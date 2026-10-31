@@ -1121,6 +1121,11 @@ msgstr ""
 msgid "{0} {resourceName}"
 msgstr ""
 
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
@@ -3827,6 +3832,7 @@ msgstr ""
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "{n, plural, one {# game} other {# games}}"
 msgstr ""
@@ -4398,6 +4404,7 @@ msgstr ""
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "{pending} still being read."
 msgstr ""
@@ -5882,6 +5889,10 @@ msgstr ""
 
 #: src/blueprint/pages/components/ArrivingPack.tsx
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
+msgstr ""
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
 msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
@@ -18587,6 +18598,10 @@ msgstr ""
 msgid "From {originGame}"
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
+
 #: src/blueprint/library.ts
 msgid "From {scenarioName}"
 msgstr ""
@@ -24634,6 +24649,10 @@ msgstr ""
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 msgid "Named states of the project, to go back to in one action"
 msgstr ""
@@ -29836,6 +29855,7 @@ msgstr ""
 msgid "position"
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 msgid "Position"
@@ -30885,6 +30905,10 @@ msgstr ""
 
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 msgid "Reading the game's files…"
+msgstr ""
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
 msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
@@ -32404,6 +32428,7 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "Result"
@@ -36782,6 +36807,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "Taken"
 msgstr ""
@@ -38534,6 +38560,10 @@ msgstr ""
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "The map could not be drawn."
+msgstr ""
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
