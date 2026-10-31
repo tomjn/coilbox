@@ -14,8 +14,9 @@
 //! Three layers come from the demo stream: where each team started, where
 //! buildings were ordered (with the unit definition id, so the frontend can say
 //! what each was for against the right build of the game), and where every
-//! order with a place was aimed. A fourth, where units died, comes from the
-//! replay's stored analysis when it has one with events.
+//! order with a place was aimed. A fourth, where units died, and a fifth,
+//! where damage landed and where it came from, come from the replay's stored
+//! analysis when it has one with events.
 //!
 //! A replay file does not change, so its counts are kept in the app's cache
 //! directory, one small file per replay. See [`replay_grids`] for what makes a
@@ -45,7 +46,7 @@ use super::{
 /// shape of [`ReplayGrids`], which events a layer counts, how a point finds its
 /// cell, [`GRID_RESOLUTION`] or [`FRAMES_PER_SLICE`]. A file kept under another
 /// version is not read, and the replay is walked again.
-pub const GRIDS_VERSION: u32 = 1;
+pub const GRIDS_VERSION: u32 = 2;
 
 /// Cells along the map's longer side. `DEFAULT_RESOLUTION` in
 /// `src/lib/heatField.ts` is the same number, and
@@ -216,6 +217,112 @@ pub struct DeathLayer {
     pub no_position: u32,
 }
 
+/// Damage on the grid in each slice of match time, packed like a
+/// [`CountLayer`] but with a `u32` for each entry's amount.
+///
+/// The amount is whole points of damage: a cell's damage in one slice is added
+/// up as it was logged and rounded once, so a cell loses at most half a point
+/// in a slice however many stretches added to it. A `u16` would hold 65,535 points,
+/// which a busy cell can pass in a minute. `Counts::pack` splits a count that
+/// is too big for a `u16` into more entries, but a damage log has no bound that
+/// says how many entries that would take, so an entry here is a `u32` and
+/// saturates at `u32::MAX` points, and `total` saturates at `u64::MAX`. Neither
+/// wraps.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AmountLayer {
+    pub entries: u32,
+    /// `u32`, as in [`CountLayer`].
+    pub cell: String,
+    /// `u16`, as in [`CountLayer`].
+    pub slice: String,
+    /// `u32`: points of damage.
+    pub amount: String,
+    /// Points of damage in the entries.
+    pub total: u64,
+}
+
+/// Damage being added up, before it is packed.
+#[derive(Default)]
+struct Amounts {
+    /// By slice, then cell. Held unrounded.
+    cells: BTreeMap<(u16, u32), f64>,
+}
+
+impl Amounts {
+    /// Add a flat list of a cell and then the damage in it, as a `damage` line
+    /// writes it. A cell that is not on the grid and an amount that is not a
+    /// positive number are left out, as the replay page leaves them out.
+    fn add_list(&mut self, slice: u16, list: Option<&serde_json::Value>, grid: &Grid) {
+        let Some(items) = list.and_then(|v| v.as_array()) else {
+            return;
+        };
+        let numbers: Option<Vec<f64>> = items.iter().map(|v| v.as_f64()).collect();
+        let Some(numbers) = numbers.filter(|n| n.len().is_multiple_of(2)) else {
+            return;
+        };
+        let cells = f64::from(grid.width) * f64::from(grid.height);
+        for pair in numbers.chunks_exact(2) {
+            let (cell, amount) = (pair[0], pair[1]);
+            let on_grid = cell.fract() == 0.0 && cell >= 0.0 && cell < cells;
+            if on_grid && amount.is_finite() && amount > 0.0 {
+                *self.cells.entry((slice, cell as u32)).or_default() += amount;
+            }
+        }
+    }
+
+    fn pack(self) -> AmountLayer {
+        let mut cell = Vec::new();
+        let mut slice = Vec::new();
+        let mut amount = Vec::new();
+        let mut entries = 0u32;
+        let mut total = 0u64;
+        for ((s, c), sum) in self.cells {
+            let points = sum.round().min(f64::from(u32::MAX)) as u32;
+            if points == 0 {
+                continue;
+            }
+            cell.extend_from_slice(&c.to_le_bytes());
+            slice.extend_from_slice(&s.to_le_bytes());
+            amount.extend_from_slice(&points.to_le_bytes());
+            entries += 1;
+            total = total.saturating_add(u64::from(points));
+        }
+        AmountLayer {
+            entries,
+            cell: STANDARD.encode(cell),
+            slice: STANDARD.encode(slice),
+            amount: STANDARD.encode(amount),
+            total,
+        }
+    }
+}
+
+/// Where damage landed and where it came from in a replay's stored analysis.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DamageLayer {
+    /// Where the units hit stood. Every `damage` line counts.
+    pub at: AmountLayer,
+    /// Where the attackers stood. Damage no attacker dealt has no origin.
+    pub origin: AmountLayer,
+}
+
+/// What a match's stored analysis gave for damage.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DamageRead {
+    /// Absent when the analysis recorded no damage, which is every analysis
+    /// from before logger version 4, or recorded it on another grid.
+    pub layer: Option<DamageLayer>,
+    /// True when the analysis recorded damage on a grid other than the map's,
+    /// so a cell number would point at the wrong place and it was left out.
+    pub other_grid: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 /// One replay, reduced.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -246,6 +353,14 @@ pub struct ReplayGrids {
     /// events, which is a different thing from an analysis with no deaths.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deaths: Option<DeathLayer>,
+    /// Where damage landed and came from. Absent when the match has no stored
+    /// analysis with events, or its analysis recorded no damage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage: Option<DamageLayer>,
+    /// Whether the analysis recorded damage on another grid than the map's.
+    /// That replay's damage is left out and counted here.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub damage_other_grid: bool,
     /// Whether the stream's counts came from a kept file and not from a walk.
     /// Never true in a kept file itself.
     #[serde(default)]
@@ -311,6 +426,8 @@ pub fn reduce_replay(demo: &Path, grid: &Grid) -> Result<ReplayGrids, String> {
         unit_aimed: placed.unit_aimed,
         custom: placed.custom,
         deaths: None,
+        damage: None,
+        damage_other_grid: false,
         from_cache: false,
     })
 }
@@ -354,6 +471,58 @@ pub fn reduce_deaths(analyses: &Path, game_id: &str, grid: &Grid) -> Option<Deat
     })
 }
 
+/// Add up the damage in a match's stored analysis.
+///
+/// The rule for what counts is the replay page's own (`damageLog` and
+/// `damageGrid` in `src/content/replayDamage.ts`). A `damage` line is one
+/// stretch of the header's `damageFrames` frames, 450 from logger version 4 and
+/// so four to a slice, and it is counted in the slice its first frame is in.
+/// The header says which grid the cells are numbered on. An analysis with no
+/// `damageFrames` in its header, which is one from before logger version 4, has
+/// no damage. One whose grid is not `grid` is not read, because its cell
+/// numbers would land in the wrong cells.
+pub fn reduce_damage(analyses: &Path, game_id: &str, grid: &Grid) -> DamageRead {
+    let kinds = ["header".to_string(), "damage".to_string()];
+    let Ok(page) = store::read_events(analyses, game_id, Some(&kinds), 0, None) else {
+        return DamageRead::default();
+    };
+    let number = |event: &serde_json::Value, key: &str| event.get(key).and_then(|v| v.as_f64());
+    let is_kind = |event: &serde_json::Value, kind: &str| {
+        event.get("kind").and_then(|v| v.as_str()) == Some(kind)
+    };
+    let Some(header) = page.events.iter().find(|e| is_kind(e, "header")) else {
+        return DamageRead::default();
+    };
+    if !number(header, "damageFrames").is_some_and(|frames| frames > 0.0) {
+        return DamageRead::default();
+    }
+    let on_grid = number(header, "gridWidth") == Some(f64::from(grid.width))
+        && number(header, "gridHeight") == Some(f64::from(grid.height));
+    if !on_grid {
+        return DamageRead {
+            layer: None,
+            other_grid: true,
+        };
+    }
+    let mut at = Amounts::default();
+    let mut origin = Amounts::default();
+    for event in page.events.iter().filter(|e| is_kind(e, "damage")) {
+        let (Some(frame), Some(_)) = (number(event, "frame"), number(event, "target")) else {
+            continue;
+        };
+        let slice = slice_of(frame as i32);
+        at.add_list(slice, event.get("at"), grid);
+        origin.add_list(slice, event.get("origin"), grid);
+    }
+    DamageRead {
+        layer: Some(DamageLayer {
+            at: at.pack(),
+            origin: origin.pack(),
+        }),
+        other_grid: false,
+    }
+}
+
 /// A kept file: one replay's counts and what they were counted from.
 #[derive(Serialize, Deserialize)]
 struct Kept {
@@ -362,8 +531,8 @@ struct Kept {
     size_bytes: u64,
     modified_ms: u64,
     grid: Grid,
-    /// When the analysis the deaths were counted from was written, or `None`
-    /// when there was none.
+    /// When the analysis the deaths and damage were counted from was written,
+    /// or `None` when there was none.
     deaths_from: Option<u64>,
     grids: ReplayGrids,
 }
@@ -413,9 +582,10 @@ fn file_signature(demo: &Path) -> Result<(u64, u64), String> {
 /// A kept file answers for the stream's layers when it was written by this
 /// [`GRIDS_VERSION`], for this grid, from a file of this size and modified
 /// time, which is the test the stats store and the replay list use for "this
-/// file has not changed". Its deaths answer when the match's stored analysis
-/// is the one they were counted from. An analysis that arrived, changed or
-/// went since then costs a read of the analysis and no walk of the replay.
+/// file has not changed". Its deaths and damage answer when the match's stored
+/// analysis is the one they were counted from. An analysis that arrived,
+/// changed or went since then costs a read of the analysis and no walk of the
+/// replay.
 ///
 /// Failing to write a kept file is not an error: the next call walks again.
 pub fn replay_grids(
@@ -444,6 +614,11 @@ pub fn replay_grids(
     let deaths_from = analysis.map(|(_, _, at)| at);
     if walked || kept_deaths_from != deaths_from {
         grids.deaths = analysis.and_then(|(dir, id, _)| reduce_deaths(dir, id, grid));
+        let damage = analysis
+            .map(|(dir, id, _)| reduce_damage(dir, id, grid))
+            .unwrap_or_default();
+        grids.damage = damage.layer;
+        grids.damage_other_grid = damage.other_grid;
         if let Some(path) = &kept_path {
             let _ = save_kept(
                 path,
@@ -524,7 +699,7 @@ pub fn sweep(cache_dir: &Path, live: impl IntoIterator<Item = PathBuf>) -> usize
 
 #[cfg(test)]
 mod tests {
-    use super::super::analysis::log::{LogLine, UnitEvent};
+    use super::super::analysis::log::{DamageLine, LogHeader, LogLine, UnitEvent};
     use super::super::stream::fixture::Packets;
     use super::super::tests::DemoFixture;
     use super::*;
@@ -548,6 +723,22 @@ mod tests {
         slices
             .zip(cells)
             .zip(counts)
+            .map(|((s, c), n)| (s, c, n))
+            .collect()
+    }
+
+    /// A damage layer's entries as `(slice, cell, points)`.
+    fn amounts(layer: &AmountLayer) -> Vec<(u16, u32, u32)> {
+        let cells = unpack::<4>(&layer.cell).into_iter().map(u32::from_le_bytes);
+        let slices = unpack::<2>(&layer.slice)
+            .into_iter()
+            .map(u16::from_le_bytes);
+        let points = unpack::<4>(&layer.amount)
+            .into_iter()
+            .map(u32::from_le_bytes);
+        slices
+            .zip(cells)
+            .zip(points)
             .map(|((s, c), n)| (s, c, n))
             .collect()
     }
@@ -803,6 +994,188 @@ mod tests {
         );
     }
 
+    // ---- damage --------------------------------------------------------
+
+    /// The header a logger of version 4 writes, naming the grid its cells are
+    /// on.
+    fn header(grid: &Grid, damage_frames: i32) -> String {
+        text(&LogLine::Header(LogHeader {
+            damage_frames,
+            grid_width: grid.width,
+            grid_height: grid.height,
+            ..Default::default()
+        }))
+    }
+
+    fn damage(frame: i32, team: Option<i32>, at: &[f64], origin: Option<&[f64]>) -> String {
+        text(&LogLine::Damage(DamageLine {
+            frame,
+            team,
+            target: 1,
+            at: at.to_vec(),
+            origin: origin.map(<[f64]>::to_vec),
+            off: None,
+        }))
+    }
+
+    /// Store `events` as the analysis of the match the `replay` helper's game
+    /// id 7 names, and reduce the replay with it.
+    fn grids_with_analysis(events: &[String]) -> ReplayGrids {
+        let tmp = tempfile::tempdir().unwrap();
+        let analyses = tmp.path().join("analyses");
+        let id = "07".repeat(16);
+        store::write(&analyses, &provenance(&id, "reproduced", 5), Some(events)).unwrap();
+        let demo = replay(tmp.path(), "a.sdfz", short_match(), 7);
+        replay_grids(&demo, &GRID, None, Some(&analyses)).unwrap()
+    }
+
+    /// Four stretches are a slice. Fractions are rounded once, after the cell's
+    /// slice is added up, so three stretches of 0.4 are one point and not none.
+    /// Damage with no attacker is in `at` and has no `origin`.
+    #[test]
+    fn damage_is_added_up_by_slice_and_cell_for_both_ends_of_a_hit() {
+        let got = grids_with_analysis(&[
+            header(&GRID, 450),
+            damage(0, Some(0), &[3.0, 0.4, 300.0, 10.0], Some(&[7.0, 0.4])),
+            damage(450, Some(0), &[3.0, 0.4], Some(&[7.0, 0.4])),
+            damage(1350, None, &[3.0, 0.4], None),
+            damage(1800, Some(0), &[3.0, 20.0], Some(&[7.0, 20.0])),
+            text(&LogLine::UnitFinished(UnitEvent::default())),
+        ]);
+        let damage = got.damage.expect("the analysis recorded damage");
+        assert!(!got.damage_other_grid);
+        assert_eq!(
+            amounts(&damage.at),
+            vec![(0, 3, 1), (0, 300, 10), (1, 3, 20)]
+        );
+        assert_eq!(damage.at.total, 31);
+        assert_eq!(amounts(&damage.origin), vec![(0, 7, 1), (1, 7, 20)]);
+        assert_eq!(damage.origin.total, 21);
+
+        // The columns the frontend decodes.
+        let json = serde_json::to_value(&damage).unwrap();
+        for end in ["at", "origin"] {
+            for key in ["entries", "cell", "slice", "amount", "total"] {
+                assert!(json[end].get(key).is_some(), "{end}.{key} is missing");
+            }
+        }
+        assert_eq!(json["at"]["total"], 31);
+    }
+
+    /// An analysis from before logger version 4 has a header with no damage
+    /// frames and no damage lines. It has damage to give no layer, and that is
+    /// not a grid that differs.
+    #[test]
+    fn an_analysis_from_before_damage_was_logged_has_no_damage() {
+        let got = grids_with_analysis(&[
+            text(&LogLine::Header(LogHeader::default())),
+            death(10, 100.0, 1000.0, Some(3)),
+        ]);
+        assert_eq!(got.damage, None);
+        assert!(!got.damage_other_grid);
+        assert_eq!(got.deaths.expect("it still has deaths").layer.total, 1);
+    }
+
+    /// A header with damage frames and no damage lines is a quiet match, and a
+    /// layer with nothing in it. That is not the same as no damage recorded.
+    #[test]
+    fn a_match_that_recorded_damage_and_had_none_has_an_empty_layer() {
+        let got = grids_with_analysis(&[header(&GRID, 450)]);
+        assert_eq!(got.damage, Some(DamageLayer::default()));
+    }
+
+    /// Cell numbers on another grid point at other places, so the replay's
+    /// damage is left out and counted. Its deaths, which carry positions, stay.
+    #[test]
+    fn damage_on_another_grid_is_left_out_and_counted() {
+        let other = Grid::for_world(6144, 10240).unwrap();
+        assert_ne!((other.width, other.height), (GRID.width, GRID.height));
+        let got = grids_with_analysis(&[
+            header(&other, 450),
+            damage(0, Some(0), &[3.0, 50.0], Some(&[7.0, 50.0])),
+            death(10, 100.0, 1000.0, Some(3)),
+        ]);
+        assert_eq!(got.damage, None);
+        assert!(got.damage_other_grid);
+        assert!(got.deaths.is_some());
+    }
+
+    /// A grid with the right width and the wrong height is another grid too.
+    #[test]
+    fn a_grid_of_the_same_width_and_another_height_is_another_grid() {
+        let wide = Grid::for_world(8192, 4096).unwrap();
+        assert_eq!(wide.width, GRID.width);
+        let got = grids_with_analysis(&[header(&wide, 450)]);
+        assert!(got.damage_other_grid);
+    }
+
+    /// 70,000 points in one cell is more than a `u16` holds and is one entry.
+    /// A sum past a `u32` stops at the top of it and does not wrap, and so does
+    /// a single amount far past it. The total adds the entries as they are.
+    #[test]
+    fn a_large_amount_of_damage_does_not_overflow() {
+        let got = grids_with_analysis(&[
+            header(&GRID, 450),
+            damage(0, Some(0), &[5.0, 3.0e9, 6.0, 70_000.0, 9.0, 1.0e300], None),
+            damage(450, Some(0), &[5.0, 3.0e9], None),
+        ]);
+        let at = got.damage.unwrap().at;
+        let top = u32::MAX;
+        assert_eq!(amounts(&at), vec![(0, 5, top), (0, 6, 70_000), (0, 9, top)]);
+        assert_eq!(at.total, u64::from(top) * 2 + 70_000);
+    }
+
+    /// The replay page skips these and so does this: a cell off the grid or
+    /// between two cells, an amount that is nothing or less, a list that is
+    /// not pairs, and a line with no frame or target.
+    #[test]
+    fn damage_the_replay_page_would_skip_is_skipped() {
+        let cells = f64::from(GRID.width * GRID.height);
+        let no_frame = serde_json::json!({"kind": "damage", "target": 1, "at": [3, 9]});
+        let no_target = serde_json::json!({"kind": "damage", "frame": 0, "at": [3, 9]});
+        let got = grids_with_analysis(&[
+            header(&GRID, 450),
+            damage(
+                0,
+                Some(0),
+                &[cells, 5.0, -1.0, 5.0, 3.5, 5.0, 4.0, 0.0, 4.0, -2.0],
+                None,
+            ),
+            damage(0, Some(0), &[4.0, 5.0, 4.0], None),
+            no_frame.to_string(),
+            no_target.to_string(),
+            damage(0, Some(0), &[12.0, 6.0], None),
+        ]);
+        let at = got.damage.unwrap().at;
+        assert_eq!(amounts(&at), vec![(0, 12, 6)]);
+    }
+
+    #[test]
+    fn damage_follows_the_analysis_when_it_arrives_changes_or_goes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cache = tmp.path().join("cache");
+        let analyses = tmp.path().join("analyses");
+        let id = "07".repeat(16);
+        let demo = replay(tmp.path(), "a.sdfz", short_match(), 7);
+        let read = || replay_grids(&demo, &GRID, Some(&cache), Some(&analyses)).unwrap();
+        assert_eq!(read().damage, None);
+
+        let one = [header(&GRID, 450), damage(0, Some(0), &[3.0, 4.0], None)];
+        store::write(&analyses, &provenance(&id, "reproduced", 5), Some(&one[..])).unwrap();
+        let got = read();
+        assert!(got.from_cache, "the stream was not walked again");
+        assert_eq!(got.damage.unwrap().at.total, 4);
+
+        let two = [header(&GRID, 450), damage(0, Some(0), &[3.0, 9.0], None)];
+        store::write(&analyses, &provenance(&id, "reproduced", 6), Some(&two[..])).unwrap();
+        assert_eq!(read().damage.unwrap().at.total, 9);
+        // Unchanged since, so the kept damage answers.
+        assert_eq!(read().damage.unwrap().at.total, 9);
+
+        store::delete(&analyses, &id).unwrap();
+        assert_eq!(read().damage, None);
+    }
+
     // ---- the kept file -------------------------------------------------
 
     #[test]
@@ -1008,6 +1381,8 @@ mod tests {
             assert!(json.get(key).is_some(), "{key} is missing");
         }
         assert!(json.get("deaths").is_none());
+        assert!(json.get("damage").is_none());
+        assert!(json.get("damageOtherGrid").is_none());
         assert_eq!(json["buildings"]["offMap"], 0);
         assert!(json["orders"].get("def").is_none());
     }
