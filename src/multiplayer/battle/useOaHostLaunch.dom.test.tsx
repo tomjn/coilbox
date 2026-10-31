@@ -41,7 +41,7 @@ vi.mock("../openAnnihilation", () => ({
   useOpenAnnihilation: () => [program.value],
 }));
 
-import { endOaRunUnlessIn } from "../oaRun";
+import { observeOaBattle } from "../oaRun";
 import { useOaHostLaunch } from "./useOaHostLaunch";
 
 type Launch = {
@@ -221,35 +221,99 @@ describe("the run outlives the battle room page", () => {
   });
 });
 
-describe("the run ends with its battle", () => {
-  it("ends OA when the host is no longer in the battle it was started for", async () => {
+describe("the run ends when the lobby shows the player left the battle", () => {
+  const IN = { connected: true, battleId: 4021 };
+  const OUT = { connected: true, battleId: null };
+  const DROPPED = { connected: false, battleId: 4021 };
+
+  async function running() {
     const { result } = mount();
     act(() => void result.current.start());
     await waitFor(() => expect(launched).toHaveLength(1));
+    return result;
+  }
 
-    act(() => endOaRunUnlessIn(() => 4021));
+  it("ends OA when a connected session shows the host left, or the battle closed", async () => {
+    await running();
+    act(() => observeOaBattle(() => IN));
     expect(bindings.playOaCancel).not.toHaveBeenCalled();
-    act(() => endOaRunUnlessIn(() => null));
+    act(() => observeOaBattle(() => OUT));
+    expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends OA when the host is moved to another battle", async () => {
+    await running();
+    act(() => observeOaBattle(() => ({ connected: true, battleId: 77 })));
+    expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves OA running through a dropped connection", async () => {
+    await running();
+    act(() => observeOaBattle(() => IN));
+    act(() => observeOaBattle(() => DROPPED));
+    // The mirror can lose the battle before anything reconnects.
+    act(() => observeOaBattle(() => ({ connected: false, battleId: null })));
+    expect(bindings.playOaCancel).not.toHaveBeenCalled();
+  });
+
+  it("leaves OA running when the connection is gone", async () => {
+    await running();
+    act(() => observeOaBattle(() => IN));
+    act(() => observeOaBattle(() => null));
+    act(() => observeOaBattle(() => OUT));
+    expect(bindings.playOaCancel).not.toHaveBeenCalled();
+  });
+
+  it("leaves OA running after a reconnect that comes back with no battle", async () => {
+    await running();
+    act(() => observeOaBattle(() => IN));
+    act(() => observeOaBattle(() => DROPPED));
+    act(() => observeOaBattle(() => OUT));
+    act(() => observeOaBattle(() => OUT));
+    expect(bindings.playOaCancel).not.toHaveBeenCalled();
+  });
+
+  it("ends OA when the host leaves the battle after rejoining it on the new session", async () => {
+    await running();
+    act(() => observeOaBattle(() => DROPPED));
+    act(() => observeOaBattle(() => OUT));
+    act(() => observeOaBattle(() => IN));
+    act(() => observeOaBattle(() => OUT));
     expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
   });
 
   it("looks at the connection the battle is on", async () => {
-    const { result } = mount();
-    act(() => void result.current.start());
-    await waitFor(() => expect(launched).toHaveLength(1));
-
+    await running();
     const asked: string[] = [];
     act(() =>
-      endOaRunUnlessIn((serverKey) => {
+      observeOaBattle((serverKey) => {
         asked.push(serverKey);
-        return 4021;
+        return IN;
       }),
     );
     expect(asked).toEqual(["me@server:8200"]);
   });
 
   it("does nothing while no OA runs", () => {
-    endOaRunUnlessIn(() => null);
+    observeOaBattle(() => OUT);
     expect(bindings.playOaCancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("what is undone when OA ends", () => {
+  it("lets a failing undo leave the run ended, so OA can start again", async () => {
+    setIngame.mockImplementation((ingame: boolean) => {
+      if (!ingame) throw new Error("the connection is gone");
+    });
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    act(() => launched[0].onEvent.onmessage(screen("mp_battleroom")));
+
+    await act(async () => launched[0].finish({ exitCode: 0, signal: null }));
+    expect(result.current.running).toBe(false);
+
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(2));
   });
 });
