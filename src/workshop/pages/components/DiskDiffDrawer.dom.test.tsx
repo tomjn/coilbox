@@ -21,7 +21,10 @@ const calls: string[] = [];
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: (_plugin: string, command: string) => async () => {
     calls.push(command);
-    if (command === "workshop_in_place_diffs") return diffsResponse;
+    if (command === "workshop_in_place_diffs") {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return diffsResponse;
+    }
     if (command === "workshop_undo_in_place") {
       diffsResponse = [];
       return { restored: ["units/armcom.lua"], deleted: [] };
@@ -42,6 +45,19 @@ afterEach(() => {
   diffsResponse = [];
   calls.length = 0;
 });
+
+/**
+ * The toolbar buttons are on screen from the first render but stay disabled
+ * until the diff has loaded, and a click on a disabled button does nothing. So
+ * wait for the button to be enabled, not just present.
+ */
+async function enabledButton(name: string): Promise<HTMLButtonElement> {
+  const button = (await screen.findByRole("button", {
+    name,
+  })) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  return button;
+}
 
 function draw(onDone: (done: InPlaceDone) => void = vi.fn(), reading = false) {
   return render(
@@ -144,7 +160,7 @@ describe("the disk diff drawer", () => {
     ];
     const onDone = vi.fn();
     draw(onDone);
-    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    fireEvent.click(await enabledButton("Undo"));
     expect(await screen.findByText("Put 1 file back as it was.")).toBeTruthy();
     expect(onDone).toHaveBeenCalledWith({ kind: "undo", changed: true });
     await waitFor(() =>
@@ -169,7 +185,7 @@ describe("the disk diff drawer", () => {
     ];
     const onDone = vi.fn();
     draw(onDone);
-    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    fireEvent.click(await enabledButton("Accept"));
     expect(screen.getByText("Keep the changes?")).toBeTruthy();
     expect(calls).not.toContain("workshop_accept_in_place");
 
