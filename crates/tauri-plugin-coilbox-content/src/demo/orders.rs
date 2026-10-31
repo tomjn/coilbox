@@ -447,6 +447,8 @@ pub(super) struct Positioned {
     pub(super) x: Vec<f32>,
     pub(super) z: Vec<f32>,
     pub(super) frame: Vec<i32>,
+    /// The engine team that gave each order, or -1 when none is known.
+    pub(super) team: Vec<i16>,
     pub(super) unit_aimed: u32,
     pub(super) custom: u32,
 }
@@ -463,6 +465,7 @@ pub(super) fn positioned_orders(
         x: r.x,
         z: r.z,
         frame: r.frame,
+        team: r.team,
         unit_aimed: r.unit_aimed,
         custom: r.custom,
     }

@@ -46,7 +46,7 @@ use super::{
 /// shape of [`ReplayGrids`], which events a layer counts, how a point finds its
 /// cell, [`GRID_RESOLUTION`] or [`FRAMES_PER_SLICE`]. A file kept under another
 /// version is not read, and the replay is walked again.
-pub const GRIDS_VERSION: u32 = 2;
+pub const GRIDS_VERSION: u32 = 3;
 
 /// Cells along the map's longer side. `DEFAULT_RESOLUTION` in
 /// `src/lib/heatField.ts` is the same number, and
@@ -55,6 +55,17 @@ pub const GRID_RESOLUTION: u32 = 256;
 
 /// One slice of match time is a minute: 30 frames a second.
 pub const FRAMES_PER_SLICE: i32 = 30 * 60;
+
+/// The team an entry carries when the log or the stream names none.
+pub const NO_TEAM: i16 = -1;
+
+/// The `team` column's value for an engine team, or [`NO_TEAM`] for an absent
+/// one, a negative one and one too big for the column.
+fn team_column(team: Option<i32>) -> i16 {
+    team.filter(|t| *t >= 0)
+        .and_then(|t| i16::try_from(t).ok())
+        .unwrap_or(NO_TEAM)
+}
 
 /// The folder under the app's cache directory that holds the kept files. It is
 /// in `caches::CACHE_SUBDIRS`, so the storage screen sizes it and clears it.
@@ -117,6 +128,10 @@ impl Grid {
 /// - `slice`: `u16`, the minute of the match, 0 for the first.
 /// - `count`: `u16`, how many events. A cell with more in one slice has a
 ///   second entry.
+/// - `team`: `i16`, the engine team the events belong to, or -1 for events
+///   with none known. A building or an order belongs to the team that gave it
+///   and a death to the team that lost the unit. A cell with events of two
+///   teams in one slice has an entry for each.
 /// - `def`: `u32`, the unit definition id, on the buildings layer only. Empty
 ///   on the others.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -126,6 +141,7 @@ pub struct CountLayer {
     pub cell: String,
     pub slice: String,
     pub count: String,
+    pub team: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub def: String,
     /// How many events are in the entries.
@@ -137,8 +153,9 @@ pub struct CountLayer {
 /// Counts being added up, before they are packed.
 #[derive(Default)]
 struct Counts {
-    /// By slice, then cell, then unit definition id (0 where the layer has none).
-    cells: BTreeMap<(u16, u32, u32), u32>,
+    /// By slice, then cell, then unit definition id (0 where the layer has
+    /// none), then team.
+    cells: BTreeMap<(u16, u32, u32, i16), u32>,
     total: u32,
     off_map: u32,
 }
@@ -150,10 +167,13 @@ fn slice_of(frame: i32) -> u16 {
 }
 
 impl Counts {
-    fn add(&mut self, grid: &Grid, x: f32, z: f32, frame: i32, def: u32) {
+    fn add(&mut self, grid: &Grid, x: f32, z: f32, frame: i32, def: u32, team: i16) {
         match grid.cell(x, z) {
             Some(cell) => {
-                *self.cells.entry((slice_of(frame), cell, def)).or_default() += 1;
+                *self
+                    .cells
+                    .entry((slice_of(frame), cell, def, team))
+                    .or_default() += 1;
                 self.total += 1;
             }
             None => self.off_map += 1,
@@ -164,14 +184,16 @@ impl Counts {
         let mut cell = Vec::new();
         let mut slice = Vec::new();
         let mut count = Vec::new();
+        let mut team = Vec::new();
         let mut def = Vec::new();
         let mut entries = 0u32;
-        for ((s, c, d), mut n) in self.cells {
+        for ((s, c, d, tm), mut n) in self.cells {
             while n > 0 {
                 let part = n.min(u32::from(u16::MAX));
                 cell.extend_from_slice(&c.to_le_bytes());
                 slice.extend_from_slice(&s.to_le_bytes());
                 count.extend_from_slice(&(part as u16).to_le_bytes());
+                team.extend_from_slice(&tm.to_le_bytes());
                 if with_def {
                     def.extend_from_slice(&d.to_le_bytes());
                 }
@@ -184,6 +206,7 @@ impl Counts {
             cell: STANDARD.encode(cell),
             slice: STANDARD.encode(slice),
             count: STANDARD.encode(count),
+            team: STANDARD.encode(team),
             def: STANDARD.encode(def),
             total: self.total,
             off_map: self.off_map,
@@ -238,6 +261,9 @@ pub struct AmountLayer {
     pub slice: String,
     /// `u32`: points of damage.
     pub amount: String,
+    /// `i16`, as in [`CountLayer`]. On the landed end it is the team whose
+    /// units were hit, and on the origin end the team that dealt the damage.
+    pub team: String,
     /// Points of damage in the entries.
     pub total: u64,
 }
@@ -245,15 +271,16 @@ pub struct AmountLayer {
 /// Damage being added up, before it is packed.
 #[derive(Default)]
 struct Amounts {
-    /// By slice, then cell. Held unrounded.
-    cells: BTreeMap<(u16, u32), f64>,
+    /// By slice, then cell, then team. Held unrounded.
+    cells: BTreeMap<(u16, u32, i16), f64>,
 }
 
 impl Amounts {
     /// Add a flat list of a cell and then the damage in it, as a `damage` line
     /// writes it. A cell that is not on the grid and an amount that is not a
-    /// positive number are left out, as the replay page leaves them out.
-    fn add_list(&mut self, slice: u16, list: Option<&serde_json::Value>, grid: &Grid) {
+    /// positive number are left out, as the replay page leaves them out. All of
+    /// it is `team`'s.
+    fn add_list(&mut self, slice: u16, list: Option<&serde_json::Value>, grid: &Grid, team: i16) {
         let Some(items) = list.and_then(|v| v.as_array()) else {
             return;
         };
@@ -265,7 +292,7 @@ impl Amounts {
         for &[cell, amount] in numbers.as_chunks::<2>().0 {
             let on_grid = cell.fract() == 0.0 && cell >= 0.0 && cell < cells;
             if on_grid && amount.is_finite() && amount > 0.0 {
-                *self.cells.entry((slice, cell as u32)).or_default() += amount;
+                *self.cells.entry((slice, cell as u32, team)).or_default() += amount;
             }
         }
     }
@@ -274,9 +301,10 @@ impl Amounts {
         let mut cell = Vec::new();
         let mut slice = Vec::new();
         let mut amount = Vec::new();
+        let mut team = Vec::new();
         let mut entries = 0u32;
         let mut total = 0u64;
-        for ((s, c), sum) in self.cells {
+        for ((s, c, tm), sum) in self.cells {
             let points = sum.round().min(f64::from(u32::MAX)) as u32;
             if points == 0 {
                 continue;
@@ -284,6 +312,7 @@ impl Amounts {
             cell.extend_from_slice(&c.to_le_bytes());
             slice.extend_from_slice(&s.to_le_bytes());
             amount.extend_from_slice(&points.to_le_bytes());
+            team.extend_from_slice(&tm.to_le_bytes());
             entries += 1;
             total = total.saturating_add(u64::from(points));
         }
@@ -292,6 +321,7 @@ impl Amounts {
             cell: STANDARD.encode(cell),
             slice: STANDARD.encode(slice),
             amount: STANDARD.encode(amount),
+            team: STANDARD.encode(team),
             total,
         }
     }
@@ -390,14 +420,21 @@ pub fn reduce_replay(demo: &Path, grid: &Grid) -> Result<ReplayGrids, String> {
                 at.z,
                 order.frame,
                 u32::try_from(order.unit_def_id).unwrap_or(0),
+                team_column(order.team),
             );
         }
     }
 
     let placed = positioned_orders(&walked, names, seats);
     let mut orders = Counts::default();
-    for ((x, z), frame) in placed.x.iter().zip(&placed.z).zip(&placed.frame) {
-        orders.add(grid, *x, *z, *frame, 0);
+    for (((x, z), frame), team) in placed
+        .x
+        .iter()
+        .zip(&placed.z)
+        .zip(&placed.frame)
+        .zip(&placed.team)
+    {
+        orders.add(grid, *x, *z, *frame, 0, *team);
     }
 
     Ok(ReplayGrids {
@@ -442,7 +479,8 @@ fn analysis_signature(analyses: &Path, game_id: &str) -> Option<u64> {
 ///
 /// The rule for what counts is the replay page's own (`placedEvents` in
 /// `src/content/replayEventLayers.ts`): every `unit_destroyed` line with a
-/// frame and a position, whether or not it names an attacker.
+/// frame and a position, whether or not it names an attacker. A death belongs
+/// to the team that lost the unit, which is the line's `team`.
 pub fn reduce_deaths(analyses: &Path, game_id: &str, grid: &Grid) -> Option<DeathLayer> {
     let kinds = ["unit_destroyed".to_string()];
     let page = store::read_events(analyses, game_id, Some(&kinds), 0, None).ok()?;
@@ -461,7 +499,8 @@ pub fn reduce_deaths(analyses: &Path, game_id: &str, grid: &Grid) -> Option<Deat
         if number("attacker").is_none() && number("attackerTeam").is_none() {
             unattacked += 1;
         }
-        counts.add(grid, x as f32, z as f32, frame as i32, 0);
+        let team = team_column(number("team").map(|t| t as i32));
+        counts.add(grid, x as f32, z as f32, frame as i32, 0, team);
     }
     Some(DeathLayer {
         layer: counts.pack(false),
@@ -476,6 +515,9 @@ pub fn reduce_deaths(analyses: &Path, game_id: &str, grid: &Grid) -> Option<Deat
 /// `damageGrid` in `src/content/replayDamage.ts`). A `damage` line is one
 /// stretch of the header's `damageFrames` frames, 450 from logger version 4 and
 /// so four to a slice, and it is counted in the slice its first frame is in.
+/// A line is for a pair of teams, so each end goes to one of them: where the
+/// damage landed to the team whose units were hit (`target`), and where it came
+/// from to the team that dealt it (`team`).
 /// The header says which grid the cells are numbered on. An analysis with no
 /// `damageFrames` in its header, which is one from before logger version 4, has
 /// no damage. One whose grid is not `grid` is not read, because its cell
@@ -506,12 +548,18 @@ pub fn reduce_damage(analyses: &Path, game_id: &str, grid: &Grid) -> DamageRead 
     let mut at = Amounts::default();
     let mut origin = Amounts::default();
     for event in page.events.iter().filter(|e| is_kind(e, "damage")) {
-        let (Some(frame), Some(_)) = (number(event, "frame"), number(event, "target")) else {
+        let (Some(frame), Some(target)) = (number(event, "frame"), number(event, "target")) else {
             continue;
         };
         let slice = slice_of(frame as i32);
-        at.add_list(slice, event.get("at"), grid);
-        origin.add_list(slice, event.get("origin"), grid);
+        let attacker = number(event, "team").map(|t| t as i32);
+        at.add_list(
+            slice,
+            event.get("at"),
+            grid,
+            team_column(Some(target as i32)),
+        );
+        origin.add_list(slice, event.get("origin"), grid, team_column(attacker));
     }
     DamageRead {
         layer: Some(DamageLayer {
@@ -742,6 +790,13 @@ mod tests {
             .collect()
     }
 
+    fn teams(column: &str) -> Vec<i16> {
+        unpack::<2>(column)
+            .into_iter()
+            .map(i16::from_le_bytes)
+            .collect()
+    }
+
     fn defs(layer: &CountLayer) -> Vec<u32> {
         unpack::<4>(&layer.def)
             .into_iter()
@@ -871,6 +926,47 @@ mod tests {
         assert_eq!(got.deaths, None);
     }
 
+    /// Player 1 sits on team 1 in the fixture's script. Two teams ordering
+    /// buildings on one cell in one minute are two entries, and the totals are
+    /// what they were before the split.
+    #[test]
+    fn buildings_and_orders_are_split_by_the_team_that_gave_them() {
+        let tmp = tempfile::tempdir().unwrap();
+        let packets = Packets::default()
+            .keyframe(0)
+            .newframes(10)
+            .command(0, &order(-42, &[100.0, 0.0, 1000.0, 0.0]))
+            .command(1, &order(-43, &[100.0, 0.0, 1000.0, 0.0]))
+            .keyframe(FRAMES_PER_SLICE)
+            .newframes(5)
+            .command(1, &order(CMD_MOVE, &[4000.0, 0.0, 4000.0]));
+        let got = reduce_replay(&replay(tmp.path(), "a.sdfz", packets, 7), &GRID).unwrap();
+
+        let cell = 31 * 256 + 3;
+        assert_eq!(entries(&got.buildings), vec![(0, cell, 1), (0, cell, 1)]);
+        assert_eq!(defs(&got.buildings), vec![42, 43]);
+        assert_eq!(teams(&got.buildings.team), vec![0, 1]);
+        assert_eq!(got.buildings.total, 2);
+
+        assert_eq!(
+            entries(&got.orders),
+            vec![(0, cell, 1), (0, cell, 1), (1, 125 * 256 + 125, 1)]
+        );
+        assert_eq!(teams(&got.orders.team), vec![0, 1, 1]);
+        assert_eq!(got.orders.total, 3);
+    }
+
+    /// A team that is absent, negative or too big for the column is -1, which
+    /// no engine team is.
+    #[test]
+    fn a_team_the_column_cannot_hold_is_minus_one() {
+        assert_eq!(team_column(Some(0)), 0);
+        assert_eq!(team_column(Some(15)), 15);
+        assert_eq!(team_column(None), NO_TEAM);
+        assert_eq!(team_column(Some(-3)), NO_TEAM);
+        assert_eq!(team_column(Some(70_000)), NO_TEAM);
+    }
+
     #[test]
     fn an_order_off_the_map_is_counted_and_left_out() {
         let tmp = tempfile::tempdir().unwrap();
@@ -887,10 +983,11 @@ mod tests {
     fn a_count_too_big_for_one_entry_takes_two() {
         let mut counts = Counts::default();
         for _ in 0..70_000 {
-            counts.add(&GRID, 10.0, 10.0, 0, 0);
+            counts.add(&GRID, 10.0, 10.0, 0, 0, 0);
         }
         let layer = counts.pack(false);
         assert_eq!(entries(&layer), vec![(0, 0, u16::MAX), (0, 0, 4465)]);
+        assert_eq!(teams(&layer.team), vec![0, 0]);
         assert_eq!(layer.total, 70_000);
     }
 
@@ -935,6 +1032,38 @@ mod tests {
             attacker,
             ..Default::default()
         }))
+    }
+
+    /// A death for a unit of `team`, with an attacker.
+    fn death_of(team: i32, frame: i32, x: f32, z: f32) -> String {
+        text(&LogLine::UnitDestroyed(UnitEvent {
+            frame,
+            x,
+            z,
+            team,
+            attacker: Some(3),
+            ..Default::default()
+        }))
+    }
+
+    /// A death belongs to the team that lost the unit, not the one that killed
+    /// it, so a cell where two teams lost units has an entry for each.
+    #[test]
+    fn deaths_are_split_by_the_team_that_lost_the_unit() {
+        let got = grids_with_analysis(&[
+            death_of(1, 10, 100.0, 1000.0),
+            death_of(0, 20, 100.0, 1000.0),
+            death_of(1, 30, 100.0, 1000.0),
+            death_of(2, FRAMES_PER_SLICE, 100.0, 1000.0),
+        ]);
+        let layer = got.deaths.expect("the analysis has events").layer;
+        let cell = 31 * 256 + 3;
+        assert_eq!(
+            entries(&layer),
+            vec![(0, cell, 1), (0, cell, 2), (1, cell, 1)]
+        );
+        assert_eq!(teams(&layer.team), vec![0, 1, 2]);
+        assert_eq!(layer.total, 4);
     }
 
     #[test]
@@ -1007,10 +1136,20 @@ mod tests {
     }
 
     fn damage(frame: i32, team: Option<i32>, at: &[f64], origin: Option<&[f64]>) -> String {
+        damage_to(frame, team, 1, at, origin)
+    }
+
+    fn damage_to(
+        frame: i32,
+        team: Option<i32>,
+        target: i32,
+        at: &[f64],
+        origin: Option<&[f64]>,
+    ) -> String {
         text(&LogLine::Damage(DamageLine {
             frame,
             team,
-            target: 1,
+            target,
             at: at.to_vec(),
             origin: origin.map(<[f64]>::to_vec),
             off: None,
@@ -1054,11 +1193,36 @@ mod tests {
         // The columns the frontend decodes.
         let json = serde_json::to_value(&damage).unwrap();
         for end in ["at", "origin"] {
-            for key in ["entries", "cell", "slice", "amount", "total"] {
+            for key in ["entries", "cell", "slice", "amount", "team", "total"] {
                 assert!(json[end].get(key).is_some(), "{end}.{key} is missing");
             }
         }
         assert_eq!(json["at"]["total"], 31);
+    }
+
+    /// A line is for a pair of teams. Where it landed goes to the team hit and
+    /// where it came from to the team that dealt it. Damage with no attacker is
+    /// the target's and has no origin.
+    #[test]
+    fn damage_is_split_by_the_team_hit_and_the_team_that_dealt_it() {
+        let got = grids_with_analysis(&[
+            header(&GRID, 450),
+            damage_to(0, Some(0), 1, &[3.0, 5.0], Some(&[9.0, 5.0])),
+            damage_to(0, Some(1), 0, &[3.0, 11.0], Some(&[9.0, 11.0])),
+            damage_to(450, None, 1, &[3.0, 2.0], None),
+            // A team hitting its own units is on both ends.
+            damage_to(0, Some(2), 2, &[4.0, 6.0], Some(&[8.0, 6.0])),
+        ]);
+        let damage = got.damage.expect("the analysis recorded damage");
+        assert_eq!(amounts(&damage.at), vec![(0, 3, 11), (0, 3, 7), (0, 4, 6)]);
+        assert_eq!(teams(&damage.at.team), vec![0, 1, 2]);
+        assert_eq!(damage.at.total, 24);
+        assert_eq!(
+            amounts(&damage.origin),
+            vec![(0, 8, 6), (0, 9, 5), (0, 9, 11)]
+        );
+        assert_eq!(teams(&damage.origin.team), vec![2, 0, 1]);
+        assert_eq!(damage.origin.total, 22);
     }
 
     /// An analysis from before logger version 4 has a header with no damage
@@ -1234,6 +1398,40 @@ mod tests {
         );
     }
 
+    /// A file kept before the team column existed has no `team` to read. Its
+    /// version says so, and it is walked again and not read as a file whose
+    /// events all belong to nobody.
+    #[test]
+    fn a_kept_file_from_before_the_team_column_is_walked_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cache = tmp.path().join("cache");
+        let demo = replay(tmp.path(), "a.sdfz", short_match(), 7);
+        replay_grids(&demo, &GRID, Some(&cache), None).unwrap();
+
+        let path = cache.join(kept_name(&demo));
+        let mut json = Vec::new();
+        GzDecoder::new(std::fs::File::open(&path).unwrap())
+            .read_to_end(&mut json)
+            .unwrap();
+        let mut old: serde_json::Value = serde_json::from_slice(&json).unwrap();
+        old["version"] = serde_json::json!(2);
+        for layer in ["buildings", "orders"] {
+            old["grids"][layer]
+                .as_object_mut()
+                .unwrap()
+                .remove("team")
+                .expect("the layer has a team column");
+        }
+        let mut gz = GzEncoder::new(Vec::new(), Compression::default());
+        gz.write_all(&serde_json::to_vec(&old).unwrap()).unwrap();
+        std::fs::write(&path, gz.finish().unwrap()).unwrap();
+
+        let got = replay_grids(&demo, &GRID, Some(&cache), None).unwrap();
+        assert!(!got.from_cache);
+        // The three orders are two entries, as the moves share a cell.
+        assert_eq!(teams(&got.orders.team), vec![0, 0]);
+    }
+
     #[test]
     fn a_changed_replay_file_is_walked_again() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1384,6 +1582,8 @@ mod tests {
         assert!(json.get("damageOtherGrid").is_none());
         assert_eq!(json["buildings"]["offMap"], 0);
         assert!(json["orders"].get("def").is_none());
+        assert!(json["buildings"].get("team").is_some());
+        assert!(json["orders"].get("team").is_some());
     }
 
     /// Every replay in `~/.spring/demos`, read only: how many each map name
