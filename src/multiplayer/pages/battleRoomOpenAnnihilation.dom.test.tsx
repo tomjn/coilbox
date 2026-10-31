@@ -20,6 +20,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OaEvent } from "../../play/bindings";
+import { observeOaAutoLaunch } from "../oaRun";
 
 const state = vi.hoisted(() => ({
   room: null as Record<string, unknown> | null,
@@ -310,6 +311,9 @@ let launches: {
   finish: (o: { exitCode: number | null; signal: number | null }) => void;
 }[] = [];
 
+const IN_GAME = { connected: true, battleId: 4021, hostIngame: true };
+const HOST_STOPPED = { connected: true, battleId: 4021, hostIngame: false };
+
 function show() {
   return render(
     <I18nProvider i18n={i18n}>
@@ -338,6 +342,8 @@ beforeEach(() => {
 });
 afterEach(async () => {
   cleanup();
+  // What the room remembers about launching is held outside the page too.
+  act(() => observeOaAutoLaunch(() => HOST_STOPPED));
   // The run is held outside the page, so one a test left up would block the next.
   await act(async () => {
     for (const l of launches) l.finish({ exitCode: 0, signal: null });
@@ -467,6 +473,61 @@ describe("the room of an Open Annihilation battle you joined", () => {
     expect(
       screen.queryByRole("button", { name: /Get Open Annihilation/ }),
     ).toBe(null);
+  });
+});
+
+describe("coming back to an Open Annihilation battle it already started for", () => {
+  async function startAndExit() {
+    state.room = roomFor("Open Annihilation", { hostIngame: true });
+    const first = show();
+    await waitFor(() => expect(launches).toHaveLength(1));
+    await act(async () => launches[0].finish({ exitCode: 0, signal: null }));
+    first.unmount();
+  }
+
+  it("shows Join in OA and waits for the click when the room is shown again", async () => {
+    await startAndExit();
+    show();
+    const button = await screen.findByRole("button", { name: "Join in OA" });
+    expect(launches).toHaveLength(1);
+    fireEvent.click(button);
+    await waitFor(() => expect(launches).toHaveLength(2));
+  });
+
+  it("launches by itself again once the host has stopped being in game", async () => {
+    await startAndExit();
+    act(() => observeOaAutoLaunch(() => HOST_STOPPED));
+    show();
+    await waitFor(() => expect(launches).toHaveLength(2));
+  });
+
+  it("launches by itself again after the player left the battle, with the page not shown", async () => {
+    await startAndExit();
+    act(() => observeOaAutoLaunch(() => IN_GAME));
+    act(() => observeOaAutoLaunch(() => ({ ...IN_GAME, battleId: null })));
+    show();
+    await waitFor(() => expect(launches).toHaveLength(2));
+  });
+
+  it("does not forget on a drop or a reconnect that has not shown the player back in the battle", async () => {
+    await startAndExit();
+    act(() => observeOaAutoLaunch(() => IN_GAME));
+    act(() => observeOaAutoLaunch(() => ({ ...IN_GAME, connected: false })));
+    act(() => observeOaAutoLaunch(() => null));
+    act(() => observeOaAutoLaunch(() => ({ ...IN_GAME, battleId: null })));
+    show();
+    await screen.findByRole("button", { name: "Join in OA" });
+    expect(launches).toHaveLength(1);
+  });
+
+  it("keeps a battle's memory separate from another battle's", async () => {
+    await startAndExit();
+    state.room = roomFor("Open Annihilation", {
+      hostIngame: true,
+      battle: { ...battle("Open Annihilation"), id: 4022 },
+    });
+    show();
+    await waitFor(() => expect(launches).toHaveLength(2));
   });
 });
 

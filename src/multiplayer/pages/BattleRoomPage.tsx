@@ -77,6 +77,7 @@ import { otherEngineName } from "../battles/battleFilters";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { isOaBattle } from "../oaHost";
+import { noteOaAutoLaunch, oaAutoLaunchSpent } from "../oaRun";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
 import {
@@ -463,14 +464,26 @@ function BattleRoomPage() {
       // An OA host's flag means its room is open and taking joiners, so a
       // joiner who arrives after it went up is let in as well.
       presentAtStart: oaJoiner || room.presentAtStart,
-      launched: launchedRef.current,
+      // An OA that exited leaves the host in game, so coming back to the room
+      // must not start it again (issue #4961).
+      launched:
+        launchedRef.current ||
+        (oaJoiner &&
+          !!room.serverKey &&
+          !!room.battle &&
+          oaAutoLaunchSpent(room.serverKey, room.battle.id)),
       canRun,
       serverSendsMatch: room.serverSendsMatch,
     });
     if (!go) return;
     launchedRef.current = true;
+    if (oaJoiner && room.serverKey && room.battle) {
+      noteOaAutoLaunch(room.serverKey, room.battle.id);
+    }
     void runLaunch();
   }, [
+    room.serverKey,
+    room.battle,
     room.selfHost,
     room.hostIngame,
     room.presentAtStart,
