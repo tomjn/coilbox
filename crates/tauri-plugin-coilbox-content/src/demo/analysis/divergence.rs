@@ -436,6 +436,23 @@ pub(super) mod tests {
         );
     }
 
+    /// The recorder writing more must not change whether a run is kept.
+    #[test]
+    fn what_each_unit_dealt_and_took_has_no_part_in_the_check() {
+        let line = "{\"kind\":\"unit_damage\",\"frame\":1501,\"unit\":3,\"def\":40,\"team\":0,\"dealt\":9999}\n";
+        let cut = FIXTURE
+            .rfind("{\"kind\":\"game_over\"")
+            .expect("the game over line");
+        let text = format!("{}{line}{}", &FIXTURE[..cut], &FIXTURE[cut..]);
+        let log = parse_log(&text);
+
+        assert_eq!(log.counts().unit_damage, 1);
+        assert_eq!(
+            compare(&fixture_trailer(), FIXTURE_SECONDS, &log, 0),
+            Vec::new()
+        );
+    }
+
     fn only(found: Vec<Disagreement>) -> Disagreement {
         assert_eq!(found.len(), 1, "{found:?}");
         found.into_iter().next().unwrap()

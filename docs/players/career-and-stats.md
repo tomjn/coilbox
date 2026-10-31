@@ -95,7 +95,7 @@ When the page is for somebody other than you, Head-to-head with you shows the ga
 
 Match figures shows the player's own figures per minute, such as metal produced and damage dealt, averaged over their games. The All, Wins and Losses columns compare their games overall with the ones they won and lost. Trend, under the table, draws one figure from game to game. Pick the figure from its list.
 
-Units ordered lists the units the player ordered across their games, with how much metal those orders cost. Select a column's name to sort by it. These are orders, not units built. Finished and Died only fill in for replays you have analysed. See [Analyse a replay](replays.md#analyse-a-replay).
+Units ordered lists the units the player ordered across their games, with how much metal those orders cost. Select a column's name to sort by it. These are orders, not units built. Finished, Died and Damage per metal only fill in for replays you have analysed. Damage per metal is the damage that unit dealt for the metal spent on those you finished, including units still alive at the end, and shows how many games it comes from. Each hit counts for at most its target's maximum health, and a hit on an ally does not count. A replay analysed before this column existed leaves it empty until you analyse it again. See [Analyse a replay](replays.md#analyse-a-replay).
 
 A game whose version is not installed may be left out of Units ordered. The line under the heading says how many games were counted and how many were left out.
 

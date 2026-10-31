@@ -1623,6 +1623,7 @@ end
                     + counts.start_unit_position
                     + counts.start_unit_replaced
                     + counts.damage
+                    + counts.unit_damage
                     + counts.game_over
                     + counts.unknown
             );

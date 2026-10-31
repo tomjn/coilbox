@@ -14,7 +14,8 @@
 //! decides whether a replay can be named at all.
 //!
 //! For a match with a stored analysis the table gains what the simulation did:
-//! how many of each unit a team finished, and how many of those died.
+//! how many of each unit a team finished, how many of those died, and the damage
+//! they dealt.
 //!
 //! A replay file does not change, so its totals are kept in the app's cache
 //! directory, one small file per replay, the way `map_grids` keeps its counts.
@@ -32,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, Runtime};
 
+use super::analysis::log::UNIT_DAMAGE_SINCE;
 use super::analysis::store::{self, AnalysisState};
 use super::build_orders::{build_orders_from_stream, player_teams};
 use super::def_sets::{self, Ids, Link, UnitDef};
@@ -46,7 +48,8 @@ use crate::model::CommandOrigin;
 ///
 /// 2: a replay carries its match's setup, which the unit list it is read
 /// against is now read with (#3847).
-pub const UNIT_ORDERS_VERSION: u32 = 2;
+/// 3: a unit's events carry the damage it dealt (#3895).
+pub const UNIT_ORDERS_VERSION: u32 = 3;
 
 /// The folder under the app's cache directory that holds the kept files. It is
 /// in `caches::CACHE_SUBDIRS`, so the storage screen sizes it and clears it.
@@ -89,7 +92,7 @@ pub struct Seat {
 }
 
 /// What the simulation did with one unit definition for one team.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DefEvents {
     /// The unit definition id, as the analysis run's engine numbered it.
@@ -98,10 +101,13 @@ pub struct DefEvents {
     pub finished: u32,
     /// Finished units that were destroyed while the team had them.
     pub died: u32,
+    /// The damage the units the team finished dealt while it held them. Only
+    /// means something when [`ReplayUnitOrders::events_damage`] is true.
+    pub dealt: f64,
 }
 
 /// One team's finished and destroyed units in a stored analysis.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TeamEvents {
     pub team: i32,
@@ -141,6 +147,11 @@ pub struct ReplayUnitOrders {
     /// which nothing was finished.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub events: Option<Vec<TeamEvents>>,
+    /// True when the analysis behind `events` is from a logger that recorded
+    /// damage for each unit. Otherwise `dealt` is nought for want of a record,
+    /// not because nothing was dealt.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub events_damage: bool,
     /// Whether the orders came from a kept file and not from a walk. Never
     /// true in a kept file itself.
     #[serde(default)]
@@ -220,15 +231,20 @@ pub fn reduce_replay(demo: &Path) -> Result<ReplayUnitOrders, String> {
             })
             .collect(),
         events: None,
+        events_damage: false,
         from_cache: false,
     })
 }
 
 /// What says whether a match's stored analysis is the one a kept file counted:
-/// when it was written. `None` when there is no analysis with events.
-fn analysis_signature(analyses: &Path, game_id: &str) -> Option<u64> {
+/// when it was written. With it, which logger wrote it. `None` when there is no
+/// analysis with events.
+fn analysis_signature(analyses: &Path, game_id: &str) -> Option<(u64, u32)> {
     let stored = store::read(analyses, game_id).ok().flatten()?;
-    (stored.state != AnalysisState::Diverged).then_some(stored.provenance.analysed_at_ms)
+    (stored.state != AnalysisState::Diverged).then_some((
+        stored.provenance.analysed_at_ms,
+        stored.provenance.logger_version,
+    ))
 }
 
 /// Total what each team finished and lost in a match's stored analysis.
@@ -237,13 +253,21 @@ fn analysis_signature(analyses: &Path, game_id: &str) -> Option<u64> {
 /// names. It died when a `unit_destroyed` line names a unit that had been
 /// finished, for the team that had it then. A unit destroyed before it was
 /// finished is a build that was cancelled or shot down, and is neither.
+///
+/// Damage dealt is the `unit_damage` lines of a unit the line's own team
+/// finished. The metal it is set against is the cost of the units the team
+/// finished, so a unit it was given or captured is on neither side. A dead unit's
+/// line comes after its `unit_destroyed` line, because its death explosion does.
 pub fn reduce_events(analyses: &Path, game_id: &str) -> Option<Vec<TeamEvents>> {
-    let kinds = ["unit_finished".to_string(), "unit_destroyed".to_string()];
+    let kinds = ["unit_finished", "unit_destroyed", "unit_damage"].map(String::from);
     let page = store::read_events(analyses, game_id, Some(&kinds), 0, None).ok()?;
     let mut teams: BTreeMap<i32, BTreeMap<u32, DefEvents>> = BTreeMap::new();
     // The engine gives a dead unit's id to a later one, so a finished unit is
     // forgotten when it dies.
     let mut alive: HashSet<i64> = HashSet::new();
+    // Who finished each unit and what as. Kept after it dies, for the lines that
+    // follow, until the id is given to a unit that is finished in turn.
+    let mut finished_by: HashMap<i64, (i32, u32)> = HashMap::new();
     for event in &page.events {
         let whole = |key: &str| event.get(key).and_then(|v| v.as_i64());
         let (Some(unit), Some(def), Some(team)) = (whole("unit"), whole("def"), whole("team"))
@@ -253,12 +277,18 @@ pub fn reduce_events(analyses: &Path, game_id: &str) -> Option<Vec<TeamEvents>> 
         let (Ok(def), Ok(team)) = (u32::try_from(def), i32::try_from(team)) else {
             continue;
         };
-        let finished = match event.get("kind").and_then(|k| k.as_str()) {
+        let (finished, died, dealt) = match event.get("kind").and_then(|k| k.as_str()) {
             Some("unit_finished") => {
                 alive.insert(unit);
-                true
+                finished_by.insert(unit, (team, def));
+                (1, 0, 0.0)
             }
-            Some("unit_destroyed") if alive.remove(&unit) => false,
+            Some("unit_destroyed") if alive.remove(&unit) => (0, 1, 0.0),
+            Some("unit_damage") if finished_by.get(&unit) == Some(&(team, def)) => (
+                0,
+                0,
+                event.get("dealt").and_then(|v| v.as_f64()).unwrap_or(0.0),
+            ),
             _ => continue,
         };
         let entry = teams
@@ -269,12 +299,11 @@ pub fn reduce_events(analyses: &Path, game_id: &str) -> Option<Vec<TeamEvents>> 
                 def,
                 finished: 0,
                 died: 0,
+                dealt: 0.0,
             });
-        if finished {
-            entry.finished += 1;
-        } else {
-            entry.died += 1;
-        }
+        entry.finished += finished;
+        entry.died += died;
+        entry.dealt += dealt;
     }
     Some(
         teams
@@ -371,9 +400,11 @@ pub fn replay_unit_orders(
     let analysis = analyses
         .zip(game_id.as_deref())
         .and_then(|(dir, id)| analysis_signature(dir, id).map(|sig| (dir, id, sig)));
-    let events_from = analysis.map(|(_, _, at)| at);
+    let events_from = analysis.map(|(_, _, (at, _))| at);
     if walked || kept_events_from != events_from {
         orders.events = analysis.and_then(|(dir, id, _)| reduce_events(dir, id));
+        orders.events_damage = orders.events.is_some()
+            && analysis.is_some_and(|(_, _, (_, logger))| logger >= UNIT_DAMAGE_SINCE);
         if let Some(path) = &kept_path {
             let _ = save_kept(
                 path,
@@ -581,7 +612,7 @@ pub(crate) async fn content_replay_unit_orders<R: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::analysis::log::{LogLine, UnitEvent};
+    use super::super::analysis::log::{LogLine, UnitDamageLine, UnitEvent};
     use super::super::def_sets::{Origin, Source};
     use super::super::stream::fixture::Packets;
     use super::super::tests::DemoFixture;
@@ -947,6 +978,7 @@ mod tests {
             def,
             finished,
             died,
+            dealt: 0.0,
         };
         assert_eq!(
             got.events,
@@ -960,6 +992,109 @@ mod tests {
                     defs: vec![ev(30, 1, 0)],
                 },
             ])
+        );
+    }
+
+    fn dealt(unit: i32, def: i32, team: i32, dealt: f64) -> LogLine {
+        LogLine::UnitDamage(UnitDamageLine {
+            unit,
+            def,
+            team,
+            dealt: Some(dealt),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn damage_dealt_is_added_up_for_the_units_a_team_finished() {
+        let tmp = tempfile::tempdir().unwrap();
+        let analyses = tmp.path().join("analyses");
+        let id = "07".repeat(16);
+        let events = [
+            // Alive at game over.
+            LogLine::UnitFinished(event(1, 42, 0)),
+            dealt(1, 42, 0, 100.0),
+            // Dead, with a line after its death for its death explosion, and
+            // another for a blast that landed later.
+            LogLine::UnitFinished(event(2, 42, 0)),
+            LogLine::UnitDestroyed(event(2, 42, 0)),
+            dealt(2, 42, 0, 50.0),
+            dealt(2, 42, 0, 5.5),
+            // Took damage and dealt none.
+            LogLine::UnitFinished(event(4, 42, 0)),
+            LogLine::UnitDamage(UnitDamageLine {
+                unit: 4,
+                def: 42,
+                team: 0,
+                taken: Some(30.0),
+                ..Default::default()
+            }),
+            // Never finished, so its metal is not counted and nor is this.
+            dealt(9, 42, 0, 999.0),
+            // Finished by team 1, then dealt damage for both teams. Team 0 has
+            // no metal for it, and team 1's share is its own.
+            LogLine::UnitFinished(event(3, 30, 1)),
+            dealt(3, 30, 1, 7.0),
+            LogLine::UnitGiven(event(3, 30, 0)),
+            dealt(3, 30, 0, 800.0),
+        ];
+        store::write(
+            &analyses,
+            &provenance(&id, "reproduced", 5),
+            Some(&text(&events)),
+        )
+        .unwrap();
+
+        let demo = replay(tmp.path(), "a.sdfz", short_match(), 7);
+        let got = replay_unit_orders(&demo, None, Some(&analyses)).unwrap();
+        assert!(got.events_damage);
+        let teams = got.events.unwrap();
+        assert_eq!(
+            teams,
+            vec![
+                TeamEvents {
+                    team: 0,
+                    defs: vec![DefEvents {
+                        def: 42,
+                        finished: 3,
+                        died: 1,
+                        dealt: 155.5,
+                    }],
+                },
+                TeamEvents {
+                    team: 1,
+                    defs: vec![DefEvents {
+                        def: 30,
+                        finished: 1,
+                        died: 0,
+                        dealt: 7.0,
+                    }],
+                },
+            ]
+        );
+    }
+
+    /// An analysis from before the logger wrote `unit_damage` has events and no
+    /// record of damage, so its noughts must not be read as nothing dealt.
+    #[test]
+    fn an_analysis_from_before_the_logger_recorded_each_units_damage_says_so() {
+        let tmp = tempfile::tempdir().unwrap();
+        let analyses = tmp.path().join("analyses");
+        let id = "07".repeat(16);
+        let older = store::Provenance {
+            logger_version: UNIT_DAMAGE_SINCE - 1,
+            ..provenance(&id, "reproduced", 5)
+        };
+        let one = [LogLine::UnitFinished(event(1, 42, 0))];
+        store::write(&analyses, &older, Some(&text(&one))).unwrap();
+
+        let demo = replay(tmp.path(), "a.sdfz", short_match(), 7);
+        let got = replay_unit_orders(&demo, None, Some(&analyses)).unwrap();
+        assert!(got.events.is_some());
+        assert!(!got.events_damage);
+        assert_eq!(
+            store::read(&analyses, &id).unwrap().unwrap().state,
+            AnalysisState::Outdated
         );
     }
 
@@ -1258,7 +1393,13 @@ mod tests {
         ] {
             assert!(json.get(key).is_some(), "{key} is missing");
         }
-        for absent in ["events", "streamList", "eventsList", "orders"] {
+        for absent in [
+            "events",
+            "eventsDamage",
+            "streamList",
+            "eventsList",
+            "orders",
+        ] {
             assert!(json.get(absent).is_none(), "{absent} should be left out");
         }
         assert_eq!(

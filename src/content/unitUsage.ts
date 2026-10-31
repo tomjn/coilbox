@@ -174,6 +174,23 @@ export function replayLists(
   };
 }
 
+/** The damage a unit dealt and the metal it was dealt for. */
+export interface DealtDamage {
+  /** Analysed replays that recorded damage and in which the player ordered the
+   *  unit. */
+  replays: number;
+  /** Damage the team's finished units of this kind dealt in those replays. */
+  dealt: number;
+  /** What those finished units cost, each replay's at the price in the list its
+   *  analysis ran on. */
+  metal: number;
+}
+
+/** Damage dealt for each metal spent, or null when no metal was spent. */
+export function damagePerMetal(damage: DealtDamage): number | null {
+  return damage.metal > 0 ? damage.dealt / damage.metal : null;
+}
+
 /** What a unit's finished and died figures are drawn from. */
 export interface AnalysedUnit {
   /** Analysed replays the player ordered the unit in. */
@@ -184,6 +201,8 @@ export interface AnalysedUnit {
   finished: number;
   /** Finished units of this kind the team lost in those replays. */
   died: number;
+  /** Null where none of those replays recorded damage for each unit. */
+  damage: DealtDamage | null;
 }
 
 /** One unit a player ordered. */
@@ -251,6 +270,9 @@ export interface UnitUsage {
   /** Counted games with an analysis whose record holds no team for the
    *  player, so the events cannot be tied to them. */
   analysedNoTeam: number;
+  /** Of `analysed`, games whose analysis is from before the recorder kept
+   *  damage for each unit. */
+  analysedNoDamage: number;
 }
 
 function metalCost(unit: UnitDatasetEntry): number | null {
@@ -284,6 +306,12 @@ const EMPTY_SPLIT = (): Record<SplitBucket, number> => ({
  * and are counted for a unit only in replays where the player ordered it, so
  * they sit beside what was ordered in the same replays. Two players who share
  * a team share its units, so both get the team's figures.
+ *
+ * Damage dealt and the metal it is divided by come from the same place: the
+ * events of a replay and the list its analysis ran on, which are numbered alike
+ * and priced as that match was. A kind is priced replay by replay, so a build
+ * that changed its cost weighs what it cost then. An analysis from before the
+ * recorder kept damage counts for nothing here, not as nothing dealt.
  */
 export function foldUnitUsage(
   games: readonly PlayerGame[],
@@ -310,6 +338,7 @@ export function foldUnitUsage(
     analysed: 0,
     analysedUnnamed: 0,
     analysedNoTeam: 0,
+    analysedNoDamage: 0,
   };
 
   for (const game of games) {
@@ -354,18 +383,30 @@ export function foldUnitUsage(
       me?.team === undefined
         ? undefined
         : replay.events?.find((t) => t.team === me.team);
-    let events: Map<string, { finished: number; died: number }> | null = null;
+    let events: Map<
+      string,
+      { finished: number; died: number; dealt: number; metal: number }
+    > | null = null;
+    const withDamage = replay.eventsDamage === true;
     if (replay.events && !lists.events) out.analysedUnnamed++;
     else if (replay.events && me?.team === undefined) out.analysedNoTeam++;
     else if (replay.events && lists.events) {
       out.analysed++;
+      if (!withDamage) out.analysedNoDamage++;
       events = new Map();
       for (const d of teamEvents?.defs ?? []) {
         const unit = lists.events[d.def - 1];
         if (!unit) continue;
-        const sum = events.get(unit.name) ?? { finished: 0, died: 0 };
+        const sum = events.get(unit.name) ?? {
+          finished: 0,
+          died: 0,
+          dealt: 0,
+          metal: 0,
+        };
         sum.finished += d.finished;
         sum.died += d.died;
+        sum.dealt += d.dealt;
+        sum.metal += (metalCost(unit) ?? 0) * d.finished;
         events.set(unit.name, sum);
       }
     }
@@ -414,7 +455,13 @@ export function foldUnitUsage(
         out.split[splitBucket(row.category)] += cost * d.units;
       }
       if (events) {
-        row.analysed ??= { replays: 0, ordered: 0, finished: 0, died: 0 };
+        row.analysed ??= {
+          replays: 0,
+          ordered: 0,
+          finished: 0,
+          died: 0,
+          damage: null,
+        };
         row.analysed.ordered += d.units;
       }
       seen.add(row);
@@ -428,6 +475,12 @@ export function foldUnitUsage(
         row.analysed.replays++;
         row.analysed.finished += sum?.finished ?? 0;
         row.analysed.died += sum?.died ?? 0;
+        if (withDamage) {
+          row.analysed.damage ??= { replays: 0, dealt: 0, metal: 0 };
+          row.analysed.damage.replays++;
+          row.analysed.damage.dealt += sum?.dealt ?? 0;
+          row.analysed.damage.metal += sum?.metal ?? 0;
+        }
       }
     }
   }
@@ -445,7 +498,8 @@ export type UsageColumn =
   | "metal"
   | "won"
   | "finished"
-  | "died";
+  | "died"
+  | "damagePerMetal";
 
 export interface UsageSort {
   column: UsageColumn;
@@ -477,6 +531,10 @@ function sortValue(row: UnitUsageRow, column: UsageColumn): number | string {
       return row.analysed?.finished ?? -1;
     case "died":
       return row.analysed?.died ?? -1;
+    case "damagePerMetal": {
+      const damage = row.analysed?.damage;
+      return (damage && damagePerMetal(damage)) ?? -1;
+    }
     default:
       return row[column];
   }
@@ -485,7 +543,8 @@ function sortValue(row: UnitUsageRow, column: UsageColumn): number | string {
 /**
  * The rows in the order a sort asks for. Ties fall back to metal, then to the
  * name, so the order never depends on the order the replays were read in. A
- * row with no finished or died figure sorts below every row that has one.
+ * row with no finished, died or damage figure sorts below every row that has
+ * one.
  */
 export function sortUsageRows(
   rows: readonly UnitUsageRow[],
