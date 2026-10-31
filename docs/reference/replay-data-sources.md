@@ -165,6 +165,8 @@ So a replay's list is read with the replay's own setup, taken from its start scr
 
 Coilbox answers 15 of the 16 functions the engine gives its definitions parser from these: `GetModOptions`, `GetModOption`, `GetMapOptions`, `GetMapOption`, `GetTeamList`, `GetAllyTeamList`, `GetGaiaTeamID`, `GetPlayerList`, `GetTeamInfo`, `GetAllyTeamInfo`, `GetTeamAllyTeamID`, `GetTeamLuaAI`, `GetAIInfo`, `AreTeamsAllied` and `ArePlayersAllied`. Each is a copy of the engine's own, in `lua/match-unit-list/match_unit_list.lua`. `GetSideData` is not answered from a match, because it reads the game's sides and not the start script, and it gives no value as before.
 
+The same file gives `math.random` a fixed answer, because unitsync's parser compiles the engine's version out and its stand-in returns no value. `random()` gives 0, `random(m)` gives 1 and `random(m, n)` gives `m`. Each is inside the range the call asked for, and a call the engine refuses (`random(0)`, `random(3, 2)`, text or three arguments) is refused the same way. The read applies this with or without a setup. The game's own unit list, which the unit pages read, does not, so for a game like Beyond All Reason it still lacks the definitions that need a draw, and a match read as the empty setup is kept as a list of its own rather than a pointer to it.
+
 Then the definitions the engine refuses are left out before the rest are numbered. The engine gives no id to a definition with health at or below zero, a negative metal or energy cost, a build time at or below zero, a negative speed, reverse speed, acceleration or brake rate, or a movement class the game does not define when the unit moves over ground or water. The next definition takes the id.
 
 What it costs:
@@ -210,7 +212,7 @@ On the replays on the development machine, 2 of 19 are Beyond All Reason. One re
 What it does not cover:
 
 - A unit a map ships. The engine loads the map before the definitions, and this read mounts the game alone.
-- A definition script that draws a random number. The engine seeds it from the match, and under unitsync it returns nothing. Beyond All Reason's 36 `lootboxnano` definitions are such a case, and the read leaves them out (#4926).
+- A definition script whose names, costs or movement depend on a random number. The engine seeds `math.random` from the match, and the read gives it a fixed answer, the bottom of the range asked for. Beyond All Reason's 36 `lootboxnano` definitions draw one only to pick a build list and a model, so they get the names and ids the engine gives them (#4926). Whether the read now equals the engine's list for those four matches is not yet checked.
 - A definition script that reads a map field off `Game`, such as `Game.mapSizeX`.
 - A replay whose exact build of the game is not installed. Another version is read as it always was, with the warning.
 - A player being active. The definitions load before the engine marks any player active, so asking for active players gives none. That is from reading the engine's source and is not measured.
