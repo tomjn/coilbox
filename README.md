@@ -93,9 +93,10 @@ per-platform folder from the committed prebuilts (run automatically by
 `PRD_SIDECAR` if the sidecar isn't found via the resource dir.
 
 > **Note:** macOS is arm64-only (Apple Silicon) by design. The committed
-> `aarch64-apple-darwin` binary links Homebrew dylibs, so the bundled sidecar
-> needs those at runtime; a portable distribution needs a static/self-contained
-> build — a future step.
+> `aarch64-apple-darwin` binary links only `/usr/lib` libraries, with minizip and
+> jsoncpp built in. `scripts/build-prdownloader-macos.sh` rebuilds it from a
+> pinned pr-downloader commit and fails if the result links anything from
+> Homebrew. Check with `otool -L src-tauri/binaries/pr-downloader-aarch64-apple-darwin`.
 
 ## Branding catalog
 

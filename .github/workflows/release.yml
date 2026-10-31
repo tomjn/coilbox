@@ -5,11 +5,6 @@ name: release
 # triple. uberstress is an externalBin (tauri-build bundles it automatically);
 # pr-downloader is assembled into the `prdownloader/` resource folder per runner
 # (so its Windows DLLs ship beside it). macOS is arm64-only by design.
-#
-# KNOWN LIMITATION: the committed macOS binary links Homebrew dylibs (e.g.
-# minizip), so the bundled sidecar needs those present at runtime. A portable mac
-# release needs a static/self-contained pr-downloader build (or bundling its
-# dylibs into the .app) — a future hardening step, not done here.
 
 on:
   # The normal way to cut a release. The workflow creates the tag and the draft
