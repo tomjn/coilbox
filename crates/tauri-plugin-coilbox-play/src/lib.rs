@@ -719,6 +719,22 @@ async fn play_oa_check(path: String) -> CliResult {
     }
 }
 
+/// `play_oa_maps` lists the maps the Open Annihilation at `path` has installed
+/// (issue #4946), as `{ maps: [{ shownName, key }] }`, for the host form's map
+/// choice. Rejects with why the program could not list them.
+#[tauri::command]
+async fn play_oa_maps(path: String) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        oa::list_maps_with_default_wait(Path::new(&path))
+    })
+    .await;
+    match result {
+        Ok(Ok(maps)) => CliResult::ok(json!({ "maps": maps })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("Open Annihilation map list failed: {e}")),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-play"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-play|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -747,6 +763,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_system_info,
             play_oa_find,
             play_oa_check,
+            play_oa_maps,
             oa_launch::play_oa_launch,
             oa_launch::play_oa_cancel
         ])

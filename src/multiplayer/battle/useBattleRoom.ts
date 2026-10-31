@@ -18,6 +18,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "@/play/config";
+import { otherEngineName } from "../battles/battleFilters";
 import type { Battle, MemberStatus, Vote, VoteChoice } from "../bindings";
 import {
   mpAddBot,
@@ -643,14 +644,23 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const contentUnreadableReason = contentUnreadable
     ? contentVerdict.unreadableReason
     : null;
+  // A battle on another engine (Open Annihilation) names a map and a game that
+  // no Recoil install has, and an engine no scan finds. None of that is missing
+  // content, so it is neither reported nor pushed as unsynced (issue #4946).
+  const recoilBattle = !battle || otherEngineName(battle) === null;
   const mapMissing =
-    contentKnown && contentVerdict.missing.some((r) => r.kind === "map");
+    recoilBattle &&
+    contentKnown &&
+    contentVerdict.missing.some((r) => r.kind === "map");
   const gameMissing =
-    contentKnown && contentVerdict.missing.some((r) => r.kind === "game");
+    recoilBattle &&
+    contentKnown &&
+    contentVerdict.missing.some((r) => r.kind === "game");
   // The game is here but an archive it depends on is not (issue #3489).
-  const missingDependency = contentKnown
-    ? contentVerdict.missing.find((r) => r.kind === "dependency")
-    : undefined;
+  const missingDependency =
+    recoilBattle && contentKnown
+      ? contentVerdict.missing.find((r) => r.kind === "dependency")
+      : undefined;
   const dependencyMissing = !!missingDependency;
   const dependencyBlock = missingDependency?.gameName
     ? dependencyBlockReason(missingDependency.label, missingDependency.gameName)
@@ -689,7 +699,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // differ: an engine that has not said its version has confirmed nothing. A
   // lobby that never gave the host's version leaves nothing to confirm against.
   const engineMissing =
-    engine.verdict !== "match" && engine.verdict !== "unknown";
+    recoilBattle && engine.verdict !== "match" && engine.verdict !== "unknown";
   // On joining, every engine that has not said its version is asked, not only
   // the one about to launch: the host's engine may be one of the others.
   const unreadableEngines = useEngineVersionCheck(
@@ -817,7 +827,12 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   useEffect(() => {
     // A wrong engine is known without the content scan, which that engine may
     // never finish.
-    if (!activeKey || !myStatus || (!contentKnown && !engineMissing)) return;
+    if (
+      !activeKey ||
+      !myStatus ||
+      (recoilBattle && !contentKnown && !engineMissing)
+    )
+      return;
     const desired =
       engineMissing ||
       mapMissing ||
@@ -830,6 +845,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   }, [
     activeKey,
     myStatus,
+    recoilBattle,
     contentKnown,
     engineMissing,
     mapMissing,

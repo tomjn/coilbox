@@ -28724,6 +28724,7 @@ msgstr "mapa"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/multiplayer/battles/OaMapChoice.tsx
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
@@ -34848,6 +34849,14 @@ msgstr "Abrir una pantalla"
 msgid "Open Annihilation"
 msgstr ""
 
+#: src/multiplayer/battles/HostBattleForm.tsx
+msgid "Open Annihilation battle"
+msgstr ""
+
+#: src/multiplayer/oaRun.ts
+msgid "Open Annihilation exited with code {code}."
+msgstr ""
+
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 msgstr ""
@@ -38185,6 +38194,10 @@ msgstr "Leyendo el mapa…"
 #, fuzzy
 msgid "Reading maps"
 msgstr "Leyendo mapas"
+
+#: src/multiplayer/battles/OaMapChoice.tsx
+msgid "Reading maps…"
+msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
@@ -42554,6 +42567,10 @@ msgstr "Configurar este escenario"
 #, fuzzy
 msgid "Set version"
 msgstr "Fijar versión"
+
+#: src/multiplayer/battle/useOaHostLaunch.ts
+msgid "Set where Open Annihilation is in Settings first."
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy

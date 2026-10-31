@@ -169,6 +169,96 @@ pub fn check_with_default_wait(path: &Path) -> Result<String, String> {
     check(path, VERSION_WAIT)
 }
 
+/// How long `--list-content --json` may take. It finished within the same
+/// whole second on OA 0.8.10 on macOS (three runs timed with `date`), so this
+/// is the same chosen margin as [`VERSION_WAIT`], not a measurement.
+const LIST_WAIT: Duration = Duration::from_secs(10);
+
+/// One installed map, as `--list-content --json` names it. `shown_name` is what
+/// OA's own menus show and what the lobby's map field carries. `key` is the
+/// name `--map` takes, which differs from it for a few maps.
+#[derive(Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OaMap {
+    pub shown_name: String,
+    pub key: String,
+}
+
+/// The installed maps `--list-content --json` prints on standard output, in the
+/// order OA gives them. Its log goes to standard error, which is dropped.
+pub fn list_maps(path: &Path, wait: Duration) -> Result<Vec<OaMap>, String> {
+    let shown = path.display().to_string();
+    let mut child = coilbox_proc::command(path)
+        .args(["--list-content", "--json"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("{shown} would not run: {e}"))?;
+    let mut stdout = child.stdout.take().expect("stdout was piped");
+    let (sent, received) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut text = Vec::new();
+        let _ = stdout.read_to_end(&mut text);
+        let _ = sent.send(text);
+    });
+
+    let deadline = Instant::now() + wait;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "{shown} did not list its maps within {} seconds.",
+                    wait.as_secs()
+                ));
+            }
+            Err(e) => return Err(format!("{shown} would not run: {e}")),
+        }
+    };
+    if !status.success() {
+        return Err(format!("{shown} failed when asked for its maps."));
+    }
+    let output = received.recv_timeout(wait).unwrap_or_default();
+    parse_maps(&String::from_utf8_lossy(&output))
+}
+
+/// The `maps` array of the JSON object on the last line of `text`.
+fn parse_maps(text: &str) -> Result<Vec<OaMap>, String> {
+    let line = text
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .ok_or("Open Annihilation listed nothing.")?;
+    let parsed: serde_json::Value = serde_json::from_str(line)
+        .map_err(|e| format!("Open Annihilation's map list was not JSON: {e}"))?;
+    let maps = parsed
+        .get("maps")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("Open Annihilation's list has no maps.")?;
+    Ok(maps
+        .iter()
+        .filter_map(|m| {
+            let key = m.get("key")?.as_str()?;
+            let shown_name = m.get("shown-name").and_then(|s| s.as_str()).unwrap_or(key);
+            Some(OaMap {
+                shown_name: shown_name.to_string(),
+                key: key.to_string(),
+            })
+        })
+        .collect())
+}
+
+/// [`list_maps`] with the wait the host form uses.
+pub fn list_maps_with_default_wait(path: &Path) -> Result<Vec<OaMap>, String> {
+    list_maps(path, LIST_WAIT)
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
@@ -221,6 +311,41 @@ mod tests {
             check(&oa, A_FEW_SECONDS).unwrap(),
             "Open Annihilation 0.8.0 (macos-universal arm64, 2ac0217b)"
         );
+    }
+
+    #[test]
+    fn the_maps_come_from_the_json_on_standard_output() {
+        let dir = Dir::new("maps");
+        let oa = dir.program(
+            "oa",
+            r#"echo 'open-annihilation: timing: noise' >&2
+echo '{"maps":[{"shown-name":"Shew Drop","key":"Comet Catcher","players":4},{"key":"Plain"}],"mods":[]}'"#,
+        );
+        assert_eq!(
+            list_maps(&oa, A_FEW_SECONDS).unwrap(),
+            vec![
+                OaMap {
+                    shown_name: "Shew Drop".into(),
+                    key: "Comet Catcher".into()
+                },
+                OaMap {
+                    shown_name: "Plain".into(),
+                    key: "Plain".into()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_map_list_that_is_not_json_or_fails_is_an_error() {
+        let dir = Dir::new("badmaps");
+        let not_json = dir.program("a", "echo 'hello'");
+        assert!(list_maps(&not_json, A_FEW_SECONDS).is_err());
+        let failing = dir.program("b", "echo '{\"maps\":[]}'; exit 2");
+        assert!(list_maps(&failing, A_FEW_SECONDS).is_err());
+        let hanging = dir.program("c", "sleep 30");
+        let error = list_maps(&hanging, Duration::from_millis(200)).unwrap_err();
+        assert!(error.contains("did not list"), "{error}");
     }
 
     #[test]

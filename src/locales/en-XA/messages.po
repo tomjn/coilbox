@@ -23352,6 +23352,7 @@ msgstr ""
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/multiplayer/battles/OaMapChoice.tsx
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
@@ -28319,6 +28320,14 @@ msgstr ""
 msgid "Open Annihilation"
 msgstr ""
 
+#: src/multiplayer/battles/HostBattleForm.tsx
+msgid "Open Annihilation battle"
+msgstr ""
+
+#: src/multiplayer/oaRun.ts
+msgid "Open Annihilation exited with code {code}."
+msgstr ""
+
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 msgstr ""
@@ -31041,6 +31050,10 @@ msgstr ""
 #: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Reading maps"
+msgstr ""
+
+#: src/multiplayer/battles/OaMapChoice.tsx
+msgid "Reading maps…"
 msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
@@ -34602,6 +34615,10 @@ msgstr ""
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Set version"
+msgstr ""
+
+#: src/multiplayer/battle/useOaHostLaunch.ts
+msgid "Set where Open Annihilation is in Settings first."
 msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx

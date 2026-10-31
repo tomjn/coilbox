@@ -1,0 +1,89 @@
+import { describe, expect, it } from "vitest";
+import {
+  OA_UNPICKED_MAP,
+  oaBattleTitle,
+  oaHostArguments,
+  oaMapArgument,
+  oaPlayerName,
+} from "./oaHost";
+
+describe("oaBattleTitle", () => {
+  it("marks the host's title", () => {
+    expect(oaBattleTitle("  Friday night ", "fallback")).toBe(
+      "[OA] Friday night",
+    );
+  });
+
+  it("marks the fallback when the title is blank", () => {
+    expect(oaBattleTitle("   ", "Open Annihilation battle")).toBe(
+      "[OA] Open Annihilation battle",
+    );
+  });
+});
+
+describe("oaPlayerName", () => {
+  it("cuts a 20 character name to 16 rather than refusing it", () => {
+    expect(oaPlayerName("abcdefghijklmnopqrst")).toBe("abcdefghijklmnop");
+  });
+
+  it("leaves a short name alone", () => {
+    expect(oaPlayerName("Tom")).toBe("Tom");
+  });
+
+  it("counts characters, not bytes", () => {
+    expect(oaPlayerName("é".repeat(20))).toBe("é".repeat(16));
+  });
+});
+
+describe("oaMapArgument", () => {
+  const maps = [{ shownName: "Shew Drop", key: "Comet Catcher" }];
+
+  it("is none while the host leaves the choice to OA", () => {
+    expect(oaMapArgument(OA_UNPICKED_MAP, maps)).toBeNull();
+  });
+
+  it("is the key OA lists for the shown name", () => {
+    expect(oaMapArgument("Shew Drop", maps)).toBe("Comet Catcher");
+  });
+
+  it("passes a name OA does not list as it stands", () => {
+    expect(oaMapArgument("Somewhere", maps)).toBe("Somewhere");
+  });
+});
+
+describe("oaHostArguments", () => {
+  const base = {
+    battleId: 4021,
+    username: "abcdefghijklmnopqrst",
+    map: null,
+    maxPlayers: 8,
+  };
+
+  it("hosts a room named after the battle, with the name cut", () => {
+    expect(oaHostArguments(base)).toEqual([
+      "--host",
+      "--game-name",
+      "CB4021",
+      "--player-name",
+      "abcdefghijklmnop",
+      "--player-limit",
+      "8",
+    ]);
+  });
+
+  it("adds the map when one was picked", () => {
+    expect(
+      oaHostArguments({ ...base, map: "Comet Catcher" }).slice(-2),
+    ).toEqual(["--map", "Comet Catcher"]);
+  });
+
+  it("never asks for a limit above OA's", () => {
+    expect(oaHostArguments({ ...base, maxPlayers: 32 })).toContain("10");
+  });
+
+  it("leaves out the local network options", () => {
+    const args = oaHostArguments({ ...base, map: "Comet Catcher" });
+    expect(args).not.toContain("--dplay-guid");
+    expect(args).not.toContain("--dplay-port");
+  });
+});

@@ -20,6 +20,7 @@ permissions = [
   "allow-play-system-info",
   "allow-play-oa-find",
   "allow-play-oa-check",
+  "allow-play-oa-maps",
   "allow-play-oa-launch",
   "allow-play-oa-cancel",
 ]

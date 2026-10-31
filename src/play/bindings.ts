@@ -323,6 +323,24 @@ export const playOaCheck = defineCommand<{ path: string }, OaProgram>(
   "play_oa_check",
 );
 
+/** An installed Open Annihilation map. */
+export interface OaMap {
+  /** What OA's menus show, and what the lobby's map field carries. */
+  shownName: string;
+  /** What OA's `--map` takes. */
+  key: string;
+}
+
+/**
+ * The maps the Open Annihilation at `path` has installed, from
+ * `--list-content --json`. Rejects, with a message to show, when the program
+ * would not run or printed something else.
+ */
+export const playOaMaps = defineCommand<{ path: string }, { maps: OaMap[] }>(
+  "coilbox-play",
+  "play_oa_maps",
+);
+
 /**
  * One line of Open Annihilation's status stream. Fields coilbox reads are named.
  * `seq`, `frame` and `tick` are on every kind but `hello` and `unreadable`, and
