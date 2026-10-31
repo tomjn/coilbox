@@ -479,6 +479,7 @@ do
 	local allowed = {
 		GetGameFrame = true,
 		GetUnitPosition = true,
+		GetUnitBuildFacing = true,
 		GetUnitHealth = true,
 		GetTeamStatsHistory = true,
 		GetGaiaTeamID = true,
@@ -758,6 +759,179 @@ do
 
 	check("a successor is replaced in its turn",
 		#replaced == 2 and replaced[2].unit == second and replaced[2].by == third and replaced[2].frame == 900)
+end
+
+--------------------------------------------------------------------------------
+-- A start unit that is a building, whose replacement a game snaps to the grid.
+--------------------------------------------------------------------------------
+
+-- Footprints in the engine's squares of 8 elmos: 1 by 1, 2 by 2, 3 by 3, 8 by 8
+-- and 1 by 4 build squares. Def 12 is what the stand-in match starts with.
+local FOOTPRINTS = {
+	[12] = { name = "start", isBuilding = true, xsize = 4, zsize = 4 },
+	[20] = { name = "one", isBuilding = true, xsize = 2, zsize = 2 },
+	[21] = { name = "two", isBuilding = true, xsize = 4, zsize = 4 },
+	[22] = { name = "three", isBuilding = true, xsize = 6, zsize = 6 },
+	[23] = { name = "eight", isBuilding = true, xsize = 16, zsize = 16 },
+	[24] = { name = "long", isBuilding = true, xsize = 2, zsize = 8 },
+	[25] = { name = "walker", xsize = 4, zsize = 4 },
+}
+
+-- A building start unit standing at x, z, 400 frames in.
+local function startBuilding(x, z)
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2, unitDefs = FOOTPRINTS })
+	local mine = engine.create(12, 0, x, 5, z)
+	engine.create(31, 1, 3900, 10, 1800)
+	engine.runTo(400)
+	return engine, mine
+end
+
+-- What unit_morph.lua in both games does with a new building's position.
+local function snapped(position, size)
+	local cell = math.floor(position / 16) * 16
+	if size / 4 ~= math.floor(size / 4) then
+		return cell + 8
+	end
+	return cell
+end
+
+do
+	-- Every footprint, at every spot in a build square, in each facing: the bound
+	-- has to take in whatever that code can do.
+	local refused = {}
+	for def, footprint in pairs(FOOTPRINTS) do
+		if footprint.isBuilding and def ~= 12 then
+			for facing = 0, 3 do
+				local xsize = facing % 2 == 1 and footprint.zsize or footprint.xsize
+				local zsize = facing % 2 == 1 and footprint.xsize or footprint.zsize
+				for offset = 0, 15.75, 0.25 do
+					local x, z = 1600 + offset, 800 + 15.75 - offset
+					local engine, mine = startBuilding(x, z)
+					local new = engine.create(def, 0, snapped(x, xsize), 5, snapped(z, zsize), nil, facing)
+					engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+					local replaced = ofKind(engine, "start_unit_replaced")
+					if not (#replaced == 1 and replaced[1].by == new) then
+						refused[#refused + 1] = footprint.name .. " facing " .. facing .. " at " .. offset
+					end
+				end
+			end
+		end
+	end
+	check("a building's replacement is followed wherever the snap can put it", #refused == 0, table.concat(refused, ", "))
+end
+
+do
+	local engine, mine = startBuilding(1610, 800)
+	local new = engine.create(21, 0, 1600, 5, 800)
+	engine.runTo(401)
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	local replaced = ofKind(engine, "start_unit_replaced")
+	check("a snapped building whose old one is destroyed on the next frame is still followed",
+		#replaced == 1 and replaced[1].by == new and replaced[1].x == 1600 and replaced[1].z == 800)
+end
+
+do
+	local engine, mine = startBuilding(1610, 800)
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	local new = engine.create(21, 0, 1600, 5, 800)
+	local replaced = ofKind(engine, "start_unit_replaced")
+	check("a snapped building made after the old one is destroyed is followed",
+		#replaced == 1 and replaced[1].by == new)
+end
+
+do
+	local function links(def, dx, dz, facing, builder)
+		local engine, mine = startBuilding(1600, 800)
+		engine.create(def, 0, 1600 + dx, 5, 800 + dz, builder and mine or nil, facing)
+		engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+		return #ofKind(engine, "start_unit_replaced")
+	end
+
+	check("half a one by one footprint away is in its place", links(20, 8, 0) == 1)
+	check("a little more than half a one by one footprint away is not", links(20, 8.25, 0) == 0)
+	check("one build square away is in the place of a two by two", links(21, 16, 16) == 1)
+	check("a little more than one build square is not", links(21, 16.25, 0) == 0)
+	check("a huge footprint still reaches only one build square", links(23, 16.25, 0) == 0)
+	check("a long footprint reaches further along its length", links(24, 8, 16) == 1)
+	check("and no further than half its width across", links(24, 16, 8) == 0)
+	check("a facing turns a footprint round", links(24, 16, 8, 1) == 1)
+	check("a unit that is not a building gets no distance at all", links(25, 0.25, 0) == 0)
+	check("a building something built nearby is not a successor", links(21, 8, 0, 0, true) == 0)
+end
+
+--------------------------------------------------------------------------------
+-- Another unit made on the spot at the moment of an upgrade.
+--------------------------------------------------------------------------------
+
+do
+	-- Another gadget's unit first, then the swap in one call. Metal Factions'
+	-- unit_morph.lua and its unit_drones.lua could do this.
+	local engine, mine = twoStartUnits()
+	local morph, drones = engine.gadget(), engine.gadget()
+	drones.run(engine.create, 40, 0, 100, 5, 200)
+	local upgraded = morph.run(engine.create, 13, 0, 100, 5, 200)
+	morph.run(engine.destroy, mine, nil, KILLED_BY_SCRIPT)
+	local replaced = ofKind(engine, "start_unit_replaced")
+	check("the unit made by the gadget that destroyed the old one is its successor",
+		#replaced == 1 and replaced[1].unit == mine and replaced[1].by == upgraded)
+end
+
+do
+	-- The swap across two frames, as Splinter Faction does it, with another
+	-- gadget's unit made after the new one and before the old one goes.
+	local engine, mine = twoStartUnits()
+	local morph, other = engine.gadget(), engine.gadget()
+	local upgraded = morph.run(engine.create, 13, 0, 100, 5, 200)
+	other.run(engine.create, 40, 0, 100, 5, 200)
+	engine.runTo(401)
+	other.run(engine.create, 41, 0, 100, 5, 200)
+	morph.run(engine.destroy, mine, nil, KILLED_BY_SCRIPT)
+	local replaced = ofKind(engine, "start_unit_replaced")
+	check("so it is when the old one goes on the next frame, with others made either side",
+		#replaced == 1 and replaced[1].by == upgraded and replaced[1].frame == 401)
+	local created = ofKind(engine, "unit_created")
+	check("and the other units are not start units", created[#created].startUnit == nil)
+end
+
+do
+	local function links(scene)
+		local engine, mine = twoStartUnits()
+		scene(engine, mine, engine.gadget(), engine.gadget())
+		return #ofKind(engine, "start_unit_replaced")
+	end
+
+	check("two units from the gadget that destroyed the old one cannot be told apart",
+		links(function(e, mine, morph)
+			morph.run(e.create, 13, 0, 100, 5, 200)
+			morph.run(e.create, 14, 0, 100, 5, 200)
+			morph.run(e.destroy, mine, nil, KILLED_BY_SCRIPT)
+		end) == 0)
+	check("two units from other gadgets are not the destroying gadget's successor",
+		links(function(e, mine, morph, other)
+			other.run(e.create, 13, 0, 100, 5, 200)
+			other.run(e.create, 14, 0, 100, 5, 200)
+			morph.run(e.destroy, mine, nil, KILLED_BY_SCRIPT)
+		end) == 0)
+	check("a gadget's unit from two frames back does not count towards two",
+		links(function(e, mine, morph, other)
+			other.run(e.create, 40, 0, 100, 5, 200)
+			e.runTo(402)
+			morph.run(e.create, 13, 0, 100, 5, 200)
+			morph.run(e.destroy, mine, nil, KILLED_BY_SCRIPT)
+		end) == 1)
+	check("one of two that died first leaves the other as the successor",
+		links(function(e, mine, morph, other)
+			local drone = other.run(e.create, 40, 0, 100, 5, 200)
+			morph.run(e.create, 13, 0, 100, 5, 200)
+			e.destroy(drone, nil, 7)
+			e.destroy(mine, nil, KILLED_BY_SCRIPT)
+		end) == 1)
+	check("a destroying script that is no gadget chooses nothing",
+		links(function(e, mine, morph, other)
+			morph.run(e.create, 13, 0, 100, 5, 200)
+			other.run(e.create, 40, 0, 100, 5, 200)
+			e.destroy(mine, nil, KILLED_BY_SCRIPT)
+		end) == 0)
 end
 
 --------------------------------------------------------------------------------

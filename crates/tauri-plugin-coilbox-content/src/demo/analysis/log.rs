@@ -26,7 +26,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 5;
+pub const LOGGER_VERSION: u32 = 6;
 
 /// The first [`LOGGER_VERSION`] that wrote `unit_damage` lines. An analysis from
 /// before it has no line for any unit, which is not the same as every unit
@@ -597,7 +597,7 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                5,
+                6,
                 vec![
                     "damage",
                     "game_over",
