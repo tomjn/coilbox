@@ -6059,6 +6059,14 @@ msgstr "{server} керує поточною кімнатою, тому прий
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} не пропонує відновлення пароля в Coilbox. Натомість скиньте його на власній сторінці сервера:"
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -14363,6 +14371,8 @@ msgid "Change part"
 msgstr "Змінити деталь"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 #, fuzzy
 msgid "Change password"
 msgstr "Змінити пароль"
@@ -14643,11 +14653,6 @@ msgstr "Перевірити завантаження"
 #, fuzzy
 msgid "Check the host's address"
 msgstr "Перевірте адресу хоста"
-
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "Перевірте пароль у Налаштуваннях, а потім увійдіть знову з верхньої панелі."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -28295,6 +28300,10 @@ msgid "Login failed: {loginError}"
 msgstr "Не вдалося увійти: {loginError}"
 
 #: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Logs out {replacedName}"
 msgstr "Виходить із {replacedName}"
@@ -30133,11 +30142,6 @@ msgstr "Мережева гра"
 msgid "Multiplayer battle"
 msgstr "Мережевий матч"
 
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Multiplayer login refused"
-msgstr "Вхід у мережеву гру відхилено"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Multiplayer: away"
@@ -30162,6 +30166,10 @@ msgstr "Мережева гра: помилка з’єднання"
 #, fuzzy
 msgid "Multiplayer: log in"
 msgstr "Мережева гра: увійти"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -35764,6 +35772,10 @@ msgstr "Пароль (необов’язково)"
 #, fuzzy
 msgid "password needed"
 msgstr "потрібен пароль"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy

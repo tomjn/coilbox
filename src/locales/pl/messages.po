@@ -6059,6 +6059,14 @@ msgstr "{server} ma bieżący pokój, więc zaakceptowanie tego meczu uruchomił
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} nie oferuje odzyskiwania hasła w Coilbox. Zresetuj je na stronie serwera:"
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -14363,6 +14371,8 @@ msgid "Change part"
 msgstr "Zmień część"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 #, fuzzy
 msgid "Change password"
 msgstr "Zmień hasło"
@@ -14643,11 +14653,6 @@ msgstr "Sprawdź, czy się wczytuje"
 #, fuzzy
 msgid "Check the host's address"
 msgstr "Sprawdź adres hosta"
-
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "Sprawdź hasło w Ustawieniach, a potem zaloguj się ponownie z górnego paska."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -28295,6 +28300,10 @@ msgid "Login failed: {loginError}"
 msgstr "Logowanie nie powiodło się: {loginError}"
 
 #: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Logs out {replacedName}"
 msgstr "Wylogowuje {replacedName}"
@@ -30133,11 +30142,6 @@ msgstr "Wieloosobowa"
 msgid "Multiplayer battle"
 msgstr "Mecz wieloosobowy"
 
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Multiplayer login refused"
-msgstr "Odmowa logowania do gry wieloosobowej"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Multiplayer: away"
@@ -30162,6 +30166,10 @@ msgstr "Gra wieloosobowa: błąd połączenia"
 #, fuzzy
 msgid "Multiplayer: log in"
 msgstr "Gra wieloosobowa: zaloguj się"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -35764,6 +35772,10 @@ msgstr "Hasło (opcjonalne)"
 #, fuzzy
 msgid "password needed"
 msgstr "wymagane hasło"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy

@@ -4922,6 +4922,14 @@ msgstr ""
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr ""
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
 msgstr ""
@@ -11645,6 +11653,8 @@ msgid "Change part"
 msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 msgid "Change password"
 msgstr ""
 
@@ -11873,10 +11883,6 @@ msgstr ""
 
 #: src/multiplayer/battle/useBattleLaunch.ts
 msgid "Check the host's address"
-msgstr ""
-
-#: src/multiplayer/store.tsx
-msgid "Check the password in Settings, then log in again from the topbar."
 msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
@@ -22994,6 +23000,10 @@ msgid "Login failed: {loginError}"
 msgstr ""
 
 #: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
 msgid "Logs out {replacedName}"
 msgstr ""
 
@@ -24488,10 +24498,6 @@ msgstr ""
 msgid "Multiplayer battle"
 msgstr ""
 
-#: src/multiplayer/store.tsx
-msgid "Multiplayer login refused"
-msgstr ""
-
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Multiplayer: away"
 msgstr ""
@@ -24510,6 +24516,10 @@ msgstr ""
 
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Multiplayer: log in"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
 msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
@@ -29054,6 +29064,10 @@ msgstr ""
 
 #: src/direct/room.ts
 msgid "password needed"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx

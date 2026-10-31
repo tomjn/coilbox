@@ -21,8 +21,10 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { takeDrawerRequest } from "../lobby-servers/drawerRequest";
 import type { ConnectionState } from "./connections";
 import LobbyStatusButton, { LoginPanel } from "./LobbyStatusButton";
+import { LoginRefusedError } from "./loginRefused";
 
 const ALICE_KEY = "alice@server4.beyondallreason.info:8200";
 const CAROL_KEY = "carol@lobby.techa-rts.com:8200";
@@ -53,7 +55,17 @@ const mp = {
       calls.push(`connect ${account.username}`);
   }),
   // The fields the logged-out view reads off the focused connection.
-  mirror: { phase: null, state: null, error: null, loginError: null },
+  mirror: {
+    phase: null,
+    state: null,
+    error: null,
+    loginError: null,
+  } as {
+    phase: null;
+    state: null;
+    error: string | null;
+    loginError: string | null;
+  },
   status: { ingame: false, away: false },
 };
 
@@ -107,6 +119,7 @@ function connection(
     live?: boolean;
     away?: boolean;
     error?: string;
+    loginError?: string;
     direct?: boolean;
   } = {},
 ): ConnectionState {
@@ -118,7 +131,7 @@ function connection(
       phase: opts.live === false ? null : "ready",
       state: { myUsername: username },
       error: opts.error ?? null,
-      loginError: null,
+      loginError: opts.loginError ?? null,
     },
     agreement: null,
     accountInfo: null,
@@ -166,6 +179,7 @@ beforeEach(() => {
   mp.reconnectAll.mockClear();
   mp.cancelConnect.mockClear();
   mp.setManualAway.mockClear();
+  mp.mirror = { phase: null, state: null, error: null, loginError: null };
   settings["lobbyServers.accounts"] = { accounts: BASE_ACCOUNTS };
   settings["lobbyServers.lastLogin"] = {
     serverId: "bar-ssl",
@@ -174,7 +188,10 @@ beforeEach(() => {
   settings["multiplayer.autoConnect"] = false;
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  takeDrawerRequest();
+});
 
 describe("the login panel with one connection", () => {
   it("names the account and its server, and logs out of it", async () => {
@@ -525,5 +542,137 @@ describe("account rows fill the panel width (issue #2933)", () => {
     expect(screen.getByRole("link", { name: /Add a login/ }).className).toMatch(
       /\bw-full\b/,
     );
+  });
+});
+
+// A wrong password (issue #4184). The store raises the notification, so the
+// panel's part is to mark the login that was refused, say why once, and link to
+// the login's settings.
+describe("the login panel after a refused password", () => {
+  const refusedAlice = () =>
+    connection(ALICE_KEY, { live: false, loginError: "invalid password" });
+
+  it("marks the refused login's row with the server's reason, once", () => {
+    connectAs(refusedAlice());
+    // The focused connection's mirror is what the panel's foot used to quote.
+    mp.mirror = { ...mp.mirror, loginError: "invalid password" };
+    draw();
+
+    expect(account("alice").textContent).toContain("Password refused");
+    expect(account("alice").textContent).toContain("invalid password");
+    expect(screen.getAllByText(/invalid password/)).toHaveLength(1);
+    expect(screen.queryByText(/Login failed/)).toBeNull();
+    // Only the refused login is marked.
+    expect(account("carol").textContent).not.toContain("Password refused");
+  });
+
+  it("links the refused login to the settings drawer at its password", () => {
+    connectAs(refusedAlice());
+    const onNavigate = vi.fn();
+    render(
+      <MemoryRouter>
+        <LoginPanel onNavigate={onNavigate} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole("link", { name: "Change password" });
+    expect(link.getAttribute("href")).toBe("/settings/lobby-servers");
+    fireEvent.click(link);
+
+    expect(takeDrawerRequest()).toEqual({
+      kind: "password",
+      serverId: "bar-ssl",
+      username: "alice",
+    });
+    expect(onNavigate).toHaveBeenCalled();
+  });
+
+  it("marks each of two refused logins with its own server's reason", () => {
+    connectAs(
+      refusedAlice(),
+      connection(CAROL_KEY, { live: false, loginError: "Invalid password" }),
+    );
+    draw();
+
+    expect(
+      screen.getAllByRole("link", { name: "Change password" }),
+    ).toHaveLength(2);
+    expect(account("alice").textContent).toContain("invalid password");
+    expect(account("carol").textContent).toContain("Invalid password");
+  });
+
+  it("marks a refusal for another reason as a refused login, with no password link", () => {
+    connectAs(
+      connection(ALICE_KEY, { live: false, loginError: "Already logged in." }),
+    );
+    draw();
+
+    expect(account("alice").textContent).toContain("Login refused");
+    expect(account("alice").textContent).not.toContain("Password refused");
+    expect(account("alice").textContent).toContain("Already logged in.");
+    expect(screen.queryByRole("link", { name: "Change password" })).toBeNull();
+  });
+
+  it("marks a refusal that gave no reason as a refused login, with no password link", () => {
+    connectAs(connection(ALICE_KEY, { live: false, loginError: "" }));
+    draw();
+
+    expect(account("alice").textContent).toContain("Login refused");
+    expect(screen.queryByRole("link", { name: "Change password" })).toBeNull();
+  });
+
+  it("shows no second message for the refusal a connect threw", async () => {
+    mp.connect.mockRejectedValueOnce(
+      new LoginRefusedError(
+        "Beyond All Reason refused the password for alice",
+        "invalid password",
+      ),
+    );
+    connectAs();
+    draw();
+
+    await act(async () => {
+      fireEvent.click(account("alice"));
+    });
+
+    expect(screen.queryByText(/refused the password/)).toBeNull();
+  });
+
+  it("still shows the error of a connect that failed for another reason", async () => {
+    mp.connect.mockRejectedValueOnce(new Error("could not reach the server"));
+    connectAs();
+    draw();
+
+    await act(async () => {
+      fireEvent.click(account("alice"));
+    });
+
+    expect(screen.getByText("could not reach the server")).toBeTruthy();
+  });
+
+  it("lists a refused login beside a working one with the same link", () => {
+    connectAs(connection(CAROL_KEY), refusedAlice());
+    draw();
+
+    expect(rowFor("alice").textContent).toContain("invalid password");
+    expect(
+      within(rowFor("alice")).getByRole("link", { name: "Change password" }),
+    ).toBeTruthy();
+    expect(
+      within(rowFor("carol")).queryByRole("link", { name: "Change password" }),
+    ).toBeNull();
+  });
+
+  it("lists a login refused for another reason beside a working one, with no password link", () => {
+    connectAs(
+      connection(CAROL_KEY),
+      connection(ALICE_KEY, { live: false, loginError: "Already logged in." }),
+    );
+    draw();
+
+    expect(rowFor("alice").textContent).toContain("Already logged in.");
+    expect(
+      within(rowFor("alice")).queryByRole("link", { name: "Change password" }),
+    ).toBeNull();
   });
 });

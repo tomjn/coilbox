@@ -91,7 +91,13 @@ const UBERSERVER_URL = "https://github.com/ScarylePoo/uberserver";
  */
 type DrawerState<T> =
   | { mode: "add"; draft: T }
-  | { mode: "edit"; id: string; added?: boolean };
+  | {
+      mode: "edit";
+      id: string;
+      added?: boolean;
+      /** Put the cursor in the password field, for a refused password. */
+      focusPassword?: boolean;
+    };
 
 /** What the save line at the foot of an edit drawer says. */
 type SaveStatus =
@@ -169,6 +175,11 @@ export default function LobbyServersSettings() {
   const moveServerKeyData = useMoveServerKeyData();
 
   const servers = allServers(customCfg.servers);
+
+  // The drawer request effect below runs once, so it reads the logins through
+  // this rather than the render it was made in.
+  const accountsRef = useRef(accountsCfg.accounts);
+  accountsRef.current = accountsCfg.accounts;
 
   // Writes fold over what is stored rather than this render's copy, because a
   // keychain move finishes renders later and must not undo what happened since.
@@ -257,7 +268,20 @@ export default function LobbyServersSettings() {
     const open = () => {
       const request = takeDrawerRequest();
       if (!request) return;
-      if (request.kind === "login") {
+      if (request.kind === "password") {
+        // A login the player has removed since the refusal has nothing to open.
+        const account = accountsRef.current.find(
+          (a) =>
+            a.serverId === request.serverId && a.username === request.username,
+        );
+        if (account) {
+          setAccountDrawer({
+            mode: "edit",
+            id: account.id,
+            focusPassword: true,
+          });
+        }
+      } else if (request.kind === "login") {
         setAccountDrawer({
           mode: "add",
           draft: {
@@ -632,6 +656,7 @@ function AccountDrawer({
           accounts={accounts}
           servers={servers}
           added={state?.mode === "edit" && state.added === true}
+          focusPassword={state?.mode === "edit" && state.focusPassword === true}
           onChange={(patch) => onChange(account.id, patch)}
           onRemove={() => onRemove(account)}
           onOpenConsole={onOpenConsole}
@@ -758,6 +783,7 @@ function AccountForm({
   accounts,
   servers,
   added,
+  focusPassword,
   onChange,
   onRemove,
   onOpenConsole,
@@ -767,6 +793,7 @@ function AccountForm({
   accounts: LobbyAccount[];
   servers: LobbyServer[];
   added: boolean;
+  focusPassword: boolean;
   onChange: (patch: Partial<LobbyAccount>) => void;
   onRemove: () => void;
   onOpenConsole: (serverKey: string) => void;
@@ -979,6 +1006,7 @@ function AccountForm({
             }
           >
             <Input
+              autoFocus={focusPassword}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

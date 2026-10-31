@@ -33,9 +33,19 @@ vi.mock("./components/AutojoinChannels", () => ({
 }));
 
 const setSetting = vi.fn();
+const stored = vi.hoisted(() => ({
+  accounts: {
+    accounts: [
+      { id: "a1", serverId: "bar-ssl", username: "AF", hasSecret: true },
+    ],
+  },
+}));
 vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
-  useSetting: (_key: string, initial: unknown) => [initial, setSetting],
+  useSetting: (key: string, initial: unknown) => [
+    key === "lobbyServers.accounts" ? stored.accounts : initial,
+    setSetting,
+  ],
 }));
 
 vi.mock("../../multiplayer/store", () => ({
@@ -91,4 +101,24 @@ it("takes a request once, so coming back to the page does not reopen it", () => 
 
   render(<LobbyServersSettings />);
   expect(screen.queryByDisplayValue("evil.example")).toBeNull();
+});
+
+const SAVED_PASSWORD = "•••••••• (saved)";
+
+it("opens a saved login with the cursor in its password field", () => {
+  requestDrawer({ kind: "password", serverId: "bar-ssl", username: "AF" });
+  render(<LobbyServersSettings />);
+
+  expect(screen.getByRole("heading", { name: "AF" })).toBeTruthy();
+  expect(document.activeElement).toBe(
+    screen.getByPlaceholderText(SAVED_PASSWORD),
+  );
+  expect(setSetting).not.toHaveBeenCalled();
+});
+
+it("opens nothing for a login that has since been removed", () => {
+  requestDrawer({ kind: "password", serverId: "bar-ssl", username: "gone" });
+  render(<LobbyServersSettings />);
+
+  expect(screen.queryByPlaceholderText(SAVED_PASSWORD)).toBeNull();
 });

@@ -6059,6 +6059,14 @@ msgstr "{server} possède le salon actuel, accepter ce match lancerait donc une 
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} ne propose pas la récupération de mot de passe dans Coilbox. Réinitialisez-le plutôt sur la page du serveur :"
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -14363,6 +14371,8 @@ msgid "Change part"
 msgstr "Changer d’élément"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 #, fuzzy
 msgid "Change password"
 msgstr "Changer le mot de passe"
@@ -14643,11 +14653,6 @@ msgstr "Vérifier le chargement"
 #, fuzzy
 msgid "Check the host's address"
 msgstr "Vérifiez l’adresse de l’hôte"
-
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "Vérifiez le mot de passe dans Paramètres, puis reconnectez-vous depuis la barre du haut."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -28295,6 +28300,10 @@ msgid "Login failed: {loginError}"
 msgstr "Échec de la connexion : {loginError}"
 
 #: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Logs out {replacedName}"
 msgstr "Déconnecte {replacedName}"
@@ -30133,11 +30142,6 @@ msgstr "Multijoueur"
 msgid "Multiplayer battle"
 msgstr "Partie multijoueur"
 
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Multiplayer login refused"
-msgstr "Connexion multijoueur refusée"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Multiplayer: away"
@@ -30162,6 +30166,10 @@ msgstr "Multijoueur : erreur de connexion"
 #, fuzzy
 msgid "Multiplayer: log in"
 msgstr "Multijoueur : se connecter"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -35764,6 +35772,10 @@ msgstr "Mot de passe (facultatif)"
 #, fuzzy
 msgid "password needed"
 msgstr "mot de passe requis"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy

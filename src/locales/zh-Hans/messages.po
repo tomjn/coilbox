@@ -6059,6 +6059,14 @@ msgstr "{server} 拥有当前的房间，因此接受此对局会开始第二局
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} 不支持在 Coilbox 中找回密码。请改在服务器自己的页面上重置："
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -14363,6 +14371,8 @@ msgid "Change part"
 msgstr "更换零件"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 #, fuzzy
 msgid "Change password"
 msgstr "更改密码"
@@ -14643,11 +14653,6 @@ msgstr "检查能否加载"
 #, fuzzy
 msgid "Check the host's address"
 msgstr "检查主机地址"
-
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "请在“设置”中检查密码，然后从顶栏重新登录。"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -28295,6 +28300,10 @@ msgid "Login failed: {loginError}"
 msgstr "登录失败：{loginError}"
 
 #: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Logs out {replacedName}"
 msgstr "将使 {replacedName} 退出登录"
@@ -30133,11 +30142,6 @@ msgstr "多人游戏"
 msgid "Multiplayer battle"
 msgstr "多人对局"
 
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Multiplayer login refused"
-msgstr "多人游戏登录被拒绝"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Multiplayer: away"
@@ -30162,6 +30166,10 @@ msgstr "多人游戏：连接错误"
 #, fuzzy
 msgid "Multiplayer: log in"
 msgstr "多人游戏：登录"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -35764,6 +35772,10 @@ msgstr "密码（可选）"
 #, fuzzy
 msgid "password needed"
 msgstr "需要密码"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy

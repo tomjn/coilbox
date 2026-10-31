@@ -6059,6 +6059,14 @@ msgstr "{server} besitzt den aktuellen Raum, daher würde das Annehmen dieser Pa
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} bietet in Coilbox keine Passwort-Wiederherstellung an. Setzen Sie es stattdessen auf der eigenen Seite des Servers zurück:"
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -14363,6 +14371,8 @@ msgid "Change part"
 msgstr "Bauteil ändern"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 #, fuzzy
 msgid "Change password"
 msgstr "Passwort ändern"
@@ -14643,11 +14653,6 @@ msgstr "Laden prüfen"
 #, fuzzy
 msgid "Check the host's address"
 msgstr "Adresse des Hosts prüfen"
-
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "Prüfen Sie das Passwort in den Einstellungen und melden Sie sich dann über die obere Leiste erneut an."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -28295,6 +28300,10 @@ msgid "Login failed: {loginError}"
 msgstr "Anmeldung fehlgeschlagen: {loginError}"
 
 #: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
+
+#: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Logs out {replacedName}"
 msgstr "Meldet {replacedName} ab"
@@ -30133,11 +30142,6 @@ msgstr "Mehrspieler"
 msgid "Multiplayer battle"
 msgstr "Mehrspieler-Partie"
 
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Multiplayer login refused"
-msgstr "Mehrspieler-Anmeldung abgelehnt"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Multiplayer: away"
@@ -30162,6 +30166,10 @@ msgstr "Mehrspieler: Verbindungsfehler"
 #, fuzzy
 msgid "Multiplayer: log in"
 msgstr "Mehrspieler: anmelden"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -35764,6 +35772,10 @@ msgstr "Passwort (optional)"
 #, fuzzy
 msgid "password needed"
 msgstr "Passwort nötig"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy

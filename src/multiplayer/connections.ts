@@ -260,6 +260,10 @@ export interface ConnectionRuntime {
   loggedIn: boolean;
   /** The server refused this attempt's credentials, so do not retry them. */
   denied: boolean;
+  /** The reason the server gave for that refusal. */
+  deniedReason: string | null;
+  /** The player has been told about that refusal, so it is told once. */
+  refusalAnnounced: boolean;
   /** Enough to connect again, captured on each connect attempt. */
   reconnectCtx: {
     server: LobbyServer;
@@ -293,6 +297,8 @@ export function newRuntime(): ConnectionRuntime {
     intentional: false,
     loggedIn: false,
     denied: false,
+    deniedReason: null,
+    refusalAnnounced: false,
     reconnectCtx: null,
     rejoinBattle: null,
     reconnectGen: 0,

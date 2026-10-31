@@ -31,6 +31,10 @@ import {
   useLobbyAccounts,
 } from "../lobby-servers/config";
 import {
+  LOBBY_SERVERS_ROUTE,
+  openDrawerPage,
+} from "../lobby-servers/drawerRequest";
+import {
   addressOfKey,
   bracketedHost,
   dialHost,
@@ -105,6 +109,11 @@ import { DebriefingDrawer } from "./DebriefingDrawer";
 import { useFavourites } from "./friends";
 import { useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
+import {
+  isLoginRefusedCode,
+  isPasswordRefusal,
+  LoginRefusedError,
+} from "./loginRefused";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
 import { protocolForKey } from "./protocol";
@@ -606,6 +615,54 @@ interface MultiplayerContextValue {
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
+
+/**
+ * Record that a server refused a login and tell the player once, however many
+ * ways the refusal reaches us: the denial event, a connect that rejects, or
+ * both in either order. Sticky, so it is still there when the popover that
+ * started the login has closed.
+ *
+ * Only a reason that names a password gets the password wording and the button
+ * to the place it is changed. Any other refusal, such as "Already logged in.",
+ * is said neutrally with the server's words, because the password may be right.
+ *
+ * Marks the runtime denied, which is what stops the reconnect loop: a refused
+ * login is not retried until the player acts. Returns the error a connect then
+ * throws.
+ */
+function refuseLogin(
+  rt: ConnectionRuntime,
+  server: LobbyServer,
+  username: string,
+  reason: string | null,
+): LoginRefusedError {
+  rt.denied = true;
+  rt.deniedReason ??= reason;
+  const known = rt.deniedReason;
+  const serverName = server.name;
+  const password = isPasswordRefusal(known);
+  const title = password
+    ? t`${serverName} refused the password for ${username}`
+    : t`${serverName} refused the login for ${username}`;
+  if (!rt.refusalAnnounced) {
+    rt.refusalAnnounced = true;
+    void notify({
+      title,
+      body: known ?? undefined,
+      level: "error",
+      sticky: true,
+      ...(password && {
+        to: LOBBY_SERVERS_ROUTE,
+        action: {
+          label: t`Change password`,
+          onClick: () =>
+            openDrawerPage({ kind: "password", serverId: server.id, username }),
+        },
+      }),
+    });
+  }
+  return new LoginRefusedError(title, known);
+}
 
 /**
  * App-level provider owning the (single) live lobby connection. It lives above the
@@ -1125,7 +1182,19 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // The server has refused these credentials. Recorded so the reconnect
           // loop stops rather than spending attempts on a password that will be
           // refused again, which on Zero-K is counted against the IP address.
-          if (d.kind === "loginDenied" || d.kind === "registrationDenied") {
+          if (d.kind === "loginDenied") {
+            // Announced from here as well as from `doConnect`'s catch, because
+            // `mpConnect` resolves once the socket is up and the server's answer
+            // to the login arrives afterwards, on this channel. A room accepts
+            // any password, so a refusal there is not about one.
+            const ctx = rt.reconnectCtx;
+            if (ctx && !ctx.direct) {
+              rt.deniedReason = d.reason;
+              refuseLogin(rt, ctx.server, ctx.username, d.reason);
+            } else {
+              rt.denied = true;
+            }
+          } else if (d.kind === "registrationDenied") {
             rt.denied = true;
           }
           // An autohost `!ring` is a transient event, not state - react to it directly
@@ -1443,6 +1512,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       rt.intentional = false;
       rt.loggedIn = false;
       rt.denied = false;
+      rt.deniedReason = null;
+      rt.refusalAnnounced = false;
       rt.reconnectCtx = { server, username, direct };
       connectingKeysRef.current.add(serverKey);
       try {
@@ -1518,6 +1589,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           });
         }
         const snap = await mpSnapshot({ serverKey });
+        // A refusal that arrived while the snapshot was being fetched has torn
+        // the connection down already. Going live now would show a dead login.
+        if (rt.denied && !direct) {
+          throw refuseLogin(rt, server, username, rt.deniedReason);
+        }
         rt.state = snap.state;
         dispatchMirror(serverKey, { type: "snapshot", state: snap.state });
         markLive(serverKey, focus);
@@ -1548,6 +1624,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           type: "connectFailed",
           reason: describeError(e),
         });
+        // The Rust side rejects with a coded error when a login it was waiting
+        // on is refused, and the denial event can arrive after that rejection or
+        // not at all, so the code counts as a refusal too. Read from the code,
+        // never from the English message. A room accepts any password, so a
+        // refusal there is not about one.
+        if (!direct && isLoginRefusedCode(e)) rt.denied = true;
+        if (rt.denied && !direct) {
+          throw refuseLogin(rt, server, username, rt.deniedReason);
+        }
         throw e;
       } finally {
         connectingKeysRef.current.delete(serverKey);
@@ -1632,7 +1717,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
         try {
           await doConnect(server, account.username, false, false);
-        } catch {
+        } catch (e) {
+          // A refused password has already said so, with a way to fix it.
+          if (e instanceof LoginRefusedError) continue;
           const username = account.username;
           const serverName = server.name;
           void notify({
@@ -1716,14 +1803,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // retry costs a failed attempt and buys nothing. On Zero-K it costs more
           // than that: it logs failed attempts per IP address, so a loop bans the
           // address rather than the account. Stop and let the person fix it.
-          if (rt.denied) {
-            void notify({
-              title: t`Multiplayer login refused`,
-              body: t`Check the password in Settings, then log in again from the topbar.`,
-              level: "error",
-            });
-            return;
-          }
+          // `doConnect` has already said so.
+          if (rt.denied) return;
           // A Tachyon sign-in the server has refused will be refused again, so
           // retrying it only delays the one thing that can fix it: another trip
           // through the browser, which a reconnect must never open by itself.

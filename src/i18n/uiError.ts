@@ -16,6 +16,8 @@ export interface UiError {
 /** Codes the Rust side raises that other code branches on. */
 export const UI_ERROR_CODES = {
   packageTargetExists: "workshop.package.target_exists",
+  /** `wait_until_ready` in `conn.rs`: the server answered the login with DENIED. */
+  loginRefused: "multiplayer.login.refused",
 } as const;
 
 function isStringRecord(value: unknown): value is Record<string, string> {

@@ -18,11 +18,23 @@ export interface NotifyInput {
   to?: string;
   /** Keep the toast up until it is dismissed, rather than letting it time out. */
   sticky?: boolean;
+  /**
+   * A button on the toast. An OS banner cannot carry one, so the same place is
+   * reachable through `to` from the bell.
+   */
+  action?: { label: string; onClick: () => void };
 }
 
-function showToast({ title, body, level = "info", sticky }: NotifyInput): void {
+function showToast({
+  title,
+  body,
+  level = "info",
+  sticky,
+  action,
+}: NotifyInput): void {
   const opts = {
     ...(body && { description: body }),
+    ...(action && { action }),
     ...(sticky && { duration: Number.POSITIVE_INFINITY, closeButton: true }),
   };
   if (level === "success") toast.success(title, opts);
