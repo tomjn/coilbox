@@ -25,7 +25,9 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{ipc::Channel, State};
 
 /// The running Open Annihilation, keyed by the frontend's run id like the
@@ -37,6 +39,13 @@ const STATUS_FLAG: &str = "--status-stdout";
 
 /// What OA's refusal line on standard error starts with.
 const REFUSAL_PREFIX: &str = "open-annihilation: ";
+
+/// How long to wait for standard error to close once the process has said it is
+/// leaving. OA's own output is already in the pipe by then, so this only covers
+/// the reader thread catching up, or a child process of OA holding the pipe
+/// open. It is not a measured value. Running out costs the refusal line, and the
+/// room then shows its fixed sentence.
+const STDERR_WAIT: Duration = Duration::from_secs(2);
 
 /// The fields every status line after `hello` carries, passed on as OA wrote
 /// them. They are numbers, but coilbox does not need to know which kind.
@@ -84,7 +93,10 @@ pub enum OaEvent {
         rest: Map<String, Value>,
     },
     /// `reason` is one of `game-ended`, `left`, `connection-lost`, `quit` and
-    /// `refused`. A refusal after the stream began also has `code` in `rest`.
+    /// `refused`. A refusal after the stream began also has `code` in `rest`,
+    /// and coilbox adds `message` there: the text of OA's refusal line on
+    /// standard error, without its `open-annihilation: ` prefix, when there was
+    /// one.
     Exit {
         #[serde(flatten)]
         stamp: Stamp,
@@ -205,16 +217,54 @@ pub(crate) fn parse_line(text: &str, first: bool) -> OaEvent {
 
 /// What standard error said, kept without storing all of it: the first refusal
 /// line, and the last line of any kind for a program that fails some other way.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct StderrNotes {
     refusal: Option<String>,
     last: Option<String>,
 }
 
-/// Read standard error to its end. It is always drained, because a program
-/// that fills the pipe stops writing and would never exit.
-fn read_stderr(stderr: impl Read) -> StderrNotes {
-    let mut notes = StderrNotes::default();
+/// Standard error being read on its own thread. The notes fill in as lines
+/// arrive, so a wait that runs out still has whatever came before.
+struct StderrReader {
+    notes: Arc<Mutex<StderrNotes>>,
+    /// Disconnects when the thread has read to the end.
+    done: Receiver<()>,
+    gave_up: bool,
+}
+
+impl StderrReader {
+    /// Drain `stderr` on a new thread. It is always drained, because a program
+    /// that fills the pipe stops writing and would never exit.
+    fn start(stderr: impl Read + Send + 'static) -> Self {
+        let notes = Arc::new(Mutex::new(StderrNotes::default()));
+        let (finished, done) = mpsc::channel::<()>();
+        let shared = notes.clone();
+        std::thread::spawn(move || {
+            read_stderr(stderr, &shared);
+            drop(finished);
+        });
+        StderrReader {
+            notes,
+            done,
+            gave_up: false,
+        }
+    }
+
+    /// What standard error has said, after waiting up to [`STDERR_WAIT`] for it
+    /// to close. Once a wait has run out, later calls do not wait again.
+    fn notes(&mut self) -> StderrNotes {
+        if !self.gave_up {
+            // The sender never sends, so the only answers are a close or a timeout.
+            if let Err(RecvTimeoutError::Timeout) = self.done.recv_timeout(STDERR_WAIT) {
+                self.gave_up = true;
+            }
+        }
+        self.notes.lock().unwrap().clone()
+    }
+}
+
+/// Read standard error to its end into `notes`.
+fn read_stderr(stderr: impl Read, notes: &Mutex<StderrNotes>) {
     for line in BufReader::new(stderr).split(b'\n') {
         let Ok(bytes) = line else { break };
         let text = String::from_utf8_lossy(&bytes);
@@ -222,6 +272,7 @@ fn read_stderr(stderr: impl Read) -> StderrNotes {
         if text.is_empty() {
             continue;
         }
+        let mut notes = notes.lock().unwrap();
         if notes.refusal.is_none() {
             if let Some(reason) = text.strip_prefix(REFUSAL_PREFIX) {
                 notes.refusal = Some(reason.to_string());
@@ -229,7 +280,6 @@ fn read_stderr(stderr: impl Read) -> StderrNotes {
         }
         notes.last = Some(text.to_string());
     }
-    notes
 }
 
 /// What the launch answers when the process ended before `hello` without
@@ -264,7 +314,7 @@ pub(crate) fn run_blocking(
 ) -> Result<Option<ExitOutcome>, String> {
     // The check and the insert share one hold of the lock, so two starts that
     // arrive together cannot both pass.
-    let (stdout, stderr) = {
+    let (stdout, mut stderr) = {
         let mut map = reg.lock().unwrap();
         if !map.is_empty() {
             return Err("Open Annihilation is already running.".to_string());
@@ -283,7 +333,7 @@ pub(crate) fn run_blocking(
         let stdout = child.stdout.take().expect("stdout was piped");
         let stderr = child.stderr.take().expect("stderr was piped");
         map.insert(run_id.to_string(), child);
-        (stdout, std::thread::spawn(move || read_stderr(stderr)))
+        (stdout, StderrReader::start(stderr))
     };
 
     let mut seen_a_line = false;
@@ -295,8 +345,18 @@ pub(crate) fn run_blocking(
         if text.is_empty() {
             continue;
         }
-        let event = parse_line(text, !seen_a_line);
+        let mut event = parse_line(text, !seen_a_line);
         seen_a_line = true;
+        // A refusal's words are on standard error, which this thread has not
+        // read. The event is held until that closes, within a bound, so the
+        // frontend gets the words with it.
+        if let OaEvent::Exit { reason, rest, .. } = &mut event {
+            if reason == "refused" {
+                if let Some(message) = stderr.notes().refusal {
+                    rest.entry("message").or_insert(Value::String(message));
+                }
+            }
+        }
         said_hello |= matches!(event, OaEvent::Hello { .. });
         on_event(event);
     }
@@ -323,9 +383,8 @@ pub(crate) fn run_blocking(
         std::thread::sleep(POLL_INTERVAL);
     };
 
-    let notes = stderr.join().unwrap_or_default();
     if !said_hello && (outcome.code != Some(0)) {
-        return Err(failure_before_hello(notes, &outcome));
+        return Err(failure_before_hello(stderr.notes(), &outcome));
     }
     Ok(Some(outcome))
 }
@@ -582,23 +641,94 @@ echo '{{"event":"exit","seq":1,"frame":0,"tick":0,"reason":"quit"}}'"#
         );
     }
 
+    const REFUSED_EXIT: &str =
+        r#"echo '{"event":"exit","seq":1,"frame":0,"tick":0,"reason":"refused","code":2}'"#;
+    const REFUSAL_LINE: &str =
+        "echo 'open-annihilation: --game-password: is longer than 10 characters' >&2";
+    const REFUSAL_TEXT: &str = "--game-password: is longer than 10 characters";
+
+    fn exit_json(events: &[OaEvent]) -> Value {
+        assert!(matches!(events[0], OaEvent::Hello { .. }));
+        assert_eq!(events.len(), 2);
+        serde_json::to_value(&events[1]).unwrap()
+    }
+
     #[test]
-    fn a_failure_after_hello_is_a_result_not_an_error() {
+    fn a_refusal_after_hello_carries_the_line_written_after_the_exit_event() {
         let dir = Dir::new("refused-late");
+        let oa = dir.program(
+            "oa",
+            &format!("{HELLO}\n{REFUSED_EXIT}\n{REFUSAL_LINE}\nexit 2"),
+        );
+        let (result, events) = run(&oa, &[]);
+        // A failure after hello is a result, not an error.
+        assert_eq!(result.unwrap().unwrap().code, Some(2));
+        let exit = exit_json(&events);
+        assert_eq!(exit["reason"], "refused");
+        assert_eq!(exit["code"], 2);
+        assert_eq!(exit["message"], REFUSAL_TEXT);
+    }
+
+    #[test]
+    fn a_refusal_after_hello_carries_the_line_written_before_the_exit_event() {
+        let dir = Dir::new("refused-early");
+        let oa = dir.program(
+            "oa",
+            &format!("{HELLO}\n{REFUSAL_LINE}\n{REFUSED_EXIT}\nexit 2"),
+        );
+        let (result, events) = run(&oa, &[]);
+        assert_eq!(result.unwrap().unwrap().code, Some(2));
+        assert_eq!(exit_json(&events)["message"], REFUSAL_TEXT);
+    }
+
+    #[test]
+    fn a_refusal_after_hello_without_a_refusal_line_has_no_message() {
+        let dir = Dir::new("refused-silent");
+        let oa = dir.program("oa", &format!("{HELLO}\n{REFUSED_EXIT}\nexit 2"));
+        let (_, events) = run(&oa, &[]);
+        assert!(exit_json(&events).get("message").is_none());
+        // A line that is not a refusal is not passed on as one.
+        let other = dir.program(
+            "other",
+            &format!("{HELLO}\necho 'out of memory' >&2\n{REFUSED_EXIT}\nexit 2"),
+        );
+        let (_, events) = run(&other, &[]);
+        assert!(exit_json(&events).get("message").is_none());
+    }
+
+    #[test]
+    fn a_refusal_event_still_arrives_when_standard_error_never_closes() {
+        let dir = Dir::new("refused-open-pipe");
+        // The background `sleep` keeps standard error open after OA has gone, as
+        // a child process of OA could. Its standard output is closed.
+        let oa = dir.program(
+            "oa",
+            &format!("{HELLO}\n{REFUSAL_LINE}\n(sleep 5 >/dev/null &)\n{REFUSED_EXIT}\nexit 2"),
+        );
+        let started = std::time::Instant::now();
+        let (result, events) = run(&oa, &[]);
+        assert_eq!(result.unwrap().unwrap().code, Some(2));
+        // The line was read before the wait ran out, so it still arrives.
+        assert_eq!(exit_json(&events)["message"], REFUSAL_TEXT);
+        assert!(started.elapsed() < A_FEW_SECONDS);
+    }
+
+    #[test]
+    fn an_exit_that_is_not_a_refusal_does_not_wait_for_standard_error() {
+        let dir = Dir::new("quit-open-pipe");
         let oa = dir.program(
             "oa",
             &format!(
                 r#"{HELLO}
-echo '{{"event":"exit","seq":1,"frame":0,"tick":0,"reason":"refused","code":2}}'
-echo 'open-annihilation: no such map' >&2
-exit 2"#
+(sleep 5 >/dev/null &)
+echo '{{"event":"exit","seq":1,"frame":0,"tick":0,"reason":"quit"}}'"#
             ),
         );
+        let started = std::time::Instant::now();
         let (result, events) = run(&oa, &[]);
-        assert_eq!(result.unwrap().unwrap().code, Some(2));
-        let exit = serde_json::to_value(&events[1]).unwrap();
-        assert_eq!(exit["reason"], "refused");
-        assert_eq!(exit["code"], 2);
+        assert_eq!(result.unwrap().unwrap().code, Some(0));
+        assert!(exit_json(&events).get("message").is_none());
+        assert!(started.elapsed() < STDERR_WAIT);
     }
 
     #[test]
