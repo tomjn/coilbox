@@ -23,6 +23,7 @@ const COMMANDS: &[&str] = &[
     "dl_set_engine_dirs",
     "dl_path_writable",
     "dl_fetch_text",
+    "dl_fetch_preset_pack",
     "dl_rapid_release_archives",
     "dl_inspect_archive",
     "dl_install_archive",
