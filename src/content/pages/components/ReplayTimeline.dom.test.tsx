@@ -6,16 +6,18 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { useEffect } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { useEffect, useLayoutEffect } from "react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ChatLine, ReplayPlayer, TimelineEvent } from "../../bindings";
 import {
+  type ChartAxis,
   playerTeams,
   timelineDomain,
   toEventMarks,
   toMarks,
 } from "../../replayTimeline";
 import type { EmphasisStore } from "../../seriesEmphasis";
+import { ChartAxisProvider, useSetChartAxis } from "../../useChartAxis";
 import {
   SeriesEmphasisProvider,
   useSeriesEmphasis,
@@ -302,6 +304,119 @@ describe("ReplayTimeline", () => {
       expect(screen.getByText("p1")).toBeTruthy();
       fireEvent.click(mark);
       expect(onOpen).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe("the chart's axis", () => {
+    const grid = () => screen.getByTestId("timeline-grid");
+
+    /** The chart's end of the page, publishing an axis the way the chart column does. */
+    function Chart({ axis }: { axis: ChartAxis }) {
+      const setAxis = useSetChartAxis();
+      useLayoutEffect(() => {
+        setAxis(axis);
+        return () => setAxis(null);
+      }, [setAxis, axis]);
+      return null;
+    }
+
+    function aligned(lines: ChatLine[], axis: ChartAxis | null) {
+      const marks = toMarks(lines);
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+        left: 100,
+        right: 1024,
+      } as DOMRect);
+      return render(
+        <SeriesEmphasisProvider>
+          <ChartAxisProvider>
+            {axis && <Chart axis={axis} />}
+            <ReplayTimeline
+              marks={marks}
+              totalSec={timelineDomain(marks, 600, false)}
+              describe={(l) => l.text}
+              onOpenLine={vi.fn()}
+            />
+          </ChartAxisProvider>
+        </SeriesEmphasisProvider>,
+      );
+    }
+
+    const CHART: ChartAxis = { left: 352, right: 1012, endSec: 300 };
+
+    beforeAll(() => {
+      globalThis.ResizeObserver ??= class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("keeps its own axis on a replay with no statistics", () => {
+      aligned([line({ frame: 30 * 60, text: "one" })], null);
+      expect(grid().getAttribute("style")).toBeNull();
+      expect(grid().className).toContain("grid-cols-[5.5rem_minmax(0,1fr)]");
+      expect(screen.getByText("10:00")).toBeTruthy();
+    });
+
+    it("keeps its own axis with no provider above it", () => {
+      strip([line({ frame: 30 * 60, text: "one" })]);
+      expect(grid().getAttribute("style")).toBeNull();
+    });
+
+    it("puts its strip under the chart's plot", () => {
+      aligned([line({ frame: 30 * 60, text: "one" })], CHART);
+      expect(grid().style.gridTemplateColumns).toBe("252px minmax(0,1fr)");
+      expect(grid().style.paddingRight).toBe("12px");
+      expect(grid().className).not.toContain("grid-cols-");
+    });
+
+    it("runs to the chart's end, not its own, so a moment sits under the same moment", () => {
+      aligned([line({ frame: 30 * 150, text: "half way" })], CHART);
+      expect(screen.queryByText("10:00")).toBeNull();
+      expect(screen.getByText("5:00")).toBeTruthy();
+      const mark = screen.getByRole("button", { name: /1 line/ });
+      expect(mark.style.left).toBe("50%");
+    });
+
+    it("keeps a line after the chart's last sample on the strip, in the last column", () => {
+      aligned([line({ frame: 30 * 400, text: "gg" })], CHART);
+      const mark = screen.getByRole("button", { name: /1 line/ });
+      expect(Number.parseFloat(mark.style.left)).toBeLessThan(100);
+      expect(Number.parseFloat(mark.style.left)).toBeGreaterThan(98);
+    });
+
+    it("moves row labels above the strip when the gap left of the axis is too narrow", () => {
+      aligned([line({ frame: 30 * 60, text: "one" })], {
+        ...CHART,
+        left: 152,
+      });
+      expect(grid().style.gridTemplateColumns).toBe("52px minmax(0,1fr)");
+      expect(screen.getByText("Everyone").className).toContain("col-span-full");
+    });
+
+    it("goes back to its own axis when the chart goes away", () => {
+      const { rerender } = aligned(
+        [line({ frame: 30 * 60, text: "one" })],
+        CHART,
+      );
+      expect(grid().getAttribute("style")).not.toBeNull();
+      const marks = toMarks([line({ frame: 30 * 60, text: "one" })]);
+      rerender(
+        <SeriesEmphasisProvider>
+          <ChartAxisProvider>
+            <ReplayTimeline
+              marks={marks}
+              totalSec={600}
+              describe={(l) => l.text}
+              onOpenLine={vi.fn()}
+            />
+          </ChartAxisProvider>
+        </SeriesEmphasisProvider>,
+      );
+      expect(grid().getAttribute("style")).toBeNull();
+      expect(screen.getByText("10:00")).toBeTruthy();
     });
   });
 });

@@ -3,10 +3,12 @@ import type { ChatLine, ReplayPlayer, TimelineEvent } from "./bindings";
 import {
   axisTicks,
   binMarks,
+  chartAxis,
   describeEvent,
   markKind,
   markTeams,
   playerTeams,
+  stripLayout,
   timelineDomain,
   toEventMarks,
   toMarks,
@@ -19,6 +21,62 @@ const line = (over: Partial<ChatLine>): ChatLine => ({
   text: "",
   system: false,
   ...over,
+});
+
+describe("chartAxis", () => {
+  const column = { left: 300, right: 1100 };
+
+  it("takes the value axis off the left and the fixed gutter off the right", () => {
+    expect(chartAxis(column, false, 900)).toEqual({
+      left: 352,
+      right: 1092,
+      endSec: 900,
+    });
+  });
+
+  it("leaves room for end labels when the chart draws them", () => {
+    expect(chartAxis(column, true, 900).right).toBe(1012);
+  });
+});
+
+describe("stripLayout", () => {
+  const axis = { left: 352, right: 1012, endSec: 900 };
+
+  it("gives the strip what is left of its box once the axis is taken out", () => {
+    const layout = stripLayout(axis, { left: 100, right: 1024 }, false);
+    expect(layout).toEqual({
+      columns: "252px minmax(0,1fr)",
+      paddingRight: 12,
+      labelsAbove: false,
+    });
+  });
+
+  it("takes the pregame column out of the gap, so zero stays where it was", () => {
+    const layout = stripLayout(axis, { left: 100, right: 1024 }, true);
+    expect(layout.columns).toBe("196px 56px minmax(0,1fr)");
+  });
+
+  it("moves the labels above the strip when the gap is too narrow for them", () => {
+    const narrow = stripLayout(axis, { left: 300, right: 1024 }, false);
+    expect(narrow).toEqual({
+      columns: "52px minmax(0,1fr)",
+      paddingRight: 12,
+      labelsAbove: true,
+    });
+  });
+
+  it("counts the pregame column when deciding there is no room", () => {
+    const box = { left: 252, right: 1024 };
+    expect(stripLayout(axis, box, false).labelsAbove).toBe(false);
+    expect(stripLayout(axis, box, true).labelsAbove).toBe(true);
+    expect(stripLayout(axis, box, true).columns).toBe("100px minmax(0,1fr)");
+  });
+
+  it("never asks for a negative inset when the chart runs past its box", () => {
+    const layout = stripLayout(axis, { left: 400, right: 1000 }, false);
+    expect(layout.columns).toBe("0px minmax(0,1fr)");
+    expect(layout.paddingRight).toBe(0);
+  });
 });
 
 describe("markKind", () => {

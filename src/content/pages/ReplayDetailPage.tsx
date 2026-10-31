@@ -51,6 +51,7 @@ import { teamResultLabel } from "../replaySideLabel";
 import { refreshStoredTracks } from "../replayTracks";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
+import { ChartAxisProvider } from "../useChartAxis";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
@@ -900,99 +901,101 @@ export default function ReplayDetailPage() {
            * you to the next one. It reaches down to the map, so the sections
            * between are inside it too and read nothing from it. */}
           <SeriesEmphasisProvider key={filename}>
-            <ReplayRoster info={info} replayPath={replay?.path} />
+            <ChartAxisProvider>
+              <ReplayRoster info={info} replayPath={replay?.path} />
 
-            {/* Directly under the roster (#1200). The roster is where a player
-             * is already reading per-seat numbers, and the chart answers the
-             * question the roster raises. */}
-            {replay && !isProfileHidden("analytics.matchStats") && (
-              <MatchStatsSection info={info} replayPath={replay.path} />
-            )}
-            {replay && !isProfileHidden("analytics.matchStats") && (
-              <ReplayBuildOrders info={info} replayPath={replay.path} />
-            )}
+              {/* Directly under the roster (#1200). The roster is where a player
+               * is already reading per-seat numbers, and the chart answers the
+               * question the roster raises. */}
+              {replay && !isProfileHidden("analytics.matchStats") && (
+                <MatchStatsSection info={info} replayPath={replay.path} />
+              )}
+              {replay && !isProfileHidden("analytics.matchStats") && (
+                <ReplayBuildOrders info={info} replayPath={replay.path} />
+              )}
 
-            {/* Opt in, one replay at a time (#1157). One run makes the analysis
-             * and the track (#3962). The section gates itself on
-             * `analytics.run`, and still shows what is already stored. */}
-            {replay && (
-              <ReplayAnalysisSection
-                replayPath={replay.path}
+              {/* Opt in, one replay at a time (#1157). One run makes the analysis
+               * and the track (#3962). The section gates itself on
+               * `analytics.run`, and still shows what is already stored. */}
+              {replay && (
+                <ReplayAnalysisSection
+                  replayPath={replay.path}
+                  info={info}
+                  target={resolved?.matched ? resolved.target : null}
+                  missingGame={missingGame}
+                  missingMap={missingMap}
+                  dependencyBlock={dependencyBlock}
+                  installedGames={answered?.games ?? []}
+                  downloads={
+                    <MissingContentNotice
+                      gameType={info.gameType}
+                      mapName={info.mapName}
+                      missingGame={missingGame}
+                      missingMap={missingMap}
+                      engine={engine}
+                      onMapDownloaded={onMapDownloaded}
+                    />
+                  }
+                />
+              )}
+
+              {/* The track the section above records, drawn (#3807). It shows
+               * itself only when the replay has one. */}
+              <ReplayMapViewSection
                 info={info}
-                target={resolved?.matched ? resolved.target : null}
-                missingGame={missingGame}
-                missingMap={missingMap}
-                dependencyBlock={dependencyBlock}
-                installedGames={answered?.games ?? []}
-                downloads={
-                  <MissingContentNotice
-                    gameType={info.gameType}
+                enginePath={selected?.enginePath}
+                dataDir={selected?.rootPath}
+                replayPath={replay?.path ?? ""}
+                watch={engine.watch}
+                dependencyBlock={playbackBlock}
+                game={playbackGame?.name}
+              />
+
+              {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
+              {replay && !isProfileHidden("analytics.matchStats") && (
+                <ReplayAnalysisEvents info={info} replayPath={replay.path} />
+              )}
+
+              {/* Read from the replay file, so it needs no engine. */}
+              {replay && (
+                <ReplayChat
+                  replayPath={replay.path}
+                  durationSec={info.durationSec}
+                  players={info.players}
+                />
+              )}
+
+              <ReplayNotes filename={filename} gameId={info.gameId} />
+
+              <section className="flex flex-col gap-2">
+                {selected && info.mapName ? (
+                  <ReplayMapPreview
+                    heading={
+                      <h2 className="text-sm font-medium">
+                        <Trans>Map · {infoMapName}</Trans>
+                      </h2>
+                    }
+                    key={previewNonce}
+                    enginePath={selected.enginePath}
+                    dataDir={selected.rootPath}
                     mapName={info.mapName}
-                    missingGame={missingGame}
-                    missingMap={missingMap}
-                    engine={engine}
-                    onMapDownloaded={onMapDownloaded}
+                    info={info}
+                    replayPath={replay?.path}
                   />
-                }
-              />
-            )}
-
-            {/* The track the section above records, drawn (#3807). It shows
-             * itself only when the replay has one. */}
-            <ReplayMapViewSection
-              info={info}
-              enginePath={selected?.enginePath}
-              dataDir={selected?.rootPath}
-              replayPath={replay?.path ?? ""}
-              watch={engine.watch}
-              dependencyBlock={playbackBlock}
-              game={playbackGame?.name}
-            />
-
-            {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
-            {replay && !isProfileHidden("analytics.matchStats") && (
-              <ReplayAnalysisEvents info={info} replayPath={replay.path} />
-            )}
-
-            {/* Read from the replay file, so it needs no engine. */}
-            {replay && (
-              <ReplayChat
-                replayPath={replay.path}
-                durationSec={info.durationSec}
-                players={info.players}
-              />
-            )}
-
-            <ReplayNotes filename={filename} gameId={info.gameId} />
-
-            <section className="flex flex-col gap-2">
-              {selected && info.mapName ? (
-                <ReplayMapPreview
-                  heading={
+                ) : (
+                  <>
                     <h2 className="text-sm font-medium">
                       <Trans>Map · {infoMapName}</Trans>
                     </h2>
-                  }
-                  key={previewNonce}
-                  enginePath={selected.enginePath}
-                  dataDir={selected.rootPath}
-                  mapName={info.mapName}
-                  info={info}
-                  replayPath={replay?.path}
-                />
-              ) : (
-                <>
-                  <h2 className="text-sm font-medium">
-                    <Trans>Map · {infoMapName}</Trans>
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {info.mapName
-                      ? t`Install an engine to preview this map.`
-                      : t`No map recorded for this replay.`}
-                  </p>
-                </>
-              )}
-            </section>
+                    <p className="text-sm text-muted-foreground">
+                      {info.mapName
+                        ? t`Install an engine to preview this map.`
+                        : t`No map recorded for this replay.`}
+                    </p>
+                  </>
+                )}
+              </section>
+            </ChartAxisProvider>
           </SeriesEmphasisProvider>
         </>
       ) : null}

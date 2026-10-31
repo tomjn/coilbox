@@ -1,7 +1,7 @@
 import { plural, t } from "@lingui/core/macro";
 import { useLingui as useLocale } from "@lingui/react";
 import { Trans } from "@lingui/react/macro";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { formatDuration } from "@/lib/format";
 import type { ChatLine } from "../../bindings";
 import {
@@ -14,9 +14,11 @@ import {
   MARK_KINDS,
   type MarkKind,
   markTeams,
+  stripLayout,
   type TimelineBin,
   type TimelineMark,
 } from "../../replayTimeline";
+import { useChartAxis } from "../../useChartAxis";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 
 /**
@@ -130,11 +132,17 @@ function readoutHeading(active: Active, totalSec: number): string {
  * those teams elsewhere. Spectator, server and system lines have no team, and
  * neither do players the replay gives no number, so their marks stay as they
  * are. Mount it under a `SeriesEmphasisProvider`.
+ *
+ * While the page draws a match statistics chart, the strip takes that chart's
+ * time axis, in position and in length, so a mark sits under the moment it
+ * belongs to (#3856). The chart stops at its last sample, so a line after that
+ * lands in the last column. With no chart the strip keeps `ownSec` and its own
+ * columns.
  */
 export function ReplayTimeline({
   marks,
   events = [],
-  totalSec,
+  totalSec: ownSec,
   describe,
   onOpenLine,
   teamOf = NO_TEAMS,
@@ -150,6 +158,23 @@ export function ReplayTimeline({
   useLocale();
   const e = useSeriesEmphasis();
   const [active, setActive] = useState<Active | null>(null);
+  const axis = useChartAxis();
+  const grid = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ left: number; right: number } | null>(null);
+  const following = axis !== null;
+  useLayoutEffect(() => {
+    const el = grid.current;
+    if (!following || !el) return;
+    const measure = () => {
+      const { left, right } = el.getBoundingClientRect();
+      setBox({ left, right });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [following]);
+  const totalSec = axis && axis.endSec > 0 ? axis.endSec : ownSec;
   const bins = binMarks(marks, totalSec, BIN_COUNT);
   const eventBins = binMarks(events, totalSec, BIN_COUNT);
   const hasPregame =
@@ -161,9 +186,14 @@ export function ReplayTimeline({
   );
   const ticks = axisTicks(totalSec);
   const hiddenCount = active ? active.bin.marks.length - READOUT_LINES : 0;
-  const columns = hasPregame
-    ? "grid-cols-[5.5rem_3.5rem_minmax(0,1fr)]"
-    : "grid-cols-[5.5rem_minmax(0,1fr)]";
+  const layout = axis && box ? stripLayout(axis, box, hasPregame) : null;
+  const columns = layout
+    ? ""
+    : hasPregame
+      ? "grid-cols-[5.5rem_3.5rem_minmax(0,1fr)]"
+      : "grid-cols-[5.5rem_minmax(0,1fr)]";
+  const labelsAbove = layout?.labelsAbove ?? false;
+  const labelClass = `self-center pr-2 text-muted-foreground ${labelsAbove ? "col-span-full" : ""}`;
 
   const cell = (bin: TimelineBin, max: number, style: React.CSSProperties) => {
     const n = bin.marks.length;
@@ -241,22 +271,32 @@ export function ReplayTimeline({
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 text-xs">
-      <div className={`grid items-stretch gap-y-1 ${columns}`}>
+      <div
+        ref={grid}
+        data-testid="timeline-grid"
+        className={`grid items-stretch gap-y-1 ${columns}`}
+        style={
+          layout
+            ? {
+                gridTemplateColumns: layout.columns,
+                paddingRight: layout.paddingRight,
+              }
+            : undefined
+        }
+      >
         {kinds.map((kind) => {
           const row = bins.filter((b) => b.kind === kind);
           const max = Math.max(...row.map((b) => b.marks.length));
           const pre = row.find((b) => b.slot === "pregame");
           return (
             <div key={kind} className="contents">
-              <span className="self-center pr-2 text-muted-foreground">
-                {kindLabel(kind)}
-              </span>
+              <span className={labelClass}>{kindLabel(kind)}</span>
               {hasPregame && (
                 <div className="relative h-6 border-r border-border/60">
                   {pre && cell(pre, max, { left: 0, right: 0, width: "auto" })}
                 </div>
               )}
-              <div className="relative h-6">
+              <div className="relative col-end-[-1] h-6">
                 {row
                   .filter((b) => b.slot !== "pregame")
                   .map((b) =>
@@ -275,16 +315,14 @@ export function ReplayTimeline({
           const pre = row.find((b) => b.slot === "pregame");
           return (
             <div key={kind} className="contents">
-              <span className="self-center pr-2 text-muted-foreground">
-                {eventLabel(kind)}
-              </span>
+              <span className={labelClass}>{eventLabel(kind)}</span>
               {hasPregame && (
                 <div className="relative h-6 border-r border-border/60">
                   {pre &&
                     eventCell(pre, max, { left: 0, right: 0, width: "auto" })}
                 </div>
               )}
-              <div className="relative h-6">
+              <div className="relative col-end-[-1] h-6">
                 {row
                   .filter((b) => b.slot !== "pregame")
                   .map((b) =>
@@ -297,13 +335,16 @@ export function ReplayTimeline({
             </div>
           );
         })}
-        <span />
+        {!labelsAbove && <span />}
         {hasPregame && (
           <span className="pt-1 text-center text-muted-foreground">
             <Trans>Before</Trans>
           </span>
         )}
-        <div className="relative h-5 border-t border-border/60 text-muted-foreground">
+        <div
+          data-testid="timeline-axis"
+          className="relative col-end-[-1] h-5 border-t border-border/60 text-muted-foreground"
+        >
           {ticks.map((tick) => (
             <span
               key={tick}
