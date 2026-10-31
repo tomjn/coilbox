@@ -7,30 +7,28 @@ import { OpenAnnihilationIcon } from "../../multiplayer/OpenAnnihilationIcon";
 import { useOpenAnnihilation } from "../../multiplayer/openAnnihilation";
 import { type OaEvent, playOaLaunch } from "../../play/bindings";
 import { getGameMatcher } from "../../profile/profile";
+import { OA_CARD_ID } from "../openAnnihilationArt";
 import { ToolCard } from "./ToolCards";
 
-/**
- * The tool id the card is drawn, and given art, under. It is not a nav item, so
- * nothing else uses it, but a distribution's per-tool art settings key on it
- * like any other card's.
- */
-export const OA_CARD_ID = "multiplayer.open-annihilation";
+export { OA_CARD_ID };
 
 /** Where the card goes when Open Annihilation is not set up. */
 export const CORE_PRIME_URL = "https://play.coreprime.net";
 
 /**
- * A welcome card for Open Annihilation (issue #4945), in the Multiplayer group
- * beside the other cards.
+ * A welcome card for Open Annihilation (issue #4945), in the Play group beside
+ * the other cards (issue #4966).
  *
- * With the program path from #4943 set, pressing it starts OA on its own main
- * menu: `--skip-intro` and nothing else. Without one it opens Core Prime's page
- * in the browser, which `ToolCard` already does for an item with an `href`. The
- * two states are the card's label and action, with no explanation on the card.
+ * With the program path from #4943 set, pressing it starts OA with no arguments
+ * of its own, so its intro plays. Without one it opens Core Prime's page in the
+ * browser, which `ToolCard` already does for an item with an `href`. The two
+ * states are the card's label and action, with no explanation on the card.
  *
  * It is {@link ToolCard} with a synthetic nav item, so it has the same shell,
- * art, focus ring and external-link mark as the cards around it. The group
- * hands it `compact` for the same reason it hands it to them.
+ * art, focus ring and external-link mark as the cards around it. Its art is the
+ * picture of `openAnnihilationArt.ts` in both states, unless a distribution
+ * overrides it. The group hands it `compact` for the same reason it hands it to
+ * the other cards.
  *
  * ## A profile narrowed to a game hides it
  *
@@ -61,7 +59,7 @@ export default function OpenAnnihilationCard({
       // One channel per call: a channel reused across commands stops delivering.
       await playOaLaunch({
         executable: program.path,
-        args: ["--skip-intro"],
+        args: [],
         runId: crypto.randomUUID(),
         onEvent: new Channel<OaEvent>(),
       });

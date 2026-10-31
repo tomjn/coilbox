@@ -133,13 +133,16 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
 const SUGGESTED_MAP_GROUP = "library";
 
 /**
- * The nav group the Open Annihilation card joins: Multiplayer, where the other
- * cards for playing with other people are. The card hides itself under a
- * profile's game filter (see {@link OpenAnnihilationCard}). Like the suggested
- * map's card it is counted for the row's height even then, which errs towards
- * a taller row, as the grid's own note says.
+ * The nav group the Open Annihilation card joins: Play, where the other cards
+ * for playing the game are. The card hides itself under a profile's game filter
+ * (see {@link OpenAnnihilationCard}). Like the suggested map's card it is
+ * counted for the row's height even then, which errs towards a taller row, as
+ * the grid's own note says.
+ *
+ * Its picture makes the row a row with a picture in it, so the group is only
+ * compact when a distribution has set `art: false` on the card too.
  */
-const OPEN_ANNIHILATION_GROUP = "multiplayer";
+const OPEN_ANNIHILATION_GROUP = "play";
 
 /**
  * What a tool card adds to the shared shell in both rendering modes. Sizing, the

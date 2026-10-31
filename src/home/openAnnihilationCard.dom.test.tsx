@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 
 /**
- * The Open Annihilation welcome card (issue #4945), drawn where the home page
- * draws it: in the Multiplayer group of the tool grid.
+ * The Open Annihilation welcome card (issues #4945 and #4966), drawn where the
+ * home page draws it: in the Play group of the tool grid.
  */
 
 import { i18n } from "@lingui/core";
@@ -51,6 +51,11 @@ vi.mock("@picoframe/frame", async () => ({
   useFrame: () => ({
     nav: [
       {
+        id: "play",
+        label: "Play",
+        items: [{ id: "play.skirmish", label: "Skirmish", to: "/play" }],
+      },
+      {
         id: "multiplayer",
         label: "Multiplayer",
         items: [
@@ -66,6 +71,9 @@ vi.mock("../profile/profile", async (importOriginal) => ({
   getGameMatcher: () => state.matcher,
 }));
 
+import { publishArtOverrides, resetArtOverrides } from "./artOverride";
+import oaPicture from "./images/open-annihilation.webp";
+import { OA_CARD_ID } from "./openAnnihilationArt";
 import ToolCards from "./zones/ToolCards";
 
 /** What a Rust `UiError` looks like once it reaches a rejected promise. */
@@ -90,9 +98,17 @@ beforeEach(() => {
   bindings.playOaLaunch.mockReset().mockResolvedValue({});
   opener.openUrl.mockReset().mockResolvedValue(undefined);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetArtOverrides();
+});
 
-it("starts Open Annihilation on its main menu when the program is set", async () => {
+/** The group a heading belongs to: its section. */
+const groupOf = (name: string) =>
+  screen.getByRole("heading", { name }).parentElement
+    ?.parentElement as HTMLElement;
+
+it("starts Open Annihilation with no arguments of its own when the program is set", async () => {
   state.program = MAC_OA;
   show();
   fireEvent.click(
@@ -101,7 +117,7 @@ it("starts Open Annihilation on its main menu when the program is set", async ()
   await waitFor(() => expect(bindings.playOaLaunch).toHaveBeenCalledOnce());
   const call = bindings.playOaLaunch.mock.calls[0][0];
   expect(call.executable).toBe(MAC_OA.path);
-  expect(call.args).toEqual(["--skip-intro"]);
+  expect(call.args).toEqual([]);
   expect(call.runId).toEqual(expect.any(String));
   expect(opener.openUrl).not.toHaveBeenCalled();
 });
@@ -154,10 +170,38 @@ it("is hidden by a profile narrowed to a game", () => {
   expect(screen.queryByText(/open annihilation/i)).toBeNull();
 });
 
-it("sits in the Multiplayer group with the other cards", () => {
+it("sits in the Play group, not the Multiplayer group", () => {
   show();
-  const group = screen.getByRole("heading", { name: "Multiplayer" })
-    .parentElement?.parentElement as HTMLElement;
-  expect(group.textContent).toContain("Battles");
-  expect(group.textContent).toContain("Get Open Annihilation");
+  expect(groupOf("Play").textContent).toContain("Skirmish");
+  expect(groupOf("Play").textContent).toContain("Get Open Annihilation");
+  expect(groupOf("Multiplayer").textContent).toContain("Battles");
+  expect(groupOf("Multiplayer").textContent).not.toContain("Open Annihilation");
+});
+
+const picture = () =>
+  screen
+    .getByRole("button", { name: /open annihilation/i })
+    .querySelector("img");
+
+it("uses the supplied picture as its art when the program is not set", () => {
+  show();
+  expect(picture()?.getAttribute("src")).toBe(oaPicture);
+});
+
+it("uses the supplied picture as its art when the program is set", () => {
+  state.program = MAC_OA;
+  show();
+  expect(picture()?.getAttribute("src")).toBe(oaPicture);
+});
+
+it("lets a distribution's art for the card replace the picture", () => {
+  publishArtOverrides(new Map([[OA_CARD_ID, "/profile/oa.png"]]));
+  show();
+  expect(picture()?.getAttribute("src")).toBe("/profile/oa.png");
+});
+
+it("lets a distribution switch the picture off", () => {
+  publishArtOverrides(new Map([[OA_CARD_ID, false]]));
+  show();
+  expect(picture()).toBeNull();
 });

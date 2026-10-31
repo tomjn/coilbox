@@ -28,10 +28,18 @@ vi.mock("@picoframe/frame", () => ({
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
+// The Open Annihilation card reads a setting and the lobby bindings, which this
+// file has no frame for. It has its own tests in openAnnihilationCard.dom.test.tsx.
+vi.mock("./zones/OpenAnnihilationCard", async () => ({
+  default: () => null,
+  OA_CARD_ID: (await import("./openAnnihilationArt")).OA_CARD_ID,
+}));
+
 import type { NavItem } from "@picoframe/plugin-sdk";
 import { Rocket } from "lucide-react";
 import { type CardArtStep, registerCardArtSource } from "./art";
 import { ART_BAND_CLASS, ART_CARD_CLASS } from "./cardShell";
+import { OA_CARD_ID } from "./openAnnihilationArt";
 import { proceduralCardArt } from "./proceduralArt";
 import ToolCards, { cardArtUrl, ToolCard } from "./zones/ToolCards";
 
@@ -290,11 +298,25 @@ describe("how tall a row of pictureless cards is", () => {
   it("draws the compact row when every tool in the group is pictureless", () => {
     // The design's original case, and still right: nothing is wrong with a row
     // of icon cards not being full height. Only reachable through a
-    // distribution, because the procedural floor never fails.
-    registerByTool("override", { skirmish: false, "play.replays": false });
+    // distribution, because the procedural floor never fails. The Open
+    // Annihilation card lives in this group, so it has to be switched off too.
+    registerByTool("override", {
+      skirmish: false,
+      "play.replays": false,
+      [OA_CARD_ID]: false,
+    });
     const play = section(grid(), "Play");
     expect(play.match(new RegExp(CHIP, "g"))).toHaveLength(2);
     expect(play).not.toContain("min-h-28");
+  });
+
+  it("keeps the Play row at full height for the Open Annihilation picture", () => {
+    // Every tool is switched off, but the card's own picture is a picture in
+    // the row, as the suggested map's is in Library.
+    registerByTool("override", { skirmish: false, "play.replays": false });
+    const play = section(grid(), "Play");
+    expect(play).not.toContain(CHIP);
+    expect(play.match(/min-h-28/g)).toHaveLength(2);
   });
 
   it("gives every pictureless card a full footprint when one tool has art", () => {

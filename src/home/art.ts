@@ -2,16 +2,17 @@
  * One art resolver for the whole home page. Every zone that shows card art calls
  * {@link resolveCardArt}, and no zone carries its own fallback logic.
  *
- * Four sources, tried in order:
+ * Five sources, tried in order:
  *
  * 1. `override`: the distribution's per-tool art (issue #1000).
  * 2. `content`: art derived from the user's install, such as a last-played map's
  *    minimap, a campaign panorama, or a Warpath run's galaxy (issue #989).
- * 3. `bundled`: an illustration Coilbox ships for that tool (issue #990).
- * 4. `procedural`: a pattern seeded from the tool id and the theme colour.
+ * 3. `shipped`: an image file Coilbox carries and paints as it is (issue #4966).
+ * 4. `bundled`: an illustration Coilbox draws for that tool (issue #990).
+ * 5. `procedural`: a pattern seeded from the tool id and the theme colour.
  *
- * Step 4 always succeeds, so no card is ever artless and none of the art work
- * above blocks on artwork existing. It also means the three sources above are
+ * Step 5 always succeeds, so no card is ever artless and none of the art work
+ * above blocks on artwork existing. It also means the four sources above are
  * genuinely optional and can land in any order.
  *
  * ## Adding a source
@@ -39,7 +40,7 @@
 import { FALLBACK_THEME_COLOR, proceduralCardArt } from "./proceduralArt";
 
 /** The steps above the procedural floor, in the order they are tried. */
-export type CardArtStep = "override" | "content" | "bundled";
+export type CardArtStep = "override" | "content" | "shipped" | "bundled";
 
 /**
  * The colour scheme a card is drawn for.
@@ -55,7 +56,12 @@ export type CardScheme = "light" | "dark";
 export type CardArtSourceName = CardArtStep | "procedural";
 
 /** Steps in priority order. The floor is not in here, it is unconditional. */
-const STEPS: readonly CardArtStep[] = ["override", "content", "bundled"];
+const STEPS: readonly CardArtStep[] = [
+  "override",
+  "content",
+  "shipped",
+  "bundled",
+];
 
 /** What a source is asked about. */
 export interface CardArtRequest {
@@ -280,6 +286,10 @@ export function forgetThemeColor(): void {
 import { bundledCardArt } from "./bundledArt";
 
 registerCardArtSource("bundled", bundledCardArt);
+
+import { shippedCardArt } from "./openAnnihilationArt";
+
+registerCardArtSource("shipped", shippedCardArt);
 
 import { contentCardArt } from "./contentArt";
 
