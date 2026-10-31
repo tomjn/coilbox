@@ -49,16 +49,25 @@ vi.mock("./presets", async (importOriginal) => ({
   useSkirmishPresets: () => ({ presets: stored, savePreset }),
 }));
 
-vi.mock("./config", () => ({
-  useSkirmishAis: () => ({
-    ais: [{ shortName: "BARb", kind: "native", name: "BARb" }],
-  }),
-}));
+// What the game's AI list and info reads say, which a test changes to see the
+// view while they load or after they fail.
+const aiRead = vi.fn();
+const infoRead = vi.fn();
+vi.mock("./config", () => ({ useSkirmishAis: () => aiRead() }));
 vi.mock("@/content/config", () => ({
-  useUnitsyncGameInfo: () => ({
-    info: { sides: [{ name: "Armada" }, { name: "Cortex" }] },
-  }),
+  useUnitsyncGameInfo: () => infoRead(),
 }));
+const settledReads = () => {
+  aiRead.mockReturnValue({
+    ais: [{ shortName: "BARb", kind: "native", name: "BARb" }],
+    loaded: true,
+    failed: false,
+  });
+  infoRead.mockReturnValue({
+    info: { sides: [{ name: "Armada" }, { name: "Cortex" }] },
+    status: "ready",
+  });
+};
 
 const notify = vi.fn();
 vi.mock("@/notify/notify", () => ({ notify: (n: unknown) => notify(n) }));
@@ -77,12 +86,23 @@ function mine(id: string, name: string): SkirmishPreset {
   };
 }
 
-function renderView(over: { disabled?: boolean; game?: string } = {}) {
+function renderView(
+  over: {
+    disabled?: boolean;
+    game?: string;
+    files?: string[];
+    /** Give the view a resolved game, so it waits on the game's reads. */
+    resolved?: boolean;
+  } = {},
+) {
   render(
     <ChobbyPresetsView
-      files={[FILE]}
+      files={over.files ?? [FILE]}
       currentGameName={over.game ?? "BAR test"}
       disabled={over.disabled}
+      {...(over.resolved
+        ? { enginePath: "/engine", dataDir: "/data", archive: "bar.sdz" }
+        : {})}
     />,
   );
 }
@@ -91,6 +111,7 @@ const asFile = (records: object) => ({ json: JSON.stringify(records) });
 
 beforeEach(() => {
   stored.length = 0;
+  settledReads();
   read.mockResolvedValue(asFile(RECORDS));
   write.mockImplementation(
     async ({ edits }: { edits: { op: string; name: string }[] }) => {
@@ -266,5 +287,130 @@ describe("the Chobby presets face", () => {
       "a game is running",
     );
     expect(screen.getByText("Skirmish 2v2")).toBeTruthy();
+  });
+});
+
+describe("while the game's factions and AIs are not known", () => {
+  const importButton = () =>
+    screen.getByRole("button", { name: /^Import( 1 preset)?$/ });
+
+  it("waits for both reads before importing or writing", async () => {
+    aiRead.mockReturnValue({ ais: [], loaded: false, failed: false });
+    infoRead.mockReturnValue({ info: null, status: "loading" });
+    stored.push(mine("a", "Mine"));
+    renderView({ resolved: true });
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Skirmish/ }));
+    expect((importButton() as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Preset to write" }));
+    fireEvent.click(screen.getByRole("option", { name: "Mine" }));
+    expect(
+      (screen.getByRole("button", { name: "Write" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
+  it("does not convert when a read failed, and says so", async () => {
+    aiRead.mockReturnValue({ ais: [], loaded: true, failed: true });
+    renderView({ resolved: true });
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Skirmish/ }));
+    expect((importButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Could not read this game's factions and AIs",
+    );
+  });
+
+  it("imports once both have arrived", async () => {
+    renderView({ resolved: true });
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Skirmish/ }));
+    expect((importButton() as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("a preset written from another game", () => {
+  const botPreset = (id: string, game: string): SkirmishPreset => ({
+    ...mine(id, "Theirs"),
+    gameName: game,
+    participants: [
+      {
+        id: "b",
+        kind: "ai",
+        name: "AI 1",
+        ai: { shortName: "BARb", kind: "native" },
+        side: "Cortex",
+        color: [1, 0, 0],
+        allyTeam: 1,
+        spectator: false,
+      },
+    ],
+  });
+
+  const writeIt = async () => {
+    fireEvent.click(
+      await screen.findByRole("combobox", { name: "Preset to write" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "Theirs" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Write" }));
+    });
+    return write.mock.calls[0][0].edits[0].record.Bots["AI 1"];
+  };
+
+  it("gets no side, because the selected game's list is not its own", async () => {
+    stored.push(botPreset("t", "Some other game"));
+    renderView();
+    expect(await writeIt()).not.toHaveProperty("side");
+  });
+
+  it("gets its side from the selected game's list when it is that game's", async () => {
+    stored.push(botPreset("t", "BAR test"));
+    renderView();
+    expect((await writeIt()).side).toBe(1);
+  });
+});
+
+describe("switching between two files", () => {
+  const A = "/a/optionsPresets.json";
+  const B = "/b/optionsPresets.json";
+
+  it("shows no record of the old file while the new one loads, and ignores a late reply", async () => {
+    let answerB: (v: { json: string }) => void = () => {};
+    read.mockImplementation(({ path }: { path: string }) =>
+      path === A
+        ? Promise.resolve(asFile({ "From A": {} }))
+        : new Promise((resolve) => {
+            answerB = resolve;
+          }),
+    );
+    renderView({ files: [A, B] });
+    expect(await screen.findByText("From A")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Chobby file" }));
+    fireEvent.click(screen.getByRole("option", { name: "/b" }));
+
+    // File B has not answered, so file A's record must not be on offer.
+    expect(screen.queryByText("From A")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Remove From A from Chobby" }),
+    ).toBeNull();
+
+    await act(async () => answerB(asFile({ "From B": {} })));
+    expect(await screen.findByText("From B")).toBeTruthy();
+    expect(screen.queryByText("From A")).toBeNull();
+  });
+
+  it("changes the file that was shown when the edit began, whichever is shown by the time it ends", async () => {
+    read.mockImplementation(({ path }: { path: string }) =>
+      Promise.resolve(asFile(path === A ? { "From A": {} } : { "From B": {} })),
+    );
+    renderView({ files: [A, B] });
+    await screen.findByText("From A");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove From A from Chobby" }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    });
+    expect(write.mock.calls[0][0].path).toBe(A);
   });
 });

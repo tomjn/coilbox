@@ -227,22 +227,32 @@ export function chobbyRecordToDraft(
  * Chobby walks with `ipairs`: an ally team with no box gets the whole map, so
  * the walk does not stop short.
  *
+ * Start boxes are only written for choose-in-game start positions. A draft
+ * keeps old boxes when the player switches away, but a launch ignores them, so
+ * writing them would bring back a layout the preset does not use.
+ *
+ * A bot's side is its index in `sides`, which must be the sides of the game the
+ * preset belongs to. With no sides, or a side not among them, the side is left
+ * out and Chobby uses the game's default.
+ *
  * Numbers and booleans are written as such. Chobby reads `locked` for truth and
  * the string "false" is true in Lua, which is why that section is not written.
  */
 export function presetToChobbyRecord(
   draft: SkirmishDraft,
-  sides: readonly string[],
+  sides: readonly string[] | undefined,
 ): Record<string, unknown> {
   const record: Record<string, unknown> = {};
   if (draft.mapName) record.Map = draft.mapName;
   if (Object.keys(draft.modOptionValues).length > 0)
     record.Modoptions = { ...draft.modOptionValues };
 
-  const sideIndex = (side: string): number => {
+  const sideIndex = (side: string): number | undefined => {
+    if (!sides) return undefined;
     const named =
       side === RANDOM_SIDE ? gameRandomSide(sides.map(asSide)) : side;
-    return Math.max(0, sides.indexOf(named ?? ""));
+    const index = sides.indexOf(named ?? "");
+    return index >= 0 ? index : undefined;
   };
   const bots: Record<string, unknown> = {};
   const names: string[] = [];
@@ -250,18 +260,20 @@ export function presetToChobbyRecord(
     if (p.kind !== "ai" || !p.ai) continue;
     const name = dedupePresetName(names, p.name);
     names.push(name);
+    const side = sideIndex(p.side);
     bots[name] = {
       aiLib: p.ai.shortName,
       allyNumber: p.allyTeam,
       aiOptions: {},
       teamColor: [...p.color],
-      side: sideIndex(p.side),
+      ...(side !== undefined ? { side } : {}),
       ...(p.handicap ? { handicap: p.handicap } : {}),
     };
   }
   record.Bots = bots;
 
-  const rects = draft.startRects ?? {};
+  const rects: Record<string, StartRect> =
+    draft.startPosType === 2 ? (draft.startRects ?? {}) : {};
   const allies = Object.keys(rects).map(Number);
   const whole = { left: 0, top: 0, right: GRID, bottom: GRID };
   record["Start Boxes"] = Array.from(

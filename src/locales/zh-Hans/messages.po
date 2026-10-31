@@ -17535,6 +17535,10 @@ msgstr "无法读取此游戏的归档。"
 msgid "Could not read this game's archive. Use the file picker instead."
 msgstr "无法读取此游戏的归档。请改用文件选择器。"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Could not read this game's factions and AIs. Close the sheet and open it again to retry."
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Could not read this game's files."

@@ -254,8 +254,30 @@ describe("presetToChobbyRecord", () => {
       side: 2,
       handicap: 10,
     });
-    expect(bots["AI 1 (2)"].side).toBe(0);
+    // "Engine default" is not a side in the list, so none is written.
+    expect(bots["AI 1 (2)"]).not.toHaveProperty("side");
     expect(bots["AI 1 (2)"]).not.toHaveProperty("handicap");
+  });
+
+  it("writes no side when the sides of the preset's game are not known", () => {
+    const bots = presetToChobbyRecord(draft, undefined).Bots as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(bots["AI 1"]).not.toHaveProperty("side");
+  });
+
+  it("writes no side for a faction the game's list does not have", () => {
+    const bots = presetToChobbyRecord(draft, ["Armada", "Cortex"])
+      .Bots as Record<string, Record<string, unknown>>;
+    expect(bots["AI 1"]).not.toHaveProperty("side");
+  });
+
+  it("leaves out boxes the preset keeps but does not use", () => {
+    for (const startPosType of [0, 1]) {
+      const out = presetToChobbyRecord({ ...draft, startPosType }, SIDES);
+      expect(out["Start Boxes"]).toEqual([]);
+    }
   });
 
   it("writes start boxes as the array Chobby walks, filling a gap with the whole map", () => {

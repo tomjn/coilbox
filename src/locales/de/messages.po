@@ -17535,6 +17535,10 @@ msgstr "Das Archiv dieses Spiels konnte nicht gelesen werden."
 msgid "Could not read this game's archive. Use the file picker instead."
 msgstr "Das Archiv dieses Spiels konnte nicht gelesen werden. Verwenden Sie stattdessen die Dateiauswahl."
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Could not read this game's factions and AIs. Close the sheet and open it again to retry."
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Could not read this game's files."
