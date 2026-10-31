@@ -17,6 +17,7 @@ vi.mock("../openAnnihilation", () => ({
   useOpenAnnihilation: () => [mocks.program],
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: mocks.openUrl }));
+vi.mock("./BattleRowMapThumb", () => ({ BattleRowMapThumb: () => null }));
 
 import { BattleRow } from "./BattleRow";
 

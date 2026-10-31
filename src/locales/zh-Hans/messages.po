@@ -14788,7 +14788,6 @@ msgstr "检查中…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -15707,6 +15706,10 @@ msgstr ""
 #, fuzzy
 msgid "Coilbox could not leave it: {reason}."
 msgstr "Coilbox 无法离开它：{reason}。"
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Coilbox could not leave it: {why}."
+msgstr ""
 
 #: src/workshop/loadsAs.ts
 #, fuzzy
@@ -20780,7 +20783,6 @@ msgstr "引擎"
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
@@ -23698,7 +23700,7 @@ msgid "Get IP"
 msgstr "获取 IP"
 
 #: src/home/zones/OpenAnnihilationCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
+#: src/multiplayer/battles/BattleRow.tsx
 msgid "Get Open Annihilation"
 msgstr ""
 
@@ -24810,8 +24812,6 @@ msgstr "水平"
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
-#: src/multiplayer/battle/OaPlayerList.tsx
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
 msgid "Host"
@@ -25726,10 +25726,6 @@ msgstr "游戏中"
 #, fuzzy
 msgid "In game widget"
 msgstr "游戏内小部件"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "In OA"
-msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -26679,10 +26675,6 @@ msgstr "按地址加入"
 msgid "Join failed: {lastJoinError}"
 msgstr "加入失败：{lastJoinError}"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Join in OA"
-msgstr ""
-
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
@@ -26692,10 +26684,6 @@ msgstr "加入或创建频道…"
 #, fuzzy
 msgid "Join room"
 msgstr "加入房间"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Join the host's room in Open Annihilation"
-msgstr ""
 
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
@@ -27654,6 +27642,10 @@ msgstr "已排除：{noTotals} 场没有记录数据（较旧或未测量的回�
 
 #: src/play/ChobbyPresetsView.tsx
 msgid "Left out: {sections}"
+msgstr ""
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Left the Open Annihilation battle"
 msgstr ""
 
 #: src/multiplayer/chat/ChatPane.tsx
@@ -33002,7 +32994,6 @@ msgstr "无"
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "None"
@@ -33266,7 +33257,6 @@ msgid "not found"
 msgstr "未找到"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #, fuzzy
 msgid "Not given by the lobby"
 msgstr "大厅未提供"
@@ -34888,7 +34878,7 @@ msgstr ""
 msgid "Open Annihilation exited with code {code}."
 msgstr ""
 
-#: src/multiplayer/battle/useOaJoinLaunch.ts
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation is already running."
 msgstr ""
 
@@ -34896,16 +34886,12 @@ msgstr ""
 msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 msgstr ""
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Open Annihilation is running"
-msgstr ""
-
-#: src/multiplayer/battle/useOaJoinLaunch.ts
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation refused to join this battle."
 msgstr ""
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Open Annihilation starts when the host's room is open"
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Open Annihilation refused to open this battle."
 msgstr ""
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
@@ -42623,8 +42609,7 @@ msgstr "设置此场景"
 msgid "Set version"
 msgstr "设置版本"
 
-#: src/multiplayer/battle/useOaHostLaunch.ts
-#: src/multiplayer/pages/BattleRoomPage.tsx
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Set where Open Annihilation is in Settings first."
 msgstr ""
 
@@ -44766,18 +44751,10 @@ msgstr "启动任务 \"{missionId}\" 不在战役“{campaignTitle}”中"
 msgid "Start muted"
 msgstr "静音开始"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Start OA"
-msgstr ""
-
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "新建一个，然后把零件拖进去。在“Lego 零件”下浏览可用零件。"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Start Open Annihilation for this battle"
-msgstr ""
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -52572,7 +52549,6 @@ msgstr "未知"
 #: src/content/replaySideLabel.ts
 #: src/content/stats.ts
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/UserBadges.tsx
 #, fuzzy
 msgid "Unknown"
@@ -53265,7 +53241,6 @@ msgstr "多面手"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
@@ -53490,7 +53465,7 @@ msgstr "等待他们"
 msgid "Waiting for a slot…"
 msgstr "正在等待空位…"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
+#: src/multiplayer/battles/BattleRow.tsx
 msgid "Waiting for host"
 msgstr ""
 
@@ -55328,7 +55303,6 @@ msgstr "你"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battle/MemberRow.tsx
-#: src/multiplayer/battle/OaPlayerList.tsx
 #: src/multiplayer/NameMarkIcon.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/runlite/galaxyAdapter.ts
@@ -55428,6 +55402,10 @@ msgstr "你仍在对局中"
 #, fuzzy
 msgid "You are still in a running match"
 msgstr "你仍在一场进行中的对局里"
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "You are still in the Open Annihilation battle"
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -55912,7 +55890,6 @@ msgid "yours"
 msgstr "你的"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #, fuzzy
 msgid "Yours"
 msgstr "你的"

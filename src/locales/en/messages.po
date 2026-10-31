@@ -12000,7 +12000,6 @@ msgstr "checking…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -12765,6 +12764,10 @@ msgstr "Coilbox could not create the game's settings file."
 #: src/multiplayer/battles/joinBattle.ts
 msgid "Coilbox could not leave it: {reason}."
 msgstr "Coilbox could not leave it: {reason}."
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Coilbox could not leave it: {why}."
+msgstr "Coilbox could not leave it: {why}."
 
 #: src/workshop/loadsAs.ts
 msgid "Coilbox could not load the game to check typed values, so they are written as typed: {reason}"
@@ -16905,7 +16908,6 @@ msgstr "engine"
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
@@ -19276,7 +19278,7 @@ msgid "Get IP"
 msgstr "Get IP"
 
 #: src/home/zones/OpenAnnihilationCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
+#: src/multiplayer/battles/BattleRow.tsx
 msgid "Get Open Annihilation"
 msgstr "Get Open Annihilation"
 
@@ -20175,8 +20177,6 @@ msgstr "Horizontal"
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
-#: src/multiplayer/battle/OaPlayerList.tsx
 #: src/play/pages/SkirmishPage.tsx
 msgid "Host"
 msgstr "Host"
@@ -20920,10 +20920,6 @@ msgstr "In game"
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
 msgid "In game widget"
 msgstr "In game widget"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "In OA"
-msgstr "In OA"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "In place"
@@ -21693,10 +21689,6 @@ msgstr "Join by address"
 msgid "Join failed: {lastJoinError}"
 msgstr "Join failed: {lastJoinError}"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Join in OA"
-msgstr "Join in OA"
-
 #: src/multiplayer/chat/ChannelBrowser.tsx
 msgid "Join or create a channel…"
 msgstr "Join or create a channel…"
@@ -21704,10 +21696,6 @@ msgstr "Join or create a channel…"
 #: src/direct/JoinRoomForm.tsx
 msgid "Join room"
 msgstr "Join room"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Join the host's room in Open Annihilation"
-msgstr "Join the host's room in Open Annihilation"
 
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Join the party with {who}"
@@ -22483,6 +22471,10 @@ msgstr "Left out: {noTotals} with no figures recorded (older or unmeasured repla
 #: src/play/ChobbyPresetsView.tsx
 msgid "Left out: {sections}"
 msgstr "Left out: {sections}"
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Left the Open Annihilation battle"
+msgstr "Left the Open Annihilation battle"
 
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "left: {leaveReason}"
@@ -26827,7 +26819,6 @@ msgstr "none"
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/profile/SettingsSection.tsx
 msgid "None"
 msgstr "None"
@@ -27042,7 +27033,6 @@ msgid "not found"
 msgstr "not found"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 msgid "Not given by the lobby"
 msgstr "Not given by the lobby"
 
@@ -28360,7 +28350,7 @@ msgstr "Open Annihilation battle"
 msgid "Open Annihilation exited with code {code}."
 msgstr "Open Annihilation exited with code {code}."
 
-#: src/multiplayer/battle/useOaJoinLaunch.ts
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation is already running."
 msgstr "Open Annihilation is already running."
 
@@ -28368,17 +28358,13 @@ msgstr "Open Annihilation is already running."
 msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 msgstr "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Open Annihilation is running"
-msgstr "Open Annihilation is running"
-
-#: src/multiplayer/battle/useOaJoinLaunch.ts
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation refused to join this battle."
 msgstr "Open Annihilation refused to join this battle."
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Open Annihilation starts when the host's room is open"
-msgstr "Open Annihilation starts when the host's room is open"
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Open Annihilation refused to open this battle."
+msgstr "Open Annihilation refused to open this battle."
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Open another file"
@@ -34673,8 +34659,7 @@ msgstr "Set up this scenario"
 msgid "Set version"
 msgstr "Set version"
 
-#: src/multiplayer/battle/useOaHostLaunch.ts
-#: src/multiplayer/pages/BattleRoomPage.tsx
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Set where Open Annihilation is in Settings first."
 msgstr "Set where Open Annihilation is in Settings first."
 
@@ -36414,17 +36399,9 @@ msgstr "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
 msgid "Start muted"
 msgstr "Start muted"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Start OA"
-msgstr "Start OA"
-
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "Start one, then drop parts into it. Browse what is available under Lego Parts."
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Start Open Annihilation for this battle"
-msgstr "Start Open Annihilation for this battle"
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -42738,7 +42715,6 @@ msgstr "unknown"
 #: src/content/replaySideLabel.ts
 #: src/content/stats.ts
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/UserBadges.tsx
 msgid "Unknown"
 msgstr "Unknown"
@@ -43300,7 +43276,6 @@ msgstr "Versatile"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Version"
@@ -43483,7 +43458,7 @@ msgstr "Wait for them"
 msgid "Waiting for a slot…"
 msgstr "Waiting for a slot…"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
+#: src/multiplayer/battles/BattleRow.tsx
 msgid "Waiting for host"
 msgstr "Waiting for host"
 
@@ -44972,7 +44947,6 @@ msgstr "you"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battle/MemberRow.tsx
-#: src/multiplayer/battle/OaPlayerList.tsx
 #: src/multiplayer/NameMarkIcon.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/runlite/galaxyAdapter.ts
@@ -45054,6 +45028,10 @@ msgstr "You are still in a match"
 #: src/multiplayer/RejoinOfferPanel.tsx
 msgid "You are still in a running match"
 msgstr "You are still in a running match"
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "You are still in the Open Annihilation battle"
+msgstr "You are still in the Open Annihilation battle"
 
 #: src/multiplayer/battles/joinBattle.ts
 msgid "You are still in your other battle"
@@ -45447,7 +45425,6 @@ msgid "yours"
 msgstr "yours"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 msgid "Yours"
 msgstr "Yours"
 
