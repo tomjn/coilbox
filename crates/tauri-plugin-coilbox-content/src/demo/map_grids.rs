@@ -262,8 +262,7 @@ impl Amounts {
             return;
         };
         let cells = f64::from(grid.width) * f64::from(grid.height);
-        for pair in numbers.chunks_exact(2) {
-            let (cell, amount) = (pair[0], pair[1]);
+        for &[cell, amount] in numbers.as_chunks::<2>().0 {
             let on_grid = cell.fract() == 0.0 && cell >= 0.0 && cell < cells;
             if on_grid && amount.is_finite() && amount > 0.0 {
                 *self.cells.entry((slice, cell as u32)).or_default() += amount;
