@@ -20,7 +20,21 @@ vi.mock("@/workshop/project", () => ({
   useModProjects: () => ({ projects: [] }),
 }));
 
-afterEach(cleanup);
+// Which `optionsPresets.json` files the search finds. The face itself has a
+// test of its own.
+const chobbyFiles = vi.fn<() => string[]>(() => []);
+vi.mock("../../useChobbyPresetFiles", () => ({
+  useChobbyPresetFiles: () => chobbyFiles(),
+}));
+vi.mock("../../ChobbyPresetsView", () => ({
+  ChobbyPresetsView: () => <div>chobby face</div>,
+}));
+
+afterEach(() => {
+  cleanup();
+  chobbyFiles.mockReset();
+  chobbyFiles.mockReturnValue([]);
+});
 
 const you: Participant = {
   id: "p0",
@@ -129,6 +143,33 @@ describe("the preset list", () => {
     expect(
       screen.queryByRole("button", { name: "Back to presets" }),
     ).toBeNull();
+  });
+
+  it("shows none of the Chobby controls when no data folder has its file", () => {
+    renderDrawer();
+    expect(screen.queryByText("Chobby presets")).toBeNull();
+  });
+
+  it("opens Chobby's presets from a row when a data folder has the file, and comes back", () => {
+    chobbyFiles.mockReturnValue(["/data/optionsPresets.json"]);
+    renderDrawer();
+    fireEvent.click(screen.getByText("Chobby presets"));
+    expect(screen.getByText("chobby face")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back to presets" }));
+    expect(screen.getByText("Chobby presets")).toBeTruthy();
+    expect(screen.queryByText("chobby face")).toBeNull();
+  });
+
+  it("will not open Chobby's presets while a game is running", () => {
+    chobbyFiles.mockReturnValue(["/data/optionsPresets.json"]);
+    renderDrawer({ disabled: true });
+    expect(
+      (
+        screen
+          .getByText("Chobby presets")
+          .closest("button") as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 
   it("sends you to the hub for presets you have not made yourself", () => {
