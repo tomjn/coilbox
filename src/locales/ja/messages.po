@@ -34178,6 +34178,10 @@ msgstr "numparticles、出現ごと。"
 msgid "NW-SE"
 msgstr "北西-南東"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "OA"
+msgstr ""
+
 #: src/scenario/listing.ts
 #: src/scenario/validate.ts
 #, fuzzy

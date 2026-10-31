@@ -62,7 +62,11 @@ describe("Open Annihilation filter", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Filters and sorting" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Open Annihilation" }));
+    const toggle = screen.getByRole("button", { name: "Open Annihilation" });
+    expect(toggle.textContent).toBe("OA");
+    expect(toggle.getAttribute("title")).toBe("Open Annihilation");
+
+    fireEvent.click(toggle);
     expect(screen.getByTestId("shown").textContent).toBe("1");
 
     fireEvent.click(screen.getByRole("button", { name: "Open Annihilation" }));
