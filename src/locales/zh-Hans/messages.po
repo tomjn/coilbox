@@ -48238,6 +48238,22 @@ msgstr "房间仍在运行"
 msgid "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port."
 msgstr "房间已启动，但其中的对局一直没有开放，所以房间已被停止。请重试，如果一直如此，请换一个端口创建。"
 
+#: src/multiplayer/battle/tweakDelivery.ts
+msgid "The room's vote on {slotName} did not pass."
+msgstr ""
+
+#: src/multiplayer/battle/tweakDelivery.ts
+msgid "The room's vote on {slotName} was still open after {seconds}s."
+msgstr ""
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room's vote on it did not pass."
+msgstr ""
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room's vote on it was still open after {seconds}s."
+msgstr ""
+
 #: src/lego/model.ts
 #, fuzzy
 msgid "The root piece is missing."

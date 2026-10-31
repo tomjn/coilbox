@@ -526,7 +526,14 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const modOptionsSchema = gameInfo.info?.options ?? [];
   const mapOptionsSchema = mapInfo.info?.options ?? [];
   const hostIsBot = !!battle && !!state?.users[battle.host]?.status.bot;
-  const canEditOptions = canEditBattleOptions(isFounder, hostIsBot);
+  // A Zero-K room's chat commands are answered by Nightwatch, which has no
+  // `!set`, `!bSet` or `!addbox` (its commands are in `ZkLobbyServer/autohost/
+  // Commands`). Sending SPADS commands there would be chat that does nothing.
+  const hostTakesSpadsCommands = hostIsBot && protocol !== "zerok";
+  const canEditOptions = canEditBattleOptions(
+    isFounder,
+    hostTakesSpadsCommands,
+  );
   // We founded the battle and run it ourselves (no autohost bot relaying it), so we
   // drive the roster/options over the protocol and launch the game as founder.
   // Founding a Zero-K room is not that: the server runs the match whoever opened
@@ -1274,7 +1281,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // The autohost steps of a preset: the map and the room's team shape. Reads go
   // through a ref for the same reason `useTweakDelivery`'s do. The run lasts
   // seconds and the mirror it is watching is replaced underneath it.
-  const autohost = hostIsBot && !isFounder;
+  const autohost = hostTakesSpadsCommands && !isFounder;
   const roomRef = useRef({ state, battle });
   roomRef.current = { state, battle };
   const mountedRef = useRef(true);

@@ -6,7 +6,11 @@ import {
   settingAnswer,
   teamShape,
 } from "./hostSteps";
-import { AUTOHOST_COMMAND_GAP_MS, confirmTimeoutMs } from "./tweakDelivery";
+import {
+  AUTOHOST_COMMAND_GAP_MS,
+  confirmTimeoutMs,
+  VOTE_WAIT_MS,
+} from "./tweakDelivery";
 
 const player = (
   id: string,
@@ -114,6 +118,10 @@ function fakeRoom(
   const said: { at: number; text: string }[] = [];
   const sent: { line: string; at: number }[] = [];
   const state = { map };
+  // Lines the host says, and maps it moves to, at a fixed time after the start.
+  const timeline: { at: number; text: string; map?: string }[] = [];
+  const later = (afterMs: number, text: string, toMap?: string) =>
+    timeline.push({ at: 1000 + afterMs, text, map: toMap });
   const io: HostStepsIo = {
     async send(line) {
       sent.push({ line, at: clock });
@@ -122,18 +130,22 @@ function fakeRoom(
       const mapMatch = /^!map (.+)$/.exec(line);
       if (mapMatch && text === "map changed") state.map = mapMatch[1];
     },
-    hostSaidSince: (at) =>
-      said
+    hostSaidSince: (at) => [
+      ...said
         .filter((m) => m.at >= at && m.text !== "map changed")
         .map((m) => m.text),
-    currentMap: () => state.map,
+      ...timeline.filter((m) => m.at >= at && m.at <= clock).map((m) => m.text),
+    ],
+    currentMap: () =>
+      [...timeline].reverse().find((m) => m.map !== undefined && m.at <= clock)
+        ?.map ?? state.map,
     here: () => sent.length < leavesAfterSends,
     async sleep(ms) {
       clock += ms;
     },
     now: () => clock,
   };
-  return { io, sent, said };
+  return { io, sent, said, later };
 }
 
 describe("runHostSteps", () => {
@@ -220,6 +232,122 @@ describe("runHostSteps", () => {
     expect((await runHostSteps({ map: "New Map" }, room.io)).failures).toEqual(
       [],
     );
+  });
+
+  describe("when the autohost puts a step to a vote", () => {
+    const called = (command: string) =>
+      `alice called a vote for command "${command}" [!vote y, !vote n, !vote b]`;
+
+    it("counts a setting as taken when the vote passes and the host then applies it", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set teamSize 4"));
+      room.later(30_000, 'Vote for command "set teamSize 4" passed.');
+      room.later(30_000, "Global setting changed by alice (teamSize=4)");
+      const result = await runHostSteps({ teamSize: 4 }, room.io);
+      expect(result.failures).toEqual([]);
+      // The vote outlasted what an echo is given, so this only passes because
+      // the step waited for the vote.
+      expect(30_000).toBeGreaterThan(
+        confirmTimeoutMs("!set teamSize 4".length, true),
+      );
+    });
+
+    it("says the vote did not pass when it fails, not that the setting was refused", async () => {
+      const room = fakeRoom((line) =>
+        line.startsWith("!set nbTeams")
+          ? "Global setting changed by Tom (nbTeams=2)"
+          : null,
+      );
+      room.later(500, called("set teamSize 4"));
+      room.later(20_000, 'Vote for command "set teamSize 4" failed.');
+      const result = await runHostSteps({ teamSize: 4, nbTeams: 2 }, room.io);
+      expect(result.failures).toEqual([
+        { step: "teamSize", reason: "The room's vote on it did not pass." },
+      ]);
+      // A failed vote on one part is no reason to skip the next.
+      expect(room.sent.map((s) => s.line)).toEqual([
+        "!set teamSize 4",
+        "!set nbTeams 2",
+      ]);
+    });
+
+    it("reads a vote that failed when its time ran out the same way", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set nbTeams 2"));
+      room.later(
+        45_000,
+        'Vote for command "set nbTeams 2" failed (delay expired).',
+      );
+      const result = await runHostSteps({ nbTeams: 2 }, room.io);
+      expect(result.failures).toEqual([
+        { step: "nbTeams", reason: "The room's vote on it did not pass." },
+      ]);
+    });
+
+    it("reports a vote that never reports, after the wait a vote is given", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set teamSize 4"));
+      const result = await runHostSteps({ teamSize: 4 }, room.io);
+      expect(result.failures).toEqual([
+        {
+          step: "teamSize",
+          reason: "The room's vote on it was still open after 53s.",
+        },
+      ]);
+      expect((await room.io.now()) - 1000).toBeGreaterThanOrEqual(VOTE_WAIT_MS);
+    });
+
+    it("reports what the room holds when a passed vote lands on another value", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set teamSize 4"));
+      room.later(10_000, 'Vote for command "set teamSize 4" passed.');
+      room.later(10_000, "Global setting changed by alice (teamSize=8)");
+      const result = await runHostSteps({ teamSize: 4 }, room.io);
+      expect(result.failures).toEqual([
+        { step: "teamSize", reason: "The room is set to 8." },
+      ]);
+    });
+
+    it("does not take a vote on some other setting for its own", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set nbTeams 2"));
+      const result = await runHostSteps({ teamSize: 4 }, room.io);
+      // Not waited out as a vote: the step gives up after an echo's wait and
+      // quotes what the host said.
+      expect(result.failures).toEqual([
+        { step: "teamSize", reason: called("set nbTeams 2") },
+      ]);
+      expect((await room.io.now()) - 1000).toBeLessThan(VOTE_WAIT_MS);
+    });
+
+    it("waits for a vote on the map, which SPADS reads as set map", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set map New Map"));
+      room.later(15_000, 'Vote for command "set map New Map" passed.');
+      room.later(15_000, "Map changed by alice: New Map", "New Map");
+      const result = await runHostSteps({ map: "New Map" }, room.io);
+      expect(result.failures).toEqual([]);
+    });
+
+    it("says a map vote did not pass", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set map New Map"));
+      room.later(12_000, 'Vote for command "set map New Map" failed.');
+      const result = await runHostSteps({ map: "New Map" }, room.io);
+      expect(result.failures).toEqual([
+        { step: "map", reason: "The room's vote on it did not pass." },
+      ]);
+    });
+
+    it("treats a vote someone cancels as one that did not pass", async () => {
+      const room = fakeRoom(() => null);
+      room.later(500, called("set teamSize 4"));
+      room.later(5_000, "Vote cancelled by bob");
+      const result = await runHostSteps({ teamSize: 4 }, room.io);
+      expect(result.failures).toEqual([
+        { step: "teamSize", reason: "The room's vote on it did not pass." },
+      ]);
+    });
   });
 
   it("sends nothing when there are no steps", async () => {
