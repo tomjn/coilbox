@@ -247,7 +247,7 @@ mod tests {
                 let len = seen.len().min(wanted.len());
                 seen[..len] == wanted[..len]
             };
-            if !OURS.iter().any(|wanted| matches(&wanted)) {
+            if !OURS.iter().any(|wanted| matches(wanted)) {
                 return false;
             }
             if seen.windows(4).any(|w| w == b"\r\n\r\n") {
