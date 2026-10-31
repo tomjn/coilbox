@@ -1349,6 +1349,9 @@ fn mp_ignore(
     ) {
         return result;
     }
+    if let Some(refusal) = command::tagged_command_refusal("reason", &username, reason.as_deref()) {
+        return CliResult::err(refusal);
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -1406,6 +1409,10 @@ fn mp_friend_request(
         ZerokRelation::Friend,
     ) {
         return result;
+    }
+    if let Some(refusal) = command::tagged_command_refusal("message", &username, message.as_deref())
+    {
+        return CliResult::err(refusal);
     }
     enqueue(
         registry.inner(),
@@ -1831,6 +1838,17 @@ async fn open_battle(
     // afterwards, so it has to stop here.
     if !command::fits_one_field(&battle.key) {
         return CliResult::err("a battle password cannot contain spaces");
+    }
+    // Refused for the same reason: a tab in the title ends it early, and the
+    // text after it is read as the game's name in place of the real one.
+    if let Some(refusal) = command::open_battle_refusal(
+        &battle.engine,
+        &battle.version,
+        &battle.map,
+        &battle.title,
+        &battle.modname,
+    ) {
+        return CliResult::err(refusal);
     }
 
     // Dropped before the attempt rather than after it, so a host whose relay
@@ -5534,6 +5552,40 @@ mod tests {
                 .as_deref()
                 .unwrap_or_default()
                 .contains("cannot contain spaces"),
+            "got: {:?}",
+            refused.error
+        );
+        assert!(
+            sent.try_recv().is_err(),
+            "a server with a relay was not even asked for a credential"
+        );
+    }
+
+    /// Issue #4916. A tab in the title would put the text after it where the game's
+    /// name goes, so nothing is sent and the host is told which field it was.
+    #[tokio::test]
+    async fn a_title_with_a_tab_is_refused_before_a_relay_is_asked_for() {
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");
+
+        let refused = open_battle(
+            &registry,
+            "alice@bar:8200",
+            8452,
+            BattleToOpen {
+                title: "Fun\tOther game".into(),
+                ..a_battle_to_open()
+            },
+            Some(std::path::Path::new("/nowhere/agent.json")),
+        )
+        .await;
+
+        assert!(!refused.success);
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("the title cannot contain a tab"),
             "got: {:?}",
             refused.error
         );
