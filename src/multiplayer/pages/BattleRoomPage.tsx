@@ -53,6 +53,8 @@ import { type HostSteps, teamShape } from "../battle/hostSteps";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { launchesOnItsOwn, matchAction } from "../battle/matchAction";
 import { matchStartAction } from "../battle/matchStart";
+import { OaEngineCard } from "../battle/OaEngineCard";
+import { OaPlayerList } from "../battle/OaPlayerList";
 import {
   applyRoomSteps,
   type NotTakenWhat,
@@ -68,11 +70,13 @@ import { useBattleLaunch } from "../battle/useBattleLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { useBattleRoomKey } from "../battle/useBattleRoomKey";
 import { useOaHostLaunch } from "../battle/useOaHostLaunch";
+import { useOaJoinLaunch } from "../battle/useOaJoinLaunch";
 import { useRejoinRequest } from "../battle/useRejoinRequest";
 import { VotePanel } from "../battle/VotePanel";
 import { otherEngineName } from "../battles/battleFilters";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
+import { isOaBattle } from "../oaHost";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
 import {
@@ -134,23 +138,28 @@ function BattleRoomPage() {
   // checks below that ask for one do not apply.
   const oaHost =
     room.selfHost && !!room.battle && otherEngineName(room.battle) !== null;
-  const block = oaHost
-    ? null
-    : launchBlock({
-        hasTarget: !!room.target,
-        targetLoading: room.targetLoading,
-        engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
-        engineUnreadable: room.engineUnreadable,
-        unreadable: room.contentUnreadable,
-        unreadableReason: room.contentUnreadableReason,
-        contentKnown: room.contentKnown,
-        mapMissing: room.mapMissing,
-        gameMissing: room.gameMissing,
-        dependencyBlock: room.dependencyBlock,
-        compat: room.compat,
-        mapName: room.battle?.map ?? "",
-        gameName: room.requiredGame ?? room.battle?.modname ?? "",
-      });
+  // A battle someone else hosts on Open Annihilation (issue #4947). OA's own
+  // room enforces the engine, game, map and hashes, so none of them is checked.
+  const oaJoiner = !room.selfHost && !!room.battle && isOaBattle(room.battle);
+  const block =
+    oaHost || oaJoiner
+      ? null
+      : launchBlock({
+          hasTarget: !!room.target,
+          targetLoading: room.targetLoading,
+          engineMissing:
+            engine.verdict === "mismatch" ? engine.hostLabel : null,
+          engineUnreadable: room.engineUnreadable,
+          unreadable: room.contentUnreadable,
+          unreadableReason: room.contentUnreadableReason,
+          contentKnown: room.contentKnown,
+          mapMissing: room.mapMissing,
+          gameMissing: room.gameMissing,
+          dependencyBlock: room.dependencyBlock,
+          compat: room.compat,
+          mapName: room.battle?.map ?? "",
+          gameName: room.requiredGame ?? room.battle?.modname ?? "",
+        });
   const blockReason = block?.reason ?? null;
   // The player's own widgets, for the strip that says which of them this
   // room's options turn off (issue #1292).
@@ -165,6 +174,14 @@ function BattleRoomPage() {
     room.selfHost,
     blockReason,
   );
+  const oaJoin = useOaJoinLaunch({
+    serverKey: room.serverKey,
+    battleId: room.battle?.id ?? null,
+    hostIp: room.battle?.ip ?? "",
+    hostPort: room.battle?.port ?? "",
+    username: room.me,
+    setIngame: room.setIngame,
+  });
   const oaRun = useOaHostLaunch({
     serverKey: room.serverKey,
     battleId: room.battle?.id ?? null,
@@ -417,13 +434,15 @@ function BattleRoomPage() {
   // Only for a match we were in the room for. Walking into a room that is
   // already running launches nothing, and the header offers to watch instead.
   const launchedRef = useRef(false);
-  const canRun =
-    !!room.target &&
-    !room.contentUnreadable &&
-    !room.mapMissing &&
-    !room.gameMissing &&
-    !room.dependencyBlock;
+  const canRun = oaJoiner
+    ? oaJoin.canRun
+    : !!room.target &&
+      !room.contentUnreadable &&
+      !room.mapMissing &&
+      !room.gameMissing &&
+      !room.dependencyBlock;
   const { launch: doLaunch } = launch;
+  const { join: joinOa } = oaJoin;
   // A launch of ours is on its way or has an engine up. Once it is over and the
   // host is still in-game we have dropped out of a running match, which is what
   // the header's Rejoin offers to undo (issue #453).
@@ -431,17 +450,19 @@ function BattleRoomPage() {
   const runLaunch = useCallback(async () => {
     setLaunching(true);
     try {
-      await doLaunch();
+      await (oaJoiner ? joinOa() : doLaunch());
     } finally {
       setLaunching(false);
     }
-  }, [doLaunch]);
+  }, [doLaunch, oaJoiner, joinOa]);
   useEffect(() => {
     if (!room.hostIngame) launchedRef.current = false;
     const go = launchesOnItsOwn({
       selfHost: room.selfHost,
       hostIngame: room.hostIngame,
-      presentAtStart: room.presentAtStart,
+      // An OA host's flag means its room is open and taking joiners, so a
+      // joiner who arrives after it went up is let in as well.
+      presentAtStart: oaJoiner || room.presentAtStart,
       launched: launchedRef.current,
       canRun,
       serverSendsMatch: room.serverSendsMatch,
@@ -454,6 +475,7 @@ function BattleRoomPage() {
     room.hostIngame,
     room.presentAtStart,
     room.serverSendsMatch,
+    oaJoiner,
     canRun,
     runLaunch,
   ]);
@@ -501,15 +523,20 @@ function BattleRoomPage() {
   // What the header's main button does. Getting into a running match is never
   // automatic past the first launch: an engine that exited may have exited on
   // purpose, so going back has to be a deliberate click.
-  const action = oaRun.running
-    ? "ingame"
-    : matchAction({
-        selfHost: room.selfHost,
-        hostIngame: room.hostIngame,
-        presentAtStart: room.presentAtStart,
-        launching,
-        running: launch.running,
-      });
+  const action =
+    oaRun.running || oaJoin.running
+      ? "ingame"
+      : oaJoiner
+        ? room.hostIngame
+          ? "rejoin"
+          : "start"
+        : matchAction({
+            selfHost: room.selfHost,
+            hostIngame: room.hostIngame,
+            presentAtStart: room.presentAtStart,
+            launching,
+            running: launch.running,
+          });
 
   // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
   // launch the engine in host mode, then clear the flag once it exits. A joined
@@ -561,6 +588,7 @@ function BattleRoomPage() {
 
   async function onLeave() {
     oaRun.cancel();
+    oaJoin.cancel();
     // A battle in this client's own LAN room is the room, so the button that
     // closes one closes both (issue #2057). Not a leave followed by a stop: the
     // room's own "Stop room" drops this client first on purpose, and the two
@@ -599,11 +627,16 @@ function BattleRoomPage() {
         myStatus={room.myStatus}
         sync={room.sync}
         blockShort={block?.short ?? null}
-        blockReason={blockReason}
-        unsynced={unsyncedPlayers(room.rows)}
+        blockReason={
+          blockReason ??
+          (oaJoiner && !oaJoin.canRun
+            ? t`Set where Open Annihilation is in Settings first.`
+            : null)
+        }
+        unsynced={oaHost || oaJoiner ? [] : unsyncedPlayers(room.rows)}
         action={action}
         // Readiness is for the engine's own room. OA's has its own.
-        allReady={oaHost || room.allReady}
+        allReady={oaHost || oaJoiner || room.allReady}
         onToggleReady={room.setReady}
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
@@ -630,6 +663,15 @@ function BattleRoomPage() {
           connections,
           servers,
         )}
+        oaJoin={
+          !oaJoiner
+            ? null
+            : oaJoin.running
+              ? "inOa"
+              : room.hostIngame
+                ? "join"
+                : "waiting"
+        }
       />
 
       {/* Above everything else on the page: somebody is sitting on a spinner
@@ -650,9 +692,9 @@ function BattleRoomPage() {
         <VotePanel vote={room.currentVote} onVote={room.castVote} />
       )}
 
-      {(launch.error ?? oaRun.error) && (
+      {(launch.error ?? oaRun.error ?? oaJoin.error) && (
         <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-          {launch.error ?? oaRun.error}
+          {launch.error ?? oaRun.error ?? oaJoin.error}
         </p>
       )}
       {room.actionError && (
@@ -699,37 +741,43 @@ function BattleRoomPage() {
               split.tableClass,
             )}
           >
-            <BattleMembersTable
-              serverKey={room.serverKey}
-              markFor={markFor}
-              rows={room.rows}
-              sides={room.sides}
-              factionLogos={factionLogos}
-              maxSlots={battle.maxPlayers}
-              startPosType={room.startPosType}
-              selfHost={room.selfHost}
-              serverAssignsSeat={room.serverAssignsSeat}
-              canKick={room.canKick}
-              canBoss={room.canBoss}
-              canAddBot={room.canAddBot}
-              botsRefused={room.botsRefused}
-              canSetBotAlly={room.canSetBotAlly}
-              hostControls={room.hostControls}
-              addableAis={room.addableAis}
-              addableAisReady={room.addableAisReady}
-              aiConfig={aiConfig}
-              noteFor={(row) => getNote(row.userId, row.name)}
-              onSetNote={(row, text) => setNote(row.userId, row.name, text)}
-              statsSummaryFor={(row) => relationSummary(relationFor(row.name))}
-              // Only an autohost battle has anything to send this to: there is
-              // no founder-direct equivalent of SPADS's `!force ... bonus`.
-              onSetBonus={!room.selfHost ? room.setBonus : undefined}
-              onAddBot={room.addBot}
-              onSide={room.setSide}
-              onTeam={room.setTeam}
-              onAlly={room.setAlly}
-              onColor={room.setColor}
-            />
+            {oaJoiner ? (
+              <OaPlayerList rows={room.rows} />
+            ) : (
+              <BattleMembersTable
+                serverKey={room.serverKey}
+                markFor={markFor}
+                rows={room.rows}
+                sides={room.sides}
+                factionLogos={factionLogos}
+                maxSlots={battle.maxPlayers}
+                startPosType={room.startPosType}
+                selfHost={room.selfHost}
+                serverAssignsSeat={room.serverAssignsSeat}
+                canKick={room.canKick}
+                canBoss={room.canBoss}
+                canAddBot={room.canAddBot}
+                botsRefused={room.botsRefused}
+                canSetBotAlly={room.canSetBotAlly}
+                hostControls={room.hostControls}
+                addableAis={room.addableAis}
+                addableAisReady={room.addableAisReady}
+                aiConfig={aiConfig}
+                noteFor={(row) => getNote(row.userId, row.name)}
+                onSetNote={(row, text) => setNote(row.userId, row.name, text)}
+                statsSummaryFor={(row) =>
+                  relationSummary(relationFor(row.name))
+                }
+                // Only an autohost battle has anything to send this to: there is
+                // no founder-direct equivalent of SPADS's `!force ... bonus`.
+                onSetBonus={!room.selfHost ? room.setBonus : undefined}
+                onAddBot={room.addBot}
+                onSide={room.setSide}
+                onTeam={room.setTeam}
+                onAlly={room.setAlly}
+                onColor={room.setColor}
+              />
+            )}
           </div>
           <RoomSplitHandle {...split.handle} />
           <BattleChatCard
@@ -750,201 +798,206 @@ function BattleRoomPage() {
           />
         </div>
 
-        <aside className="w-[var(--battle-sidebar-width)] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
-          <BattleMapCard
-            key={room.contentNonce}
-            battle={battle}
-            rows={room.rows}
-            enginePath={room.enginePath}
-            dataDir={room.dataDir}
-            game={room.localGame}
-            maps={room.maps}
-            mapsLoading={room.mapsLoading}
-            localMap={room.localMap}
-            mapMissing={room.mapMissing}
-            startPosType={room.startPosType}
-            canChangeMap={room.canChangeMap}
-            canEditBoxes={room.canEditBoxes}
-            activeAlly={boxAllies.activeAlly}
-            onSetBox={room.setStartBox}
-            onClearBox={room.clearStartBox}
-            onSuggestMap={room.suggestMap}
-            onChangeMap={room.setMap}
-            onRescan={room.rescan}
-          />
-          {/* One door to the preset library, the same sheet Singleplayer opens.
+        {oaJoiner ? (
+          <aside className="w-[var(--battle-sidebar-width)] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
+            <OaEngineCard hostVersion={battle.version} />
+          </aside>
+        ) : (
+          <aside className="w-[var(--battle-sidebar-width)] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
+            <BattleMapCard
+              key={room.contentNonce}
+              battle={battle}
+              rows={room.rows}
+              enginePath={room.enginePath}
+              dataDir={room.dataDir}
+              game={room.localGame}
+              maps={room.maps}
+              mapsLoading={room.mapsLoading}
+              localMap={room.localMap}
+              mapMissing={room.mapMissing}
+              startPosType={room.startPosType}
+              canChangeMap={room.canChangeMap}
+              canEditBoxes={room.canEditBoxes}
+              activeAlly={boxAllies.activeAlly}
+              onSetBox={room.setStartBox}
+              onClearBox={room.clearStartBox}
+              onSuggestMap={room.suggestMap}
+              onChangeMap={room.setMap}
+              onRescan={room.rescan}
+            />
+            {/* One door to the preset library, the same sheet Singleplayer opens.
               Saving this battle as a replayable skirmish (other humans become
               AIs) lives inside it, along with importing and the hub, rather than
               as separate buttons out here. Distinct from the host-only "Option
               presets" below, which stores only mod/map options. */}
-          {room.canEditOptions && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setApplyPresetOpen(true)}
-              >
-                <Bookmark className="size-4" /> <Trans>Presets</Trans>
-              </Button>
-              <ApplySkirmishPresetDrawer
-                open={applyPresetOpen}
-                onOpenChange={setApplyPresetOpen}
-                // Every preset, not just this game's. The panel blocks the
-                // game-keyed parts itself, and an exact game-name match (version
-                // and all) showed an empty list far more often than it helped.
-                presets={skirmishPresets.presets}
-                gameName={battle.modname}
-                enginePath={room.enginePath}
-                dataDir={room.dataDir}
-                archive={room.localGame?.primaryArchive.name}
-                scanFailure={room.contentUnreadableReason}
-                canEditRestrictions={room.canEditRestrictions}
-                modOptionsSchema={room.modOptionsSchema}
-                // Through the same route every other option takes, so a
-                // bot-hosted room gets the paced !bSet run rather than a
-                // second copy of it.
-                onApplyTweaks={(slots) => {
-                  const tags: Record<string, string> = {};
-                  for (const [key, value] of Object.entries(slots))
-                    tags[`game/modoptions/${key}`] = value;
-                  void room.applyOptionTags(tags);
-                }}
-                selfHost={room.selfHost}
-                delivery={room.presetDelivery}
-                currentMapName={battle.map}
-                currentStartPosType={room.startPosType}
-                scriptTags={battle.scriptTags}
-                onApply={applySkirmishPresetInPlace}
-                saveLabel={t`Save this battle`}
-                onSave={(name) => {
-                  const draft = battleToSkirmishDraft({
-                    battle,
-                    me: room.me,
-                    sides: room.sides,
-                    ais: skirmishAis,
-                  });
-                  if (!draft) {
-                    notify({
-                      title: t`Couldn't save preset`,
-                      body: t`This battle can't be captured yet.`,
-                      level: "error",
+            {room.canEditOptions && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setApplyPresetOpen(true)}
+                >
+                  <Bookmark className="size-4" /> <Trans>Presets</Trans>
+                </Button>
+                <ApplySkirmishPresetDrawer
+                  open={applyPresetOpen}
+                  onOpenChange={setApplyPresetOpen}
+                  // Every preset, not just this game's. The panel blocks the
+                  // game-keyed parts itself, and an exact game-name match (version
+                  // and all) showed an empty list far more often than it helped.
+                  presets={skirmishPresets.presets}
+                  gameName={battle.modname}
+                  enginePath={room.enginePath}
+                  dataDir={room.dataDir}
+                  archive={room.localGame?.primaryArchive.name}
+                  scanFailure={room.contentUnreadableReason}
+                  canEditRestrictions={room.canEditRestrictions}
+                  modOptionsSchema={room.modOptionsSchema}
+                  // Through the same route every other option takes, so a
+                  // bot-hosted room gets the paced !bSet run rather than a
+                  // second copy of it.
+                  onApplyTweaks={(slots) => {
+                    const tags: Record<string, string> = {};
+                    for (const [key, value] of Object.entries(slots))
+                      tags[`game/modoptions/${key}`] = value;
+                    void room.applyOptionTags(tags);
+                  }}
+                  selfHost={room.selfHost}
+                  delivery={room.presetDelivery}
+                  currentMapName={battle.map}
+                  currentStartPosType={room.startPosType}
+                  scriptTags={battle.scriptTags}
+                  onApply={applySkirmishPresetInPlace}
+                  saveLabel={t`Save this battle`}
+                  onSave={(name) => {
+                    const draft = battleToSkirmishDraft({
+                      battle,
+                      me: room.me,
+                      sides: room.sides,
+                      ais: skirmishAis,
                     });
-                    return;
-                  }
-                  skirmishPresets.savePreset(name, draft);
-                  notify({
-                    title: t`Saved to Singleplayer presets`,
-                    body: t`"${name}" — replay it from Singleplayer → Presets.`,
-                    level: "success",
-                  });
-                }}
-                onImport={presetImport.importFromFile}
-                onSaveFromReplay={(name, draft) => {
-                  skirmishPresets.savePreset(name, draft);
-                  notify({
-                    title: t`Saved to Singleplayer presets`,
-                    body: t`"${name}" — replay it from Singleplayer → Presets.`,
-                    level: "success",
-                  });
-                }}
-                onBrowseHub={() => {
-                  setApplyPresetOpen(false);
-                  navigate("/hub?kind=preset");
-                }}
-              />
-              {/* An imported preset names a game and a map this machine may not
+                    if (!draft) {
+                      notify({
+                        title: t`Couldn't save preset`,
+                        body: t`This battle can't be captured yet.`,
+                        level: "error",
+                      });
+                      return;
+                    }
+                    skirmishPresets.savePreset(name, draft);
+                    notify({
+                      title: t`Saved to Singleplayer presets`,
+                      body: t`"${name}" — replay it from Singleplayer → Presets.`,
+                      level: "success",
+                    });
+                  }}
+                  onImport={presetImport.importFromFile}
+                  onSaveFromReplay={(name, draft) => {
+                    skirmishPresets.savePreset(name, draft);
+                    notify({
+                      title: t`Saved to Singleplayer presets`,
+                      body: t`"${name}" — replay it from Singleplayer → Presets.`,
+                      level: "success",
+                    });
+                  }}
+                  onBrowseHub={() => {
+                    setApplyPresetOpen(false);
+                    navigate("/hub?kind=preset");
+                  }}
+                />
+                {/* An imported preset names a game and a map this machine may not
                   have, so it waits behind the same content check Singleplayer
                   puts it behind. */}
-              <PresetImportGate
-                pending={presetImport.pending}
-                target={room.target ?? undefined}
-                targetLoading={room.targetLoading}
-                onCancel={() => presetImport.setPending(null)}
-                onContinue={(p) => {
-                  skirmishPresets.savePreset(
-                    p.name?.trim() || t`Imported preset`,
-                    p,
-                  );
-                  presetImport.setPending(null);
-                }}
-              />
-            </>
-          )}
-          {!room.startPositionsUnavailable && (
-            <StartPosOptions
-              battle={battle}
-              canEdit={room.canEditOptions}
-              sendOption={room.sendOption}
-              note={startPosNote({
-                startPosType: room.startPosType,
-                hasBoxes: Object.keys(battle.startRects).length > 0,
-                canEditBoxes: room.canEditBoxes,
-              })}
-            >
-              {room.canEditBoxes && (
-                <StartBoxControls
-                  mapName={battle.map}
-                  rects={battle.startRects}
-                  allyList={boxAllies.allyList}
-                  activeAlly={boxAllies.activeAlly}
-                  onPickAlly={boxAllies.pickAlly}
-                  onSetBox={room.setStartBox}
-                  onClearBox={room.clearStartBox}
+                <PresetImportGate
+                  pending={presetImport.pending}
+                  target={room.target ?? undefined}
+                  targetLoading={room.targetLoading}
+                  onCancel={() => presetImport.setPending(null)}
+                  onContinue={(p) => {
+                    skirmishPresets.savePreset(
+                      p.name?.trim() || t`Imported preset`,
+                      p,
+                    );
+                    presetImport.setPending(null);
+                  }}
                 />
-              )}
-            </StartPosOptions>
-          )}
-          <BattleOptionsDrawer
-            battle={battle}
-            modOptionsSchema={room.modOptionsSchema}
-            mapOptionsSchema={room.mapOptionsSchema}
-            canEdit={room.canEditOptions}
-            gameMissing={room.gameMissing}
-            mapMissing={room.mapMissing}
-            sendOption={room.sendOption}
-            sendOptions={room.sendOptions}
-            sendOptionsPaced={!room.isFounder}
-            delivery={room.presetDelivery}
-            canEditRestrictions={room.canEditRestrictions}
-            restrictionsUnavailable={room.restrictionsUnavailable}
-            startPositionsUnavailable={room.startPositionsUnavailable}
-            onRestrictChange={room.setRestrictions}
-          />
-          {room.gameMissing && (
-            <MissingContentCard
-              battleId={battle.id}
-              gameName={room.requiredGame ?? battle.modname}
-              onRescan={room.rescan}
+              </>
+            )}
+            {!room.startPositionsUnavailable && (
+              <StartPosOptions
+                battle={battle}
+                canEdit={room.canEditOptions}
+                sendOption={room.sendOption}
+                note={startPosNote({
+                  startPosType: room.startPosType,
+                  hasBoxes: Object.keys(battle.startRects).length > 0,
+                  canEditBoxes: room.canEditBoxes,
+                })}
+              >
+                {room.canEditBoxes && (
+                  <StartBoxControls
+                    mapName={battle.map}
+                    rects={battle.startRects}
+                    allyList={boxAllies.allyList}
+                    activeAlly={boxAllies.activeAlly}
+                    onPickAlly={boxAllies.pickAlly}
+                    onSetBox={room.setStartBox}
+                    onClearBox={room.clearStartBox}
+                  />
+                )}
+              </StartPosOptions>
+            )}
+            <BattleOptionsDrawer
+              battle={battle}
+              modOptionsSchema={room.modOptionsSchema}
+              mapOptionsSchema={room.mapOptionsSchema}
+              canEdit={room.canEditOptions}
+              gameMissing={room.gameMissing}
+              mapMissing={room.mapMissing}
+              sendOption={room.sendOption}
+              sendOptions={room.sendOptions}
+              sendOptionsPaced={!room.isFounder}
+              delivery={room.presetDelivery}
+              canEditRestrictions={room.canEditRestrictions}
+              restrictionsUnavailable={room.restrictionsUnavailable}
+              startPositionsUnavailable={room.startPositionsUnavailable}
+              onRestrictChange={room.setRestrictions}
             />
-          )}
-          <CompatBattleCard state={room.compat} onRetry={room.retryCompat} />
-          {room.isFounder &&
-            room.compat.status === "idle" &&
-            room.compatBaseArchive &&
-            room.enginePath &&
-            room.dataDir && (
-              <CompatHostExport
-                enginePath={room.enginePath}
-                dataDir={room.dataDir}
-                baseArchive={room.compatBaseArchive}
+            {room.gameMissing && (
+              <MissingContentCard
+                battleId={battle.id}
+                gameName={room.requiredGame ?? battle.modname}
+                onRescan={room.rescan}
               />
             )}
-          {/* Game-type presets + Balance (issue #344): unlike AutohostControls
+            <CompatBattleCard state={room.compat} onRetry={room.retryCompat} />
+            {room.isFounder &&
+              room.compat.status === "idle" &&
+              room.compatBaseArchive &&
+              room.enginePath &&
+              room.dataDir && (
+                <CompatHostExport
+                  enginePath={room.enginePath}
+                  dataDir={room.dataDir}
+                  baseArchive={room.compatBaseArchive}
+                />
+              )}
+            {/* Game-type presets + Balance (issue #344): unlike AutohostControls
               this works self-hosted too (founder-direct force calls), so it
               renders regardless of `selfHost` and only hides itself where the
               server assigns seats (Zero-K, Tachyon — see the component doc). */}
-          <GameTypePresetsControls
-            rows={room.rows}
-            me={room.me}
-            selfHost={room.selfHost}
-            serverAssignsSeat={room.serverAssignsSeat}
-            directRoom={room.directRoom}
-            hostControls={room.hostControls}
-            onSetBattleStatusBatch={room.setBattleStatusBatch}
-            onAutohostSend={room.autohostSend}
-          />
-          {/* The `!`-command panel is mostly for somebody who isn't hosting
+            <GameTypePresetsControls
+              rows={room.rows}
+              me={room.me}
+              selfHost={room.selfHost}
+              serverAssignsSeat={room.serverAssignsSeat}
+              directRoom={room.directRoom}
+              hostControls={room.hostControls}
+              onSetBattleStatusBatch={room.setBattleStatusBatch}
+              onAutohostSend={room.autohostSend}
+            />
+            {/* The `!`-command panel is mostly for somebody who isn't hosting
               the battle themselves: self-hosted, those commands are inert
               (lock moves to the header, map changes go through the map card)
               and only Ring unready is left, which the founder's own client
@@ -952,32 +1005,33 @@ function BattleRoomPage() {
               requests the founder answers in the battle chat rather than
               commands a bot answers (issue #2871, replacing #2738's outright
               hiding of this panel there). */}
-          <AutohostControls
-            locked={battle.locked}
-            directRoom={room.directRoom}
-            selfHost={room.selfHost}
-            onCommand={room.autohostSend}
-            onRing={() => room.hostControls.ring()}
-          />
-          {!oaHost && (
-            <>
-              <BattleGameCard
-                enginePath={room.enginePath}
-                dataDir={room.dataDir}
-                game={room.localGame}
-                gameName={battle.modname}
-              />
-              <BattleEngineCard
-                battleId={battle.id}
-                match={engine}
-                version={battle.version}
-                target={room.target}
-                onInstalled={room.refreshTarget}
-                unreadable={room.engineUnreadable}
-              />
-            </>
-          )}
-        </aside>
+            <AutohostControls
+              locked={battle.locked}
+              directRoom={room.directRoom}
+              selfHost={room.selfHost}
+              onCommand={room.autohostSend}
+              onRing={() => room.hostControls.ring()}
+            />
+            {!oaHost && (
+              <>
+                <BattleGameCard
+                  enginePath={room.enginePath}
+                  dataDir={room.dataDir}
+                  game={room.localGame}
+                  gameName={battle.modname}
+                />
+                <BattleEngineCard
+                  battleId={battle.id}
+                  match={engine}
+                  version={battle.version}
+                  target={room.target}
+                  onInstalled={room.refreshTarget}
+                  unreadable={room.engineUnreadable}
+                />
+              </>
+            )}
+          </aside>
+        )}
       </div>
     </main>
   );
