@@ -28,7 +28,7 @@ function replay(path: string): ReplayFile {
 }
 
 function summary(over: Partial<Record<string, number>> = {}) {
-  return { added: 1, updated: 0, skipped: 4, failed: 0, total: 5, ...over };
+  return { added: 1, updated: 0, skipped: 4, failed: 0, removed: 0, total: 5, ...over };
 }
 
 beforeEach(() => {

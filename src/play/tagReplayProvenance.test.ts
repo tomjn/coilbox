@@ -37,7 +37,7 @@ beforeEach(() => {
   findNewReplay.mockReset();
   forgetIngestedReplays();
   ingest.mockResolvedValue({
-    summary: { added: 1, updated: 0, skipped: 0, failed: 0, total: 1 },
+    summary: { added: 1, updated: 0, skipped: 0, failed: 0, removed: 0, total: 1 },
     records: [],
   });
 });
