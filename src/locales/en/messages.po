@@ -14909,6 +14909,10 @@ msgstr "Data is not JSON: {reason}"
 msgid "Data table"
 msgstr "Data table"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Datagrams"
+msgstr "Datagrams"
+
 #: src/content/matchStatsImage.ts
 msgid "Date"
 msgstr "Date"
@@ -28198,6 +28202,10 @@ msgstr "Only the fields you change are recorded, so the rest still follow the ga
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 msgstr "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
+msgstr "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
 msgstr "Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
@@ -30031,6 +30039,10 @@ msgstr "Ports are whole numbers."
 #: src/direct/room.ts
 msgid "Ports run from 1 to 65535."
 msgstr "Ports run from 1 to 65535."
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Ports to forward"
+msgstr "Ports to forward"
 
 #: src/lego/pages/components/PosesPopover.tsx
 msgid "Pose name"
@@ -34464,6 +34476,10 @@ msgstr "Server statistics"
 msgid "Servers"
 msgstr "Servers"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Session discovery"
+msgstr "Session discovery"
+
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 msgid "Sessions logged in for more than 14 days are logged out. Bots and static accounts are exempt."
 msgstr "Sessions logged in for more than 14 days are logged out. Bots and static accounts are exempt."
@@ -36780,6 +36796,10 @@ msgstr "Streak"
 #: src/content/pages/components/AchievementsSection.tsx
 msgid "Streaks"
 msgstr "Streaks"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Stream messages"
+msgstr "Stream messages"
 
 #: src/lego/animPresets.ts
 msgid "Stride time"
@@ -44264,6 +44284,10 @@ msgstr "white smoke"
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "white star"
 msgstr "white star"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Who needs to forward these ports"
+msgstr "Who needs to forward these ports"
 
 #: src/content/replayAnalysis.ts
 msgid "Who won"
