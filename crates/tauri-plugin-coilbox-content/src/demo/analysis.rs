@@ -1519,6 +1519,25 @@ mod tests {
         );
     }
 
+    /// Later lines of the log, such as logger version 5's `unit_damage`, are not
+    /// definitions and do not count towards the header's total.
+    #[test]
+    fn lines_of_other_kinds_after_the_list_leave_it_whole() {
+        let after = format!(
+            "{}{{\"kind\":\"unit_damage\",\"frame\":1,\"unit\":2,\"def\":3,\"team\":0,\"taken\":4}}\n",
+            unit_list_fixture()
+        );
+        let units = unit_list_in(&after).unwrap().expect("a list");
+        assert_eq!(units.len(), 4);
+
+        // And they do not stand in for a definition that is missing.
+        let short = format!(
+            "{}{{\"kind\":\"unit_damage\",\"frame\":1,\"unit\":2,\"def\":3,\"team\":0,\"taken\":4}}\n",
+            partial_unit_list()
+        );
+        assert_eq!(unit_list_in(&short).unwrap(), None);
+    }
+
     #[test]
     fn a_list_with_a_definition_missing_is_refused() {
         assert_eq!(unit_list_in(&partial_unit_list()).unwrap(), None);
