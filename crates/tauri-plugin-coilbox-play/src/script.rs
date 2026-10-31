@@ -164,14 +164,17 @@ pub struct AllyTeam {
 
 /// Render a `BattleConfig` into the engine's `[GAME]{ ... }` start-script text.
 ///
-/// Refuses a client script holding a value that would change what the script
-/// says. See [`generate_client_script`].
+/// Refuses a script holding a value that would change what the script says. See
+/// [`generate_client_script`] and [`host_script_refusal`].
 pub fn generate_script(cfg: &BattleConfig) -> Result<String, String> {
     // A client joining a remote lobby battle needs only a minimal script pointing
     // at the host; the host relays the full game/team/player state. (See skylobby
     // `script-data-client`.)
     if !cfg.is_host {
         return generate_client_script(cfg);
+    }
+    if let Some(refused) = host_script_refusal(cfg) {
+        return Err(refused);
     }
 
     let mut s = String::new();
@@ -365,12 +368,11 @@ fn generate_client_script(cfg: &BattleConfig) -> Result<String, String> {
 /// them as ordinary text, and Zero-K names may contain `[` and `]` for a clan
 /// tag (`Utils.ValidLobbyNameCharacter` in Zero-K-Infrastructure).
 fn value_refusal(what: &str, value: &str) -> Option<String> {
+    if let Some(refused) = line_refusal(what, value) {
+        return Some(refused);
+    }
     let reason = if value.is_empty() {
         "is empty"
-    } else if value.contains(';') {
-        "contains a semicolon"
-    } else if value.chars().any(char::is_control) {
-        "contains a line break or another control character"
     } else if value.starts_with(char::is_whitespace) || value.ends_with(char::is_whitespace) {
         "starts or ends with a space"
     } else if value.starts_with('"') {
@@ -381,6 +383,89 @@ fn value_refusal(what: &str, value: &str) -> Option<String> {
     Some(format!(
         "Coilbox did not start the game: the {what} {reason}."
     ))
+}
+
+/// Why `value` cannot be written without starting another line of the script, or
+/// `None` when it can. Only what ends a value early (see [`value_refusal`]), since
+/// an empty option is a real setting and the rest of that check does not apply to
+/// text a game declared. A NUL counts too: the engine copies the script as a C
+/// string (`TdfParser::ParseBuffer`), which would cut it off there.
+fn line_refusal(what: &str, value: &str) -> Option<String> {
+    let reason = if value.contains(';') {
+        "contains a semicolon"
+    } else if value.chars().any(char::is_control) {
+        "contains a line break or another control character"
+    } else {
+        return None;
+    };
+    Some(format!(
+        "Coilbox did not start the game: the {what} {reason}."
+    ))
+}
+
+/// The same for an option: its key as well as its value. A key is read up to the
+/// first space or `=` (`ParseKey`, same file), so one holding either carries a value
+/// of its own, and one holding `}` can close the section. Every option key in the
+/// games checked for this is letters, digits and underscores.
+fn option_refusal(what: &str, key: &str, value: &str) -> Option<String> {
+    let plain = !key.is_empty() && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if !plain {
+        return Some(format!(
+            "Coilbox did not start the game: the {what} {key:?} has a name that is not only letters, digits and underscores."
+        ));
+    }
+    line_refusal(&format!("{what} {key}"), value)
+}
+
+/// Why a host script cannot be written, or `None` when it can.
+///
+/// Everything in it that is text can come from a saved or followed preset or a
+/// lobby, and goes through [`kv`] as it stands. A value that starts another line can
+/// add a tweak slot, which is Lua the game runs, or close the section and set a
+/// mutator, so the launch is refused rather than the text escaped, for the reason
+/// [`generate_client_script`] gives. The numbers it holds cannot do this.
+fn host_script_refusal(cfg: &BattleConfig) -> Option<String> {
+    let mut texts: Vec<(&str, &str)> = vec![
+        ("map name", &cfg.map_name),
+        ("game name", &cfg.game_type),
+        ("player name", &cfg.my_player_name),
+    ];
+    if let Some(ip) = &cfg.host_ip {
+        texts.push(("host address", ip));
+    }
+    for p in &cfg.players {
+        texts.push(("player name", &p.name));
+    }
+    for a in &cfg.ais {
+        texts.push(("bot name", &a.name));
+        texts.push(("bot short name", &a.short_name));
+        if let Some(version) = &a.version {
+            texts.push(("bot version", version));
+        }
+    }
+    for t in &cfg.teams {
+        if let Some(side) = &t.side {
+            texts.push(("team side", side));
+        }
+    }
+    for unit in cfg.restricted_units.keys() {
+        texts.push(("restricted unit", unit));
+    }
+    let options = [
+        ("mod option", &cfg.mod_options),
+        ("map option", &cfg.map_options),
+    ];
+    let bot_options = cfg.ais.iter().map(|a| ("bot option", &a.options));
+    texts
+        .into_iter()
+        .find_map(|(what, text)| line_refusal(what, text))
+        .or_else(|| {
+            options
+                .into_iter()
+                .chain(bot_options)
+                .flat_map(|(what, map)| map.iter().map(move |(k, v)| (what, k, v)))
+                .find_map(|(what, k, v)| option_refusal(what, k, v))
+        })
 }
 
 /// The same check for the host's address, which is narrower still. An address
@@ -645,6 +730,140 @@ mod tests {
                 "a host address of {value:?} was written"
             );
         }
+    }
+
+    /// A host script with one option set, the way a preset's option reaches it.
+    fn with_option(key: &str, value: &str, map: bool) -> Result<String, String> {
+        let mut cfg = sample();
+        let options = if map {
+            &mut cfg.map_options
+        } else {
+            &mut cfg.mod_options
+        };
+        options.insert(key.into(), value.into());
+        generate_script(&cfg)
+    }
+
+    /// A value ends at the next `;` or line break (`ParseValue` in the engine's
+    /// `parse_tdf.lua`), so either one starts a key of the sender's choosing. These
+    /// write a tweak slot that no filter on the option's own key would see.
+    #[test]
+    fn an_option_value_that_would_write_other_lines_is_refused() {
+        for value in [
+            "1;tweakdefs=bHVh",
+            "1;\ntweakdefs=bHVh",
+            "1\ntweakdefs=bHVh",
+            "1\rtweakdefs=bHVh",
+            "1;\n}\nMutator0=evil;\n[X]\n{\nbar=2",
+            "a\0b",
+            "a\tb",
+        ] {
+            for map in [false, true] {
+                assert!(
+                    with_option("maxunits", value, map).is_err(),
+                    "a value of {value:?} was written (map options: {map})"
+                );
+            }
+        }
+    }
+
+    /// A key is read up to the first space or `=`, so anything else in one can
+    /// close the section or carry a value of its own.
+    #[test]
+    fn an_option_key_that_is_not_a_plain_name_is_refused() {
+        for key in [
+            "a=1;\ntweakdefs",
+            "a}",
+            "}\nMapName",
+            "a b",
+            "a;b",
+            "a-b",
+            "a.b",
+            "[x]",
+            "a\nb",
+            "",
+            "tw\u{e9}ak",
+        ] {
+            for map in [false, true] {
+                assert!(
+                    with_option(key, "1", map).is_err(),
+                    "a key of {key:?} was written (map options: {map})"
+                );
+            }
+        }
+    }
+
+    /// What real games set must still start: an empty value, which a tweak slot
+    /// left blank has today, and text the parser treats as ordinary inside a value.
+    #[test]
+    fn an_ordinary_option_is_still_written() {
+        for (key, value) in [
+            ("maxunits", "2000"),
+            ("tweakdefs", ""),
+            ("tweakdefs3", "ZG8gZW5k"),
+            ("TweakDefs", "ZG8gZW5k"),
+            ("tweakdefs", "cmV0dXJuIHt9=="),
+            ("a_b_2", "a}b"),
+            ("a", "[a]=b"),
+            ("a", "a//b"),
+            ("a", " spaced "),
+            ("a", "\"quoted\""),
+            ("a", "caf\u{e9}"),
+        ] {
+            for map in [false, true] {
+                let script = with_option(key, value, map)
+                    .unwrap_or_else(|e| panic!("{key}={value:?} was refused: {e}"));
+                assert!(script.contains(&format!("{key}={value};")), "{script}");
+            }
+        }
+    }
+
+    /// The refusal names the option, so a player can find it in the setup.
+    #[test]
+    fn a_refused_option_is_named() {
+        assert_eq!(
+            with_option("maxunits", "1;x", false).unwrap_err(),
+            "Coilbox did not start the game: the mod option maxunits contains a semicolon."
+        );
+        assert_eq!(
+            with_option("wind", "1\nx", true).unwrap_err(),
+            "Coilbox did not start the game: the map option wind contains a line break or another control character."
+        );
+        assert_eq!(
+            with_option("a}", "1", false).unwrap_err(),
+            "Coilbox did not start the game: the mod option \"a}\" has a name that is not only letters, digits and underscores."
+        );
+    }
+
+    /// Every other value a preset or a lobby can fill goes through `kv` as well, so
+    /// a side or a bot's name could do what an option's value can.
+    #[test]
+    fn every_other_value_that_could_write_other_lines_is_refused() {
+        let forged = "x;\ntweakdefs=bHVh";
+        let cases: [(&str, fn(&mut BattleConfig, String)); 9] = [
+            ("the map name", |c, v| c.map_name = v),
+            ("the game name", |c, v| c.game_type = v),
+            ("the player name", |c, v| c.my_player_name = v),
+            ("a player's name", |c, v| c.players[0].name = v),
+            ("a bot's name", |c, v| c.ais[0].name = v),
+            ("a bot's short name", |c, v| c.ais[0].short_name = v),
+            ("a bot's version", |c, v| c.ais[0].version = Some(v)),
+            ("a team's side", |c, v| c.teams[0].side = Some(v)),
+            ("a restricted unit", |c, v| {
+                c.restricted_units.insert(v, 0);
+            }),
+        ];
+        for (what, set) in cases {
+            let mut cfg = sample();
+            set(&mut cfg, forged.into());
+            assert!(generate_script(&cfg).is_err(), "{what} was written");
+        }
+        let mut cfg = sample();
+        cfg.ais[0].options.insert("a}".into(), "1".into());
+        assert!(generate_script(&cfg).is_err(), "a bot option's key");
+        let mut cfg = sample();
+        cfg.ais[0].options.insert("a".into(), forged.into());
+        assert!(generate_script(&cfg).is_err(), "a bot option's value");
     }
 
     /// The refusal says which value it was, so the player is not left guessing.
