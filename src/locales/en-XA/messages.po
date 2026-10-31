@@ -444,6 +444,11 @@ msgstr ""
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr ""
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr ""
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 msgid "{0, plural, one {{unitName} carries it for {userList}, which names it.} other {{unitName} carries it for {userList}, which name it.}}"
@@ -550,7 +555,9 @@ msgstr ""
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr ""
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 msgid "{0, plural, one {# field} other {# fields}}"
 msgstr ""
@@ -8607,6 +8614,10 @@ msgstr ""
 msgid "already set"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
+msgstr ""
+
 #: src/scenario/pages/components/registries.ts
 msgid "Already taken"
 msgstr ""
@@ -11418,6 +11429,10 @@ msgstr ""
 msgid "Cannot be carried"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Cannot follow {name}"
 msgstr ""
@@ -11681,6 +11696,18 @@ msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Changes every one of a unit's weapons, each from its own current range."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -14033,6 +14060,10 @@ msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 msgid "could not be checked"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -25892,6 +25923,10 @@ msgstr ""
 msgid "No open battles right now."
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
+msgstr ""
+
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "No options."
 msgstr ""
@@ -27538,6 +27573,11 @@ msgstr ""
 
 #: src/notify/NotificationsBell.tsx
 msgid "now"
+msgstr ""
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
 msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
@@ -29884,6 +29924,10 @@ msgstr ""
 msgid "Presentation"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
+msgstr ""
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Preset AI adjusted"
 msgstr ""
@@ -30556,6 +30600,10 @@ msgstr ""
 msgid "Rating"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr ""
+
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
 msgstr ""
@@ -30889,6 +30937,10 @@ msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Reading the replay to see how the mission went."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
 msgstr ""
 
 #: src/blueprint/pack.ts
@@ -38751,6 +38803,10 @@ msgstr ""
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+msgstr ""
+
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
 msgid "The orders could not be read from this replay."
@@ -43457,6 +43513,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "What it builds with"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
 msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx

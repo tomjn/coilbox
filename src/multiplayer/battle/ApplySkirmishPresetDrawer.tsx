@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ConfigOption } from "@/content/bindings";
 import { useUnitsyncMapInfo, useUnitsyncThumbnails } from "@/content/config";
 import type { SkirmishDraft } from "@/play/drafts";
@@ -15,9 +15,20 @@ import type { PresetFitFacts } from "@/play/presetFit";
 import type { PresetSelection } from "@/play/presetParts";
 import type { SkirmishPreset } from "@/play/presets";
 import { usePresetFitFacts } from "@/play/usePresetFitFacts";
+import { type OptionScope, rawOptionEntries } from "./battleOptions";
 import { hexToI32 } from "./config";
 import { DeliveryProgressPanel } from "./DeliveryProgressPanel";
 import type { TweakDelivery } from "./useTweakDelivery";
+
+/** The values a room holds for one scope, by bare option key. */
+function optionEntries(
+  scriptTags: Record<string, string>,
+  scope: OptionScope,
+): Record<string, string> {
+  return Object.fromEntries(
+    rawOptionEntries(scriptTags, scope).map(({ key, value }) => [key, value]),
+  );
+}
 
 /**
  * Applying parts of a saved skirmish preset to the CURRENT battle room
@@ -66,6 +77,7 @@ export function ApplySkirmishPresetDrawer({
   onBrowseHub,
   currentMapName,
   currentStartPosType,
+  scriptTags,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -119,8 +131,19 @@ export function ApplySkirmishPresetDrawer({
   /** The room's map and start position mode, for the fit warnings. */
   currentMapName: string;
   currentStartPosType: number;
+  /** The room's script tags, for saying which of a preset's option changes the
+   *  room already has. */
+  scriptTags?: Record<string, string>;
 }) {
   const { t } = useLingui();
+  const currentOptions = useMemo(
+    () =>
+      scriptTags && {
+        modOptionValues: optionEntries(scriptTags, "mod"),
+        mapOptionValues: optionEntries(scriptTags, "map"),
+      },
+    [scriptTags],
+  );
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
   const fit = usePresetFitFacts({
     preset: viewing,
@@ -219,6 +242,7 @@ export function ApplySkirmishPresetDrawer({
               currentGameName={gameName}
               verb={t`Apply`}
               fit={fit}
+              current={currentOptions}
               // The room is already on a game and cannot be moved off it.
               omit={["game"]}
               extraDisabledReasons={

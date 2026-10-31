@@ -12,7 +12,13 @@
  * empty for anyone whose game had moved a version.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Participant } from "@/play/participants";
 import type { PresetSelection } from "@/play/presetParts";
@@ -24,8 +30,14 @@ const mapStatus = vi.hoisted(() => ({ value: "ready" as string }));
 // What unitsync would say about each map, by name. A map not listed has no
 // options and no start positions, which is what an unread one looks like.
 const maps = vi.hoisted(() => ({
-  games: {} as Record<string, { key: string; name: string }[]>,
-  options: {} as Record<string, { key: string; name: string }[]>,
+  games: {} as Record<
+    string,
+    { key: string; name: string; type?: string; default?: string }[]
+  >,
+  options: {} as Record<
+    string,
+    { key: string; name: string; type?: string; default?: string }[]
+  >,
   positions: {} as Record<string, number>,
   // The maps the player has, or null while the install has not been read.
   installed: null as string[] | null,
@@ -67,8 +79,16 @@ vi.mock("@/workshop/project", () => ({
   useModProjects: () => ({ projects: [] }),
 }));
 
+// The decode command runs Lua in Rust, which a bare render has no way to reach.
+const decode = vi.hoisted(() => ({ run: vi.fn() }));
+vi.mock("@/workshop/decodeTweakSet", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/workshop/decodeTweakSet")>()),
+  workshopDecodeTweakSet: decode.run,
+}));
+
 afterEach(() => {
   cleanup();
+  decode.run.mockReset();
   mapStatus.value = "ready";
   maps.games = {};
   maps.options = {};
@@ -364,5 +384,97 @@ describe("the room's preset panel, warning about what does not fit", () => {
     });
     openPanel();
     expect(screen.queryByText(/does not declare|start positions\./)).toBeNull();
+  });
+});
+
+describe("what a preset changes, in the room", () => {
+  const schema = [
+    { key: "maxunits", name: "Max units", type: "number", default: "1000" },
+    { key: "fog", name: "Fog", type: "bool", default: "true" },
+  ];
+
+  /** Open the list under one part's row. */
+  const showChanges = (part: string) => {
+    const row = screen.getByText(part).closest("li");
+    if (!row) throw new Error(`no row for ${part}`);
+    fireEvent.click(
+      within(row).getByRole("button", { name: "What it changes" }),
+    );
+  };
+
+  it("shows one row for one option off its default, with the room's value beside it", () => {
+    maps.games["a-game.sdz"] = schema;
+    renderDrawer({
+      archive: "a-game.sdz",
+      presets: [preset({ modOptionValues: { maxunits: "8000", fog: "1" } })],
+      scriptTags: { "game/modoptions/maxunits": "2000" },
+    });
+    openPanel();
+    showChanges("Mod options");
+    expect(screen.getByText("Max units")).toBeTruthy();
+    expect(screen.getByText("Preset 8000, default 1000")).toBeTruthy();
+    expect(screen.getByText("Now 2000")).toBeTruthy();
+    expect(screen.queryByText("Fog")).toBeNull();
+  });
+
+  it("says a preset equal to the defaults changes nothing", () => {
+    maps.games["a-game.sdz"] = schema;
+    renderDrawer({
+      archive: "a-game.sdz",
+      presets: [preset({ modOptionValues: { maxunits: "1000", fog: "true" } })],
+    });
+    openPanel();
+    showChanges("Mod options");
+    expect(screen.getByText("Changes nothing from the defaults.")).toBeTruthy();
+  });
+
+  it("says so when the game's options are not available", () => {
+    renderDrawer({
+      presets: [preset({ modOptionValues: { maxunits: "8000" } })],
+    });
+    openPanel();
+    showChanges("Mod options");
+    expect(
+      screen.getByText(/The options for A Game are not available/),
+    ).toBeTruthy();
+  });
+
+  it("compares map options with the map's defaults", () => {
+    maps.options["Preset Map"] = [
+      { key: "wind", name: "Wind", type: "number", default: "5" },
+    ];
+    renderDrawer({
+      presets: [preset({ mapOptionValues: { wind: "9" } })],
+    });
+    openPanel();
+    showChanges("Map options");
+    expect(screen.getByText("Wind")).toBeTruthy();
+    expect(screen.getByText("Preset 9, default 5")).toBeTruthy();
+  });
+
+  it("lists a tweak slot's units and fields from the decode", async () => {
+    decode.run.mockResolvedValue({
+      tweakdefs: [
+        {
+          key: "tweakdefs",
+          kind: "tweakdefs",
+          slot: 0,
+          lua: "",
+          manifest: null,
+          form: "table",
+          table: { armcom: { health: 5000 } },
+          error: null,
+        },
+      ],
+      tweakunits: [],
+      unrecognised: [],
+    });
+    renderDrawer();
+    openPanel();
+    showChanges("Unit tweaks");
+    expect(await screen.findByText("health = 5000")).toBeTruthy();
+    expect(decode.run).toHaveBeenCalledWith({
+      entries: { tweakdefs: "PRESET" },
+    });
   });
 });

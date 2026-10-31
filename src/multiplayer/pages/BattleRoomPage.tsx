@@ -776,6 +776,7 @@ function BattleRoomPage() {
                 delivery={room.presetDelivery}
                 currentMapName={battle.map}
                 currentStartPosType={room.startPosType}
+                scriptTags={battle.scriptTags}
                 onApply={applySkirmishPresetInPlace}
                 saveLabel={t`Save this battle`}
                 onSave={(name) => {

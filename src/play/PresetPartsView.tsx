@@ -4,6 +4,12 @@ import { Button } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type { SkirmishDraft } from "./drafts";
+import { plainOptionValues, tweakSlotValues } from "./optionChanges";
+import {
+  ChangesDisclosure,
+  PresetOptionChanges,
+  TweakSlotChangesList,
+} from "./PresetChanges";
 import { PresetPartsPicker } from "./PresetPartsPicker";
 import { type PresetFitFacts, presetFitWarnings } from "./presetFit";
 import {
@@ -13,6 +19,13 @@ import {
   type PresetSelection,
   partSummary,
 } from "./presetParts";
+
+/** The option values a setup or room holds now: only what was set, so an option
+ *  absent here is at its default. */
+export interface CurrentOptionValues {
+  modOptionValues: Record<string, string>;
+  mapOptionValues?: Record<string, string>;
+}
 
 /**
  * Choosing which parts of one preset to take, as a panel a drawer switches to.
@@ -38,6 +51,7 @@ export function PresetPartsView({
   progress,
   actions,
   fit,
+  current,
 }: {
   preset: SkirmishDraft;
   /** The game being applied to now: the setup's game, or the room's. Decides
@@ -64,6 +78,9 @@ export function PresetPartsView({
   /** What the game and map declare, for warning about parts that do not fit
    *  them. Absent, only the start box warning is given. */
   fit?: PresetFitFacts;
+  /** The option values of the setup or room this would replace, to say which
+   *  changes are already in place. Absent, the lists show only the defaults. */
+  current?: CurrentOptionValues;
 }) {
   const { t } = useLingui();
   const offered = PRESET_PARTS.filter((part) => !omit.includes(part));
@@ -137,6 +154,49 @@ export function PresetPartsView({
       : {}),
   };
 
+  // The preset's own game and map decide which defaults it is compared with,
+  // and the current setup is only comparable when it is on the same ones, since
+  // option keys mean different things under a different game or map.
+  const sameGame = preset.gameName === currentGameName;
+  const sameMap = !!fit && preset.mapName === fit.currentMapName;
+  const modSchema = sameGame ? fit?.modOptions.current : fit?.modOptions.preset;
+  const mapSchema = sameMap ? fit?.mapOptions.current : fit?.mapOptions.preset;
+  const details: Partial<Record<PresetPart, ReactNode>> = {
+    modOptions: (
+      <ChangesDisclosure>
+        <PresetOptionChanges
+          schema={modSchema}
+          presetValues={plainOptionValues(preset.modOptionValues)}
+          currentValues={
+            sameGame && current
+              ? plainOptionValues(current.modOptionValues)
+              : undefined
+          }
+          subject={preset.gameName}
+        />
+      </ChangesDisclosure>
+    ),
+    mapOptions: (
+      <ChangesDisclosure>
+        <PresetOptionChanges
+          schema={mapSchema}
+          presetValues={preset.mapOptionValues ?? {}}
+          currentValues={
+            sameMap && current ? (current.mapOptionValues ?? {}) : undefined
+          }
+          subject={preset.mapName}
+        />
+      </ChangesDisclosure>
+    ),
+    tweakSlots: (
+      <ChangesDisclosure>
+        <TweakSlotChangesList
+          values={tweakSlotValues(preset.modOptionValues)}
+        />
+      </ChangesDisclosure>
+    ),
+  };
+
   const count = effective.parts.length;
   const everything = count === carried.length;
 
@@ -169,6 +229,7 @@ export function PresetPartsView({
           omit={omit}
           disabledReasons={disabledReasons}
           warnings={warnings}
+          details={details}
         />
       </div>
 
