@@ -1,17 +1,31 @@
-# Set for every cargo invocation, here rather than in the CI workflows, because
-# three separate things compile Assimp: `scripts/build-unitsync-worker.sh`,
-# `cargo clippy --all-targets`, and `cargo test --workspace`. Putting it in one
-# workflow step would leave the other two broken, and would leave a developer
-# running the same commands locally broken as well.
+# asset-importer-sys tells Assimp to use the system zlib on Unix, and Assimp then
+# asks pkg-config for minizip. With Homebrew's minizip installed it finds one, drops
+# its own copy of the sources, fails on `unzip.h`, and would not link against that
+# library even past that error, because the crate never tells rustc about it.
+# `scripts/build-prdownloader-macos.sh` documents the same trap for another binary.
+# A Linux machine with libminizip-dev has the same pkg-config entry.
 #
-# Assimp 5.3.0 vendors zlib 1.2.13, whose `contrib/zlib/zutil.h` still carries a
-# branch written for pre-OS X Macs, guarded on `TARGET_OS_MAC`. Every modern Mac
-# defines that, so the branch fires and does `#define fdopen(fd,mode) NULL`,
-# which then mangles the macOS SDK's own declaration of `fdopen` and fails the
-# build. The guard around it is `#ifndef fdopen`, so defining `fdopen` as itself
-# makes zlib skip the bad define and changes nothing else.
+# `PKG_CONFIG_LIBDIR` would fix it, but `[env]` has no per-target form and it would
+# hide GTK from the crates that find it through pkg-config on Linux. CMake is the
+# only thing that reads a toolchain file, and the cmake crate takes this variable per
+# target triple, so pkg-config stays untouched for everything else. Windows builds
+# its own zlib and minizip, so it needs none of this.
 #
-# `[env]` does not override a value already set in the environment, so anyone
-# who needs different C flags can still pass their own.
+# The real fix is one line upstream, `ASSIMP_BUILD_MINIZIP=ON` in asset-importer-sys.
+#
+# `MACOSX_DEPLOYMENT_TARGET` keeps every cargo and tauri command on one macOS version.
+# Without it, C code is compiled for a version that moves with the SDK on the runner.
+# asset-importer-sys also reruns its build script when the value changes, which
+# compiles Assimp again. The Tauri CLI overwrites the variable with
+# `bundle.macOS.minimumSystemVersion`, 10.13 if unset, so `src-tauri/tauri.conf.json`
+# has to say the same. 11.0 is what rustc already stamps on arm64 binaries, and only
+# Apple targets read the variable.
+#
+# `[env]` does not override a value already set in the environment, so anyone who
+# needs a different toolchain file or macOS version can still pass their own.
 [env]
-CFLAGS = "-Dfdopen=fdopen"
+MACOSX_DEPLOYMENT_TARGET = "11.0"
+CMAKE_TOOLCHAIN_FILE_aarch64_apple_darwin = { value = ".cargo/no-pkg-config.cmake", relative = true }
+CMAKE_TOOLCHAIN_FILE_x86_64_apple_darwin = { value = ".cargo/no-pkg-config.cmake", relative = true }
+CMAKE_TOOLCHAIN_FILE_aarch64_unknown_linux_gnu = { value = ".cargo/no-pkg-config.cmake", relative = true }
+CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_gnu = { value = ".cargo/no-pkg-config.cmake", relative = true }

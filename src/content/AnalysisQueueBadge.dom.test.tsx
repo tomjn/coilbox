@@ -41,6 +41,7 @@ import {
 
 const RUNNING = {
   id: 1,
+  kind: "analyse" as const,
   gameId: "a".repeat(32),
   name: "first.sdfz",
   replayPath: "/replays/first.sdfz",
@@ -54,12 +55,14 @@ const RUNNING = {
 const QUEUED = [
   {
     id: 2,
+    kind: "analyse" as const,
     gameId: "b".repeat(32),
     name: "second.sdfz",
     replayPath: "/b",
   },
   {
     id: 3,
+    kind: "analyse" as const,
     gameId: "c".repeat(32),
     name: "third.sdfz",
     replayPath: "/c",

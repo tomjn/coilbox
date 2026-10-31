@@ -19,11 +19,9 @@
 //! straight: 24 of flove's 27 models turned out to carry a rotation, so this is
 //! the common case rather than an exotic one.
 
-use russimp::material::{PropertyTypeInfo, TextureType};
-use russimp::node::Node;
-use russimp::property::PropertyStore;
-use russimp::scene::{PostProcess, Scene};
-use std::rc::Rc;
+use asset_importer::node::Node;
+use asset_importer::postprocess::PostProcessSteps;
+use asset_importer::{Importer, Matrix4x4, Scene, TextureType};
 
 /// The extensions the engine hands to Assimp, from `CheckAssimpWhitelist` in
 /// `rts/Rendering/Models/IModelParser.cpp`. Assimp itself reads many more and
@@ -34,7 +32,7 @@ pub const EXTENSIONS: [&str; 5] = ["3ds", "dae", "lwo", "obj", "blend"];
 /// What `RemoveComponent` throws away, matching the engine's
 /// `ASS_IMPORTER_OPTIONS`: animations, textures, lights, cameras and materials.
 /// The values are `aiComponent_*` from Assimp's `config.h`, which are the same
-/// in the 4.0.1 the engine vendors and the 5.3.0 we build against.
+/// in the 4.0.1 the engine vendors and the 6.0.5 we build against.
 ///
 /// Materials being in that list is not a mistake, and does not stop
 /// [`material_texture`](Model::material_texture) working: the flag discards
@@ -126,33 +124,35 @@ pub struct Model {
 /// `hint` is the file extension without a dot, such as `dae`. Assimp uses it to
 /// pick an importer when it cannot tell from the content alone.
 pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
-    let mut props = PropertyStore::default();
-    // Nul terminated because `set_integer` takes the raw bytes of a C string.
-    // The key is `AI_CONFIG_PP_RVC_FLAGS` from Assimp's `config.h`.
-    props.set_integer(b"PP_RVC_FLAGS\0", REMOVE_COMPONENTS);
-    // A Collada file states the size of its own unit, and Assimp multiplies the
-    // root node's transform by it. The engine keeps that scale on the root piece
-    // alone: it never lets a parent's scale into a child's offset, and it sizes a
-    // model from raw vertex bounds, so the model stays in the units it was
-    // modelled in. This reader composes transforms down the tree instead, so the
-    // same scale would shrink every piece and every vertex. flove's models say
-    // `meter="0.01875"`, which made a mushroom 1.7 elmos tall rather than 90 and
-    // turned a walk cycle's four elmo bob into a leap over its own head.
-    props.set_integer(b"IMPORT_COLLADA_IGNORE_UNIT_SIZE\0", 1);
-
-    let scene = Scene::from_buffer_with_props(bytes, import_flags(), hint, &props)
+    let scene = Importer::new()
+        .import_from_memory_with(bytes, Some(hint), |builder| {
+            builder
+                .with_post_process(import_flags())
+                // The key is `AI_CONFIG_PP_RVC_FLAGS` from Assimp's `config.h`.
+                .with_property_int("PP_RVC_FLAGS", REMOVE_COMPONENTS)
+                // A Collada file states the size of its own unit, and Assimp
+                // multiplies the root node's transform by it. The engine keeps that
+                // scale on the root piece alone: it never lets a parent's scale into
+                // a child's offset, and it sizes a model from raw vertex bounds, so
+                // the model stays in the units it was modelled in. This reader
+                // composes transforms down the tree instead, so the same scale would
+                // shrink every piece and every vertex. flove's models say
+                // `meter="0.01875"`, which made a mushroom 1.7 elmos tall rather
+                // than 90 and turned a walk cycle's four elmo bob into a leap over
+                // its own head.
+                .with_property_int("IMPORT_COLLADA_IGNORE_UNIT_SIZE", 1)
+        })
         .map_err(|e| e.to_string())?;
 
     let root = scene
-        .root
-        .as_ref()
+        .root_node()
         .ok_or_else(|| "the file parsed but holds no nodes".to_string())?;
 
     let mut notes = Notes {
         materials: distinct_materials(&scene),
         ..Notes::default()
     };
-    let mut piece = walk(root, &IDENTITY, [0.0; 3], &scene.meshes, &mut notes);
+    let mut piece = walk(&root, &IDENTITY, [0.0; 3], &scene, &mut notes);
     // Assimp's own root node carries the file's overall transform. The engine
     // treats that node as the model root rather than shifting the model by it,
     // so its offset stays where it is and every child stays relative to it.
@@ -180,10 +180,10 @@ pub fn read(bytes: &[u8], hint: &str) -> Result<Model, String> {
 
 /// How many materials the file's meshes paint with between them.
 ///
-/// Counted off the meshes rather than off `scene.materials`, because a file can
+/// Counted off the meshes rather than off `scene.materials()`, because a file can
 /// declare a material nothing uses and that is not a difference worth reporting.
 fn distinct_materials(scene: &Scene) -> usize {
-    let mut used: Vec<u32> = scene.meshes.iter().map(|m| m.material_index).collect();
+    let mut used: Vec<usize> = scene.meshes().map(|m| m.material_index()).collect();
     used.sort_unstable();
     used.dedup();
     used.len()
@@ -199,23 +199,21 @@ fn distinct_materials(scene: &Scene) -> usize {
 /// reader has no GPU to ask. Splitting exists to keep a single draw call within
 /// what a driver accepts, which is a drawing concern rather than a reading one,
 /// and picking a limit here would be inventing a number the engine never used.
-fn import_flags() -> Vec<PostProcess> {
-    vec![
-        PostProcess::RemoveComponent,
-        PostProcess::FixOrRemoveInvalidData,
-        PostProcess::CalculateTangentSpace,
-        PostProcess::GenerateSmoothNormals,
-        PostProcess::Triangulate,
-        PostProcess::GenerateUVCoords,
-        PostProcess::SortByPrimitiveType,
-        PostProcess::JoinIdenticalVertices,
-        PostProcess::LimitBoneWeights,
-    ]
+fn import_flags() -> PostProcessSteps {
+    PostProcessSteps::REMOVE_COMPONENT
+        | PostProcessSteps::FIND_INVALID_DATA
+        | PostProcessSteps::CALC_TANGENT_SPACE
+        | PostProcessSteps::GEN_SMOOTH_NORMALS
+        | PostProcessSteps::TRIANGULATE
+        | PostProcessSteps::GEN_UV_COORDS
+        | PostProcessSteps::SORT_BY_PTYPE
+        | PostProcessSteps::JOIN_IDENTICAL_VERTICES
+        | PostProcessSteps::LIMIT_BONE_WEIGHTS
 }
 
-/// A transform as Assimp hands it over: row major, translation in the fourth
-/// column. Kept in that layout rather than converted, so the field names in
-/// Assimp's own documentation still describe it.
+/// A transform as Assimp stores it: row major, translation in the fourth column.
+/// Kept in that layout rather than converted, so the field names in Assimp's own
+/// documentation still describe it.
 type Mat4 = [[f32; 4]; 4];
 
 const IDENTITY: Mat4 = [
@@ -228,12 +226,13 @@ const IDENTITY: Mat4 = [
 /// The 3x3 identity, row major, as [`linear_part`] returns one.
 const IDENTITY_LINEAR: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 
-fn mat4_of(m: &russimp::Matrix4x4) -> Mat4 {
+/// `asset-importer` hands a matrix over column major, so this transposes it.
+fn mat4_of(m: &Matrix4x4) -> Mat4 {
     [
-        [m.a1, m.a2, m.a3, m.a4],
-        [m.b1, m.b2, m.b3, m.b4],
-        [m.c1, m.c2, m.c3, m.c4],
-        [m.d1, m.d2, m.d3, m.d4],
+        [m.x_axis.x, m.y_axis.x, m.z_axis.x, m.w_axis.x],
+        [m.x_axis.y, m.y_axis.y, m.z_axis.y, m.w_axis.y],
+        [m.x_axis.z, m.y_axis.z, m.z_axis.z, m.w_axis.z],
+        [m.x_axis.w, m.y_axis.w, m.z_axis.w, m.w_axis.w],
     ]
 }
 
@@ -302,15 +301,16 @@ fn normalise(v: [f32; 3]) -> [f32; 3] {
     }
 }
 
-fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9], notes: &mut Notes) -> Mesh {
-    let uvs = m.texture_coords.first().and_then(|c| c.as_ref());
+fn mesh_of(m: &asset_importer::mesh::Mesh, linear: &[f32; 9], notes: &mut Notes) -> Mesh {
+    let uvs = m.texture_coords_raw(0);
+    let normals = m.normals_raw();
     let normal_matrix = inverse_transpose(linear);
     // An untransformed node's vertices are copied rather than recomputed, so a
     // normal that is not quite unit length is left as the file wrote it instead
     // of being changed for no reason.
     let plain = *linear == IDENTITY_LINEAR;
     let vertices = m
-        .vertices
+        .vertices_raw()
         .iter()
         .enumerate()
         .map(|(i, v)| Vertex {
@@ -323,8 +323,7 @@ fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9], notes: &mut Notes) -> Mes
             // a missing normal here means the mesh had no vertex at all to
             // generate one from. Straight up matches the engine's own fallback.
             normal: {
-                let n = m
-                    .normals
+                let n = normals
                     .get(i)
                     .map(|n| [n.x, n.y, n.z])
                     .unwrap_or([0.0, 1.0, 0.0]);
@@ -334,30 +333,27 @@ fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9], notes: &mut Notes) -> Mes
                     normalise(apply(&normal_matrix, n))
                 }
             },
-            uv: uvs
-                .and_then(|c| c.get(i))
-                .map(|t| [t.x, t.y])
-                .unwrap_or([0.0, 0.0]),
+            uv: uvs.get(i).map(|t| [t.x, t.y]).unwrap_or([0.0, 0.0]),
         })
         .collect();
     // Faces that are not triangles are dropped rather than repaired, which is
     // what the engine does. `Triangulate` and `SortByPrimitiveType` mean the
     // only things left to drop are lines and points, and they are counted so
     // whatever opens the model can say that some of it was left out.
-    notes.dropped_faces += m.faces.iter().filter(|f| f.0.len() != 3).count();
+    notes.dropped_faces += m.faces().filter(|f| f.indices().len() != 3).count();
     // A mirroring transform turns every triangle inside out, so the winding is
     // reversed to match. Without it the piece draws back to front, and is lit
     // from inside.
     let mirrored = determinant(linear) < 0.0;
     let indices = m
-        .faces
-        .iter()
-        .filter(|f| f.0.len() == 3)
+        .faces()
+        .filter(|f| f.indices().len() == 3)
         .flat_map(|f| {
+            let i = f.indices();
             if mirrored {
-                [f.0[0], f.0[2], f.0[1]]
+                [i[0], i[2], i[1]]
             } else {
-                [f.0[0], f.0[1], f.0[2]]
+                [i[0], i[1], i[2]]
             }
         })
         .collect();
@@ -371,13 +367,13 @@ fn mesh_of(m: &russimp::mesh::Mesh, linear: &[f32; 9], notes: &mut Notes) -> Mes
 /// than only its own. A mesh named by two nodes is built twice for that reason,
 /// once per node, since each may sit under a different transform.
 fn walk(
-    node: &Rc<Node>,
+    node: &Node,
     parent_world: &Mat4,
     parent_translation: [f32; 3],
-    scene_meshes: &[russimp::mesh::Mesh],
+    scene: &Scene,
     notes: &mut Notes,
 ) -> Piece {
-    let world = multiply(parent_world, &mat4_of(&node.transformation));
+    let world = multiply(parent_world, &mat4_of(&node.transformation()));
     // Row major, so the translation is the fourth column.
     let translation = [world[0][3], world[1][3], world[2][3]];
     let linear = linear_part(&world);
@@ -389,18 +385,18 @@ fn walk(
     // meshes and then the children each take their turn with `notes` instead of
     // two closures reaching for it at once.
     let mut meshes = Vec::new();
-    for index in &node.meshes {
-        if let Some(mesh) = scene_meshes.get(*index as usize) {
-            meshes.push(mesh_of(mesh, &linear, notes));
+    for index in node.mesh_indices() {
+        if let Some(mesh) = scene.mesh(index) {
+            meshes.push(mesh_of(&mesh, &linear, notes));
         }
     }
     let mut children = Vec::new();
-    for child in node.children.borrow().iter() {
-        children.push(walk(child, &world, translation, scene_meshes, notes));
+    for child in node.children() {
+        children.push(walk(&child, &world, translation, scene, notes));
     }
 
     Piece {
-        name: node.name.clone(),
+        name: node.name(),
         // Both translations are in model space, so their difference is where
         // this piece sits relative to its parent, with the parent's own
         // rotation already accounted for.
@@ -451,19 +447,19 @@ fn bounds(piece: &Piece, parent: [f32; 3]) -> ([f32; 3], [f32; 3]) {
 /// engine probes in `FindTextures`, in the same order. Later wins, so diffuse
 /// beats the other two, exactly as the engine's overwriting does.
 fn material_texture(scene: &Scene) -> Option<String> {
-    let material = scene.materials.first()?;
+    let material = scene.material(0)?;
     let mut found = None;
     for want in [
         TextureType::Specular,
         TextureType::Unknown,
         TextureType::Diffuse,
     ] {
-        for p in &material.properties {
-            if p.semantic != want || p.key != "$tex.file" {
+        for p in material.properties() {
+            if p.semantic() != Some(want) || p.key_str() != "$tex.file" {
                 continue;
             }
-            if let PropertyTypeInfo::String(s) = &p.data {
-                let cleaned = clean_texture_path(s);
+            if let Some(s) = p.string_ref() {
+                let cleaned = clean_texture_path(&s.as_str());
                 if !cleaned.is_empty() {
                     found = Some(cleaned);
                 }

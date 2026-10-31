@@ -74,9 +74,11 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     // it and never runs the second pass.
     let mut units = collect_units_native(&us);
     let mut redirects = Redirects::new();
+    let mut logged = Vec::new();
     let unit_errors = us.drain_errors();
     if units.is_empty() {
-        let shimmed = units_via_shim(&us);
+        let (shimmed, definition_errors) = units_via_shim(&us);
+        logged = definition_errors;
         let _ = us.drain_errors();
         match shimmed {
             Ok((shimmed, borrowed)) if !shimmed.is_empty() => {
@@ -156,6 +158,9 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
     }
 
     errors.extend(us.drain_errors());
+    // Last, so a reader that shows only the first error still shows the one
+    // that stopped the read, and not a definition script's (#4928).
+    errors.extend(logged);
     us.remove_all_archives();
     us.uninit();
 
@@ -196,9 +201,9 @@ const VFS_ALL_MODES: &str = "rmMbe";
 /// loads nothing or raises, and no units come back.
 const UNIT_DEFS_SHIM_SCRIPT: &str = r#"
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
-if not ok then return { __error = tostring(defs) } end
+if not ok then return __cb_with_logged({ __error = tostring(defs) }) end
 local ud = (type(defs) == 'table') and defs.unitdefs or nil
-if type(ud) ~= 'table' then return { __error = 'defs.lua produced no unitdefs table' } end
+if type(ud) ~= 'table' then return __cb_with_logged({ __error = 'defs.lua produced no unitdefs table' }) end
 
 local names = {}
 for k in pairs(ud) do names[#names + 1] = k end
@@ -229,8 +234,9 @@ for _, k in ipairs(names) do
   lines[#lines + 1] = tostring(k) .. '\t' .. full .. '\t' .. name_from(d)
 end
 -- Sent back in pieces: a big game's list is longer than unitsync can return in
--- one string.
-return __cb_chunk(table.concat(lines, '\n'))
+-- one string. The errors the definition scripts logged go back beside them
+-- (#4928).
+return __cb_with_logged(__cb_chunk(table.concat(lines, '\n')))
 "#;
 
 /// Native unit enumeration: `ProcessUnits` must have populated the unitdef table
@@ -253,14 +259,18 @@ fn collect_units_native(us: &Unitsync) -> Vec<UnitEntry> {
 /// by the caller) with the missing game environment shimmed in, and read back
 /// `name\tfullname\tnamefrom` per unit. The failure is returned so the caller can
 /// report why a game has no units.
-fn units_via_shim(us: &Unitsync) -> Result<(Vec<UnitEntry>, Redirects), String> {
+///
+/// The second half of the answer is the errors the game's definition scripts
+/// logged while the read ran (#4928). A definition file that fails this way
+/// leaves no other trace than the units missing from the list.
+fn units_via_shim(us: &Unitsync) -> (Result<ShimUnits, String>, Vec<String>) {
     let script = format!(
         "{}{}{UNIT_DEFS_SHIM_SCRIPT}",
         crate::lua::CHUNKED_RESULT,
         crate::lua::DEFS_ENV_SHIM
     );
-    us.run_lua_source(&script, VFS_ALL_MODES)
-        .map(|raw| parse_shim_units(&raw))
+    let run = us.run_lua_source_logged(&script, VFS_ALL_MODES);
+    (run.result.map(|raw| parse_shim_units(&raw)), run.logged)
 }
 
 /// Def key (lowercased) to the def key its name is looked up under, for the
@@ -268,6 +278,9 @@ fn units_via_shim(us: &Unitsync) -> Result<(Vec<UnitEntry>, Redirects), String> 
 /// because it is how this read finds a name and not a fact about the game worth
 /// putting in the output.
 type Redirects = HashMap<String, String>;
+
+/// The units [`units_via_shim`] read, and the redirects that go with them.
+type ShimUnits = (Vec<UnitEntry>, Redirects);
 
 /// Parse the `name\tfullname\tnamefrom` lines [`UNIT_DEFS_SHIM_SCRIPT`] returns.
 /// A full name equal to the internal name (the script's fallback) or missing

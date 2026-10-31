@@ -83,6 +83,25 @@ pub struct LuaReplRaw {
     pub prints: Option<String>,
 }
 
+/// What [`Unitsync::run_lua_source_logged`] reads back: the script's result, and
+/// the errors its definition scripts logged while it ran.
+pub struct LuaRun {
+    pub result: Result<String, String>,
+    /// One entry per `Spring.Log` call at error level or above, each already
+    /// worded for the worker's `errors` list. See `lua/defs-env/log_errors.lua`.
+    pub logged: Vec<String>,
+}
+
+impl LuaRun {
+    /// A run that produced no result, and so logged nothing that could be read.
+    fn failed(message: impl Into<String>) -> Self {
+        LuaRun {
+            result: Err(message.into()),
+            logged: Vec::new(),
+        }
+    }
+}
+
 /// Copy a library-owned C string into an owned `String`. Null -> `None`.
 pub(crate) unsafe fn cstr(p: *const c_char) -> Option<String> {
     if p.is_null() {
@@ -147,6 +166,26 @@ fn read_chunked_field(
         format!("the Lua parser did not say how many {prefix} pieces it wrote (got {count:?})")
     })?;
     read_chunked_result(prefix, n, &mut get)
+}
+
+/// The lines `__cb_with_logged` put under `logged`, one per error. A script that
+/// did not call it wrote no count and reads as no lines. A piece that did not
+/// survive the read reads as a line saying so, because leaving it out would show
+/// a clean read.
+fn read_logged(mut get: impl FnMut(String) -> String) -> Vec<String> {
+    if get("loggedChunks".to_string()).trim().is_empty() {
+        return Vec::new();
+    }
+    match read_chunked_field("logged", get) {
+        Ok(text) => text
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(str::to_string)
+            .collect(),
+        Err(e) => vec![format!(
+            "the errors a definitions script logged could not be read back: {e}"
+        )],
+    }
 }
 
 /// A loaded unitsync library plus its resolved entry points. The `Library` is
@@ -1873,6 +1912,15 @@ impl Unitsync {
     /// string buffer intact, and a piece that came back as unitsync's own buffer
     /// complaint is an error rather than data, because the real value is gone.
     pub fn run_lua_source(&self, source: &str, modes: &str) -> Result<String, String> {
+        self.run_lua_source_logged(source, modes).result
+    }
+
+    /// [`Self::run_lua_source`], and with it the errors the script's definition
+    /// scripts logged (#4928): the lines `__cb_with_logged` in
+    /// [`crate::lua::CHUNKED_RESULT`] put under `logged`. A script that does not
+    /// call it has none. They are read whether the run succeeded or not, because
+    /// the lines logged before a failure are the best account of it.
+    pub fn run_lua_source_logged(&self, source: &str, modes: &str) -> LuaRun {
         let (Some(open), Some(execute), Some(close), Some(root), Some(get_str)) = (
             self.lp_open_source_fn,
             self.lp_execute_fn,
@@ -1880,9 +1928,10 @@ impl Unitsync {
             self.lp_root_table_fn,
             self.lp_str_key_str_val_fn,
         ) else {
-            return Err("this engine's libunitsync does not expose the Lua parser \
-                        (lpOpenSource/lpGetStrKeyStrVal)"
-                .into());
+            return LuaRun::failed(
+                "this engine's libunitsync does not expose the Lua parser \
+                 (lpOpenSource/lpGetStrKeyStrVal)",
+            );
         };
         let (Ok(csrc), Ok(cmodes), Ok(err_key), Ok(empty)) = (
             CString::new(source),
@@ -1890,14 +1939,15 @@ impl Unitsync {
             CString::new("__error"),
             CString::new(""),
         ) else {
-            return Err("Lua source or arguments contained a NUL byte".into());
+            return LuaRun::failed("Lua source or arguments contained a NUL byte");
         };
 
         unsafe {
             if open(csrc.as_ptr(), cmodes.as_ptr()) == 0 {
-                return Err(self
-                    .lp_error_log()
-                    .unwrap_or_else(|| "could not compile the script".into()));
+                return LuaRun::failed(
+                    self.lp_error_log()
+                        .unwrap_or_else(|| "could not compile the script".into()),
+                );
             }
             // lpExecute returns nonzero on success; we don't read it here because a
             // failed run leaves no root table, so root() == 0 below is the signal.
@@ -1905,22 +1955,27 @@ impl Unitsync {
             if root() == 0 {
                 let log = self.lp_error_log();
                 close();
-                return Err(log.unwrap_or_else(|| {
+                return LuaRun::failed(log.unwrap_or_else(|| {
                     "script did not produce a result table (lpRootTable failed)".into()
                 }));
             }
             let runtime_err =
                 cstr(get_str(err_key.as_ptr(), empty.as_ptr())).filter(|s| !s.is_empty());
-            let result = read_chunked_field("result", |key| {
+            let read = |key: String| {
                 CString::new(key)
                     .ok()
                     .and_then(|k| cstr(get_str(k.as_ptr(), empty.as_ptr())))
                     .unwrap_or_default()
-            });
+            };
+            let result = read_chunked_field("result", &read);
+            let logged = read_logged(&read);
             close();
-            match runtime_err {
-                Some(e) => Err(e),
-                None => result,
+            LuaRun {
+                result: match runtime_err {
+                    Some(e) => Err(e),
+                    None => result,
+                },
+                logged,
             }
         }
     }

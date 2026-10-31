@@ -23,6 +23,10 @@
 //!
 //! The replay itself is read and never written, and nothing is written under a
 //! content folder or beside the replay.
+//!
+//! [`read_unit_list`] is a shorter run of the same engine, game and logger. It
+//! stops the engine once the logger has written the engine's unit list, which
+//! is before the first frame, so it needs no recorded outcome (issue #3906).
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -37,6 +41,7 @@ pub mod log;
 pub mod queue;
 pub mod store;
 
+use super::def_sets::UnitDef;
 use super::playback::adapter;
 use divergence::Disagreement;
 use launch::{EngineExit, RunControl};
@@ -338,6 +343,152 @@ pub fn analyse_replay(
     on_poll: &dyn Fn(RunProgress),
 ) -> Result<AnalysisRun, String> {
     analyse_with(request, control, on_poll, game::LOGGER)
+}
+
+/// A finished run that read only the engine's unit list.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnitListRun {
+    /// The engine's whole list, in id order. `None` when the run ended before
+    /// the logger had written every definition its header counts.
+    pub units: Option<Vec<UnitDef>>,
+    /// The game the run depended on. See [`AnalysisReport::base_game`].
+    pub base_game: String,
+    /// The game the replay says it was recorded on.
+    pub recorded_game: String,
+    /// How the engine ended. A run that got its list stopped the engine itself,
+    /// so this reads as killed.
+    pub exit: EngineExit,
+    /// The logger's first line. Absent when the logger did not load.
+    pub header: Option<LogHeader>,
+    /// What the engine said, for a run that got no list.
+    pub log_excerpt: Vec<String>,
+}
+
+/// The engine's unit list in the logger's file, when the file holds the whole
+/// of it. `Err` for a logger whose lines this reader does not know.
+fn unit_list_in(events: &str) -> Result<Option<Vec<UnitDef>>, String> {
+    let parsed = log::parse_log(events);
+    if let Some(header) = parsed.header().filter(|h| h.format != log::FORMAT_VERSION) {
+        return Err(format!(
+            "the replay logger wrote format {}, and this reader knows format {}",
+            header.format,
+            log::FORMAT_VERSION
+        ));
+    }
+    Ok(log::unit_defs_of(&parsed.lines))
+}
+
+/// Start a replay's match in the engine under the logger, keep the engine's own
+/// unit list and stop the engine (issue #3906).
+///
+/// The logger writes the list from `gadget:Initialize`, before the first frame,
+/// and flushes every line. So the engine is stopped as soon as the file holds
+/// as many definitions as its header counts. The match is not played, which is
+/// why this needs no game over and no comparison with the replay's result.
+///
+/// The time limit is the request's. Blocks for as long as the engine runs, so
+/// call it from a blocking task. Cancelling `control` kills the engine.
+pub fn read_unit_list(
+    request: &AnalysisRequest,
+    control: &RunControl,
+    on_poll: &dyn Fn(RunProgress),
+) -> Result<UnitListRun, String> {
+    let raw = super::read_header_and_script(&request.replay)?;
+    let recorded_game = super::find_game(&super::parse_tdf(&raw.script))
+        .get("gametype")
+        .unwrap_or("")
+        .to_string();
+    let base_game = request
+        .game
+        .as_deref()
+        .map(str::trim)
+        .filter(|game| !game.is_empty())
+        .map_or_else(|| recorded_game.clone(), str::to_string);
+    let engine = launch::headless_binary(&request.engine_dir);
+    if !engine.is_file() {
+        return Err(format!(
+            "no headless engine in {}",
+            request.engine_dir.display()
+        ));
+    }
+    let engine_dir = request.engine_dir.to_string_lossy();
+    let datadirs = request
+        .data_dirs
+        .iter()
+        .map(|dir| dir.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(&coilbox_proc::DATADIR_SEP.to_string());
+    let short_name = match &request.game_short_name {
+        Some(name) => name.clone(),
+        None => tauri_plugin_coilbox_unitsync::game_short_name_blocking(
+            &engine_dir,
+            &datadirs,
+            &base_game,
+        )
+        .map_err(|e| format!("could not read the short name of {base_game}: {e}"))?,
+    };
+
+    let scratch = Scratch::create(&request.scratch_root)?;
+    let data = scratch.dir.join("data");
+    let write_dir = scratch.dir.join("write");
+    let demo = scratch.dir.join("replay.sdfz");
+    let engine_log = scratch.dir.join("engine.log");
+    game::write_game(&data, &base_game, &short_name, game::LOGGER, None)?;
+    super::retarget::write_retargeted(&request.replay, &demo, &game::gametype())?;
+
+    let mut data_dirs = vec![data];
+    data_dirs.extend(request.data_dirs.iter().cloned());
+    let events_file = write_dir.join(game::EVENTS_FILE);
+    let probe = ProgressProbe::new(events_file.clone(), raw.game_time);
+    let listed = || {
+        std::fs::read(&events_file)
+            .ok()
+            .and_then(|bytes| {
+                unit_list_in(&String::from_utf8_lossy(&bytes))
+                    .ok()
+                    .flatten()
+            })
+            .is_some()
+    };
+    let stopped = std::cell::Cell::new(false);
+    let exit = launch::run_headless(
+        &launch::Launch {
+            engine: &engine,
+            demo: &demo,
+            write_dir: &write_dir,
+            config: &scratch.dir.join("engine.cfg"),
+            pid_file: &scratch.dir.join(launch::PID_FILE),
+            data_dirs: &data_dirs,
+            log: &engine_log,
+            timeout: request.timeout,
+            on_poll: &|| {
+                on_poll(probe.read());
+                if !stopped.get() && listed() {
+                    stopped.set(true);
+                    control.cancel();
+                }
+            },
+        },
+        control,
+    )?;
+
+    let events = std::fs::read(&events_file).unwrap_or_default();
+    let events = String::from_utf8_lossy(&events);
+    let units = unit_list_in(&events)?;
+    let header = log::parse_log(&events).header().cloned();
+    let output = std::fs::read(&engine_log).unwrap_or_default();
+    Ok(UnitListRun {
+        log_excerpt: if units.is_some() {
+            Vec::new()
+        } else {
+            excerpt(&String::from_utf8_lossy(&output))
+        },
+        units,
+        base_game,
+        recorded_game,
+        exit,
+        header,
+    })
 }
 
 fn analyse_with(
@@ -659,6 +810,24 @@ mod tests {
                     scratch_root: self.scratch_root(),
                     timeout,
                     record: self.record.clone(),
+                },
+                &RunControl::default(),
+                &|_| {},
+            )
+        }
+
+        fn list(&self, engine_body: &str, timeout: Duration) -> Result<UnitListRun, String> {
+            fake_engine(self.dir.path(), engine_body);
+            read_unit_list(
+                &AnalysisRequest {
+                    replay: self.replay.clone(),
+                    engine_dir: self.dir.path().join("engine"),
+                    data_dirs: vec![self.dir.path().join("content")],
+                    game: None,
+                    game_short_name: Some(self.short_name.clone()),
+                    scratch_root: self.scratch_root(),
+                    timeout,
+                    record: None,
                 },
                 &RunControl::default(),
                 &|_| {},
@@ -1327,6 +1496,128 @@ mod tests {
         assert!(!a.exists() && !b.exists());
     }
 
+    /// The logger's fixture of the engine's unit list: a header that counts four
+    /// definitions, and the four.
+    fn unit_list_fixture() -> &'static str {
+        super::log::tests::UNIT_DEFS_FIXTURE
+    }
+
+    /// The same, with the last definition missing and the header still saying
+    /// four, which is what a run stopped part way through the list leaves.
+    fn partial_unit_list() -> String {
+        let lines: Vec<&str> = unit_list_fixture().lines().collect();
+        format!("{}\n", lines[..lines.len() - 1].join("\n"))
+    }
+
+    #[test]
+    fn a_list_with_every_definition_the_header_counts_is_read() {
+        let units = unit_list_in(unit_list_fixture()).unwrap().expect("a list");
+
+        assert_eq!(
+            units.iter().map(|u| u.name.as_str()).collect::<Vec<_>>(),
+            vec!["tgcom", "tgmex", "tgwind", "tg\"odd"]
+        );
+    }
+
+    /// Later lines of the log, such as logger version 5's `unit_damage`, are not
+    /// definitions and do not count towards the header's total.
+    #[test]
+    fn lines_of_other_kinds_after_the_list_leave_it_whole() {
+        let after = format!(
+            "{}{{\"kind\":\"unit_damage\",\"frame\":1,\"unit\":2,\"def\":3,\"team\":0,\"taken\":4}}\n",
+            unit_list_fixture()
+        );
+        let units = unit_list_in(&after).unwrap().expect("a list");
+        assert_eq!(units.len(), 4);
+
+        // And they do not stand in for a definition that is missing.
+        let short = format!(
+            "{}{{\"kind\":\"unit_damage\",\"frame\":1,\"unit\":2,\"def\":3,\"team\":0,\"taken\":4}}\n",
+            partial_unit_list()
+        );
+        assert_eq!(unit_list_in(&short).unwrap(), None);
+    }
+
+    #[test]
+    fn a_list_with_a_definition_missing_is_refused() {
+        assert_eq!(unit_list_in(&partial_unit_list()).unwrap(), None);
+    }
+
+    #[test]
+    fn a_list_cut_off_in_the_middle_of_its_last_line_is_refused() {
+        // Loses the closing brace of the last definition and its newline.
+        let cut = unit_list_fixture()
+            .trim_end()
+            .strip_suffix('}')
+            .expect("a JSON object on the last line");
+
+        assert_eq!(unit_list_in(cut).unwrap(), None);
+    }
+
+    #[test]
+    fn a_file_with_no_header_is_no_list() {
+        assert_eq!(unit_list_in("").unwrap(), None);
+    }
+
+    #[test]
+    fn an_engine_is_stopped_once_it_has_written_the_whole_list() {
+        let world = World::new(replay_bytes());
+        // Writes the list and then carries on, as an engine playing a match
+        // does. Only being stopped ends it before the limit.
+        let engine = format!("{}exec sleep 60\n", writes(unit_list_fixture()));
+
+        let run = world.list(&engine, LONG).unwrap();
+
+        assert_eq!(run.units.as_ref().map(Vec::len), Some(4));
+        assert!(!run.exit.timed_out);
+        assert!(run.exit.wall_seconds < LONG.as_secs_f64());
+        assert_eq!(run.base_game, "Some Game 1.0");
+        assert_eq!(run.header.as_ref().unwrap().unit_defs, 4);
+        assert!(run.log_excerpt.is_empty());
+        assert_eq!(world.leftovers(), Vec::<String>::new());
+    }
+
+    /// The match has no recorded game over here, which an analysis refuses.
+    #[test]
+    fn a_replay_with_no_recorded_game_over_gives_its_list() {
+        let world = World::new(
+            DemoFixture {
+                script: SCRIPT.into(),
+                stream: stream_with_game_data(SCRIPT, b""),
+                ..Default::default()
+            }
+            .gzipped(),
+        );
+        let engine = format!("{}exec sleep 60\n", writes(unit_list_fixture()));
+
+        let run = world.list(&engine, LONG).unwrap();
+
+        assert_eq!(run.units.as_ref().map(Vec::len), Some(4));
+    }
+
+    #[test]
+    fn an_engine_that_wrote_part_of_the_list_and_ran_on_gets_none_and_is_killed_at_the_limit() {
+        let world = World::new(replay_bytes());
+        let engine = format!("{}exec sleep 60\n", writes(&partial_unit_list()));
+
+        let run = world.list(&engine, SHORT).unwrap();
+
+        assert_eq!(run.units, None);
+        assert!(run.exit.timed_out);
+        assert_eq!(world.leftovers(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn an_engine_that_exits_before_the_list_is_whole_gets_none() {
+        let world = World::new(replay_bytes());
+
+        let run = world.list(&writes(&partial_unit_list()), LONG).unwrap();
+
+        assert_eq!(run.units, None);
+        assert_eq!(run.exit.code, Some(0));
+        assert!(!run.exit.timed_out);
+    }
+
     /// A gadget that ends a scratch match one second in, so the engine exits
     /// cleanly and writes the replay it recorded. If the game never starts it
     /// ends the run after twenty seconds of the engine's own clock instead.
@@ -1491,6 +1782,86 @@ end
             recorded.mod_options.len(),
             recorded.teams.len(),
             recorded.ais.len()
+        );
+    }
+
+    /// The short run that reads only the engine's unit list (#3906), against a
+    /// real engine, a real game and a real replay. Prints the seconds it took,
+    /// which is the figure the issue asks for.
+    ///
+    /// Reads what to run from the environment and does nothing without it:
+    ///
+    /// - `COILBOX_UNIT_LIST_REPLAY`: the replay. It need not have a recorded
+    ///   game over.
+    /// - `COILBOX_UNIT_LIST_ENGINE_DIR`: the folder of an engine with a
+    ///   headless build.
+    /// - `COILBOX_UNIT_LIST_DATA_DIRS`: the content folders holding its game and
+    ///   map, separated the way `SPRING_DATADIR` is.
+    /// - `COILBOX_UNIT_LIST_TIMEOUT_SECS`: how long the engine may run.
+    ///
+    /// The scratch folder is a temporary directory, never the app's own cache.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them, named by COILBOX_UNIT_LIST_REPLAY, COILBOX_UNIT_LIST_ENGINE_DIR, COILBOX_UNIT_LIST_DATA_DIRS and COILBOX_UNIT_LIST_TIMEOUT_SECS"]
+    fn a_real_replay_gives_the_engines_unit_list_in_a_short_run() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(replay), Some(engine_dir), Some(data_dirs), Some(timeout)) = (
+            var("COILBOX_UNIT_LIST_REPLAY"),
+            var("COILBOX_UNIT_LIST_ENGINE_DIR"),
+            var("COILBOX_UNIT_LIST_DATA_DIRS"),
+            var("COILBOX_UNIT_LIST_TIMEOUT_SECS"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_UNIT_LIST_REPLAY, COILBOX_UNIT_LIST_ENGINE_DIR, \
+                 COILBOX_UNIT_LIST_DATA_DIRS and COILBOX_UNIT_LIST_TIMEOUT_SECS to run it"
+            );
+            return;
+        };
+        let replay = PathBuf::from(replay);
+        let before = hash_of(&replay);
+        let scratch = tempfile::tempdir().unwrap();
+        let began = std::time::Instant::now();
+
+        let run = read_unit_list(
+            &AnalysisRequest {
+                replay: replay.clone(),
+                engine_dir: PathBuf::from(engine_dir),
+                data_dirs: data_dirs
+                    .split(coilbox_proc::DATADIR_SEP)
+                    .map(PathBuf::from)
+                    .collect(),
+                game: None,
+                game_short_name: None,
+                scratch_root: scratch.path().to_path_buf(),
+                timeout: Duration::from_secs(timeout.parse().expect("seconds")),
+                record: None,
+            },
+            &RunControl::default(),
+            &|_| {},
+        )
+        .expect("the run");
+
+        eprintln!("{:?}", run.exit);
+        assert!(
+            !run.exit.timed_out,
+            "the engine was killed at its time limit"
+        );
+        let units = run.units.as_ref().expect("the engine's whole unit list");
+        let header = run.header.as_ref().expect("the logger's header");
+        assert_eq!(units.len(), header.unit_defs as usize);
+        eprintln!(
+            "unit list: {} definitions from {} on engine {}, engine run {:.1} seconds, \
+             whole call {:.1} seconds",
+            units.len(),
+            run.base_game,
+            header.engine,
+            run.exit.wall_seconds,
+            began.elapsed().as_secs_f64()
+        );
+        assert_eq!(hash_of(&replay), before, "the replay was changed");
+        assert_eq!(
+            std::fs::read_dir(scratch.path()).unwrap().count(),
+            0,
+            "the scratch folder was left behind"
         );
     }
 

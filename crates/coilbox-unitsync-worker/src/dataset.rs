@@ -47,9 +47,9 @@ const ENGINE_KEEPS: &str = "\nud, names = __cb_engine_keeps(defs, ud)\n";
 /// contain. `shared/unitdef-stats.json` writes down what goes in it.
 const UNIT_DATASET_SHIM_HEAD: &str = r#"
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
-if not ok then return { __error = tostring(defs) } end
+if not ok then return __cb_with_logged({ __error = tostring(defs) }) end
 local ud = (type(defs) == 'table') and defs.unitdefs or nil
-if type(ud) ~= 'table' then return { __error = 'defs.lua produced no unitdefs table' } end
+if type(ud) ~= 'table' then return __cb_with_logged({ __error = 'defs.lua produced no unitdefs table' }) end
 
 local names = {}
 for k in pairs(ud) do names[#names + 1] = k end
@@ -501,8 +501,9 @@ for _, k in ipairs(names) do
     .. '\t' .. name_from(d)
 end
 -- A big game's list runs to hundreds of kilobytes, far past what unitsync can
--- hand back in one string, so it goes back in pieces.
-return __cb_chunk(table.concat(lines, '\n'))
+-- hand back in one string, so it goes back in pieces. The errors the definition
+-- scripts logged go back beside them (#4928).
+return __cb_with_logged(__cb_chunk(table.concat(lines, '\n')))
 "#;
 
 /// Load `game_archive` and read its unit graph (units + `buildoptions` edges).
@@ -578,7 +579,8 @@ fn read_mounted(
     // A game that ships no gamedata/defs.lua (legacy TDF `.fbi` games) has no
     // units to give, and says which of the two it is rather than reading as a
     // game with nothing in it.
-    let mut units = match units_via_shim(us, prelude) {
+    let (read, logged) = units_via_shim(us, prelude);
+    let mut units = match read {
         Ok(units) => units,
         Err(e) => {
             errors.push(format!("could not read this game's units: {}", e.trim()));
@@ -606,6 +608,9 @@ fn read_mounted(
     let checksum = primary_mod_checksum(us, game_archive);
 
     errors.extend(us.drain_errors());
+    // Last, so a reader that shows only the first error still shows the one
+    // that stopped the read, and not a definition script's.
+    errors.extend(logged);
 
     UnitDatasetOutput {
         units,
@@ -822,7 +827,14 @@ pub fn emit_error(msg: String) {
 /// `prelude` is the Lua a read for one match puts ahead of everything
 /// ([`MatchSetup::prelude`]), or `None` for the game's own unit dataset, whose
 /// script is then exactly what it was before a match could be read.
-fn units_via_shim(us: &Unitsync, prelude: Option<&str>) -> Result<Vec<UnitDatasetEntry>, String> {
+///
+/// The second half of the answer is the errors the game's definition scripts
+/// logged while the read ran (#4928). A definition file that fails this way
+/// leaves no other trace than the units missing from the list.
+fn units_via_shim(
+    us: &Unitsync,
+    prelude: Option<&str>,
+) -> (Result<Vec<UnitDatasetEntry>, String>, Vec<String>) {
     let script = format!(
         "{}{}{}{UNIT_DATASET_SHIM_HEAD}{}{UNIT_DATASET_SHIM_TAIL}",
         crate::lua::CHUNKED_RESULT,
@@ -830,8 +842,8 @@ fn units_via_shim(us: &Unitsync, prelude: Option<&str>) -> Result<Vec<UnitDatase
         crate::lua::DEFS_ENV_SHIM,
         if prelude.is_some() { ENGINE_KEEPS } else { "" },
     );
-    us.run_lua_source(&script, VFS_ALL_MODES)
-        .map(|raw| parse_dataset_units(&raw))
+    let run = us.run_lua_source_logged(&script, VFS_ALL_MODES);
+    (run.result.map(|raw| parse_dataset_units(&raw)), run.logged)
 }
 
 /// One footprint field, in build squares. Anything missing, unreadable or below
@@ -1592,7 +1604,7 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("weapondefs"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("stats_of"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("i18nfromunit"));
-        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_with_logged(__cb_chunk("));
     }
 
     /// The redirect rides the same tab-separated line as everything else, and a
@@ -1676,6 +1688,7 @@ mod tests {
                error(\"Include() file missing '\" .. name .. \"'\")\n\
              end }}\n\
              __cb_chunk = function(s) return s end\n\
+             __cb_with_logged = function(out) return out end\n\
              return (function()\n{}\nend)()",
             whole_script()
         );
@@ -1704,6 +1717,7 @@ mod tests {
                error(\"Include() file missing '\" .. name .. \"'\")\n\
              end }}\n\
              __cb_chunk = function(s) return s end\n\
+             __cb_with_logged = function(out) return out end\n\
              return (function()\n{}{}{UNIT_DATASET_SHIM_HEAD}{ENGINE_KEEPS}{UNIT_DATASET_SHIM_TAIL}\nend)()",
             setup.prelude(lua_ais),
             crate::lua::DEFS_ENV_SHIM,
@@ -1770,6 +1784,124 @@ mod tests {
         assert_eq!(names(&listed), ["armcom", "armsolar", "raptor"]);
         let unlisted = extract_for_match(A_GAME_THAT_READS_ITS_MATCH, &setup, &[]);
         assert_eq!(names(&unlisted), ["armcom", "armsolar"]);
+    }
+
+    /// What `math.random` gives once a read's script has run as far as the end
+    /// of the shim, with `prelude` ahead of it, in a parser whose own
+    /// `math.random` returns no value, as unitsync's does (#4929). The last
+    /// answer indexes a table with a draw the way Beyond All Reason's
+    /// `lootboxnano` script does.
+    fn draws_after(prelude: &str) -> String {
+        let lua = mlua::Lua::new();
+        let script = format!(
+            "math.random = function() end\n\
+             Spring = {{}}\n\
+             return (function()\n{prelude}{}\n\
+             local models = {{ 'one', 'two' }}\n\
+             return table.concat({{ tostring(math.random()), tostring(math.random(6)),\n\
+               tostring(math.random(3, 9)), models[math.random(1, #models)] }}, ',')\n\
+             end)()",
+            crate::lua::DEFS_ENV_SHIM,
+        );
+        lua.load(script)
+            .eval()
+            .expect("the draw script did not run")
+    }
+
+    /// The game's own read has no prelude and a match's read has one, and both
+    /// run the same shim, so a definition script that draws a number gets the
+    /// same answer in each. A copy kept in only one of them is what let the unit
+    /// pages lose the 36 `lootboxnano` units while a replay's list kept them.
+    #[test]
+    fn the_games_own_read_and_a_match_read_draw_the_same_number() {
+        let own = draws_after("");
+        assert_eq!(own, "0,1,3,one");
+
+        let setup: MatchSetup =
+            serde_json::from_str(include_str!("../tests/fixtures/match_setup.json")).unwrap();
+        assert_eq!(draws_after(&MatchSetup::default().prelude(&[])), own);
+        assert_eq!(draws_after(&setup.prelude(&[])), own);
+    }
+
+    /// The game's own unit script over a `gamedata/defs.lua` body, in stock Lua
+    /// 5.1 with the real chunking, and the three things a read hands back: the
+    /// unit list, the errors the definition scripts logged and the failure, when
+    /// there is one.
+    fn read_logging(defs_body: &str) -> (Vec<UnitDatasetEntry>, Vec<String>, Option<String>) {
+        let lua = mlua::Lua::new();
+        let script = format!(
+            "Spring = {{ Log = function() end }}\n\
+             LOG = {{ WARNING = 40, ERROR = 50 }}\n\
+             VFS = {{ Include = function(name)\n\
+               if name == 'gamedata/defs.lua' then return (function()\n{defs_body}\nend)() end\n\
+               error(\"Include() file missing '\" .. name .. \"'\")\n\
+             end }}\n\
+             return (function()\n{}{}{UNIT_DATASET_SHIM_HEAD}{UNIT_DATASET_SHIM_TAIL}\nend)()",
+            crate::lua::CHUNKED_RESULT,
+            crate::lua::DEFS_ENV_SHIM,
+        );
+        let table: mlua::Table = lua
+            .load(script)
+            .eval()
+            .expect("the unit list script did not run");
+        let piece = |prefix: &str| -> String {
+            let count: usize = table
+                .get::<String>(format!("{prefix}Chunks"))
+                .map(|n| n.parse().unwrap())
+                .unwrap_or(0);
+            (1..=count)
+                .map(|i| table.get::<String>(format!("{prefix}{i}")).unwrap())
+                .collect()
+        };
+        let units = parse_dataset_units(&piece("result"));
+        let logged = piece("logged").lines().map(str::to_string).collect();
+        (
+            units,
+            logged,
+            table.get::<Option<String>>("__error").unwrap(),
+        )
+    }
+
+    /// Beyond All Reason loads each unit file in a `pcall`, logs the failure at
+    /// error level and goes on without that file's units (#4926). The list that
+    /// comes back is the other units, and the reason is what it says.
+    #[test]
+    fn a_definition_script_that_fails_leaves_its_reason_with_the_list() {
+        let (units, logged, error) = read_logging(
+            "Spring.Log('unitdefs', LOG.ERROR, 'Error loading units/lootbox.lua: boom')\n\
+             Spring.Log('unitdefs', LOG.WARNING, 'a warning is not an error')\n\
+             return { unitdefs = { armcom = { name = 'Commander' } } }",
+        );
+        assert_eq!(names(&units), ["armcom"]);
+        assert_eq!(
+            logged,
+            ["a definitions script logged an error: [unitdefs] Error loading units/lootbox.lua: boom"]
+        );
+        assert_eq!(error, None);
+    }
+
+    #[test]
+    fn a_read_where_nothing_fails_logs_nothing() {
+        let (units, logged, _) =
+            read_logging("return { unitdefs = { armcom = { name = 'Commander' } } }");
+        assert_eq!(names(&units), ["armcom"]);
+        assert!(logged.is_empty());
+    }
+
+    /// When `defs.lua` itself raises there is no list at all, and the errors
+    /// logged on the way there are still sent.
+    #[test]
+    fn a_read_that_fails_still_sends_what_was_logged_before_it() {
+        let (units, logged, error) = read_logging(
+            "Spring.Log('unitdefs', LOG.ERROR, 'before the end')\n\
+             error('defs.lua raised')",
+        );
+        assert!(units.is_empty());
+        assert_eq!(
+            logged,
+            ["a definitions script logged an error: [unitdefs] before the end"]
+        );
+        assert!(error.unwrap().contains("defs.lua raised"));
     }
 
     /// The unit list read for one match's setup against the list the engine
