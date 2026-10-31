@@ -105,4 +105,23 @@ describe("friendBattles", () => {
     ]);
     expect(found.map((f) => f.battle.id)).toEqual([2, 1]);
   });
+
+  it("sorts an Open Annihilation battle by the title it is shown with", () => {
+    const found = friendBattles([
+      {
+        serverKey: "a",
+        battles: [
+          battle(1, { title: "B", host: "amy" }),
+          battle(2, {
+            title: "[OA] A",
+            engine: "Open Annihilation",
+            host: "amy",
+          }),
+        ],
+        users: {},
+        friends: amy,
+      },
+    ]);
+    expect(found.map((f) => f.battle.id)).toEqual([2, 1]);
+  });
 });

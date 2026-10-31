@@ -10085,7 +10085,10 @@ msgstr ""
 msgid "Battle {0}"
 msgstr ""
 
+#: src/multiplayer/battles/BattleRow.tsx
+#: src/multiplayer/chat/FriendBattleButton.tsx
 #: src/multiplayer/chat/FriendRow.tsx
+#: src/multiplayer/ConnectionSession.tsx
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "battle {battleId}"
 msgstr ""

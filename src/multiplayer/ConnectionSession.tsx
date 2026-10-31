@@ -33,6 +33,7 @@ import { backfilledCounts, conversationCounts } from "./chat/conversation";
 import type { ConnectionRuntime, ConnectionState } from "./connections";
 import { favouritesFor } from "./friends";
 import { addIgnore, ignoredFor } from "./ignore";
+import { shownBattleTitle } from "./oaHost";
 import { autoJoinsChannels, protocolForKey, syncsOnReady } from "./protocol";
 import { newScriptPassword } from "./scriptPassword";
 import { adminLevelFromOutcome, isUberserver } from "./serverAdmin";
@@ -350,7 +351,8 @@ export function ConnectionSession({
     toldBattlesRef.current = told;
     for (const { search, battle } of matches) {
       const searchName = describeSearch(search);
-      const battleTitle = battle.title;
+      const battleId = battle.id;
+      const battleTitle = shownBattleTitle(battle) || t`battle ${battleId}`;
       const map = battle.map;
       const taken = occupancy(battle);
       const maxPlayers = battle.maxPlayers;

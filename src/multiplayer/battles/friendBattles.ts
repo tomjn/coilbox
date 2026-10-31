@@ -1,4 +1,5 @@
 import type { Battle } from "../bindings";
+import { shownBattleTitle } from "../oaHost";
 import { isBattleRunning } from "./battleFilters";
 import { friendsInBattles } from "./friendsInBattles";
 
@@ -62,7 +63,7 @@ export function friendBattles(sources: FriendBattleSource[]): FriendBattle[] {
       (a, b) =>
         ORDER.indexOf(a.group) - ORDER.indexOf(b.group) ||
         b.count - a.count ||
-        a.battle.title.localeCompare(b.battle.title) ||
+        shownBattleTitle(a.battle).localeCompare(shownBattleTitle(b.battle)) ||
         a.serverKey.localeCompare(b.serverKey),
     )
     .map(({ count: _count, ...entry }) => entry);

@@ -12443,7 +12443,10 @@ msgstr "戦闘"
 msgid "Battle {0}"
 msgstr "ルーム {0}"
 
+#: src/multiplayer/battles/BattleRow.tsx
+#: src/multiplayer/chat/FriendBattleButton.tsx
 #: src/multiplayer/chat/FriendRow.tsx
+#: src/multiplayer/ConnectionSession.tsx
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "battle {battleId}"

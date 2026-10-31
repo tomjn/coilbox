@@ -71,6 +71,21 @@ export function oaBattleTitle(title: string, fallback: string): string {
   return `${TITLE_PREFIX} ${title.trim() || fallback}`;
 }
 
+/**
+ * The title coilbox shows for a battle. The `[OA]` mark is for other lobby
+ * clients, so it is dropped from an OA battle's title only: a Recoil battle
+ * whose host typed it keeps it. A title that is only the mark comes back empty,
+ * and the caller names the battle by its id.
+ */
+export function shownBattleTitle(
+  battle: Pick<Battle, "engine" | "title">,
+): string {
+  if (!isOaBattle(battle) || !battle.title.startsWith(TITLE_PREFIX)) {
+    return battle.title;
+  }
+  return battle.title.slice(TITLE_PREFIX.length).trim();
+}
+
 /** The lobby username cut to what OA takes, by characters rather than bytes. */
 export function oaPlayerName(username: string): string {
   return [...username].slice(0, OA_PLAYER_NAME_MAX).join("");
