@@ -34908,6 +34908,10 @@ msgstr ""
 msgid "Open Annihilation starts when the host's room is open"
 msgstr ""
 
+#: src/multiplayer/battles/HostBattleForm.tsx
+msgid "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
+msgstr ""
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
 msgid "Open another file"

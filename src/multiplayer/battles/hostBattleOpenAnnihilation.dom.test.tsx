@@ -200,6 +200,48 @@ describe("Open Annihilation as an engine choice", () => {
   });
 });
 
+describe("a password on an Open Annihilation battle (issue #4955)", () => {
+  const typePassword = (value: string) =>
+    fireEvent.change(screen.getByLabelText("Password (optional)"), {
+      target: { value },
+    });
+  const TOO_LONG = /takes a password of up to 10 characters/;
+
+  it("refuses one over 10 characters, under the field, for OA", () => {
+    const opened = form();
+    chooseOa();
+    typePassword("12345678901");
+    expect(screen.getByText(TOO_LONG)).toBeTruthy();
+    const button = screen.getByRole("button", { name: "Host battle" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(button.closest("form") as HTMLFormElement);
+    expect(opened).toEqual([]);
+  });
+
+  it("does not refuse the same password for a Recoil engine", () => {
+    form();
+    typePassword("12345678901");
+    expect(screen.queryByText(TOO_LONG)).toBeNull();
+  });
+
+  it("sends 10 characters to the lobby and keeps them out of settings", async () => {
+    const opened = form();
+    chooseOa();
+    typePassword("1234567890");
+    expect(screen.queryByText(TOO_LONG)).toBeNull();
+    host();
+    await waitFor(() => expect(opened).toHaveLength(1));
+    expect(opened[0].key).toBe("1234567890");
+    await waitFor(() =>
+      expect(settings["multiplayer.hostBattle.lastEngine"]).toBe(
+        "open-annihilation",
+      ),
+    );
+    expect(JSON.stringify(settings)).not.toContain("1234567890");
+    expect(JSON.stringify({ ...localStorage })).not.toContain("1234567890");
+  });
+});
+
 describe("the ports an Open Annihilation host forwards (issue #4950)", () => {
   it("names the three ranges and offers no relay", () => {
     settings["multiplayer.relayMode"] = "always";

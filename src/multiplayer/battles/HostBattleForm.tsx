@@ -49,8 +49,10 @@ import {
   OA_HASH,
   OA_MAX_PLAYERS,
   OA_MODNAME,
+  OA_PASSWORD_MAX,
   OA_UNPICKED_MAP,
   oaBattleTitle,
+  oaPasswordTooLong,
 } from "../oaHost";
 import { useOpenAnnihilation } from "../openAnnihilation";
 import { relayPingLabel, useRelayPing } from "../relayPing";
@@ -300,7 +302,11 @@ export function HostBattleForm({
   const noEngine = content.noEngine;
   // A password the OPENBATTLE line cannot carry opens a battle every joiner
   // sees as full (issue #3518).
-  const passwordProblem = battlePasswordProblem(password);
+  const passwordProblem =
+    battlePasswordProblem(password) ??
+    (oaChosen && oaPasswordTooLong(password)
+      ? t`Open Annihilation takes a password of up to ${OA_PASSWORD_MAX} characters.`
+      : null);
   // A tab in the title would take the game's place on the line (issue #4916).
   const titleProblem = battleTitleProblem(title);
   // The button and `submit` both read this, so a live button is never one whose
