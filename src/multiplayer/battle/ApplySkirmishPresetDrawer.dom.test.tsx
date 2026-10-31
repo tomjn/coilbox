@@ -21,12 +21,36 @@ import { ApplySkirmishPresetDrawer } from "./ApplySkirmishPresetDrawer";
 import type { TweakDelivery } from "./useTweakDelivery";
 
 const mapStatus = vi.hoisted(() => ({ value: "ready" as string }));
+// What unitsync would say about each map, by name. A map not listed has no
+// options and no start positions, which is what an unread one looks like.
+const maps = vi.hoisted(() => ({
+  games: {} as Record<string, { key: string; name: string }[]>,
+  options: {} as Record<string, { key: string; name: string }[]>,
+  positions: {} as Record<string, number>,
+}));
 
 vi.mock("@/content/config", () => ({
+  THUMB_MINIMAP_MIP: 3,
   useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
-  useUnitsyncMapInfo: () => ({
+  useUnitsyncGameInfo: (
+    _engine?: string,
+    _data?: string,
+    archive?: string,
+  ) => ({
+    info: archive ? { options: maps.games[archive] ?? [] } : null,
+    status: archive ? "ready" : "idle",
+    loading: false,
+  }),
+  useUnitsyncMapInfo: (_engine?: string, _data?: string, map?: string) => ({
     status: mapStatus.value,
-    info: mapStatus.value === "ready" ? { checksum: "0x1234" } : undefined,
+    info:
+      mapStatus.value === "ready"
+        ? { checksum: "0x1234", options: maps.options[map ?? ""] ?? [] }
+        : undefined,
+  }),
+  useUnitsyncMinimap: (_engine?: string, _data?: string, map?: string) => ({
+    loading: false,
+    startPositions: Array.from({ length: maps.positions[map ?? ""] ?? 0 }),
   }),
 }));
 
@@ -39,12 +63,15 @@ vi.mock("@/workshop/project", () => ({
 afterEach(() => {
   cleanup();
   mapStatus.value = "ready";
+  maps.games = {};
+  maps.options = {};
+  maps.positions = {};
 });
 
 const _idleDelivery = (): TweakDelivery => ({
   progress: null,
   running: false,
-  start: vi.fn(async () => {}),
+  start: vi.fn(async () => null),
   cancel: vi.fn(),
   clear: vi.fn(),
 });
@@ -84,6 +111,8 @@ function renderDrawer(
       onOpenChange={vi.fn()}
       presets={[preset()]}
       gameName="A Game"
+      currentMapName="Room Map"
+      currentStartPosType={0}
       modOptionsSchema={[]}
       onApplyTweaks={vi.fn()}
       onApply={onApply}
@@ -221,5 +250,91 @@ describe("the room's preset panel", () => {
     fireEvent.click(checkbox("Unit restrictions"));
     fireEvent.click(screen.getByRole("button", { name: "Apply 2 parts" }));
     expect(selectionOf(onApply)).toEqual(["modOptions", "tweakSlots"]);
+  });
+});
+
+describe("the room's preset panel, warning about what does not fit", () => {
+  const twoPlayers = (): Participant[] => [
+    you,
+    { ...you, id: "p1", kind: "ai", name: "Bot", allyTeam: 1 },
+  ];
+  const threePlayers = (): Participant[] => [
+    ...twoPlayers(),
+    { ...you, id: "p2", kind: "ai", name: "Bot 2", allyTeam: 2 },
+  ];
+
+  it("names a mod option the game does not declare", () => {
+    maps.games["a-game.sdz"] = [{ key: "maxunits", name: "Max units" }];
+    renderDrawer({
+      archive: "a-game.sdz",
+      presets: [
+        preset({ modOptionValues: { maxunits: "8000", bogus: "1", odd: "2" } }),
+      ],
+    });
+    openPanel();
+    expect(
+      screen.getByText("A Game does not declare bogus, odd."),
+    ).toBeTruthy();
+  });
+
+  it("names a map option the preset's map does not declare", () => {
+    maps.options["Preset Map"] = [{ key: "fog", name: "Fog" }];
+    renderDrawer({
+      presets: [preset({ mapOptionValues: { fog: "1", wind: "3" } })],
+    });
+    openPanel();
+    expect(screen.getByText("Preset Map does not declare wind.")).toBeTruthy();
+  });
+
+  it("checks map options against the room's map when the map is left out", () => {
+    maps.options["Room Map"] = [{ key: "wind", name: "Wind" }];
+    maps.options["Preset Map"] = [{ key: "fog", name: "Fog" }];
+    renderDrawer({
+      presets: [preset({ mapOptionValues: { wind: "3" } })],
+    });
+    openPanel();
+    // The preset's map does not declare wind, so with the map ticked it warns.
+    expect(screen.getByText("Preset Map does not declare wind.")).toBeTruthy();
+    fireEvent.click(checkbox("Map"));
+    expect(screen.queryByText(/does not declare/)).toBeNull();
+  });
+
+  it("warns when the roster has more teams than the map has start positions", () => {
+    maps.positions["Preset Map"] = 2;
+    renderDrawer({
+      presets: [preset({ startPosType: 0, participants: threePlayers() })],
+    });
+    openPanel();
+    expect(
+      screen.getByText("3 teams, but Preset Map has 2 start positions."),
+    ).toBeTruthy();
+  });
+
+  it("does not count start positions when the boxes decide", () => {
+    maps.positions["Preset Map"] = 2;
+    renderDrawer({
+      presets: [preset({ startPosType: 2, participants: threePlayers() })],
+    });
+    openPanel();
+    expect(screen.queryByText(/start positions\./)).toBeNull();
+  });
+
+  it("shows no warning for a preset that fits", () => {
+    maps.positions["Preset Map"] = 2;
+    maps.options["Preset Map"] = [{ key: "fog", name: "Fog" }];
+    maps.games["a-game.sdz"] = [{ key: "maxunits", name: "Max units" }];
+    renderDrawer({
+      archive: "a-game.sdz",
+      presets: [
+        preset({
+          startPosType: 0,
+          participants: twoPlayers(),
+          modOptionValues: { maxunits: "8000" },
+          mapOptionValues: { fog: "1" },
+        }),
+      ],
+    });
+    openPanel();
+    expect(screen.queryByText(/does not declare|start positions\./)).toBeNull();
   });
 });

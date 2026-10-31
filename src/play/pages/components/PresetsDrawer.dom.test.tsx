@@ -14,13 +14,44 @@ import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
 import { PresetsDrawer } from "./PresetsDrawer";
 
+// What unitsync would say, by name. The real minimap hook reads a persistent
+// value that needs the app frame, and a bare render has none. A name not listed
+// is an unread game or map, which is the state that must warn about nothing.
+const unitsync = vi.hoisted(() => ({
+  games: {} as Record<string, { key: string; name: string }[]>,
+  mapOptions: {} as Record<string, { key: string; name: string }[]>,
+  positions: {} as Record<string, number>,
+}));
+
+vi.mock("@/content/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/content/config")>()),
+  useUnitsyncGameInfo: (_e?: string, _d?: string, archive?: string) => ({
+    info: archive ? { options: unitsync.games[archive] ?? [] } : null,
+    status: "ready",
+    loading: false,
+  }),
+  useUnitsyncMapInfo: (_e?: string, _d?: string, map?: string) => ({
+    status: "ready",
+    info: map ? { options: unitsync.mapOptions[map] ?? [] } : null,
+  }),
+  useUnitsyncMinimap: (_e?: string, _d?: string, map?: string) => ({
+    loading: false,
+    startPositions: Array.from({ length: unitsync.positions[map ?? ""] ?? 0 }),
+  }),
+}));
+
 // The tweaks panel reads the project library, which lives in the frame's
 // settings store and has no provider in a bare render.
 vi.mock("@/workshop/project", () => ({
   useModProjects: () => ({ projects: [] }),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  unitsync.games = {};
+  unitsync.mapOptions = {};
+  unitsync.positions = {};
+});
 
 const you: Participant = {
   id: "p0",
@@ -61,6 +92,9 @@ function renderDrawer(over: Partial<Parameters<typeof PresetsDrawer>[0]> = {}) {
       presets={[preset]}
       thumbs={new Map()}
       currentGameName="Preset Game"
+      currentMapName="Current Map"
+      currentStartPosType={0}
+      gameArchiveFor={(name) => `${name}.sdz`}
       modOptionsSchema={[]}
       onApplyTweaks={vi.fn()}
       // Singleplayer always has the archive route, so "no slots" is never the
@@ -231,5 +265,90 @@ describe("a preset's panel", () => {
     expect(
       screen.queryByRole("button", { name: "Back to presets" }),
     ).toBeNull();
+  });
+});
+
+describe("a preset's panel, warning about what does not fit", () => {
+  const bot = (id: string, allyTeam: number): Participant => ({
+    ...you,
+    id,
+    kind: "ai",
+    name: id,
+    allyTeam,
+  });
+
+  it("names a mod option the game does not declare", () => {
+    unitsync.games["Preset Game.sdz"] = [
+      { key: "maxunits", name: "Max units" },
+    ];
+    renderDrawer({
+      archive: "Preset Game.sdz",
+      presets: [{ ...preset, modOptionValues: { maxunits: "1", bogus: "2" } }],
+    });
+    openPanel();
+    expect(
+      screen.getByText("Preset Game does not declare bogus."),
+    ).toBeTruthy();
+  });
+
+  it("reads the options of the preset's own game when the game is taken", () => {
+    unitsync.games["Other Game.sdz"] = [{ key: "bogus", name: "Bogus" }];
+    unitsync.games["Current Game.sdz"] = [
+      { key: "maxunits", name: "Max units" },
+    ];
+    renderDrawer({
+      currentGameName: "Current Game",
+      archive: "Current Game.sdz",
+      presets: [
+        {
+          ...preset,
+          gameName: "Other Game",
+          modOptionValues: { bogus: "2", maxunits: "1" },
+        },
+      ],
+    });
+    openPanel();
+    expect(
+      screen.getByText("Other Game does not declare maxunits."),
+    ).toBeTruthy();
+  });
+
+  it("warns when the roster has more teams than the map has start positions", () => {
+    unitsync.positions["Preset Map"] = 2;
+    renderDrawer({
+      presets: [
+        {
+          ...preset,
+          startPosType: 0,
+          participants: [you, bot("b", 1), bot("c", 2)],
+        },
+      ],
+    });
+    openPanel();
+    expect(
+      screen.getByText("3 teams, but Preset Map has 2 start positions."),
+    ).toBeTruthy();
+  });
+
+  it("shows no warning for a preset that fits", () => {
+    unitsync.positions["Preset Map"] = 2;
+    unitsync.mapOptions["Preset Map"] = [{ key: "fog", name: "Fog" }];
+    unitsync.games["Preset Game.sdz"] = [
+      { key: "maxunits", name: "Max units" },
+    ];
+    renderDrawer({
+      archive: "Preset Game.sdz",
+      presets: [
+        {
+          ...preset,
+          startPosType: 0,
+          participants: [you, bot("b", 1)],
+          modOptionValues: { maxunits: "1" },
+          mapOptionValues: { fog: "1" },
+        },
+      ],
+    });
+    openPanel();
+    expect(screen.queryByText(/does not declare|start positions\./)).toBeNull();
   });
 });

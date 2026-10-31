@@ -107,7 +107,7 @@ export function battleOptionTags(
  * `draftToHostSeed` builds four kinds of tag: the start-pos type, the draft's
  * mod options, its map options, and the restrict block for its disabled units.
  */
-function partForTag(key: string): PresetPart | null {
+export function partForTag(key: string): PresetPart | null {
   const low = key.toLowerCase();
   if (low === STARTPOSTYPE_KEY) return "startPositions";
   if (low.startsWith(RESTRICT_PREFIX)) return "restrictions";

@@ -11,8 +11,10 @@ import { PresetList } from "@/play/PresetList";
 import { PresetPartsView } from "@/play/PresetPartsView";
 import { PresetTweaksRow } from "@/play/PresetTweaksRow";
 import { PresetTweaksView, usePresetTweaks } from "@/play/PresetTweaksView";
+import type { PresetFitFacts } from "@/play/presetFit";
 import type { PresetSelection } from "@/play/presetParts";
 import type { SkirmishPreset } from "@/play/presets";
+import { usePresetFitFacts } from "@/play/usePresetFitFacts";
 import { hexToI32 } from "./config";
 import { DeliveryProgressPanel } from "./DeliveryProgressPanel";
 import type { TweakDelivery } from "./useTweakDelivery";
@@ -62,6 +64,8 @@ export function ApplySkirmishPresetDrawer({
   onImport,
   onSaveFromReplay,
   onBrowseHub,
+  currentMapName,
+  currentStartPosType,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -98,10 +102,13 @@ export function ApplySkirmishPresetDrawer({
   /** Progress of that paced run, for the sheet to show. Absent where there is
    *  no paced run to watch. */
   delivery?: TweakDelivery;
+  /** `fit` is what the panel warned about, so the apply can skip the same
+   *  options rather than reading the game again. */
   onApply: (
     preset: SkirmishPreset,
     maphash: number,
     selection: PresetSelection,
+    fit?: PresetFitFacts,
   ) => void;
   /** What the save button says, e.g. "Save this battle". */
   saveLabel: string;
@@ -109,9 +116,21 @@ export function ApplySkirmishPresetDrawer({
   onImport: () => void;
   onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
   onBrowseHub: () => void;
+  /** The room's map and start position mode, for the fit warnings. */
+  currentMapName: string;
+  currentStartPosType: number;
 }) {
   const { t } = useLingui();
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
+  const fit = usePresetFitFacts({
+    preset: viewing,
+    enginePath,
+    dataDir,
+    currentGameName: gameName,
+    currentGameArchive: archive,
+    currentMapName,
+    currentStartPosType,
+  });
   const [tweaksOpen, setTweaksOpen] = useState(false);
   // Read here as well as in the panel, so the row says up front when there is
   // nothing behind it rather than opening onto an explanation.
@@ -198,6 +217,7 @@ export function ApplySkirmishPresetDrawer({
               preset={viewing}
               currentGameName={gameName}
               verb={t`Apply`}
+              fit={fit}
               // The room is already on a game and cannot be moved off it.
               omit={["game"]}
               extraDisabledReasons={
@@ -216,7 +236,7 @@ export function ApplySkirmishPresetDrawer({
               }
               disabled={disabled}
               onConfirm={(selection) => {
-                onApply(viewing, maphash, selection);
+                onApply(viewing, maphash, selection, fit);
                 // A bot-hosted apply is one `!bSet` at a time over real
                 // seconds, so closing here would hide the whole of it.
                 if (selfHost) close();

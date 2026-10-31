@@ -85,9 +85,14 @@ import {
 } from "./config";
 import { battleRequirements } from "./contentBlock";
 import { type EngineMatch, engineMatch } from "./engineMatch";
+import {
+  type HostSteps,
+  type HostStepsResult,
+  runHostSteps,
+} from "./hostSteps";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
-import { optionTagSlots } from "./tweakDelivery";
+import { type DeliveryProgress, optionTagSlots } from "./tweakDelivery";
 import { useCompatBattle } from "./useCompatBattle";
 import { useEngineVersionCheck } from "./useEngineVersionCheck";
 import { type TweakDelivery, useTweakDelivery } from "./useTweakDelivery";
@@ -166,7 +171,18 @@ export interface BattleRoomView {
    * room is in choose-in-game mode, and the tag that puts it there is in this
    * run. A caller sending boxes has to let this finish first.
    */
-  applyOptionTags: (tags: Record<string, string>) => Promise<void>;
+  applyOptionTags: (
+    tags: Record<string, string>,
+  ) => Promise<DeliveryProgress | null>;
+  /** Whether a bot runs this room, so the preset's map and team shape go out
+   *  as commands and are checked against what the bot says. */
+  autohost: boolean;
+  /**
+   * Send the steps of a preset that are not options to the autohost, one at a
+   * time, and say which did not take. Resolves with none for a room that has no
+   * autohost.
+   */
+  runHostSteps: (steps: HostSteps) => Promise<HostStepsResult>;
   /**
    * Progress of the paced autohost delivery `applyOptionTags` starts on a
    * SPADS battle (issue #2761). Stays empty on a battle we founded, where
@@ -1183,8 +1199,8 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // `setRestrictions`). Autohost battle: `!bSet` each value (removal isn't possible
   // there — an omitted option simply keeps its current value).
   const applyOptionTags = useCallback(
-    async (tags: Record<string, string>): Promise<void> => {
-      if (!activeKey || !battle) return;
+    async (tags: Record<string, string>): Promise<DeliveryProgress | null> => {
+      if (!activeKey || !battle) return null;
       if (isFounder) {
         // A preset stores only what its author changed, so top the founder's set
         // up with the game's and the map's own defaults for the rest (#1837,
@@ -1221,12 +1237,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
           );
         }
         await Promise.all(writes);
+        return null;
       } else {
         // Firing every `!bSet` at once trips SPADS' flood ban after the third
         // one, leaving the room holding part of a preset (issue #2761). Route
         // through the same paced, confirmed run #1279 built for tweak slots
         // instead of a second copy of that mistake.
-        await presetDelivery.start(optionTagSlots(tags));
+        return presetDelivery.start(optionTagSlots(tags));
       }
     },
     [
@@ -1239,6 +1256,48 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
       setErr,
       presetDelivery.start,
     ],
+  );
+
+  // The autohost steps of a preset: the map and the room's team shape. Reads go
+  // through a ref for the same reason `useTweakDelivery`'s do. The run lasts
+  // seconds and the mirror it is watching is replaced underneath it.
+  const autohost = hostIsBot && !isFounder;
+  const roomRef = useRef({ state, battle });
+  roomRef.current = { state, battle };
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const runHostStepsOnRoom = useCallback(
+    async (steps: HostSteps): Promise<HostStepsResult> => {
+      if (!autohost || !activeKey) return { failures: [], left: false };
+      // `mp_say_battle` sends to whichever battle the connection is in, so a
+      // command sent after the player moves on would land in the new one.
+      const battleIdAtStart = roomRef.current.battle?.id;
+      return runHostSteps(steps, {
+        here: () =>
+          mountedRef.current &&
+          battleIdAtStart !== undefined &&
+          roomRef.current.battle?.id === battleIdAtStart,
+        send: autohostSend,
+        hostSaidSince(at) {
+          const { state: live, battle: liveBattle } = roomRef.current;
+          if (!live || !liveBattle?.channel) return [];
+          return (live.channels[liveBattle.channel]?.messages ?? [])
+            .filter(
+              (m) => m.at >= at && m.from === liveBattle.host && m.id == null,
+            )
+            .map((m) => m.text);
+        },
+        currentMap: () => roomRef.current.battle?.map,
+        sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+        now: () => Date.now(),
+      });
+    },
+    [autohost, activeKey, autohostSend],
   );
 
   // Publish the game's own option defaults into a battle we found, for every
@@ -1462,6 +1521,8 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     sendOption,
     sendOptions,
     applyOptionTags,
+    autohost,
+    runHostSteps: runHostStepsOnRoom,
     presetDelivery,
     canEditRestrictions: isFounder && !restrictionsRefused,
     restrictionsUnavailable: restrictionsRefused,

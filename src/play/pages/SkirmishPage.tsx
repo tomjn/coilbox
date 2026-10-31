@@ -1068,6 +1068,11 @@ export default function SkirmishPage() {
         presets={presets}
         thumbs={thumbs}
         currentGameName={gameName}
+        currentMapName={mapName}
+        currentStartPosType={startPosType}
+        gameArchiveFor={(name) =>
+          games.find((g) => g.name === name)?.primaryArchive.name
+        }
         modOptionsSchema={modOptions}
         enginePath={enginePath}
         dataDir={dataDir}
