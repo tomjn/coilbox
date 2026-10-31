@@ -98,6 +98,15 @@ describe("ingestFinishedReplay", () => {
     expect(emit).toHaveBeenCalledTimes(1);
   });
 
+  it("announces an update when a pass only removed records", async () => {
+    ingest.mockResolvedValue({
+      summary: summary({ added: 0, updated: 0, removed: 1 }),
+      records: [],
+    });
+    await ingestFinishedReplay(target, replay("/data/demos/a.sdfz"));
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
   it("swallows an ingest failure and allows a later retry", async () => {
     ingest.mockRejectedValueOnce(new Error("boom"));
     const r = replay("/data/demos/a.sdfz");

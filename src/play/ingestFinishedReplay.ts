@@ -36,7 +36,7 @@ export async function ingestFinishedReplay(
       roots: [target.dataDir],
       enginePath: target.enginePath,
     });
-    if (summary.added + summary.updated > 0) {
+    if (summary.added + summary.updated + summary.removed > 0) {
       await emit(STATS_UPDATED_EVENT, summary);
     }
   } catch {
