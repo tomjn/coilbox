@@ -1,4 +1,6 @@
 import type { OaMap } from "../play/bindings";
+import { otherEngineName } from "./battles/battleFilters";
+import type { Battle } from "./bindings";
 
 /**
  * Hosting an Open Annihilation (OA) battle on a lobby server (issue #4946). The
@@ -49,6 +51,14 @@ export function oaPlayerName(username: string): string {
 }
 
 /**
+ * The name of the OA room that belongs to a lobby battle. A joiner passes it
+ * too, so the right session is picked when several on the network answer.
+ */
+export function oaGameName(battleId: number): string {
+  return `CB${battleId}`;
+}
+
+/**
  * The map `--map` takes for the lobby's map field, or null when the host
  * picked none. A name `maps` does not list is passed as it stands, because OA
  * reads the lobby's own word for it.
@@ -81,7 +91,7 @@ export function oaHostArguments({
   const args = [
     "--host",
     "--game-name",
-    `CB${battleId}`,
+    oaGameName(battleId),
     "--player-name",
     oaPlayerName(username),
     "--player-limit",
@@ -89,4 +99,34 @@ export function oaHostArguments({
   ];
   if (map) args.push("--map", map);
   return args;
+}
+
+/**
+ * The arguments that start OA joining the room the host of this battle opened.
+ * `hostIp` is the address the lobby gave for the battle, as it gave it.
+ */
+export function oaJoinArguments({
+  battleId,
+  username,
+  hostIp,
+}: {
+  battleId: number;
+  username: string;
+  hostIp: string;
+}): string[] {
+  return [
+    "--join",
+    hostIp,
+    "--player-name",
+    oaPlayerName(username),
+    "--game-name",
+    oaGameName(battleId),
+  ];
+}
+
+/** Whether a battle is hosted on Open Annihilation, by the engine name it sends. */
+export function isOaBattle(battle: Pick<Battle, "engine">): boolean {
+  return (
+    otherEngineName(battle)?.toLowerCase() === OA_ENGINE_NAME.toLowerCase()
+  );
 }
