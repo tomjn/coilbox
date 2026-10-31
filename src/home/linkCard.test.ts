@@ -46,6 +46,13 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   },
 }));
 
+// The Open Annihilation card reads a setting and the lobby bindings, which this
+// file has no frame for. It has its own tests in openAnnihilationCard.dom.test.tsx.
+vi.mock("./zones/OpenAnnihilationCard", async () => ({
+  default: () => null,
+  OA_CARD_ID: (await import("./openAnnihilationArt")).OA_CARD_ID,
+}));
+
 import { BookOpen, Rocket } from "lucide-react";
 import { buildProfileNav } from "../profile/links";
 import type { Profile } from "../profile/profile";

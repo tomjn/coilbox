@@ -35,6 +35,13 @@ vi.mock("@picoframe/frame", async () => {
 // The links card opens its chips through the OS opener, which is not there in node.
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
+// The Open Annihilation card reads a setting and the lobby bindings, which this
+// file has no frame for. It has its own tests in openAnnihilationCard.dom.test.tsx.
+vi.mock("./zones/OpenAnnihilationCard", async () => ({
+  default: () => null,
+  OA_CARD_ID: (await import("./openAnnihilationArt")).OA_CARD_ID,
+}));
+
 type LobbyConnection = {
   live: boolean;
   mirror: { phase: string | null; state: { myUsername: string | null } | null };
