@@ -50,7 +50,11 @@ import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
-import { filterSortBattles, isBattleRunning } from "../battles/battleFilters";
+import {
+  filterSortBattles,
+  isBattleRunning,
+  scopeToProfileGame,
+} from "../battles/battleFilters";
 import {
   type CreateLobbyArgs,
   CreateLobbyPopover,
@@ -528,9 +532,7 @@ function BattlesPage() {
           const all = Object.values(
             connections[key]?.mirror.state?.battles ?? {},
           );
-          const scoped = gameMatch
-            ? all.filter((b) => gameMatch(b.modname))
-            : all;
+          const scoped = scopeToProfileGame(all, gameMatch);
           const shown = filterSortBattles(scoped, filters);
           const target =
             focus?.serverKey === key

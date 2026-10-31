@@ -34839,6 +34839,7 @@ msgstr "Відкрийте проєкт, щоб записати його змі
 msgid "Open a screen"
 msgstr "Відкрити екран"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
 #: src/multiplayer/index.tsx
 msgid "Open Annihilation"
 msgstr ""

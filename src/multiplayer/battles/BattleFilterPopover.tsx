@@ -22,6 +22,7 @@ const DEFAULTS = {
   hideEmpty: false,
   hideLockedPassworded: false,
   hideFull: false,
+  hideOpenAnnihilation: false,
   sortKey: "players",
   sortDir: "desc",
 } satisfies Omit<BattleFilters, "search">;
@@ -51,7 +52,8 @@ export function BattleFilterPopover({
     Number(hasSearch) +
     Number(filters.hideEmpty) +
     Number(filters.hideLockedPassworded) +
-    Number(filters.hideFull);
+    Number(filters.hideFull) +
+    Number(filters.hideOpenAnnihilation);
   const nonDefault =
     badgeCount > 0 ||
     filters.sortKey !== DEFAULTS.sortKey ||
@@ -125,6 +127,7 @@ export function BattleFilterPopover({
               ...(filters.hideEmpty ? ["empty"] : []),
               ...(filters.hideLockedPassworded ? ["locked"] : []),
               ...(filters.hideFull ? ["full"] : []),
+              ...(filters.hideOpenAnnihilation ? ["oa"] : []),
             ]}
             onValueChange={(vals) =>
               setFilters((f) => ({
@@ -132,6 +135,7 @@ export function BattleFilterPopover({
                 hideEmpty: vals.includes("empty"),
                 hideLockedPassworded: vals.includes("locked"),
                 hideFull: vals.includes("full"),
+                hideOpenAnnihilation: vals.includes("oa"),
               }))
             }
             className={GROUP_CLASS}
@@ -144,6 +148,9 @@ export function BattleFilterPopover({
             </ToggleGroupItem>
             <ToggleGroupItem value="full" className={ITEM_CLASS}>
               <Trans>Full</Trans>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="oa" className={ITEM_CLASS}>
+              <Trans>Open Annihilation</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
         </fieldset>

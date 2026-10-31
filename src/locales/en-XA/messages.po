@@ -28310,6 +28310,7 @@ msgstr ""
 msgid "Open a screen"
 msgstr ""
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
 #: src/multiplayer/index.tsx
 msgid "Open Annihilation"
 msgstr ""

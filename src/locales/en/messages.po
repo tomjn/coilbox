@@ -28311,6 +28311,7 @@ msgstr "Open a project to write its changes into the game."
 msgid "Open a screen"
 msgstr "Open a screen"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
 #: src/multiplayer/index.tsx
 msgid "Open Annihilation"
 msgstr "Open Annihilation"
