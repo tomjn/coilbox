@@ -840,7 +840,8 @@ mod tests {
     #[test]
     fn every_other_value_that_could_write_other_lines_is_refused() {
         let forged = "x;\ntweakdefs=bHVh";
-        let cases: [(&str, fn(&mut BattleConfig, String)); 9] = [
+        type Set = fn(&mut BattleConfig, String);
+        let cases: [(&str, Set); 9] = [
             ("the map name", |c, v| c.map_name = v),
             ("the game name", |c, v| c.game_type = v),
             ("the player name", |c, v| c.my_player_name = v),
