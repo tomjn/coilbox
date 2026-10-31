@@ -355,3 +355,28 @@ describe("commandRatesCsv", () => {
     );
   });
 });
+
+describe("commandRatesCsv teams", () => {
+  const withTeams = {
+    ...info,
+    players: [
+      { team: 1, allyTeam: 0, spectator: false },
+      { team: 3, allyTeam: 0, spectator: false },
+      { team: 2, allyTeam: 1, spectator: false },
+    ],
+    ais: [],
+  } as unknown as DemoInfo;
+
+  it("writes the team of a player line and the teams of a side line", () => {
+    const out = commandRatesCsv({
+      info: withTeams,
+      source: "selection",
+      series: [line("team2", "Bea"), line("ally0", "Red")],
+      rows: [{ timeSec: 30, team2: 4, ally0: 6 }],
+    })
+      .trimEnd()
+      .split("\r\n");
+    expect(out[1]).toMatch(/^30,Bea,2,selection,4,/);
+    expect(out[2]).toMatch(/^30,Red,1 3,selection,6,/);
+  });
+});
