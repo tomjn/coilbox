@@ -11,9 +11,11 @@ import { type OaEvent, playOaCancel, playOaLaunch } from "../play/bindings";
  * outlives it in `PlayProvider`: leaving the page and coming back finds the run
  * still there, and cancelling it still works.
  *
- * It belongs to the battle it was started for. `endOaRunUnlessIn` ends it when
- * that battle is no longer the one its connection is in, however the player
- * left, was kicked, or lost the battle.
+ * It belongs to the battle it was started for. `observeOaBattle` ends it when
+ * the lobby shows the player left, was kicked from, or lost that battle while
+ * the same session stayed connected. OA's game does not use the lobby
+ * connection, so a connection that drops, is gone, or comes back as a fresh
+ * session never ends it: OA runs on with no battle.
  *
  * Hosting and joining both start OA through here. What each does with OA's
  * status stream goes in `onEvent`, and what it undoes when OA is gone goes in
@@ -31,6 +33,12 @@ export interface OaRunState {
 
 let state: OaRunState = { running: false, error: null, battle: null };
 let runId: string | null = null;
+/**
+ * Whether the connection has shown the player in the battle during this
+ * unbroken stretch of being connected. Only then can a battle that is no longer
+ * there mean the player left it.
+ */
+let inBattleThisSession = false;
 const listeners = new Set<() => void>();
 
 function publish(next: OaRunState) {
@@ -73,6 +81,7 @@ export async function startOaRun({
   if (runId) return;
   const id = crypto.randomUUID();
   runId = id;
+  inBattleThisSession = true;
   publish({ running: true, error: null, battle });
   const channel = new Channel<OaEvent>();
   channel.onmessage = (event) => onEvent?.(event);
@@ -91,7 +100,13 @@ export async function startOaRun({
   } catch (e) {
     error = describeError(e);
   } finally {
-    onEnd?.();
+    // Whatever the caller undoes may talk to a connection that has gone, and a
+    // failure there must not leave the run looking as if it still existed.
+    try {
+      onEnd?.();
+    } catch {
+      // Nothing to do: OA is gone either way.
+    }
     runId = null;
     publish({ running: false, error, battle: null });
   }
@@ -102,15 +117,37 @@ export function cancelOaRun() {
   if (runId) void playOaCancel({ runId });
 }
 
+/** What the lobby connection a run's battle is on shows right now. */
+export interface OaBattleView {
+  /** The connection is up: opened and not dropped since. */
+  connected: boolean;
+  /** The battle the player is in on it, or null. */
+  battleId: number | null;
+}
+
 /**
- * End the running OA unless its battle is still the one its connection is in.
- * `currentBattle` answers which battle a connection is in, or null.
+ * Look at the lobby and end the running OA if the player has left its battle.
+ * `look` answers for a connection, or null when it is gone.
+ *
+ * Only a connected session that showed the player in the battle and now shows
+ * them out of it counts: left, kicked, or the battle closed. A connection that
+ * is down or gone breaks the session instead, and one that comes back has to
+ * show the player in the battle again before leaving it can end anything. A
+ * mirror that is empty because it was just rebuilt is therefore not a leave.
  */
-export function endOaRunUnlessIn(
-  currentBattle: (serverKey: string) => number | null,
+export function observeOaBattle(
+  look: (serverKey: string) => OaBattleView | null,
 ) {
   const { battle } = state;
-  if (battle && currentBattle(battle.serverKey) !== battle.battleId) {
-    cancelOaRun();
+  if (!battle || !runId) return;
+  const view = look(battle.serverKey);
+  if (!view?.connected) {
+    inBattleThisSession = false;
+    return;
   }
+  if (view.battleId === battle.battleId) {
+    inBattleThisSession = true;
+    return;
+  }
+  if (inBattleThisSession) cancelOaRun();
 }

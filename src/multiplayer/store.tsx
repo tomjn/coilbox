@@ -116,7 +116,7 @@ import {
 } from "./loginRefused";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
-import { endOaRunUnlessIn } from "./oaRun";
+import { observeOaBattle } from "./oaRun";
 import { protocolForKey } from "./protocol";
 import { RejoinOfferPanel } from "./RejoinOfferPanel";
 import { triggerRing } from "./ringEffect";
@@ -1895,15 +1895,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     forgetBattleMovedUnless(inBattle);
   }, [inBattle]);
 
-  // End the Open Annihilation started for a battle when that battle is gone,
-  // whichever page the player is on and whichever way they left. Read from every
-  // connection rather than the focused one, because a battle room can be on
-  // another connection (issue #2844, issue #4946).
+  // End the Open Annihilation started for a battle when the lobby shows the
+  // player left it, whichever page they are on and however they left. Read from
+  // every connection rather than the focused one, because a battle room can be
+  // on another connection (issue #2844, issue #4946). A drop or a reconnect is
+  // not a leave: OA's game does not use this connection.
   useEffect(() => {
-    endOaRunUnlessIn(
-      (serverKey) =>
-        connections[serverKey]?.mirror.state?.currentBattle ?? null,
-    );
+    observeOaBattle((serverKey) => {
+      const c = connections[serverKey];
+      return c
+        ? {
+            connected: c.live && c.mirror.connected,
+            battleId: c.mirror.state?.currentBattle ?? null,
+          }
+        : null;
+    });
   }, [connections]);
 
   // Register a new account: open a throwaway connection that sends REGISTER, then
