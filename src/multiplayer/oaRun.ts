@@ -151,3 +151,60 @@ export function observeOaBattle(
   }
   if (inBattleThisSession) cancelOaRun();
 }
+
+/**
+ * The battle a joiner's room already launched OA for by itself, held outside
+ * the page (issue #4961). OA exiting leaves the host in game, so a room that is
+ * shown again would otherwise launch it a second time. Quitting OA has to mean
+ * staying out until the player clicks Join in OA. One battle at most, as one OA
+ * runs at a time.
+ */
+let autoLaunched: {
+  serverKey: string;
+  battleId: number;
+  /** As `inBattleThisSession`, for this battle's memory. */
+  inBattleThisSession: boolean;
+} | null = null;
+
+/** Whether the room already launched OA by itself for this battle. */
+export function oaAutoLaunchSpent(serverKey: string, battleId: number) {
+  return (
+    autoLaunched?.serverKey === serverKey && autoLaunched.battleId === battleId
+  );
+}
+
+/** Record that the room launched OA by itself for this battle. */
+export function noteOaAutoLaunch(serverKey: string, battleId: number) {
+  autoLaunched = { serverKey, battleId, inBattleThisSession: true };
+}
+
+/** What the lobby connection of the remembered battle shows right now. */
+export interface OaAutoLaunchView extends OaBattleView {
+  /** The host of the player's battle is in game. */
+  hostIngame: boolean;
+}
+
+/**
+ * Forget the remembered auto launch when the battle is over for it. That is
+ * when the host is no longer in game, or when a connected session that had the
+ * player in the battle shows them out of it. A new room from the same host then
+ * launches by itself again. This runs from the provider, so it forgets with the
+ * room page gone. A drop or a fresh session never forgets, for the reason
+ * `observeOaBattle` gives.
+ */
+export function observeOaAutoLaunch(
+  look: (serverKey: string) => OaAutoLaunchView | null,
+) {
+  if (!autoLaunched) return;
+  const view = look(autoLaunched.serverKey);
+  if (!view?.connected) {
+    autoLaunched.inBattleThisSession = false;
+    return;
+  }
+  if (view.battleId === autoLaunched.battleId) {
+    if (view.hostIngame) autoLaunched.inBattleThisSession = true;
+    else autoLaunched = null;
+    return;
+  }
+  if (autoLaunched.inBattleThisSession) autoLaunched = null;
+}
