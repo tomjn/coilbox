@@ -19269,6 +19269,10 @@ msgstr "Geometry."
 msgid "Get IP"
 msgstr "Get IP"
 
+#: src/home/zones/OpenAnnihilationCard.tsx
+msgid "Get Open Annihilation"
+msgstr "Get Open Annihilation"
+
 #: src/content/pages/components/GetStartedCard.tsx
 msgid "Get started"
 msgstr "Get started"
@@ -29709,6 +29713,10 @@ msgstr "Play on 15 different maps."
 #: src/content/achievements.ts
 msgid "Play on 5 different maps."
 msgstr "Play on 5 different maps."
+
+#: src/home/zones/OpenAnnihilationCard.tsx
+msgid "Play Open Annihilation"
+msgstr "Play Open Annihilation"
 
 #: src/content/replayMapView/timelineKeys.ts
 msgid "Play or pause"
