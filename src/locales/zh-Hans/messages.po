@@ -2818,6 +2818,10 @@ msgstr "{front} 和 {last}"
 msgid "{game} brought by this game's own published table"
 msgstr "{game} 由此游戏自己发布的对照表提供"
 
+#: src/play/pages/SkirmishPage.tsx
+msgid "{game} does not declare {names}."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
@@ -27722,10 +27726,26 @@ msgstr "从文件加载"
 msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
 msgstr "启动后加载地图、游戏和引擎列表。使用按流量计费的网络时请关闭。"
 
+#: src/play/PresetLoadGate.tsx
+msgid "Load onto {game}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Load repos"
 msgstr "加载仓库"
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load this preset"
+msgstr ""
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load without the game"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Loaded \"{presetName}\" onto {game}"
+msgstr ""
 
 #: src/lego/moduleFileIo.ts
 #, fuzzy
@@ -43693,6 +43713,10 @@ msgstr "所需的部分内容未安装，而且 coilbox 无法下载。安装之
 msgid "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."
 msgstr "所需的部分内容未安装。请在下方下载，或取消。在一切就绪之前不会导入任何内容。"
 
+#: src/play/PresetLoadGate.tsx
+msgid "Some content this preset needs isn't installed. Download it below, or cancel to leave your setup as it is."
+msgstr ""
+
 #: src/content/pages/components/GatherReplaysButton.tsx
 #, fuzzy
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
@@ -54843,6 +54867,10 @@ msgstr "你无法在这里注册新账号。此服务器的验证邮件无法送
 #, fuzzy
 msgid "you changed this"
 msgstr "你已更改"
+
+#: src/play/presetFit.ts
+msgid "You do not have {mapName}."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy

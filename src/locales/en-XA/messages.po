@@ -2307,6 +2307,10 @@ msgstr ""
 msgid "{game} brought by this game's own published table"
 msgstr ""
 
+#: src/play/pages/SkirmishPage.tsx
+msgid "{game} does not declare {names}."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
 msgstr ""
@@ -22487,8 +22491,24 @@ msgstr ""
 msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
 msgstr ""
 
+#: src/play/PresetLoadGate.tsx
+msgid "Load onto {game}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Load repos"
+msgstr ""
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load this preset"
+msgstr ""
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load without the game"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Loaded \"{presetName}\" onto {game}"
 msgstr ""
 
 #: src/lego/moduleFileIo.ts
@@ -35453,6 +35473,10 @@ msgstr ""
 msgid "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."
 msgstr ""
 
+#: src/play/PresetLoadGate.tsx
+msgid "Some content this preset needs isn't installed. Download it below, or cancel to leave your setup as it is."
+msgstr ""
+
 #: src/content/pages/components/GatherReplaysButton.tsx
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr ""
@@ -44461,6 +44485,10 @@ msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "you changed this"
+msgstr ""
+
+#: src/play/presetFit.ts
+msgid "You do not have {mapName}."
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx

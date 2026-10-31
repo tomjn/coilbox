@@ -2818,6 +2818,10 @@ msgstr "{front} と {last}"
 msgid "{game} brought by this game's own published table"
 msgstr "このゲーム自身が公開している表から取得した {game}"
 
+#: src/play/pages/SkirmishPage.tsx
+msgid "{game} does not declare {names}."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
@@ -27722,10 +27726,26 @@ msgstr "ファイルから読み込み"
 msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
 msgstr "起動後にマップ、ゲーム、エンジンの一覧を読み込みます。従量制の接続ではオフにしてください。"
 
+#: src/play/PresetLoadGate.tsx
+msgid "Load onto {game}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Load repos"
 msgstr "リポジトリを読み込み"
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load this preset"
+msgstr ""
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load without the game"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Loaded \"{presetName}\" onto {game}"
+msgstr ""
 
 #: src/lego/moduleFileIo.ts
 #, fuzzy
@@ -43693,6 +43713,10 @@ msgstr "必要なコンテンツの一部がインストールされておらず
 msgid "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."
 msgstr "必要なコンテンツの一部がインストールされていません。下でダウンロードするか、キャンセルしてください — すべての準備ができるまで何もインポートされません。"
 
+#: src/play/PresetLoadGate.tsx
+msgid "Some content this preset needs isn't installed. Download it below, or cancel to leave your setup as it is."
+msgstr ""
+
 #: src/content/pages/components/GatherReplaysButton.tsx
 #, fuzzy
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
@@ -54843,6 +54867,10 @@ msgstr "ここでは新しいアカウントを登録できません。このサ
 #, fuzzy
 msgid "you changed this"
 msgstr "自分が変更"
+
+#: src/play/presetFit.ts
+msgid "You do not have {mapName}."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy

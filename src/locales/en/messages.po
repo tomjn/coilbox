@@ -2308,6 +2308,10 @@ msgstr "{front} and {last}"
 msgid "{game} brought by this game's own published table"
 msgstr "{game} brought by this game's own published table"
 
+#: src/play/pages/SkirmishPage.tsx
+msgid "{game} does not declare {names}."
+msgstr "{game} does not declare {names}."
+
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
 msgstr "{game} is not installed, so nothing says what a unit costs or what it is for."
@@ -22488,9 +22492,25 @@ msgstr "Load from file"
 msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
 msgstr "Load map, game and engine lists after launch. Turn this off on a metered connection."
 
+#: src/play/PresetLoadGate.tsx
+msgid "Load onto {game}"
+msgstr "Load onto {game}"
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Load repos"
 msgstr "Load repos"
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load this preset"
+msgstr "Load this preset"
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load without the game"
+msgstr "Load without the game"
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Loaded \"{presetName}\" onto {game}"
+msgstr "Loaded \"{presetName}\" onto {game}"
 
 #: src/lego/moduleFileIo.ts
 msgid "Loaded {loadedName}"
@@ -35454,6 +35474,10 @@ msgstr "Some content this needs isn't installed, and coilbox cannot download it.
 msgid "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."
 msgstr "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."
 
+#: src/play/PresetLoadGate.tsx
+msgid "Some content this preset needs isn't installed. Download it below, or cancel to leave your setup as it is."
+msgstr "Some content this preset needs isn't installed. Download it below, or cancel to leave your setup as it is."
+
 #: src/content/pages/components/GatherReplaysButton.tsx
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
@@ -44463,6 +44487,10 @@ msgstr "You cannot register a new account here. This server's verification email
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "you changed this"
 msgstr "you changed this"
+
+#: src/play/presetFit.ts
+msgid "You do not have {mapName}."
+msgstr "You do not have {mapName}."
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "You do not have {missingGame}"
