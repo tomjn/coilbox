@@ -12,7 +12,9 @@
  */
 export type DrawerRequest =
   | { kind: "login"; serverId: string }
-  | { kind: "server"; host: string; port: number };
+  | { kind: "server"; host: string; port: number }
+  /** A saved login, opened for editing with the cursor in its password field. */
+  | { kind: "password"; serverId: string; username: string };
 
 let pending: DrawerRequest | null = null;
 const listeners = new Set<() => void>();
@@ -35,4 +37,29 @@ export function onDrawerRequest(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/** The page the requests above are answered on. */
+export const LOBBY_SERVERS_ROUTE = "/settings/lobby-servers";
+
+let navigateTo: ((to: string) => void) | null = null;
+
+/**
+ * Let code outside the router, such as a notification button, take the player
+ * to the lobby servers page. A component inside the router registers its
+ * `navigate` here. Answers the way to stop.
+ */
+export function registerDrawerNavigator(
+  navigate: (to: string) => void,
+): () => void {
+  navigateTo = navigate;
+  return () => {
+    if (navigateTo === navigate) navigateTo = null;
+  };
+}
+
+/** Ask for a drawer and go to the page that opens it. */
+export function openDrawerPage(request: DrawerRequest): void {
+  requestDrawer(request);
+  navigateTo?.(LOBBY_SERVERS_ROUTE);
 }

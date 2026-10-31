@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { HostedRoomProvider } from "../direct/HostedRoomProvider";
 import { lazyText } from "../i18n/pluginText";
+import { DrawerNavigator } from "../lobby-servers/DrawerNavigator";
 import { isProfileHidden } from "../profile/hidden";
 import { RECORDS_GROUP } from "../recordsGroup";
 import FollowIndicator from "./follow/FollowIndicator";
@@ -58,6 +59,7 @@ function LobbyProviders({ children }: { children: ReactNode }) {
       <HostedRoomProvider>
         {children}
         <InviteLinkHost />
+        <DrawerNavigator />
       </HostedRoomProvider>
     </MultiplayerProvider>
   );

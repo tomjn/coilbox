@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type ConnectionState, newConnection } from "./connections";
-import { lobbyDotStatus } from "./loginStatus";
+import { lobbyDotStatus, refusedReason } from "./loginStatus";
 
 function entry(
   serverKey: string,
@@ -8,6 +8,7 @@ function entry(
     live?: boolean;
     phase?: ConnectionState["mirror"]["phase"];
     error?: string | null;
+    loginError?: string | null;
     away?: boolean;
     direct?: boolean;
   } = {},
@@ -20,6 +21,7 @@ function entry(
       ...base.mirror,
       phase: opts.phase ?? null,
       error: opts.error ?? null,
+      loginError: opts.loginError ?? null,
     },
     status: { ingame: false, away: opts.away ?? false },
   };
@@ -98,5 +100,55 @@ describe("lobbyDotStatus", () => {
     const room = entry(A, { live: true, phase: "ready", direct: true });
     const login = entry(B, { live: true, phase: "ready" });
     expect(lobbyDotStatus(all(room, login), false)).toBe("on");
+  });
+});
+
+describe("a refused password", () => {
+  it("is a refusal when every login left was refused", () => {
+    expect(
+      lobbyDotStatus(
+        all(
+          entry(A, { loginError: "invalid password" }),
+          entry(B, { loginError: "invalid password" }),
+        ),
+        false,
+      ),
+    ).toBe("refused");
+  });
+
+  it("is still an error when one login failed another way beside a refusal", () => {
+    expect(
+      lobbyDotStatus(
+        all(
+          entry(A, { loginError: "invalid password" }),
+          entry(B, { error: "connection reset" }),
+        ),
+        false,
+      ),
+    ).toBe("error");
+  });
+
+  it("does not turn the dot red beside a working login", () => {
+    expect(
+      lobbyDotStatus(
+        all(
+          entry(A, { live: true, phase: "ready" }),
+          entry(B, { loginError: "invalid password" }),
+        ),
+        false,
+      ),
+    ).toBe("on");
+  });
+
+  it("gives the server's reason, and none for a login that is up", () => {
+    expect(refusedReason(entry(A, { loginError: "invalid password" }))).toBe(
+      "invalid password",
+    );
+    expect(refusedReason(entry(A, { error: "connection reset" }))).toBeNull();
+    expect(
+      refusedReason(
+        entry(A, { live: true, phase: "ready", loginError: "stale" }),
+      ),
+    ).toBeNull();
   });
 });

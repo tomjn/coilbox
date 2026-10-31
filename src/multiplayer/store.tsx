@@ -31,6 +31,10 @@ import {
   useLobbyAccounts,
 } from "../lobby-servers/config";
 import {
+  LOBBY_SERVERS_ROUTE,
+  openDrawerPage,
+} from "../lobby-servers/drawerRequest";
+import {
   addressOfKey,
   bracketedHost,
   dialHost,
@@ -105,6 +109,7 @@ import { DebriefingDrawer } from "./DebriefingDrawer";
 import { useFavourites } from "./friends";
 import { useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
+import { LoginRefusedError } from "./loginRefused";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
 import { protocolForKey } from "./protocol";
@@ -606,6 +611,34 @@ interface MultiplayerContextValue {
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
+
+/**
+ * Tell the player a server refused a login's password, with a button to the
+ * place the password is changed. Sticky, so it is still there when the popover
+ * that started the login has closed. Returns the error the connect then throws.
+ * Nothing here retries: a refused password stays refused until the player acts.
+ */
+function announceLoginRefused(
+  server: LobbyServer,
+  username: string,
+  reason: string | null,
+): LoginRefusedError {
+  const serverName = server.name;
+  const title = t`${serverName} refused the password for ${username}`;
+  void notify({
+    title,
+    body: reason ?? undefined,
+    level: "error",
+    sticky: true,
+    to: LOBBY_SERVERS_ROUTE,
+    action: {
+      label: t`Change password`,
+      onClick: () =>
+        openDrawerPage({ kind: "password", serverId: server.id, username }),
+    },
+  });
+  return new LoginRefusedError(title, reason ?? "");
+}
 
 /**
  * App-level provider owning the (single) live lobby connection. It lives above the
@@ -1127,6 +1160,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // refused again, which on Zero-K is counted against the IP address.
           if (d.kind === "loginDenied" || d.kind === "registrationDenied") {
             rt.denied = true;
+            rt.deniedReason = d.reason;
           }
           // An autohost `!ring` is a transient event, not state - react to it directly
           // (gong + reverberation + taskbar flash) rather than through the snapshot.
@@ -1443,6 +1477,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       rt.intentional = false;
       rt.loggedIn = false;
       rt.denied = false;
+      rt.deniedReason = null;
       rt.reconnectCtx = { server, username, direct };
       connectingKeysRef.current.add(serverKey);
       try {
@@ -1548,6 +1583,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           type: "connectFailed",
           reason: describeError(e),
         });
+        // A refused password is the one failure the player has to act on, so it
+        // is announced here, once, for every way a connect starts: the popover,
+        // the boot connect and the reconnect loop. A room accepts any password,
+        // so a refusal there is not about one.
+        if (rt.denied && !direct) {
+          throw announceLoginRefused(server, username, rt.deniedReason);
+        }
         throw e;
       } finally {
         connectingKeysRef.current.delete(serverKey);
@@ -1632,7 +1674,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
         try {
           await doConnect(server, account.username, false, false);
-        } catch {
+        } catch (e) {
+          // A refused password has already said so, with a way to fix it.
+          if (e instanceof LoginRefusedError) continue;
           const username = account.username;
           const serverName = server.name;
           void notify({
@@ -1716,14 +1760,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // retry costs a failed attempt and buys nothing. On Zero-K it costs more
           // than that: it logs failed attempts per IP address, so a loop bans the
           // address rather than the account. Stop and let the person fix it.
-          if (rt.denied) {
-            void notify({
-              title: t`Multiplayer login refused`,
-              body: t`Check the password in Settings, then log in again from the topbar.`,
-              level: "error",
-            });
-            return;
-          }
+          // `doConnect` has already said so.
+          if (rt.denied) return;
           // A Tachyon sign-in the server has refused will be refused again, so
           // retrying it only delays the one thing that can fix it: another trip
           // through the browser, which a reconnect must never open by itself.
