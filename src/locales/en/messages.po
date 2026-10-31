@@ -4312,6 +4312,10 @@ msgstr "{ownPointCount, plural, one {# point} other {# points}}"
 msgid "{pack} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox."
 msgstr "{pack} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox."
 
+#: src/play/FollowedPacksRow.tsx
+msgid "{packCount, plural, one {Following # pack} other {Following # packs}}"
+msgstr "{packCount, plural, one {Following # pack} other {Following # packs}}"
+
 #: src/scenario/pages/components/teams.ts
 msgid "{paid} on income"
 msgstr "{paid} on income"
@@ -7279,6 +7283,10 @@ msgstr "A player who is not an ally sees no health bar and no health in the tool
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
 msgstr "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
+
+#: src/i18n/uiError.ts
+msgid "A preset pack's address must be https."
+msgstr "A preset pack's address must be https."
 
 #: src/profile/SettingsSection.tsx
 msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
@@ -12797,6 +12805,10 @@ msgstr "Coilbox could not write your widget settings for {game}"
 msgid "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 msgstr "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 
+#: src/i18n/uiError.ts
+msgid "Coilbox does not follow packs from {host}. That host is not on its list."
+msgstr "Coilbox does not follow packs from {host}. That host is not on its list."
+
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Coilbox does not have an engine and content root to play with yet, so there is nowhere to put the widget. Install an engine first."
 msgstr "Coilbox does not have an engine and content root to play with yet, so there is nowhere to put the widget. Install an engine first."
@@ -18301,12 +18313,17 @@ msgid "Folder writability not checked"
 msgstr "Folder writability not checked"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
+#: src/play/FollowedPacksView.tsx
 msgid "Follow"
 msgstr "Follow"
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Follow {name}"
 msgstr "Follow {name}"
+
+#: src/play/FollowedPacksRow.tsx
+msgid "Follow a preset pack by its address"
+msgstr "Follow a preset pack by its address"
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Follow game updates"
@@ -18323,6 +18340,11 @@ msgstr "Follow the driving unit with the camera"
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Followed {name} into their battle"
 msgstr "Followed {name} into their battle"
+
+#: src/play/FollowedPacksRow.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Followed packs"
+msgstr "Followed packs"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Following {name}"
@@ -21698,6 +21720,10 @@ msgstr "Keep both"
 msgid "Keep editing"
 msgstr "Keep editing"
 
+#: src/play/FollowedPacksView.tsx
+msgid "Keep following"
+msgstr "Keep following"
+
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 msgid "Keep it"
@@ -22078,6 +22104,10 @@ msgstr "Last system ID"
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Last turn"
 msgstr "Last turn"
+
+#: src/play/FollowedPacksView.tsx
+msgid "Last updated {updatedAt}"
+msgstr "Last updated {updatedAt}"
 
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Latency (p50 / p95 / p99)"
@@ -28793,6 +28823,10 @@ msgstr "Pack"
 msgid "Pack {projectName} across {gameName}'s numbered tweak slots, for a lobby you are not hosting yourself."
 msgstr "Pack {projectName} across {gameName}'s numbered tweak slots, for a lobby you are not hosting yourself."
 
+#: src/play/FollowedPacksView.tsx
+msgid "Pack address"
+msgstr "Pack address"
+
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Pack for tweak slots"
 msgstr "Pack for tweak slots"
@@ -31395,6 +31429,7 @@ msgstr "Reflectivity (greyscale, optional)"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/chat/ChannelBrowser.tsx
+#: src/play/FollowedPacksView.tsx
 msgid "Refresh"
 msgstr "Refresh"
 
@@ -32981,6 +33016,10 @@ msgstr "Same as default"
 msgid "Save"
 msgstr "Save"
 
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Save a copy"
+msgstr "Save a copy"
+
 #: src/blueprint/pages/components/WritePackForm.tsx
 msgid "Save a file of blueprints"
 msgstr "Save a file of blueprints"
@@ -33132,6 +33171,10 @@ msgstr "Save your new password"
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Saved"
 msgstr "Saved"
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Saved \"{copyName}\" to your presets."
+msgstr "Saved \"{copyName}\" to your presets."
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Saved \"{trimmed}\"."
@@ -37174,6 +37217,19 @@ msgstr "That address answered, but it is not a coilbox hub."
 msgid "That address answered, but it is not a coilbox hub. Check the hub address in Settings."
 msgstr "That address answered, but it is not a coilbox hub. Check the hub address in Settings."
 
+#: src/i18n/uiError.ts
+#: src/play/followedPacks.ts
+msgid "That address did not return a setup pack."
+msgstr "That address did not return a setup pack."
+
+#: src/i18n/uiError.ts
+msgid "That address redirects to {host}, which is not on the list of hosts coilbox follows packs from."
+msgstr "That address redirects to {host}, which is not on the list of hosts coilbox follows packs from."
+
+#: src/i18n/uiError.ts
+msgid "That address redirects too many times."
+msgstr "That address redirects too many times."
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 msgid "That blueprint could not be copied: {reason}"
@@ -37226,6 +37282,10 @@ msgstr "That doesn't look like a coilbox challenge code."
 #: src/packs/envelope.ts
 msgid "That doesn't look like a coilbox setup pack."
 msgstr "That doesn't look like a coilbox setup pack."
+
+#: src/i18n/uiError.ts
+msgid "That file is too large to be a setup pack."
+msgstr "That file is too large to be a setup pack."
 
 #: src/blueprint/transfer.ts
 msgid "That file isn't a coilbox blueprint."
@@ -37283,6 +37343,10 @@ msgstr "That is not a coilbox tweak project."
 #: src/deeplink/parse.ts
 msgid "That is not a valid link."
 msgstr "That is not a valid link."
+
+#: src/i18n/uiError.ts
+msgid "That is not a web address coilbox can follow."
+msgstr "That is not a web address coilbox can follow."
 
 #: src/hub/publish.ts
 msgid "That is not something coilbox made, so the hub will not take it."
@@ -37344,6 +37408,10 @@ msgstr "That scenario was made by a newer version of coilbox. Update coilbox to 
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "that server"
 msgstr "that server"
+
+#: src/play/followedPacks.ts
+msgid "That setup pack has no presets to follow."
+msgstr "That setup pack has no presets to follow."
 
 #: src/packs/envelope.ts
 msgid "That setup pack is corrupted or incomplete."
@@ -42133,8 +42201,13 @@ msgstr "Unfinished mission"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/follow/FollowIndicator.tsx
+#: src/play/FollowedPacksView.tsx
 msgid "Unfollow"
 msgstr "Unfollow"
+
+#: src/play/FollowedPacksView.tsx
+msgid "Unfollow \"{title}\"? Its presets go. Copies you saved stay."
+msgstr "Unfollow \"{title}\"? Its presets go. Copies you saved stay."
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Unfollow {name}"
@@ -42692,6 +42765,10 @@ msgstr "Update to the latest \"{liveName}\"?"
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Update widget"
 msgstr "Update widget"
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Updated"
+msgstr "Updated"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Updated the blueprint widget. Its panel opens on its own the first time a match starts."
@@ -44650,6 +44727,10 @@ msgstr "you"
 #: src/runlite/galaxyAdapter.ts
 msgid "You"
 msgstr "You"
+
+#: src/play/followedPacks.ts
+msgid "You already follow that pack."
+msgstr "You already follow that pack."
 
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."

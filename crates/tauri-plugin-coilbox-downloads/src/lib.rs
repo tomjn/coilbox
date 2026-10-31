@@ -6,6 +6,7 @@
 
 mod github_cache;
 mod install;
+mod preset_pack;
 mod progress;
 mod rapid;
 mod rapid_cache;
@@ -60,6 +61,13 @@ pub mod codes {
     pub const FETCH_TOO_LARGE: &str = "downloads.fetch.too_large";
     pub const FETCH_INTERRUPTED: &str = "downloads.fetch.interrupted";
     pub const FETCH_NOT_AN_IMPORT: &str = "downloads.fetch.not_an_import";
+    pub const PACK_HOST_NOT_ALLOWED: &str = "downloads.pack.host_not_allowed";
+    pub const PACK_REDIRECT_REFUSED: &str = "downloads.pack.redirect_refused";
+    pub const PACK_HTTPS_ONLY: &str = "downloads.pack.https_only";
+    pub const PACK_BAD_ADDRESS: &str = "downloads.pack.bad_address";
+    pub const PACK_TOO_MANY_REDIRECTS: &str = "downloads.pack.too_many_redirects";
+    pub const PACK_TOO_LARGE: &str = "downloads.pack.too_large";
+    pub const PACK_NOT_A_PACK: &str = "downloads.pack.not_a_pack";
 }
 
 fn fetch_timeout() -> UiError {
@@ -867,6 +875,38 @@ async fn dl_download_file(
     }
 }
 
+/// Read a response body, stopping at `limit`. Streamed with the cap applied as it
+/// goes, so a body that exceeds (or lies about) its size is dropped mid transfer
+/// rather than fully downloaded first.
+async fn read_capped(
+    mut resp: reqwest::Response,
+    limit: u64,
+    too_large: fn() -> UiError,
+) -> Result<Vec<u8>, UiError> {
+    if resp.content_length().is_some_and(|len| len > limit) {
+        return Err(too_large());
+    }
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                if buf.len() as u64 + chunk.len() as u64 > limit {
+                    return Err(too_large());
+                }
+                buf.extend_from_slice(&chunk);
+            }
+            Ok(None) => return Ok(buf),
+            Err(e) if e.is_timeout() => return Err(fetch_timeout()),
+            Err(_) => {
+                return Err(UiError::new(
+                    codes::FETCH_INTERRUPTED,
+                    "The download failed part way through.",
+                ))
+            }
+        }
+    }
+}
+
 /// `dl_fetch_text` - fetch a shared `coilbox://import?url=` payload as text over
 /// HTTPS from the Rust side, so it is not subject to the webview's CORS rules (a
 /// browser `fetch` only reaches hosts that send permissive CORS headers, which
@@ -892,7 +932,7 @@ async fn dl_fetch_text(url: String) -> CliResult {
         Ok(c) => c,
         Err(e) => return CliResult::err(e),
     };
-    let mut resp = match client.get(url).send().await {
+    let resp = match client.get(url).send().await {
         Ok(r) => r,
         Err(e) if e.is_timeout() => return CliResult::err(fetch_timeout()),
         Err(_) => {
@@ -912,33 +952,10 @@ async fn dl_fetch_text(url: String) -> CliResult {
             .param("status", status),
         );
     }
-    if let Some(len) = resp.content_length() {
-        if len > IMPORT_FETCH_LIMIT {
-            return CliResult::err(fetch_too_large());
-        }
-    }
-
-    // Stream with a hard cap so a body that exceeds (or lies about) its size is
-    // dropped mid transfer rather than fully downloaded first.
-    let mut buf: Vec<u8> = Vec::new();
-    loop {
-        match resp.chunk().await {
-            Ok(Some(chunk)) => {
-                if buf.len() as u64 + chunk.len() as u64 > IMPORT_FETCH_LIMIT {
-                    return CliResult::err(fetch_too_large());
-                }
-                buf.extend_from_slice(&chunk);
-            }
-            Ok(None) => break,
-            Err(e) if e.is_timeout() => return CliResult::err(fetch_timeout()),
-            Err(_) => {
-                return CliResult::err(UiError::new(
-                    codes::FETCH_INTERRUPTED,
-                    "The download failed part way through.",
-                ))
-            }
-        }
-    }
+    let buf = match read_capped(resp, IMPORT_FETCH_LIMIT, fetch_too_large).await {
+        Ok(buf) => buf,
+        Err(e) => return CliResult::err(e),
+    };
 
     match String::from_utf8(buf) {
         Ok(text) => CliResult::ok(json!({ "text": text })),
@@ -1708,6 +1725,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_set_engine_dirs,
             dl_path_writable,
             dl_fetch_text,
+            preset_pack::dl_fetch_preset_pack,
             dl_rapid_release_archives,
             dl_inspect_archive,
             dl_install_archive

@@ -15,6 +15,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { FollowedPack } from "../../followedPacks";
 import type { Participant } from "../../participants";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
@@ -75,8 +76,28 @@ vi.mock("../../ChobbyPresetsView", () => ({
   ChobbyPresetsView: () => <div>chobby face</div>,
 }));
 
+// The followed packs store reads the frame's settings, which a bare render has
+// not got. Its own tests cover the store, so this holds what a store would hand
+// back and sees what the sheet asks it to do.
+const packs = vi.hoisted(() => ({
+  list: [] as FollowedPack[],
+  markSeen: vi.fn(),
+}));
+vi.mock("../../followedPacks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../followedPacks")>()),
+  useFollowedPacks: () => ({
+    packs: packs.list,
+    follow: vi.fn(),
+    refreshAll: vi.fn(),
+    unfollow: vi.fn(),
+    markSeen: packs.markSeen,
+  }),
+}));
+
 afterEach(() => {
   cleanup();
+  packs.list = [];
+  packs.markSeen.mockReset();
   chobbyFiles.mockReset();
   chobbyFiles.mockReturnValue([]);
   unitsync.games = {};
@@ -113,6 +134,7 @@ function renderDrawer(over: Partial<Parameters<typeof PresetsDrawer>[0]> = {}) {
   const handlers = {
     onLoad: vi.fn(),
     onDelete: vi.fn(),
+    onSaveCopy: vi.fn(),
     onExportPreset: vi.fn(),
     onCopyPresetLink: vi.fn(),
     onHostAsBattle: vi.fn(),
@@ -148,6 +170,89 @@ const openPanel = () => fireEvent.click(screen.getByText("8v8 ruleset"));
 // Exact, because "Map" and "Map options" are both rows.
 const checkbox = (label: string) =>
   screen.getByRole("checkbox", { name: label });
+
+describe("a followed preset", () => {
+  const followed: SkirmishPreset = {
+    ...preset,
+    id: "pack-1/Community 8v8",
+    name: "Community 8v8",
+  };
+  const pack = (seenKey: string | null, updated: boolean): FollowedPack => ({
+    id: "pack-1",
+    url: "https://raw.githubusercontent.com/o/r/main/pack.json",
+    title: "Community pack",
+    lastUpdatedAt: "2026-10-31T10:00:00.000Z",
+    lastError: null,
+    presets: [{ preset: followed, contentKey: "v2", seenKey, updated }],
+  });
+  const openFollowedPanel = () =>
+    fireEvent.click(screen.getByText("Community 8v8"));
+
+  it("is listed with its pack's name and the player's own stay above it", () => {
+    packs.list = [pack("v2", false)];
+    renderDrawer();
+    expect(screen.getByText("Community pack")).toBeTruthy();
+    expect(screen.getByText("8v8 ruleset")).toBeTruthy();
+    expect(screen.queryByText("Updated")).toBeNull();
+  });
+
+  it("is marked as updated when a refresh changed it", () => {
+    packs.list = [pack("v1", true)];
+    renderDrawer();
+    expect(screen.getByText("Updated")).toBeTruthy();
+  });
+
+  it("records the version opened, and only when it is opened", () => {
+    packs.list = [pack("v1", true)];
+    renderDrawer();
+    expect(packs.markSeen).not.toHaveBeenCalled();
+    openFollowedPanel();
+    expect(packs.markSeen).toHaveBeenCalledWith(
+      "pack-1",
+      "pack-1/Community 8v8",
+      "v2",
+    );
+  });
+
+  it("brings its tweak slots to a load once it has been opened", () => {
+    packs.list = [pack("v1", true)];
+    const { onLoad } = renderDrawer();
+    openFollowedPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^Load/ }));
+    expect(onLoad.mock.calls[0][0].modOptionValues.tweakdefs).toBe("PRESET");
+  });
+
+  it("can be copied but not deleted", () => {
+    packs.list = [pack("v2", false)];
+    const { onSaveCopy, onDelete } = renderDrawer();
+    openFollowedPanel();
+    expect(screen.queryByRole("button", { name: /^Delete/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save a copy" }));
+    expect(onSaveCopy.mock.calls[0][0].id).toBe(followed.id);
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it("leaves the player's own preset deletable and not copied", () => {
+    packs.list = [pack("v2", false)];
+    renderDrawer();
+    openPanel();
+    expect(screen.getByRole("button", { name: /^Delete/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save a copy" })).toBeNull();
+  });
+
+  it("is on the list with no own presets, without saying there are none", () => {
+    packs.list = [pack("v2", false)];
+    renderDrawer({ presets: [] });
+    expect(screen.getByText("Community 8v8")).toBeTruthy();
+    expect(screen.queryByText(/^No presets yet/)).toBeNull();
+  });
+
+  it("opens the followed packs face from its row", () => {
+    renderDrawer();
+    fireEvent.click(screen.getByText("Followed packs"));
+    expect(screen.getByRole("textbox", { name: "Pack address" })).toBeTruthy();
+  });
+});
 
 describe("the preset list", () => {
   it("carries no per-preset actions at all, just the row", () => {

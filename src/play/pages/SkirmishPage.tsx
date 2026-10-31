@@ -61,6 +61,7 @@ import {
   usernameFromKey,
 } from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
+import { dedupePresetName } from "@/packs/manifest";
 import {
   launchRequirements,
   missingLaunchDependency,
@@ -1167,6 +1168,17 @@ export default function SkirmishPage() {
         onLoad={requestLoad}
         onSave={saveCurrentPreset}
         onDelete={removePreset}
+        onSaveCopy={(p) => {
+          const copyName = dedupePresetName(
+            presets.map((own) => own.name),
+            p.name,
+          );
+          savePreset(copyName, p);
+          void notify({
+            title: t`Saved "${copyName}" to your presets.`,
+            level: "success",
+          });
+        }}
         records={presetRecords}
         replayExists={(filename) => replayFilenames.has(filename)}
         onClearRecord={(p) => clearPresetRecord(presetRecordKey(p))}

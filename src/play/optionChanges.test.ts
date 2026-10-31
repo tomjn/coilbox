@@ -154,6 +154,18 @@ describe("optionChanges", () => {
   });
 });
 
+describe("a tweak slot in another case", () => {
+  const stored = { maxunits: "100", TweakDefs: "x", TWEAKUNITS1: "" };
+
+  it("is not listed as a plain option", () => {
+    expect(plainOptionValues(stored)).toEqual({ maxunits: "100" });
+  });
+
+  it("is listed as a tweak slot", () => {
+    expect(tweakSlotValues(stored)).toEqual({ TweakDefs: "x" });
+  });
+});
+
 describe("splitting a preset's stored options", () => {
   const stored = {
     maxunits: "100",

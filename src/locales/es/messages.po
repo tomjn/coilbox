@@ -5300,6 +5300,10 @@ msgstr "{ownPointCount, plural, one {# punto} other {# puntos}}"
 msgid "{pack} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox."
 msgstr "{pack} es un paquete de atlas con el que se dibuja una de las unidades de esta campaña. Ponlo en la carpeta de paquetes de extensión de la biblioteca de piezas y reinicia coilbox."
 
+#: src/play/FollowedPacksRow.tsx
+msgid "{packCount, plural, one {Following # pack} other {Following # packs}}"
+msgstr ""
+
 #: src/scenario/pages/components/teams.ts
 #, fuzzy
 msgid "{paid} on income"
@@ -8989,6 +8993,10 @@ msgstr "Un jugador que no es aliado no ve barra de vida ni vida en la descripci�
 #, fuzzy
 msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
 msgstr "La primera unidad de un jugador tiene que crearse para él al inicio, no dársele, para contar como unidad inicial."
+
+#: src/i18n/uiError.ts
+msgid "A preset pack's address must be https."
+msgstr ""
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -15758,6 +15766,10 @@ msgstr ""
 msgid "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 msgstr "Coilbox lo elimina de este equipo. Sigue en el hub, así que puedes volver a importarlo."
 
+#: src/i18n/uiError.ts
+msgid "Coilbox does not follow packs from {host}. That host is not on its list."
+msgstr ""
+
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
 msgid "Coilbox does not have an engine and content root to play with yet, so there is nowhere to put the widget. Install an engine first."
@@ -22525,6 +22537,7 @@ msgid "Folder writability not checked"
 msgstr "Permiso de escritura de las carpetas sin comprobar"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
+#: src/play/FollowedPacksView.tsx
 #, fuzzy
 msgid "Follow"
 msgstr "Seguir"
@@ -22533,6 +22546,10 @@ msgstr "Seguir"
 #, fuzzy
 msgid "Follow {name}"
 msgstr "Seguir a {name}"
+
+#: src/play/FollowedPacksRow.tsx
+msgid "Follow a preset pack by its address"
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -22553,6 +22570,11 @@ msgstr "Seguir con la cámara a la unidad que conduce"
 #, fuzzy
 msgid "Followed {name} into their battle"
 msgstr "Seguiste a {name} a su partida"
+
+#: src/play/FollowedPacksRow.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Followed packs"
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -26714,6 +26736,10 @@ msgstr "Conservar ambos"
 msgid "Keep editing"
 msgstr "Seguir editando"
 
+#: src/play/FollowedPacksView.tsx
+msgid "Keep following"
+msgstr ""
+
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 #, fuzzy
@@ -27185,6 +27211,10 @@ msgstr "Último ID de sistema"
 #, fuzzy
 msgid "Last turn"
 msgstr "Último turno"
+
+#: src/play/FollowedPacksView.tsx
+msgid "Last updated {updatedAt}"
+msgstr ""
 
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
@@ -35457,6 +35487,10 @@ msgstr "Paquete"
 msgid "Pack {projectName} across {gameName}'s numbered tweak slots, for a lobby you are not hosting yourself."
 msgstr "Empaqueta {projectName} en las ranuras de ajuste numeradas de {gameName}, para un lobby que no alojas tú."
 
+#: src/play/FollowedPacksView.tsx
+msgid "Pack address"
+msgstr ""
+
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
 msgid "Pack for tweak slots"
@@ -38649,6 +38683,7 @@ msgstr "Reflectividad (escala de grises, opcional)"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/chat/ChannelBrowser.tsx
+#: src/play/FollowedPacksView.tsx
 #, fuzzy
 msgid "Refresh"
 msgstr "Actualizar"
@@ -40594,6 +40629,10 @@ msgstr "Igual que por defecto"
 msgid "Save"
 msgstr "Guardar"
 
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Save a copy"
+msgstr ""
+
 #: src/blueprint/pages/components/WritePackForm.tsx
 #, fuzzy
 msgid "Save a file of blueprints"
@@ -40781,6 +40820,10 @@ msgstr "Guardar tu nueva contraseña"
 #, fuzzy
 msgid "Saved"
 msgstr "Guardado"
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Saved \"{copyName}\" to your presets."
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -45752,6 +45795,19 @@ msgstr "Esa dirección respondió, pero no es un hub de coilbox."
 msgid "That address answered, but it is not a coilbox hub. Check the hub address in Settings."
 msgstr "Esa dirección respondió, pero no es un hub de coilbox. Revisa la dirección del hub en Ajustes."
 
+#: src/i18n/uiError.ts
+#: src/play/followedPacks.ts
+msgid "That address did not return a setup pack."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That address redirects to {host}, which is not on the list of hosts coilbox follows packs from."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That address redirects too many times."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #, fuzzy
@@ -45817,6 +45873,10 @@ msgstr "Eso no parece un código de desafío de coilbox."
 #, fuzzy
 msgid "That doesn't look like a coilbox setup pack."
 msgstr "Eso no parece un paquete de configuración de coilbox."
+
+#: src/i18n/uiError.ts
+msgid "That file is too large to be a setup pack."
+msgstr ""
 
 #: src/blueprint/transfer.ts
 #, fuzzy
@@ -45888,6 +45948,10 @@ msgstr "No es un proyecto de ajustes de coilbox."
 #, fuzzy
 msgid "That is not a valid link."
 msgstr "No es un enlace válido."
+
+#: src/i18n/uiError.ts
+msgid "That is not a web address coilbox can follow."
+msgstr ""
 
 #: src/hub/publish.ts
 #, fuzzy
@@ -45964,6 +46028,10 @@ msgstr "Ese escenario se creó con una versión más nueva de coilbox. Actualiza
 #, fuzzy
 msgid "that server"
 msgstr "ese servidor"
+
+#: src/play/followedPacks.ts
+msgid "That setup pack has no presets to follow."
+msgstr ""
 
 #: src/packs/envelope.ts
 #, fuzzy
@@ -51904,9 +51972,14 @@ msgstr "Misión sin terminar"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/follow/FollowIndicator.tsx
+#: src/play/FollowedPacksView.tsx
 #, fuzzy
 msgid "Unfollow"
 msgstr "Dejar de seguir"
+
+#: src/play/FollowedPacksView.tsx
+msgid "Unfollow \"{title}\"? Its presets go. Copies you saved stay."
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
@@ -52591,6 +52664,10 @@ msgstr "¿Actualizar a la versión más reciente de \"{liveName}\"?"
 #, fuzzy
 msgid "Update widget"
 msgstr "Actualizar widget"
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Updated"
+msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
@@ -55009,6 +55086,10 @@ msgstr "tú"
 #, fuzzy
 msgid "You"
 msgstr "Tú"
+
+#: src/play/followedPacks.ts
+msgid "You already follow that pack."
+msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy

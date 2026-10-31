@@ -117,6 +117,25 @@ const MESSAGES: Record<string, (params: Params) => MessageDescriptor> = {
   "downloads.fetch.not_an_import": () =>
     msg`That import is not a coilbox import.`,
 
+  "downloads.pack.host_not_allowed": (params) => {
+    const host = params.host ?? "";
+    return msg`Coilbox does not follow packs from ${host}. That host is not on its list.`;
+  },
+  "downloads.pack.redirect_refused": (params) => {
+    const host = params.host ?? "";
+    return msg`That address redirects to ${host}, which is not on the list of hosts coilbox follows packs from.`;
+  },
+  "downloads.pack.https_only": () =>
+    msg`A preset pack's address must be https.`,
+  "downloads.pack.bad_address": () =>
+    msg`That is not a web address coilbox can follow.`,
+  "downloads.pack.too_many_redirects": () =>
+    msg`That address redirects too many times.`,
+  "downloads.pack.too_large": () =>
+    msg`That file is too large to be a setup pack.`,
+  "downloads.pack.not_a_pack": () =>
+    msg`That address did not return a setup pack.`,
+
   "hub.endpoint.not_a_hub": () =>
     msg`That address answered, but it is not a coilbox hub.`,
   "hub.endpoint.stopped_answering": () =>

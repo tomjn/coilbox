@@ -398,6 +398,13 @@ export interface Profile {
    * already covers this, since there is then no hub at all.
    */
   hubAssetUploads?: boolean;
+  /**
+   * The hosts a player may follow a preset pack from, in place of the built-in
+   * `raw.githubusercontent.com` and `gist.githubusercontent.com`. `[]` refuses every
+   * host. A lock: the Rust fetch reads this key from the file itself and applies it
+   * to every redirect, so it is declared here only as part of the schema.
+   */
+  presetPackHosts?: string[];
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
   /**
