@@ -102,6 +102,24 @@ describe("parsePresetJson restrictions", () => {
   });
 });
 
+describe("parsePresetJson map options", () => {
+  it("keeps them, so a shared preset loads the setup it was saved with", () => {
+    const parsed = parsePresetJson(
+      JSON.stringify({ ...base, mapOptionValues: { wind: "high" } }),
+    );
+    expect(parsed?.mapOptionValues).toEqual({ wind: "high" });
+  });
+
+  it("drops anything that is not a map of strings", () => {
+    for (const mapOptionValues of [{ wind: 7 }, ["wind"], "wind"]) {
+      const parsed = parsePresetJson(
+        JSON.stringify({ ...base, mapOptionValues }),
+      );
+      expect(parsed && "mapOptionValues" in parsed).toBe(false);
+    }
+  });
+});
+
 describe("parsePresetJson start boxes", () => {
   const box = { left: 0, top: 0, right: 60, bottom: 200 };
 

@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ArrowLeft,
+  CopyPlus,
   Link as LinkIcon,
   Share2,
   Swords,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import type { ConfigOption } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import type { ResultRecord } from "../../../records/bestResult";
@@ -17,6 +19,9 @@ import type { ModProject } from "../../../workshop/project";
 import { ChobbyPresetsRow } from "../../ChobbyPresetsRow";
 import { ChobbyPresetsView } from "../../ChobbyPresetsView";
 import type { SkirmishDraft } from "../../drafts";
+import { FollowedPacksRow } from "../../FollowedPacksRow";
+import { FollowedPacksView } from "../../FollowedPacksView";
+import { presetForBattle, useFollowedPacks } from "../../followedPacks";
 import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
 import { PresetList } from "../../PresetList";
 import {
@@ -59,6 +64,7 @@ export function PresetsDrawer({
   onLoad,
   onSave,
   onDelete,
+  onSaveCopy,
   records,
   replayExists,
   onClearRecord,
@@ -99,6 +105,8 @@ export function PresetsDrawer({
   onLoad: (preset: SkirmishPreset, selection?: PresetSelection) => void;
   onSave: (name: string) => SkirmishPreset;
   onDelete: (id: string) => void;
+  /** Save a followed preset as the player's own, to edit or keep. */
+  onSaveCopy: (preset: SkirmishPreset) => void;
   /** Best results by `presetRecordKey`, shown on each row. */
   records?: Record<string, ResultRecord>;
   /** Whether a result's replay is still on disk, so its row can link to it. */
@@ -152,6 +160,25 @@ export function PresetsDrawer({
   // open, and the row is there only when a data folder holds the file.
   const [chobbyOpen, setChobbyOpen] = useState(false);
   const chobbyFiles = useChobbyPresetFiles(open);
+  // Packs followed by their address, another face. Their presets are on the list
+  // beside the player's own. What a row holds is `presetForBattle`, so the tweak
+  // slots of a version nobody has opened are not on it to be loaded. Opening a row
+  // is what takes the whole preset, and records that this version was opened.
+  const [packsOpen, setPacksOpen] = useState(false);
+  const followed = useFollowedPacks();
+  const followedRows = followed.packs.flatMap((pack) =>
+    pack.presets.map((entry) => ({
+      pack,
+      entry,
+      preset: presetForBattle(entry),
+    })),
+  );
+  const openFollowed = (preset: SkirmishPreset) => {
+    const row = followedRows.find((r) => r.preset.id === preset.id);
+    if (!row) return;
+    followed.markSeen(row.pack.id, preset.id, row.entry.contentKey);
+    setViewing(row.entry.preset);
+  };
   // Read here as well as in the panel, so the row says up front when there is
   // nothing behind it rather than opening onto an explanation.
   const tweaks = usePresetTweaks(
@@ -175,6 +202,7 @@ export function PresetsDrawer({
           setViewing(null);
           setTweaksOpen(false);
           setChobbyOpen(false);
+          setPacksOpen(false);
         }
         onOpenChange(next);
       }}
@@ -183,7 +211,7 @@ export function PresetsDrawer({
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center gap-2 border-b border-border/60 px-5 py-4">
-            {(viewing || tweaksOpen || chobbyOpen) && (
+            {(viewing || tweaksOpen || chobbyOpen || packsOpen) && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -191,6 +219,7 @@ export function PresetsDrawer({
                   setViewing(null);
                   setTweaksOpen(false);
                   setChobbyOpen(false);
+                  setPacksOpen(false);
                 }}
                 aria-label={t`Back to presets`}
               >
@@ -202,7 +231,9 @@ export function PresetsDrawer({
                 ? t`Unit tweaks`
                 : chobbyOpen
                   ? t`Chobby presets`
-                  : (viewing?.name ?? t`Presets`)}
+                  : packsOpen
+                    ? t`Followed packs`
+                    : (viewing?.name ?? t`Presets`)}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label={t`Close`}>
@@ -220,6 +251,8 @@ export function PresetsDrawer({
               archive={archive}
               disabled={disabled}
             />
+          ) : packsOpen ? (
+            <FollowedPacksView followed={followed} disabled={disabled} />
           ) : tweaksOpen ? (
             <PresetTweaksView
               gameName={currentGameName}
@@ -291,22 +324,34 @@ export function PresetsDrawer({
                       <LinkIcon className="size-4" /> <Trans>Copy link</Trans>
                     </Button>
                   </div>
-                  {/* Set apart, because it is the one action here that cannot
-                   * be undone. */}
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                    disabled={disabled}
-                    onClick={() => {
-                      // Back to the list, since the preset this panel is about
-                      // has just stopped existing.
-                      onDelete(viewing.id);
-                      setViewing(null);
-                    }}
-                  >
-                    <Trash2 className="size-4" /> <Trans>Delete preset</Trans>
-                  </Button>
+                  {presets.some((p) => p.id === viewing.id) ? (
+                    // Set apart, because it is the one action here that cannot
+                    // be undone.
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      disabled={disabled}
+                      onClick={() => {
+                        // Back to the list, since the preset this panel is about
+                        // has just stopped existing.
+                        onDelete(viewing.id);
+                        setViewing(null);
+                      }}
+                    >
+                      <Trash2 className="size-4" /> <Trans>Delete preset</Trans>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={disabled}
+                      onClick={() => onSaveCopy(viewing)}
+                    >
+                      <CopyPlus className="size-4" /> <Trans>Save a copy</Trans>
+                    </Button>
+                  )}
                 </>
               }
             />
@@ -333,16 +378,49 @@ export function PresetsDrawer({
                     onOpen={() => setChobbyOpen(true)}
                   />
                 )}
-                <PresetList
-                  presets={presets}
-                  thumbs={thumbs}
+                <FollowedPacksRow
+                  packCount={followed.packs.length}
                   disabled={disabled}
-                  onOpen={setViewing}
-                  records={records}
-                  replayExists={replayExists}
-                  onClearRecord={onClearRecord}
-                  empty={t`No presets yet. Save your current setup above, or import a shared one.`}
+                  onOpen={() => setPacksOpen(true)}
                 />
+                {(presets.length > 0 || followedRows.length === 0) && (
+                  <PresetList
+                    presets={presets}
+                    thumbs={thumbs}
+                    disabled={disabled}
+                    onOpen={setViewing}
+                    records={records}
+                    replayExists={replayExists}
+                    onClearRecord={onClearRecord}
+                    empty={t`No presets yet. Save your current setup above, or import a shared one.`}
+                  />
+                )}
+                {followedRows.length > 0 && (
+                  <div className={presets.length > 0 ? "mt-2" : undefined}>
+                    <PresetList
+                      presets={followedRows.map((row) => row.preset)}
+                      thumbs={thumbs}
+                      disabled={disabled}
+                      onOpen={openFollowed}
+                      empty=""
+                      note={(preset) => {
+                        const row = followedRows.find(
+                          (r) => r.preset.id === preset.id,
+                        );
+                        return (
+                          <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                            <span className="truncate">{row?.pack.title}</span>
+                            {row?.entry.updated && (
+                              <Badge className="shrink-0">
+                                <Trans>Updated</Trans>
+                              </Badge>
+                            )}
+                          </span>
+                        );
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </>
           )}

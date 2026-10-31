@@ -225,9 +225,22 @@ export function parsePresetJson(
     startPosType: d.startPosType,
     startRects: parseStartRects(d.startRects),
     modOptionValues: d.modOptionValues as SkirmishDraft["modOptionValues"],
+    ...(isStringMap(d.mapOptionValues)
+      ? { mapOptionValues: d.mapOptionValues }
+      : {}),
     restrictions: parseRestrictions(d.restrictions),
     name: typeof d.name === "string" ? d.name : undefined,
   };
+}
+
+/** Whether a value is an object holding only strings, as an option map must. */
+export function isStringMap(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((v) => typeof v === "string")
+  );
 }
 
 /**

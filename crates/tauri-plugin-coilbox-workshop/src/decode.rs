@@ -276,7 +276,9 @@ fn normalize_base64(text: &str) -> String {
 /// A key's kind and numbered slot, matching `deliveryRoutes.ts`'s own
 /// `TWEAK_KEY` pattern: `tweak(defs|units)(\d+)?`. The bare key is slot 0,
 /// numbered ones from 1, the same convention `tweak_pack::bset_prefix` writes.
+/// Any case, as there, because the engine lowers every key in a start script.
 fn slot_kind_and_index(key: &str) -> (SlotKind, Option<usize>) {
+    let key = key.to_ascii_lowercase();
     for (prefix, kind) in [
         ("tweakdefs", SlotKind::Tweakdefs),
         ("tweakunits", SlotKind::Tweakunits),
@@ -451,6 +453,20 @@ mod tests {
     }
 
     // -- slot_kind_and_index ------------------------------------------------
+
+    /// The engine lowers every key in a start script, so `TweakDefs` reaches a game
+    /// as its `tweakdefs` slot. Left out here, it would run and not be shown.
+    #[test]
+    fn a_slot_key_in_another_case_is_the_same_slot() {
+        assert_eq!(
+            slot_kind_and_index("TweakDefs"),
+            (SlotKind::Tweakdefs, Some(0))
+        );
+        assert_eq!(
+            slot_kind_and_index("TWEAKUNITS12"),
+            (SlotKind::Tweakunits, Some(12))
+        );
+    }
 
     #[test]
     fn the_bare_key_is_slot_zero_and_a_numbered_one_counts_from_one() {

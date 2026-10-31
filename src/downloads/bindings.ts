@@ -310,6 +310,16 @@ export const dlFetchText = defineCommand<{ url: string }, { text: string }>(
   "dl_fetch_text",
 );
 
+/**
+ * Fetch a followed preset pack's manifest as text (issue #1298). The Rust side
+ * checks the host against the allowed list on every redirect, enforces https and a
+ * byte cap, and rejects with a reason that names what it refused.
+ */
+export const dlFetchPresetPack = defineCommand<
+  { url: string },
+  { text: string }
+>("coilbox-downloads", "dl_fetch_preset_pack");
+
 /** A Recoil engine release matching the running platform. */
 export interface EngineRelease {
   version: string;

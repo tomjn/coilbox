@@ -50,3 +50,20 @@ In the Singleplayer Presets drawer, select a preset to open it. It has two ways 
 - Copy link copies a coilbox link. When someone opens it, coilbox offers to import the preset.
 
 To add a preset someone sent you as a file, select Import at the top of the drawer and pick the file. Coilbox adds it as a new preset, so it never replaces one you already have. Restrictions travel with the preset, so a shared conquest or warpath fight plays the same way on someone else's computer.
+
+## Following a preset pack
+
+A community can publish a set of presets at a web address and keep improving them. Following that address puts its presets in your drawer and keeps them current, without changing anything you saved.
+
+1. In the Singleplayer Presets drawer, select Followed packs.
+2. Paste the pack's address and select Follow.
+
+The pack's presets appear in the drawer with the pack's name on them. Its games and maps are not downloaded in advance.
+
+Coilbox refreshes followed packs when it starts and when you select Refresh. If a refresh fails, for example because you are offline, the presets you already have stay and still load. The Followed packs page shows when each pack last updated and why its last refresh failed.
+
+A preset that changed in a refresh is marked Updated until you open it. A preset can hold unit tweaks, which are Lua the game runs, so its unit tweaks cannot reach a battle until you have opened that version. That applies to a preset from a pack you just followed too.
+
+You cannot edit or delete a followed preset. Open it and select Save a copy to get one of your own, which a refresh never changes. Unfollowing a pack removes its presets and keeps your copies.
+
+Coilbox only follows packs from `raw.githubusercontent.com` and `gist.githubusercontent.com`, over https, and it refuses an address that redirects anywhere else. A distribution can [replace that list](../developers/distribution-profile.md#presetpackhosts-array-of-strings). The address must return a [setup pack](library.md#import-a-setup-pack) as JSON, holding at least one game or map and at least one preset.

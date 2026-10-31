@@ -2,6 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Film, ImageOff, RotateCcw } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
@@ -31,6 +32,7 @@ export function PresetList({
   records,
   replayExists,
   onClearRecord,
+  note,
 }: {
   presets: SkirmishPreset[];
   thumbs: Map<string, MapThumbData>;
@@ -44,6 +46,8 @@ export function PresetList({
   replayExists?: (filename: string) => boolean;
   /** Forget one preset's record. Absent hides the button. */
   onClearRecord?: (preset: SkirmishPreset) => void;
+  /** A further line for a row, saying what only this surface knows about it. */
+  note?: (preset: SkirmishPreset) => ReactNode;
 }) {
   const { t } = useLingui();
   // A short, derived summary of a preset: its map, game and opponent count. No
@@ -124,6 +128,7 @@ export function PresetList({
                       {recordSummary(record)}
                     </span>
                   )}
+                  {note?.(p)}
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </button>

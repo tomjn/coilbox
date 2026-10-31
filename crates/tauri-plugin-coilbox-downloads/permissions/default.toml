@@ -23,6 +23,7 @@ permissions = [
   "allow-dl-set-engine-dirs",
   "allow-dl-path-writable",
   "allow-dl-fetch-text",
+  "allow-dl-fetch-preset-pack",
   "allow-dl-rapid-release-archives",
   "allow-dl-inspect-archive",
   "allow-dl-install-archive",

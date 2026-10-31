@@ -1006,6 +1006,16 @@ Points the Coilbox hub at a server you run yourself, instead of the built-in `ht
 
 A player can still override this with a setting of their own. This only changes the default they start from.
 
+### `presetPackHosts` (array of strings)
+
+The hosts a player may [follow a preset pack](../players/presets.md#following-a-preset-pack) from, in place of the built-in `raw.githubusercontent.com` and `gist.githubusercontent.com`. An empty list refuses every host, which turns following off.
+
+```json
+{ "version": 1, "presetPackHosts": ["packs.example.org"] }
+```
+
+Coilbox checks the list when it fetches, on the address and on every redirect, and refuses a host that is not an exact match. Addresses must be https on the default port. A loopback host on the list may use http and any port, so you can test a pack locally. There is no player setting for this one.
+
 ### `hubAssetsUrl` (string)
 
 Points Coilbox at your own copy of the hub's pictures, instead of the built-in `https://tomjn.github.io/coilbox-assets/`. Set it with [`hubUrl`](#huburl-string) when you run your own hub, or your hub's items are drawn with pictures from the public one.

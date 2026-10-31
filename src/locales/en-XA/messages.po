@@ -4311,6 +4311,10 @@ msgstr ""
 msgid "{pack} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox."
 msgstr ""
 
+#: src/play/FollowedPacksRow.tsx
+msgid "{packCount, plural, one {Following # pack} other {Following # packs}}"
+msgstr ""
+
 #: src/scenario/pages/components/teams.ts
 msgid "{paid} on income"
 msgstr ""
@@ -7277,6 +7281,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "A preset pack's address must be https."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -12800,6 +12808,10 @@ msgstr ""
 msgid "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 msgstr ""
 
+#: src/i18n/uiError.ts
+msgid "Coilbox does not follow packs from {host}. That host is not on its list."
+msgstr ""
+
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Coilbox does not have an engine and content root to play with yet, so there is nowhere to put the widget. Install an engine first."
 msgstr ""
@@ -18304,11 +18316,16 @@ msgid "Folder writability not checked"
 msgstr ""
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
+#: src/play/FollowedPacksView.tsx
 msgid "Follow"
 msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Follow {name}"
+msgstr ""
+
+#: src/play/FollowedPacksRow.tsx
+msgid "Follow a preset pack by its address"
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -18325,6 +18342,11 @@ msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Followed {name} into their battle"
+msgstr ""
+
+#: src/play/FollowedPacksRow.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Followed packs"
 msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
@@ -21701,6 +21723,10 @@ msgstr ""
 msgid "Keep editing"
 msgstr ""
 
+#: src/play/FollowedPacksView.tsx
+msgid "Keep following"
+msgstr ""
+
 #: src/challenge/ChallengeRecordLine.tsx
 #: src/play/PresetList.tsx
 msgid "Keep it"
@@ -22080,6 +22106,10 @@ msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Last turn"
+msgstr ""
+
+#: src/play/FollowedPacksView.tsx
+msgid "Last updated {updatedAt}"
 msgstr ""
 
 #: src/uberstress/pages/HistoryPage.tsx
@@ -28796,6 +28826,10 @@ msgstr ""
 msgid "Pack {projectName} across {gameName}'s numbered tweak slots, for a lobby you are not hosting yourself."
 msgstr ""
 
+#: src/play/FollowedPacksView.tsx
+msgid "Pack address"
+msgstr ""
+
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Pack for tweak slots"
 msgstr ""
@@ -31398,6 +31432,7 @@ msgstr ""
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/chat/ChannelBrowser.tsx
+#: src/play/FollowedPacksView.tsx
 msgid "Refresh"
 msgstr ""
 
@@ -32984,6 +33019,10 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Save a copy"
+msgstr ""
+
 #: src/blueprint/pages/components/WritePackForm.tsx
 msgid "Save a file of blueprints"
 msgstr ""
@@ -33134,6 +33173,10 @@ msgstr ""
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Saved"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Saved \"{copyName}\" to your presets."
 msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -37182,6 +37225,19 @@ msgstr ""
 msgid "That address answered, but it is not a coilbox hub. Check the hub address in Settings."
 msgstr ""
 
+#: src/i18n/uiError.ts
+#: src/play/followedPacks.ts
+msgid "That address did not return a setup pack."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That address redirects to {host}, which is not on the list of hosts coilbox follows packs from."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That address redirects too many times."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 msgid "That blueprint could not be copied: {reason}"
@@ -37233,6 +37289,10 @@ msgstr ""
 
 #: src/packs/envelope.ts
 msgid "That doesn't look like a coilbox setup pack."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That file is too large to be a setup pack."
 msgstr ""
 
 #: src/blueprint/transfer.ts
@@ -37290,6 +37350,10 @@ msgstr ""
 
 #: src/deeplink/parse.ts
 msgid "That is not a valid link."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That is not a web address coilbox can follow."
 msgstr ""
 
 #: src/hub/publish.ts
@@ -37351,6 +37415,10 @@ msgstr ""
 
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "that server"
+msgstr ""
+
+#: src/play/followedPacks.ts
+msgid "That setup pack has no presets to follow."
 msgstr ""
 
 #: src/packs/envelope.ts
@@ -42145,7 +42213,12 @@ msgstr ""
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/follow/FollowIndicator.tsx
+#: src/play/FollowedPacksView.tsx
 msgid "Unfollow"
+msgstr ""
+
+#: src/play/FollowedPacksView.tsx
+msgid "Unfollow \"{title}\"? Its presets go. Copies you saved stay."
 msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
@@ -42703,6 +42776,10 @@ msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Update widget"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Updated"
 msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
@@ -44661,6 +44738,10 @@ msgstr ""
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "You"
+msgstr ""
+
+#: src/play/followedPacks.ts
+msgid "You already follow that pack."
 msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
