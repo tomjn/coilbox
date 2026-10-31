@@ -37,6 +37,9 @@ export interface PresetFitFacts {
   mapOptions: { current?: ConfigOption[]; preset?: ConfigOption[] };
   /** How many start positions each map defines. */
   startPositions: { current?: number; preset?: number };
+  /** Whether the preset's map is installed, once the install has been read.
+   *  Left out by a surface that does not warn about it. */
+  presetMapInstalled?: boolean;
 }
 
 /**
@@ -57,7 +60,7 @@ export function undeclaredOptions(
   return [...keys].filter((key) => !declared.has(key.toLowerCase()));
 }
 
-function named(names: string[]): string {
+export function named(names: string[]): string {
   const shown = names.slice(0, NAMED_IN_WARNING).join(", ");
   const more = names.length - NAMED_IN_WARNING;
   return more > 0 ? t`${shown} and ${more} more` : shown;
@@ -116,6 +119,10 @@ export function presetFitWarnings(
       const names = named(missing);
       out.mapOptions = t`${mapName} does not declare ${names}.`;
     }
+  }
+
+  if (take("map") && facts.presetMapInstalled === false) {
+    out.map = t`You do not have ${mapName}.`;
   }
 
   // Start positions only bind in fixed mode, where team N spawns at position N.

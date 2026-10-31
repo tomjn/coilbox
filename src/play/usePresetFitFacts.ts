@@ -4,6 +4,7 @@ import {
   useUnitsyncGameInfo,
   useUnitsyncMapInfo,
   useUnitsyncMinimap,
+  useUnitsyncScan,
 } from "@/content/config";
 import type { SkirmishDraft } from "./drafts";
 import type { PresetFitFacts } from "./presetFit";
@@ -47,6 +48,7 @@ export function usePresetFitFacts({
   currentMapName,
   currentStartPosType,
   gameArchiveFor,
+  checkMapInstalled,
 }: {
   /** The preset being looked at, or null when the sheet is on its list. */
   preset: SkirmishDraft | null;
@@ -60,6 +62,10 @@ export function usePresetFitFacts({
   /** The archive to read a game's options from, for a preset naming another
    *  game. A surface that cannot change game does not need it. */
   gameArchiveFor?: (gameName: string) => string | undefined;
+  /** Say whether the preset's map is installed, so the sheet can warn before a
+   *  map the player lacks is sent. Singleplayer leaves it off, because loading
+   *  there offers the download. */
+  checkMapInstalled?: boolean;
 }): PresetFitFacts | undefined {
   const currentGame = useUnitsyncGameInfo(
     enginePath,
@@ -93,6 +99,13 @@ export function usePresetFitFacts({
     THUMB_MINIMAP_MIP,
   );
 
+  // Pointed at nothing unless asked, so a surface that does not warn about the
+  // map never scans for it.
+  const scan = useUnitsyncScan(
+    checkMapInstalled ? enginePath : undefined,
+    checkMapInstalled ? dataDir : undefined,
+  );
+
   if (!preset) return undefined;
   return {
     currentGameName,
@@ -110,5 +123,9 @@ export function usePresetFitFacts({
       current: positionCount(currentPositions),
       preset: positionCount(presetPositions),
     },
+    presetMapInstalled:
+      checkMapInstalled && scan.data && presetMapName
+        ? scan.data.maps.some((m) => m.name === presetMapName)
+        : undefined,
   };
 }
