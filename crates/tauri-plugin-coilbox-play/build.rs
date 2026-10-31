@@ -20,6 +20,8 @@ const COMMANDS: &[&str] = &[
     "play_system_info",
     "play_oa_find",
     "play_oa_check",
+    "play_oa_launch",
+    "play_oa_cancel",
 ];
 
 fn main() {
