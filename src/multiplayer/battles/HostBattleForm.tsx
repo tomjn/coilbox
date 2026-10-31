@@ -44,7 +44,7 @@ import { useEngineVersionCheck } from "../battle/useEngineVersionCheck";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { relayPingLabel, useRelayPing } from "../relayPing";
 import { HostCompatChoice } from "./HostCompatChoice";
-import { hostBattleFailure } from "./hostBattle";
+import { battleTitleProblem, hostBattleFailure } from "./hostBattle";
 import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { leaveAndLabel } from "./oneBattle";
@@ -276,9 +276,16 @@ export function HostBattleForm({
   // A password the OPENBATTLE line cannot carry opens a battle every joiner
   // sees as full (issue #3518).
   const passwordProblem = battlePasswordProblem(password);
+  // A tab in the title would take the game's place on the line (issue #4916).
+  const titleProblem = battleTitleProblem(title);
   // The button and `submit` both read this, so a live button is never one whose
   // press is swallowed. `target` is part of it because `submit` needs one.
-  const canHost = !!target && content.ready && compat.ready && !passwordProblem;
+  const canHost =
+    !!target &&
+    content.ready &&
+    compat.ready &&
+    !passwordProblem &&
+    !titleProblem;
   // Why Host is not live, when the form has not said so already. The password
   // problem sits under its own field, a failed hash has its own row, and a hash
   // still running is in the button's label.
@@ -447,6 +454,9 @@ export function HostBattleForm({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={hostedTitle(gameName || t`Game`)}
             />
+            {titleProblem && (
+              <span className="text-xs text-destructive">{titleProblem}</span>
+            )}
           </label>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}

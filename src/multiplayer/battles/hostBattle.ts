@@ -11,6 +11,19 @@
 import { t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 
+/**
+ * Why a typed battle title cannot be sent, or null when it can. Pure. The title
+ * is one tab-separated field of the `OPENBATTLE` line, so a tab in it replaces
+ * the game's name with the text after it (issue #4916). A form trims the title
+ * before it sends it, so the edges are not checked. The check is the one the
+ * backend applies, which is any control character.
+ */
+export function battleTitleProblem(typed: string): string | null {
+  return /\p{Cc}/u.test(typed.trim())
+    ? t`The title cannot contain a tab or another control character.`
+    : null;
+}
+
 export function hostBattleFailure(error: unknown): string {
   const raw = describeError(error ?? "").trim();
   return raw
