@@ -34178,6 +34178,10 @@ msgstr "numparticles, pro Spawn."
 msgid "NW-SE"
 msgstr "NW-SO"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "OA"
+msgstr ""
+
 #: src/scenario/listing.ts
 #: src/scenario/validate.ts
 #, fuzzy
