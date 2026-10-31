@@ -360,6 +360,7 @@ msgid "(no username)"
 msgstr "(no username)"
 
 #: src/mapconv/pages/components/PathField.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "(none)"
 msgstr "(none)"
 
@@ -4372,6 +4373,10 @@ msgstr "{path} cannot be copied: {detail}"
 msgid "{path} cannot be copied."
 msgstr "{path} cannot be copied."
 
+#: src/i18n/uiError.ts
+msgid "{path} did not answer within {seconds} seconds."
+msgstr "{path} did not answer within {seconds} seconds."
+
 #: src/content/bundle.ts
 msgid "{path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead."
 msgstr "{path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead."
@@ -4380,13 +4385,29 @@ msgstr "{path} is a loose .sdd game. It is read in place, but coilbox does not w
 msgid "{path} is not a platform folder, so its engine is never used. Use one of {platforms}."
 msgstr "{path} is not a platform folder, so its engine is never used. Use one of {platforms}."
 
+#: src/i18n/uiError.ts
+msgid "{path} is not a program. Choose the open-annihilation file itself."
+msgstr "{path} is not a program. Choose the open-annihilation file itself."
+
+#: src/i18n/uiError.ts
+msgid "{path} is not Open Annihilation. Choose the open-annihilation file."
+msgstr "{path} is not Open Annihilation. Choose the open-annihilation file."
+
 #: src/content/bundle.ts
 msgid "{path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/."
 msgstr "{path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/."
 
+#: src/i18n/uiError.ts
+msgid "{path} ran but failed when asked for its version."
+msgstr "{path} ran but failed when asked for its version."
+
 #: src/content/bundle.ts
 msgid "{path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it."
 msgstr "{path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it."
+
+#: src/i18n/uiError.ts
+msgid "{path} would not run: {reason}"
+msgstr "{path} would not run: {reason}"
 
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "{pathName} · point {pointNumber}"
@@ -12028,6 +12049,7 @@ msgstr "Chobby presets"
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 msgid "Choose"
 msgstr "Choose"
 
@@ -17956,6 +17978,10 @@ msgstr "Filters and sorting"
 #: src/content/mapImage.ts
 msgid "Filters: {filters}"
 msgstr "Filters: {filters}"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Find"
+msgstr "Find"
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -28285,6 +28311,14 @@ msgstr "Open a project to write its changes into the game."
 msgid "Open a screen"
 msgstr "Open a screen"
 
+#: src/multiplayer/index.tsx
+msgid "Open Annihilation"
+msgstr "Open Annihilation"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
+msgstr "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Open another file"
 msgstr "Open another file"
@@ -30254,6 +30288,10 @@ msgstr "Profile loaded from {profileSource}"
 #: src/profile/health.ts
 msgid "profile.json failed to parse"
 msgstr "profile.json failed to parse"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Program"
+msgstr "Program"
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 msgid "Program, read only"
@@ -34096,6 +34134,10 @@ msgstr "Select on the model's pieces"
 #: src/content/pages/components/PlayerPicker.tsx
 msgid "Select player"
 msgstr "Select player"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Select the Open Annihilation program"
+msgstr "Select the Open Annihilation program"
 
 #: src/content/pages/components/UnitPicker.tsx
 #: src/scenario/pages/components/ContentsList.tsx
@@ -43163,6 +43205,7 @@ msgstr "Versatile"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Version"
 msgstr "Version"
@@ -44021,6 +44064,10 @@ msgstr "where the most matches were at their own busiest in {when}, {over}. Each
 #: src/content/mapAggregate.ts
 msgid "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
 msgstr "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
+
+#: src/multiplayer/index.tsx
+msgid "Where the Open Annihilation program is, and which version it is."
+msgstr "Where the Open Annihilation program is, and which version it is."
 
 #: src/content/pages/components/SectionHelp.tsx
 msgid "Where these numbers come from"

@@ -444,6 +444,7 @@ msgid "(no username)"
 msgstr "(немає імені користувача)"
 
 #: src/mapconv/pages/components/PathField.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "(none)"
 msgstr "(немає)"
@@ -5372,6 +5373,10 @@ msgstr "Не вдалося скопіювати {path}: {detail}"
 msgid "{path} cannot be copied."
 msgstr "Не вдалося скопіювати {path}."
 
+#: src/i18n/uiError.ts
+msgid "{path} did not answer within {seconds} seconds."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead."
@@ -5382,15 +5387,31 @@ msgstr "{path} – розпакована гра .sdd. Її читають бе�
 msgid "{path} is not a platform folder, so its engine is never used. Use one of {platforms}."
 msgstr "{path} не є папкою платформи, тому її рушій ніколи не використовується. Використайте одну з: {platforms}."
 
+#: src/i18n/uiError.ts
+msgid "{path} is not a program. Choose the open-annihilation file itself."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "{path} is not Open Annihilation. Choose the open-annihilation file."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/."
 msgstr "{path} не входить до папки даних Spring, тому її ніщо не читає. Така папка містить engine/, games/, maps/, packages/ і pool/."
 
+#: src/i18n/uiError.ts
+msgid "{path} ran but failed when asked for its version."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it."
 msgstr "{path} лежить на верхньому рівні папки. Перемістіть його в games/ або maps/, інакше його ніщо не знайде."
+
+#: src/i18n/uiError.ts
+msgid "{path} would not run: {reason}"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 #, fuzzy
@@ -14823,6 +14844,7 @@ msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Choose"
 msgstr "Вибрати"
@@ -22081,6 +22103,10 @@ msgstr "Фільтри й сортування"
 #, fuzzy
 msgid "Filters: {filters}"
 msgstr "Фільтри: {filters}"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Find"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -34813,6 +34839,14 @@ msgstr "Відкрийте проєкт, щоб записати його змі
 msgid "Open a screen"
 msgstr "Відкрити екран"
 
+#: src/multiplayer/index.tsx
+msgid "Open Annihilation"
+msgstr ""
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
+msgstr ""
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
 msgid "Open another file"
@@ -37229,6 +37263,10 @@ msgstr "Профіль завантажено з {profileSource}"
 #, fuzzy
 msgid "profile.json failed to parse"
 msgstr "Не вдалося розібрати profile.json"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Program"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -41938,6 +41976,10 @@ msgstr "Виділення за елементами моделі"
 #, fuzzy
 msgid "Select player"
 msgstr "Виберіть гравця"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Select the Open Annihilation program"
+msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
 #: src/scenario/pages/components/ContentsList.tsx
@@ -53128,6 +53170,7 @@ msgstr "Універсальність"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
@@ -54188,6 +54231,10 @@ msgstr "де більшість матчів мали власний пік ак
 #, fuzzy
 msgid "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
 msgstr "де більшість матчів мали власний пік активності, {over}. Кожен матч масштабовано до його найактивнішої точки, тож це не кількість"
+
+#: src/multiplayer/index.tsx
+msgid "Where the Open Annihilation program is, and which version it is."
+msgstr ""
 
 #: src/content/pages/components/SectionHelp.tsx
 #, fuzzy

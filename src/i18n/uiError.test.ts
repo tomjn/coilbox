@@ -123,6 +123,38 @@ const CASES: {
     translated: ["Pas de reponse (fixture) en ", ["seconds"], " secondes."],
   },
   {
+    code: "play.oa.not_a_file",
+    params: { path: "/tmp/oa" },
+    english:
+      "/tmp/oa is not a program. Choose the open-annihilation file itself.",
+    translated: [["path"], " pas un programme (fixture)"],
+  },
+  {
+    code: "play.oa.did_not_run",
+    params: { path: "/tmp/oa", reason: "Permission denied" },
+    english: "/tmp/oa would not run: Permission denied",
+    translated: [["path"], " ne demarre pas (fixture) ", ["reason"]],
+  },
+  {
+    code: "play.oa.timed_out",
+    params: { path: "/tmp/oa", seconds: "10" },
+    english: "/tmp/oa did not answer within 10 seconds.",
+    translated: [["path"], " muet (fixture) ", ["seconds"]],
+  },
+  {
+    code: "play.oa.exited_badly",
+    params: { path: "/tmp/oa" },
+    english: "/tmp/oa ran but failed when asked for its version.",
+    translated: [["path"], " en echec (fixture)"],
+  },
+  {
+    code: "play.oa.not_oa",
+    params: { path: "/tmp/oa" },
+    english:
+      "/tmp/oa is not Open Annihilation. Choose the open-annihilation file.",
+    translated: [["path"], " pas OA (fixture)"],
+  },
+  {
     code: "multiplayer.login.refused",
     params: {},
     english: "the server refused the login",

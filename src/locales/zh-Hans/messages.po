@@ -444,6 +444,7 @@ msgid "(no username)"
 msgstr "（无用户名）"
 
 #: src/mapconv/pages/components/PathField.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "(none)"
 msgstr "（无）"
@@ -5372,6 +5373,10 @@ msgstr "无法复制 {path}：{detail}"
 msgid "{path} cannot be copied."
 msgstr "无法复制 {path}。"
 
+#: src/i18n/uiError.ts
+msgid "{path} did not answer within {seconds} seconds."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead."
@@ -5382,15 +5387,31 @@ msgstr "{path} 是未打包的 .sdd 游戏。它会被直接读取，但 coilbox
 msgid "{path} is not a platform folder, so its engine is never used. Use one of {platforms}."
 msgstr "{path} 不是平台文件夹，因此其引擎永远不会被使用。请使用 {platforms} 之一。"
 
+#: src/i18n/uiError.ts
+msgid "{path} is not a program. Choose the open-annihilation file itself."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "{path} is not Open Annihilation. Choose the open-annihilation file."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/."
 msgstr "{path} 不属于 Spring 数据目录，因此不会被读取。该文件夹包含 engine/、games/、maps/、packages/ 和 pool/。"
 
+#: src/i18n/uiError.ts
+msgid "{path} ran but failed when asked for its version."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it."
 msgstr "{path} 位于文件夹的顶层。请将其移到 games/ 或 maps/ 中，否则不会被找到。"
+
+#: src/i18n/uiError.ts
+msgid "{path} would not run: {reason}"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 #, fuzzy
@@ -14823,6 +14844,7 @@ msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Choose"
 msgstr "选择"
@@ -22081,6 +22103,10 @@ msgstr "筛选与排序"
 #, fuzzy
 msgid "Filters: {filters}"
 msgstr "筛选条件：{filters}"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Find"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -34813,6 +34839,14 @@ msgstr "打开一个项目，即可将其更改写入游戏。"
 msgid "Open a screen"
 msgstr "打开页面"
 
+#: src/multiplayer/index.tsx
+msgid "Open Annihilation"
+msgstr ""
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
+msgstr ""
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
 msgid "Open another file"
@@ -37229,6 +37263,10 @@ msgstr "已从 {profileSource} 加载配置档案"
 #, fuzzy
 msgid "profile.json failed to parse"
 msgstr "profile.json 解析失败"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Program"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -41938,6 +41976,10 @@ msgstr "按模型部件选择"
 #, fuzzy
 msgid "Select player"
 msgstr "选择玩家"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Select the Open Annihilation program"
+msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
 #: src/scenario/pages/components/ContentsList.tsx
@@ -53128,6 +53170,7 @@ msgstr "多面手"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
@@ -54188,6 +54231,10 @@ msgstr "{when} 内大多数对局各自最活跃的位置，{over}。每场对�
 #, fuzzy
 msgid "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
 msgstr "大多数对局各自最活跃的位置，{over}。每场对局按其最活跃的位置缩放，所以这不是计数"
+
+#: src/multiplayer/index.tsx
+msgid "Where the Open Annihilation program is, and which version it is."
+msgstr ""
 
 #: src/content/pages/components/SectionHelp.tsx
 #, fuzzy

@@ -444,6 +444,7 @@ msgid "(no username)"
 msgstr "(pas de nom d’utilisateur)"
 
 #: src/mapconv/pages/components/PathField.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "(none)"
 msgstr "(aucun)"
@@ -5372,6 +5373,10 @@ msgstr "{path} ne peut pas être copié : {detail}"
 msgid "{path} cannot be copied."
 msgstr "{path} ne peut pas être copié."
 
+#: src/i18n/uiError.ts
+msgid "{path} did not answer within {seconds} seconds."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead."
@@ -5382,15 +5387,31 @@ msgstr "{path} est un jeu .sdd décompressé. Il est lu sur place, mais coilbox 
 msgid "{path} is not a platform folder, so its engine is never used. Use one of {platforms}."
 msgstr "{path} n’est pas un dossier de plateforme, son moteur n’est donc jamais utilisé. Utilisez l’un de {platforms}."
 
+#: src/i18n/uiError.ts
+msgid "{path} is not a program. Choose the open-annihilation file itself."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "{path} is not Open Annihilation. Choose the open-annihilation file."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/."
 msgstr "{path} ne fait pas partie d’un répertoire de données Spring, rien ne le lit donc. Ce dossier contient engine/, games/, maps/, packages/ et pool/."
 
+#: src/i18n/uiError.ts
+msgid "{path} ran but failed when asked for its version."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it."
 msgstr "{path} est à la racine du dossier. Déplacez-le dans games/ ou maps/, sinon rien ne le trouvera."
+
+#: src/i18n/uiError.ts
+msgid "{path} would not run: {reason}"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 #, fuzzy
@@ -14823,6 +14844,7 @@ msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Choose"
 msgstr "Choisir"
@@ -22081,6 +22103,10 @@ msgstr "Filtres et tri"
 #, fuzzy
 msgid "Filters: {filters}"
 msgstr "Filtres : {filters}"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Find"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -34813,6 +34839,14 @@ msgstr "Ouvrez un projet pour écrire ses modifications dans le jeu."
 msgid "Open a screen"
 msgstr "Ouvrir un écran"
 
+#: src/multiplayer/index.tsx
+msgid "Open Annihilation"
+msgstr ""
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
+msgstr ""
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
 msgid "Open another file"
@@ -37229,6 +37263,10 @@ msgstr "Profil chargé depuis {profileSource}"
 #, fuzzy
 msgid "profile.json failed to parse"
 msgstr "Échec de l’analyse de profile.json"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Program"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -41938,6 +41976,10 @@ msgstr "Sélection sur les pièces du modèle"
 #, fuzzy
 msgid "Select player"
 msgstr "Sélectionner un joueur"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Select the Open Annihilation program"
+msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
 #: src/scenario/pages/components/ContentsList.tsx
@@ -53128,6 +53170,7 @@ msgstr "Polyvalent"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
@@ -54188,6 +54231,10 @@ msgstr "là où le plus de parties étaient à leur pic d’activité en {when},
 #, fuzzy
 msgid "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
 msgstr "là où le plus de parties étaient à leur pic d’activité, {over}. Chaque partie est mise à l’échelle de son point le plus actif, ce n’est donc pas un décompte"
+
+#: src/multiplayer/index.tsx
+msgid "Where the Open Annihilation program is, and which version it is."
+msgstr ""
 
 #: src/content/pages/components/SectionHelp.tsx
 #, fuzzy

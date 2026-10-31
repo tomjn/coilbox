@@ -97,6 +97,29 @@ const MESSAGES: Record<string, (params: Params) => MessageDescriptor> = {
     return msg`The game did not answer within ${seconds} seconds. Its infolog says why.`;
   },
 
+  "play.oa.not_a_file": (params) => {
+    const path = params.path ?? "";
+    return msg`${path} is not a program. Choose the open-annihilation file itself.`;
+  },
+  "play.oa.did_not_run": (params) => {
+    const path = params.path ?? "";
+    const reason = params.reason ?? "";
+    return msg`${path} would not run: ${reason}`;
+  },
+  "play.oa.timed_out": (params) => {
+    const path = params.path ?? "";
+    const seconds = params.seconds ?? "";
+    return msg`${path} did not answer within ${seconds} seconds.`;
+  },
+  "play.oa.exited_badly": (params) => {
+    const path = params.path ?? "";
+    return msg`${path} ran but failed when asked for its version.`;
+  },
+  "play.oa.not_oa": (params) => {
+    const path = params.path ?? "";
+    return msg`${path} is not Open Annihilation. Choose the open-annihilation file.`;
+  },
+
   "multiplayer.login.refused": () => msg`the server refused the login`,
   "multiplayer.login.ended": () =>
     msg`the connection ended before the login finished`,

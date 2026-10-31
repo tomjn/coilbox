@@ -8,6 +8,7 @@ import {
   History,
   LogIn,
   MessagesSquare,
+  Rocket,
   ShieldCheck,
   Swords,
   Users,
@@ -34,6 +35,7 @@ import {
 } from "./navPredicates";
 import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
+import OpenAnnihilationSettings from "./pages/OpenAnnihilationSettings";
 import RelayIndicator from "./RelayIndicator";
 import { MultiplayerProvider } from "./store";
 
@@ -258,6 +260,17 @@ const multiplayerPlugin: FramePlugin = {
       order: 30,
       icon: UserX,
       Component: IgnoreSettings,
+    },
+    {
+      id: "open-annihilation",
+      title: lazyText(msg`Open Annihilation`),
+      description: lazyText(
+        msg`Where the Open Annihilation program is, and which version it is.`,
+      ),
+      parent: "multiplayer",
+      order: 50,
+      icon: Rocket,
+      Component: OpenAnnihilationSettings,
     },
   ],
   slots: [
