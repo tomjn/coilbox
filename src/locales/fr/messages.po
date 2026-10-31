@@ -23691,6 +23691,10 @@ msgstr "Géométrie."
 msgid "Get IP"
 msgstr "Obtenir l’IP"
 
+#: src/home/zones/OpenAnnihilationCard.tsx
+msgid "Get Open Annihilation"
+msgstr ""
+
 #: src/content/pages/components/GetStartedCard.tsx
 #, fuzzy
 msgid "Get started"
@@ -36565,6 +36569,10 @@ msgstr "Jouez sur 15 cartes différentes."
 #, fuzzy
 msgid "Play on 5 different maps."
 msgstr "Jouez sur 5 cartes différentes."
+
+#: src/home/zones/OpenAnnihilationCard.tsx
+msgid "Play Open Annihilation"
+msgstr ""
 
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
