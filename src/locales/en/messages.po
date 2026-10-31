@@ -7348,6 +7348,10 @@ msgstr "A remix has no analysis of its own. Analyse the original match."
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 msgstr "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A replay that never recorded a game over cannot be analysed, but the engine's unit list can still be read from it. That starts the match in the engine and stops it as soon as the engine has listed its units, without playing the match."
+msgstr "A replay that never recorded a game over cannot be analysed, but the engine's unit list can still be read from it. That starts the match in the engine and stops it as soon as the engine has listed its units, without playing the match."
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
@@ -19237,6 +19241,10 @@ msgstr "Get started — download a map"
 msgid "Get the code, link and file that let someone else load this scenario."
 msgstr "Get the code, link and file that let someone else load this scenario."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Get the engine's unit list"
+msgstr "Get the engine's unit list"
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 msgid "Get user ID"
 msgstr "Get user ID"
@@ -31054,6 +31062,10 @@ msgstr "Reading the replay to see how the mission went."
 msgid "Reading the slots…"
 msgstr "Reading the slots…"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Reading the unit list from the engine. {label}."
+msgstr "Reading the unit list from the engine. {label}."
+
 #: src/blueprint/pack.ts
 msgid "Reading this file {all}."
 msgstr "Reading this file {all}."
@@ -37952,6 +37964,10 @@ msgstr "The engine wrote none for it. Either the recording was abandoned, or the
 msgid "The engine's log could not be read for this run, so there is nothing here about what it did."
 msgstr "The engine's log could not be read for this run, so there is nothing here about what it did."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine's unit list could not be read."
+msgstr "The engine's unit list could not be read."
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "The events could not be read from this replay's analysis."
@@ -40781,6 +40797,10 @@ msgstr "This project's mutator writes {POST_FILE}, and {gameName} has no file of
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "This puts the mission back the way it was when you opened it, and saves that. Anything imported since goes off disk with it."
 msgstr "This puts the mission back the way it was when you opened it, and saves that. Anything imported since goes off disk with it."
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay already has the engine's unit list."
+msgstr "This replay already has the engine's unit list."
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayMap.tsx

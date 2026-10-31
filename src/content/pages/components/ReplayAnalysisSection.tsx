@@ -1,7 +1,14 @@
 import { plural as icuPlural, t } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { ChevronRight, Loader2, ScanSearch, Trash2, X } from "lucide-react";
+import {
+  ChevronRight,
+  ListChecks,
+  Loader2,
+  ScanSearch,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   type ReactNode,
   useEffect,
@@ -73,6 +80,7 @@ import {
   useTrackUsage,
 } from "../../replayTracks";
 import { useMetricRegistry } from "../../useMetricRegistry";
+import { useKeptUnitLinks } from "../../useReplayUnits";
 import { SectionHelp } from "./SectionHelp";
 
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
@@ -179,6 +187,7 @@ function AnalysisBody({
   const costs = useRecordingCosts();
   const [check, setCheck] = useState<Check | undefined>(undefined);
   const [pending, setPending] = useState(false);
+  const [listPending, setListPending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +218,7 @@ function AnalysisBody({
   const gameId = info.remixed ? undefined : info.gameId;
   const stored = gameId ? analyses.get(gameId) : undefined;
   const track = gameId ? tracks.get(gameId) : undefined;
+  const { links, ready: linksKnown } = useKeptUnitLinks(gameId, !hidden);
   if (hidden && !stored && !track) return null;
 
   // With the run hidden there is nothing here to follow or to steer.
@@ -249,7 +259,7 @@ function AnalysisBody({
   const run =
     target ?? (chosen && { enginePath: chosen.path, dataDir: chosen.dataDir });
 
-  const blockers = analysisBlockers({
+  const facts = {
     cannot: check?.cannot,
     engineVersion: info.engineVersion,
     engineInstalled: target !== null,
@@ -265,7 +275,28 @@ function AnalysisBody({
     dependencyBlock: otherGame
       ? replayDependencyBlock(otherGame.name, installedGames)
       : dependencyBlock,
+  };
+  const blockers = analysisBlockers(facts);
+  // The unit list is compared with nothing the replay recorded, so a replay
+  // that never recorded a game over can still have it read (#3906).
+  const listBlockers = analysisBlockers({
+    ...facts,
+    cannot: facts.cannot === "noGameOver" ? null : facts.cannot,
   });
+  const hasEngineList = links.some((link) => link.origin === "engine");
+  // Offered only where an analysis cannot give the list. A replay that can be
+  // analysed has one way to ask, and its analysis keeps the list.
+  const listWanted =
+    !hidden &&
+    gameId !== undefined &&
+    linksKnown &&
+    !hasEngineList &&
+    check?.cannot === "noGameOver";
+  const listReady =
+    listWanted &&
+    check !== undefined &&
+    listBlockers.length === 0 &&
+    run !== null;
   const ready = check !== undefined && blockers.length === 0 && run !== null;
   const substitution = check !== undefined && (options.length > 0 || otherGame);
 
@@ -293,6 +324,32 @@ function AnalysisBody({
       setError(errMessage(e));
     } finally {
       setPending(false);
+    }
+  }
+
+  /** Start the engine just long enough for its own unit list (#3906). */
+  async function readList() {
+    if (!run) return;
+    setListPending(true);
+    setError(null);
+    setNote(null);
+    try {
+      const outcome = await requestAnalysis({
+        replayPath,
+        enginePath: run.enginePath,
+        dataDir: run.dataDir,
+        game: otherGame?.name,
+        unitListOnly: true,
+      });
+      if (outcome === "alreadyQueued") {
+        setNote(t`This replay is already in the queue.`);
+      } else if (outcome === "alreadyDone") {
+        setNote(t`This replay already has the engine's unit list.`);
+      }
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setListPending(false);
     }
   }
 
@@ -449,6 +506,22 @@ function AnalysisBody({
               <TrackLine track={track} />
             )}
             {!hidden && !(analysed && recorded) && offer}
+            {listReady && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-fit gap-1.5"
+                disabled={listPending}
+                onClick={() => void readList()}
+              >
+                {listPending ? (
+                  <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <ListChecks className="size-4" />
+                )}
+                <Trans>Get the engine's unit list</Trans>
+              </Button>
+            )}
           </>
         )}
         {note && <p className="text-xs text-muted-foreground">{note}</p>}
@@ -494,6 +567,14 @@ function AnalysisHelp({
       </p>
       {canRun && (
         <>
+          <p>
+            <Trans>
+              A replay that never recorded a game over cannot be analysed, but
+              the engine's unit list can still be read from it. That starts the
+              match in the engine and stops it as soon as the engine has listed
+              its units, without playing the match.
+            </Trans>
+          </p>
           <p>
             <Trans>
               The match is {duration} long, and playback runs faster than the
@@ -841,7 +922,9 @@ function Running({
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
           {job.phase === "thinning"
             ? t`Making the track from the recording.`
-            : t`Playing the match back. ${label}.`}
+            : job.kind === "unitList"
+              ? t`Reading the unit list from the engine. ${label}.`
+              : t`Playing the match back. ${label}.`}
         </p>
         <Button
           type="button"
@@ -1055,6 +1138,9 @@ export const FAILURE_WORDS: Record<ReplayAnalysisFailure["reason"], string> = {
   get thinFailed() {
     return t`The recording could not be made into a track.`;
   },
+  get listFailed() {
+    return t`The engine's unit list could not be read.`;
+  },
 };
 
 function Failed({
@@ -1078,7 +1164,9 @@ function Failed({
           <p className="text-xs text-muted-foreground">
             {failure.reason === "tookTooLong" && failure.limitSeconds
               ? t`It was allowed ${allowed}, which is the length of the match plus time for the engine to start. Nothing was stored.`
-              : `${reasonText}. ${earlierTrack ? t`The earlier track was kept.` : t`No track was made.`}`}
+              : failure.reason === "listFailed"
+                ? `${reasonText}.`
+                : `${reasonText}. ${earlierTrack ? t`The earlier track was kept.` : t`No track was made.`}`}
           </p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>

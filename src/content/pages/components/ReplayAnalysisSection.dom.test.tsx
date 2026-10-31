@@ -46,6 +46,8 @@ let ENGINES: { path: string; version: string; syncVersion?: string }[] = [];
 let ENGINE_OUTPUT: string[] | null = null;
 /** What `content_analysis_enqueue` answers, or throws when it is an Error. */
 let ENQUEUE: string | Error = "queued";
+/** What `content_unit_def_set` answers: the lists kept for the replay. */
+let UNIT_SETS: unknown = { links: [], sets: {} };
 
 // The frame's `useSetting`, held in memory.
 vi.mock("@picoframe/frame", async (importOriginal) => {
@@ -71,6 +73,8 @@ vi.mock("@picoframe/plugin-sdk", () => ({
           return { outcome: ENQUEUE, queue: EMPTY_QUEUE };
         case "content_replay_analyses":
           return { analyses: [] };
+        case "content_unit_def_set":
+          return UNIT_SETS;
         case "content_analysis_engine_output":
           return { lines: ENGINE_OUTPUT };
         case "content_metric_registry":
@@ -125,6 +129,7 @@ import {
   resetReplayTracksForTests,
   seedReplayTracksForTests,
 } from "../../replayTracks";
+import { resetKeptUnitListsForTests } from "../../useReplayUnits";
 import { ReplayAnalysisSection } from "./ReplayAnalysisSection";
 
 const ID = "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf";
@@ -189,6 +194,7 @@ function job(
 ): ReplayAnalysisRunningJob {
   return {
     id: 7,
+    kind: "analyse",
     gameId: ID,
     name: "match.sdfz",
     replayPath: PATH,
@@ -292,7 +298,9 @@ beforeEach(() => {
   ENGINES = [];
   ENGINE_OUTPUT = null;
   ENQUEUE = "queued";
+  UNIT_SETS = { links: [], sets: {} };
   resetContentState();
+  resetKeptUnitListsForTests();
   resetReplayAnalysisForTests();
   seedReplayAnalysisForTests({});
   resetReplayTracksForTests();
@@ -848,12 +856,14 @@ describe("a replay in the queue", () => {
   it("says how many are ahead of a queued one", () => {
     const other = {
       id: 3,
+      kind: "analyse" as const,
       gameId: "b".repeat(32),
       name: "b.sdfz",
       replayPath: "/b",
     };
     const mine = {
       id: 4,
+      kind: "analyse" as const,
       gameId: ID,
       name: "match.sdfz",
       replayPath: PATH,
@@ -872,6 +882,7 @@ describe("a replay in the queue", () => {
   it("says it is waiting for the game when one is running", () => {
     const mine = {
       id: 4,
+      kind: "analyse" as const,
       gameId: ID,
       name: "match.sdfz",
       replayPath: PATH,
@@ -1256,6 +1267,135 @@ describe("a stored analysis made with another engine (#3869)", () => {
     expect(region()).toContain(
       "Tried so far, and none reproduced the match: engine 2026.07.01 with G 1, engine 2026.07.04 with G 1.",
     );
+  });
+});
+
+/**
+ * The shorter run that keeps only the engine's own unit list (#3906). A replay
+ * with no recorded game over, which an analysis refuses, can still have it. One
+ * that can be analysed has one way to ask, and its analysis keeps the list.
+ */
+describe("the engine's unit list (#3906)", () => {
+  const LIST = "Get the engine's unit list";
+  const NEVER_FINISHED = {
+    cannot: "noGameOver",
+    gameId: null,
+    matchSeconds: 0,
+    headless: [TARGET.enginePath],
+  };
+  /** Wait for the section to have heard from the check and the store. */
+  async function settled() {
+    await waitFor(() => expect(commands()).toContain("content_unit_def_set"));
+    await waitFor(() => expect(analyseButton()).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it("is offered for a replay that never recorded a game over, and asks for the short run only", async () => {
+    CHECK = NEVER_FINISHED;
+    show();
+
+    fireEvent.click(await screen.findByRole("button", { name: LIST }));
+
+    await waitFor(() =>
+      expect(commands()).toContain("content_analysis_enqueue"),
+    );
+    expect(enqueued()).toEqual({
+      replayPath: PATH,
+      enginePath: "/engines/2026",
+      dataDir: "/data",
+      unitListOnly: true,
+    });
+    // The analysis stays refused, with its reason.
+    expect((analyseButton() as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("says a replay that already has its list does", async () => {
+    ENQUEUE = "alreadyDone";
+    CHECK = NEVER_FINISHED;
+    show();
+
+    fireEvent.click(await screen.findByRole("button", { name: LIST }));
+
+    await screen.findByText("This replay already has the engine's unit list.");
+  });
+
+  it("is not offered once the engine's list is kept", async () => {
+    CHECK = NEVER_FINISHED;
+    UNIT_SETS = {
+      links: [
+        {
+          digest: `sha256:${"a".repeat(64)}`,
+          origin: "engine",
+          game: "Some Game 1.0",
+          takenAtMs: 1,
+        },
+      ],
+      sets: {},
+    };
+    show();
+
+    await settled();
+
+    expect(screen.queryByRole("button", { name: LIST })).toBeNull();
+  });
+
+  it("is not offered for a replay that can be analysed", async () => {
+    show();
+
+    await settled();
+
+    expect(screen.queryByRole("button", { name: LIST })).toBeNull();
+  });
+
+  it("is not offered when the game is not installed", async () => {
+    CHECK = NEVER_FINISHED;
+    show({ missingGame: true });
+
+    await settled();
+
+    expect(screen.queryByRole("button", { name: LIST })).toBeNull();
+  });
+
+  it("is not offered with the run hidden", async () => {
+    HIDE = ["analytics.run"];
+    CHECK = NEVER_FINISHED;
+    seedReplayAnalysisForTests({ analyses: [stored({ state: "diverged" })] });
+    show();
+
+    expect(screen.queryByRole("button", { name: LIST })).toBeNull();
+    expect(commands()).not.toContain("content_unit_def_set");
+  });
+
+  it("says a running list job is reading the unit list", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: job({ kind: "unitList", phase: "loading" }) },
+    });
+    show();
+
+    expect(region()).toContain(
+      "Reading the unit list from the engine. Loading the match.",
+    );
+  });
+
+  it("says a failed list job could not read the list, with the engine's reason", () => {
+    seedReplayAnalysisForTests({
+      queue: {
+        failures: [
+          failure({
+            reason: "listFailed",
+            message:
+              "the engine had not written the unit list after 350 seconds",
+          }),
+        ],
+      },
+    });
+    show();
+
+    expect(region()).toContain("The engine's unit list could not be read.");
+    expect(region()).toContain(
+      "The engine had not written the unit list after 350 seconds.",
+    );
+    expect(region()).not.toContain("No track was made.");
   });
 });
 

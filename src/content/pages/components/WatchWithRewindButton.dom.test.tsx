@@ -146,6 +146,7 @@ const INFO = {
 
 const job = (): ReplayAnalysisRunningJob => ({
   id: 7,
+  kind: "analyse",
   gameId: ID,
   name: "match.sdfz",
   replayPath: PATH,

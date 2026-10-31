@@ -9072,6 +9072,10 @@ msgstr "改编没有自己的分析。请分析原始对局。"
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 msgstr "回放用一个编号来指代单位，这个编号只在该对局所用的游戏版本中才有意义。Coilbox 会保存读取回放时所用的单位列表，因此即使游戏更新或移除，回放仍能为其单位命名。"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A replay that never recorded a game over cannot be analysed, but the engine's unit list can still be read from it. That starts the match in the engine and stops it as soon as the engine has listed its units, without playing the match."
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
@@ -23664,6 +23668,10 @@ msgstr "开始使用——下载地图"
 msgid "Get the code, link and file that let someone else load this scenario."
 msgstr "获取可让他人加载此场景的代码、链接和文件。"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Get the engine's unit list"
+msgstr ""
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #, fuzzy
 msgid "Get user ID"
@@ -38218,6 +38226,10 @@ msgstr "正在读取回放，查看任务结果。"
 msgid "Reading the slots…"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Reading the unit list from the engine. {label}."
+msgstr ""
+
 #: src/blueprint/pack.ts
 #, fuzzy
 msgid "Reading this file {all}."
@@ -46694,6 +46706,10 @@ msgstr "引擎没有为它写入任何统计。要么录制被放弃了，要么
 msgid "The engine's log could not be read for this run, so there is nothing here about what it did."
 msgstr "无法读取这次运行的引擎日志，所以这里没有关于它做了什么的信息。"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine's unit list could not be read."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -50207,6 +50223,10 @@ msgstr "此项目的变异器会写入 {POST_FILE}，而 {gameName} 在那里没
 #, fuzzy
 msgid "This puts the mission back the way it was when you opened it, and saves that. Anything imported since goes off disk with it."
 msgstr "这会把任务恢复到你打开时的状态，并保存下来。此后导入的所有内容都会随之从磁盘上删除。"
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay already has the engine's unit list."
+msgstr ""
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayMap.tsx

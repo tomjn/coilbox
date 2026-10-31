@@ -9072,6 +9072,10 @@ msgstr "リミックスには独自の分析がありません。元の試合を
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 msgstr "リプレイはユニットを番号で指定しますが、その番号はプレイしたゲームのビルドでしか意味を持ちません。Coilbox はリプレイの読み込み時に使ったユニット一覧を保持するため、ゲームがアップデートまたは削除されてもリプレイはユニットに名前を付けられます。"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A replay that never recorded a game over cannot be analysed, but the engine's unit list can still be read from it. That starts the match in the engine and stops it as soon as the engine has listed its units, without playing the match."
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
@@ -23664,6 +23668,10 @@ msgstr "はじめに：マップをダウンロード"
 msgid "Get the code, link and file that let someone else load this scenario."
 msgstr "他の人がこのシナリオを読み込めるコード、リンク、ファイルを取得します。"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Get the engine's unit list"
+msgstr ""
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #, fuzzy
 msgid "Get user ID"
@@ -38218,6 +38226,10 @@ msgstr "ミッションの結果を確認するため、リプレイを読み込
 msgid "Reading the slots…"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Reading the unit list from the engine. {label}."
+msgstr ""
+
 #: src/blueprint/pack.ts
 #, fuzzy
 msgid "Reading this file {all}."
@@ -46694,6 +46706,10 @@ msgstr "エンジンはこれについて何も書き込みませんでした。
 msgid "The engine's log could not be read for this run, so there is nothing here about what it did."
 msgstr "この実行についてエンジンのログを読み込めなかったため、何をしたかの情報はありません。"
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine's unit list could not be read."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -50207,6 +50223,10 @@ msgstr "このプロジェクトのミューテーターは {POST_FILE} を書�
 #, fuzzy
 msgid "This puts the mission back the way it was when you opened it, and saves that. Anything imported since goes off disk with it."
 msgstr "ミッションを開いたときの状態に戻して保存します。その後にインポートしたものはディスクからも削除されます。"
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay already has the engine's unit list."
+msgstr ""
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayMap.tsx

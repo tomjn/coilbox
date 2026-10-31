@@ -14,6 +14,7 @@ import {
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "./config";
+import { useAnalysisQueue } from "./replayAnalysis";
 import {
   isLooseFolder,
   liveGame,
@@ -56,6 +57,21 @@ function forget(gameId: string) {
 }
 
 /**
+ * The count of runs the queue had stored when the lists were last dropped. A
+ * run keeps a replay's engine list in Rust (#3906), so a changed count means
+ * what is remembered here may be out of date.
+ */
+let seenRuns = 0;
+
+/** Drop what is remembered for every replay. */
+function forgetAll() {
+  kept.clear();
+  pending.clear();
+  version++;
+  for (const listener of listeners) listener();
+}
+
+/**
  * Ask the store what it holds for a replay. A failure reads as nothing kept:
  * the store only ever adds a source of names, so a replay with none is read
  * the way it was before there was a store.
@@ -87,6 +103,12 @@ function useKeptUnitLists(gameId: string | undefined, wanted: boolean) {
     sets: ReplayUnitDefSets | null;
   } | null>(null);
   const key = gameId ? `${gameId}:${seen}` : undefined;
+  const { stored } = useAnalysisQueue();
+  useEffect(() => {
+    if (stored === seenRuns) return;
+    seenRuns = stored;
+    forgetAll();
+  }, [stored]);
 
   useEffect(() => {
     if (!wanted || !gameId || !key) return;
@@ -174,6 +196,26 @@ export function useReplayUnits(
 }
 
 const NO_LINKS: UnitDefLink[] = [];
+
+/** For tests: forget everything, as a fresh session would. */
+export function resetKeptUnitListsForTests(): void {
+  seenRuns = 0;
+  handedOver.clear();
+  forgetAll();
+}
+
+/**
+ * Every list the store holds for a replay, for a part of the page that offers
+ * to get one. `ready` is false until the store has answered, so nothing is
+ * offered on the strength of a list that has not been looked for yet.
+ */
+export function useKeptUnitLinks(
+  gameId: string | undefined,
+  wanted: boolean,
+): { links: readonly UnitDefLink[]; ready: boolean } {
+  const { sets, ready } = useKeptUnitLists(gameId, wanted);
+  return { links: sets?.links ?? NO_LINKS, ready };
+}
 
 /**
  * Keep the unit list a replay was just read against, once (#1176).
