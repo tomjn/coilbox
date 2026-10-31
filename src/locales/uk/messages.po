@@ -8274,6 +8274,7 @@ msgid "A {shape} lobby, with a start box for each side."
 msgstr "Лобі {shape} зі стартовою зоною для кожної сторони."
 
 #: src/content/mapImageExport.ts
+#: src/content/matchStatsImageExport.ts
 #, fuzzy
 msgid "A 2D canvas is not available."
 msgstr "2D-полотно недоступне."
@@ -18051,6 +18052,7 @@ msgstr "Опір розчавлюванню"
 msgid "CSV"
 msgstr "CSV"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Cumulative"
@@ -18258,6 +18260,10 @@ msgstr "Дані не є JSON: {reason}"
 #, fuzzy
 msgid "Data table"
 msgstr "Таблиця даних"
+
+#: src/content/matchStatsImage.ts
+msgid "Date"
+msgstr ""
 
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
@@ -21419,6 +21425,7 @@ msgstr "Експортувати CSV"
 #: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "Export failed: {reason}"
 msgstr "Експорт не вдався: {reason}"
@@ -21427,6 +21434,10 @@ msgstr "Експорт не вдався: {reason}"
 #, fuzzy
 msgid "Export HTML"
 msgstr "Експортувати HTML"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export image"
+msgstr ""
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
@@ -21447,6 +21458,10 @@ msgstr "Експортувати шар у CSV"
 #, fuzzy
 msgid "Export match statistics"
 msgstr "Експортувати статистику матчу"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export match statistics image"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -23262,6 +23277,10 @@ msgstr "Гра для декодованого проєкту"
 #, fuzzy
 msgid "Game for the new project"
 msgstr "Гра для нового проєкту"
+
+#: src/content/matchStatsImage.ts
+msgid "Game id"
+msgstr ""
 
 #: src/multiplayer/nav/navBadges.tsx
 #, fuzzy
@@ -28600,6 +28619,7 @@ msgstr "мапа"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/index.ts
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
@@ -29003,6 +29023,10 @@ msgstr "Статистика матчу"
 #, fuzzy
 msgid "Match statistics exported."
 msgstr "Статистику матчу експортовано."
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Match statistics image exported."
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -35870,6 +35894,7 @@ msgstr "Люди в цій мережі бачать вашу кімнату б�
 msgid "People whose messages coilbox hides from you."
 msgstr "Люди, чиї повідомлення coilbox від вас приховує."
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Per minute"
@@ -36591,6 +36616,7 @@ msgstr ""
 msgid "Player's own"
 msgstr "Власні гравця"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
@@ -36705,6 +36731,7 @@ msgid "Playtime"
 msgstr "Час гри"
 
 #: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "PNG image"
 msgstr "Зображення PNG"
@@ -40910,6 +40937,10 @@ msgstr "Збереження"
 #, fuzzy
 msgid "savegames"
 msgstr "збереження"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Saves the chart as a PNG with the map, date, players, metric and game id written on it."
+msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
 #, fuzzy
@@ -45548,6 +45579,7 @@ msgstr ""
 msgid "Team-colour mask (greyscale, optional)"
 msgstr "Маска кольору команди (відтінки сірого, необов’язково)"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battles/zerokBattle.ts
@@ -46171,6 +46203,10 @@ msgstr "Імовірність від 0 до 1, що кожна ракета, я
 #, fuzzy
 msgid "The change ledger could not be built: {error}"
 msgstr "Не вдалося побудувати журнал змін: {error}"
+
+#: src/content/matchStatsImageExport.ts
+msgid "The chart could not be drawn as a picture."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52901,6 +52937,10 @@ msgstr "Значення в грі"
 msgid "Value of living units by kind"
 msgstr "Вартість живих юнітів за типом"
 
+#: src/content/matchStatsImage.ts
+msgid "Values"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #: src/scenario/validate.ts
 #, fuzzy
@@ -53051,6 +53091,7 @@ msgstr "Відео"
 msgid "Video from game files"
 msgstr "Відео з файлів гри"
 
+#: src/content/matchStatsImage.ts
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy

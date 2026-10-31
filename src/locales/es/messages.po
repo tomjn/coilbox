@@ -8274,6 +8274,7 @@ msgid "A {shape} lobby, with a start box for each side."
 msgstr "Un lobby {shape}, con una zona de inicio para cada facción."
 
 #: src/content/mapImageExport.ts
+#: src/content/matchStatsImageExport.ts
 #, fuzzy
 msgid "A 2D canvas is not available."
 msgstr "No hay un lienzo 2D disponible."
@@ -18051,6 +18052,7 @@ msgstr "Resistencia al aplastamiento"
 msgid "CSV"
 msgstr "CSV"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Cumulative"
@@ -18258,6 +18260,10 @@ msgstr "Los datos no son JSON: {reason}"
 #, fuzzy
 msgid "Data table"
 msgstr "Tabla de datos"
+
+#: src/content/matchStatsImage.ts
+msgid "Date"
+msgstr ""
 
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
@@ -21419,6 +21425,7 @@ msgstr "Exportar CSV"
 #: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "Export failed: {reason}"
 msgstr "Falló la exportación: {reason}"
@@ -21427,6 +21434,10 @@ msgstr "Falló la exportación: {reason}"
 #, fuzzy
 msgid "Export HTML"
 msgstr "Exportar HTML"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export image"
+msgstr ""
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
@@ -21447,6 +21458,10 @@ msgstr "Exportar CSV de la capa"
 #, fuzzy
 msgid "Export match statistics"
 msgstr "Exportar estadísticas de la partida"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export match statistics image"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -23262,6 +23277,10 @@ msgstr "Juego del proyecto decodificado"
 #, fuzzy
 msgid "Game for the new project"
 msgstr "Juego del nuevo proyecto"
+
+#: src/content/matchStatsImage.ts
+msgid "Game id"
+msgstr ""
 
 #: src/multiplayer/nav/navBadges.tsx
 #, fuzzy
@@ -28600,6 +28619,7 @@ msgstr "mapa"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/index.ts
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
@@ -29003,6 +29023,10 @@ msgstr "Estadísticas de la partida"
 #, fuzzy
 msgid "Match statistics exported."
 msgstr "Estadísticas de la partida exportadas."
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Match statistics image exported."
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -35870,6 +35894,7 @@ msgstr "La gente de esta red ve tu sala sin que le digas una dirección. Si lo d
 msgid "People whose messages coilbox hides from you."
 msgstr "Personas cuyos mensajes te oculta coilbox."
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Per minute"
@@ -36591,6 +36616,7 @@ msgstr ""
 msgid "Player's own"
 msgstr "Propias del jugador"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
@@ -36705,6 +36731,7 @@ msgid "Playtime"
 msgstr "Tiempo de juego"
 
 #: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "PNG image"
 msgstr "Imagen PNG"
@@ -40910,6 +40937,10 @@ msgstr "Partida guardada"
 #, fuzzy
 msgid "savegames"
 msgstr "partidas guardadas"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Saves the chart as a PNG with the map, date, players, metric and game id written on it."
+msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
 #, fuzzy
@@ -45548,6 +45579,7 @@ msgstr ""
 msgid "Team-colour mask (greyscale, optional)"
 msgstr "Máscara de color de equipo (escala de grises, opcional)"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battles/zerokBattle.ts
@@ -46171,6 +46203,10 @@ msgstr "La probabilidad, de 0 a 1, de que cada misil que llega se deje engañar 
 #, fuzzy
 msgid "The change ledger could not be built: {error}"
 msgstr "No se pudo crear el registro de cambios: {error}"
+
+#: src/content/matchStatsImageExport.ts
+msgid "The chart could not be drawn as a picture."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52901,6 +52937,10 @@ msgstr "Valor en el juego"
 msgid "Value of living units by kind"
 msgstr "Valor de las unidades vivas por tipo"
 
+#: src/content/matchStatsImage.ts
+msgid "Values"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #: src/scenario/validate.ts
 #, fuzzy
@@ -53051,6 +53091,7 @@ msgstr "Vídeo"
 msgid "Video from game files"
 msgstr "Vídeo de los archivos del juego"
 
+#: src/content/matchStatsImage.ts
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy

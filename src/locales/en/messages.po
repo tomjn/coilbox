@@ -6701,6 +6701,7 @@ msgid "A {shape} lobby, with a start box for each side."
 msgstr "A {shape} lobby, with a start box for each side."
 
 #: src/content/mapImageExport.ts
+#: src/content/matchStatsImageExport.ts
 msgid "A 2D canvas is not available."
 msgstr "A 2D canvas is not available."
 
@@ -14662,6 +14663,7 @@ msgstr "Crush resistance"
 msgid "CSV"
 msgstr "CSV"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 msgid "Cumulative"
 msgstr "Cumulative"
@@ -14829,6 +14831,10 @@ msgstr "Data is not JSON: {reason}"
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 msgid "Data table"
 msgstr "Data table"
+
+#: src/content/matchStatsImage.ts
+msgid "Date"
+msgstr "Date"
 
 #: src/workshop/pages/ProjectsPage.tsx
 msgid "Date created"
@@ -17406,12 +17412,17 @@ msgstr "Export CSV"
 #: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 msgid "Export failed: {reason}"
 msgstr "Export failed: {reason}"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
 msgid "Export HTML"
 msgstr "Export HTML"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export image"
+msgstr "Export image"
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "Export it first."
@@ -17428,6 +17439,10 @@ msgstr "Export layer CSV"
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Export match statistics"
 msgstr "Export match statistics"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export match statistics image"
+msgstr "Export match statistics image"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Export name"
@@ -18898,6 +18913,10 @@ msgstr "Game for the decoded project"
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Game for the new project"
 msgstr "Game for the new project"
+
+#: src/content/matchStatsImage.ts
+msgid "Game id"
+msgstr "Game id"
 
 #: src/multiplayer/nav/navBadges.tsx
 msgid "Game in progress"
@@ -23228,6 +23247,7 @@ msgstr "map"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/index.ts
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
@@ -23557,6 +23577,10 @@ msgstr "Match statistics"
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Match statistics exported."
 msgstr "Match statistics exported."
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Match statistics image exported."
+msgstr "Match statistics image exported."
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Match time window"
@@ -29125,6 +29149,7 @@ msgstr "People on this network see your room without being told an address. Turn
 msgid "People whose messages coilbox hides from you."
 msgstr "People whose messages coilbox hides from you."
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 msgid "Per minute"
 msgstr "Per minute"
@@ -29712,6 +29737,7 @@ msgstr "Player widgets are switched off in the widget list of {game}."
 msgid "Player's own"
 msgstr "Player's own"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
@@ -29805,6 +29831,7 @@ msgid "Playtime"
 msgstr "Playtime"
 
 #: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 msgid "PNG image"
 msgstr "PNG image"
 
@@ -33238,6 +33265,10 @@ msgstr "Savegame"
 #: src/play/pages/SavegamesPage.tsx
 msgid "savegames"
 msgstr "savegames"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Saves the chart as a PNG with the map, date, players, metric and game id written on it."
+msgstr "Saves the chart as a PNG with the map, date, players, metric and game id written on it."
 
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
@@ -37001,6 +37032,7 @@ msgstr "Team size"
 msgid "Team-colour mask (greyscale, optional)"
 msgstr "Team-colour mask (greyscale, optional)"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battles/zerokBattle.ts
@@ -37512,6 +37544,10 @@ msgstr "The chance, from 0 to 1, that each incoming missile is fooled into chasi
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "The change ledger could not be built: {error}"
 msgstr "The change ledger could not be built: {error}"
+
+#: src/content/matchStatsImageExport.ts
+msgid "The chart could not be drawn as a picture."
+msgstr "The chart could not be drawn as a picture."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "The chassis was renamed, so the list of locked units under its old name was emptied:"
@@ -42946,6 +42982,10 @@ msgstr "Value in the game"
 msgid "Value of living units by kind"
 msgstr "Value of living units by kind"
 
+#: src/content/matchStatsImage.ts
+msgid "Values"
+msgstr "Values"
+
 #: src/scenario/triggerTypes.ts
 #: src/scenario/validate.ts
 msgid "variable"
@@ -43068,6 +43108,7 @@ msgstr "Video"
 msgid "Video from game files"
 msgstr "Video from game files"
 
+#: src/content/matchStatsImage.ts
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "View"
