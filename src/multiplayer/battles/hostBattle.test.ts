@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hostBattleFailure } from "./hostBattle";
+import { battleTitleProblem, hostBattleFailure } from "./hostBattle";
 
 describe("hostBattleFailure", () => {
   it("carries the refusal, which is the only account of it there is", () => {
@@ -21,5 +21,30 @@ describe("hostBattleFailure", () => {
   it("stands alone when there is nothing to carry", () => {
     expect(hostBattleFailure(new Error(""))).toBe("Could not host the battle.");
     expect(hostBattleFailure(undefined)).toBe("Could not host the battle.");
+  });
+});
+
+describe("battleTitleProblem", () => {
+  it("takes the titles a host types and a preset names", () => {
+    expect(battleTitleProblem("")).toBeNull();
+    expect(battleTitleProblem("Fun & games: 8v8 [no rush] - héllo")).toBeNull();
+  });
+
+  // The form trims the title before it sends it, so an edge is not a problem.
+  it("does not mind a tab at either end, which the form trims", () => {
+    expect(battleTitleProblem("\tFun\t")).toBeNull();
+  });
+
+  it("refuses a tab or another control character inside the title", () => {
+    for (const title of [
+      "Fun\tOther game",
+      "Fun\u0001x",
+      "Fun\u007fx",
+      "a\nb",
+    ]) {
+      expect(battleTitleProblem(title), JSON.stringify(title)).toBe(
+        "The title cannot contain a tab or another control character.",
+      );
+    }
   });
 });

@@ -48622,6 +48622,10 @@ msgstr "Текстура у файлі, з яким гра не запускал
 msgid "the timeline"
 msgstr "шкала часу"
 
+#: src/multiplayer/battles/hostBattle.ts
+msgid "The title cannot contain a tab or another control character."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "The tooltip and the selection label read the owning player's name instead of the unit's."

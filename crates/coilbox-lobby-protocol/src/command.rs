@@ -73,6 +73,52 @@ pub fn script_tags_refusal(tags: &BTreeMap<String, String>) -> Option<String> {
         .find_map(|(key, value)| script_tag_refusal(key, value))
 }
 
+/// Why a field of an `OPENBATTLE` line cannot be sent, or `None` when it can.
+///
+/// The line ends in five fields split at tabs, and nothing escapes one. A tab in
+/// the title moves the game name along a slot: the server reads the text after
+/// the tab as the game and drops the real one, so players are told to fetch a
+/// game that is not the one being hosted. The title is the field a host can fill
+/// from a preset's name rather than type, but each field takes the same path.
+pub fn open_battle_refusal(
+    engine: &str,
+    version: &str,
+    map: &str,
+    title: &str,
+    modname: &str,
+) -> Option<String> {
+    let (name, _) = [
+        ("engine", engine),
+        ("engine version", version),
+        ("map", map),
+        ("title", title),
+        ("game", modname),
+    ]
+    .into_iter()
+    .find(|(_, value)| value.chars().any(char::is_control))?;
+    Some(format!(
+        "Coilbox did not open the battle: the {name} cannot contain a tab or another control character."
+    ))
+}
+
+/// Why a `FRIENDREQUEST` or `IGNORE` cannot be sent, or `None` when it can.
+///
+/// Both are `key=value` tags split at tabs, and nothing escapes one. A tab in the
+/// user name or the note adds a tag nobody named. `note_name` is how the caller
+/// calls the note, a message for a friend request and a reason for an ignore.
+pub fn tagged_command_refusal(note_name: &str, user: &str, note: Option<&str>) -> Option<String> {
+    let name = if user.chars().any(char::is_control) {
+        "user name"
+    } else if note.is_some_and(|note| note.chars().any(char::is_control)) {
+        note_name
+    } else {
+        return None;
+    };
+    Some(format!(
+        "Coilbox did not send this: the {name} cannot contain a tab or another control character."
+    ))
+}
+
 /// `LOGIN <user> <pass> <cpu> <local_ip> <agent>\t<client_id>\t<flags>`.
 ///
 /// `pw_hash` is the already-computed `BASE64(MD5(password))`. `cpu` is fixed at
@@ -757,6 +803,99 @@ mod tests {
         assert!(fits_one_field("letmein"));
         // The empty key a room with no password sends.
         assert!(fits_one_field("*"));
+    }
+
+    /// The hazard itself: the line the builder writes for a tab in the title reads
+    /// back with the text after the tab as the game, and the refusal catches it.
+    #[test]
+    fn a_tab_in_a_battle_title_replaces_the_game_name() {
+        let line = open_battle(
+            0,
+            0,
+            "*",
+            8452,
+            16,
+            -1,
+            0,
+            -1,
+            "spring",
+            "105",
+            "Map",
+            "Fun\tOther game",
+            "BAR",
+        );
+        let crate::server::ClientCommand::OpenBattle { title, modname, .. } =
+            crate::server::parse_client_line(&line)
+        else {
+            panic!("not read as an open battle: {line}");
+        };
+        assert_eq!((title.as_str(), modname.as_str()), ("Fun", "Other game"));
+
+        let refused =
+            open_battle_refusal("spring", "105", "Map", "Fun\tOther game", "BAR").unwrap();
+        assert!(refused.contains("title"), "{refused}");
+    }
+
+    #[test]
+    fn open_battle_refusal_names_the_field_with_a_control_character() {
+        for (fields, name) in [
+            (["sp\tring", "105", "Map", "Title", "BAR"], "engine"),
+            (
+                ["spring", "105\t1", "Map", "Title", "BAR"],
+                "engine version",
+            ),
+            (["spring", "105", "Ma\tp", "Title", "BAR"], "map"),
+            (["spring", "105", "Map", "Ti\ttle", "BAR"], "title"),
+            (["spring", "105", "Map", "Title", "B\tAR"], "game"),
+            (["spring", "105", "Map", "Ti\u{1}tle", "BAR"], "title"),
+        ] {
+            let [engine, version, map, title, modname] = fields;
+            let refused = open_battle_refusal(engine, version, map, title, modname)
+                .unwrap_or_else(|| panic!("{fields:?} was sent"));
+            assert!(refused.contains(&format!("the {name} cannot")), "{refused}");
+        }
+    }
+
+    #[test]
+    fn open_battle_refusal_takes_the_fields_a_room_really_sends() {
+        assert_eq!(
+            open_battle_refusal(
+                "spring",
+                "105.1.1-2511-gd3cb4fe",
+                "Comet Catcher Remake 1.8",
+                "Fun & games: 8v8 [no rush] - héllo",
+                "Beyond All Reason test-27096-d3cb4fe"
+            ),
+            None
+        );
+    }
+
+    /// A tab in the note of a `FRIENDREQUEST` or an `IGNORE` adds a tag after it.
+    /// Our own server takes the first tag for a key, so who it is for does not
+    /// change there, but another server's reading is not known.
+    #[test]
+    fn a_tab_in_a_friend_request_or_ignore_adds_a_tag_and_is_refused() {
+        let line = friend_request("bob", Some("hi\tuserName=mallory"));
+        assert_eq!(line.matches("userName=").count(), 2);
+        assert!(tagged_command_refusal("message", "bob", Some("hi\tuserName=mallory")).is_some());
+
+        let line = ignore("bob", Some("spam\tuserName=mallory"));
+        assert_eq!(line.matches("userName=").count(), 2);
+        let refused =
+            tagged_command_refusal("reason", "bob", Some("spam\tuserName=mallory")).unwrap();
+        assert!(refused.contains("the reason cannot"), "{refused}");
+
+        let refused = tagged_command_refusal("message", "bo\tb", None).unwrap();
+        assert!(refused.contains("the user name cannot"), "{refused}");
+    }
+
+    #[test]
+    fn tagged_command_refusal_takes_an_ordinary_note() {
+        assert_eq!(tagged_command_refusal("message", "bob", None), None);
+        assert_eq!(
+            tagged_command_refusal("message", "bob", Some("hi, it's me = Tom; héllo")),
+            None
+        );
     }
 
     fn one_tag(key: &str, value: &str) -> BTreeMap<String, String> {
