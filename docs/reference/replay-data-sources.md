@@ -194,26 +194,29 @@ Beyond All Reason was checked on 31 October 2026 the same way, on engine 2026.09
 
 | Game | Setup | Engine's list | Read with the setup, equal by id and name | The game's own list, equal by id and name |
 | --- | --- | --- | --- | --- |
-| Beyond All Reason test-30922 | No options, no AI | 600 | 540 of 600 (the read has 564) | 540 of 600 (564) |
-| Beyond All Reason test-30922 | A `RaptorsAI` on a team | 727 | 540 of 727 (691) | 540 of 727 (564) |
-| Beyond All Reason test-30922 | A `ScavengersAI` on a team | 1,900 | 1,728 of 1,900 (1,828) | 1 of 1,900 (564) |
-| Beyond All Reason test-30922 | `experimentallegionfaction` on | 845 | 785 of 845 (809) | 253 of 845 (564) |
+| Beyond All Reason test-30922 | No options, no AI | 600 | 600 of 600 | 540 of 600 (the game's own list has 564) |
+| Beyond All Reason test-30922 | A `RaptorsAI` on a team | 727 | 727 of 727 | 540 of 727 (564) |
+| Beyond All Reason test-30922 | A `ScavengersAI` on a team | 1,900 | 1,900 of 1,900 | 1 of 1,900 (564) |
+| Beyond All Reason test-30922 | `experimentallegionfaction` on | 845 | 845 of 845 | 253 of 845 (564) |
 
-All four fail the comparison, and for one reason. The engine's list holds the 36 definitions `lootboxnano_t1_var1` to `lootboxnano_t4_var9` (72 in the Scavengers match, with their `_scav` copies) and the read holds none of them. The read has no definition the engine lacks. Ids are numbered in sorted key order, so every unit sorted after `lootboxnano_t1_var1` has the wrong id in the read. The first id that differs is 541 in the first two rows, 1,729 in the third and 786 in the fourth, where the engine has `lootboxnano_t1_var1` and the read has `lootboxplatinum`. The definitions come from `units/other/lootboxes/lootboxnano.lua`, which calls `math.random`, and unitsync's parser gives `math.random` no result. That is filed as #4926. The counts of the read match the earlier figures of 564, 809, 691 and 1,828 that came from unitsync alone, so the earlier figures were 36 short in each case (72 for the Scavengers AI).
+All four reads equal the engine's list by id and name, with the read as long as the engine's list in each. The worker's error list was empty on every read.
 
-The worker's error list was empty on every read.
+An earlier run of the same four matches on this build failed, because the read held 564, 691, 1,828 and 809 definitions and lacked the 36 `lootboxnano_t1_var1` to `lootboxnano_t4_var9` definitions (72 in the Scavengers match, with their `_scav` copies). They come from `units/other/lootboxes/lootboxnano.lua`, which calls `math.random`, and unitsync's parser gave `math.random` no result (#4926). Giving it the fixed answer described above fixed all four. The ids after `lootboxnano_t1_var1` had been wrong in that earlier read.
+
+The game's own list, which the unit pages read, still lacks the lootbox definitions, so it differs from the engine's list for every match here. That column is unchanged by the fix. The empty setup's read now differs from it, so the read is kept as a list of its own and not as a pointer to the game's.
+
+The comparison was rerun on 31 October 2026 on the head of #4931, with the engine's lists made again from four new headless matches on engine 2026.09.01. Each read was made in the test's own process, built from that head, with no cache carried over.
 
 The start scripts carried no mod options, so the first row is not what a lobby match looks like. A lobby match writes every option, including the current date.
 
-On the replays on the development machine, 2 of 19 are Beyond All Reason. One records test-30018 and is a lobby match with 243 mod options, including `date_year`, `date_month`, `date_day` and `date_hour`. The installed build declares those four with a default of 0, so a lobby match is always read with a setup of its own, one run of the game's definitions for each replay. Removing the four date options still leaves a setup that is not the empty one, so other options also differ from the declared defaults. That replay's game is not installed, so this was read against test-30922's declared options and the reading is not the replay's own. The other records test-30922 and is two `SimpleAI` teams with no mod options. `SimpleAI` is listed in the game's `LuaAI.lua`, so it is read with a setup of its own too. So 2 of 2 are read with a setup of their own and none share the game's one read. Two replays, one of them a lobby match, is too few to say what share of real matches need their own read. Both gave a list equal to the game's own, which is kept once, but with the lootbox definitions missing from both that equality holds nothing yet.
+On the replays on the development machine, 2 of 19 are Beyond All Reason. One records test-30018 and is a lobby match with 243 mod options, including `date_year`, `date_month`, `date_day` and `date_hour`. The installed build declares those four with a default of 0, so a lobby match is always read with a setup of its own, one run of the game's definitions for each replay. Removing the four date options still leaves a setup that is not the empty one, so other options also differ from the declared defaults. That replay's game is not installed, so this was read against test-30922's declared options and the reading is not the replay's own. The other records test-30922 and is two `SimpleAI` teams with no mod options. `SimpleAI` is listed in the game's `LuaAI.lua`, so it is read with a setup of its own too. So 2 of 2 are read with a setup of their own and none share the game's one read. Two replays, one of them a lobby match, is too few to say what share of real matches need their own read. Both gave a list equal to the game's own before the fix for #4926. That was not measured again, and the game's own list still lacks the lootbox definitions that the read now holds.
 
 `a_librarys_build_orders_fit_before_and_after_reading_with_the_setup` over the whole `~/.spring/demos` folder counted 19 replays, 10 naming a game that is not installed, 2 with no build orders and 7 checked. Neither Beyond All Reason replay was among the 7 checked, because test-30018 is not installed and the test-30922 replay has a spectator and two AIs and no human player on a team, so I expect it holds no orders (not confirmed on its own). All 7 checked fit before and after.
 
 What it does not cover:
 
 - A unit a map ships. The engine loads the map before the definitions, and this read mounts the game alone.
-- A definition script whose names, costs or movement depend on a random number. The engine seeds `math.random` from the match, and the read gives it a fixed answer, the bottom of the range asked for. Beyond All Reason's 36 `lootboxnano` definitions draw one only to pick a build list and a model, so they get the names and ids the engine gives them (#4926). Whether the read now equals the engine's list for those four matches is not yet checked.
-- A definition script that reads a map field off `Game`, such as `Game.mapSizeX`.
+- A definition script whose names, costs or movement depend on a random number. The engine seeds `math.random` from the match, and the read gives it a fixed answer, the bottom of the range asked for.- A definition script that reads a map field off `Game`, such as `Game.mapSizeX`.
 - A replay whose exact build of the game is not installed. Another version is read as it always was, with the warning.
 - A player being active. The definitions load before the engine marks any player active, so asking for active players gives none. That is from reading the engine's source and is not measured.
 - Whether anything the engine calls while it builds a definition refuses it, beyond the nine checks in the definition's own constructor.
