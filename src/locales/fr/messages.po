@@ -44766,10 +44766,18 @@ msgstr "la mission de départ ''{missionId}'' n’est pas dans la campagne ''{ca
 msgid "Start muted"
 msgstr "Démarrer en sourdine"
 
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start OA"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "Créez-en un, puis ajoutez-y des éléments. Parcourez ce qui est disponible dans Éléments Lego."
+
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start Open Annihilation for this battle"
+msgstr ""
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -53257,6 +53265,7 @@ msgstr "Polyvalent"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy

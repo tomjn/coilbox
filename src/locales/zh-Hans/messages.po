@@ -44766,10 +44766,18 @@ msgstr "启动任务 \"{missionId}\" 不在战役“{campaignTitle}”中"
 msgid "Start muted"
 msgstr "静音开始"
 
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start OA"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "新建一个，然后把零件拖进去。在“Lego 零件”下浏览可用零件。"
+
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start Open Annihilation for this battle"
+msgstr ""
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -53257,6 +53265,7 @@ msgstr "多面手"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy

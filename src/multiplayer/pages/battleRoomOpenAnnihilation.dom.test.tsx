@@ -25,6 +25,12 @@ import { observeOaAutoLaunch } from "../oaRun";
 const state = vi.hoisted(() => ({
   room: null as Record<string, unknown> | null,
   program: null as { path: string; version: string } | null,
+  /** What the host's launch hook was given and answers, for a room we host. */
+  hostArgs: null as { autoStart: boolean } | null,
+  hostRunning: false,
+  hostStart: vi.fn(),
+  /** What the room gave the chat card last. */
+  chatProps: null as { canChangeMap: boolean } | null,
 }));
 
 vi.mock("@/components/ui/popover", () => ({
@@ -93,12 +99,15 @@ vi.mock("../battle/useBattleLaunch", () => ({
 }));
 vi.mock("../battle/useRejoinRequest", () => ({ useRejoinRequest: vi.fn() }));
 vi.mock("../battle/useOaHostLaunch", () => ({
-  useOaHostLaunch: () => ({
-    running: false,
-    error: null,
-    start: vi.fn(),
-    cancel: vi.fn(),
-  }),
+  useOaHostLaunch: (args: { autoStart: boolean }) => {
+    state.hostArgs = args;
+    return {
+      running: state.hostRunning,
+      error: null,
+      start: state.hostStart,
+      cancel: vi.fn(),
+    };
+  },
 }));
 vi.mock("../notes", () => ({
   useNoteActions: () => ({ get: () => "", set: vi.fn() }),
@@ -129,7 +138,10 @@ vi.mock("../battle/AutohostControls", () => ({
   AutohostControls: stub("autohost-controls"),
 }));
 vi.mock("../battle/BattleChatCard", () => ({
-  BattleChatCard: stub("chat"),
+  BattleChatCard: (props: { canChangeMap: boolean }) => {
+    state.chatProps = props;
+    return <div data-testid="chat" />;
+  },
 }));
 vi.mock("../battle/BattleEngineCard", () => ({
   BattleEngineCard: stub("recoil-engine-card"),
@@ -327,6 +339,10 @@ beforeEach(() => {
   launches = [];
   state.program = OA;
   state.room = roomFor("Open Annihilation");
+  state.hostArgs = null;
+  state.hostRunning = false;
+  state.hostStart.mockReset().mockResolvedValue(undefined);
+  state.chatProps = null;
   setIngame.mockReset();
   opener.openUrl.mockReset().mockResolvedValue(undefined);
   bindings.playOaCancel.mockReset().mockResolvedValue({ cancelled: true });
@@ -560,7 +576,101 @@ describe("a player with no Open Annihilation", () => {
   });
 });
 
+describe("the room of an Open Annihilation battle you host", () => {
+  beforeEach(() => {
+    state.room = roomFor("Open Annihilation", {
+      selfHost: true,
+      isFounder: true,
+      canChangeMap: true,
+      canEditOptions: true,
+      canEditBoxes: true,
+      rows: [
+        { name: "abcdefghijklmnopqrst", kind: "human", self: true, host: true },
+      ],
+    });
+  });
+
+  it("draws the players, chat and engine card, and no way to pick a Recoil map", () => {
+    show();
+    expect(screen.getByText("abcdefghijklmnopqrst")).toBeTruthy();
+    expect(screen.getByTestId("chat")).toBeTruthy();
+    for (const id of [
+      "members-table",
+      "map-card",
+      "start-pos",
+      "options-drawer",
+      "game-card",
+      "recoil-engine-card",
+      "autohost-controls",
+    ]) {
+      expect(screen.queryByTestId(id)).toBeNull();
+    }
+    expect(state.chatProps?.canChangeMap).toBe(false);
+    expect(screen.queryByText("Ready")).toBeNull();
+    expect(screen.queryByText("Spectate")).toBeNull();
+  });
+
+  it("asks the launch hook to start OA by itself", () => {
+    show();
+    expect(state.hostArgs?.autoStart).toBe(true);
+  });
+
+  it("says Start OA when OA is not up, and starts it on a click", () => {
+    show();
+    const button = screen.getByRole("button", { name: "Start OA" });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
+    expect(state.hostStart).toHaveBeenCalledOnce();
+  });
+
+  it("says In OA, and cannot be pressed, while OA is up", () => {
+    state.hostRunning = true;
+    show();
+    const button = screen.getByRole("button", { name: "In OA" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Start OA" })).toBeNull();
+  });
+
+  it("keeps the host's controls to closing the battle and locking it", () => {
+    show();
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(screen.getByText("Locked")).toBeTruthy();
+  });
+
+  it("gives the host's own version once, with no separate host row", async () => {
+    show();
+    expect(await screen.findByText("Open Annihilation 0.8.10")).toBeTruthy();
+    expect(screen.getByText("Version")).toBeTruthy();
+    expect(screen.queryByText("Host", { selector: "dt" })).toBeNull();
+    expect(screen.queryByText("Yours")).toBeNull();
+    expect(screen.queryByText("Open Annihilation 0.8.9")).toBeNull();
+  });
+
+  it("shows the Core Prime link to a host with no OA set", () => {
+    state.program = null;
+    show();
+    expect(screen.getByText("None")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Get Open Annihilation/ }),
+    ).toBeTruthy();
+  });
+});
+
 describe("a Recoil battle", () => {
+  it("keeps the full room for a Recoil host, and never starts OA by itself", () => {
+    state.room = roomFor("spring", {
+      selfHost: true,
+      isFounder: true,
+      canChangeMap: true,
+    });
+    show();
+    for (const id of ["members-table", "map-card", "game-card"]) {
+      expect(screen.getByTestId(id)).toBeTruthy();
+    }
+    expect(state.hostArgs?.autoStart).toBe(false);
+    expect(state.chatProps?.canChangeMap).toBe(true);
+  });
+
   it("keeps its table, map and engine cards, and never launches OA", () => {
     state.room = roomFor("spring", { hostIngame: true, presentAtStart: false });
     show();

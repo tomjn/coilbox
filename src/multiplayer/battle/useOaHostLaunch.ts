@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { describeError } from "@/i18n/uiError";
 import { playOaMaps } from "../../play/bindings";
 import {
@@ -7,7 +7,13 @@ import {
   oaHostArguments,
   oaMapArgument,
 } from "../oaHost";
-import { cancelOaRun, startOaRun, useOaRun } from "../oaRun";
+import {
+  cancelOaRun,
+  noteOaAutoLaunch,
+  oaAutoLaunchSpent,
+  startOaRun,
+  useOaRun,
+} from "../oaRun";
 import { useOpenAnnihilation } from "../openAnnihilation";
 
 /**
@@ -23,6 +29,9 @@ import { useOpenAnnihilation } from "../openAnnihilation";
  * The run is held by `oaRun`, not by the page, so it survives the host moving
  * to another page and back, and it ends when the battle does. `setIngame` is
  * the multiplayer provider's, which does not depend on the page either.
+ *
+ * With `autoStart`, the first time the host is in the room of a battle, OA is
+ * started without a click (issue #4964).
  */
 export function useOaHostLaunch({
   serverKey,
@@ -31,6 +40,7 @@ export function useOaHostLaunch({
   maxPlayers,
   username,
   setIngame,
+  autoStart,
 }: {
   serverKey: string | null;
   battleId: number | null;
@@ -39,6 +49,8 @@ export function useOaHostLaunch({
   maxPlayers: number;
   username: string | null;
   setIngame: (ingame: boolean) => void;
+  /** This client hosts the OA battle on screen, so OA opens by itself once. */
+  autoStart: boolean;
 }) {
   const [program] = useOpenAnnihilation();
   const run = useOaRun();
@@ -94,6 +106,18 @@ export function useOaHostLaunch({
     program,
     setIngame,
   ]);
+
+  // Hosting is one step: OA opens by itself when the host arrives in the room of
+  // a battle they have just opened. The memory is the battle's, outside the
+  // page, so a host who quits OA and comes back gets the button and nothing
+  // else. Without an OA set there is nothing to start, and nothing is spent, so
+  // the host who then sets one is not left with a room that never opened it.
+  useEffect(() => {
+    if (!autoStart || !program || !serverKey || battleId === null) return;
+    if (!username || oaAutoLaunchSpent(serverKey, battleId)) return;
+    noteOaAutoLaunch(serverKey, battleId, true);
+    void start();
+  }, [autoStart, program, serverKey, battleId, username, start]);
 
   return {
     running: run.running,
