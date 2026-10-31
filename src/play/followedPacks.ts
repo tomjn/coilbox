@@ -68,12 +68,45 @@ export function presetForBattle(entry: FollowedPreset): SkirmishPreset {
 }
 
 /**
+ * Whether text can be written into a start script without starting another line.
+ * The same rule `line_refusal` applies in the play plugin's `script.rs`, which is
+ * what stops a launch. This is the same check made early, so a pack that would be
+ * refused there is refused at the door and its cached copy stays.
+ */
+function isScriptText(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (char === ";" || code < 32 || (code >= 127 && code <= 159)) return false;
+  }
+  return true;
+}
+
+/** Option keys are letters, digits and underscores, as `option_refusal` holds. */
+const OPTION_KEY = /^[A-Za-z0-9_]+$/;
+
+function isSoundOptions(options: unknown): boolean {
+  return (
+    isStringMap(options) &&
+    Object.entries(options).every(
+      ([key, value]) => OPTION_KEY.test(key) && isScriptText(value),
+    )
+  );
+}
+
+/**
  * A preset here came from the internet and is about to be held and loaded, so the
- * fields `parsePresetJson` takes on trust are checked as well.
+ * fields `parsePresetJson` takes on trust are checked as well, and every string
+ * that reaches a start script has to be text that cannot add to it.
  */
 function isSoundPreset(preset: SetupPackPreset): boolean {
   return (
-    isStringMap(preset.modOptionValues) &&
+    isScriptText(preset.gameName) &&
+    isScriptText(preset.mapName) &&
+    isSoundOptions(preset.modOptionValues) &&
+    (preset.mapOptionValues === undefined ||
+      isSoundOptions(preset.mapOptionValues)) &&
+    (preset.restrictions?.disabledUnits ?? []).every(isScriptText) &&
     preset.participants.every(isSoundParticipant)
   );
 }
@@ -85,8 +118,8 @@ function isSoundParticipant(raw: unknown): boolean {
     v === undefined || typeof v === "number";
   return (
     (p.kind === "you" || p.kind === "ai") &&
-    typeof p.name === "string" &&
-    typeof p.side === "string" &&
+    isScriptText(p.name) &&
+    isScriptText(p.side) &&
     typeof p.allyTeam === "number" &&
     Array.isArray(p.color) &&
     p.color.length === 3 &&
@@ -101,9 +134,9 @@ function isSoundAi(raw: unknown): boolean {
   if (typeof raw !== "object" || raw === null) return false;
   const ai = raw as Record<string, unknown>;
   return (
-    typeof ai.shortName === "string" &&
+    isScriptText(ai.shortName) &&
     (ai.kind === "native" || ai.kind === "lua") &&
-    (ai.name === undefined || typeof ai.name === "string")
+    (ai.name === undefined || isScriptText(ai.name))
   );
 }
 

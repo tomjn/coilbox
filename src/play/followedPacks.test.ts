@@ -98,6 +98,23 @@ describe("readPack", () => {
     expect(readPack(text)).toMatchObject({ ok: true });
   });
 
+  it("keeps what real options hold: blanks and ordinary punctuation", () => {
+    const text = JSON.stringify(
+      manifest([
+        rawPreset("A", {
+          modOptionValues: {
+            tweakdefs: "",
+            tweakdefs3: "ZG8gZW5k",
+            a_b_2: "a}b",
+            c: "[a]=b // é",
+          },
+          mapOptionValues: { Wind: "" },
+        }),
+      ]),
+    );
+    expect(readPack(text)).toMatchObject({ ok: true });
+  });
+
   it("reads a pack exported from coilbox", () => {
     const code = encodeContainerCode(
       "setup-pack",
@@ -166,6 +183,96 @@ describe("readPack", () => {
         manifest([rawPreset("A", { participants: [{ ...you, team: "1" }] })]),
       ),
     ],
+    ...[
+      "1;tweakdefs=bHVh",
+      "1;\ntweakdefs=bHVh",
+      "1\ntweakdefs=bHVh",
+      "1\r\ntweakdefs=bHVh",
+      "a\u0000b",
+      "a\tb",
+    ].flatMap((value): [string, string][] => [
+      [
+        `a mod option value of ${JSON.stringify(value)}`,
+        JSON.stringify(
+          manifest([rawPreset("A", { modOptionValues: { maxunits: value } })]),
+        ),
+      ],
+      [
+        `a map option value of ${JSON.stringify(value)}`,
+        JSON.stringify(
+          manifest([rawPreset("A", { mapOptionValues: { wind: value } })]),
+        ),
+      ],
+    ]),
+    ...[
+      "a=1",
+      "a}",
+      "}\nMapName",
+      "a b",
+      "a;b",
+      "a-b",
+      "a\nb",
+      "",
+      "é",
+    ].flatMap((key): [string, string][] => [
+      [
+        `a mod option key of ${JSON.stringify(key)}`,
+        JSON.stringify(
+          manifest([rawPreset("A", { modOptionValues: { [key]: "1" } })]),
+        ),
+      ],
+      [
+        `a map option key of ${JSON.stringify(key)}`,
+        JSON.stringify(
+          manifest([rawPreset("A", { mapOptionValues: { [key]: "1" } })]),
+        ),
+      ],
+    ]),
+    ...(
+      [
+        ["a game name", { gameName: "G;\ntweakdefs=x" }],
+        ["a map name", { mapName: "M;\ntweakdefs=x" }],
+        [
+          "a participant's name",
+          { participants: [{ ...you, name: "Y;\ntweakdefs=x" }] },
+        ],
+        [
+          "a participant's side",
+          { participants: [{ ...you, side: "S;\ntweakdefs=x" }] },
+        ],
+        [
+          "an AI's short name",
+          {
+            participants: [
+              {
+                ...you,
+                kind: "ai",
+                ai: { kind: "native", shortName: "B;\ntweakdefs=x" },
+              },
+            ],
+          },
+        ],
+        [
+          "an AI's name",
+          {
+            participants: [
+              {
+                ...you,
+                kind: "ai",
+                ai: { kind: "native", shortName: "B", name: "N;\nx=1" },
+              },
+            ],
+          },
+        ],
+        [
+          "a disabled unit",
+          { restrictions: { disabledUnits: ["armcom;\ntweakdefs=x"] } },
+        ],
+      ] as [string, Record<string, unknown>][]
+    ).map(([what, over]): [string, string] => [
+      `${what} that would write other script lines`,
+      JSON.stringify(manifest([rawPreset("A", over)])),
+    ]),
     [
       "one bad preset among good ones",
       JSON.stringify(
@@ -253,6 +360,26 @@ describe("presetForBattle", () => {
   it("holds back tweak slots on a version newer than the one opened", () => {
     const options = presetForBattle(entryOf("other")).modOptionValues;
     expect(options).toEqual({ maxunits: "8000" });
+  });
+
+  it("holds back a tweak slot spelled in any case, since the engine lowers keys", () => {
+    const [entry] = mergePresets(
+      "pack",
+      parsed([
+        rawPreset("A", {
+          modOptionValues: {
+            maxunits: "8000",
+            TweakDefs: "bHVh",
+            TWEAKUNITS3: "bHVh",
+          },
+        }),
+      ]),
+      null,
+      "t0",
+    );
+    expect(presetForBattle(entry).modOptionValues).toEqual({
+      maxunits: "8000",
+    });
   });
 
   it("gives the whole preset once this version was opened", () => {
