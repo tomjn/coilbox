@@ -19,6 +19,7 @@ import { homeToolGroups, splitGroupItems } from "../nav";
 import { openExternal, useResolvedNavItem } from "../navItem";
 import { accentHueRotate, useThemeColor } from "../useThemeColor";
 import LinkCard from "./LinkCard";
+import OpenAnnihilationCard, { OA_CARD_ID } from "./OpenAnnihilationCard";
 
 /**
  * Every navigable route as a card, grouped exactly as the sidebar groups them.
@@ -81,9 +82,11 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
         // The suggested map's card is a picture of a map, so a group holding it
         // has a picture in it whatever its tools resolved to.
         const withSuggested = group.id === SUGGESTED_MAP_GROUP && suggested;
+        const withOa = group.id === OPEN_ANNIHILATION_GROUP;
         const compact =
           !withSuggested &&
-          tools.every((item) => cardIsIconOnly(item.id, undefined, resolved));
+          tools.every((item) => cardIsIconOnly(item.id, undefined, resolved)) &&
+          (!withOa || cardIsIconOnly(OA_CARD_ID, undefined, resolved));
         return (
           <section
             key={group.id}
@@ -106,6 +109,7 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
               {tools.map((item) => (
                 <ToolCard key={item.id} item={item} compact={compact} />
               ))}
+              {withOa && <OpenAnnihilationCard compact={compact} />}
               {withSuggested}
               {links.length > 0 && <LinkCard items={links} />}
             </div>
@@ -127,6 +131,15 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
  * stay last, which is the order {@link LinkCard} already argues for.
  */
 const SUGGESTED_MAP_GROUP = "library";
+
+/**
+ * The nav group the Open Annihilation card joins: Multiplayer, where the other
+ * cards for playing with other people are. The card hides itself under a
+ * profile's game filter (see {@link OpenAnnihilationCard}). Like the suggested
+ * map's card it is counted for the row's height even then, which errs towards
+ * a taller row, as the grid's own note says.
+ */
+const OPEN_ANNIHILATION_GROUP = "multiplayer";
 
 /**
  * What a tool card adds to the shared shell in both rendering modes. Sizing, the
@@ -215,8 +228,15 @@ export function cardArtUrl(art: CardArt, broken: string | null): string | null {
 export function ToolCard({
   item,
   compact = false,
+  onPress,
 }: {
   item: NavItem;
+  /**
+   * Runs instead of navigating when the card is pressed, for a card that does
+   * something in place. Ignored when the item has an `href`, which opens the
+   * browser. Only {@link OpenAnnihilationCard} sets it.
+   */
+  onPress?: () => void;
   /**
    * Whether every card in this card's row is pictureless, in which case a card
    * with no art of its own may size to its content and the row is short
@@ -351,6 +371,19 @@ export function ToolCard({
         data-nav-item=""
         data-tool-card=""
         onClick={() => openExternal(href)}
+        className={cardClass}
+      >
+        {inner}
+      </button>
+    );
+  }
+  if (onPress) {
+    return (
+      <button
+        type="button"
+        data-nav-item=""
+        data-tool-card=""
+        onClick={onPress}
         className={cardClass}
       >
         {inner}

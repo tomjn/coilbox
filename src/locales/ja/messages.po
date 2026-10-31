@@ -23691,6 +23691,10 @@ msgstr "形状。"
 msgid "Get IP"
 msgstr "IP を取得"
 
+#: src/home/zones/OpenAnnihilationCard.tsx
+msgid "Get Open Annihilation"
+msgstr ""
+
 #: src/content/pages/components/GetStartedCard.tsx
 #, fuzzy
 msgid "Get started"
@@ -36556,6 +36560,10 @@ msgstr "15 種類のマップでプレイする。"
 #, fuzzy
 msgid "Play on 5 different maps."
 msgstr "5 種類のマップでプレイする。"
+
+#: src/home/zones/OpenAnnihilationCard.tsx
+msgid "Play Open Annihilation"
+msgstr ""
 
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
