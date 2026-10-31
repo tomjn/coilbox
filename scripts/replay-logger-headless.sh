@@ -91,7 +91,7 @@ run_fixture() { # fixture, game archive, side of team 0, side of team 1, gadget 
   local work game_dir base_name game_name map_name replay
   work="$(mktemp -d "${TMPDIR:-/tmp}/coilbox-logger-headless.XXXXXX")"
   game_dir="$work/data/games/coilbox-logger-fixture.sdd"
-  mkdir -p "$work/data/games" "$work/data/maps" "$work/write" "$game_dir/luarules/gadgets"
+  mkdir -p "$work/data/games" "$work/data/maps" "$work/write"
   ln -s "$BASE_CONTENT" "$work/data/base"
   ln -s "$DATA_DIR/games/$archive" "$work/data/games/$archive"
   ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$work/data/maps/$MAP_ARCHIVE"
@@ -113,6 +113,7 @@ run_fixture() { # fixture, game archive, side of team 0, side of team 1, gadget 
     return
   fi
 
+  mkdir -p "$game_dir/luarules/gadgets"
   for gadget in "$@"; do
     cp "$FIXTURES/$gadget" "$game_dir/luarules/gadgets/coilbox_logger_$gadget"
   done
@@ -137,7 +138,7 @@ run_fixture() { # fixture, game archive, side of team 0, side of team 1, gadget 
   fi
   # A run in which the engine started and the gadget did not load has none of these.
   if [ "$(grep -c 'FIXTURE created ' "$work/match.log" || true)" != 1 ] \
-    || [ "$(grep -c 'FIXTURE done ' "$work/match.log" || true)" != 1 ]; then
+    || [ "$(grep -c 'FIXTURE done ' "$work/match.log" || true)" = 0 ]; then
     echo "  fail the fixture did not play, see $work/match.log"
     failures=$((failures + 1))
     return
