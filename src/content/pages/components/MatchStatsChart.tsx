@@ -2,7 +2,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useTheme } from "@picoframe/frame";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -62,6 +62,8 @@ import {
   tooltipRows,
   valueTable,
 } from "../../matchStats";
+import { chartAxis, plotInsets } from "../../replayTimeline";
+import { useSetChartAxis } from "../../useChartAxis";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { CommandRateChart } from "./CommandRateChart";
@@ -93,9 +95,6 @@ const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
 
 /** Long enough to tell two players apart, short enough to sit beside the plot. */
 const END_LABEL_MAX_CHARS = 14;
-
-/** Room on the right for the end-point labels, in pixels. */
-const END_LABEL_GUTTER = 88;
 
 const axisTime = (sec: number) => formatDuration(Math.round(sec));
 
@@ -358,6 +357,43 @@ function EndLabels({
         );
       })}
     </g>
+  );
+}
+
+/**
+ * The column the plot or the table fills. It tells the timeline where the plot's
+ * time axis is (#3856). The table has no plot, so this measures the column rather
+ * than the plot: both views fill it, and the insets the plot draws to are fixed,
+ * so the axis is the same in either view and follows a resize in both.
+ */
+function PlotColumn({
+  endLabels,
+  endSec,
+  children,
+}: {
+  endLabels: boolean;
+  endSec: number;
+  children: React.ReactNode;
+}) {
+  const column = useRef<HTMLDivElement>(null);
+  const setAxis = useSetChartAxis();
+  useLayoutEffect(() => {
+    const el = column.current;
+    if (!el) return;
+    const measure = () =>
+      setAxis(chartAxis(el.getBoundingClientRect(), endLabels, endSec));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      setAxis(null);
+    };
+  }, [setAxis, endLabels, endSec]);
+  return (
+    <div ref={column} className="order-first min-w-0 flex-1 lg:order-last">
+      {children}
+    </div>
   );
 }
 
@@ -630,7 +666,10 @@ export function MatchStatsChart({
             plotHeight={chartHeight(drawn.length)}
             onChange={setKey}
           />
-          <div className="order-first min-w-0 flex-1 lg:order-last">
+          <PlotColumn
+            endLabels={labelled}
+            endSec={rows[rows.length - 1]?.timeSec ?? 0}
+          >
             {display === "table" ? (
               <MatchStatsTable table={table} />
             ) : (
@@ -642,7 +681,7 @@ export function MatchStatsChart({
                   data={rows}
                   margin={{
                     top: 8,
-                    right: labelled ? END_LABEL_GUTTER : 8,
+                    right: plotInsets(labelled).right,
                     bottom: 0,
                     left: 0,
                   }}
@@ -673,7 +712,7 @@ export function MatchStatsChart({
                     tick={axisTick}
                     tickLine={false}
                     axisLine={false}
-                    width={52}
+                    width={plotInsets(labelled).left}
                   />
                   <Tooltip
                     content={
@@ -762,7 +801,7 @@ export function MatchStatsChart({
                 </LineChart>
               </ResponsiveContainer>
             )}
-          </div>
+          </PlotColumn>
         </div>
       )}
 

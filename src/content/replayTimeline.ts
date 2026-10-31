@@ -143,6 +143,68 @@ export function binMarks<M extends Placed>(
   return [...bins.values()];
 }
 
+/**
+ * Where the match statistics chart draws its time axis, in viewport pixels, and
+ * the match time its right edge stands for. Null means the page has no chart.
+ */
+export interface ChartAxis {
+  left: number;
+  right: number;
+  endSec: number;
+}
+
+/** The value axis and the room right of the plot, in pixels, which the chart draws to. */
+export function plotInsets(endLabels: boolean): {
+  left: number;
+  right: number;
+} {
+  return { left: 52, right: endLabels ? 88 : 8 };
+}
+
+/** The axis a chart column at this position draws, whichever view is showing. */
+export function chartAxis(
+  column: { left: number; right: number },
+  endLabels: boolean,
+  endSec: number,
+): ChartAxis {
+  const insets = plotInsets(endLabels);
+  return {
+    left: column.left + insets.left,
+    right: column.right - insets.right,
+    endSec,
+  };
+}
+
+/** The timeline's row label column and its pregame column, in pixels. */
+const LABEL_COLUMN = 88;
+const PREGAME_COLUMN = 56;
+
+/** How the timeline's grid places its strip under a chart's axis. */
+export interface StripLayout {
+  columns: string;
+  paddingRight: number;
+  /** No room left of the axis for labels, so each sits on a line above its strip. */
+  labelsAbove: boolean;
+}
+
+/** The grid that puts the strip's zero and end under the chart's, from the grid's own box. */
+export function stripLayout(
+  axis: ChartAxis,
+  box: { left: number; right: number },
+  hasPregame: boolean,
+): StripLayout {
+  const left = Math.max(0, axis.left - box.left);
+  const paddingRight = Math.max(0, box.right - axis.right);
+  const strip = "minmax(0,1fr)";
+  const labelsAbove = left < LABEL_COLUMN + (hasPregame ? PREGAME_COLUMN : 0);
+  if (labelsAbove)
+    return { columns: `${left}px ${strip}`, paddingRight, labelsAbove };
+  const columns = hasPregame
+    ? `${left - PREGAME_COLUMN}px ${PREGAME_COLUMN}px ${strip}`
+    : `${left}px ${strip}`;
+  return { columns, paddingRight, labelsAbove };
+}
+
 const TICK_STEPS = [60, 120, 300, 600, 900, 1200, 1800, 3600, 7200];
 /** Most ticks the axis labels. */
 const MAX_TICKS = 6;
