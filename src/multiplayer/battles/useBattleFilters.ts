@@ -10,6 +10,7 @@ const defaultPersistedBattleFilters: PersistedBattleFilters = {
   hideEmpty: false,
   hideLockedPassworded: false,
   hideFull: false,
+  hideOpenAnnihilation: false,
   sortKey: "players",
   sortDir: "desc",
 };
@@ -33,7 +34,12 @@ export function useBattleFilters(): [
     defaultPersistedBattleFilters,
   );
 
-  const filters: BattleFilters = { search, ...persisted };
+  // Defaults first, so a setting saved before a filter existed still has it.
+  const filters: BattleFilters = {
+    search,
+    ...defaultPersistedBattleFilters,
+    ...persisted,
+  };
   const setFilters: Dispatch<SetStateAction<BattleFilters>> = (action) => {
     const next =
       typeof action === "function"
@@ -44,6 +50,7 @@ export function useBattleFilters(): [
       hideEmpty: next.hideEmpty,
       hideLockedPassworded: next.hideLockedPassworded,
       hideFull: next.hideFull,
+      hideOpenAnnihilation: next.hideOpenAnnihilation,
       sortKey: next.sortKey,
       sortDir: next.sortDir,
     });
