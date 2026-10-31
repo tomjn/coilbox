@@ -48238,6 +48238,22 @@ msgstr "Le salon est toujours actif"
 msgid "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port."
 msgstr "Le salon a démarré mais sa partie ne s’est jamais ouverte, le salon a donc été arrêté. Réessayez, et si cela se reproduit, hébergez sur un autre port."
 
+#: src/multiplayer/battle/tweakDelivery.ts
+msgid "The room's vote on {slotName} did not pass."
+msgstr ""
+
+#: src/multiplayer/battle/tweakDelivery.ts
+msgid "The room's vote on {slotName} was still open after {seconds}s."
+msgstr ""
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room's vote on it did not pass."
+msgstr ""
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room's vote on it was still open after {seconds}s."
+msgstr ""
+
 #: src/lego/model.ts
 #, fuzzy
 msgid "The root piece is missing."

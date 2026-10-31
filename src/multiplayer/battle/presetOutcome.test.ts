@@ -133,6 +133,28 @@ describe("deliveryNotTaken", () => {
     ]);
   });
 
+  it("says a vote did not pass, not quoting the host's call for it", () => {
+    const progress: DeliveryProgress = {
+      slots: [
+        slot("b", "failed", {
+          reason: "The room's vote on b did not pass.",
+          vote: "failed",
+          hostSaid: ['alice called a vote for command "bSet b 1" [!vote y]'],
+        }),
+        slot("c", "skipped"),
+      ],
+      done: true,
+      stoppedAt: 0,
+    };
+    expect(deliveryNotTaken(progress)).toEqual([
+      {
+        what: "modOptions",
+        items: ["b", "c"],
+        reason: "The room's vote on b did not pass.",
+      },
+    ]);
+  });
+
   it("is empty when every option took, and for a room with no paced run", () => {
     expect(
       deliveryNotTaken({

@@ -105,13 +105,14 @@ export function deliveryNotTaken(
 ): NotTaken[] {
   if (!progress) return [];
   const byPart = new Map<PresetPart, NotTaken>();
-  for (const { slot, state, reason, hostSaid } of progress.slots) {
+  for (const { slot, state, reason, hostSaid, vote } of progress.slots) {
     if (state !== "failed" && state !== "skipped") continue;
     const part = partForTag(slot.tagKey) ?? "modOptions";
     const entry = byPart.get(part) ?? { what: part, items: [] };
     entry.items.push(slot.name);
+    // A vote's first line is the call for it, which says nothing of the result.
     if (state === "failed" && !entry.reason)
-      entry.reason = hostSaid?.[0] ?? reason;
+      entry.reason = vote ? reason : (hostSaid?.[0] ?? reason);
     byPart.set(part, entry);
   }
   return [...byPart.values()];
