@@ -208,6 +208,23 @@ describe("tweakSlotUnits", () => {
     ]);
   });
 
+  it("walks a sequence too, numbering its entries from one", () => {
+    const units = tweakSlotUnits(
+      slot({
+        table: {
+          armcom: {
+            weapons: [{ name: "laser", damage: 40 }, { name: "gun" }],
+          },
+        },
+      }),
+    );
+    expect(units?.[0].fields).toEqual([
+      { path: "weapons.1.name", value: "laser" },
+      { path: "weapons.1.damage", value: "40" },
+      { path: "weapons.2.name", value: "gun" },
+    ]);
+  });
+
   it("is null for a program, which is not a list of changes", () => {
     expect(tweakSlotUnits(slot({ form: "block" }))).toBeNull();
   });

@@ -139,15 +139,23 @@ function fieldValue(v: unknown): string {
   return typeof v === "string" ? v : (JSON.stringify(v) ?? String(v));
 }
 
+/** A table's entries, numbering a sequence from one as Lua does. Null for a
+ *  value that is not a table. */
+function tableEntries(v: unknown): [string, unknown][] | null {
+  if (Array.isArray(v)) return v.map((item, i) => [String(i + 1), item]);
+  return isPlainObject(v) ? Object.entries(v) : null;
+}
+
 function flatten(def: unknown, prefix: string): TweakField[] {
-  if (!isPlainObject(def)) return [{ path: prefix, value: fieldValue(def) }];
-  const entries = Object.entries(def);
+  const entries = tableEntries(def);
+  if (!entries) return [{ path: prefix, value: fieldValue(def) }];
   if (entries.length === 0) return [{ path: prefix, value: "{}" }];
-  return entries.flatMap(([key, value]) =>
-    isPlainObject(value) && Object.keys(value).length > 0
+  return entries.flatMap(([key, value]) => {
+    const nested = tableEntries(value);
+    return nested && nested.length > 0
       ? flatten(value, `${prefix}${key}.`)
-      : [{ path: `${prefix}${key}`, value: fieldValue(value) }],
-  );
+      : [{ path: `${prefix}${key}`, value: fieldValue(value) }];
+  });
 }
 
 /**
@@ -159,7 +167,7 @@ export function tweakSlotUnits(slot: DecodedSlot): TweakUnit[] | null {
   if (slot.error || slot.form !== "table" || !slot.table) return null;
   return Object.entries(slot.table).map(([unit, def]) => ({
     unit,
-    fields: isPlainObject(def)
+    fields: tableEntries(def)
       ? flatten(def, "").filter((f) => f.path !== "")
       : [{ path: "", value: fieldValue(def) }],
   }));
