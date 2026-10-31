@@ -27779,6 +27779,10 @@ msgstr ""
 msgid "NW-SE"
 msgstr ""
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "OA"
+msgstr ""
+
 #: src/scenario/listing.ts
 #: src/scenario/validate.ts
 msgid "objective"

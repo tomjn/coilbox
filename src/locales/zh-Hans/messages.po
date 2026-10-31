@@ -34178,6 +34178,10 @@ msgstr "numparticles，每次生成的数量。"
 msgid "NW-SE"
 msgstr "西北-东南"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "OA"
+msgstr ""
+
 #: src/scenario/listing.ts
 #: src/scenario/validate.ts
 #, fuzzy

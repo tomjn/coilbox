@@ -27780,6 +27780,10 @@ msgstr "numparticles, per spawn."
 msgid "NW-SE"
 msgstr "NW-SE"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "OA"
+msgstr "OA"
+
 #: src/scenario/listing.ts
 #: src/scenario/validate.ts
 msgid "objective"

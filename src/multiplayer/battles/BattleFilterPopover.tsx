@@ -149,8 +149,13 @@ export function BattleFilterPopover({
             <ToggleGroupItem value="full" className={ITEM_CLASS}>
               <Trans>Full</Trans>
             </ToggleGroupItem>
-            <ToggleGroupItem value="oa" className={ITEM_CLASS}>
-              <Trans>Open Annihilation</Trans>
+            <ToggleGroupItem
+              value="oa"
+              className={ITEM_CLASS}
+              aria-label={t`Open Annihilation`}
+              title={t`Open Annihilation`}
+            >
+              <Trans>OA</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
         </fieldset>
