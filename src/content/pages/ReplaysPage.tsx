@@ -19,6 +19,7 @@ import {
 import { useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
+import { MeasuredRowList } from "@/components/MeasuredRowList";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -130,6 +131,12 @@ const ORIGIN_BADGE: Record<
   // every row would just be noise.
   other: null,
 };
+
+/** The shortest row: the 64px map thumbnail, 16px of padding and 2px of border. */
+const ROW_HEIGHT_ESTIMATE = 82;
+/** The list's `gap-2`. */
+const ROW_GAP = 8;
+const replayRowKey = (r: { path: string }) => r.path;
 
 /** Played date, e.g. `27 Apr 2026, 20:14`. */
 function playedAt(ms: number): string {
@@ -620,8 +627,14 @@ export default function ReplaysPage() {
             }
           />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {sorted.map((r) => {
+          <MeasuredRowList
+            items={sorted}
+            rowKey={replayRowKey}
+            estimatedRowHeight={ROW_HEIGHT_ESTIMATE}
+            gap={ROW_GAP}
+            className="flex flex-col gap-2"
+            rowClassName="flex items-stretch overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40"
+            renderRow={(r) => {
               const thumb = r.mapName ? thumbs.get(r.mapName) : undefined;
               const meta = [
                 playedAt(dateOf(r)),
@@ -638,10 +651,7 @@ export default function ReplaysPage() {
               const hasSkill = r.skillAvg != null;
               const stat = statsByPath(r);
               return (
-                <li
-                  key={r.path}
-                  className="flex items-stretch overflow-hidden rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40"
-                >
+                <>
                   <Link
                     to={`/play/replays/${encodeURIComponent(r.filename)}`}
                     className="flex min-w-0 flex-1 items-stretch gap-3 p-2"
@@ -797,10 +807,10 @@ export default function ReplaysPage() {
                       />
                     </Button>
                   </div>
-                </li>
+                </>
               );
-            })}
-          </ul>
+            }}
+          />
         )}
       </div>
     </TooltipProvider>
