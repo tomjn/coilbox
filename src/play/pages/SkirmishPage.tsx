@@ -782,6 +782,10 @@ export default function SkirmishPage() {
     });
   };
 
+  // Every game the scan found, generated ones included. `games` hides those from
+  // the picker, but a preset saved on one still has its game here.
+  const scannedGameNames = (scan.data?.games ?? []).map((g) => g.name);
+
   const notifyGameMissing = (p: SkirmishPreset) => {
     const missingGame = p.gameName;
     const presetName = p.name;
@@ -807,7 +811,7 @@ export default function SkirmishPage() {
     if (
       selection.parts.includes("game") &&
       p.gameName !== gameName &&
-      !games.some((g) => g.name === p.gameName)
+      !scannedGameNames.includes(p.gameName)
     ) {
       taken = withoutGame(selection);
       notifyGameMissing(p);
@@ -858,7 +862,7 @@ export default function SkirmishPage() {
     keys: string[];
   } | null>(null);
   const installedForLoad = {
-    games: games.map((g) => g.name),
+    games: scannedGameNames,
     maps: maps.map((m) => m.name),
   };
   const requestLoad = (

@@ -227,6 +227,29 @@ describe("loading a saved preset", () => {
     expect(shown("options")).toBe(JSON.stringify(PRESET.modOptionValues));
   });
 
+  it("loads a preset saved on a game coilbox generated, which the picker hides", () => {
+    world.scan = {
+      games: [
+        ...scanOf(["Game 1.0"], []).games,
+        {
+          name: "Game 3.0",
+          primaryArchive: { name: "coilbox-workshop-test.sdd" },
+          dependencyArchives: [],
+          info: {},
+        },
+      ],
+      maps: [{ name: "Map A" }, { name: "Far Map" }],
+    };
+    render(tree());
+
+    load();
+
+    expect(gateOpen()).toBe(false);
+    expect(shown("game")).toBe("Game 3.0");
+    expect(shown("options")).toBe(JSON.stringify(PRESET.modOptionValues));
+    expect(world.notices).toEqual([]);
+  });
+
   it("offers the download of a missing game and map, and loads the whole preset once they arrive", () => {
     const { rerender } = render(tree());
     expect(shown("game")).toBe("Game 1.0");
