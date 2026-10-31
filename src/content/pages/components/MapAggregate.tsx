@@ -1,4 +1,4 @@
-import type { MessageDescriptor } from "@lingui/core";
+import { i18n, type MessageDescriptor } from "@lingui/core";
 import { msg, plural } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
@@ -19,6 +19,7 @@ import {
   type AggregateFilters,
   aggregateLayer,
   aggregateStarts,
+  DAMAGE_MODE_LABEL,
   FORMAT_LABEL,
   filterChoices,
   filterMatches,
@@ -55,6 +56,7 @@ import {
   versionsSpanned,
 } from "../../mapVersions";
 import { useStoredAnalyses } from "../../replayAnalysis";
+import type { DamageMode } from "../../replayDamage";
 import { type MapWorld, mapFraction } from "../../replayMapLayers";
 import { findSet, resolveSet, useReplaySets } from "../../replaySets";
 import {
@@ -113,13 +115,22 @@ const WINDOWS: {
   { value: "custom", label: msg`Between two minutes`, window: null },
 ];
 
-const LEGEND_LABEL: Record<HeatLayerId, MessageDescriptor> = {
+const LEGEND_LABEL: Record<
+  Exclude<HeatLayerId, "damage">,
+  MessageDescriptor
+> = {
   buildings: msg`Where buildings were ordered`,
   defence: msg`Where defences were ordered`,
   economy: msg`Where economy buildings were ordered`,
   orders: msg`Where orders were aimed`,
   deaths: msg`Where units died`,
 };
+
+/** What a layer draws, in the legend's words. The damage layer has two. */
+const legendLabel = (layer: HeatLayerId, damageMode: DamageMode): string =>
+  layer === "damage"
+    ? DAMAGE_MODE_LABEL[damageMode]
+    : i18n._(LEGEND_LABEL[layer]);
 
 /** What a scaling does, for the help. */
 const NORMALISE_NOTE: Record<Normalise, MessageDescriptor> = {
@@ -269,6 +280,7 @@ export function MapAggregate({
   );
 
   const [layer, setLayer] = useState<HeatLayerId | "">("buildings");
+  const [damageMode, setDamageMode] = useState<DamageMode>("at");
   const [showStarts, setShowStarts] = useState(true);
   const [normalise, setNormalise] = useState<Normalise>("share");
   const [windowChoice, setWindowChoice] = useState("whole");
@@ -302,9 +314,10 @@ export function MapAggregate({
         window: timeWindow,
         categories,
         countsOnly: id !== layer,
+        damageMode,
       });
     return out;
-  }, [replays, world, normalise, timeWindow, categories, layer]);
+  }, [replays, world, normalise, timeWindow, categories, layer, damageMode]);
   const drawn = layer ? perLayer[layer] : null;
   const field = drawn?.field ?? null;
 
@@ -505,10 +518,14 @@ export function MapAggregate({
           <SectionHelp
             section={t`how this map is played`}
             source={
-              layer === "deaths" ? "log" : layer === "" ? undefined : "stream"
+              layer === "deaths" || layer === "damage"
+                ? "log"
+                : layer === ""
+                  ? undefined
+                  : "stream"
             }
             detail={
-              layer === "deaths" || layer === ""
+              layer === "deaths" || layer === "damage" || layer === ""
                 ? undefined
                 : t`These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other.`
             }
@@ -814,6 +831,32 @@ export function MapAggregate({
                 </ToggleGroup>
               </div>
 
+              {layer === "damage" && (
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  spacing={1}
+                  aria-label={t`Which end of the damage is drawn`}
+                  className="flex-wrap"
+                  value={damageMode}
+                  onValueChange={(v) => {
+                    if (v === "at" || v === "origin") setDamageMode(v);
+                  }}
+                  data-testid="damage-mode"
+                >
+                  <ToggleGroupItem value="at" data-testid="damage-mode-at">
+                    {t`Where it landed`}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="origin"
+                    data-testid="damage-mode-origin"
+                  >
+                    {t`Where it came from`}
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
+
               <div className="flex flex-wrap items-end gap-2">
                 <OptionSelect
                   size="sm"
@@ -881,10 +924,22 @@ export function MapAggregate({
               {layer && drawn && (
                 <LayerNotes
                   layer={layer}
+                  damageMode={damageMode}
                   drawn={drawn}
                   normalise={normalise}
                   timeWindow={timeWindow}
                   analysedShown={withEvents}
+                  noDamage={
+                    replays.filter(
+                      (r) =>
+                        r.deaths !== null &&
+                        r.damage === null &&
+                        !r.damageOtherGrid,
+                    ).length
+                  }
+                  damageOtherGrid={
+                    replays.filter((r) => r.damageOtherGrid).length
+                  }
                   reading={read.reading}
                   categoriesLoading={categoriesLoading}
                   misfit={misfit}
@@ -895,7 +950,8 @@ export function MapAggregate({
               <MapExportButtons
                 info={exportBasis}
                 layer={layer}
-                layerSentence={layer ? t(LEGEND_LABEL[layer]) : ""}
+                layerSentence={layer ? legendLabel(layer, damageMode) : ""}
+                damageMode={damageMode}
                 drawn={drawn}
                 normalise={normalise}
                 window={timeWindow}
@@ -934,21 +990,29 @@ export function MapAggregate({
  *  the warnings that the picture may be incomplete. The rest is in the help. */
 function LayerNotes({
   layer,
+  damageMode,
   drawn,
   normalise,
   timeWindow,
   analysedShown,
+  noDamage,
+  damageOtherGrid,
   reading,
   categoriesLoading,
   misfit,
   incomplete,
 }: {
   layer: HeatLayerId;
+  damageMode: DamageMode;
   drawn: LayerAggregate;
   normalise: Normalise;
   timeWindow: MatchWindow;
   /** Matches in the picture that have event data. */
   analysedShown: number;
+  /** Analysed matches in the picture with no damage recorded. */
+  noDamage: number;
+  /** Matches whose damage was recorded on another grid than the map's. */
+  damageOtherGrid: number;
   reading: boolean;
   categoriesLoading: boolean;
   /** Matches whose orders do not fit their unit list, so no category layer
@@ -959,6 +1023,8 @@ function LayerNotes({
 }) {
   const { t } = useLingui();
   const category = layer === "defence" || layer === "economy";
+  // Layers read from an analysis, which a match without one has nothing for.
+  const fromAnalysis = layer === "deaths" || layer === "damage";
   const windowed = timeWindow.kind !== "whole";
   const when = windowLabel(timeWindow);
   const unclassified = drawn.unclassified - misfit;
@@ -968,12 +1034,43 @@ function LayerNotes({
   const fromMatches = matchCount(drawn.contributing);
   return (
     <div className="flex flex-col gap-2" data-testid="layer-notes">
-      {layer === "deaths" && analysedShown === 0 && (
+      {fromAnalysis && analysedShown === 0 && (
         <p className="text-xs text-muted-foreground" data-testid="no-analysis">
-          <Trans>
-            No match on this map in the picture has been analysed, so there are
-            no deaths to draw.
-          </Trans>
+          {layer === "deaths" ? (
+            <Trans>
+              No match on this map in the picture has been analysed, so there
+              are no deaths to draw.
+            </Trans>
+          ) : (
+            <Trans>
+              No match on this map in the picture has been analysed, so there is
+              no damage to draw.
+            </Trans>
+          )}
+        </p>
+      )}
+      {layer === "damage" && noDamage > 0 && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="damage-missing"
+        >
+          <Plural
+            value={noDamage}
+            one="# analysed match has no damage recorded and is left out. Analyse it again to record damage."
+            other="# analysed matches have no damage recorded and are left out. Analyse them again to record damage."
+          />
+        </p>
+      )}
+      {layer === "damage" && damageOtherGrid > 0 && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="damage-other-grid"
+        >
+          <Plural
+            value={damageOtherGrid}
+            one="# match recorded its damage on a map of another size and is left out."
+            other="# matches recorded their damage on a map of another size and are left out."
+          />
         </p>
       )}
 
@@ -1008,7 +1105,7 @@ function LayerNotes({
 
       {!reading &&
         drawn.contributing === 0 &&
-        !(layer === "deaths" && analysedShown === 0) && (
+        !(fromAnalysis && analysedShown === 0) && (
           <p
             className="text-xs text-muted-foreground"
             data-testid="layer-empty"
@@ -1034,7 +1131,7 @@ function LayerNotes({
             : t`${events}, from ${fromMatches}.`}
         </p>
       )}
-      {incomplete > 0 && layer !== "deaths" && (
+      {incomplete > 0 && !fromAnalysis && (
         <p className="text-xs text-muted-foreground">
           <Plural
             value={incomplete}
@@ -1046,7 +1143,7 @@ function LayerNotes({
 
       {drawn.field && drawn.field.peak > 0 && (
         <HeatLegend
-          label={t(LEGEND_LABEL[layer])}
+          label={legendLabel(layer, damageMode)}
           peak={layerLegend(layer, drawn, normalise, timeWindow)}
           kind={HEAT_KIND_OF_LAYER[layer]}
         />
@@ -1194,6 +1291,17 @@ function AggregateHelp({
           {analysedShown > 0 && ` ${destroyedNote}`}
           {analysedShown > 0 && unattacked > 0 && ` ${unattackedNote}`}
           {analysedShown > 0 && noPosition > 0 && ` ${noPositionNote}`}
+        </p>
+      )}
+      {picture && layer === "damage" && (
+        <p>
+          <Trans>
+            Damage comes from playing a match back, which is run from a replay's
+            own page. It is added up in each cell and each minute and rounded to
+            a whole point. Damage past a unit's last health, paralysis and
+            healing are not in it. Where it landed counts every hit. Where it
+            came from counts only damage an attacker dealt.
+          </Trans>
         </p>
       )}
       {picture && category && (

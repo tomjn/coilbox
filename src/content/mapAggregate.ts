@@ -22,6 +22,7 @@ import {
   heatGridSize,
 } from "@/lib/heatField";
 import type {
+  MapAmountLayer,
   MapCountLayer,
   ReplayMapGrids,
   StatRecord,
@@ -29,6 +30,7 @@ import type {
   UnitDatasetEntry,
 } from "./bindings";
 import { sameMapFamily } from "./mapVersions";
+import type { DamageMode } from "./replayDamage";
 import { isShortReplay } from "./replayFilterVisibility";
 import type { MapWorld } from "./replayMapLayers";
 import { column } from "./replayOrderPoints";
@@ -50,7 +52,9 @@ export interface CountColumns {
   entries: number;
   cell: Uint32Array;
   slice: Uint16Array;
-  count: Uint16Array;
+  /** Events in each entry, or points of damage on the damage layers, which
+   *  can pass what a `Uint16Array` holds. */
+  count: Uint16Array | Uint32Array;
   /** The unit definition id of each entry, on the buildings layer only. */
   def: Uint32Array | null;
   total: number;
@@ -76,22 +80,38 @@ export interface ReplayCounts {
   deathsUnattacked: number;
   /** Deaths the log put at exactly 0,0, which were left out. */
   deathsNoPosition: number;
+  /** Where damage landed and where it came from. Null when the match has no
+   *  analysis with damage recorded. */
+  damage: { at: CountColumns; origin: CountColumns } | null;
+  /** True when the analysis recorded damage on another grid than the map's, so
+   *  the match is left out of the damage layer. */
+  damageOtherGrid: boolean;
 }
 
-function unpack(layer: MapCountLayer, name: string): CountColumns {
+function unpack(
+  layer: MapCountLayer | MapAmountLayer,
+  name: string,
+): CountColumns {
   const n = layer.entries;
   const out = {
     entries: n,
     total: layer.total,
-    offMap: layer.offMap,
+    offMap: "offMap" in layer ? layer.offMap : 0,
   } as CountColumns;
   const columns: [keyof CountColumns, object | null][] = [
     ["cell", column(layer.cell, Uint32Array, 4, n, `${name} cell`)],
     ["slice", column(layer.slice, Uint16Array, 2, n, `${name} slice`)],
-    ["count", column(layer.count, Uint16Array, 2, n, `${name} count`)],
+    [
+      "count",
+      "amount" in layer
+        ? column(layer.amount, Uint32Array, 4, n, `${name} amount`)
+        : column(layer.count, Uint16Array, 2, n, `${name} count`),
+    ],
     [
       "def",
-      layer.def ? column(layer.def, Uint32Array, 4, n, `${name} def`) : null,
+      "def" in layer && layer.def
+        ? column(layer.def, Uint32Array, 4, n, `${name} def`)
+        : null,
     ],
   ];
   // Not enumerable, so a development build of React never walks a column.
@@ -115,6 +135,13 @@ export function decodeReplayGrids(raw: ReplayMapGrids): ReplayCounts {
     deaths: raw.deaths ? unpack(raw.deaths.layer, "deaths") : null,
     deathsUnattacked: raw.deaths?.unattacked ?? 0,
     deathsNoPosition: raw.deaths?.noPosition ?? 0,
+    damage: raw.damage
+      ? {
+          at: unpack(raw.damage.at, "damage at"),
+          origin: unpack(raw.damage.origin, "damage origin"),
+        }
+      : null,
+    damageOtherGrid: raw.damageOtherGrid ?? false,
   };
 }
 
@@ -452,6 +479,7 @@ export const HEAT_LAYERS = [
   "economy",
   "orders",
   "deaths",
+  "damage",
 ] as const;
 export type HeatLayerId = (typeof HEAT_LAYERS)[number];
 
@@ -487,7 +515,8 @@ export interface LayerAggregate {
    *  anything in the window. */
   field: HeatField | null;
   /** Matches that could have been in this layer: all that were read for a
-   *  stream layer, the analysed ones for deaths, the ones whose game build is
+   *  stream layer, the analysed ones for deaths, the analysed ones with damage
+   *  recorded on this map's grid for damage, the ones whose game build is
    *  installed for a category layer. */
   available: number;
   /** Matches with at least one event in the window. The mean is over these. */
@@ -572,6 +601,9 @@ export function aggregateLayer(
     /** Count the matches and events and build no field, for a layer that is
      *  not being drawn and still has a count beside its toggle. */
     countsOnly?: boolean;
+    /** Which end of a hit the damage layer counts: where it landed (the
+     *  default) or where it came from. */
+    damageMode?: DamageMode;
   },
 ): LayerAggregate {
   const { width, height } = heatGridSize(
@@ -596,7 +628,9 @@ export function aggregateLayer(
         ? replay.orders
         : layer === "deaths"
           ? replay.deaths
-          : replay.buildings;
+          : layer === "damage"
+            ? (replay.damage?.[options.damageMode ?? "at"] ?? null)
+            : replay.buildings;
     if (!columns) continue;
     let keep: ((def: number) => boolean) | null = null;
     if (category) {
@@ -689,6 +723,7 @@ const NOUN_ONE: Record<HeatLayerId, MessageDescriptor> = {
   economy: msg`order to place an economy building`,
   orders: msg`order`,
   deaths: msg`death`,
+  damage: msg`point of damage`,
 };
 
 const NOUN_MANY: Record<HeatLayerId, MessageDescriptor> = {
@@ -697,6 +732,7 @@ const NOUN_MANY: Record<HeatLayerId, MessageDescriptor> = {
   economy: msg`orders to place an economy building`,
   orders: msg`orders`,
   deaths: msg`deaths`,
+  damage: msg`points of damage`,
 };
 
 export const LAYER_LABEL = lazyLabels<HeatLayerId>({
@@ -705,6 +741,14 @@ export const LAYER_LABEL = lazyLabels<HeatLayerId>({
   economy: msg`Economy`,
   orders: msg`Order density`,
   deaths: msg`Deaths`,
+  damage: msg`Damage dealt`,
+});
+
+/** What the damage layer draws, for each end of a hit. The words are the
+ *  replay page's (`damageLegend`). */
+export const DAMAGE_MODE_LABEL = lazyLabels<DamageMode>({
+  at: msg`Where damage landed`,
+  origin: msg`Where damage came from`,
 });
 
 /** A count of matches in words. */

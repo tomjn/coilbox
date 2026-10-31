@@ -1,16 +1,24 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { heatAt, heatGridSize } from "@/lib/heatField";
-import type { MapCountLayer, ReplayMapGrids, StatRecord } from "./bindings";
+import type {
+  MapAmountLayer,
+  MapCountLayer,
+  ReplayMapGrids,
+  StatRecord,
+} from "./bindings";
 import {
   type AggregateMatch,
   aggregateLayer,
   aggregateStarts,
+  DAMAGE_MODE_LABEL,
   decodeReplayGrids,
   defCategories,
   FRAMES_PER_SLICE,
   filterChoices,
   filterMatches,
+  LAYER_LABEL,
+  layerEvents,
   layerLegend,
   MAP_GRID_RESOLUTION,
   mapMatches,
@@ -460,6 +468,143 @@ describe("how many matches are behind each layer", () => {
     const got = aggregateLayer([], "orders", WORLD, options);
     expect(got).toMatchObject({ field: null, available: 0, contributing: 0 });
     expect(layerLegend("orders", got, "share", WHOLE)).toBe("");
+  });
+});
+
+/** Pack damage the way `map_grids.rs` does: `[cell, slice, points]`, with a
+ *  `u32` for the points. */
+function amountLayer(entries: [number, number, number][]): MapAmountLayer {
+  const n = entries.length;
+  const cell = new Uint32Array(n);
+  const slice = new Uint16Array(n);
+  const amount = new Uint32Array(n);
+  entries.forEach(([c, s, k], i) => {
+    cell[i] = c;
+    slice[i] = s;
+    amount[i] = k;
+  });
+  const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
+  return {
+    entries: n,
+    cell: packed(cell),
+    slice: packed(slice),
+    amount: packed(amount),
+    total: entries.reduce((sum, e) => sum + e[2], 0),
+  };
+}
+
+describe("the damage layer", () => {
+  // More than a u16 holds in one cell in one minute, landed on BUSY and dealt
+  // from QUIET.
+  const HEAVY = 70_000;
+  const analysed = replay({
+    path: "/demos/a.sdfz",
+    damage: {
+      at: amountLayer([
+        [BUSY, 0, HEAVY],
+        [QUIET, 1, 30],
+      ]),
+      origin: amountLayer([[QUIET, 0, HEAVY]]),
+    },
+  });
+  // Analysed with events and no damage in them: older than logger version 4.
+  const older = replay({
+    path: "/demos/b.sdfz",
+    deaths: { layer: layer([[BUSY, 3, 5]]), unattacked: 0, noPosition: 0 },
+  });
+  const otherGrid = replay({
+    path: "/demos/c.sdfz",
+    damageOtherGrid: true,
+    deaths: { layer: layer([[BUSY, 3, 5]]), unattacked: 0, noPosition: 0 },
+  });
+  const unanalysed = replay({ path: "/demos/d.sdfz" });
+  const all = [analysed, older, otherGrid, unanalysed];
+  const options = { normalise: "share", window: WHOLE } as const;
+
+  it("reads a u32 amount a u16 could not hold, and keeps its columns out of an enumeration", () => {
+    const landed = analysed.damage?.at;
+    expect(Array.from(landed?.count ?? [])).toEqual([HEAVY, 30]);
+    expect(landed?.count).toBeInstanceOf(Uint32Array);
+    expect(landed?.total).toBe(HEAVY + 30);
+    expect(landed?.def).toBeNull();
+    expect(Object.keys(landed ?? {})).toEqual(["entries", "total", "offMap"]);
+    expect(older.damage).toBeNull();
+    expect(older.damageOtherGrid).toBe(false);
+    expect(otherGrid.damageOtherGrid).toBe(true);
+  });
+
+  it("counts only the matches that have damage, and leaves the rest out", () => {
+    const got = aggregateLayer(all, "damage", WORLD, options);
+    // Not the older analysis, not the one on another grid, not the match
+    // that was never analysed.
+    expect([got.available, got.contributing]).toEqual([1, 1]);
+    expect(got.events).toBe(HEAVY + 30);
+    expect(at(got.field, BUSY)).toBeGreaterThan(at(got.field, QUIET));
+  });
+
+  it("draws where it landed by default and where it came from on request", () => {
+    const landed = aggregateLayer(all, "damage", WORLD, {
+      ...options,
+      damageMode: "at",
+    });
+    const origin = aggregateLayer(all, "damage", WORLD, {
+      ...options,
+      damageMode: "origin",
+    });
+    expect(aggregateLayer(all, "damage", WORLD, options).events).toBe(
+      landed.events,
+    );
+    expect(origin.events).toBe(HEAVY);
+    expect(at(origin.field, QUIET)).toBeGreaterThan(at(origin.field, BUSY));
+    expect(at(landed.field, BUSY)).toBeGreaterThan(at(landed.field, QUIET));
+  });
+
+  it("windows by the minute, as the other layers do", () => {
+    const got = aggregateLayer(all, "damage", WORLD, {
+      normalise: "share",
+      window: { kind: "range", from: 1, to: 2 },
+    });
+    expect(got.events).toBe(30);
+  });
+
+  it("has nothing when no match has damage, and the other layers do not read it", () => {
+    const none = aggregateLayer(
+      [older, otherGrid, unanalysed],
+      "damage",
+      WORLD,
+      options,
+    );
+    expect(none).toMatchObject({ field: null, available: 0, contributing: 0 });
+    expect(aggregateLayer(all, "deaths", WORLD, options).events).toBe(10);
+    expect(aggregateLayer(all, "orders", WORLD, options).events).toBe(0);
+  });
+
+  it("counts the same without building a field", () => {
+    for (const damageMode of ["at", "origin"] as const) {
+      const full = aggregateLayer(all, "damage", WORLD, {
+        ...options,
+        damageMode,
+      });
+      const counted = aggregateLayer(all, "damage", WORLD, {
+        ...options,
+        damageMode,
+        countsOnly: true,
+      });
+      expect(counted.field).toBeNull();
+      expect(counted).toMatchObject({
+        available: full.available,
+        contributing: full.contributing,
+        events: full.events,
+      });
+    }
+  });
+
+  it("states its amounts in points of damage", () => {
+    expect(layerEvents("damage", 30)).toBe("30 points of damage");
+    expect(layerEvents("damage", 1)).toBe("1 point of damage");
+    expect(LAYER_LABEL.damage).toBe("Damage dealt");
+    expect(DAMAGE_MODE_LABEL.at).toBe("Where damage landed");
+    expect(DAMAGE_MODE_LABEL.origin).toBe("Where damage came from");
   });
 });
 
