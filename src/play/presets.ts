@@ -258,7 +258,7 @@ function parseRestrictions(value: unknown): BattleRestrictions | undefined {
  * rather than repaired: a box is quick to redraw and a silently moved one is not
  * quick to notice. Returns undefined when nothing valid survives.
  */
-function parseStartRects(
+export function parseStartRects(
   value: unknown,
 ): Record<string, StartRect> | undefined {
   if (typeof value !== "object" || value === null) return undefined;

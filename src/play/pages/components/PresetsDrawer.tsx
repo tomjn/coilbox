@@ -14,6 +14,8 @@ import type { ConfigOption } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import type { ResultRecord } from "../../../records/bestResult";
 import type { ModProject } from "../../../workshop/project";
+import { ChobbyPresetsRow } from "../../ChobbyPresetsRow";
+import { ChobbyPresetsView } from "../../ChobbyPresetsView";
 import type { SkirmishDraft } from "../../drafts";
 import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
 import { PresetList } from "../../PresetList";
@@ -22,6 +24,7 @@ import { PresetTweaksRow } from "../../PresetTweaksRow";
 import { PresetTweaksView, usePresetTweaks } from "../../PresetTweaksView";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
+import { useChobbyPresetFiles } from "../../useChobbyPresetFiles";
 import { usePresetFitFacts } from "../../usePresetFitFacts";
 
 /**
@@ -138,6 +141,10 @@ export function PresetsDrawer({
   // The unit tweak list, the sheet's third face alongside the list and a
   // preset's own panel.
   const [tweaksOpen, setTweaksOpen] = useState(false);
+  // BYAR-Chobby's saved presets, another face. Looked for while the sheet is
+  // open, and the row is there only when a data folder holds the file.
+  const [chobbyOpen, setChobbyOpen] = useState(false);
+  const chobbyFiles = useChobbyPresetFiles(open);
   // Read here as well as in the panel, so the row says up front when there is
   // nothing behind it rather than opening onto an explanation.
   const tweaks = usePresetTweaks(
@@ -160,6 +167,7 @@ export function PresetsDrawer({
         if (!next) {
           setViewing(null);
           setTweaksOpen(false);
+          setChobbyOpen(false);
         }
         onOpenChange(next);
       }}
@@ -168,13 +176,14 @@ export function PresetsDrawer({
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center gap-2 border-b border-border/60 px-5 py-4">
-            {(viewing || tweaksOpen) && (
+            {(viewing || tweaksOpen || chobbyOpen) && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => {
                   setViewing(null);
                   setTweaksOpen(false);
+                  setChobbyOpen(false);
                 }}
                 aria-label={t`Back to presets`}
               >
@@ -182,7 +191,11 @@ export function PresetsDrawer({
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {tweaksOpen ? t`Unit tweaks` : (viewing?.name ?? t`Presets`)}
+              {tweaksOpen
+                ? t`Unit tweaks`
+                : chobbyOpen
+                  ? t`Chobby presets`
+                  : (viewing?.name ?? t`Presets`)}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label={t`Close`}>
@@ -191,7 +204,16 @@ export function PresetsDrawer({
             </DialogPrimitive.Close>
           </div>
 
-          {tweaksOpen ? (
+          {chobbyOpen && chobbyFiles.length > 0 ? (
+            <ChobbyPresetsView
+              files={chobbyFiles}
+              currentGameName={currentGameName}
+              enginePath={enginePath}
+              dataDir={dataDir}
+              archive={archive}
+              disabled={disabled}
+            />
+          ) : tweaksOpen ? (
             <PresetTweaksView
               gameName={currentGameName}
               modOptionsSchema={modOptionsSchema}
@@ -297,6 +319,12 @@ export function PresetsDrawer({
                   unavailable={tweaks.unavailable}
                   onOpen={() => setTweaksOpen(true)}
                 />
+                {chobbyFiles.length > 0 && (
+                  <ChobbyPresetsRow
+                    disabled={disabled}
+                    onOpen={() => setChobbyOpen(true)}
+                  />
+                )}
                 <PresetList
                   presets={presets}
                   thumbs={thumbs}

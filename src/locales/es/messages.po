@@ -107,6 +107,11 @@ msgstr "Solo BeamLaser 'Large'. Lo rápido que el rayo se desvanece hasta desapa
 msgid "'Large' BeamLaser only. Regular BeamLaser stretches a single tile instead of repeating it."
 msgstr "Solo BeamLaser 'Large'. El BeamLaser normal estira una sola tesela en lugar de repetirla."
 
+#. placeholder {0}: writing.name
+#: src/play/ChobbyPresetsView.tsx
+msgid "\"{0}\" is already in Chobby."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
@@ -578,6 +583,11 @@ msgstr "{0, plural, one {# bloqueo haría que llegue roto a quien lo juegue: {fi
 msgid "{0, plural, one {# blueprint added to your library.} other {# blueprints added to your library.}}"
 msgstr "{0, plural, one {# plano añadido a tu biblioteca.} other {# planos añadidos a tu biblioteca.}}"
 
+#. placeholder {0}: sum.bots
+#: src/play/ChobbyPresetsView.tsx
+msgid "{0, plural, one {# bot} other {# bots}}"
+msgstr ""
+
 #. placeholder {0}: dead.length
 #. placeholder {0}: ops.length
 #: src/workshop/compatibility.ts
@@ -767,6 +777,8 @@ msgid "{0, plural, one {# of them has a stored analysis, which is deleted too an
 msgstr "{0, plural, one {# de ellas tiene un análisis guardado, que también se elimina y libera otros {analysisFreed}.} other {# de ellas tienen un análisis guardado, que también se elimina y libera otros {analysisFreed}.}}"
 
 #. placeholder {0}: counts.plain
+#. placeholder {0}: sum.options
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/presetParts.ts
 #, fuzzy
 msgid "{0, plural, one {# option} other {# options}}"
@@ -1140,6 +1152,11 @@ msgstr "{0, plural, one {Lista de ocultos: # id, que coincide con una función o
 #, fuzzy
 msgid "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
 msgstr "{0, plural, one {Ajustes ocultos: # id, que coincide con una sección} other {Ajustes ocultos: # ids, todos coinciden con una sección}}"
+
+#. placeholder {0}: picked.size
+#: src/play/ChobbyPresetsView.tsx
+msgid "{0, plural, one {Import # preset} other {Import # presets}}"
+msgstr ""
 
 #. placeholder {0}: data.sharedTeamGames
 #: src/content/pages/components/PlayerMatchFigures.tsx
@@ -2212,6 +2229,10 @@ msgstr "{count, plural, one {Un amigo en la sala} other {# amigos en la sala}}"
 #, fuzzy
 msgid "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
 msgstr "{count, plural, one {El filtro de juegos coincide con # juego instalado} other {El filtro de juegos coincide con # juegos instalados}}"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "{count, plural, one {Imported # preset from Chobby} other {Imported # presets from Chobby}}"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -12097,6 +12118,10 @@ msgstr "Color de fondo"
 msgid "Background set, no icon"
 msgstr "Fondo definido, sin icono"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Backup: {backup}"
+msgstr ""
+
 #: src/content/buildPicMissing.ts
 #, fuzzy
 msgid "bad pic"
@@ -13937,6 +13962,7 @@ msgstr "No puede dañar a su propia unidad"
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
 #: src/placement/TerrainControls.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -14706,6 +14732,15 @@ msgstr "Comprueba la boca del arma en cada frame"
 msgid "checksum {checksum}"
 msgstr "suma de comprobación {checksum}"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Chobby file"
+msgstr ""
+
+#: src/play/ChobbyPresetsRow.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Chobby presets"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -14821,6 +14856,10 @@ msgstr "Elige un mapa."
 #, fuzzy
 msgid "Choose a model"
 msgstr "Elige un modelo"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Choose a preset to write"
+msgstr ""
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
@@ -17520,6 +17559,10 @@ msgstr "No se pudo leer el archivo comprimido de este juego."
 #, fuzzy
 msgid "Could not read this game's archive. Use the file picker instead."
 msgstr "No se pudo leer el archivo comprimido de este juego. Usa el selector de archivos."
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Could not read this game's factions and AIs. Close the sheet and open it again to retry."
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -25195,6 +25238,7 @@ msgstr "Volumen del sonido de impacto (bajo el agua)"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/PresetLibraryToolbar.tsx
 #: src/scenario/pages/components/ScenarioImportButton.tsx
 #: src/uberstress/pages/HistoryPage.tsx
@@ -25207,6 +25251,10 @@ msgstr "Importar"
 #, fuzzy
 msgid "Import .sdd folder…"
 msgstr "Importar carpeta .sdd…"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Import {name}"
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -25310,6 +25358,10 @@ msgstr "Importar desde un enlace"
 #, fuzzy
 msgid "Import from file…"
 msgstr "Importar desde archivo…"
+
+#: src/play/ChobbyPresetsRow.tsx
+msgid "Import from or write to optionsPresets.json"
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -27391,6 +27443,10 @@ msgstr "Omitidas: {noTotals} sin datos registrados (repeticiones antiguas o sin 
 #, fuzzy
 msgid "Left out: {noTotals} with no figures recorded (older or unmeasured replays)."
 msgstr "Omitidas: {noTotals} sin datos registrados (repeticiones antiguas o sin medir)."
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Left out: {sections}"
+msgstr ""
 
 #: src/multiplayer/chat/ChatPane.tsx
 #, fuzzy
@@ -34918,6 +34974,18 @@ msgstr "Opcional. Zero-K lo guarda en tu cuenta y no envía ningún código."
 msgid "Options"
 msgstr "Opciones"
 
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is empty."
+msgstr ""
+
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is not a table of presets."
+msgstr ""
+
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is not valid JSON: {reason}"
+msgstr ""
+
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #, fuzzy
 msgid "Or equip one from the library"
@@ -36725,6 +36793,10 @@ msgstr "IA de la plantilla ajustada"
 #, fuzzy
 msgid "Preset name"
 msgstr "Nombre de la plantilla"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Preset to write"
+msgstr ""
 
 #: src/multiplayer/battle/ApplySkirmishPresetDrawer.tsx
 #: src/multiplayer/pages/BattleRoomPage.tsx
@@ -38737,6 +38809,7 @@ msgstr "Remezclada de"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -38811,6 +38884,10 @@ msgstr "¿Quitar {mapTitle}?"
 #, fuzzy
 msgid "Remove {name}"
 msgstr "Quitar {name}"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Remove {name} from Chobby"
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
@@ -39005,6 +39082,10 @@ msgstr "Quitar palabra"
 #, fuzzy
 msgid "removed"
 msgstr "eliminado"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Removed \"{name}\" from Chobby"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -39229,6 +39310,7 @@ msgstr "se repite · {cooldown} s"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
@@ -54474,6 +54556,10 @@ msgstr "Restos"
 msgid "Wreck pose"
 msgstr "Pose de restos"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Write"
+msgstr ""
+
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
 msgid "Write {projectName} out as a .sdz for {gameName}, ready to hand to somebody else or upload."
@@ -54624,6 +54710,10 @@ msgstr "Se escribe al exportar en <0>{scriptPath}</0> dentro del juego al que ex
 #, fuzzy
 msgid "Written:"
 msgstr "Escrito:"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Wrote \"{name}\" to Chobby"
+msgstr ""
 
 #. placeholder {0}: result.groups.length
 #: src/content/pages/components/Convert3doDrawer.tsx
