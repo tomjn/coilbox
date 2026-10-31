@@ -8,7 +8,6 @@ import {
   History,
   LogIn,
   MessagesSquare,
-  Rocket,
   ShieldCheck,
   Swords,
   Users,
@@ -33,6 +32,7 @@ import {
   useMpRevealed,
   useMpServerAdmin,
 } from "./navPredicates";
+import { OpenAnnihilationIcon } from "./OpenAnnihilationIcon";
 import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
 import OpenAnnihilationSettings from "./pages/OpenAnnihilationSettings";
@@ -269,7 +269,7 @@ const multiplayerPlugin: FramePlugin = {
       ),
       parent: "multiplayer",
       order: 50,
-      icon: Rocket,
+      icon: OpenAnnihilationIcon,
       Component: OpenAnnihilationSettings,
     },
   ],
