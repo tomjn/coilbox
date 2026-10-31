@@ -27,6 +27,7 @@ import {
 import type { MarkPlace } from "../../mapImage";
 import { renderMapImage, savePngBytes } from "../../mapImageExport";
 import type { StartRecords } from "../../mapRecords";
+import type { DamageMode } from "../../replayDamage";
 import type { StartRow } from "../../startNames";
 
 type Kind = "image" | "layer" | "starts";
@@ -44,6 +45,7 @@ export function MapExportButtons({
   info: basis,
   layer,
   layerSentence,
+  damageMode,
   drawn,
   normalise,
   window,
@@ -60,6 +62,8 @@ export function MapExportButtons({
   layer: HeatLayerId | "";
   /** What the layer counts, as the legend names it. */
   layerSentence: string;
+  /** Which end of a hit the damage layer draws. Read for that layer only. */
+  damageMode?: DamageMode;
   drawn: LayerAggregate | null;
   normalise: Normalise;
   window: MatchWindow;
@@ -120,7 +124,7 @@ export function MapExportButtons({
     return run(
       "image",
       t`Export the picture`,
-      layerImageFileName(info, layer),
+      layerImageFileName(info, layer, damageMode),
       { name: t`PNG image`, extensions: ["png"] },
       t`Picture exported.`,
       async (dest) => {
@@ -157,7 +161,7 @@ export function MapExportButtons({
     return run(
       "layer",
       t`Export the layer as CSV`,
-      layerCsvFileName(info, layer),
+      layerCsvFileName(info, layer, damageMode),
       csv,
       t`Layer exported.`,
       (dest) =>
@@ -166,6 +170,7 @@ export function MapExportButtons({
           text: layerCsv({
             info,
             layer,
+            damageMode,
             normalise,
             window,
             contributing: drawn.contributing,

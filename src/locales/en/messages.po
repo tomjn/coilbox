@@ -1946,6 +1946,10 @@ msgstr "{counts}, in build order"
 msgid "{currentName} (not installed)"
 msgstr "{currentName} (not installed)"
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{damageOtherGrid, plural, one {# match recorded its damage on a map of another size and is left out.} other {# matches recorded their damage on a map of another size and are left out.}}"
+msgstr "{damageOtherGrid, plural, one {# match recorded its damage on a map of another size and is left out.} other {# matches recorded their damage on a map of another size and are left out.}}"
+
 #: src/notify/NotificationsBell.tsx
 msgid "{days}d"
 msgstr "{days}d"
@@ -4083,6 +4087,10 @@ msgstr "{next}m"
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
 msgstr "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{noDamage, plural, one {# analysed match has no damage recorded and is left out. Analyse it again to record damage.} other {# analysed matches have no damage recorded and are left out. Analyse them again to record damage.}}"
+msgstr "{noDamage, plural, one {# analysed match has no damage recorded and is left out. Analyse it again to record damage.} other {# analysed matches have no damage recorded and are left out. Analyse them again to record damage.}}"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "{nodeName} has fallen."
@@ -14784,6 +14792,11 @@ msgstr "Damage"
 msgid "Damage against {armourClass}"
 msgstr "Damage against {armourClass}"
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Damage comes from playing a match back, which is run from a replay's own page. It is added up in each cell and each minute and rounded to a whole point. Damage past a unit's last health, paralysis and healing are not in it. Where it landed counts every hit. Where it came from counts only damage an attacker dealt."
+msgstr "Damage comes from playing a match back, which is run from a replay's own page. It is added up in each cell and each minute and rounded to a whole point. Damage past a unit's last health, paralysis and healing are not in it. Where it landed counts every hit. Where it came from counts only damage an attacker dealt."
+
+#: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Damage dealt"
 msgstr "Damage dealt"
@@ -25874,6 +25887,10 @@ msgid "No match on this map in the picture has been analysed, so there are no de
 msgstr "No match on this map in the picture has been analysed, so there are no deaths to draw."
 
 #: src/content/pages/components/MapAggregate.tsx
+msgid "No match on this map in the picture has been analysed, so there is no damage to draw."
+msgstr "No match on this map in the picture has been analysed, so there is no damage to draw."
+
+#: src/content/pages/components/MapAggregate.tsx
 msgid "No match on this map is in your library yet."
 msgstr "No match on this map is in your library yet."
 
@@ -29843,9 +29860,17 @@ msgstr "Point at a unit to name it. Click one to keep it named, and click the gr
 msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
 msgstr "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
 
+#: src/content/mapAggregate.ts
+msgid "point of damage"
+msgstr "point of damage"
+
 #: src/lego/animPresets.ts
 msgid "Points at whatever the unit is building, which no fixed pose can hold."
 msgstr "Points at whatever the unit is building, which no fixed pose can hold."
+
+#: src/content/mapAggregate.ts
+msgid "points of damage"
+msgstr "points of damage"
 
 #: src/lego/animPresets.ts
 msgid "Points the build arm at whatever the unit is building and holds it there until the job stops. A builder only."
@@ -43829,10 +43854,12 @@ msgstr "When you join a battle whose game or map you don't have, start the downl
 msgid "Where buildings were ordered"
 msgstr "Where buildings were ordered"
 
+#: src/content/mapAggregate.ts
 #: src/content/replayDamage.ts
 msgid "Where damage came from"
 msgstr "Where damage came from"
 
+#: src/content/mapAggregate.ts
 #: src/content/replayDamage.ts
 msgid "Where damage landed"
 msgstr "Where damage landed"
@@ -43857,6 +43884,7 @@ msgstr "Where from"
 msgid "Where games and maps come from."
 msgstr "Where games and maps come from."
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "Where it came from"
 msgstr "Where it came from"
@@ -43865,6 +43893,7 @@ msgstr "Where it came from"
 msgid "Where it can be built"
 msgstr "Where it can be built"
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "Where it landed"
 msgstr "Where it landed"
@@ -43963,6 +43992,7 @@ msgstr "Whether the wireframe build animation is drawn while this unit is under 
 msgid "Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked."
 msgstr "Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked."
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "Which end of the damage is drawn"
 msgstr "Which end of the damage is drawn"

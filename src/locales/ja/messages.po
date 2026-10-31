@@ -2360,6 +2360,10 @@ msgstr ""
 msgid "{currentName} (not installed)"
 msgstr "{currentName}（未インストール）"
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{damageOtherGrid, plural, one {# match recorded its damage on a map of another size and is left out.} other {# matches recorded their damage on a map of another size and are left out.}}"
+msgstr ""
+
 #: src/notify/NotificationsBell.tsx
 #, fuzzy
 msgid "{days}d"
@@ -5017,6 +5021,10 @@ msgstr "{next} 分"
 #, fuzzy
 msgid "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
 msgstr "{noAttacker, plural, other {# 件の損失には攻撃者が記録されていません（建設の取り消しなど）。他と同様に集計しています。}}"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{noDamage, plural, one {# analysed match has no damage recorded and is left out. Analyse it again to record damage.} other {# analysed matches have no damage recorded and are left out. Analyse them again to record damage.}}"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
@@ -18201,6 +18209,11 @@ msgstr "ダメージ"
 msgid "Damage against {armourClass}"
 msgstr "{armourClass} へのダメージ"
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Damage comes from playing a match back, which is run from a replay's own page. It is added up in each cell and each minute and rounded to a whole point. Damage past a unit's last health, paralysis and healing are not in it. Where it landed counts every hit. Where it came from counts only damage an attacker dealt."
+msgstr ""
+
+#: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "Damage dealt"
@@ -31851,6 +31864,10 @@ msgid "No match on this map in the picture has been analysed, so there are no de
 msgstr "画像内でこのマップの試合が分析されていないため、描画する損失はありません。"
 
 #: src/content/pages/components/MapAggregate.tsx
+msgid "No match on this map in the picture has been analysed, so there is no damage to draw."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "No match on this map is in your library yet."
 msgstr "このマップの試合はまだライブラリにありません。"
@@ -36746,10 +36763,18 @@ msgstr "ユニットにポインターを合わせると名前を表示します
 msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
 msgstr "マークにポインターを合わせるかフォーカスすると読み上げます。チャットのマークを選択すると、その行でチャットログを開きます。"
 
+#: src/content/mapAggregate.ts
+msgid "point of damage"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Points at whatever the unit is building, which no fixed pose can hold."
 msgstr "ユニットが建設しているものを指し続けます。固定のポーズでは表現できません。"
+
+#: src/content/mapAggregate.ts
+msgid "points of damage"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -53982,11 +54007,13 @@ msgstr "ゲームやマップを持っていない試合に参加したとき、
 msgid "Where buildings were ordered"
 msgstr "建物が命令された場所"
 
+#: src/content/mapAggregate.ts
 #: src/content/replayDamage.ts
 #, fuzzy
 msgid "Where damage came from"
 msgstr "ダメージの発生元"
 
+#: src/content/mapAggregate.ts
 #: src/content/replayDamage.ts
 #, fuzzy
 msgid "Where damage landed"
@@ -54017,6 +54044,7 @@ msgstr "入手元"
 msgid "Where games and maps come from."
 msgstr "ゲームとマップの入手元。"
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "Where it came from"
@@ -54027,6 +54055,7 @@ msgstr "発生元"
 msgid "Where it can be built"
 msgstr "建設できる場所"
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "Where it landed"
@@ -54149,6 +54178,7 @@ msgstr "このユニットの建設中に、ワイヤーフレームの建設ア
 msgid "Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked."
 msgstr "「ゲームのアップデートに追従」にチェックしたとき、この行がゲームに追従するルールを記録するか、固定値を記録するか。"
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "Which end of the damage is drawn"

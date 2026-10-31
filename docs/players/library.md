@@ -289,7 +289,8 @@ To choose which matches go in:
 To choose what the picture shows:
 
 - Start positions puts a dot where each player started.
-- Building density, Defences, Economy, Order density and Deaths each colour the map by where that happened most. The number on each button is how many matches have it. Deaths needs analysed matches.
+- Building density, Defences, Economy, Order density, Deaths and Damage dealt each colour the map by where that happened most. The number on each button is how many matches have it. Deaths and Damage dealt need analysed matches, and Damage dealt needs ones analysed by a recent enough version of coilbox. Analyse an older match again to add its damage.
+- Damage dealt has two views: Where it landed and Where it came from. Only one of Deaths and Damage dealt is drawn at a time.
 - The first list under the buttons decides how the matches are added together: Share of each match, Each match's busiest spot or Per minute of match.
 - The second list limits the picture to part of every match, such as First 5 minutes. Between two minutes lets you type your own range.
 

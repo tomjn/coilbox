@@ -314,4 +314,23 @@ describe("file names", () => {
       "map-density.png",
     );
   });
+
+  it("tell the two ends of the damage layer apart", () => {
+    expect(layerCsvFileName(info, "damage")).toBe(
+      "tabula-2-1-damage-landed.csv",
+    );
+    expect(layerCsvFileName(info, "damage", "at")).toBe(
+      "tabula-2-1-damage-landed.csv",
+    );
+    expect(layerCsvFileName(info, "damage", "origin")).toBe(
+      "tabula-2-1-damage-origin.csv",
+    );
+    expect(layerImageFileName(info, "damage", "origin")).toBe(
+      "tabula-2-1-damage-origin.png",
+    );
+    // The mode is read for the damage layer only.
+    expect(layerCsvFileName(info, "deaths", "origin")).toBe(
+      "tabula-2-1-deaths.csv",
+    );
+  });
 });

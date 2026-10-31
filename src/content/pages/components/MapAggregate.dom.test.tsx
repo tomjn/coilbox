@@ -17,6 +17,7 @@ import {
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  MapAmountLayer,
   MapCountLayer,
   MatchSetup,
   ReplayMapGrids,
@@ -165,6 +166,27 @@ function layer(entries: [number, number, number, number?][]): MapCountLayer {
     def: entries.some((e) => e[3] !== undefined) ? packed(def) : undefined,
     total: entries.reduce((sum, e) => sum + e[2], 0),
     offMap: 0,
+  };
+}
+
+/** `[cell, minute, points]`, packed as Rust packs damage: a `u32` each. */
+function amountLayer(entries: [number, number, number][]): MapAmountLayer {
+  const n = entries.length;
+  const cell = new Uint32Array(n);
+  const slice = new Uint16Array(n);
+  const amount = new Uint32Array(n);
+  entries.forEach(([c, s, k], i) => {
+    cell[i] = c;
+    slice[i] = s;
+    amount[i] = k;
+  });
+  const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
+  return {
+    entries: n,
+    cell: packed(cell),
+    slice: packed(slice),
+    amount: packed(amount),
+    total: entries.reduce((sum, e) => sum + e[2], 0),
   };
 }
 
@@ -494,6 +516,133 @@ describe("the picture of every match on a map", () => {
       said.getByText(
         /1 death was recorded at exactly the map's corner.*is left out/,
       ),
+    ).toBeTruthy();
+  });
+
+  /**
+   * Three analysed matches. `a` has deaths and damage. `b` was analysed before
+   * damage was logged, so it has deaths and no damage. `c` recorded its damage
+   * on another grid.
+   */
+  function analysedMatches(): StatRecord[] {
+    const records = [
+      ...twoMatches(),
+      record({ filename: "c.sdfz", gameId: "cc" }),
+    ];
+    seedReplayAnalysisForTests({
+      analyses: [
+        stored("aa", "current"),
+        stored("bb", "current"),
+        stored("cc", "current"),
+      ],
+    });
+    const deaths = (cell: number) => ({
+      layer: layer([[cell, 3, 7]]),
+      unattacked: 0,
+      noPosition: 0,
+    });
+    Object.assign(GRIDS["/demos/a.sdfz"] as Partial<ReplayMapGrids>, {
+      deaths: deaths(60 * 256 + 60),
+      damage: {
+        at: amountLayer([[100 * 256 + 100, 3, 120]]),
+        origin: amountLayer([[10 * 256 + 10, 3, 100]]),
+      },
+    });
+    Object.assign(GRIDS["/demos/b.sdfz"] as Partial<ReplayMapGrids>, {
+      deaths: deaths(70 * 256 + 70),
+    });
+    GRIDS["/demos/c.sdfz"] = {
+      gameId: "cc",
+      deaths: deaths(80 * 256 + 80),
+      damageOtherGrid: true,
+    };
+    return records;
+  }
+
+  it("offers a damage layer and says how many matches it is built from", async () => {
+    show(analysedMatches());
+    await settled();
+    expect(text("layer-damage")).toBe("Damage dealt · 1");
+    fireEvent.click(screen.getByTestId("layer-damage"));
+    expect(text("layer-events")).toBe("120 points of damage, from 1 match.");
+    expect(
+      document.querySelector('canvas[data-layer="damage"]'),
+    ).not.toBeNull();
+  });
+
+  it("leaves out a match with no damage recorded and one on another grid, and counts both", async () => {
+    show(analysedMatches());
+    await settled();
+    fireEvent.click(screen.getByTestId("layer-damage"));
+    expect(text("damage-missing")).toBe(
+      "1 analysed match has no damage recorded and is left out. Analyse it again to record damage.",
+    );
+    expect(text("damage-other-grid")).toBe(
+      "1 match recorded its damage on a map of another size and is left out.",
+    );
+    // Neither note belongs to another layer.
+    fireEvent.click(screen.getByTestId("layer-deaths"));
+    expect(screen.queryByTestId("damage-missing")).toBeNull();
+    expect(screen.queryByTestId("damage-other-grid")).toBeNull();
+    expect(text("layer-deaths")).toBe("Deaths · 3");
+  });
+
+  it("draws where damage landed, or where it came from, with the legend to match", async () => {
+    show(analysedMatches());
+    await settled();
+    expect(screen.queryByTestId("damage-mode")).toBeNull();
+    fireEvent.click(screen.getByTestId("layer-damage"));
+    expect(text("layer-notes")).toMatch(/Where damage landed/);
+    expect(
+      screen.getByTestId("damage-mode-at").getAttribute("data-state"),
+    ).toBe("on");
+
+    fireEvent.click(screen.getByTestId("damage-mode-origin"));
+    expect(text("layer-events")).toBe("100 points of damage, from 1 match.");
+    expect(text("layer-notes")).toMatch(/Where damage came from/);
+    expect(text("layer-notes")).not.toMatch(/Where damage landed/);
+
+    fireEvent.click(screen.getByTestId("layer-orders"));
+    expect(screen.queryByTestId("damage-mode")).toBeNull();
+  });
+
+  it("never draws damage and deaths together", async () => {
+    show(analysedMatches());
+    await settled();
+    const drawn = () =>
+      [...document.querySelectorAll("canvas[data-layer]")].map((c) =>
+        c.getAttribute("data-layer"),
+      );
+    fireEvent.click(screen.getByTestId("layer-deaths"));
+    expect(drawn()).toEqual(["deaths"]);
+    fireEvent.click(screen.getByTestId("layer-damage"));
+    expect(drawn()).toEqual(["damage"]);
+    fireEvent.click(screen.getByTestId("damage-mode-origin"));
+    expect(drawn()).toEqual(["damage"]);
+    fireEvent.click(screen.getByTestId("layer-deaths"));
+    expect(drawn()).toEqual(["deaths"]);
+  });
+
+  it("says no match has been analysed when the damage layer has none", async () => {
+    show(twoMatches());
+    await settled();
+    expect(text("layer-damage")).toBe("Damage dealt · 0");
+    fireEvent.click(screen.getByTestId("layer-damage"));
+    expect(text("no-analysis")).toBe(
+      "No match on this map in the picture has been analysed, so there is no damage to draw.",
+    );
+    expect(screen.queryByTestId("layer-events")).toBeNull();
+    expect(document.querySelector("canvas")).toBeNull();
+  });
+
+  it("gives the damage layer the playback source and says where damage comes from", async () => {
+    show(analysedMatches());
+    await settled();
+    fireEvent.click(screen.getByTestId("layer-damage"));
+    const said = help();
+    expect(said.getByText(/From playing the match back/)).toBeTruthy();
+    expect(
+      said.getByText(/Damage comes from playing a match back/),
     ).toBeTruthy();
   });
 

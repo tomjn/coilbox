@@ -1004,6 +1004,23 @@ export interface MapCountLayer {
   offMap: number;
 }
 
+/**
+ * Damage in each cell of a map's grid in each minute of a match, packed like a
+ * `MapCountLayer` but with a `u32` for each entry (#3897). An amount is whole
+ * points of damage, rounded once per cell and minute.
+ */
+export interface MapAmountLayer {
+  entries: number;
+  /** `u32`: the row times the grid's width plus the column. */
+  cell: string;
+  /** `u16`: the minute of the match, 0 for the first. */
+  slice: string;
+  /** `u32`: points of damage. */
+  amount: string;
+  /** Points of damage in the entries. */
+  total: number;
+}
+
 /** One replay reduced to counts on its map's grid (#1161). */
 export interface ReplayMapGrids {
   path: string;
@@ -1031,6 +1048,14 @@ export interface ReplayMapGrids {
     /** Deaths the log puts at exactly 0,0, which are left out. */
     noPosition: number;
   };
+  /**
+   * Where damage landed (`at`) and where it came from (`origin`). Absent when
+   * the match has no analysis with events or its analysis recorded no damage.
+   */
+  damage?: { at: MapAmountLayer; origin: MapAmountLayer };
+  /** True when the analysis recorded damage on another grid than the map's,
+   *  so it was left out. */
+  damageOtherGrid?: boolean;
   /** Whether the counts came from a kept file and not from walking the replay. */
   fromCache: boolean;
 }
