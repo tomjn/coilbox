@@ -34813,6 +34813,10 @@ msgstr "Abre un proyecto para escribir sus cambios en el juego."
 msgid "Open a screen"
 msgstr "Abrir una pantalla"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "Open Annihilation"
+msgstr ""
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
 msgid "Open another file"

@@ -28284,6 +28284,10 @@ msgstr ""
 msgid "Open a screen"
 msgstr ""
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "Open Annihilation"
+msgstr ""
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Open another file"
 msgstr ""
