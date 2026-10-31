@@ -271,9 +271,9 @@ describe("ReplayTimeline", () => {
       strip([said(60, 1), said(300, 2)], vi.fn(), [], players, CHARTED);
       const [, ben] = screen.getAllByRole("button");
       // happy-dom has no focus-visible state, so say the focus came from the keyboard.
-      const matches = ben.matches.bind(ben);
-      ben.matches = (selector: string) =>
-        selector === ":focus-visible" || matches(selector);
+      vi.spyOn(ben, "matches").mockImplementation(
+        (selector: string) => selector === ":focus-visible",
+      );
       fireEvent.focus(ben);
       expect(store.getState().hovered).toEqual([1]);
       expect(lit(ben)).toBe("true");
@@ -284,7 +284,7 @@ describe("ReplayTimeline", () => {
     it("does not point at a team on a focus that is not from the keyboard", () => {
       strip([said(60, 1)], vi.fn(), [], players, CHARTED);
       const mark = screen.getByRole("button");
-      mark.matches = () => false;
+      vi.spyOn(mark, "matches").mockReturnValue(false);
       fireEvent.focus(mark);
       expect(store.getState().hovered).toBeNull();
     });
