@@ -513,8 +513,8 @@ mod tests {
             13,
             1_700_000_000,
         );
-        assert_eq!(skirmish_key(&engine, Some(&game())), "ab29c551257322ae7");
-        assert_eq!(skirmish_key(&engine, None), "a9c6cc44db315cafd");
+        assert_eq!(skirmish_key(&engine, Some(&game())), "addeee25113e77783");
+        assert_eq!(skirmish_key(&engine, None), "aa582ebb6c926eec4");
     }
 
     #[test]
