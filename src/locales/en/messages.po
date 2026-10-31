@@ -36410,9 +36410,17 @@ msgstr "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
 msgid "Start muted"
 msgstr "Start muted"
 
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start OA"
+msgstr "Start OA"
+
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "Start one, then drop parts into it. Browse what is available under Lego Parts."
+
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start Open Annihilation for this battle"
+msgstr "Start Open Annihilation for this battle"
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -43288,6 +43296,7 @@ msgstr "Versatile"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Version"

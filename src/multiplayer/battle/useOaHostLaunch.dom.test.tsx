@@ -41,7 +41,7 @@ vi.mock("../openAnnihilation", () => ({
   useOpenAnnihilation: () => [program.value],
 }));
 
-import { observeOaBattle } from "../oaRun";
+import { observeOaAutoLaunch, observeOaBattle } from "../oaRun";
 import { useOaHostLaunch } from "./useOaHostLaunch";
 
 type Launch = {
@@ -55,7 +55,10 @@ let launched: Launch[] = [];
 
 const setIngame = vi.fn();
 
-function mount(battleMap = "Host chooses in OA") {
+/** The lobby with the host out of the battle, which ends its memory. */
+const GONE = { connected: true, battleId: null, hostIngame: false };
+
+function mount(battleMap = "Host chooses in OA", autoStart = false) {
   return renderHook(() =>
     useOaHostLaunch({
       serverKey: "me@server:8200",
@@ -64,6 +67,7 @@ function mount(battleMap = "Host chooses in OA") {
       maxPlayers: 6,
       username: "abcdefghijklmnopqrst",
       setIngame,
+      autoStart,
     }),
   );
 }
@@ -85,6 +89,8 @@ beforeEach(() => {
 });
 afterEach(async () => {
   cleanup();
+  // The once-per-battle memory is held outside the hook as well.
+  act(() => observeOaAutoLaunch(() => GONE));
   // The run is held outside the hook, so a test that left OA running would
   // block the next one. Every launch ends here.
   await act(async () => {
@@ -177,6 +183,66 @@ describe("starting Open Annihilation for the host", () => {
     await waitFor(() => expect(launched).toHaveLength(1));
     act(() => result.current.cancel());
     expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("starting by itself for a battle the host has just opened", () => {
+  const STILL_OPEN = { connected: true, battleId: 4021, hostIngame: false };
+
+  it("starts OA once with no click, with the same arguments as the button", async () => {
+    mount("Host chooses in OA", true);
+    await waitFor(() => expect(launched).toHaveLength(1));
+    expect(launched[0].args.slice(0, 3)).toEqual([
+      "--host",
+      "--game-name",
+      "CB4021",
+    ]);
+  });
+
+  it("starts nothing when autoStart is off", async () => {
+    mount();
+    await act(async () => {});
+    expect(bindings.playOaLaunch).not.toHaveBeenCalled();
+  });
+
+  it("does not start again when the host quits OA and comes back to the room", async () => {
+    const first = mount("Host chooses in OA", true);
+    await waitFor(() => expect(launched).toHaveLength(1));
+    act(() => launched[0].onEvent.onmessage(screen("mp_battleroom")));
+    await act(async () => launched[0].finish({ exitCode: 0, signal: null }));
+    // OA's exit lowered the host's own flag, which says nothing of the battle.
+    act(() => observeOaAutoLaunch(() => STILL_OPEN));
+    first.unmount();
+
+    const second = mount("Host chooses in OA", true);
+    await act(async () => {});
+    expect(launched).toHaveLength(1);
+    expect(second.result.current.running).toBe(false);
+
+    act(() => void second.result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(2));
+  });
+
+  it("starts again for the next battle once the first has closed", async () => {
+    const first = mount("Host chooses in OA", true);
+    await waitFor(() => expect(launched).toHaveLength(1));
+    await act(async () => launched[0].finish({ exitCode: 0, signal: null }));
+    act(() => observeOaAutoLaunch(() => STILL_OPEN));
+    act(() => observeOaAutoLaunch(() => GONE));
+    first.unmount();
+
+    mount("Host chooses in OA", true);
+    await waitFor(() => expect(launched).toHaveLength(2));
+  });
+
+  it("waits for a program to be set, and spends nothing until then", async () => {
+    program.value = null;
+    const { rerender } = mount("Host chooses in OA", true);
+    await act(async () => {});
+    expect(bindings.playOaLaunch).not.toHaveBeenCalled();
+    program.value = OA;
+    rerender();
+    await waitFor(() => expect(launched).toHaveLength(1));
   });
 });
 

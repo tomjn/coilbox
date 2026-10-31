@@ -16,7 +16,15 @@ import { useOpenAnnihilation } from "../openAnnihilation";
  * The stored version line goes stale because OA updates itself, so the player's
  * own version is read from the program each time the card opens.
  */
-export function OaEngineCard({ hostVersion }: { hostVersion: string }) {
+export function OaEngineCard({
+  hostVersion,
+  hosting = false,
+}: {
+  hostVersion: string;
+  /** The player is the host, so the host's version is their own and one row
+   * says it (issue #4964). */
+  hosting?: boolean;
+}) {
   const { t } = useLingui();
   const [program] = useOpenAnnihilation();
   const path = program?.path ?? null;
@@ -43,14 +51,18 @@ export function OaEngineCard({ hostVersion }: { hostVersion: string }) {
         <Trans>Engine</Trans>
       </span>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        {!hosting && (
+          <>
+            <dt className="text-muted-foreground">
+              <Trans>Host</Trans>
+            </dt>
+            <dd className="break-words">
+              {hostVersion.trim() || t`Not given by the lobby`}
+            </dd>
+          </>
+        )}
         <dt className="text-muted-foreground">
-          <Trans>Host</Trans>
-        </dt>
-        <dd className="break-words">
-          {hostVersion.trim() || t`Not given by the lobby`}
-        </dd>
-        <dt className="text-muted-foreground">
-          <Trans>Yours</Trans>
+          {hosting ? <Trans>Version</Trans> : <Trans>Yours</Trans>}
         </dt>
         <dd className="break-words">
           {!path ? t`None` : unreadable ? t`Unknown` : (mine ?? t`Checking…`)}
