@@ -277,7 +277,7 @@ export function useFollowedPacks() {
 /**
  * Refreshes followed packs once when the app starts, whichever page it opens on.
  * Renders nothing. Its own component, so a stored pack changing does not re-render
- * the provider it sits in.
+ * the provider beside it.
  */
 export function FollowedPacksStartRefresh() {
   const { packs, refreshAll } = useFollowedPacks();

@@ -4,7 +4,7 @@ import { Clapperboard, FileText, Save, Swords } from "lucide-react";
 import { lazyText } from "../i18n/pluginText";
 import { RECORDS_GROUP } from "../recordsGroup";
 import InGameBadge from "./InGameBadge";
-import { PlayProvider } from "./PlayProvider";
+import { PlayPluginProvider } from "./PlayPluginProvider";
 import EngineLogSection from "./pages/EngineLogSection";
 
 /**
@@ -103,7 +103,7 @@ const playPlugin: FramePlugin = {
       Component: EngineLogSection,
     },
   ],
-  Provider: PlayProvider,
+  Provider: PlayPluginProvider,
   slots: [{ slot: "topbar.right", order: -10, Component: InGameBadge }],
 };
 
