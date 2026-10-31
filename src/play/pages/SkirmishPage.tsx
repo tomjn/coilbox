@@ -124,10 +124,12 @@ import {
 import { mergeGameAi } from "../gameAi";
 import { withOption } from "../modOptions";
 import { usePlay } from "../PlayProvider";
+import { type PendingLoad, PresetLoadGate } from "../PresetLoadGate";
+import { named, undeclaredOptions } from "../presetFit";
+import { missingForLoad, takenOptionKeys, withoutGame } from "../presetLoad";
 import {
   ALL_PARTS,
   applySelection,
-  type PresetPart,
   type PresetSelection,
 } from "../presetParts";
 import {
@@ -781,6 +783,20 @@ export default function SkirmishPage() {
     });
   };
 
+  // Every game the scan found, generated ones included. `games` hides those from
+  // the picker, but a preset saved on one still has its game here.
+  const scannedGameNames = (scan.data?.games ?? []).map((g) => g.name);
+
+  const notifyGameMissing = (p: SkirmishPreset) => {
+    const missingGame = p.gameName;
+    const presetName = p.name;
+    void notify({
+      title: t`You do not have ${missingGame}`,
+      body: t`The rest of "${presetName}" was loaded onto ${gameName}. Install the game to load it whole.`,
+      level: "warning",
+    });
+  };
+
   const loadPreset = (
     p: SkirmishPreset,
     selection: PresetSelection = ALL_PARTS,
@@ -796,25 +812,10 @@ export default function SkirmishPage() {
     if (
       selection.parts.includes("game") &&
       p.gameName !== gameName &&
-      !games.some((g) => g.name === p.gameName)
+      !scannedGameNames.includes(p.gameName)
     ) {
-      const stranded: PresetPart[] = [
-        "game",
-        "modOptions",
-        "tweakSlots",
-        "restrictions",
-      ];
-      taken = {
-        ...selection,
-        parts: selection.parts.filter((part) => !stranded.includes(part)),
-      };
-      const missingGame = p.gameName;
-      const presetName = p.name;
-      void notify({
-        title: t`You do not have ${missingGame}`,
-        body: t`The rest of "${presetName}" was loaded onto ${gameName}. Install the game to load it whole.`,
-        level: "warning",
-      });
+      taken = withoutGame(selection);
+      notifyGameMissing(p);
     }
     const next = applySelection(
       {
@@ -849,6 +850,80 @@ export default function SkirmishPage() {
     setRestrictions(next.restrictions);
     touchPreset(p.id);
   };
+
+  // Loading a saved preset checks its game and map first, as importing one does
+  // (issue #1302). Nothing changes until the check passes, so cancelling leaves
+  // the setup as it was.
+  const [pendingLoad, setPendingLoad] = useState<PendingLoad | null>(null);
+  // Options carried onto another version of the preset's game, to be checked
+  // against what that version declares once it has been read.
+  const [loadedOnto, setLoadedOnto] = useState<{
+    game: string;
+    presetName: string;
+    keys: string[];
+  } | null>(null);
+  const installedForLoad = {
+    games: scannedGameNames,
+    maps: maps.map((m) => m.name),
+  };
+  const requestLoad = (
+    p: SkirmishPreset,
+    selection: PresetSelection = ALL_PARTS,
+    then?: () => void,
+  ) => {
+    if (missingForLoad(p, selection, installedForLoad).length === 0) {
+      loadPreset(p, selection);
+      then?.();
+      return;
+    }
+    setPendingLoad({ preset: p, selection, then });
+  };
+
+  // Runs the load once the gate has passed and this page's own scan agrees. The
+  // gate reads the install through its own hook, which can see a download land
+  // a render before this page does, and loading against the older list would
+  // put the setup back on whichever game sorts first.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `loadPreset` is rebuilt every render, and clearing `pendingLoad` is what keeps this to one run
+  useEffect(() => {
+    if (!pendingLoad?.resolved) return;
+    const { preset, selection, how, then } = pendingLoad;
+    if (
+      scan.data &&
+      missingForLoad(preset, selection, installedForLoad).length > 0
+    )
+      return;
+    setPendingLoad(null);
+    loadPreset(preset, selection);
+    if (how?.kind === "without") notifyGameMissing(preset);
+    if (how?.kind === "onto") {
+      setLoadedOnto({
+        game: how.game,
+        presetName: preset.name,
+        keys: takenOptionKeys(preset.modOptionValues, selection),
+      });
+    }
+    then?.();
+  }, [pendingLoad, scan.data]);
+
+  // Say what the version the preset was loaded onto does not declare, once the
+  // version has been read (issue #1300 does the same for a battle room).
+  useEffect(() => {
+    if (!loadedOnto || gameName !== loadedOnto.game) return;
+    if (gameInfo.status === "loading" || gameInfo.status === "idle") return;
+    const { game, presetName, keys } = loadedOnto;
+    setLoadedOnto(null);
+    const missing =
+      gameInfo.status === "ready"
+        ? undeclaredOptions(keys, gameInfo.info?.options)
+        : [];
+    const names = named(missing);
+    void notify({
+      title: t`Loaded "${presetName}" onto ${game}`,
+      body:
+        missing.length > 0 ? t`${game} does not declare ${names}.` : undefined,
+      level: missing.length > 0 ? "warning" : "success",
+    });
+  }, [loadedOnto, gameName, gameInfo.status, gameInfo.info, t]);
 
   /**
    * Apply a project to a game with no tweak slots, by writing the mutator
@@ -978,7 +1053,7 @@ export default function SkirmishPage() {
   // longer has is said out loud rather than leaving the page looking untouched.
   const openPresetId = useOneShotParam("preset");
   const openedPreset = useRef<string | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `loadPreset` is rebuilt every render, and the ref guard is what keeps this to one run
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `requestLoad` is rebuilt every render, and the ref guard is what keeps this to one run
   useEffect(() => {
     if (!openPresetId || scan.loading) return;
     if (openedPreset.current === openPresetId) return;
@@ -991,12 +1066,16 @@ export default function SkirmishPage() {
       });
       return;
     }
-    loadPreset(preset);
     const loadedName = preset.name;
-    void notify({
-      title: t`Loaded the preset "${loadedName}".`,
-      level: "success",
-    });
+    requestLoad(
+      preset,
+      ALL_PARTS,
+      () =>
+        void notify({
+          title: t`Loaded the preset "${loadedName}".`,
+          level: "success",
+        }),
+    );
   }, [openPresetId, scan.loading, presets]);
 
   const rematchMapName = selectedMap?.name;
@@ -1085,7 +1164,7 @@ export default function SkirmishPage() {
           setModOptionValues((current) => ({ ...current, ...slots }))
         }
         onApplyMutator={applyTweakMutator}
-        onLoad={loadPreset}
+        onLoad={requestLoad}
         onSave={saveCurrentPreset}
         onDelete={removePreset}
         onSaveCopy={(p) => {
@@ -1113,6 +1192,20 @@ export default function SkirmishPage() {
         onHostAsBattle={(p) => hostAsBattle(p, p.name)}
         disabled={running}
       />
+
+      {pendingLoad && (
+        <PresetLoadGate
+          pending={pendingLoad}
+          installedGames={installedForLoad.games}
+          target={target ?? undefined}
+          targetLoading={targetLoading}
+          onChoose={setPendingLoad}
+          onContinue={() =>
+            setPendingLoad((cur) => (cur ? { ...cur, resolved: true } : cur))
+          }
+          onCancel={() => setPendingLoad(null)}
+        />
+      )}
 
       {pendingPreset && (
         <ResolveContentGate

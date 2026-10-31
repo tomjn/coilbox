@@ -153,6 +153,7 @@ export function ResolveContentGate({
   description,
   quiet,
   engineReading,
+  alternatives,
   onContinue,
   onCancel,
 }: {
@@ -174,6 +175,10 @@ export function ResolveContentGate({
   /** The caller's own confirmed reading of the installed engines, for a launch
    * that names an engine version. See `useResolveContent`. */
   engineReading?: EngineReading;
+  /** Other ways forward, listed under what is missing, for a caller that can do
+   * something short of having all of it. Choosing one is the caller's to act on,
+   * usually by changing `requirements`. */
+  alternatives?: { label: string; onChoose: () => void }[];
   /** Runs once every requirement is satisfied. May throw — the error is shown
    * inline and the drawer stays open so the user can retry or cancel. */
   onContinue: () => void | Promise<void>;
@@ -315,6 +320,24 @@ export function ResolveContentGate({
                     />
                   ))}
                 </ul>
+
+                {alternatives && alternatives.length > 0 && (
+                  <ul className="flex flex-col gap-2">
+                    {alternatives.map((alt) => (
+                      <li key={alt.label}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start"
+                          title={alt.label}
+                          onClick={alt.onChoose}
+                        >
+                          <span className="truncate">{alt.label}</span>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 {!nothingToDownload && (
                   <p className="text-xs text-muted-foreground">
