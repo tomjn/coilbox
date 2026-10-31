@@ -162,12 +162,72 @@ it("shows the message when the launch is refused, and clears it on the next pres
   expect(bindings.playOaLaunch).toHaveBeenCalledTimes(2);
 });
 
-it("is hidden by a profile narrowed to a game", () => {
-  state.program = MAC_OA;
+it.each([
+  ["set", MAC_OA],
+  ["not set", null],
+])("is hidden by a profile narrowed to a game when the program is %s", (_, program) => {
+  state.program = program;
   state.matcher = (name) => name === "Splinter Faction";
   show();
   expect(screen.getByText("Battles")).toBeTruthy();
   expect(screen.queryByText(/open annihilation/i)).toBeNull();
+});
+
+it("is a link chip in the links card, with no card or picture, when the program is not set", () => {
+  show();
+  const chip = screen.getByRole("button", { name: /get open annihilation/i });
+  expect(chip.closest("[data-link-card]")).not.toBeNull();
+  expect(chip.closest("[data-tool-card]")).toBeNull();
+  expect(chip.querySelector("img")).toBeNull();
+  expect(groupOf("Play").querySelector(`img[src="${oaPicture}"]`)).toBeNull();
+});
+
+it("is a card with no link chip when the program is set", () => {
+  state.program = MAC_OA;
+  show();
+  const card = screen.getByRole("button", { name: /play open annihilation/i });
+  expect(card.hasAttribute("data-tool-card")).toBe(true);
+  expect(
+    screen.queryByRole("button", { name: /get open annihilation/i }),
+  ).toBeNull();
+  expect(groupOf("Play").querySelector("[data-link-card]")).toBeNull();
+});
+
+it("switches between the link and the card when the program is set or cleared", () => {
+  const view = show();
+  expect(
+    screen.queryByRole("button", { name: /get open annihilation/i }),
+  ).not.toBeNull();
+
+  state.program = MAC_OA;
+  view.rerender(
+    <I18nProvider i18n={i18n}>
+      <MemoryRouter>
+        <ToolCards />
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  expect(
+    screen.queryByRole("button", { name: /get open annihilation/i }),
+  ).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: /play open annihilation/i }),
+  ).not.toBeNull();
+
+  state.program = null;
+  view.rerender(
+    <I18nProvider i18n={i18n}>
+      <MemoryRouter>
+        <ToolCards />
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  expect(
+    screen.queryByRole("button", { name: /play open annihilation/i }),
+  ).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: /get open annihilation/i }),
+  ).not.toBeNull();
 });
 
 it("sits in the Play group, not the Multiplayer group", () => {
@@ -183,11 +243,6 @@ const picture = () =>
     .getByRole("button", { name: /open annihilation/i })
     .querySelector("img");
 
-it("uses the supplied picture as its art when the program is not set", () => {
-  show();
-  expect(picture()?.getAttribute("src")).toBe(oaPicture);
-});
-
 it("uses the supplied picture as its art when the program is set", () => {
   state.program = MAC_OA;
   show();
@@ -195,12 +250,14 @@ it("uses the supplied picture as its art when the program is set", () => {
 });
 
 it("lets a distribution's art for the card replace the picture", () => {
+  state.program = MAC_OA;
   publishArtOverrides(new Map([[OA_CARD_ID, "/profile/oa.png"]]));
   show();
   expect(picture()?.getAttribute("src")).toBe("/profile/oa.png");
 });
 
 it("lets a distribution switch the picture off", () => {
+  state.program = MAC_OA;
   publishArtOverrides(new Map([[OA_CARD_ID, false]]));
   show();
   expect(picture()).toBeNull();
