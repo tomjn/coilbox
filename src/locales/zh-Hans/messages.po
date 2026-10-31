@@ -18338,6 +18338,10 @@ msgstr "数据不是 JSON：{reason}"
 msgid "Data table"
 msgstr "数据表"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Datagrams"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 msgid "Date"
 msgstr ""
@@ -34719,6 +34723,10 @@ msgstr "只记录你更改的字段，所以其余字段在游戏更新时仍会
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 msgstr "只读取了中心上的前 {scanned} 项，所以此游戏的内容可能比这里列出的更多。可以通过搜索缩小范围。"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
@@ -36980,6 +36988,10 @@ msgstr "端口必须是整数。"
 #, fuzzy
 msgid "Ports run from 1 to 65535."
 msgstr "端口范围为 1 到 65535。"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Ports to forward"
+msgstr ""
 
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
@@ -42412,6 +42424,10 @@ msgstr "服务器统计"
 msgid "Servers"
 msgstr "服务器"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Session discovery"
+msgstr ""
+
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 #, fuzzy
 msgid "Sessions logged in for more than 14 days are logged out. Bots and static accounts are exempt."
@@ -45268,6 +45284,10 @@ msgstr "连续纪录"
 #, fuzzy
 msgid "Streaks"
 msgstr "连续纪录"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Stream messages"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -54512,6 +54532,10 @@ msgstr "白烟"
 #, fuzzy
 msgid "white star"
 msgstr "白色恒星"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Who needs to forward these ports"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy

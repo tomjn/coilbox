@@ -59,6 +59,7 @@ import { battleTitleProblem, hostBattleFailure } from "./hostBattle";
 import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { OaMapChoice } from "./OaMapChoice";
+import { OaPorts } from "./OaPorts";
 import { leaveAndLabel } from "./oneBattle";
 import { useHostCompat } from "./useHostCompat";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
@@ -675,18 +676,22 @@ export function HostBattleForm({
             )}
           </label>
 
-          <ReachablePorts
-            ports={relayAlways ? null : battlePorts(port)}
-            help={
-              relayAlways
-                ? t`Not checked, because every battle you host goes through the server's relay.`
-                : undefined
-            }
-            onReport={setReachability}
-            always
-            relayWillCarry={route === "relay"}
-            onCheckingChange={setChecking}
-          />
+          {oaChosen ? (
+            <OaPorts />
+          ) : (
+            <ReachablePorts
+              ports={relayAlways ? null : battlePorts(port)}
+              help={
+                relayAlways
+                  ? t`Not checked, because every battle you host goes through the server's relay.`
+                  : undefined
+              }
+              onReport={setReachability}
+              always
+              relayWillCarry={route === "relay"}
+              onCheckingChange={setChecking}
+            />
+          )}
 
           {/* How the relay is used, next to the answer that decides it in the
               automatic case. Only on a server that has one. On a server without,

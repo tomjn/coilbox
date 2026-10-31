@@ -14909,6 +14909,10 @@ msgstr ""
 msgid "Data table"
 msgstr ""
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Datagrams"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 msgid "Date"
 msgstr ""
@@ -28216,6 +28220,10 @@ msgstr ""
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 msgstr ""
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
 msgstr ""
@@ -30064,6 +30072,10 @@ msgstr ""
 
 #: src/direct/room.ts
 msgid "Ports run from 1 to 65535."
+msgstr ""
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Ports to forward"
 msgstr ""
 
 #: src/lego/pages/components/PosesPopover.tsx
@@ -34498,6 +34510,10 @@ msgstr ""
 msgid "Servers"
 msgstr ""
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Session discovery"
+msgstr ""
+
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 msgid "Sessions logged in for more than 14 days are logged out. Bots and static accounts are exempt."
 msgstr ""
@@ -36814,6 +36830,10 @@ msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 msgid "Streaks"
+msgstr ""
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Stream messages"
 msgstr ""
 
 #: src/lego/animPresets.ts
@@ -44303,6 +44323,10 @@ msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "white star"
+msgstr ""
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Who needs to forward these ports"
 msgstr ""
 
 #: src/content/replayAnalysis.ts

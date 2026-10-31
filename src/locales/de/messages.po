@@ -18338,6 +18338,10 @@ msgstr "Daten sind kein JSON: {reason}"
 msgid "Data table"
 msgstr "Datentabelle"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Datagrams"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 msgid "Date"
 msgstr ""
@@ -34719,6 +34723,10 @@ msgstr "Nur die Felder, die Sie ändern, werden gespeichert, der Rest folgt also
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 msgstr "Nur die ersten {scanned} Einträge im Hub wurden gelesen, für dieses Spiel gibt es also eventuell mehr als hier aufgeführt. Suchen Sie, um einzugrenzen."
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
+msgstr ""
+
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
@@ -36980,6 +36988,10 @@ msgstr "Ports sind ganze Zahlen."
 #, fuzzy
 msgid "Ports run from 1 to 65535."
 msgstr "Ports reichen von 1 bis 65535."
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Ports to forward"
+msgstr ""
 
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
@@ -42412,6 +42424,10 @@ msgstr "Serverstatistik"
 msgid "Servers"
 msgstr "Server"
 
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Session discovery"
+msgstr ""
+
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 #, fuzzy
 msgid "Sessions logged in for more than 14 days are logged out. Bots and static accounts are exempt."
@@ -45268,6 +45284,10 @@ msgstr "Serie"
 #, fuzzy
 msgid "Streaks"
 msgstr "Serien"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Stream messages"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -54512,6 +54532,10 @@ msgstr "weißer Rauch"
 #, fuzzy
 msgid "white star"
 msgstr "weißer Stern"
+
+#: src/multiplayer/battles/OaPorts.tsx
+msgid "Who needs to forward these ports"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
