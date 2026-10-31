@@ -547,6 +547,11 @@ msgstr "{0, plural, one {{shown} з # юніта} few {{shown} з # юнітів
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr "{0, plural, one {{shownCount} з # юніта} few {{shownCount} з # юнітів} many {{shownCount} з # юнітів} other {{shownCount} з # юніта}}"
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr ""
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -673,7 +678,9 @@ msgstr "{0, plural, one {# наказ заводу називає нерухом
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, one {# наказ у черзі заводу не має позиції й не відображається.} few {# накази в черзі заводу не мають позиції й не відображаються.} many {# наказів у черзі заводу не мають позиції й не відображаються.} other {# наказу в черзі заводу не мають позиції й не відображаються.}}"
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 #, fuzzy
 msgid "{0, plural, one {# field} other {# fields}}"
@@ -10623,6 +10630,10 @@ msgstr "Уже збережено"
 msgid "already set"
 msgstr "уже задано"
 
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
+msgstr ""
+
 #: src/scenario/pages/components/registries.ts
 #, fuzzy
 msgid "Already taken"
@@ -14082,6 +14093,10 @@ msgstr "Тут не можна збудувати: {list}."
 msgid "Cannot be carried"
 msgstr "Не можна перевозити"
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "Cannot follow {name}"
@@ -14410,6 +14425,18 @@ msgstr "Зміни"
 #, fuzzy
 msgid "Changes every one of a unit's weapons, each from its own current range."
 msgstr "Змінює кожну зброю юніта, кожну від її поточної дальності."
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -17280,6 +17307,10 @@ msgstr "Не вдалося додати модуль"
 #, fuzzy
 msgid "could not be checked"
 msgstr "не вдалося перевірити"
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -31877,6 +31908,10 @@ msgstr "У #{channel} нікого не заглушено."
 msgid "No open battles right now."
 msgstr "Зараз немає відкритих матчів."
 
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
+msgstr ""
+
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #, fuzzy
 msgid "No options."
@@ -33917,6 +33952,11 @@ msgstr "Сповіщення: непрочитаних {unread}"
 #, fuzzy
 msgid "now"
 msgstr "зараз"
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
+msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
@@ -36802,6 +36842,10 @@ msgstr "Підготовка…"
 msgid "Presentation"
 msgstr "Оформлення"
 
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
+msgstr ""
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
 msgid "Preset AI adjusted"
@@ -37623,6 +37667,10 @@ msgstr "Темп"
 msgid "Rating"
 msgstr "Рейтинг"
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr ""
+
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
@@ -38031,6 +38079,10 @@ msgstr "Читання списку повторів..."
 #, fuzzy
 msgid "Reading the replay to see how the mission went."
 msgstr "Читання повтору, щоб побачити, як пройшла місія."
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy
@@ -47709,6 +47761,10 @@ msgstr "Перемагає той, що запущений останнім."
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 msgstr "єдина копія сценарію «{scenarioName}», якого вже немає в редакторі сценаріїв"
 
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+msgstr ""
+
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -53535,6 +53591,10 @@ msgstr "Що він будує"
 #, fuzzy
 msgid "What it builds with"
 msgstr "Чим він будує"
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy

@@ -444,6 +444,11 @@ msgstr "{0, plural, one {{shown} of # unit} other {{shown} of # units}}"
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 msgid "{0, plural, one {{unitName} carries it for {userList}, which names it.} other {{unitName} carries it for {userList}, which name it.}}"
@@ -550,7 +555,9 @@ msgstr "{0, plural, one {# factory order names a unit that does not} other {# fa
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 msgid "{0, plural, one {# field} other {# fields}}"
 msgstr "{0, plural, one {# field} other {# fields}}"
@@ -8597,6 +8604,10 @@ msgstr "Already saved"
 msgid "already set"
 msgstr "already set"
 
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
+msgstr "Already set this way"
+
 #: src/scenario/pages/components/registries.ts
 msgid "Already taken"
 msgstr "Already taken"
@@ -11408,6 +11419,10 @@ msgstr "Cannot be built here: {list}."
 msgid "Cannot be carried"
 msgstr "Cannot be carried"
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Cannot follow {name}"
 msgstr "Cannot follow {name}"
@@ -11672,6 +11687,18 @@ msgstr "Changes"
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Changes every one of a unit's weapons, each from its own current range."
 msgstr "Changes every one of a unit's weapons, each from its own current range."
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr "Changes no units."
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr "Changes nothing from the defaults."
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
+msgstr "Changes nothing: every slot is empty."
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Changes only the weapon or weapons already at each unit's longest range."
@@ -14024,6 +14051,10 @@ msgstr "Could not add the module"
 #: src/multiplayer/battles/WindowsFirewall.tsx
 msgid "could not be checked"
 msgstr "could not be checked"
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
+msgstr "Could not be decoded: {error}"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Could not be read at all ({unreadableCount})"
@@ -25874,6 +25905,10 @@ msgstr "No one is muted in #{channel}."
 msgid "No open battles right now."
 msgstr "No open battles right now."
 
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
+msgstr "No option it declares differs from its default."
+
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "No options."
 msgstr "No options."
@@ -27521,6 +27556,11 @@ msgstr "Notifications: {unread} unread"
 #: src/notify/NotificationsBell.tsx
 msgid "now"
 msgstr "now"
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
+msgstr "Now {0}"
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "nowhere yet"
@@ -29865,6 +29905,10 @@ msgstr "Preparing…"
 msgid "Presentation"
 msgstr "Presentation"
 
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
+msgstr "Preset {value}, default {defaultValue}"
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Preset AI adjusted"
 msgstr "Preset AI adjusted"
@@ -30537,6 +30581,10 @@ msgstr "Rate"
 msgid "Rating"
 msgstr "Rating"
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr "Raw text"
+
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
 msgstr "Re-read the texture file, to pick up an edit made elsewhere"
@@ -30867,6 +30915,10 @@ msgstr "Reading the replay list..."
 #: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Reading the replay to see how the mission went."
 msgstr "Reading the replay to see how the mission went."
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
+msgstr "Reading the slots…"
 
 #: src/blueprint/pack.ts
 msgid "Reading this file {all}."
@@ -38722,6 +38774,10 @@ msgstr "The one started last takes it."
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 msgstr "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+msgstr "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
 msgid "The orders could not be read from this replay."
@@ -43429,6 +43485,10 @@ msgstr "What it builds"
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "What it builds with"
 msgstr "What it builds with"
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
+msgstr "What it changes"
 
 #: src/lego/pages/components/AimPointPanel.tsx
 msgid "What moves with it"
