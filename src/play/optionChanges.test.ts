@@ -70,8 +70,8 @@ describe("optionChanges", () => {
         type: "list",
         default: "a",
         listItems: [
-          { key: "a", name: "Alpha", description: "" },
-          { key: "b", name: "Beta", description: "" },
+          { key: "a", name: "Alpha" },
+          { key: "b", name: "Beta" },
         ],
       }),
     ];
