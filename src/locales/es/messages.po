@@ -48622,6 +48622,10 @@ msgstr "La textura está en un archivo con el que no empezó el juego, así que 
 msgid "the timeline"
 msgstr "la línea de tiempo"
 
+#: src/multiplayer/battles/hostBattle.ts
+msgid "The title cannot contain a tab or another control character."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "The tooltip and the selection label read the owning player's name instead of the unit's."
