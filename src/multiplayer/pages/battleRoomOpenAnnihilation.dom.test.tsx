@@ -472,6 +472,26 @@ describe("the room of an Open Annihilation battle you joined", () => {
     ).toBeTruthy();
   });
 
+  it("shows OA's own line from a refusing exit event in the room", async () => {
+    state.room = roomFor("Open Annihilation", { hostIngame: true });
+    show();
+    await waitFor(() => expect(launches).toHaveLength(1));
+    act(() =>
+      launches[0].onEvent.onmessage({
+        kind: "exit",
+        reason: "refused",
+        message: "no game named CB4021 answered",
+      }),
+    );
+    await act(async () => launches[0].finish({ exitCode: 2, signal: null }));
+    expect(
+      await screen.findByText("no game named CB4021 answered"),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText("Open Annihilation refused to join this battle."),
+    ).toBeNull();
+  });
+
   it("ends OA when the player leaves", async () => {
     state.room = roomFor("Open Annihilation", { hostIngame: true });
     show();

@@ -210,6 +210,34 @@ describe("starting Open Annihilation for the host", () => {
     expect(result.current.running).toBe(false);
   });
 
+  it("shows OA's own line when it refuses after its stream began", async () => {
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    act(() =>
+      launched[0].onEvent.onmessage({
+        kind: "exit",
+        reason: "refused",
+        message: "--game-password: is longer than 10 characters",
+      }),
+    );
+    await act(async () => launched[0].finish({ exitCode: 2, signal: null }));
+    expect(result.current.error).toBe(
+      "--game-password: is longer than 10 characters",
+    );
+  });
+
+  it("names the exit code when a refusal after the stream began has no line", async () => {
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    act(() =>
+      launched[0].onEvent.onmessage({ kind: "exit", reason: "refused" }),
+    );
+    await act(async () => launched[0].finish({ exitCode: 2, signal: null }));
+    expect(result.current.error).toBe("Open Annihilation exited with code 2.");
+  });
+
   it("says so when no program is set", async () => {
     program.value = null;
     const { result } = mount();
