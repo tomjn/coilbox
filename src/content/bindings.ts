@@ -1260,6 +1260,8 @@ export interface ReplayEventCounts {
   startUnitReplaced?: number;
   /** Absent from a file written before the logger recorded damage. */
   damage?: number;
+  /** Absent from a file written before the logger recorded damage by unit. */
+  unitDamage?: number;
   gameOver: number;
   /** Lines of a kind this build does not know. */
   unknown: number;
@@ -1936,11 +1938,18 @@ export interface UnitDefLink {
   /** For an engine's list: whether the run used a game other than the one the
    *  replay names. Absent when that is not known. */
   gameDiffers?: boolean;
+  /** The version of the read of a match that made the list. Absent for a list
+   *  recorded before versions were kept, which counts as the oldest, and for a
+   *  list no read of a match made. */
+  listVersion?: number;
 }
 
 /** What is recorded for one replay. */
 export interface ReplayUnitDefSets {
   links: UnitDefLink[];
+  /** The version of the read of a match that this build makes. A link with a
+   *  lower `listVersion` is out of date. */
+  matchListVersion?: number;
   /** The link that names the ids in the replay's own stream, if any. */
   stream: UnitDefLink | null;
   /** The link that names the ids in the replay's analysis events, if any. */
@@ -1962,10 +1971,18 @@ export const contentUnitDefSet = defineCommand<
  * Keep the unit list a replay was just read against. Only for a game installed
  * under the exact name the replay records. `archive` is the installed game's
  * archive name, which says whether it is a loose folder. A replay that already
- * has a list from that kind of read keeps it, and `digest` is the one it kept.
+ * has a list from that kind of read keeps it, and `digest` is the one it kept,
+ * unless the origin is an archive and `matchRead` says this list was read with
+ * the replay's own match setup by a newer version of that read (#4930).
  */
 export const contentUnitDefSetStore = defineCommand<
-  { gameId: string; game: string; archive: string; units: StoredUnitDef[] },
+  {
+    gameId: string;
+    game: string;
+    archive: string;
+    units: StoredUnitDef[];
+    matchRead?: boolean;
+  },
   { digest: string | null; origin: UnitDefOrigin; links: UnitDefLink[] }
 >("coilbox-content", "content_unit_def_set_store");
 
@@ -2006,6 +2023,9 @@ export interface UnitDefEvents {
   finished: number;
   /** Finished units destroyed while the team had them. */
   died: number;
+  /** The damage the units the team finished dealt while it held them. Only
+   *  means something when the replay's `eventsDamage` is true. */
+  dealt: number;
 }
 
 /**
@@ -2049,6 +2069,9 @@ export interface ReplayUnitOrders {
   seats: UnitOrderSeat[];
   /** By team. Absent when the match has no stored analysis with events. */
   events?: { team: number; defs: UnitDefEvents[] }[];
+  /** True when the analysis behind `events` recorded damage for each unit.
+   *  Otherwise `dealt` is nought for want of a record. */
+  eventsDamage?: boolean;
   /** The kept unit list that names the ids in `seats`, if one is kept. */
   streamList?: UnitDefLink;
   /** The kept unit list that names the ids in `events`, if one is kept. */

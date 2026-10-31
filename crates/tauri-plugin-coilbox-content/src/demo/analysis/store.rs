@@ -1213,6 +1213,7 @@ pub(super) mod tests {
             game: "Some Game 1.0",
             game_differs: None,
             taken_at_ms: 1,
+            list_version: 0,
         };
         def_sets::record(&sets, ID, &shared, &source(Origin::Archive)).unwrap();
         def_sets::record(&sets, ID, &own, &source(Origin::Folder)).unwrap();

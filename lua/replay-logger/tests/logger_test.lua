@@ -484,6 +484,7 @@ do
 		GetGaiaTeamID = true,
 		GetTeamList = true,
 		GetTeamUnitStats = true,
+		AreTeamsAllied = true,
 	}
 	local strangers = {}
 	for name in synced:gmatch("Spring%.([%w_]+)") do
@@ -889,6 +890,153 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- What each unit dealt and took.
+--------------------------------------------------------------------------------
+
+-- The lines about one unit, in the order they were written.
+local function aboutUnit(engine, unitID)
+	local found = {}
+	for _, line in ipairs(ofKind(engine, "unit_damage")) do
+		if line.unit == unitID then
+			found[#found + 1] = line
+		end
+	end
+	return found
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.runTo(10)
+	engine.damage(b, 10, a)
+	engine.damage(b, 2.5, a)
+	check("nothing is written while both units are alive", #ofKind(engine, "unit_damage") == 0)
+
+	engine.runTo(20)
+	engine.synced:GameOver({ 0 })
+	local attacker, target = aboutUnit(engine, a), aboutUnit(engine, b)
+	check("at game over a unit still alive writes what it dealt, under its def and team",
+		#attacker == 1 and attacker[1].dealt == 12.5 and attacker[1].def == 12 and attacker[1].team == 0
+			and attacker[1].frame == 20)
+	check("and a unit still alive writes what it took",
+		#target == 1 and target[1].taken == 12.5 and target[1].def == 31 and target[1].team == 1)
+	check("a total of nothing is left out", attacker[1].taken == nil and target[1].dealt == nil)
+	local lines = decoded(engine)
+	check("the game over line is still the last one", lines[#lines].kind == "game_over")
+end
+
+do
+	local engine, a, b = damageMatch()
+	local idle = engine.create(40, 0, 500, 5, 500, a)
+	engine.damage(b, 1, a)
+	engine.runTo(450)
+	engine.synced:GameOver({})
+	check("a unit that neither dealt nor took damage writes nothing", #aboutUnit(engine, idle) == 0)
+end
+
+do
+	-- Every unit in the stub has 100 health at most.
+	local engine, a, b = damageMatch()
+	engine.damage(b, 40, a)
+	engine.damage(b, 5000, a)
+	engine.runTo(10)
+	engine.synced:GameOver({})
+	check("each hit is capped at the target's maximum health, not at what it had left",
+		aboutUnit(engine, a)[1].dealt == 140, tostring(aboutUnit(engine, a)[1].dealt))
+	check("what a unit took is capped the same way", aboutUnit(engine, b)[1].taken == 140)
+	check("the map's damage line still counts what the target had left", ofKind(engine, "damage")[1].at[2] == 100)
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1, 3 }, gaiaTeam = 2, allyTeams = { [0] = 0, [3] = 0, [1] = 1 } })
+	local a = engine.create(12, 0, 100, 5, 200)
+	local friend = engine.create(13, 3, 200, 5, 200)
+	local own = engine.create(14, 0, 300, 5, 200)
+	engine.damage(a, 7, a)
+	engine.damage(friend, 11, a)
+	engine.damage(own, 13, a)
+	engine.runTo(10)
+	engine.synced:GameOver({})
+
+	check("damage to itself, to an ally and to its own team is not damage dealt", aboutUnit(engine, a)[1].dealt == nil)
+	check("the unit that hit itself did take it", aboutUnit(engine, a)[1].taken == 7)
+	check("and so did the ally and the team mate",
+		aboutUnit(engine, friend)[1].taken == 11 and aboutUnit(engine, own)[1].taken == 13)
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.damage(b, 12)
+	engine.damage(b, 30, a, true)
+	engine.damage(b, -10, a)
+	engine.runTo(10)
+	engine.synced:GameOver({})
+
+	check("a hit with no attacker is taken and dealt by nobody",
+		aboutUnit(engine, b)[1].taken == 12 and #ofKind(engine, "unit_damage") == 1)
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.runTo(50)
+	engine.damage(b, 60, a)
+	engine.destroy(b, a, 7)
+	check("a dead unit's line waits, because its death explosion comes after the callin",
+		#aboutUnit(engine, b) == 0)
+
+	-- The engine reports the death, then sets off the blast with the dying unit
+	-- as its attacker. The engine.units entry is gone, so the call is made here.
+	engine.synced:UnitDamaged(a, 12, 0, 25, false, 7, -1, b, 31, 1)
+	engine.runTo(51)
+	local line = aboutUnit(engine, b)
+	check("its death explosion is on its line, written on the next frame",
+		#line == 1 and line[1].dealt == 25 and line[1].taken == 60 and line[1].frame == 51,
+		line[1] and tostring(line[1].dealt))
+
+	-- A blast that travels lands frames later.
+	engine.runTo(60)
+	engine.synced:UnitDamaged(a, 12, 0, 5, false, 7, -1, b, 31, 1)
+	engine.runTo(61)
+	line = aboutUnit(engine, b)
+	check("damage that lands after that is a line of its own",
+		#line == 2 and line[2].dealt == 5 and line[2].taken == nil and line[2].def == 31 and line[2].team == 1)
+	engine.runTo(70)
+	check("and nothing is written twice", #aboutUnit(engine, b) == 2)
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.damage(b, 20, a)
+	engine.give(a, 1, true)
+	local line = aboutUnit(engine, a)
+	check("a unit that changes team writes what it did for the team it left",
+		#line == 1 and line[1].team == 0 and line[1].dealt == 20)
+
+	local c = engine.create(50, 0, 700, 5, 700)
+	engine.damage(c, 30, a)
+	engine.runTo(10)
+	engine.synced:GameOver({})
+	line = aboutUnit(engine, a)
+	check("and what it does after that is for the team it joined",
+		#line == 2 and line[2].team == 1 and line[2].dealt == 30)
+end
+
+do
+	-- The engine hands a dead unit's id to a new one.
+	local engine, a, b = damageMatch()
+	engine.damage(b, 20, a)
+	engine.destroy(a)
+	engine.nextUnitID = a
+	local again = engine.create(40, 0, 100, 5, 200)
+	engine.damage(b, 30, again)
+	engine.runTo(10)
+	engine.synced:GameOver({})
+	local line = aboutUnit(engine, again)
+	check("a new unit under an old id starts from nothing",
+		again == a and #line == 2 and line[1].def == 12 and line[1].dealt == 20
+			and line[2].def == 40 and line[2].dealt == 30)
+end
+
+--------------------------------------------------------------------------------
 -- The fixture files the Rust parser reads.
 --------------------------------------------------------------------------------
 
@@ -936,6 +1084,8 @@ do
 	check("the upgrade match holds one replacement and four damage lines",
 		#ofKind(engine, "start_unit_replaced") == 1 and #ofKind(engine, "damage") == 4,
 		#ofKind(engine, "start_unit_replaced") .. " and " .. #ofKind(engine, "damage"))
+	check("and a unit_damage line for each unit that was in the fight", #ofKind(engine, "unit_damage") == 2,
+		tostring(#ofKind(engine, "unit_damage")))
 
 	local path = support.root() .. "/tests/fixtures/upgrade.jsonl"
 	if os.getenv("COILBOX_WRITE_FIXTURE") then

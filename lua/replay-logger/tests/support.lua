@@ -81,6 +81,8 @@ end
 -- and holds that team's statistics samples, oldest first. `options.noFile` makes
 -- the write directory refuse the file. `options.unitDefs` is the engine's list
 -- of unit definitions, in id order, and is empty unless a test gives one.
+-- `options.allyTeams` is keyed by team and holds its ally team, and a team not
+-- in it is allied with nobody else.
 function M.newEngine(options)
 	options = options or {}
 
@@ -163,6 +165,10 @@ function M.newEngine(options)
 		end,
 		GetTeamList = function()
 			return options.teams or { 0, 1 }
+		end,
+		AreTeamsAllied = function(teamA, teamB)
+			local allyTeams = options.allyTeams or {}
+			return (allyTeams[teamA] or teamA) == (allyTeams[teamB] or teamB)
 		end,
 		-- killed, died, capturedBy, capturedFrom, received, sent, in the engine's
 		-- order. Only the captures are kept here.

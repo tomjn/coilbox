@@ -11,6 +11,7 @@ import type {
 import { gamesFor } from "./stats";
 import {
   DEFAULT_USAGE_SORT,
+  damagePerMetal,
   foldUnitUsage,
   nextUsageSort,
   type ReplayLists,
@@ -290,11 +291,11 @@ describe("foldUnitUsage", () => {
         team: 0,
         defs: [
           // The analysis ran on the second build: id 2 is the mex, 4 the tank.
-          { def: 2, finished: 3, died: 1 },
-          { def: 4, finished: 9, died: 9 },
+          { def: 2, finished: 3, died: 1, dealt: 0 },
+          { def: 4, finished: 9, died: 9, dealt: 0 },
         ],
       },
-      { team: 1, defs: [{ def: 2, finished: 50, died: 50 }] },
+      { team: 1, defs: [{ def: 2, finished: 50, died: 50, dealt: 0 }] },
     ];
     const usage = fold(
       [record("a", 1, true), record("b", 2, true), record("c", 3, true)],
@@ -332,7 +333,9 @@ describe("foldUnitUsage", () => {
       [old],
       [
         replay("a", [placed(1, 4)], {
-          events: [{ team: 0, defs: [{ def: 1, finished: 4, died: 0 }] }],
+          events: [
+            { team: 0, defs: [{ def: 1, finished: 4, died: 0, dealt: 0 }] },
+          ],
         }),
       ],
       () => ({
@@ -358,7 +361,106 @@ describe("foldUnitUsage", () => {
       ordered: 4,
       finished: 0,
       died: 0,
+      damage: null,
     });
+  });
+
+  it("divides the damage a unit dealt by the metal of those finished, game by game", () => {
+    const usage = fold(
+      [record("a", 1, true), record("b", 2, true)],
+      [
+        // The tank is id 2 at 100 metal in the first list, and id 4 at 120 in
+        // the second. Six ordered and two finished is 200 metal.
+        replay("a", [queued(2, 1, 6)], {
+          eventsDamage: true,
+          events: [
+            {
+              team: 0,
+              defs: [{ def: 2, finished: 2, died: 1, dealt: 300 }],
+            },
+          ],
+        }),
+        // One at 120.
+        replay("b", [queued(2, 1, 1)], {
+          eventsDamage: true,
+          events: [
+            {
+              team: 0,
+              defs: [{ def: 4, finished: 1, died: 0, dealt: 60 }],
+            },
+          ],
+        }),
+      ],
+      (r) => ({
+        stream: { kind: "named", units: V1, engine: false },
+        events: r.path === "a" ? V1 : V2,
+      }),
+    );
+    const damage = row(usage.rows, "tank")?.analysed?.damage;
+    expect(damage).toEqual({ replays: 2, dealt: 360, metal: 320 });
+    expect(damage && damagePerMetal(damage)).toBe(1.125);
+    expect(usage.analysedNoDamage).toBe(0);
+  });
+
+  it("leaves a game analysed before damage was recorded out of the ratio, and counts it", () => {
+    const events = [
+      { team: 0, defs: [{ def: 1, finished: 4, died: 0, dealt: 0 }] },
+    ];
+    const usage = fold(
+      [record("a", 1, true), record("b", 2, true)],
+      [
+        replay("a", [placed(1, 4)], { events }),
+        replay("b", [placed(1, 2)], {
+          eventsDamage: true,
+          events: [
+            { team: 0, defs: [{ def: 1, finished: 2, died: 0, dealt: 25 }] },
+          ],
+        }),
+      ],
+      () => ({
+        stream: { kind: "named", units: V1, engine: false },
+        events: V1,
+      }),
+    );
+    expect(usage).toMatchObject({ analysed: 2, analysedNoDamage: 1 });
+    // Finished still adds both games. The ratio is the second game's alone.
+    expect(row(usage.rows, "mex")?.analysed).toMatchObject({
+      replays: 2,
+      finished: 6,
+      damage: { replays: 1, dealt: 25, metal: 100 },
+    });
+  });
+
+  it("has no damage at all where every analysis is from before it was recorded", () => {
+    const usage = fold(
+      [record("a", 1, true)],
+      [
+        replay("a", [placed(1, 4)], {
+          events: [
+            { team: 0, defs: [{ def: 1, finished: 4, died: 0, dealt: 0 }] },
+          ],
+        }),
+      ],
+      () => ({
+        stream: { kind: "named", units: V1, engine: false },
+        events: V1,
+      }),
+    );
+    expect(row(usage.rows, "mex")?.analysed?.damage).toBeNull();
+  });
+
+  it("gives no ratio when the games it covers finished none of the unit", () => {
+    const usage = fold(
+      [record("a", 1, true)],
+      [replay("a", [placed(1, 4)], { eventsDamage: true, events: [] })],
+      () => ({
+        stream: { kind: "named", units: V1, engine: false },
+        events: V1,
+      }),
+    );
+    const damage = row(usage.rows, "mex")?.analysed?.damage;
+    expect(damage).toEqual({ replays: 1, dealt: 0, metal: 0 });
+    expect(damage && damagePerMetal(damage)).toBeNull();
   });
 
   it("keeps two games' units apart when they share a key", () => {
@@ -578,7 +680,13 @@ describe("sorting the rows", () => {
       name: "beta",
       metal: 30,
       matches: 1,
-      analysed: { replays: 1, ordered: 2, finished: 0, died: 0 },
+      analysed: {
+        replays: 1,
+        ordered: 2,
+        finished: 0,
+        died: 0,
+        damage: { replays: 1, dealt: 90, metal: 30 },
+      },
     },
     { ...base, key: "c", name: "Gamma", metal: 20, matches: 5 },
   ];
@@ -605,5 +713,26 @@ describe("sorting the rows", () => {
 
   it("puts a unit with no analysed game below one that finished none", () => {
     expect(order({ column: "finished", dir: "desc" })[0]).toBe("b");
+  });
+
+  it("sorts by damage per metal with no figure below any figure", () => {
+    const noMetal: UnitUsageRow = {
+      ...base,
+      key: "d",
+      name: "Delta",
+      metal: 5,
+      analysed: {
+        replays: 1,
+        ordered: 1,
+        finished: 0,
+        died: 0,
+        damage: { replays: 1, dealt: 0, metal: 0 },
+      },
+    };
+    const sorted = sortUsageRows([...rows, noMetal], {
+      column: "damagePerMetal",
+      dir: "desc",
+    });
+    expect(sorted.map((r) => r.key)).toEqual(["b", "c", "a", "d"]);
   });
 });

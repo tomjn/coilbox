@@ -374,10 +374,18 @@ export function ReplayBuildOrders({
     status,
     units,
     links,
+    matchListVersion,
   } = useReplayUnits(info, result !== null && result.orders.length > 0);
   // The list just read is kept for this replay, so it can still be named when
   // the game has moved on. Only a list the replay's own orders agree with.
-  useKeepUnitList(info, source, units, result?.orders ?? null, links);
+  useKeepUnitList(
+    info,
+    source,
+    units,
+    result?.orders ?? null,
+    links,
+    matchListVersion,
+  );
   const fit = useMemo(
     () => (result && units ? orderFit(result.orders, units) : null),
     [result, units],

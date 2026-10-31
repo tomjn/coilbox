@@ -9,9 +9,9 @@
 --
 -- It is not a file of its own to the engine. The worker writes one line ahead
 -- of it, `local __cb_match = { ... }` or `local __cb_match = nil`, and the
--- text after it reads `__cb_engine_keeps`. With `__cb_match` nil nothing is
--- installed and the worker's own stand-in answers as it always has, as if no
--- game were set up.
+-- text after it reads `__cb_engine_keeps`. With `__cb_match` nil none of the
+-- setup functions are installed and the worker's own stand-in answers as it
+-- always has, as if no game were set up. `math.random` is installed either way.
 --
 -- Every function is a copy of the engine's, and says which. The source read is
 -- RecoilEngine at 2026.07.01-113-g212c369b4c.
@@ -28,6 +28,49 @@
 --   players[i]               team, spectator
 --   ais[i]                   team, name, host, lua
 --   gaia                     the Gaia team's id, or false
+
+-- math.random under unitsync (#4926). LuaParser compiles Random out under
+-- UNITSYNC and installs DummyRandom, which returns no value
+-- (rts/Lua/LuaParser.cpp). A definition script that indexes with the draw then
+-- reads nil, and Beyond All Reason's lootboxnano script indexes what that gave
+-- (unitbasedefs/lootboxes/lootboxnano.lua). The game's loader logs the error
+-- and drops all 36 definitions, which moves every id after them.
+--
+-- The engine seeds the draw from the match. That script uses it for a build
+-- list and a model, never for a name, a cost or anything the refusal rules
+-- read, so a fixed answer gives the same ids. The answer is the bottom of the
+-- range asked for: 0 for no range, 1 for random(m), m for random(m, n). The
+-- argument checks are LuaParser::Random's, so a call the engine refuses is
+-- refused here too. This applies to every read, with or without a setup. It
+-- stands aside if the engine's own answers.
+if type(math) == 'table' and (type(math.random) ~= 'function' or math.random(1) == nil) then
+  -- lua_toint of an argument lua_isnumber accepts, or nil.
+  local function whole(v)
+    local n = tonumber(v)
+    if n == nil then return nil end
+    if n >= 0 then return math.floor(n) end
+    return math.ceil(n)
+  end
+
+  math.random = function(...)
+    local count = select('#', ...)
+    local a, b = ...
+    if count == 0 then return 0 end
+    if count == 1 and whole(a) then
+      local upper = whole(a)
+      if upper < 1 then
+        error(string.format('error: too small upper limit (%d) given to math.random(), should be >= 1 {LuaParser}', upper), 2)
+      end
+      return 1
+    end
+    if count == 2 and whole(a) and whole(b) then
+      local lower, upper = whole(a), whole(b)
+      if lower > upper then error('Empty interval in math.random() {LuaParser}', 2) end
+      return lower
+    end
+    error('Incorrect arguments to math.random() {LuaParser}', 2)
+  end
+end
 
 if __cb_match and type(Spring) == 'table' then
   local match = __cb_match
