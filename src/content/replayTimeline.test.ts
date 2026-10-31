@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { ChatLine, TimelineEvent } from "./bindings";
+import type { ChatLine, ReplayPlayer, TimelineEvent } from "./bindings";
 import {
   axisTicks,
   binMarks,
   describeEvent,
   markKind,
+  markTeams,
+  playerTeams,
   timelineDomain,
   toEventMarks,
   toMarks,
@@ -235,5 +237,51 @@ describe("describeEvent", () => {
     expect(
       describeEvent(event({ type: "other", action: 9, param1: 1, param2: 2 })),
     ).toContain("code 9");
+  });
+});
+
+describe("playerTeams", () => {
+  const seat = (over: Partial<ReplayPlayer>): ReplayPlayer =>
+    ({ name: "x", spectator: false, ...over }) as ReplayPlayer;
+
+  it("maps seated players by number and leaves out spectators and players with no number or team", () => {
+    const teams = playerTeams([
+      seat({ player: 0, team: 3 }),
+      seat({ player: 1, team: 0, spectator: true }),
+      seat({ team: 2 }),
+      seat({ player: 4 }),
+    ]);
+    expect([...teams]).toEqual([[0, 3]]);
+  });
+
+  it("never matches on a name shared by two players", () => {
+    const teams = playerTeams([
+      seat({ name: "Sam", player: 0, team: 0 }),
+      seat({ name: "Sam", player: 1, team: 1 }),
+    ]);
+    const marks = toMarks([line({ player: 1, playerName: "Sam" })]);
+    expect(markTeams(marks, teams)).toEqual([1]);
+  });
+});
+
+describe("markTeams", () => {
+  const teamOf = new Map([
+    [0, 5],
+    [1, 2],
+  ]);
+
+  it("lists each team once, ascending, and skips the server and system lines", () => {
+    const marks = toMarks([
+      line({ player: 0 }),
+      line({ player: 1 }),
+      line({ player: 0 }),
+      line({ player: 255 }),
+      line({ player: 0, system: true }),
+    ]);
+    expect(markTeams(marks, teamOf)).toEqual([2, 5]);
+  });
+
+  it("is empty when nobody in the mark has a team", () => {
+    expect(markTeams(toMarks([line({ player: 9 })]), teamOf)).toEqual([]);
   });
 });
