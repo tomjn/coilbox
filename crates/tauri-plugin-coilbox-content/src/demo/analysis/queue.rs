@@ -600,6 +600,7 @@ fn keep_engine_unit_defs(
                 game: &provenance.game,
                 game_differs: provenance.game_differs,
                 taken_at_ms: provenance.analysed_at_ms,
+                list_version: 0,
             },
         )
         .map(|_| ()),

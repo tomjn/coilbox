@@ -12,6 +12,7 @@ import type {
   DemoBuildOrders,
   DemoInfo,
   GameItem,
+  MatchSetup,
   ReplayUnitDefSets,
   StoredUnitDef,
   UnitDatasetEntry,
@@ -36,7 +37,18 @@ let HANDED: {
   game: string;
   archive: string;
   units: StoredUnitDef[];
+  matchRead?: boolean;
 }[] = [];
+/** The version of the read of a match that the store says is current. */
+const CURRENT_VERSION = 2;
+const MATCH_SETUP: MatchSetup = {
+  modOptions: {},
+  mapOptions: {},
+  teams: [],
+  allyTeams: [],
+  players: [],
+  ais: [],
+};
 /** The archives the section asked unitsync to read units and pictures from. */
 let ASKED: (string | undefined)[] = [];
 let PICTURES: (string | undefined)[] = [];
@@ -45,7 +57,13 @@ vi.mock("../../bindings", async (original) => ({
   ...(await original<typeof import("../../bindings")>()),
   contentDemoBuildOrders: async () => ORDERS,
   contentUnitDefSet: async ({ gameId }: { gameId: string }) =>
-    KEPT[gameId] ?? { links: [], stream: null, events: null, sets: {} },
+    KEPT[gameId] ?? {
+      links: [],
+      stream: null,
+      events: null,
+      sets: {},
+      matchListVersion: CURRENT_VERSION,
+    },
   contentUnitDefSetStore: async (args: (typeof HANDED)[number]) => {
     HANDED.push(args);
     const origin = args.archive.endsWith(".sdd") ? "folder" : "archive";
@@ -54,12 +72,14 @@ vi.mock("../../bindings", async (original) => ({
       origin,
       game: args.game,
       takenAtMs: Date.UTC(2026, 9, 10, 12),
+      listVersion: args.matchRead ? CURRENT_VERSION : 0,
     };
     KEPT[args.gameId] = {
       links: [link],
       stream: link,
       events: link,
       sets: { [link.digest]: args.units },
+      matchListVersion: CURRENT_VERSION,
     };
     return { digest: link.digest, origin, links: [link] };
   },
@@ -166,6 +186,7 @@ function keep(gameId: string, link: Partial<UnitDefLink>) {
     stream: whole,
     events: whole,
     sets: { [whole.digest]: STORED },
+    matchListVersion: CURRENT_VERSION,
   };
 }
 
@@ -188,9 +209,13 @@ afterEach(() => {
   PICTURES = [];
 });
 
-async function open(gameType: string, gameId: string | undefined) {
+async function open(
+  gameType: string,
+  gameId: string | undefined,
+  matchSetup?: MatchSetup,
+) {
   ORDERS = FITTING;
-  const info = { gameType, gameId, remixed: false, ais: [] };
+  const info = { gameType, gameId, remixed: false, ais: [], matchSetup };
   render(
     <SeriesEmphasisProvider>
       <ReplayBuildOrders
@@ -362,6 +387,80 @@ describe("keeping the list a replay was read against", () => {
         /Here 1 placed order names a unit that moves, 1 order names an id past the end of the list\./,
       ),
     ).toBeTruthy();
+    expect(HANDED).toEqual([]);
+  });
+
+  it("hands over again an archive's list made by an older version of the read, and then stops", async () => {
+    const id = freshId();
+    keep(id, { game: "SplinterFaction 0.1.88", listVersion: 1 });
+    GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+    DATASET = { units: UNITS };
+
+    await open("SplinterFaction 0.1.88", id, MATCH_SETUP);
+
+    await waitFor(() => expect(HANDED).toHaveLength(1));
+    expect(HANDED[0].matchRead).toBe(true);
+    cleanup();
+    resetReplayBuildOrders();
+
+    // The replacement carries the current version, so it is not handed over
+    // again.
+    await open("SplinterFaction 0.1.88", id, MATCH_SETUP);
+    await screen.findAllByText("Land Factory");
+    expect(HANDED).toHaveLength(1);
+  });
+
+  it("treats a list recorded with no version as the oldest", async () => {
+    const id = freshId();
+    keep(id, { game: "SplinterFaction 0.1.88" });
+    GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+    DATASET = { units: UNITS };
+
+    await open("SplinterFaction 0.1.88", id, MATCH_SETUP);
+
+    await waitFor(() => expect(HANDED).toHaveLength(1));
+  });
+
+  it("keeps an archive's list that the current version of the read made", async () => {
+    const id = freshId();
+    keep(id, {
+      game: "SplinterFaction 0.1.88",
+      listVersion: CURRENT_VERSION,
+    });
+    GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+    DATASET = { units: UNITS };
+
+    await open("SplinterFaction 0.1.88", id, MATCH_SETUP);
+
+    await screen.findAllByText("Land Factory");
+    expect(HANDED).toEqual([]);
+  });
+
+  it("keeps an older list when this read was made with no match setup", async () => {
+    const id = freshId();
+    keep(id, { game: "SplinterFaction 0.1.88", listVersion: 1 });
+    GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+    DATASET = { units: UNITS };
+
+    await open("SplinterFaction 0.1.88", id);
+
+    await screen.findAllByText("Land Factory");
+    expect(HANDED).toEqual([]);
+  });
+
+  it("never hands over a loose folder's list a second time", async () => {
+    const id = freshId();
+    keep(id, {
+      origin: "folder",
+      game: "SplinterFaction $VERSION",
+      listVersion: 1,
+    });
+    GAMES = [game("SplinterFaction $VERSION", "SplinterFaction.sdd")];
+    DATASET = { units: UNITS };
+
+    await open("SplinterFaction $VERSION", id, MATCH_SETUP);
+
+    await screen.findAllByText("Land Factory");
     expect(HANDED).toEqual([]);
   });
 

@@ -2496,6 +2496,10 @@ pub fn unit_defs_blocking(
 /// [`lua_exec_blocking`] runs that loads the game's defs.
 pub use coilbox_unitsync_worker::defsenv::DEFS_ENV_SHIM;
 
+/// The version of the read of a unit list for one match, so a list kept from
+/// an older read can be told from one the current read made (issue #4930).
+pub use coilbox_unitsync_worker::cachekey::MATCH_LIST_VERSION;
+
 /// [`unitsync_lua_exec`], blocking, for a script that loads the game's defs:
 /// the worker's `{ result?, error?, errors }` answer for `source` run with
 /// `archive` mounted. It has the time a read of the defs has, as

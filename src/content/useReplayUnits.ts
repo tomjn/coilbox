@@ -170,6 +170,8 @@ export function useReplayUnits(
     units,
     /** Every list the store holds for this replay. */
     links: lists.sets?.links ?? NO_LINKS,
+    /** The version of the read of a match that this build makes. */
+    matchListVersion: lists.sets?.matchListVersion ?? 0,
   };
 }
 
@@ -182,23 +184,39 @@ const NO_LINKS: UnitDefLink[] = [];
  * the replay has build orders, and every one of them fits the list. A list the
  * replay's own orders contradict is not the one the match was played with, and
  * keeping it would pin a wrong list to the replay for good (#3847). A replay
- * that already has a list from this kind of read keeps that one.
+ * that already has a list from this kind of read keeps that one, except that
+ * an archive's list made by an older version of the read of a match is handed
+ * over again when this list was read with the replay's match setup, so the
+ * store can replace it (#4930). That costs one hand over per replay, and the
+ * read itself is the one the page has already made.
  *
  * This is a side effect of a read that has already happened. It asks unitsync
  * for nothing and holds nothing up.
  */
 export function useKeepUnitList(
-  info: Pick<DemoInfo, "gameId">,
+  info: Pick<DemoInfo, "gameId" | "matchSetup">,
   source: UnitSource | null,
   units: UnitDatasetEntry[] | null,
   orders: readonly Pick<BuildOrder, "unitDefId" | "position">[] | null,
   links: readonly UnitDefLink[],
+  matchListVersion: number,
 ) {
   const gameId = info.gameId;
   const game: GameItem | null =
     source?.kind === "installed" ? source.game : null;
   const origin = game ? (isLooseFolder(game) ? "folder" : "archive") : null;
-  const linked = links.some((link) => link.origin === origin);
+  // Only a read made with the match setup is made by a version of that read.
+  // A folder's list is never replaced, so it is never handed over twice.
+  const matchRead = info.matchSetup !== undefined;
+  const linked = links.some(
+    (link) =>
+      link.origin === origin &&
+      !(
+        origin === "archive" &&
+        matchRead &&
+        (link.listVersion ?? 0) < matchListVersion
+      ),
+  );
 
   useEffect(() => {
     if (!gameId || !game || !units || !orders || linked) return;
@@ -213,11 +231,12 @@ export function useKeepUnitList(
           game: game.name,
           archive: game.primaryArchive.name,
           units: units.map(unitToStored),
+          matchRead: matchRead || undefined,
         }),
       )
       .then(() => forget(gameId))
       // Nothing was kept. The replay reads as it did, and the next visit in
       // another session tries again.
       .catch(() => {});
-  }, [gameId, game, units, orders, linked]);
+  }, [gameId, game, units, orders, linked, matchRead]);
 }

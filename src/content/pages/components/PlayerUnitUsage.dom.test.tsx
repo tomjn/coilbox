@@ -142,8 +142,8 @@ describe("PlayerUnitUsage", () => {
 
     expect(screen.getByText("From 3 of 3 games.")).toBeTruthy();
     expect(body()).toEqual([
-      ["Tank", "Offence", "3", "6", "600", "1 of 2", "", ""],
-      ["Mex", "Economy", "3", "4", "200", "1 of 2", "", ""],
+      ["Tank", "Offence", "3", "6", "600", "1 of 2", "", "", ""],
+      ["Mex", "Economy", "3", "4", "200", "1 of 2", "", "", ""],
     ]);
     // Counts with their sample, and no rate.
     expect(document.body.textContent).not.toContain("%");
@@ -199,7 +199,9 @@ describe("PlayerUnitUsage", () => {
   it("fills finished and died only for a unit an analysed game covers", () => {
     REPLAYS = [
       replay("a", 2, 5, {
-        events: [{ team: 0, defs: [{ def: 2, finished: 4, died: 3 }] }],
+        events: [
+          { team: 0, defs: [{ def: 2, finished: 4, died: 3, dealt: 0 }] },
+        ],
       }),
       replay("b", 1, 0),
     ];
@@ -212,9 +214,47 @@ describe("PlayerUnitUsage", () => {
       ),
     ).toBeTruthy();
     const [tank, mex] = body();
-    expect(tank.slice(6)).toEqual(["45 ordered in 1 game", "3"]);
+    expect(tank.slice(6)).toEqual(["45 ordered in 1 game", "3", ""]);
     // Ordered in the analysed game and never finished: nought, not blank.
-    expect(mex.slice(6)).toEqual(["02 ordered in 1 game", "0"]);
+    expect(mex.slice(6)).toEqual(["02 ordered in 1 game", "0", ""]);
+  });
+
+  it("shows damage per metal with its games, a dash with no metal, and nothing without a record", () => {
+    REPLAYS = [
+      replay("a", 2, 5, {
+        eventsDamage: true,
+        // Two tanks at 100 dealt 550.
+        events: [
+          { team: 0, defs: [{ def: 2, finished: 2, died: 0, dealt: 550 }] },
+        ],
+      }),
+    ];
+    LISTS = () => ({ ...NAMED, events: UNITS });
+    show([record("a", 1, true)]);
+
+    const [tank, mex] = body();
+    expect(tank[8]).toBe("2.751 game");
+    // The game covers the mex and finished none of them.
+    expect(mex[8]).toBe("—1 game");
+
+    cleanup();
+    REPLAYS = [
+      replay("a", 2, 5, {
+        events: [
+          { team: 0, defs: [{ def: 2, finished: 2, died: 0, dealt: 0 }] },
+        ],
+      }),
+    ];
+    show([record("a", 1, true)]);
+    expect(body()[0][8]).toBe("");
+    fireEvent.click(
+      screen.getByRole("button", { name: "About units ordered" }),
+    );
+    expect(
+      within(screen.getByRole("dialog")).getByText(
+        "1 game analysed before the recorder kept damage for each unit, so they are not in damage per metal. Analysing them again adds them.",
+      ),
+    ).toBeTruthy();
   });
 
   it("says it is reading, and says when the read failed", () => {
