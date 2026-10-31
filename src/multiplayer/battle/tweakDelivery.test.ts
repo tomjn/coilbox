@@ -44,9 +44,15 @@ function fakeLobby(opts: {
   serverSaysOnSend?: string[];
   /** What the room's host says once the first slot is on the wire. */
   hostSaysOnSend?: string[];
+  /** Lines the host says this long after the first slot went out. */
+  hostSaysLater?: { afterMs: number; text: string }[];
+  /** Slots whose value appears this long after that slot went out. */
+  echoAtMs?: Record<string, number>;
   cancelAfterSends?: number;
 }) {
   const tags: Record<string, string> = { ...(opts.tags ?? {}) };
+  const sentAt: Record<string, number> = {};
+  const firstSendAt: { at: number | null } = { at: null };
   const pollsSince: Record<string, number> = {};
   const serverMessages: string[] = [];
   const sent: TweakSlot[] = [];
@@ -59,6 +65,8 @@ function fakeLobby(opts: {
     async send(s) {
       if (opts.failSendOn === s.name) throw new Error("connection is closed");
       sent.push(s);
+      sentAt[s.name] = clock;
+      firstSendAt.at ??= clock;
       pollsSince[s.name] = 0;
       serverMessages.push(...(opts.serverSaysOnSend ?? []));
       if (opts.cancelAfterSends != null && sent.length >= opts.cancelAfterSends)
@@ -67,13 +75,26 @@ function fakeLobby(opts: {
     confirmed: (tagKey) => tags[tagKey],
     serverMessageCount: () => serverMessages.length,
     serverMessagesSince: (count) => serverMessages.slice(count),
-    hostSaidSince: () => (sent.length > 0 ? (opts.hostSaysOnSend ?? []) : []),
+    hostSaidSince: () => [
+      ...(sent.length > 0 ? (opts.hostSaysOnSend ?? []) : []),
+      ...(opts.hostSaysLater ?? [])
+        .filter(
+          ({ afterMs }) =>
+            firstSendAt.at !== null && clock >= firstSendAt.at + afterMs,
+        )
+        .map(({ text }) => text),
+    ],
     async sleep(ms) {
       sleeps.push(ms);
       clock += ms;
       // Every in-flight slot ages by one poll, and lands once it is due.
       for (const s of sent) {
         pollsSince[s.name] += 1;
+        const atMs = opts.echoAtMs?.[s.name];
+        if (atMs !== undefined) {
+          if (clock - sentAt[s.name] >= atMs) tags[s.tagKey] = s.value;
+          continue;
+        }
         const due = opts.echoAfter?.[s.name] ?? 1;
         if (due !== "never" && pollsSince[s.name] >= due)
           tags[s.tagKey] = s.value;
@@ -312,6 +333,96 @@ describe("runDelivery", () => {
     expect(result.slots[0].hostSaid).toEqual([
       '* alice, you are not allowed to call command "bset" in current context (boss mode is enabled).',
     ]);
+  });
+
+  describe("when the autohost puts a !bSet to a vote", () => {
+    const called =
+      'alice called a vote for command "bSet tweakdefs1 AAAA" [!vote y, !vote n, !vote b]';
+
+    it("waits out the vote and carries on when it passes", async () => {
+      // The echo lands 30 s after the send, far past what an echo is given.
+      expect(30_000).toBeGreaterThan(confirmTimeoutMs(100, true));
+      const { io, sent } = fakeLobby({
+        hostSaysLater: [
+          { afterMs: 500, text: called },
+          {
+            afterMs: 30_000,
+            text: 'Vote for command "bSet tweakdefs1 AAAA" passed.',
+          },
+        ],
+        echoAtMs: { tweakdefs1: 30_500 },
+      });
+      const slots = [
+        slot({ name: "tweakdefs1" }),
+        slot({ name: "tweakdefs2", tagKey: "game/modoptions/tweakdefs2" }),
+      ];
+
+      const result = await runDelivery(slots, io, { viaAutohost: true });
+
+      expect(result.slots.map((s) => s.state)).toEqual([
+        "confirmed",
+        "confirmed",
+      ]);
+      expect(sent.map((s) => s.name)).toEqual(["tweakdefs1", "tweakdefs2"]);
+    });
+
+    it("stops at a vote that fails, says so, and does not send the rest", async () => {
+      const { io, sent } = fakeLobby({
+        echoAfter: { tweakdefs1: "never" },
+        hostSaysLater: [
+          { afterMs: 500, text: called },
+          {
+            afterMs: 12_000,
+            text: 'Vote for command "bSet tweakdefs1 AAAA" failed.',
+          },
+        ],
+      });
+      const slots = [
+        slot({ name: "tweakdefs1" }),
+        slot({ name: "tweakdefs2", tagKey: "game/modoptions/tweakdefs2" }),
+      ];
+
+      const result = await runDelivery(slots, io, { viaAutohost: true });
+
+      expect(sent.map((s) => s.name)).toEqual(["tweakdefs1"]);
+      expect(result.slots.map((s) => s.state)).toEqual(["failed", "skipped"]);
+      expect(result.slots[0].vote).toBe("failed");
+      expect(result.slots[0].reason).toBe(
+        "The room's vote on tweakdefs1 did not pass.",
+      );
+    });
+
+    it("gives up on a vote that never reports, naming the wait", async () => {
+      const { io } = fakeLobby({
+        echoAfter: { tweakdefs1: "never" },
+        hostSaysLater: [{ afterMs: 500, text: called }],
+      });
+
+      const result = await runDelivery([slot()], io, { viaAutohost: true });
+
+      expect(result.slots[0].state).toBe("failed");
+      expect(result.slots[0].vote).toBe("open");
+      expect(result.slots[0].reason).toBe(
+        "The room's vote on tweakdefs1 was still open after 53s.",
+      );
+    });
+
+    it("ignores a vote on some other option", async () => {
+      const { io } = fakeLobby({
+        echoAfter: { tweakdefs1: "never" },
+        hostSaysLater: [
+          {
+            afterMs: 500,
+            text: 'bob called a vote for command "bSet tweakdefs2 BBBB" [!vote y, !vote n, !vote b]',
+          },
+        ],
+      });
+
+      const result = await runDelivery([slot()], io, { viaAutohost: true });
+
+      expect(result.slots[0].vote).toBeUndefined();
+      expect(result.slots[0].reason).toContain("never came back");
+    });
   });
 
   it("stops when the send itself is refused, and says why", async () => {

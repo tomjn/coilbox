@@ -32,6 +32,12 @@
 import { plural, t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 import type { TweakSlotPack } from "@/workshop/tweakPack";
+import {
+  AUTOHOST_VOTE_MS,
+  isBSetVote,
+  type VoteState,
+  voteStateOf,
+} from "./autohostVote";
 import { MODOPT_PREFIX, optionTagRefusal } from "./battleOptions";
 
 /** One packed slot, ready to send. */
@@ -73,6 +79,10 @@ const AUTOHOST_OUTPUT_BYTES_PER_SECOND = 49000 / 5;
 
 /** The wait `useBattleOptions` already gives any option edit's echo. */
 export const ECHO_BASE_MS = 8000;
+
+/** How long to wait on a vote an autohost called: its vote time, then the room's
+ *  echo of the result. */
+export const VOTE_WAIT_MS = AUTOHOST_VOTE_MS + ECHO_BASE_MS;
 
 /** How often the run looks at the battle's tags while waiting for an echo. The
  *  mirror behind them refreshes on `SNAPSHOT_BATCH_MS`, so anything faster than
@@ -185,6 +195,10 @@ export interface SlotProgress {
    *  to decide whether one did: chat is what a bot chose to say, and script
    *  tags are what the match will run on. */
   hostSaid?: string[];
+  /** Set when the autohost put this slot to a vote that did not pass, or that
+   *  was still open when the run gave up. The reason says so, and the host's
+   *  first line is only the call for the vote. */
+  vote?: "failed" | "open";
 }
 
 export interface DeliveryProgress {
@@ -281,11 +295,13 @@ export async function runDelivery(
     index: number,
     reason: string,
     said: { server: string[]; host: string[] },
+    vote?: "failed" | "open",
   ) => {
     progress[index] = {
       ...progress[index],
       state: "failed",
       reason,
+      ...(vote ? { vote } : {}),
       ...(said.server.length > 0 ? { serverSaid: said.server } : {}),
       ...(said.host.length > 0 ? { hostSaid: said.host } : {}),
     };
@@ -332,16 +348,43 @@ export async function runDelivery(
     const startedAt = sentAt;
     const timeout = confirmTimeoutMs(slot.bytes, viaAutohost);
     let landed = false;
-    while (io.now() - startedAt < timeout) {
+    // An autohost may answer by putting the `!bSet` to a vote, which takes as long
+    // as the room's vote time and not as long as an echo. The next slot waits
+    // for it, because SPADS refuses a second vote while one is open.
+    const isVote = isBSetVote(slot.name);
+    let deadline = startedAt + timeout;
+    let vote: VoteState = "none";
+    while (io.now() < deadline) {
       await io.sleep(CONFIRM_POLL_MS);
       if (io.confirmed(slot.tagKey) === slot.value) {
         landed = true;
         break;
       }
+      if (!viaAutohost) continue;
+      const now = voteStateOf(io.hostSaidSince(sentAt), isVote);
+      if (now === vote) continue;
+      vote = now;
+      // A passed vote runs the command at once, so its echo is owed from here.
+      if (vote === "open")
+        deadline = Math.max(deadline, io.now() + VOTE_WAIT_MS);
+      if (vote === "passed") deadline = Math.max(deadline, io.now() + timeout);
+      if (vote === "failed") break;
     }
 
     if (!landed) {
       const slotName = slot.name;
+      if (vote === "failed" || vote === "open") {
+        const seconds = Math.round(VOTE_WAIT_MS / 1000);
+        stop(
+          i,
+          vote === "failed"
+            ? t`The room's vote on ${slotName} did not pass.`
+            : t`The room's vote on ${slotName} was still open after ${seconds}s.`,
+          said(),
+          vote,
+        );
+        break;
+      }
       const seconds = Math.round(timeout / 1000);
       stop(
         i,
