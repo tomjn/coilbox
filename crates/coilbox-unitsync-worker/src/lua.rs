@@ -146,6 +146,13 @@ local function __cb_chunk(s, extra, prefix)
   out[prefix .. 'Chunks'] = tostring(n)
   return out
 end
+
+-- A unit list read's result table with the errors its definition scripts logged
+-- (`__cb_logged_errors`, from DEFS_ENV_SHIM) added under `logged`.
+local function __cb_with_logged(out)
+  if type(__cb_logged_errors) == 'function' then __cb_chunk(__cb_logged_errors(), out, 'logged') end
+  return out
+end
 "#;
 
 pub use coilbox_unitsync_worker::defsenv::DEFS_ENV_SHIM;
@@ -639,5 +646,112 @@ mod tests {
         assert_eq!(g.get::<i64>("allies").unwrap(), 0);
         assert_eq!(g.get::<i64>("teams").unwrap(), 0);
         assert_eq!(g.get::<Option<bool>>("info").unwrap(), None);
+    }
+
+    /// What a definition script's `Spring.Log` calls left in the parser, as the
+    /// read sends it back (#4928).
+    fn logged_after(body: &str) -> String {
+        let lua = shimmed_env(body);
+        lua.load("return __cb_logged_errors()").eval().unwrap()
+    }
+
+    /// Beyond All Reason's unit loader logs a failed file at error level and
+    /// carries on, which is how 36 units went missing with nothing to say why.
+    #[test]
+    fn an_error_a_definition_script_logs_is_kept() {
+        let logged =
+            logged_after("Spring.Log('unitdefs', 50, 'Error loading units/a.lua', 'boom')");
+        assert_eq!(
+            logged,
+            "a definitions script logged an error: [unitdefs] Error loading units/a.lua, boom"
+        );
+    }
+
+    #[test]
+    fn a_log_below_error_level_is_not_kept() {
+        let logged = logged_after(
+            "Spring.Log('unitdefs', 40, 'a warning')\n\
+             Spring.Log('unitdefs', 35, 'a notice')\n\
+             Spring.Log('unitdefs', 'info', 'text')",
+        );
+        assert_eq!(logged, "");
+    }
+
+    /// One piece of what the transport carries is 60000 bytes, so that is where
+    /// the kept text stops, and the last line counts what it left out.
+    #[test]
+    fn a_noisy_game_cannot_grow_the_answer_past_one_piece() {
+        let logged =
+            logged_after("for i = 1, 100 do Spring.Log('unitdefs', 50, string.rep('x', 1000)) end");
+        let (kept, left_out) = logged.rsplit_once('\n').expect("a count line follows");
+        assert!(kept.len() <= 60_001, "kept {} bytes", kept.len());
+        let kept_count = kept.lines().count();
+        let left_out_count: usize = left_out
+            .strip_suffix(" more definitions script errors were not kept")
+            .and_then(|n| n.parse().ok())
+            .unwrap_or_else(|| panic!("not a count line: {left_out:?}"));
+        assert!(left_out_count > 0);
+        assert_eq!(kept_count + left_out_count, 100);
+    }
+
+    /// Run a script ending in `__cb_with_logged` over the real chunking, and
+    /// rejoin the two fields it fills.
+    fn with_logged(body: &str) -> (Option<String>, Option<String>, Option<String>) {
+        let lua = Lua::new();
+        lua.load(
+            "Spring = { Log = function() end }
+             LOG = { ERROR = 50 }",
+        )
+        .exec()
+        .unwrap();
+        let t: mlua::Table = lua
+            .load(format!("{CHUNKED_RESULT}{DEFS_ENV_SHIM}\n{body}"))
+            .eval()
+            .unwrap();
+        // A failed read writes no result, and so no count to read it by.
+        let has_result = t.get::<Option<String>>("resultChunks").unwrap().is_some();
+        (
+            has_result.then(|| field(&t, "result")).flatten(),
+            field(&t, "logged"),
+            t.get::<Option<String>>("__error").unwrap(),
+        )
+    }
+
+    /// The pieces ride in the result table beside the unit list, under their own
+    /// name so that neither is mistaken for the other.
+    #[test]
+    fn the_logged_errors_ride_beside_the_result() {
+        let (result, logged, error) = with_logged(
+            "Spring.Log('s', 50, 'bad')\n\
+             return __cb_with_logged(__cb_chunk('armcom\\tCommander'))",
+        );
+        assert_eq!(result.as_deref(), Some("armcom\tCommander"));
+        assert_eq!(
+            logged.as_deref(),
+            Some("a definitions script logged an error: [s] bad")
+        );
+        assert_eq!(error, None);
+    }
+
+    /// A read that fails still sends what was logged before it did, because
+    /// those lines are the best account of why.
+    #[test]
+    fn the_logged_errors_survive_a_failed_read() {
+        let (result, logged, error) = with_logged(
+            "Spring.Log('s', 50, 'bad')\n\
+             return __cb_with_logged({ __error = 'defs.lua raised' })",
+        );
+        assert_eq!(result, None);
+        assert_eq!(
+            logged.as_deref(),
+            Some("a definitions script logged an error: [s] bad")
+        );
+        assert_eq!(error.as_deref(), Some("defs.lua raised"));
+    }
+
+    #[test]
+    fn a_read_with_nothing_logged_sends_no_pieces() {
+        let (_, logged, _) = with_logged("return __cb_with_logged(__cb_chunk('x'))");
+        assert_eq!(logged, None);
     }
 }
