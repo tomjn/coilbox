@@ -22,6 +22,7 @@ import { PresetTweaksRow } from "../../PresetTweaksRow";
 import { PresetTweaksView, usePresetTweaks } from "../../PresetTweaksView";
 import type { PresetSelection } from "../../presetParts";
 import type { SkirmishPreset } from "../../presets";
+import { usePresetFitFacts } from "../../usePresetFitFacts";
 
 /**
  * Right-hand slide-in sheet for managing singleplayer presets: browse saved
@@ -62,6 +63,9 @@ export function PresetsDrawer({
   onBrowseHub,
   onHostAsBattle,
   disabled,
+  currentMapName,
+  currentStartPosType,
+  gameArchiveFor,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -110,11 +114,27 @@ export function PresetsDrawer({
    * action on a Tachyon connection (see `docs/internal/tachyon-protocol.md`). */
   onHostAsBattle?: (preset: SkirmishPreset) => void;
   disabled?: boolean;
+  /** The setup's map and start position mode, for the fit warnings. */
+  currentMapName: string;
+  currentStartPosType: number;
+  /** The archive a game's options are read from, for a preset naming a game
+   *  other than the current one. */
+  gameArchiveFor: (gameName: string) => string | undefined;
 }) {
   const { t } = useLingui();
   // Which preset's parts are on screen, if any. The drawer switches to them in
   // place rather than stacking a popover over itself.
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
+  const fit = usePresetFitFacts({
+    preset: viewing,
+    enginePath,
+    dataDir,
+    currentGameName,
+    currentModOptions: modOptionsSchema,
+    currentMapName,
+    currentStartPosType,
+    gameArchiveFor,
+  });
   // The unit tweak list, the sheet's third face alongside the list and a
   // preset's own panel.
   const [tweaksOpen, setTweaksOpen] = useState(false);
@@ -201,6 +221,7 @@ export function PresetsDrawer({
               preset={viewing}
               currentGameName={currentGameName}
               verb={t`Load`}
+              fit={fit}
               disabled={disabled}
               onConfirm={(selection) => load(viewing, selection)}
               actions={

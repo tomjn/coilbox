@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import type { SkirmishDraft } from "./drafts";
 import { PresetPartsPicker } from "./PresetPartsPicker";
+import { type PresetFitFacts, presetFitWarnings } from "./presetFit";
 import {
   ALL_PARTS,
   PRESET_PARTS,
@@ -36,6 +37,7 @@ export function PresetPartsView({
   onConfirm,
   progress,
   actions,
+  fit,
 }: {
   preset: SkirmishDraft;
   /** The game being applied to now: the setup's game, or the room's. Decides
@@ -59,6 +61,9 @@ export function PresetPartsView({
   /** Whatever else this surface offers for the whole preset, under the primary
    *  button. Singleplayer puts hosting, sharing and deleting here. */
   actions?: ReactNode;
+  /** What the game and map declare, for warning about parts that do not fit
+   *  them. Absent, only the start box warning is given. */
+  fit?: PresetFitFacts;
 }) {
   const { t } = useLingui();
   const offered = PRESET_PARTS.filter((part) => !omit.includes(part));
@@ -122,13 +127,15 @@ export function PresetPartsView({
   };
 
   const presetMap = preset.mapName;
-  const warnings: Partial<Record<PresetPart, string>> =
-    effective.parts.includes("startPositions") &&
+  const warnings: Partial<Record<PresetPart, string>> = {
+    ...(fit ? presetFitWarnings(preset, effective, fit) : {}),
+    ...(effective.parts.includes("startPositions") &&
     !effective.parts.includes("map")
       ? {
           startPositions: t`These boxes were drawn for ${presetMap}, not the map you are on.`,
         }
-      : {};
+      : {}),
+  };
 
   const count = effective.parts.length;
   const everything = count === carried.length;
