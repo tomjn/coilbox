@@ -529,7 +529,7 @@ msgstr "{0, plural, one {Gra {gameName} nie ma już jednostki {builder}, więc #
 msgid "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 msgstr "{0, plural, one {Tabela obrażeń ({holder}) wymienia # klasę pancerza, której ta gra nie ma: {list}. Silnik używa dla niej domyślnych obrażeń, więc ten wiersz nic nie zmienia.} few {Tabela obrażeń ({holder}) wymienia # klasy pancerza, których ta gra nie ma: {list}. Silnik używa dla nich domyślnych obrażeń, więc te wiersze nic nie zmieniają.} many {Tabela obrażeń ({holder}) wymienia # klas pancerza, których ta gra nie ma: {list}. Silnik używa dla nich domyślnych obrażeń, więc te wiersze nic nie zmieniają.} other {Tabela obrażeń ({holder}) wymienia # klasy pancerza, których ta gra nie ma: {list}. Silnik używa dla nich domyślnych obrażeń, więc te wiersze nic nie zmieniają.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
@@ -1263,7 +1263,7 @@ msgstr "{0, plural, one {Pokazano pierwsze {SHOWN_ROWS} z # jednostki. Zmiana do
 msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 msgstr "{0, plural, one {Drużyna 1 {team1Record}, drużyna 2 {team2Record}, w # meczu dwóch drużyn z wynikiem.} few {Drużyna 1 {team1Record}, drużyna 2 {team2Record}, w # meczach dwóch drużyn z wynikiem.} many {Drużyna 1 {team1Record}, drużyna 2 {team2Record}, w # meczach dwóch drużyn z wynikiem.} other {Drużyna 1 {team1Record}, drużyna 2 {team2Record}, w # meczu dwóch drużyn z wynikiem.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
@@ -11231,6 +11231,10 @@ msgstr "dowolne strony"
 #, fuzzy
 msgid "Any sides"
 msgstr "Dowolne strony"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any start position"
+msgstr ""
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -44592,6 +44596,7 @@ msgid "Start playing"
 msgstr "Zacznij grać"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
+#: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Start position"
 msgstr "Pozycja startowa"
@@ -44611,6 +44616,10 @@ msgstr "Pozycja startowa {position}"
 #, fuzzy
 msgid "Start position {position} (unclaimed)"
 msgstr "Pozycja startowa {position} (nieprzypisana)"
+
+#: src/content/mapImage.ts
+msgid "start position {startPosition}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -47950,6 +47959,10 @@ msgstr "Nie udało się odczytać wyniku z powtórki. Jak zakończyła się bitw
 #, fuzzy
 msgid "The picture could not be encoded as a PNG."
 msgstr "Nie udało się zakodować obrazka jako PNG."
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
+msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy

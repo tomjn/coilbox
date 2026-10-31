@@ -529,7 +529,7 @@ msgstr "{0, plural, other {{gameName} 中已没有名为 {builder} 的单位，�
 msgid "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 msgstr "{0, plural, other {{holder} 的伤害表引用了此游戏没有的 # 种护甲类型：{list}。引擎会改用默认伤害，因此这些行不起作用。}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
@@ -1263,7 +1263,7 @@ msgstr "{0, plural, other {显示 # 个单位中的前 {SHOWN_ROWS} 个。所有
 msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 msgstr "{0, plural, other {在 # 场有结果的两队对局中，队伍 1 {team1Record}，队伍 2 {team2Record}。}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
@@ -11231,6 +11231,10 @@ msgstr "任意阵营"
 #, fuzzy
 msgid "Any sides"
 msgstr "任意阵营"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any start position"
+msgstr ""
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -44592,6 +44596,7 @@ msgid "Start playing"
 msgstr "开始游玩"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
+#: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Start position"
 msgstr "出生点"
@@ -44611,6 +44616,10 @@ msgstr "出生点 {position}"
 #, fuzzy
 msgid "Start position {position} (unclaimed)"
 msgstr "出生点 {position}（未被占用）"
+
+#: src/content/mapImage.ts
+msgid "start position {startPosition}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -47950,6 +47959,10 @@ msgstr "无法从回放中读取结果。这场战斗的结果如何？"
 #, fuzzy
 msgid "The picture could not be encoded as a PNG."
 msgstr "无法将图片编码为 PNG。"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
+msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy

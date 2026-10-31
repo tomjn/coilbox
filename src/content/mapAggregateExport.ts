@@ -74,6 +74,9 @@ export interface FilterSummary {
   playedUntil: string;
   /** The name of the replay set, or "" for every replay. */
   replaySet: string;
+  /** The name of the start position the picture is limited to, or "" for every
+   *  position. */
+  startPosition: string;
   includesShort: boolean;
 }
 
@@ -86,6 +89,7 @@ const ANALYSED = {
 export function filterSummary(
   filters: AggregateFilters,
   replaySet: string,
+  startPosition: string,
 ): FilterSummary {
   const playerCount = filters.playerCount;
   return {
@@ -101,6 +105,7 @@ export function filterSummary(
     playedFrom: filters.from,
     playedUntil: filters.to,
     replaySet,
+    startPosition,
     includesShort: filters.includeShort,
   };
 }
@@ -111,6 +116,8 @@ export function mapExportInfo(input: {
   shown: readonly AggregateMatch[];
   filters: AggregateFilters;
   replaySet: string;
+  /** The start position the matches are limited to, or "" for none. */
+  startPosition: string;
   worldWidth: number;
   worldHeight: number;
 }): MapExportBasis {
@@ -123,7 +130,7 @@ export function mapExportInfo(input: {
       (v) => v.name,
     ),
     matches: input.shown.length,
-    filters: filterSummary(input.filters, input.replaySet),
+    filters: filterSummary(input.filters, input.replaySet, input.startPosition),
     worldWidth: input.worldWidth,
     worldHeight: input.worldHeight,
   };
@@ -153,6 +160,7 @@ function infoColumns(info: MapExportInfo, layer: Column[] = []): Column[] {
     ["filter_played_from", csvText(f.playedFrom)],
     ["filter_played_until", csvText(f.playedUntil)],
     ["filter_replay_set", csvText(f.replaySet)],
+    ["filter_start_position", csvText(f.startPosition)],
     ["includes_matches_under_a_minute", f.includesShort ? "true" : "false"],
     ["map_width_elmos", csvNumber(info.worldWidth)],
     ["map_height_elmos", csvNumber(info.worldHeight)],

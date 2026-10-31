@@ -369,6 +369,9 @@ export interface PlaceRecord extends Count {
   sides: [Count, Count];
   /** Starts taken by an AI, which are in the counts above. */
   byAi: number;
+  /** The starts counted here, each with the match and the engine team that
+   *  took it. */
+  starts: JoinedStart[];
 }
 
 export interface StartRecords {
@@ -417,6 +420,7 @@ export function placeRecords(
         { taken: 0, known: 0, won: 0 },
       ],
       byAi: 0,
+      starts: [...members],
     };
     for (const s of members) {
       add(record, s.outcome);

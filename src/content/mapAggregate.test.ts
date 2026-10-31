@@ -44,17 +44,21 @@ function base64(bytes: Uint8Array): string {
 }
 
 /** Pack entries the way `map_grids.rs` does: `[cell, slice, count, def?]`. */
-function layer(entries: [number, number, number, number?][]): MapCountLayer {
+function layer(
+  entries: [number, number, number, number?, number?][],
+): MapCountLayer {
   const n = entries.length;
   const cell = new Uint32Array(n);
   const slice = new Uint16Array(n);
   const count = new Uint16Array(n);
   const def = new Uint32Array(n);
-  entries.forEach(([c, s, k, d], i) => {
+  const team = new Int16Array(n);
+  entries.forEach(([c, s, k, d, tm], i) => {
     cell[i] = c;
     slice[i] = s;
     count[i] = k;
     def[i] = d ?? 0;
+    team[i] = tm ?? 0;
   });
   const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
   return {
@@ -62,6 +66,7 @@ function layer(entries: [number, number, number, number?][]): MapCountLayer {
     cell: packed(cell),
     slice: packed(slice),
     count: packed(count),
+    team: packed(team),
     def: entries.some((e) => e[3] !== undefined) ? packed(def) : undefined,
     total: entries.reduce((sum, e) => sum + e[2], 0),
     offMap: 0,
@@ -473,15 +478,19 @@ describe("how many matches are behind each layer", () => {
 
 /** Pack damage the way `map_grids.rs` does: `[cell, slice, points]`, with a
  *  `u32` for the points. */
-function amountLayer(entries: [number, number, number][]): MapAmountLayer {
+function amountLayer(
+  entries: [number, number, number, number?][],
+): MapAmountLayer {
   const n = entries.length;
   const cell = new Uint32Array(n);
   const slice = new Uint16Array(n);
   const amount = new Uint32Array(n);
-  entries.forEach(([c, s, k], i) => {
+  const team = new Int16Array(n);
+  entries.forEach(([c, s, k, tm], i) => {
     cell[i] = c;
     slice[i] = s;
     amount[i] = k;
+    team[i] = tm ?? 0;
   });
   const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
   return {
@@ -489,6 +498,7 @@ function amountLayer(entries: [number, number, number][]): MapAmountLayer {
     cell: packed(cell),
     slice: packed(slice),
     amount: packed(amount),
+    team: packed(team),
     total: entries.reduce((sum, e) => sum + e[2], 0),
   };
 }
@@ -896,5 +906,116 @@ describe("start positions with their results", () => {
       },
     ]);
     expect(matchesWithStarts(got)).toBe(2);
+  });
+});
+
+describe("limiting a layer to the teams that held a position (#3882)", () => {
+  const PATH = "/demos/two.sdfz";
+  // Team 0 ordered 10 in the north west and team 1 ordered 30 in the south
+  // east, in the same minute.
+  const two = () =>
+    replay({
+      path: PATH,
+      orders: layer([
+        [QUIET, 0, 10, undefined, 0],
+        [BUSY, 0, 30, undefined, 1],
+      ]),
+    });
+  const options = { normalise: "share" as const, window: WHOLE };
+  const only = (...teams: number[]) => new Map([[PATH, new Set(teams)]]);
+
+  it("reads the team of every entry", () => {
+    expect(Array.from(two().orders.team)).toEqual([0, 1]);
+  });
+
+  it("counts every team when no team is asked for", () => {
+    const got = aggregateLayer([two()], "orders", WORLD, options);
+    expect(got.events).toBe(40);
+  });
+
+  it("counts only the entries of the teams kept", () => {
+    const got = aggregateLayer([two()], "orders", WORLD, {
+      ...options,
+      teams: only(1),
+    });
+    expect(got.events).toBe(30);
+    expect(got.contributing).toBe(1);
+    expect(got.grid?.events[BUSY]).toBe(30);
+    expect(got.grid?.events[QUIET]).toBe(0);
+    // Both teams, when both held the position.
+    expect(
+      aggregateLayer([two()], "orders", WORLD, {
+        ...options,
+        teams: only(0, 1),
+      }).events,
+    ).toBe(40);
+  });
+
+  it("leaves a replay with no entry out, and does not count it as available", () => {
+    const got = aggregateLayer([two()], "orders", WORLD, {
+      ...options,
+      teams: new Map(),
+    });
+    expect(got.available).toBe(0);
+    expect(got.contributing).toBe(0);
+  });
+
+  it("does not let a team with nothing in the layer contribute", () => {
+    const got = aggregateLayer([two()], "orders", WORLD, {
+      ...options,
+      teams: only(5),
+    });
+    expect(got.available).toBe(1);
+    expect(got.contributing).toBe(0);
+    expect(got.field).toBeNull();
+  });
+
+  it("scales each team's own busiest spot in peak mode, and not the first team asked for", () => {
+    const replays = [two()];
+    const peak = { normalise: "peak" as const, window: WHOLE };
+    const first = aggregateLayer(replays, "orders", WORLD, {
+      ...peak,
+      teams: only(0),
+    });
+    const second = aggregateLayer(replays, "orders", WORLD, {
+      ...peak,
+      teams: only(1),
+    });
+    expect(first.field?.peak).toBeCloseTo(1, 4);
+    expect(second.field?.peak).toBeCloseTo(1, 4);
+  });
+
+  it("splits damage by the team hit or the team that dealt it, as the layer's mode says", () => {
+    const damaged = replay({
+      path: PATH,
+      damage: {
+        at: amountLayer([
+          [QUIET, 0, 5, 0],
+          [BUSY, 0, 9, 1],
+        ]),
+        origin: amountLayer([
+          [QUIET, 0, 9, 1],
+          [BUSY, 0, 5, 0],
+        ]),
+      },
+    });
+    const kept = { ...options, teams: only(1) };
+    expect(
+      aggregateLayer([damaged], "damage", WORLD, { ...kept, damageMode: "at" })
+        .events,
+    ).toBe(9);
+    expect(
+      aggregateLayer([damaged], "damage", WORLD, {
+        ...kept,
+        damageMode: "origin",
+      }).events,
+    ).toBe(9);
+    expect(
+      aggregateLayer([damaged], "damage", WORLD, {
+        ...options,
+        teams: only(0),
+        damageMode: "origin",
+      }).events,
+    ).toBe(5);
   });
 });

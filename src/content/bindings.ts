@@ -996,6 +996,8 @@ export interface MapCountLayer {
   slice: string;
   /** `u16`: how many events. */
   count: string;
+  /** `i16`: the engine team the events belong to, -1 when none is known. */
+  team: string;
   /** `u32`: the unit definition id. On the buildings layer only. */
   def?: string;
   /** How many events are in the entries. */
@@ -1017,6 +1019,9 @@ export interface MapAmountLayer {
   slice: string;
   /** `u32`: points of damage. */
   amount: string;
+  /** `i16`: the team whose units were hit on the landed end, and the team that
+   *  dealt the damage on the origin end. -1 when none is known. */
+  team: string;
   /** Points of damage in the entries. */
   total: number;
 }

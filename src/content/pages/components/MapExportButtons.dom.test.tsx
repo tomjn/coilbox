@@ -58,6 +58,7 @@ const info: MapExportBasis = {
     playedFrom: "",
     playedUntil: "",
     replaySet: "",
+    startPosition: "",
     includesShort: false,
   },
   worldWidth: 200,
@@ -94,6 +95,7 @@ const record: PlaceRecord = {
     { taken: 0, known: 0, won: 0 },
   ],
   byAi: 0,
+  starts: [],
 };
 const records: StartRecords = {
   places: [record],

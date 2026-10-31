@@ -429,7 +429,7 @@ msgstr ""
 msgid "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 msgstr ""
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr ""
@@ -1051,7 +1051,7 @@ msgstr ""
 msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 msgstr ""
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
 msgstr ""
@@ -9091,6 +9091,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Any sides"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any start position"
 msgstr ""
 
 #: src/hub/PublishSection.tsx
@@ -36236,6 +36240,7 @@ msgid "Start playing"
 msgstr ""
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
+#: src/content/pages/components/MapAggregate.tsx
 msgid "Start position"
 msgstr ""
 
@@ -36250,6 +36255,10 @@ msgstr ""
 
 #: src/play/pages/components/MinimapPreview.tsx
 msgid "Start position {position} (unclaimed)"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "start position {startPosition}"
 msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
@@ -38956,6 +38965,10 @@ msgstr ""
 #: src/content/mapImage.ts
 #: src/lego/projects.ts
 msgid "The picture could not be encoded as a PNG."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
 msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx

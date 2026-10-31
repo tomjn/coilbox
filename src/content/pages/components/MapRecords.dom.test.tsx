@@ -102,17 +102,21 @@ function base64(bytes: Uint8Array): string {
 }
 
 /** `[cell, minute, count, def?]`, packed as Rust packs them. */
-function layer(entries: [number, number, number, number?][]): MapCountLayer {
+function layer(
+  entries: [number, number, number, number?, number?][],
+): MapCountLayer {
   const n = entries.length;
   const cell = new Uint32Array(n);
   const slice = new Uint16Array(n);
   const count = new Uint16Array(n);
   const def = new Uint32Array(n);
-  entries.forEach(([c, s, k, d], i) => {
+  const team = new Int16Array(n);
+  entries.forEach(([c, s, k, d, tm], i) => {
     cell[i] = c;
     slice[i] = s;
     count[i] = k;
     def[i] = d ?? 0;
+    team[i] = tm ?? 0;
   });
   const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
   return {
@@ -120,6 +124,7 @@ function layer(entries: [number, number, number, number?][]): MapCountLayer {
     cell: packed(cell),
     slice: packed(slice),
     count: packed(count),
+    team: packed(team),
     def: entries.some((e) => e[3] !== undefined) ? packed(def) : undefined,
     total: entries.reduce((sum, e) => sum + e[2], 0),
     offMap: 0,

@@ -188,10 +188,11 @@ export interface ImageWords {
 export function filtersSentence(info: MapExportInfo): string {
   const f = info.filters;
   const parts = [f.players, f.sides, f.analysed];
-  const { playedFrom, playedUntil, replaySet } = f;
+  const { playedFrom, playedUntil, replaySet, startPosition } = f;
   if (playedFrom) parts.push(t`played from ${playedFrom}`);
   if (playedUntil) parts.push(t`played until ${playedUntil}`);
   if (replaySet) parts.push(t`replay set ${replaySet}`);
+  if (startPosition) parts.push(t`start position ${startPosition}`);
   parts.push(
     f.includesShort
       ? t`matches under a minute included`

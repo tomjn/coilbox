@@ -60,6 +60,7 @@ import type { DamageMode } from "../../replayDamage";
 import { type MapWorld, mapFraction } from "../../replayMapLayers";
 import { findSet, resolveSet, useReplaySets } from "../../replaySets";
 import {
+  pictureAt,
   resolveNames,
   type StartRow,
   type StoredName,
@@ -76,6 +77,9 @@ import { SectionHelp } from "./SectionHelp";
 import { VersionList, VersionSpan } from "./VersionList";
 
 const ANY = "any";
+/** Before a position's name in the start position select, so a position called
+ *  "any" is not the choice of none. */
+const NAMED = "named:";
 const NO_POSITIONS: readonly Point[] = [];
 const NO_REFIGHTS: ReadonlySet<string> = new Set();
 const NO_SIZES: Readonly<Record<string, MapSize>> = {};
@@ -242,7 +246,6 @@ export function MapAggregate({
     () => filterMatches(all.matches, filters, scope),
     [all, filters, scope],
   );
-  const filtered = shown.length !== family.matches.length;
   // The rest of the library under the same filters, for the length to be set
   // beside. A set's members are looked up among those matches too.
   const elsewhere = useMemo(
@@ -274,10 +277,6 @@ export function MapAggregate({
     [shown, analyses],
   );
   const read = useMapReplayCounts(asks, world);
-  const replays = useMemo(
-    () => shown.flatMap((m) => read.counts.get(m.record.path) ?? []),
-    [shown, read.counts],
-  );
 
   const [layer, setLayer] = useState<HeatLayerId | "">("buildings");
   const [damageMode, setDamageMode] = useState<DamageMode>("at");
@@ -295,6 +294,90 @@ export function MapAggregate({
   }, [windowChoice, customFrom, customTo]);
   const customInvalid =
     windowChoice === "custom" && timeWindow.kind !== "range";
+
+  const starts = useMemo(
+    () => aggregateStarts(shown, read.counts),
+    [shown, read.counts],
+  );
+  const joined = useMemo(
+    () => joinStarts(shown, read.counts),
+    [shown, read.counts],
+  );
+  const startRecords = useMemo(
+    () => placeRecords(joined.starts, declared, world),
+    [joined, declared, world],
+  );
+  // The player's names for the positions above, and the rows they join.
+  const { stored, save } = useStartNames(mapName);
+  const resolved = useMemo(
+    () =>
+      resolveNames(
+        stored,
+        startRecords.places.map((p) => p.place),
+        startRecords.scale,
+      ),
+    [stored, startRecords],
+  );
+  const placeNames = useMemo(
+    () => new Map([...resolved.byPlace].map(([key, e]) => [key, e.name])),
+    [resolved],
+  );
+  const rows = useMemo(
+    () => startRows(startRecords.places, placeNames),
+    [startRecords, placeNames],
+  );
+  const rename = (row: StartRow, name: string) =>
+    save(withNames(stored, resolved, row.places, name));
+  const forget = (entry: StoredName) => save(withoutName(stored, entry));
+  // A mark takes the number and name of the row its position is in.
+  const marks = useMemo(
+    () =>
+      rows.flatMap((row) =>
+        row.places.flatMap((place) => {
+          const at = mapFraction(place, world);
+          return at
+            ? [{ ...at, n: row.number, name: row.name, key: place.key }]
+            : [];
+        }),
+      ),
+    [rows, world],
+  );
+
+  // The named position the picture is limited to. The names offered are the
+  // table's rows, which are made from every match that passes the filters
+  // above, so choosing one never changes what is on offer.
+  const [position, setPosition] = useState("");
+  const positionNames = useMemo(
+    () => rows.flatMap((row) => (row.name === null ? [] : [row.name])),
+    [rows],
+  );
+  const activePosition =
+    positionNames.find((n) => n.toLowerCase() === position.toLowerCase()) ??
+    null;
+  const atPosition = useMemo(
+    () =>
+      activePosition === null
+        ? null
+        : pictureAt(shown, startRecords.places, placeNames, activePosition),
+    [activePosition, shown, startRecords, placeNames],
+  );
+  // The matches the picture and its counts are made from.
+  const pictureMatches = atPosition ? atPosition.matches : shown;
+  const replays = useMemo(
+    () => pictureMatches.flatMap((m) => read.counts.get(m.record.path) ?? []),
+    [pictureMatches, read.counts],
+  );
+  const dots = useMemo(
+    () =>
+      (atPosition ? atPosition.starts : starts).flatMap((s) => {
+        const at = mapFraction(s, world);
+        return at ? [{ ...at, key: `${s.filename}:${s.team}` }] : [];
+      }),
+    [atPosition, starts, world],
+  );
+  const startMatches = atPosition
+    ? atPosition.matches.length
+    : matchesWithStarts(starts);
 
   // Asked once every replay's counts are in, so the unit orders are read in
   // one call.
@@ -315,77 +398,45 @@ export function MapAggregate({
         categories,
         countsOnly: id !== layer,
         damageMode,
+        teams: atPosition?.teams,
       });
     return out;
-  }, [replays, world, normalise, timeWindow, categories, layer, damageMode]);
+  }, [
+    replays,
+    world,
+    normalise,
+    timeWindow,
+    categories,
+    layer,
+    damageMode,
+    atPosition,
+  ]);
   const drawn = layer ? perLayer[layer] : null;
   const field = drawn?.field ?? null;
-
-  const starts = useMemo(
-    () => aggregateStarts(shown, read.counts),
-    [shown, read.counts],
-  );
-  const dots = useMemo(
-    () =>
-      starts.flatMap((s) => {
-        const at = mapFraction(s, world);
-        return at ? [{ ...at, key: `${s.filename}:${s.team}` }] : [];
-      }),
-    [starts, world],
-  );
-  const startMatches = matchesWithStarts(starts);
-  const joined = useMemo(
-    () => joinStarts(shown, read.counts),
-    [shown, read.counts],
-  );
-  const startRecords = useMemo(
-    () => placeRecords(joined.starts, declared, world),
-    [joined, declared, world],
-  );
-  // The player's names for the positions above, and the rows they join.
-  const { stored, save } = useStartNames(mapName);
-  const resolved = useMemo(
-    () =>
-      resolveNames(
-        stored,
-        startRecords.places.map((p) => p.place),
-        startRecords.scale,
-      ),
-    [stored, startRecords],
-  );
-  const rows = useMemo(
-    () =>
-      startRows(
-        startRecords.places,
-        new Map([...resolved.byPlace].map(([key, e]) => [key, e.name])),
-      ),
-    [startRecords, resolved],
-  );
-  const rename = (row: StartRow, name: string) =>
-    save(withNames(stored, resolved, row.places, name));
-  const forget = (entry: StoredName) => save(withoutName(stored, entry));
-  // A mark takes the number and name of the row its position is in.
-  const marks = useMemo(
-    () =>
-      rows.flatMap((row) =>
-        row.places.flatMap((place) => {
-          const at = mapFraction(place, world);
-          return at
-            ? [{ ...at, n: row.number, name: row.name, key: place.key }]
-            : [];
-        }),
-      ),
-    [rows, world],
-  );
 
   // What the exports say about where their numbers came from.
   const exportBasis = useMemo(
     () =>
       mapExportInfo({
         mapName,
+        shown: pictureMatches,
+        filters,
+        replaySet: activeSet?.name ?? "",
+        startPosition: activePosition ?? "",
+        worldWidth: world.worldWidth,
+        worldHeight: world.worldHeight,
+      }),
+    [mapName, pictureMatches, filters, activeSet, activePosition, world],
+  );
+  // The start table counts every match, whatever the picture is limited to.
+  const startsBasis = useMemo(
+    () =>
+      mapExportInfo({
+        mapName,
         shown,
         filters,
         replaySet: activeSet?.name ?? "",
+        startPosition: "",
         worldWidth: world.worldWidth,
         worldHeight: world.worldHeight,
       }),
@@ -402,13 +453,18 @@ export function MapAggregate({
 
   const sized = world.worldWidth > 0 && world.worldHeight > 0;
   const withOrders = replays.filter((r) => r.orders.total > 0).length;
-  const withEvents = shown.filter((m) => m.analysis === "events").length;
-  const diverged = shown.filter((m) => m.analysis === "diverged").length;
+  const withEvents = pictureMatches.filter(
+    (m) => m.analysis === "events",
+  ).length;
+  const diverged = pictureMatches.filter(
+    (m) => m.analysis === "diverged",
+  ).length;
   const set = (patch: Partial<AggregateFilters>) =>
     setFilters((f) => ({ ...f, ...patch }));
   const anyFilter =
     JSON.stringify(filters) !== JSON.stringify(NO_FILTERS) ||
     !!activeSet ||
+    activePosition !== null ||
     versionChoice.size > 0;
   const startCount = formatNumber(startMatches);
   const layerToggle = (id: HeatLayerId) => {
@@ -471,17 +527,19 @@ export function MapAggregate({
         })
       : null,
   ].filter((part): part is string => part !== null);
-  const inPicture = matchCount(shown.length);
+  const inPicture = matchCount(pictureMatches.length);
   const libraryTotal = formatNumber(family.matches.length);
-  const picturePart = filtered
-    ? plural(shown.length, {
-        one: `${inPicture} of the ${libraryTotal} on this map in your library is in this picture.`,
-        other: `${inPicture} of the ${libraryTotal} on this map in your library are in this picture.`,
-      })
-    : plural(shown.length, {
-        one: "The # match on this map in your library is in this picture.",
-        other: "All # matches on this map in your library are in this picture.",
-      });
+  const picturePart =
+    pictureMatches.length !== family.matches.length
+      ? plural(pictureMatches.length, {
+          one: `${inPicture} of the ${libraryTotal} on this map in your library is in this picture.`,
+          other: `${inPicture} of the ${libraryTotal} on this map in your library are in this picture.`,
+        })
+      : plural(pictureMatches.length, {
+          one: "The # match on this map in your library is in this picture.",
+          other:
+            "All # matches on this map in your library are in this picture.",
+        });
   const mentioned = family.remixes + family.duplicates + family.refights;
   const spanned = versionsSpanned(shown);
   const readDone = formatNumber(read.done);
@@ -543,6 +601,7 @@ export function MapAggregate({
               showStarts={showStarts}
               hasDots={dots.length > 0}
               analysedShown={withEvents}
+              position={activePosition}
               unattacked={replays.reduce((n, r) => n + r.deathsUnattacked, 0)}
               noPosition={replays.reduce((n, r) => n + r.deathsNoPosition, 0)}
               windowCount={drawn !== null && drawn.contributing > 0}
@@ -695,6 +754,24 @@ export function MapAggregate({
             ]}
           />
         )}
+        {positionNames.length > 0 && (
+          <OptionSelect
+            size="sm"
+            className="w-48"
+            ariaLabel={t`Start position`}
+            value={activePosition === null ? ANY : `${NAMED}${activePosition}`}
+            onValueChange={(v) =>
+              setPosition(v.startsWith(NAMED) ? v.slice(NAMED.length) : "")
+            }
+            options={[
+              { value: ANY, label: t`Any start position` },
+              ...positionNames.map((name) => ({
+                value: `${NAMED}${name}`,
+                label: name,
+              })),
+            ]}
+          />
+        )}
         <DateFilter
           label={t`Played from`}
           value={filters.from}
@@ -722,6 +799,7 @@ export function MapAggregate({
             onClick={() => {
               setFilters(NO_FILTERS);
               setSetId("");
+              setPosition("");
               setVersionChoice(new Map());
             }}
           >
@@ -949,6 +1027,7 @@ export function MapAggregate({
 
               <MapExportButtons
                 info={exportBasis}
+                startsInfo={startsBasis}
                 layer={layer}
                 layerSentence={layer ? legendLabel(layer, damageMode) : ""}
                 damageMode={damageMode}
@@ -1169,6 +1248,7 @@ function AggregateHelp({
   showStarts,
   hasDots,
   analysedShown,
+  position,
   unattacked,
   noPosition,
   windowCount,
@@ -1188,6 +1268,8 @@ function AggregateHelp({
   showStarts: boolean;
   hasDots: boolean;
   analysedShown: number;
+  /** The named start position the picture is limited to, or null. */
+  position: string | null;
   unattacked: number;
   noPosition: number;
   /** Whether the layer has anything in the picture. */
@@ -1272,6 +1354,17 @@ function AggregateHelp({
             A dot is where one team's start was set before one match. The engine
             can move a start into its start box, so a commander may have
             appeared a short way off.
+          </Trans>
+        </p>
+      )}
+      {picture && position !== null && (
+        <p data-testid="position-note">
+          <Trans>
+            The picture is limited to the matches where {position} was taken,
+            and to what the team that held it built, ordered, lost and dealt.
+            Where damage landed is damage to that team's units. Where it came
+            from is damage that team dealt. A match whose starts could not be
+            joined to a team is left out.
           </Trans>
         </p>
       )}

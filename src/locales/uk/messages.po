@@ -529,7 +529,7 @@ msgstr "{0, plural, one {У грі {gameName} більше немає юніта
 msgid "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 msgstr "{0, plural, one {Таблиця шкоди ({holder}) називає # клас броні, якого немає в цій грі: {list}. Рушій використовує для нього типову шкоду, тому цей рядок ні на що не впливає.} few {Таблиця шкоди ({holder}) називає # класи броні, яких немає в цій грі: {list}. Рушій використовує для них типову шкоду, тому ці рядки ні на що не впливають.} many {Таблиця шкоди ({holder}) називає # класів броні, яких немає в цій грі: {list}. Рушій використовує для них типову шкоду, тому ці рядки ні на що не впливають.} other {Таблиця шкоди ({holder}) називає # класу броні, яких немає в цій грі: {list}. Рушій використовує для них типову шкоду, тому ці рядки ні на що не впливають.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
@@ -1263,7 +1263,7 @@ msgstr "{0, plural, one {Показано перші {SHOWN_ROWS} з # юніт�
 msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 msgstr "{0, plural, one {Команда 1 {team1Record}, команда 2 {team2Record}, у # матчі двох команд із результатом.} few {Команда 1 {team1Record}, команда 2 {team2Record}, у # матчах двох команд із результатом.} many {Команда 1 {team1Record}, команда 2 {team2Record}, у # матчах двох команд із результатом.} other {Команда 1 {team1Record}, команда 2 {team2Record}, у # матчу двох команд із результатом.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
@@ -11231,6 +11231,10 @@ msgstr "будь-які сторони"
 #, fuzzy
 msgid "Any sides"
 msgstr "Будь-які сторони"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any start position"
+msgstr ""
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -44592,6 +44596,7 @@ msgid "Start playing"
 msgstr "Почати грати"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
+#: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Start position"
 msgstr "Стартова позиція"
@@ -44611,6 +44616,10 @@ msgstr "Стартова позиція {position}"
 #, fuzzy
 msgid "Start position {position} (unclaimed)"
 msgstr "Стартова позиція {position} (вільна)"
+
+#: src/content/mapImage.ts
+msgid "start position {startPosition}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -47950,6 +47959,10 @@ msgstr "Не вдалося прочитати результат із повт�
 #, fuzzy
 msgid "The picture could not be encoded as a PNG."
 msgstr "Не вдалося закодувати зображення як PNG."
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
+msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy

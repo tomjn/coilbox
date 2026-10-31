@@ -25,6 +25,7 @@ const info: MapExportInfo = {
     playedFrom: "",
     playedUntil: "",
     replaySet: "",
+    startPosition: "",
     includesShort: false,
   },
   worldWidth: 800,
@@ -78,6 +79,7 @@ describe("layerCsv", () => {
         "filter_played_from",
         "filter_played_until",
         "filter_replay_set",
+        "filter_start_position",
         "includes_matches_under_a_minute",
         "map_width_elmos",
         "map_height_elmos",
@@ -107,7 +109,7 @@ describe("layerCsv", () => {
   it("repeats the provenance on every row", () => {
     const [, first, second] = lines(text);
     const tail =
-      "Tabula 2.1,Tabula 2.1; Tabula v2.0,Game A 1.0,5,4,Building density,Share of each match,the whole match,any number of players,any sides,analysed or not,,,,false,800,400,2026-10-10T12:34:56.000Z,4,2";
+      "Tabula 2.1,Tabula 2.1; Tabula v2.0,Game A 1.0,5,4,Building density,Share of each match,the whole match,any number of players,any sides,analysed or not,,,,,false,800,400,2026-10-10T12:34:56.000Z,4,2";
     expect(first.endsWith(tail)).toBe(true);
     expect(second.endsWith(tail)).toBe(true);
   });
@@ -179,6 +181,7 @@ const place = (
     { taken: taken - 2, known: known - 1, won: won - 1 },
   ],
   byAi: 1,
+  starts: [],
 });
 
 describe("startsCsv", () => {
@@ -285,6 +288,7 @@ describe("mapExportInfo", () => {
         from: "2026-01-01",
       },
       replaySet: "Cup",
+      startPosition: "Front",
       worldWidth: 8192,
       worldHeight: 4096,
     });
@@ -298,6 +302,7 @@ describe("mapExportInfo", () => {
       playedFrom: "2026-01-01",
       playedUntil: "",
       replaySet: "Cup",
+      startPosition: "Front",
       includesShort: false,
     });
   });

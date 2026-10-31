@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { PlaceRecord } from "./mapRecords";
+import type { AggregateMatch } from "./mapAggregate";
+import type { JoinedStart, PlaceRecord } from "./mapRecords";
 import {
+  pictureAt,
   resolveNames,
   type StoredName,
   startRows,
@@ -193,6 +195,7 @@ describe("positions that share a name", () => {
       { taken: 0, known: 0, won: 0 },
     ],
     byAi: 1,
+    starts: [],
   });
   const places = [
     record("d1", 1, 5, 3),
@@ -234,5 +237,71 @@ describe("positions that share a name", () => {
     );
     expect(places[1].taken).toBe(3);
     expect(places[1].sides[0].taken).toBe(3);
+  });
+});
+
+describe("the matches where a named position was taken (#3882)", () => {
+  const start = (filename: string, team: number): JoinedStart => ({
+    filename,
+    team,
+    x: 0,
+    z: 0,
+    allyTeam: team,
+    side: null,
+    outcome: "no-result",
+    byAi: false,
+  });
+  const place = (key: string, starts: JoinedStart[]): PlaceRecord => ({
+    place: { key, kind: "declared", number: 1, x: 0, z: 0, radius: 0 },
+    taken: starts.length,
+    known: 0,
+    won: 0,
+    sides: [
+      { taken: 0, known: 0, won: 0 },
+      { taken: 0, known: 0, won: 0 },
+    ],
+    byAi: 0,
+    starts,
+  });
+  const match = (filename: string) =>
+    ({ record: { filename, path: `/demos/${filename}` } }) as AggregateMatch;
+  const matches = [match("a"), match("b"), match("c")];
+
+  // Two positions are called Front, one in each half of the map.
+  const places = [
+    place("d1", [start("a", 0), start("b", 1)]),
+    place("d2", [start("a", 2)]),
+    place("d3", [start("c", 3)]),
+  ];
+  const names = new Map([
+    ["d1", "Front"],
+    ["d2", "front"],
+    ["d3", "Back"],
+  ]);
+
+  it("keeps the matches that took it and the teams that held it", () => {
+    const got = pictureAt(matches, places, names, "Back");
+    expect(got.matches.map((m) => m.record.filename)).toEqual(["c"]);
+    expect([...got.teams]).toEqual([["/demos/c", new Set([3])]]);
+    expect(got.starts.map((s) => s.team)).toEqual([3]);
+  });
+
+  it("joins positions with one name without regard to case, and keeps both teams of a match", () => {
+    const got = pictureAt(matches, places, names, "FRONT");
+    expect(got.matches.map((m) => m.record.filename)).toEqual(["a", "b"]);
+    expect(got.teams.get("/demos/a")).toEqual(new Set([0, 2]));
+    expect(got.teams.get("/demos/b")).toEqual(new Set([1]));
+  });
+
+  it("leaves out a match that was not joined to a team", () => {
+    // Match c has a start at Back and the match list holds a d with none.
+    const got = pictureAt([...matches, match("d")], places, names, "Back");
+    expect(got.matches.map((m) => m.record.filename)).toEqual(["c"]);
+  });
+
+  it("finds nothing for a name no position has", () => {
+    const got = pictureAt(matches, places, names, "Middle");
+    expect(got.matches).toEqual([]);
+    expect(got.teams.size).toBe(0);
   });
 });
