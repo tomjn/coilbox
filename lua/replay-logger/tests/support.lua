@@ -112,6 +112,8 @@ function M.newEngine(options)
 		mapName = "Test Map",
 		mapSizeX = 4096,
 		mapSizeZ = 2048,
+		squareSize = 8,
+		buildSquareSize = 16,
 		version = "105",
 	}
 	for key, value in pairs(options.game or {}) do
@@ -153,6 +155,10 @@ function M.newEngine(options)
 		end,
 		-- health and maxHealth, in the engine's order. A unit no test has hit
 		-- has all of its health.
+		GetUnitBuildFacing = function(unitID)
+			local unit = engine.units[unitID]
+			return unit and (unit.facing or 0)
+		end,
 		GetUnitHealth = function(unitID)
 			local unit = engine.units[unitID]
 			if not unit then
@@ -201,6 +207,7 @@ function M.newEngine(options)
 
 	local syncedEnv = common({
 		Spring = syncedSpring,
+		UnitDefs = options.unitDefs or {},
 		gadgetHandler = {
 			IsSyncedCode = function()
 				return true
@@ -273,12 +280,32 @@ function M.newEngine(options)
 	unsynced:Initialize()
 
 	--- Create a unit where the test says it is, and tell the logger.
-	function engine.create(defID, team, x, y, z, builderID)
+	function engine.create(defID, team, x, y, z, builderID, facing)
 		local unitID = engine.nextUnitID
 		engine.nextUnitID = unitID + 1
-		engine.units[unitID] = { defID = defID, team = team, x = x, y = y, z = z }
+		engine.units[unitID] = { defID = defID, team = team, x = x, y = y, z = z, facing = facing }
 		engine.synced:UnitCreated(unitID, defID, team, builderID)
 		return unitID
+	end
+
+	--- A stand-in for another gadget of the game. Its functions run with an
+	-- environment of their own whose "gadget" is itself, the way a gadget handler
+	-- loads a gadget, so calling `engine.create` or `engine.destroy` through it
+	-- leaves the same Lua stack as a gadget calling Spring.CreateUnit.
+	function engine.gadget()
+		local environment = {}
+		environment.gadget = environment
+		local function run(action, ...)
+			-- Not a tail call, which would take this function off the stack.
+			local result = action(...)
+			return result
+		end
+		setfenv(run, environment)
+		return {
+			run = function(action, ...)
+				return run(action, ...)
+			end,
+		}
 	end
 
 	function engine.finish(unitID)

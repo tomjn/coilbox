@@ -59,11 +59,16 @@
 -- and ties the two together nowhere, so this is the rule, and it names no game
 -- and no unit. "unit" was a start unit that a Lua script destroyed, with no
 -- attacker (the engine gives weapon id -21 for Spring.DestroyUnit). "by" is a
--- unit created for the same team, by no builder, at exactly the x and z the
--- old one stood at as it was created, on the same frame or the one before.
+-- unit created for the same team, by no builder, in the old one's place as it
+-- was created, on the same frame or the one before. In its place means exactly
+-- the same x and z. For a building, which a game snaps to the build grid, it
+-- means no further on each axis than half the new building's footprint or one
+-- build square, whichever is less. When two units could each be the successor,
+-- it is the one made by the gadget that destroyed the old unit, if only one
+-- was, and otherwise nothing is written.
 -- From then on "by" is a start unit: its later lines carry "startUnit" and its
 -- positions are written. "x" and "z" are where "by" was when the line was
--- written. Nothing is written when two units could each be the successor.
+-- written.
 --
 -- "unit_given" is written once a unit has changed team, for a gift and a
 -- capture alike. "team" is the team it now belongs to and "from" the one it
@@ -230,9 +235,21 @@ if gadgetHandler:IsSyncedCode() then
 	local GetUnitHealth = Spring.GetUnitHealth
 	local GetTeamUnitStats = Spring.GetTeamUnitStats
 	local AreTeamsAllied = Spring.AreTeamsAllied
+	local GetUnitBuildFacing = Spring.GetUnitBuildFacing
 	local floor = math.floor
+	local abs = math.abs
+	local min = math.min
 
 	local GAIA = Spring.GetGaiaTeamID()
+
+	-- A footprint is counted in squares of this many elmos.
+	local SQUARE_SIZE = Game.squareSize
+	-- One square of the build grid. Engines from before April 2023 do not report
+	-- it, and it was already 16 there (BUILD_SQUARE_SIZE in GlobalConstants.h).
+	local BUILD_SQUARE_SIZE = Game.buildSquareSize or 16
+
+	-- This gadget's own environment, which is not the one being looked for below.
+	local OWN_ENVIRONMENT = getfenv(1)
 
 	-- Everything below is this gadget's own bookkeeping, held in Lua and never
 	-- handed to the engine.
@@ -249,9 +266,10 @@ if gadgetHandler:IsSyncedCode() then
 	local lastPlace = {}
 	-- team -> how many captures the engine had counted for it when last asked.
 	local captures = {}
-	-- A living start unit -> the one unit that could be its successor, as
-	-- { unit, frame }. "unit" is false once a second unit could be.
-	local successor = {}
+	-- A living start unit -> the units that could be its successor, in the order
+	-- they were created, each as { unit, frame, by }. "by" is the gadget that
+	-- created it, as callingGadget answers.
+	local successors = {}
 	-- The other way round: a unit that could be a successor -> the start unit.
 	local successorOf = {}
 	-- Start units a script destroyed on "vacatedFrame" with no successor yet,
@@ -389,38 +407,82 @@ if gadgetHandler:IsSyncedCode() then
 		send(line .. "}")
 	end
 
+	-- How far from a start unit's place a new unit may stand on each axis and
+	-- still be in that place. Unit morph code that snaps a new building to the
+	-- grid moves it less than a build square, and by no more than half a square
+	-- when the building's footprint is an odd number of build squares across,
+	-- which half its footprint allows for at the smallest size. A unit that is
+	-- not a building is not snapped, so it has to be exactly there.
+	local function reach(unitID, unitDefID)
+		local def = UnitDefs[unitDefID]
+		if not (def and def.isBuilding) then
+			return 0, 0
+		end
+		local xsize, zsize = def.xsize, def.zsize
+		-- CUnit::PreInit turns a footprint with the unit's facing the same way.
+		if (GetUnitBuildFacing(unitID) or 0) % 2 == 1 then
+			xsize, zsize = zsize, xsize
+		end
+		return min(xsize * SQUARE_SIZE / 2, BUILD_SQUARE_SIZE), min(zsize * SQUARE_SIZE / 2, BUILD_SQUARE_SIZE)
+	end
+
+	-- The gadget whose code is running, which is what called the engine's
+	-- CreateUnit or DestroyUnit when this is reached from a call-in they make. The
+	-- engine runs both call-ins on the caller's Lua stack (CUnit::PostInit and
+	-- CUnit::ForcedKillUnit), and a gadget handler gives each gadget an
+	-- environment of its own, whose "gadget" is itself. The first such
+	-- environment up the stack that is not this gadget's is the one. Nothing is
+	-- changed by asking, so a replay plays the same. nil means no gadget, such as
+	-- a unit a unit script made from a thread of its own.
+	local function callingGadget()
+		local level = 1
+		while true do
+			local ok, environment = pcall(getfenv, level)
+			if ok then
+				if environment ~= OWN_ENVIRONMENT and environment.gadget == environment then
+					return environment
+				end
+			elseif string.find(environment, "invalid level", 1, true) then
+				return nil
+			end
+			-- Any other refusal is a level lost to a tail call, with more above it.
+			level = level + 1
+		end
+	end
+
 	-- A unit made by no builder may be standing in for a start unit of its
-	-- team. Either the start unit is still there, at the same place, and this
+	-- team. Either the start unit is still there, in the same place, and this
 	-- is remembered until a script destroys it. Or a script destroyed it
-	-- earlier on this frame at this place, and this takes over now.
-	local function claim(unitID, unitTeam, frame)
+	-- earlier on this frame in this place, and this takes over now.
+	local function claim(unitID, unitDefID, unitTeam, frame)
 		local x, _, z = GetUnitPosition(unitID)
 		if not x then
 			return
 		end
+		local reachX, reachZ = reach(unitID, unitDefID)
 
 		local old, matches = nil, 0
 		for index = 1, #startUnits do
 			local startUnit = startUnits[index]
 			if startTeam[startUnit] == unitTeam then
 				local sx, _, sz = GetUnitPosition(startUnit)
-				if sx == x and sz == z then
+				if sx and abs(sx - x) <= reachX and abs(sz - z) <= reachZ then
 					old, matches = startUnit, matches + 1
 				end
 			end
 		end
 		if matches == 1 then
-			local held = successor[old]
-			if held and held.unit then
-				successorOf[held.unit] = nil
+			local recent = {}
+			for _, held in ipairs(successors[old] or {}) do
+				if frame - held.frame <= SUCCESSOR_FRAMES then
+					recent[#recent + 1] = held
+				else
+					successorOf[held.unit] = nil
+				end
 			end
-			if held and frame - held.frame <= SUCCESSOR_FRAMES then
-				-- Two units could each be the successor, so neither is.
-				successor[old] = { unit = false, frame = frame }
-			else
-				successor[old] = { unit = unitID, frame = frame }
-				successorOf[unitID] = old
-			end
+			recent[#recent + 1] = { unit = unitID, frame = frame, by = callingGadget() }
+			successors[old] = recent
+			successorOf[unitID] = old
 			return
 		end
 		if matches > 1 or vacatedFrame ~= frame then
@@ -431,7 +493,7 @@ if gadgetHandler:IsSyncedCode() then
 		matches = 0
 		for index = 1, #vacated do
 			local gone = vacated[index]
-			if gone and gone.team == unitTeam and gone.x == x and gone.z == z then
+			if gone and gone.team == unitTeam and abs(gone.x - x) <= reachX and abs(gone.z - z) <= reachZ then
 				slot, matches = index, matches + 1
 			end
 		end
@@ -454,7 +516,7 @@ if gadgetHandler:IsSyncedCode() then
 			if firstFrame[unitTeam] == frame then
 				track(unitID, unitTeam)
 			else
-				claim(unitID, unitTeam, frame)
+				claim(unitID, unitDefID, unitTeam, frame)
 			end
 		end
 
@@ -517,7 +579,7 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		startTeam[unitID] = nil
 		lastPlace[unitID] = nil
-		successor[unitID] = nil
+		successors[unitID] = nil
 		for index = 1, #startUnits do
 			if startUnits[index] == unitID then
 				table.remove(startUnits, index)
@@ -526,18 +588,40 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	-- A start unit a script destroyed with no attacker is replaced by its one
+	-- With several units that could be the successor, the one the destroying
+	-- gadget made, as long as it made only one of them.
+	local function chosen(recent)
+		if #recent == 1 then
+			return recent[1].unit
+		end
+		local destroyer = callingGadget()
+		local unit
+		for _, held in ipairs(recent) do
+			if destroyer and held.by == destroyer then
+				if unit then
+					return nil
+				end
+				unit = held.unit
+			end
+		end
+		return unit
+	end
+
+	-- A start unit a script destroyed with no attacker is replaced by its
 	-- successor when it has one that is recent enough. Otherwise its place is
 	-- kept for the rest of the frame, for a unit created there after it.
 	local function vacate(unitID, frame)
-		local held = successor[unitID]
-		if held and held.unit then
+		local recent = {}
+		for _, held in ipairs(successors[unitID] or {}) do
 			successorOf[held.unit] = nil
+			if frame - held.frame <= SUCCESSOR_FRAMES then
+				recent[#recent + 1] = held
+			end
 		end
-		if held and frame - held.frame <= SUCCESSOR_FRAMES then
-			-- With two that could have been, nothing is written.
-			if held.unit then
-				replace(unitID, held.unit, startTeam[unitID], frame)
+		if #recent > 0 then
+			local unit = chosen(recent)
+			if unit then
+				replace(unitID, unit, startTeam[unitID], frame)
 			end
 			return
 		end
@@ -562,8 +646,11 @@ if gadgetHandler:IsSyncedCode() then
 		local old = successorOf[unitID]
 		if old then
 			successorOf[unitID] = nil
-			if successor[old] and successor[old].unit == unitID then
-				successor[old] = nil
+			for index, held in ipairs(successors[old] or {}) do
+				if held.unit == unitID then
+					table.remove(successors[old], index)
+					break
+				end
 			end
 		end
 		if startTeam[unitID] and not attackerID and weaponDefID == KILLED_BY_SCRIPT then
