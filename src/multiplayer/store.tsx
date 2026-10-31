@@ -116,7 +116,7 @@ import {
 } from "./loginRefused";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
-import { observeOaBattle } from "./oaRun";
+import { observeOaAutoLaunch, observeOaBattle } from "./oaRun";
 import { protocolForKey } from "./protocol";
 import { RejoinOfferPanel } from "./RejoinOfferPanel";
 import { triggerRing } from "./ringEffect";
@@ -1910,7 +1910,28 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           }
         : null;
     });
-  }, [connections]);
+    // The room that launched OA for a battle may be off the screen by the time
+    // the host stops being in game or the player leaves (issue #4961).
+    observeOaAutoLaunch((serverKey) => {
+      const c = connections[serverKey];
+      if (!c) return null;
+      const state = c.mirror.state;
+      const battle =
+        state?.currentBattle != null
+          ? state.battles[String(state.currentBattle)]
+          : undefined;
+      const hostIngame =
+        !!battle &&
+        (protocolForKey(serverKey, protocolServers) === "zerok"
+          ? battle.inProgress
+          : !!state?.users[battle.host]?.status.ingame);
+      return {
+        connected: c.live && c.mirror.connected,
+        battleId: state?.currentBattle ?? null,
+        hostIngame,
+      };
+    });
+  }, [connections, protocolServers]);
 
   // Register a new account: open a throwaway connection that sends REGISTER, then
   // resolve on the `registered` phase / reject on `disconnected` (denial). The
