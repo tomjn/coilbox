@@ -1170,6 +1170,7 @@ mod tests {
             game: "Some Game 1.0",
             game_differs,
             taken_at_ms: 1,
+            list_version: 0,
         }
     }
 

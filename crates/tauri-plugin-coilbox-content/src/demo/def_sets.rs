@@ -287,6 +287,12 @@ pub struct Link {
     /// the replay names. `None` when that is not known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game_differs: Option<bool>,
+    /// For a unitsync list: the `MATCH_LIST_VERSION` of the read that made it,
+    /// or 0 for a list not made by a read of the match (an engine's list, or
+    /// one recorded before this field existed). A newer version replaces an
+    /// older one from an archive, see `link_locked`.
+    #[serde(default)]
+    pub list_version: u32,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -447,9 +453,14 @@ fn save_links(dir: &Path, links: &Links) -> Result<(), String> {
 /// link from another origin is added beside those there, and [`chosen`]
 /// decides between them. A second link from the same origin is dropped when
 /// the origin is unitsync, because the first was read nearer the match and
-/// nothing says the second is better. An engine's replaces the last engine's,
-/// because the stored analysis is that run's and its events carry that run's
-/// ids.
+/// nothing says the second is better. Two exceptions. An engine's replaces the
+/// last engine's, because the stored analysis is that run's and its events
+/// carry that run's ids. And an archive's list replaces an earlier archive
+/// list made by an older version of the read (`list_version`): an archive does
+/// not change under its name, so the two differ only in how well they were
+/// read. A folder's list is never replaced, because a folder can change under
+/// its name and a later read of it says nothing about the day the match was
+/// played.
 #[cfg(test)]
 pub fn link(dir: &Path, game_id: &str, link: Link) -> Result<Vec<Link>, String> {
     let _guard = LINKS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -463,6 +474,11 @@ fn link_locked(dir: &Path, game_id: &str, link: Link) -> Result<Vec<Link>, Strin
     let recorded = links.links.entry(game_id).or_default();
     match recorded.iter_mut().find(|l| l.origin == link.origin) {
         Some(earlier) if link.origin == Origin::Engine => *earlier = link,
+        Some(earlier)
+            if link.origin == Origin::Archive && link.list_version > earlier.list_version =>
+        {
+            *earlier = link
+        }
         Some(_) => return Ok(recorded.clone()),
         None => recorded.push(link),
     }
@@ -484,6 +500,8 @@ pub struct Source<'a> {
     pub game: &'a str,
     pub game_differs: Option<bool>,
     pub taken_at_ms: u64,
+    /// See [`Link::list_version`].
+    pub list_version: u32,
 }
 
 /// Keep a list and record it for a replay, in one step, so nothing can clear
@@ -508,6 +526,7 @@ pub fn record(
             game: source.game.to_string(),
             taken_at_ms: source.taken_at_ms,
             game_differs: source.game_differs,
+            list_version: source.list_version,
         },
     )?;
     // The list just kept is left with no link when an earlier one stood, and
@@ -620,6 +639,9 @@ pub struct ReplayDefSets {
     pub events: Option<Link>,
     /// The lists `stream` and `events` name, by digest.
     pub sets: BTreeMap<String, Vec<UnitDef>>,
+    /// The version of the read of a match that this build of coilbox makes, so
+    /// a reader can tell a link with a lower `list_version` is out of date.
+    pub match_list_version: u32,
 }
 
 /// Read what is recorded for a replay. A link whose list is gone or does not
@@ -646,6 +668,7 @@ pub fn for_replay(dir: &Path, game_id: &str) -> Result<ReplayDefSets, String> {
         stream,
         events,
         sets,
+        match_list_version: tauri_plugin_coilbox_unitsync::MATCH_LIST_VERSION,
     })
 }
 
@@ -675,8 +698,13 @@ pub(crate) async fn content_unit_def_set<R: Runtime>(
 /// folder. `game` is that game's name and version. The caller hands this over
 /// only for a game installed under the exact name the replay records.
 ///
+/// `match_read` says the list was read with the replay's own match setup, and
+/// so was made by the current version of that read. A list read without one is
+/// the game's own list, which no version of the match read made.
+///
 /// Answers `{ digest, origin, links }`. A replay that already has a list from
-/// that origin keeps it, and `digest` is then the one it kept.
+/// that origin keeps it, and `digest` is then the one it kept, unless the
+/// origin is an archive and this list was made by a newer version of the read.
 #[tauri::command]
 pub(crate) async fn content_unit_def_set_store<R: Runtime>(
     app: AppHandle<R>,
@@ -684,6 +712,7 @@ pub(crate) async fn content_unit_def_set_store<R: Runtime>(
     game: String,
     archive: String,
     units: Vec<UnitDef>,
+    match_read: Option<bool>,
 ) -> CliResult {
     let dir = match app_store_dir(&app) {
         Ok(dir) => dir,
@@ -703,6 +732,11 @@ pub(crate) async fn content_unit_def_set_store<R: Runtime>(
                 game: &game,
                 game_differs: None,
                 taken_at_ms: super::analysis::now_ms(),
+                list_version: if match_read.unwrap_or(false) {
+                    tauri_plugin_coilbox_unitsync::MATCH_LIST_VERSION
+                } else {
+                    0
+                },
             },
         )?;
         let kept = links
@@ -783,6 +817,14 @@ pub(crate) mod tests {
             game: "Some Game 1.0".into(),
             taken_at_ms,
             game_differs: (origin == Origin::Engine).then_some(false),
+            list_version: 0,
+        }
+    }
+
+    fn versioned(digest: &str, origin: Origin, taken_at_ms: u64, list_version: u32) -> Link {
+        Link {
+            list_version,
+            ..link_of(digest, origin, taken_at_ms)
         }
     }
 
@@ -1038,6 +1080,119 @@ pub(crate) mod tests {
         assert_eq!(links_for(dir.path(), ID).unwrap().len(), 2);
     }
 
+    /// Issue #4930: a list the short read made is replaced by the corrected
+    /// one when both come from the same archive.
+    #[test]
+    fn a_newer_archive_read_replaces_a_short_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let short = digest(&[unit("a", 1.0)]);
+        let corrected = digest(&[unit("a", 1.0), unit("b", 1.0)]);
+
+        link(dir.path(), ID, versioned(&short, Origin::Archive, 100, 1)).unwrap();
+        let after = link(
+            dir.path(),
+            ID,
+            versioned(&corrected, Origin::Archive, 200, 2),
+        )
+        .unwrap();
+
+        assert_eq!(after.len(), 1);
+        assert_eq!(
+            (after[0].digest.as_str(), after[0].list_version),
+            (corrected.as_str(), 2)
+        );
+    }
+
+    /// A record from before the version was kept has none, and counts as the
+    /// oldest.
+    #[test]
+    fn a_record_with_no_version_loads_as_the_oldest_and_is_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = digest(&[unit("a", 1.0)]);
+        let new = digest(&[unit("b", 1.0)]);
+        std::fs::write(
+            dir.path().join(LINKS_FILE),
+            format!(
+                "{{\"format\":1,\"links\":{{\"{ID}\":[{{\"digest\":\"{old}\",\"origin\":\"archive\",\
+                 \"game\":\"Some Game 1.0\",\"takenAtMs\":100}}]}}}}"
+            ),
+        )
+        .unwrap();
+
+        let loaded = links_for(dir.path(), ID).unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].list_version, 0);
+
+        let after = link(dir.path(), ID, versioned(&new, Origin::Archive, 200, 1)).unwrap();
+        assert_eq!(after[0].digest, new);
+    }
+
+    #[test]
+    fn two_archive_reads_of_one_version_keep_the_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = digest(&[unit("a", 1.0)]);
+        let later = digest(&[unit("b", 1.0)]);
+
+        link(dir.path(), ID, versioned(&first, Origin::Archive, 100, 2)).unwrap();
+        let same = link(dir.path(), ID, versioned(&later, Origin::Archive, 200, 2)).unwrap();
+        assert_eq!(same[0].digest, first);
+
+        // And an older read never replaces a newer one.
+        let older = link(dir.path(), ID, versioned(&later, Origin::Archive, 300, 1)).unwrap();
+        assert_eq!(older[0].digest, first);
+    }
+
+    /// A folder can change under its name, so its list is never swapped.
+    #[test]
+    fn a_newer_folder_read_does_not_replace_the_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = digest(&[unit("a", 1.0)]);
+        let later = digest(&[unit("b", 1.0)]);
+
+        link(dir.path(), ID, versioned(&first, Origin::Folder, 100, 1)).unwrap();
+        let after = link(dir.path(), ID, versioned(&later, Origin::Folder, 200, 2)).unwrap();
+
+        assert_eq!(after[0].digest, first);
+    }
+
+    /// An engine's list is the run's own numbering. A unitsync read of any
+    /// version sits beside it and never takes its place.
+    #[test]
+    fn a_newer_unitsync_read_leaves_the_engines_list_chosen() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = digest(&[unit("a", 1.0)]);
+        let read = digest(&[unit("b", 1.0)]);
+
+        link(dir.path(), ID, link_of(&engine, Origin::Engine, 100)).unwrap();
+        let after = link(dir.path(), ID, versioned(&read, Origin::Archive, 200, 9)).unwrap();
+
+        assert_eq!(after.len(), 2);
+        assert_eq!(chosen(&after, Ids::Stream).unwrap().digest, engine);
+        assert_eq!(chosen(&after, Ids::Events).unwrap().digest, engine);
+    }
+
+    /// The replaced list's file goes with its link.
+    #[test]
+    fn recording_a_newer_archive_read_removes_the_short_list_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = |list_version| Source {
+            origin: Origin::Archive,
+            game: "Some Game 1.0",
+            game_differs: None,
+            taken_at_ms: 5,
+            list_version,
+        };
+        let short = [unit("short", 1.0)];
+
+        record(dir.path(), ID, &short, &source(1)).unwrap();
+        let after = record(dir.path(), ID, &known(), &source(2)).unwrap();
+
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].digest, digest(&known()));
+        assert_eq!(read_set(dir.path(), &digest(&short)).unwrap(), None);
+        assert_eq!(usage(dir.path()).sets, 1);
+    }
+
     /// The stored analysis is the latest run's, and its events carry that
     /// run's ids, so the engine's list follows it.
     #[test]
@@ -1094,7 +1249,10 @@ pub(crate) mod tests {
         // A replay nothing was recorded for.
         assert_eq!(
             for_replay(dir.path(), OTHER).unwrap(),
-            ReplayDefSets::default()
+            ReplayDefSets {
+                match_list_version: tauri_plugin_coilbox_unitsync::MATCH_LIST_VERSION,
+                ..Default::default()
+            }
         );
     }
 
@@ -1201,6 +1359,7 @@ pub(crate) mod tests {
             game: "Some Game 1.0",
             game_differs: None,
             taken_at_ms: 5,
+            list_version: 0,
         };
         let later = [unit("later", 1.0)];
 
