@@ -175,6 +175,7 @@ function BattleRoomPage() {
     blockReason,
   );
   const oaJoin = useOaJoinLaunch({
+    serverKey: room.serverKey,
     battleId: room.battle?.id ?? null,
     hostIp: room.battle?.ip ?? "",
     hostPort: room.battle?.port ?? "",

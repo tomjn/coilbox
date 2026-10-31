@@ -336,7 +336,13 @@ beforeEach(() => {
       }),
   );
 });
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  // The run is held outside the page, so one a test left up would block the next.
+  await act(async () => {
+    for (const l of launches) l.finish({ exitCode: 0, signal: null });
+  });
+});
 
 describe("the room of an Open Annihilation battle you joined", () => {
   it("says it is waiting for the host, and launches nothing, until the host is in game", () => {

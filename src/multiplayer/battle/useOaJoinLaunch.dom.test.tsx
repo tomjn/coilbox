@@ -56,6 +56,7 @@ const setIngame = vi.fn();
 function mount(hostIp = "203.0.113.9") {
   return renderHook(() =>
     useOaJoinLaunch({
+      serverKey: "server",
       battleId: 4021,
       hostIp,
       hostPort: "8452",
@@ -77,7 +78,13 @@ beforeEach(() => {
       }),
   );
 });
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  // The run is held outside the hook, so one a test left up would block the next.
+  await act(async () => {
+    for (const l of launched) l.finish({ exitCode: 0, signal: null });
+  });
+});
 
 const started: OaEvent = { kind: "match", change: "started" };
 
