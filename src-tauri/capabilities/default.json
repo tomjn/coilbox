@@ -8,6 +8,7 @@
     "core:window:allow-set-title",
     "core:window:allow-set-fullscreen",
     "core:window:allow-request-user-attention",
+    "core:window:allow-set-progress-bar",
     "core:webview:allow-set-webview-zoom",
     "opener:default",
     "updater:default",

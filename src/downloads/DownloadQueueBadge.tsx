@@ -155,14 +155,15 @@ function RunningDownload({
 export default function DownloadQueueBadge() {
   const { t } = useLingui();
   const removeLabel = (itemLabel: string) => t`Remove ${itemLabel} from queue`;
-  const { running, active, queued, reported, cancel } = useDownloadQueue();
+  const { running, active, queued, reported, cancel, acknowledgeFailures } =
+    useDownloadQueue();
   if (running.length === 0 && queued.length === 0 && reported.length === 0)
     return null;
 
   const count = running.length + reported.length + queued.length;
   const summary = badgeSummary(active ?? reported[0] ?? null);
   return (
-    <Popover>
+    <Popover onOpenChange={(open) => open && acknowledgeFailures()}>
       <PopoverTrigger asChild>
         <button
           type="button"
