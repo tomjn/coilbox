@@ -9076,6 +9076,10 @@ msgstr "Un remix n’a pas d’analyse propre. Analysez la partie d’origine."
 msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
 msgstr "Une rediffusion désigne une unité par un numéro qui n’a de sens que dans la version du jeu sur laquelle elle a été jouée. Coilbox garde la liste d’unités utilisée pour lire une rediffusion, celle-ci nomme donc toujours ses unités après la mise à jour ou la suppression du jeu."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A replay that never recorded a game over cannot be analysed, but the engine's unit list can still be read from it. That starts the match in the engine and stops it as soon as the engine has listed its units, without playing the match."
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
@@ -23676,6 +23680,10 @@ msgstr "Pour commencer : téléchargez une carte"
 msgid "Get the code, link and file that let someone else load this scenario."
 msgstr "Obtenez le code, le lien et le fichier qui permettent à quelqu’un d’autre de charger ce scénario."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Get the engine's unit list"
+msgstr ""
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #, fuzzy
 msgid "Get user ID"
@@ -38230,6 +38238,10 @@ msgstr "Lecture de la rediffusion pour voir comment s’est passée la mission."
 msgid "Reading the slots…"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Reading the unit list from the engine. {label}."
+msgstr ""
+
 #: src/blueprint/pack.ts
 #, fuzzy
 msgid "Reading this file {all}."
@@ -46706,6 +46718,10 @@ msgstr "Le moteur n’en a écrit aucune. Soit l’enregistrement a été abando
 msgid "The engine's log could not be read for this run, so there is nothing here about what it did."
 msgstr "Le journal du moteur n’a pas pu être lu pour cette exécution, il n’y a donc rien ici sur ce qu’il a fait."
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine's unit list could not be read."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -50219,6 +50235,10 @@ msgstr "Le mutateur de ce projet écrit {POST_FILE}, et {gameName} n’a pas de 
 #, fuzzy
 msgid "This puts the mission back the way it was when you opened it, and saves that. Anything imported since goes off disk with it."
 msgstr "Ceci remet la mission dans l’état où elle était à son ouverture, et l’enregistre. Tout ce qui a été importé depuis est retiré du disque avec."
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay already has the engine's unit list."
+msgstr ""
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayMap.tsx

@@ -1296,9 +1296,17 @@ export type ReplayAnalysisPhase =
   | "playing"
   | "thinning";
 
-/** The job that is running. It analyses the match and records it (#3962). */
+/**
+ * What a job asks of the engine: `analyse` plays the match back, analyses it and
+ * records it (#3962), and `unitList` starts the match, keeps the engine's own
+ * unit list and stops (#3906).
+ */
+export type ReplayAnalysisJobKind = "analyse" | "unitList";
+
+/** The job that is running. */
 export interface ReplayAnalysisRunningJob {
   id: number;
+  kind: ReplayAnalysisJobKind;
   gameId: string;
   /** The replay's file name. */
   name: string;
@@ -1323,6 +1331,7 @@ export interface ReplayAnalysisRunningJob {
 /** A job waiting its turn. */
 export interface ReplayAnalysisQueuedJob {
   id: number;
+  kind: ReplayAnalysisJobKind;
   gameId: string;
   name: string;
   replayPath: string;
@@ -1339,6 +1348,8 @@ export interface ReplayAnalysisQueuedJob {
  *   recorder wrote no file.
  * - `thinFailed`: the playback was good and its recording could not be made
  *   into a track. Any earlier track is kept, and so is the analysis.
+ * - `listFailed`: a run that reads only the unit list did not get one. The
+ *   message says whether the engine ran out of time or stopped first.
  *
  * A playback that did not reproduce the match is not here: its analysis is
  * stored as diverged, with the figures that differed.
@@ -1346,7 +1357,12 @@ export interface ReplayAnalysisQueuedJob {
 export interface ReplayAnalysisFailure {
   gameId: string;
   name: string;
-  reason: "tookTooLong" | "engineFailed" | "couldNotRun" | "thinFailed";
+  reason:
+    | "tookTooLong"
+    | "engineFailed"
+    | "couldNotRun"
+    | "listFailed"
+    | "thinFailed";
   /** The detail: an error, or how the engine exited. */
   message: string;
   limitSeconds?: number;
@@ -1402,8 +1418,14 @@ export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
  * - `alreadyDone`: the match has a current analysis and a current track, and
  *   `force` was not set.
  *
+ * `unitListOnly` asks for the shorter run (#3906): the engine is started, its
+ * own unit list is kept and it is stopped. That needs no recorded game over.
+ * `force` is ignored, and `alreadyDone` means the replay already has an
+ * engine's list or a reproduced analysis.
+ *
  * It rejects, with the reason, for a replay that cannot be analysed: a remix,
- * one with no recorded game over, or an engine folder with no headless engine.
+ * one with no recorded game over (unless `unitListOnly`), or an engine folder
+ * with no headless engine.
  * There is no time limit to pass: the queue allows the match's own length plus
  * time for the engine to start.
  */
@@ -1414,6 +1436,7 @@ export const contentAnalysisEnqueue = defineCommand<
     dataDir: string;
     game?: string;
     force?: boolean;
+    unitListOnly?: boolean;
   },
   {
     outcome: "queued" | "alreadyQueued" | "alreadyDone";

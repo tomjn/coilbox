@@ -145,6 +145,11 @@ export function useStoredAnalyses(): Analyses {
  *
  * Answers `queued`, `alreadyQueued`, or `alreadyDone` for a match whose
  * analysis and track are both current when `force` is not set.
+ *
+ * With `unitListOnly` the run only starts the engine and keeps its own unit
+ * list (#3906), which a replay with no recorded game over can have. It is asked
+ * for the same way, from a press of a button, and `alreadyDone` then means the
+ * replay already has an engine's list.
  */
 export async function requestAnalysis(args: {
   replayPath: string;
@@ -153,6 +158,7 @@ export async function requestAnalysis(args: {
   /** Another installed version of the replay's game, in place of its own. */
   game?: string;
   force?: boolean;
+  unitListOnly?: boolean;
 }): Promise<"queued" | "alreadyQueued" | "alreadyDone"> {
   if (analysisRunHidden()) {
     throw new Error(t`Replay analysis is turned off in this distribution.`);

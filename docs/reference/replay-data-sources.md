@@ -135,7 +135,18 @@ Unit numbers in the stream are definition ids. The engine numbers a game's defin
 
 A unit list comes from one of four places. Coilbox takes the first that applies.
 
-1. The engine's own list, when the replay has been analysed. The replay logger writes the engine's unit definitions at the start of an analysis run, so this is the numbering the match really used, with its mod options, its AIs and its map applied. It always names an analysis's events. It names the replay's build orders when the run used the game the replay records, and not when it had to use another version.
+1. The engine's own list, when the replay has been analysed, or when you have asked for the list alone. The replay logger writes the engine's unit definitions at the start of a run, so this is the numbering the match really used, with its mod options, its AIs and its map applied. It always names an analysis's events. It names the replay's build orders when the run used the game the replay records, and not when it had to use another version.
+
+   Asking for the list alone ("Get the engine's unit list" on the replay's page) starts the same engine and logger and stops the engine once every definition the logger's header counts has been written. That is before the first frame, so the match is not played. It needs no recorded game over, so it is offered for a replay an analysis refuses. A list the engine had not finished writing is thrown away. The run is allowed the same time as an analysis of that replay. Coilbox does not run it unasked.
+
+   Measured on 31 October 2026 with the headless engine 2026.09.01, at a machine load of 4 to 7, two runs each:
+
+   | Game and map | Engine run | Whole call | Definitions |
+   | --- | --- | --- | --- |
+   | Splinter Faction 0.1.93, Death Valley | 20.9 s and 19.2 s | 24.8 s and 21.2 s | 137 |
+   | Splinter Faction 0.1.95, Tumult, a replay with no recorded game over | 15.9 s and 16.6 s | 18.0 s and 18.5 s | 137 |
+
+   The whole call also includes reading the game's short name and writing the scratch game before the engine starts. Beyond All Reason has not been measured through this run, because no replay of an installed build was available. A scripted match of test-30922 on All That Glitters v2.2.3 that stops itself at frame 30, which is not this run's own stop, took 18.8 s and 15.2 s of engine time and wrote 600 definitions.
 2. A packaged archive (`.sdz`, `.sd7`, or a rapid package) installed under the exact name and version the replay records, read through unitsync with the match's own setup. The section says the names were matched by name and version.
 3. A list coilbox kept for this replay. The section says when it was recorded and from which game. A kept list also stands in for an exact match that is a loose folder (`.sdd`), and then the section says so, because a folder can change under the same name and the list is what it held the day the replay was read.
 4. Another installed version of the same game, with a warning that names come from a different build and may be wrong. One unit added or removed moves every id after it.

@@ -64,6 +64,7 @@ function running(
 ): ReplayAnalysisRunningJob {
   return {
     id: 1,
+    kind: "analyse",
     gameId: "a".repeat(32),
     name: "a.sdfz",
     replayPath: "/replays/a.sdfz",
