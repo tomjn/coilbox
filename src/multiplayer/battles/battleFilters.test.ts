@@ -6,6 +6,8 @@ import {
   filterSortBattles,
   groupBattles,
   occupancy,
+  otherEngineName,
+  scopeToProfileGame,
 } from "./battleFilters";
 
 function mk(p: Partial<Battle>): Battle {
@@ -49,9 +51,68 @@ const base: BattleFilters = {
   hideEmpty: false,
   hideLockedPassworded: false,
   hideFull: false,
+  hideOpenAnnihilation: false,
   sortKey: "players",
   sortDir: "desc",
 };
+
+const oa = (p: Partial<Battle> = {}) =>
+  mk({
+    engine: "Open Annihilation",
+    modname: "Total Annihilation",
+    title: "[OA] Skirmish",
+    ...p,
+  });
+
+describe("otherEngineName", () => {
+  it("names an engine that is not Spring or Recoil", () => {
+    expect(otherEngineName(oa())).toBe("Open Annihilation");
+  });
+
+  it("reads Spring, Recoil and a lobby that names no engine as Recoil", () => {
+    expect(otherEngineName(mk({ engine: "spring" }))).toBeNull();
+    expect(otherEngineName(mk({ engine: "Recoil" }))).toBeNull();
+    expect(otherEngineName(mk({ engine: "" }))).toBeNull();
+  });
+});
+
+describe("hideOpenAnnihilation", () => {
+  const list = [mk({ id: 1, engine: "spring" }), oa({ id: 2 }), mk({ id: 3 })];
+
+  it("keeps Open Annihilation battles by default", () => {
+    expect(
+      filterSortBattles(list, base)
+        .map((b) => b.id)
+        .sort(),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it("drops them when asked, leaving Recoil battles", () => {
+    expect(
+      filterSortBattles(list, { ...base, hideOpenAnnihilation: true })
+        .map((b) => b.id)
+        .sort(),
+    ).toEqual([1, 3]);
+  });
+});
+
+describe("scopeToProfileGame", () => {
+  const list = [mk({ id: 1, modname: "Splinter Faction" }), oa({ id: 2 })];
+
+  it("changes nothing without a profile game filter", () => {
+    expect(scopeToProfileGame(list, null)).toEqual(list);
+  });
+
+  it("drops Open Annihilation even when the pattern matches its game name", () => {
+    const loose = (name: string) => /annihilation|splinter/i.test(name);
+    expect(scopeToProfileGame(list, loose).map((b) => b.id)).toEqual([1]);
+  });
+
+  it("matches Recoil battles on their game name as before", () => {
+    const only = (name: string) => name === "Other";
+    expect(scopeToProfileGame(list, only)).toEqual([]);
+  });
+});
 
 describe("occupancy", () => {
   it("counts the host when absent from members", () => {

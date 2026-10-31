@@ -14,7 +14,7 @@ import type { LobbyProtocol } from "../../lobby-servers/config";
 import { startedAgo, useNow } from "../battle/runningMatch";
 import type { Battle } from "../bindings";
 import { BattleRowMapThumb } from "./BattleRowMapThumb";
-import { battleRowAction, occupancy } from "./battleFilters";
+import { battleRowAction, occupancy, otherEngineName } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
 
 /**
@@ -109,6 +109,9 @@ function BattleRowInner({
   const spectatorCount = battle.spectatorCount;
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
+  // A battle on another engine (Open Annihilation) gets a badge, and no minimap:
+  // the thumbnail comes from local unitsync, which cannot read its map.
+  const otherEngine = otherEngineName(battle);
   // Join an open battle, or watch a running one live as a spectator. The joined
   // row shows Leave instead and ignores this action.
   const action = battleRowAction(battle, { canJoin, inProgress });
@@ -181,11 +184,13 @@ function BattleRowInner({
       } ${focused ? "ring-2 ring-primary" : ""}`}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <BattleRowMapThumb
-          battle={battle}
-          enginePath={enginePath}
-          dataDir={dataDir}
-        />
+        {!otherEngine && (
+          <BattleRowMapThumb
+            battle={battle}
+            enginePath={enginePath}
+            dataDir={dataDir}
+          />
+        )}
         {!titleAction ? (
           <div className="flex min-w-0 flex-1 items-center">{details}</div>
         ) : (
@@ -200,6 +205,11 @@ function BattleRowInner({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {otherEngine && (
+          <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+            {otherEngine}
+          </span>
+        )}
         {friendsHere && <FriendsBadge names={friendsHere} />}
         <div className="mr-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
           {started !== null && (
