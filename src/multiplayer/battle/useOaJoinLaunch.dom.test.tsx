@@ -156,6 +156,23 @@ describe("joining an Open Annihilation battle", () => {
     );
   });
 
+  it("shows OA's own line when the exit event carries one", async () => {
+    const { result } = mount();
+    act(() => void result.current.join());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    act(() =>
+      launched[0].onEvent.onmessage({
+        kind: "exit",
+        reason: "refused",
+        message: "--game-password: is longer than 10 characters",
+      }),
+    );
+    await act(async () => launched[0].finish({ exitCode: 2, signal: null }));
+    expect(result.current.error).toBe(
+      "--game-password: is longer than 10 characters",
+    );
+  });
+
   it("names the exit code when OA fails some other way", async () => {
     const { result } = mount();
     act(() => void result.current.join());

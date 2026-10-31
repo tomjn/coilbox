@@ -345,14 +345,15 @@ export const playOaMaps = defineCommand<{ path: string }, { maps: OaMap[] }>(
  * One line of Open Annihilation's status stream. Fields coilbox reads are named.
  * `seq`, `frame` and `tick` are on every kind but `hello` and `unreadable`, and
  * anything else OA wrote on the line (a screen's `previous`, an exit's `code`)
- * arrives alongside them.
+ * arrives alongside them. A `refused` exit also has `message` when OA wrote its
+ * refusal line on standard error: the text after `open-annihilation: `.
  */
 export type OaEvent =
   | { kind: "hello"; version: string; pid: number }
   | { kind: "screen"; name: string }
   | { kind: "match"; change: string }
   | { kind: "gameOver"; results: unknown[] }
-  | { kind: "exit"; reason: string }
+  | { kind: "exit"; reason: string; message?: string }
   | { kind: "unknown"; event: string }
   | { kind: "unreadable"; line: string };
 

@@ -22,7 +22,8 @@ import { checkHostAddress } from "./hostAddress";
  * A refusal reaches `error` two ways. OA ending before it says hello rejects the
  * launch with its own `open-annihilation:` line, which `oaRun` keeps. A refusal
  * after the stream began arrives as an `exit` event with the reason `refused`,
- * and its line stays on the backend, so the room says only that OA refused.
+ * which carries OA's line as `message`. Without one the room says only that OA
+ * refused.
  */
 export function useOaJoinLaunch({
   serverKey,
@@ -76,7 +77,9 @@ export function useOaJoinLaunch({
             setIngame(true);
           }
         } else if (event.kind === "exit" && event.reason === "refused") {
-          setJoinError(t`Open Annihilation refused to join this battle.`);
+          setJoinError(
+            event.message ?? t`Open Annihilation refused to join this battle.`,
+          );
         }
       },
       onEnd: () => {
