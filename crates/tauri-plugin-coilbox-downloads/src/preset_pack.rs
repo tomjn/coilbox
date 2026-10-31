@@ -218,15 +218,42 @@ pub(crate) async fn dl_fetch_preset_pack(url: String) -> CliResult {
 mod tests {
     use super::*;
     use std::io::{Read, Write};
-    use std::net::TcpListener;
+    use std::net::{TcpListener, TcpStream};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
-    /// A server on loopback that gives every request the same raw answer, and
-    /// counts the requests, so a test can say one never arrived.
+    /// A server on loopback that gives every request for a test's own paths the
+    /// same raw answer, and counts them, so a test can say one never arrived.
+    ///
+    /// Anything else is let go, uncounted. Other programs on a developer machine
+    /// probe new local ports with a `GET /`, and counting those made a request that
+    /// was refused look as if it had arrived. Each connection has its own thread, so
+    /// a probe that connects and says nothing does not hold up the request behind it.
     struct Server {
         port: u16,
         requests: Arc<AtomicUsize>,
+    }
+
+    fn is_ours(mut stream: &TcpStream) -> bool {
+        const OURS: [&[u8]; 2] = [b"GET /p ", b"GET /moved "];
+        let mut seen = Vec::new();
+        let mut chunk = [0u8; 512];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) | Err(_) => return false,
+                Ok(n) => seen.extend_from_slice(&chunk[..n]),
+            }
+            let matches = |wanted: &&[u8]| {
+                let len = seen.len().min(wanted.len());
+                seen[..len] == wanted[..len]
+            };
+            if !OURS.iter().any(|wanted| matches(&wanted)) {
+                return false;
+            }
+            if seen.windows(4).any(|w| w == b"\r\n\r\n") {
+                return true;
+            }
+        }
     }
 
     fn serve(head: &str, body: Vec<u8>) -> Server {
@@ -238,11 +265,15 @@ mod tests {
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { return };
-                let mut seen = [0u8; 4096];
-                let _ = stream.read(&mut seen);
-                counted.fetch_add(1, Ordering::SeqCst);
-                let _ = write!(stream, "{head}\r\nConnection: close\r\n\r\n");
-                let _ = stream.write_all(&body);
+                let (counted, head, body) = (counted.clone(), head.clone(), body.clone());
+                std::thread::spawn(move || {
+                    if !is_ours(&stream) {
+                        return;
+                    }
+                    counted.fetch_add(1, Ordering::SeqCst);
+                    let _ = write!(stream, "{head}\r\nConnection: close\r\n\r\n");
+                    let _ = stream.write_all(&body);
+                });
             }
         });
         Server { port, requests }
@@ -379,6 +410,22 @@ mod tests {
                 "{address}"
             );
         }
+    }
+
+    #[test]
+    fn a_probe_of_the_test_server_is_not_counted_as_a_request() {
+        let server = answering("{}");
+        let probed = |request: &[u8]| {
+            let mut probe = TcpStream::connect(("127.0.0.1", server.port)).expect("connect");
+            probe.write_all(request).expect("write");
+            // The server closes on a probe, so this returns once it has decided.
+            let mut answer = Vec::new();
+            let _ = probe.read_to_end(&mut answer);
+            answer
+        };
+        assert!(probed(b"GET / HTTP/1.1\r\n\r\n").is_empty());
+        assert!(probed(b"\x16\x03\x01").is_empty());
+        assert_eq!(server.requests.load(Ordering::SeqCst), 0);
     }
 
     #[test]
