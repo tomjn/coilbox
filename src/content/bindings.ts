@@ -1913,11 +1913,18 @@ export interface UnitDefLink {
   /** For an engine's list: whether the run used a game other than the one the
    *  replay names. Absent when that is not known. */
   gameDiffers?: boolean;
+  /** The version of the read of a match that made the list. Absent for a list
+   *  recorded before versions were kept, which counts as the oldest, and for a
+   *  list no read of a match made. */
+  listVersion?: number;
 }
 
 /** What is recorded for one replay. */
 export interface ReplayUnitDefSets {
   links: UnitDefLink[];
+  /** The version of the read of a match that this build makes. A link with a
+   *  lower `listVersion` is out of date. */
+  matchListVersion?: number;
   /** The link that names the ids in the replay's own stream, if any. */
   stream: UnitDefLink | null;
   /** The link that names the ids in the replay's analysis events, if any. */
@@ -1939,10 +1946,18 @@ export const contentUnitDefSet = defineCommand<
  * Keep the unit list a replay was just read against. Only for a game installed
  * under the exact name the replay records. `archive` is the installed game's
  * archive name, which says whether it is a loose folder. A replay that already
- * has a list from that kind of read keeps it, and `digest` is the one it kept.
+ * has a list from that kind of read keeps it, and `digest` is the one it kept,
+ * unless the origin is an archive and `matchRead` says this list was read with
+ * the replay's own match setup by a newer version of that read (#4930).
  */
 export const contentUnitDefSetStore = defineCommand<
-  { gameId: string; game: string; archive: string; units: StoredUnitDef[] },
+  {
+    gameId: string;
+    game: string;
+    archive: string;
+    units: StoredUnitDef[];
+    matchRead?: boolean;
+  },
   { digest: string | null; origin: UnitDefOrigin; links: UnitDefLink[] }
 >("coilbox-content", "content_unit_def_set_store");
 
