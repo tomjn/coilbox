@@ -3,6 +3,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { useSyncExternalStore } from "react";
 import { describeError } from "@/i18n/uiError";
 import { type OaEvent, playOaCancel, playOaLaunch } from "../play/bindings";
+import { oaGameOverLine, parseOaMatch, recordOaMatch } from "./oaMatches";
 
 /**
  * The Open Annihilation (OA) that coilbox started for a battle, held outside
@@ -19,7 +20,8 @@ import { type OaEvent, playOaCancel, playOaLaunch } from "../play/bindings";
  *
  * Hosting and joining both start OA through here. What each does with OA's
  * status stream goes in `onEvent`, and what it undoes when OA is gone goes in
- * `onEnd`.
+ * `onEnd`. The run itself keeps each finished match (`oaMatches`, issue #4948),
+ * since no page is guaranteed to be there when OA says the game is over.
  */
 
 export interface OaRunState {
@@ -84,7 +86,30 @@ export async function startOaRun({
   inBattleThisSession = true;
   publish({ running: true, error: null, battle });
   const channel = new Channel<OaEvent>();
-  channel.onmessage = (event) => onEvent?.(event);
+  let version: string | null = null;
+  let matches = 0;
+  channel.onmessage = (event) => {
+    // A finished match is kept here, as it arrives: a cancel gives no `exit`
+    // event, and the page that started the run may be gone.
+    try {
+      if (event.kind === "hello") version = event.version;
+      const line = oaGameOverLine(event);
+      if (line) {
+        matches += 1;
+        recordOaMatch({
+          id: `${id}:${matches}`,
+          finishedAt: new Date().toISOString(),
+          serverKey: battle.serverKey,
+          battleId: battle.battleId,
+          version,
+          ...parseOaMatch(line),
+        });
+      }
+    } catch {
+      // Keeping the match must not stop the caller seeing the event.
+    }
+    onEvent?.(event);
+  };
   let error: string | null = null;
   try {
     const outcome = await playOaLaunch({

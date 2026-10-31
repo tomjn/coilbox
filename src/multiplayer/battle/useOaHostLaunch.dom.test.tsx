@@ -143,6 +143,26 @@ describe("starting Open Annihilation for the host", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("raises the flag when the match starts without the battle room having been seen", async () => {
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+
+    act(() =>
+      launched[0].onEvent.onmessage({ kind: "match", change: "ended" }),
+    );
+    expect(setIngame).not.toHaveBeenCalled();
+
+    act(() =>
+      launched[0].onEvent.onmessage({ kind: "match", change: "started" }),
+    );
+    act(() => launched[0].onEvent.onmessage(screen("mp_battleroom")));
+    expect(setIngame.mock.calls).toEqual([[true]]);
+
+    await act(async () => launched[0].finish({ exitCode: 0, signal: null }));
+    expect(setIngame.mock.calls).toEqual([[true], [false]]);
+  });
+
   it("leaves the flag alone when OA never reached its battle room", async () => {
     const { result } = mount();
     act(() => void result.current.start());
