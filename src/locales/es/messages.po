@@ -6059,6 +6059,10 @@ msgstr "{server} controla la sala actual, así que aceptar esta partida iniciar�
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} no permite recuperar la contraseña en Coilbox. Restablécela en la página del propio servidor:"
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -14363,6 +14367,8 @@ msgid "Change part"
 msgstr "Cambiar pieza"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 #, fuzzy
 msgid "Change password"
 msgstr "Cambiar contraseña"
@@ -14643,11 +14649,6 @@ msgstr "Comprobar que carga"
 #, fuzzy
 msgid "Check the host's address"
 msgstr "Comprueba la dirección del anfitrión"
-
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "Comprueba la contraseña en Ajustes y vuelve a iniciar sesión desde la barra superior."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -30133,11 +30134,6 @@ msgstr "Multijugador"
 msgid "Multiplayer battle"
 msgstr "Partida multijugador"
 
-#: src/multiplayer/store.tsx
-#, fuzzy
-msgid "Multiplayer login refused"
-msgstr "Inicio de sesión multijugador rechazado"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Multiplayer: away"
@@ -30162,6 +30158,10 @@ msgstr "Multijugador: error de conexión"
 #, fuzzy
 msgid "Multiplayer: log in"
 msgstr "Multijugador: iniciar sesión"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 #, fuzzy
@@ -35764,6 +35764,10 @@ msgstr "Contraseña (opcional)"
 #, fuzzy
 msgid "password needed"
 msgstr "se necesita contraseña"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy

@@ -35,11 +35,16 @@ import {
   useLastLogin,
   useLobbyAccounts,
 } from "../lobby-servers/config";
+import {
+  LOBBY_SERVERS_ROUTE,
+  requestDrawer,
+} from "../lobby-servers/drawerRequest";
 import { PasswordRecoveryForm } from "../lobby-servers/PasswordRecoveryForm";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
 import type { LoginPhase } from "./bindings";
 import type { ConnectionState } from "./connections";
-import { type DotStatus, lobbyDotStatus } from "./loginStatus";
+import { LoginRefusedError } from "./loginRefused";
+import { type DotStatus, lobbyDotStatus, refusedReason } from "./loginStatus";
 import {
   liveConnectionKeys,
   serverHostFromKey,
@@ -57,6 +62,7 @@ const DOT_CLASS: Record<DotStatus, string> = {
   // Matches the amber "Away" dot the chat member list uses (see presence.ts).
   away: "bg-amber-500",
   error: "bg-destructive",
+  refused: "bg-destructive",
 };
 
 const LABEL: Record<DotStatus, MessageDescriptor> = {
@@ -65,6 +71,7 @@ const LABEL: Record<DotStatus, MessageDescriptor> = {
   on: msg`Multiplayer: connected`,
   away: msg`Multiplayer: away`,
   error: msg`Multiplayer: connection error`,
+  refused: msg`Multiplayer: password refused`,
 };
 
 /**
@@ -265,7 +272,9 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       await connect(server, account.username);
       setAdding(false);
     } catch (e) {
-      setError(describeError(e));
+      // A refused password is marked on the login's own row, with the server's
+      // reason, and the store has raised the notification.
+      if (!(e instanceof LoginRefusedError)) setError(describeError(e));
       if (tachyon) setNeedsSignIn(account);
     } finally {
       setPending(null);
@@ -318,8 +327,21 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     ? (resolveServer(recovered.serverId, customCfg.servers)?.name ??
       t`that server`)
     : null;
-  const loginError = mirror.loginError;
   const disconnectError = mirror.error;
+
+  // The logins whose password the server refused, by account id, with the
+  // server's reason. A login is refused until its next attempt starts.
+  const refused = new Map<string, string>();
+  const accountByKey = new Map<string, LobbyAccount>();
+  for (const a of accounts) {
+    const server = resolveServer(a.serverId, customCfg.servers);
+    if (!server) continue;
+    const key = serverKeyFor(server, a.username);
+    accountByKey.set(key, a);
+    const entry = connections[key];
+    const reason = entry ? refusedReason(entry) : null;
+    if (reason != null) refused.set(a.id, reason);
+  }
 
   if (liveKeys.length > 0 && !adding) {
     const several = listed.length > 1;
@@ -344,6 +366,12 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
                     {serverNameFor(key, servers)}
                   </p>
                   <ConnectionLine entry={entry} opening={opening} />
+                  {refusedReason(entry) != null && accountByKey.has(key) && (
+                    <ChangePasswordLink
+                      account={accountByKey.get(key) as LobbyAccount}
+                      onNavigate={onNavigate}
+                    />
+                  )}
                 </div>
                 {several && (
                   <Button
@@ -548,6 +576,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           accounts={sortedAccounts}
           customServers={customCfg.servers}
           remembered={rememberedIds}
+          refused={refused}
           liveKeys={liveKeys}
           replacedBy={replacedBy}
           disabled={busy}
@@ -601,19 +630,14 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           <Trans>Sign in with your browser</Trans>
         </Button>
       )}
-      {adding ? null : mirror.loginError ? (
-        <p className="px-2 pt-1 text-xs text-destructive">
-          <Trans>Login failed: {loginError}</Trans>
-        </p>
-      ) : (
-        mirror.error &&
-        // A connect that just failed is already reported above, in `error`.
-        !error && (
+      {adding ||
+        // A refused login says so on its own row, and a connect that just
+        // failed is already reported above, in `error`.
+        (mirror.error && !error && !mirror.loginError && (
           <p className="px-2 pt-1 text-xs text-destructive">
             <Trans>Disconnected: {disconnectError}</Trans>
           </p>
-        )
-      )}
+        ))}
     </div>
   );
 }
@@ -629,6 +653,7 @@ function AccountList({
   accounts,
   customServers,
   remembered,
+  refused,
   liveKeys,
   replacedBy,
   disabled,
@@ -639,6 +664,8 @@ function AccountList({
   customServers: LobbyServer[];
   /** Account ids `rememberedLogins` names, badged "Open last time" below. */
   remembered: ReadonlySet<string>;
+  /** Server's reason by account id, for each login whose password it refused. */
+  refused: ReadonlyMap<string, string>;
   liveKeys: string[];
   replacedBy: (account: LobbyAccount) => string | null;
   disabled: boolean;
@@ -654,6 +681,7 @@ function AccountList({
           server != null && liveKeys.includes(serverKeyFor(server, a.username));
         const replaced = current ? null : replacedBy(a);
         const replacedName = replaced ? usernameFromKey(replaced) : null;
+        const refusal = current ? undefined : refused.get(a.id);
         // A Tachyon login with no sign-in stored takes the user to their browser
         // when they press it, so say so before they press it.
         const opensBrowser =
@@ -661,49 +689,62 @@ function AccountList({
           serverProtocol(server) === "tachyon" &&
           a.hasSecret !== true;
         return (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => onPick(a)}
-            disabled={disabled || current}
-            className="flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-          >
-            <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
-              {a.username || t`(no username)`}
-              {current ? (
-                <span className="ml-auto rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-600 dark:text-green-400">
-                  <Trans>Connected</Trans>
-                </span>
-              ) : (
-                remembered.has(a.id) && (
-                  <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                    <Trans>Open last time</Trans>
+          <div key={a.id}>
+            <button
+              type="button"
+              onClick={() => onPick(a)}
+              disabled={disabled || current}
+              className="flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+            >
+              <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
+                {a.username || t`(no username)`}
+                {current ? (
+                  <span className="ml-auto rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-600 dark:text-green-400">
+                    <Trans>Connected</Trans>
                   </span>
-                )
-              )}
-            </span>
-            {/* The name and its badge are one inline run so a long name wraps
+                ) : refusal != null ? (
+                  <span className="ml-auto rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                    <Trans>Password refused</Trans>
+                  </span>
+                ) : (
+                  remembered.has(a.id) && (
+                    <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                      <Trans>Open last time</Trans>
+                    </span>
+                  )
+                )}
+              </span>
+              {/* The name and its badge are one inline run so a long name wraps
                 through the badge rather than pushing it into a column. The
                 sign-in note takes its own line under both. */}
-            <span className="text-xs text-muted-foreground">
-              {server?.name ?? t`Unknown server`}
-              {server?.alpha && (
-                <span className="ml-1.5 rounded border border-destructive/40 bg-destructive/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
-                  <Trans>Alpha</Trans>
+              <span className="text-xs text-muted-foreground">
+                {server?.name ?? t`Unknown server`}
+                {server?.alpha && (
+                  <span className="ml-1.5 rounded border border-destructive/40 bg-destructive/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                    <Trans>Alpha</Trans>
+                  </span>
+                )}
+              </span>
+              {opensBrowser && (
+                <span className="text-xs text-muted-foreground">
+                  <Trans>Signs in with your browser</Trans>
                 </span>
               )}
-            </span>
-            {opensBrowser && (
-              <span className="text-xs text-muted-foreground">
-                <Trans>Signs in with your browser</Trans>
-              </span>
+              {replaced && (
+                <span className="text-xs text-muted-foreground">
+                  <Trans>Logs out {replacedName}</Trans>
+                </span>
+              )}
+              {refusal && (
+                <span className="text-xs text-destructive">{refusal}</span>
+              )}
+            </button>
+            {refusal != null && (
+              <div className="px-2 pb-1">
+                <ChangePasswordLink account={a} onNavigate={onNavigate} />
+              </div>
             )}
-            {replaced && (
-              <span className="text-xs text-muted-foreground">
-                <Trans>Logs out {replacedName}</Trans>
-              </span>
-            )}
-          </button>
+          </div>
         );
       })}
       <Link
@@ -715,6 +756,36 @@ function AccountList({
         <Trans>Add a login</Trans>
       </Link>
     </>
+  );
+}
+
+/**
+ * The one action for a refused login: the settings drawer for that login, with
+ * the cursor in its password field.
+ */
+function ChangePasswordLink({
+  account,
+  onNavigate,
+}: {
+  account: LobbyAccount;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      to={LOBBY_SERVERS_ROUTE}
+      onClick={() => {
+        requestDrawer({
+          kind: "password",
+          serverId: account.serverId,
+          username: account.username,
+        });
+        onNavigate();
+      }}
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline"
+    >
+      <KeyRound className="size-3.5" />
+      <Trans>Change password</Trans>
+    </Link>
   );
 }
 

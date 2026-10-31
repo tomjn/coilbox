@@ -4923,6 +4923,10 @@ msgstr "{server} owns the current battle room, so accepting this match would sta
 msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 
+#: src/multiplayer/store.tsx
+msgid "{serverName} refused the password for {username}"
+msgstr "{serverName} refused the password for {username}"
+
 #: src/content/pages/StorageSection.tsx
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
 msgstr "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
@@ -11646,6 +11650,8 @@ msgid "Change part"
 msgstr "Change part"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/multiplayer/LobbyStatusButton.tsx
+#: src/multiplayer/store.tsx
 msgid "Change password"
 msgstr "Change password"
 
@@ -11875,10 +11881,6 @@ msgstr "Check it loads"
 #: src/multiplayer/battle/useBattleLaunch.ts
 msgid "Check the host's address"
 msgstr "Check the host's address"
-
-#: src/multiplayer/store.tsx
-msgid "Check the password in Settings, then log in again from the topbar."
-msgstr "Check the password in Settings, then log in again from the topbar."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "Check your email for the 8 digit code. Three wrong tries locks this request."
@@ -24489,10 +24491,6 @@ msgstr "Multiplayer"
 msgid "Multiplayer battle"
 msgstr "Multiplayer battle"
 
-#: src/multiplayer/store.tsx
-msgid "Multiplayer login refused"
-msgstr "Multiplayer login refused"
-
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Multiplayer: away"
 msgstr "Multiplayer: away"
@@ -24512,6 +24510,10 @@ msgstr "Multiplayer: connection error"
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Multiplayer: log in"
 msgstr "Multiplayer: log in"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Multiplayer: password refused"
+msgstr "Multiplayer: password refused"
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "multiple system, {names}"
@@ -29056,6 +29058,10 @@ msgstr "Password (optional)"
 #: src/direct/room.ts
 msgid "password needed"
 msgstr "password needed"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Password refused"
+msgstr "Password refused"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Password saved"
