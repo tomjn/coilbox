@@ -13,9 +13,11 @@ import {
   type EventMark,
   MARK_KINDS,
   type MarkKind,
+  markTeams,
   type TimelineBin,
   type TimelineMark,
 } from "../../replayTimeline";
+import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 
 /**
  * Columns the match is cut into. A design choice, not a measurement: it keeps a
@@ -71,6 +73,8 @@ type Active =
   | { of: "chat"; bin: TimelineBin<TimelineMark> }
   | { of: "event"; bin: TimelineBin<EventMark> };
 
+const NO_TEAMS: ReadonlyMap<number, number> = new Map();
+
 const axisTime = (sec: number) => formatDuration(Math.round(sec));
 
 function binTime(
@@ -120,6 +124,12 @@ function readoutHeading(active: Active, totalSec: number): string {
  * label. A system line is hollow where a person's is filled, and an event is a
  * diamond where a line is a bar, so nothing rests on colour. Selecting a line
  * opens it in the chat log. An event has nowhere to open, so it only reads out.
+ *
+ * A chat mark stands for the teams of whoever spoke in it, so it lights and
+ * dims with them like a roster row does (#3855), and pointing at it lights
+ * those teams elsewhere. Spectator, server and system lines have no team, and
+ * neither do players the replay gives no number, so their marks stay as they
+ * are. Mount it under a `SeriesEmphasisProvider`.
  */
 export function ReplayTimeline({
   marks,
@@ -127,14 +137,18 @@ export function ReplayTimeline({
   totalSec,
   describe,
   onOpenLine,
+  teamOf = NO_TEAMS,
 }: {
   marks: TimelineMark[];
   events?: EventMark[];
   totalSec: number;
   describe: (line: ChatLine) => string;
   onOpenLine: (index: number) => void;
+  /** Each seated player's engine team by player number. */
+  teamOf?: ReadonlyMap<number, number>;
 }) {
   useLocale();
+  const e = useSeriesEmphasis();
   const [active, setActive] = useState<Active | null>(null);
   const bins = binMarks(marks, totalSec, BIN_COUNT);
   const eventBins = binMarks(events, totalSec, BIN_COUNT);
@@ -154,15 +168,33 @@ export function ReplayTimeline({
   const cell = (bin: TimelineBin, max: number, style: React.CSSProperties) => {
     const n = bin.marks.length;
     const height = Math.round(MARK_MIN + ((MARK_MAX - MARK_MIN) * n) / max);
+    const teams = markTeams(bin.marks, teamOf);
+    // Only teams with a line can be pointed at, as in the roster.
+    const shown = teams.filter((team) => e.isShown(team));
+    const lit = shown.length > 0 && e.isLit(shown);
+    const faded = teams.length > 0 && e.dimming && !lit;
+    const point = shown.length > 0 ? e.pointTo(shown) : undefined;
+    const focus = shown.length > 0 ? e.focusOn(shown) : undefined;
     return (
       <button
         key={`${bin.kind}/${bin.slot}`}
         type="button"
         aria-label={binLabel(bin, totalSec)}
+        data-emphasised={teams.length > 0 ? lit : undefined}
         onClick={() => onOpenLine(bin.marks[0].index)}
-        onPointerEnter={() => setActive({ of: "chat", bin })}
-        onFocus={() => setActive({ of: "chat", bin })}
-        className="absolute inset-y-0 flex items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+        onPointerEnter={(ev) => {
+          setActive({ of: "chat", bin });
+          point?.onPointerEnter(ev);
+        }}
+        onPointerLeave={point?.onPointerLeave}
+        onFocus={(ev) => {
+          setActive({ of: "chat", bin });
+          focus?.onFocus(ev);
+        }}
+        onBlur={focus?.onBlur}
+        className={`absolute inset-y-0 flex items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${
+          lit ? "bg-accent/60 ring-2 ring-ring/40 ring-inset" : ""
+        } ${faded ? "opacity-40" : ""}`}
         style={style}
       >
         <span

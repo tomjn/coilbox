@@ -959,6 +959,7 @@ export default function ReplayDetailPage() {
               <ReplayChat
                 replayPath={replay.path}
                 durationSec={info.durationSec}
+                players={info.players}
               />
             )}
 

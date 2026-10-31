@@ -60,6 +60,7 @@ vi.mock("./components/MatchStatsChart", () => ({
 
 const { useDemoInfo } = await import("../config");
 const { ReplayChat } = await import("./components/ReplayChat");
+const { SeriesEmphasisProvider } = await import("../useSeriesEmphasis");
 const { MatchStatsSection } = await import("./components/MatchStatsSection");
 const { ReplayAnalysisEvents } = await import(
   "./components/ReplayAnalysisEvents"
@@ -182,12 +183,20 @@ describe("ReplayChat", () => {
 
   it("drops the first replay's chat when the path changes", async () => {
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from a"));
-    const { rerender } = render(<ReplayChat replayPath={a} />);
+    const { rerender } = render(
+      <SeriesEmphasisProvider>
+        <ReplayChat replayPath={a} />
+      </SeriesEmphasisProvider>,
+    );
     fireEvent.click(await screen.findByRole("button", { name: /everyone/i }));
     expect(await screen.findByText("gg from a", { exact: false })).toBeTruthy();
 
     bindings.contentDemoChat.mockReturnValueOnce(deferred().promise);
-    rerender(<ReplayChat replayPath={b} />);
+    rerender(
+      <SeriesEmphasisProvider>
+        <ReplayChat replayPath={b} />
+      </SeriesEmphasisProvider>,
+    );
     expect(screen.queryByText("gg from a", { exact: false })).toBeNull();
     expect(screen.queryByRole("button", { name: /everyone/i })).toBeNull();
     expect(screen.getByText("Reading chat…", { selector: "p" })).toBeTruthy();
@@ -197,9 +206,17 @@ describe("ReplayChat", () => {
     const first = deferred<ReturnType<typeof chat>>();
     bindings.contentDemoChat.mockReturnValueOnce(first.promise);
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from b"));
-    const { rerender } = render(<ReplayChat replayPath={a} />);
+    const { rerender } = render(
+      <SeriesEmphasisProvider>
+        <ReplayChat replayPath={a} />
+      </SeriesEmphasisProvider>,
+    );
 
-    rerender(<ReplayChat replayPath={b} />);
+    rerender(
+      <SeriesEmphasisProvider>
+        <ReplayChat replayPath={b} />
+      </SeriesEmphasisProvider>,
+    );
     fireEvent.click(await screen.findByRole("button", { name: /everyone/i }));
     expect(await screen.findByText("gg from b", { exact: false })).toBeTruthy();
 
@@ -210,7 +227,11 @@ describe("ReplayChat", () => {
 
   it("reads the chat once for the page, not once per surface", async () => {
     bindings.contentDemoChat.mockResolvedValue(chat("gg"));
-    render(<ReplayChat replayPath={a} />);
+    render(
+      <SeriesEmphasisProvider>
+        <ReplayChat replayPath={a} />
+      </SeriesEmphasisProvider>,
+    );
     await screen.findByRole("button", { name: /everyone/i });
     expect(bindings.contentDemoChat).toHaveBeenCalledTimes(1);
   });

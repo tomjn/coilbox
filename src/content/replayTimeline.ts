@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { formatList } from "../lib/format";
-import type { ChatLine, TimelineEvent } from "./bindings";
+import type { ChatLine, ReplayPlayer, TimelineEvent } from "./bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "./chatClock";
 
 /** What a mark is, which decides the row it sits in. */
@@ -55,6 +55,35 @@ export function toMarks(lines: ChatLine[]): TimelineMark[] {
         : Math.floor(line.frame / FRAMES_PER_SECOND),
     line,
   }));
+}
+
+/**
+ * The engine team of each seated player, by the `[playerN]` number a chat line
+ * carries. Spectators and players the file gives no number or team are left
+ * out, as is the server (255), so their lines have no team. A name is never
+ * matched: two players can share one.
+ */
+export function playerTeams(players: ReplayPlayer[]): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const p of players) {
+    if (p.spectator || p.player === undefined || p.team === undefined) continue;
+    out.set(p.player, p.team);
+  }
+  return out;
+}
+
+/** The teams behind some marks, ascending. Empty when none of them has a team. */
+export function markTeams(
+  marks: TimelineMark[],
+  teamOf: ReadonlyMap<number, number>,
+): number[] {
+  const teams = new Set<number>();
+  for (const m of marks) {
+    if (m.line.system) continue;
+    const team = teamOf.get(m.line.player);
+    if (team !== undefined) teams.add(team);
+  }
+  return [...teams].sort((a, b) => a - b);
 }
 
 /**
