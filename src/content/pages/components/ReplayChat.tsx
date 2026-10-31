@@ -5,9 +5,14 @@ import { Button } from "@picoframe/frame";
 import { Loader2, MessageSquare } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "@/lib/format";
-import type { ChatDest, ChatLine } from "../../bindings";
+import type { ChatDest, ChatLine, ReplayPlayer } from "../../bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "../../chatClock";
-import { timelineDomain, toEventMarks, toMarks } from "../../replayTimeline";
+import {
+  playerTeams,
+  timelineDomain,
+  toEventMarks,
+  toMarks,
+} from "../../replayTimeline";
 import { useReplayChat } from "../../useReplayChat";
 import { ReplayTimeline } from "./ReplayTimeline";
 import { SectionHelp } from "./SectionHelp";
@@ -119,9 +124,12 @@ function describeLine(line: ChatLine, names: Map<number, string>): string {
 export function ReplayChat({
   replayPath,
   durationSec = 0,
+  players,
 }: {
   replayPath: string;
   durationSec?: number;
+  /** The replay's seats, which tie a chat mark to its team on the emphasis. */
+  players?: ReplayPlayer[];
 }) {
   useLocale();
   const { loading, failed, messages, incomplete, events } =
@@ -141,6 +149,7 @@ export function ReplayChat({
     }
     return out;
   }, [messages]);
+  const teamOf = useMemo(() => playerTeams(players ?? []), [players]);
   const eventMarks = useMemo(() => toEventMarks(events), [events]);
   const totalSec = timelineDomain(
     [...marks, ...eventMarks],
@@ -184,6 +193,7 @@ export function ReplayChat({
             <ReplayTimeline
               marks={marks}
               events={eventMarks}
+              teamOf={teamOf}
               totalSec={totalSec}
               describe={(line) => describeLine(line, names)}
               onOpenLine={(line) => setOpened({ path: replayPath, line })}

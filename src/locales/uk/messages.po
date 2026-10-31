@@ -107,6 +107,11 @@ msgstr "Лише для 'Large' BeamLaser. Як швидко промінь зг
 msgid "'Large' BeamLaser only. Regular BeamLaser stretches a single tile instead of repeating it."
 msgstr "Лише для 'Large' BeamLaser. Звичайний BeamLaser розтягує одну плитку, а не повторює її."
 
+#. placeholder {0}: writing.name
+#: src/play/ChobbyPresetsView.tsx
+msgid "\"{0}\" is already in Chobby."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
@@ -578,6 +583,11 @@ msgstr "{0, plural, one {Через # блокувальну проблему г
 msgid "{0, plural, one {# blueprint added to your library.} other {# blueprints added to your library.}}"
 msgstr "{0, plural, one {До вашої бібліотеки додано # креслення.} few {До вашої бібліотеки додано # креслення.} many {До вашої бібліотеки додано # креслень.} other {До вашої бібліотеки додано # креслення.}}"
 
+#. placeholder {0}: sum.bots
+#: src/play/ChobbyPresetsView.tsx
+msgid "{0, plural, one {# bot} other {# bots}}"
+msgstr ""
+
 #. placeholder {0}: dead.length
 #. placeholder {0}: ops.length
 #: src/workshop/compatibility.ts
@@ -767,6 +777,8 @@ msgid "{0, plural, one {# of them has a stored analysis, which is deleted too an
 msgstr "{0, plural, one {# з них має збережений аналіз, який теж буде видалено, що звільнить ще {analysisFreed}.} few {# з них мають збережені аналізи, які теж буде видалено, що звільнить ще {analysisFreed}.} many {# з них мають збережені аналізи, які теж буде видалено, що звільнить ще {analysisFreed}.} other {# з них мають збережені аналізи, які теж буде видалено, що звільнить ще {analysisFreed}.}}"
 
 #. placeholder {0}: counts.plain
+#. placeholder {0}: sum.options
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/presetParts.ts
 #, fuzzy
 msgid "{0, plural, one {# option} other {# options}}"
@@ -1140,6 +1152,11 @@ msgstr "{0, plural, one {Список hide: # id, що відповідає фу
 #, fuzzy
 msgid "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
 msgstr "{0, plural, one {Приховані налаштування: # id, що відповідає розділу} few {Приховані налаштування: # id, усі відповідають розділам} many {Приховані налаштування: # id, усі відповідають розділам} other {Приховані налаштування: # id, усі відповідають розділам}}"
+
+#. placeholder {0}: picked.size
+#: src/play/ChobbyPresetsView.tsx
+msgid "{0, plural, one {Import # preset} other {Import # presets}}"
+msgstr ""
 
 #. placeholder {0}: data.sharedTeamGames
 #: src/content/pages/components/PlayerMatchFigures.tsx
@@ -2212,6 +2229,10 @@ msgstr "{count, plural, one {# друг у матчі} few {# друзі в ма
 #, fuzzy
 msgid "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
 msgstr "{count, plural, one {Фільтр ігор відповідає # встановленій грі} few {Фільтр ігор відповідає # встановленим іграм} many {Фільтр ігор відповідає # встановленим іграм} other {Фільтр ігор відповідає # встановленої гри}}"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "{count, plural, one {Imported # preset from Chobby} other {Imported # presets from Chobby}}"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -12101,6 +12122,10 @@ msgstr "Колір тла"
 msgid "Background set, no icon"
 msgstr "Тло задано, значка немає"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Backup: {backup}"
+msgstr ""
+
 #: src/content/buildPicMissing.ts
 #, fuzzy
 msgid "bad pic"
@@ -13941,6 +13966,7 @@ msgstr "Не може пошкодити власний юніт"
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
 #: src/placement/TerrainControls.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -14710,6 +14736,15 @@ msgstr "Перевіряє своє дуло кожного кадру"
 msgid "checksum {checksum}"
 msgstr "контрольна сума {checksum}"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Chobby file"
+msgstr ""
+
+#: src/play/ChobbyPresetsRow.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Chobby presets"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -14825,6 +14860,10 @@ msgstr "Виберіть мапу."
 #, fuzzy
 msgid "Choose a model"
 msgstr "Вибрати модель"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Choose a preset to write"
+msgstr ""
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
@@ -17524,6 +17563,10 @@ msgstr "Не вдалося прочитати архів цієї гри."
 #, fuzzy
 msgid "Could not read this game's archive. Use the file picker instead."
 msgstr "Не вдалося прочитати архів цієї гри. Натомість скористайтеся вибором файлу."
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Could not read this game's factions and AIs. Close the sheet and open it again to retry."
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -25199,6 +25242,7 @@ msgstr "Гучність звуку влучання (під водою)"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/PresetLibraryToolbar.tsx
 #: src/scenario/pages/components/ScenarioImportButton.tsx
 #: src/uberstress/pages/HistoryPage.tsx
@@ -25211,6 +25255,10 @@ msgstr "Імпортувати"
 #, fuzzy
 msgid "Import .sdd folder…"
 msgstr "Імпортувати папку .sdd…"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Import {name}"
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -25314,6 +25362,10 @@ msgstr "Імпортувати за посиланням"
 #, fuzzy
 msgid "Import from file…"
 msgstr "Імпортувати з файлу…"
+
+#: src/play/ChobbyPresetsRow.tsx
+msgid "Import from or write to optionsPresets.json"
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -27395,6 +27447,10 @@ msgstr "Не враховано без записаних даних (старі
 #, fuzzy
 msgid "Left out: {noTotals} with no figures recorded (older or unmeasured replays)."
 msgstr "Не враховано без записаних даних (старіші або невиміряні повтори): {noTotals}."
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Left out: {sections}"
+msgstr ""
 
 #: src/multiplayer/chat/ChatPane.tsx
 #, fuzzy
@@ -34938,6 +34994,18 @@ msgstr "Необов’язково. Zero-K зберігає її у вашом�
 msgid "Options"
 msgstr "Параметри"
 
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is empty."
+msgstr ""
+
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is not a table of presets."
+msgstr ""
+
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is not valid JSON: {reason}"
+msgstr ""
+
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #, fuzzy
 msgid "Or equip one from the library"
@@ -36745,6 +36813,10 @@ msgstr "ШІ шаблону скориговано"
 #, fuzzy
 msgid "Preset name"
 msgstr "Назва шаблону"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Preset to write"
+msgstr ""
 
 #: src/multiplayer/battle/ApplySkirmishPresetDrawer.tsx
 #: src/multiplayer/pages/BattleRoomPage.tsx
@@ -38757,6 +38829,7 @@ msgstr "Ремікс із"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -38831,6 +38904,10 @@ msgstr "Прибрати {mapTitle}?"
 #, fuzzy
 msgid "Remove {name}"
 msgstr "Прибрати {name}"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Remove {name} from Chobby"
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
@@ -39025,6 +39102,10 @@ msgstr "Прибрати слово"
 #, fuzzy
 msgid "removed"
 msgstr "видалено"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Removed \"{name}\" from Chobby"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -39249,6 +39330,7 @@ msgstr "повторюється · {cooldown} с"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
@@ -54498,6 +54580,10 @@ msgstr "Уламки"
 msgid "Wreck pose"
 msgstr "Поза уламків"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Write"
+msgstr ""
+
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
 msgid "Write {projectName} out as a .sdz for {gameName}, ready to hand to somebody else or upload."
@@ -54648,6 +54734,10 @@ msgstr "Записується під час експорту в <0>{scriptPath}
 #, fuzzy
 msgid "Written:"
 msgstr "Записано:"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Wrote \"{name}\" to Chobby"
+msgstr ""
 
 #. placeholder {0}: result.groups.length
 #: src/content/pages/components/Convert3doDrawer.tsx

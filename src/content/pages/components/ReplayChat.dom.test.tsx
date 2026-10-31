@@ -19,6 +19,7 @@ vi.mock("../../bindings", () => ({
 }));
 
 const { ReplayChat, chatTime } = await import("./ReplayChat");
+const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
 const line = (over: Partial<ChatLine>): ChatLine => ({
@@ -34,7 +35,11 @@ afterEach(cleanup);
 
 function open(result: typeof RESULT) {
   RESULT = result;
-  render(<ReplayChat replayPath="/replays/a.sdfz" durationSec={600} />);
+  render(
+    <SeriesEmphasisProvider>
+      <ReplayChat replayPath="/replays/a.sdfz" durationSec={600} />
+    </SeriesEmphasisProvider>,
+  );
 }
 
 /** Opens the log once the chat has been read. */

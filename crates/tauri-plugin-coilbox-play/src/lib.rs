@@ -8,6 +8,7 @@
 //! signal — the `play_launch` command simply resolves when the process exits.
 
 mod autohost;
+mod chobby_presets;
 mod focus;
 mod infolog;
 mod launch;
@@ -194,6 +195,43 @@ async fn play_import_preset(src: String) -> CliResult {
     match std::fs::read_to_string(&src) {
         Ok(json) => CliResult::ok(json!({ "json": json })),
         Err(e) => CliResult::err(format!("could not read preset: {e}")),
+    }
+}
+
+/// `play_chobby_presets_find` lists the content folders that hold BYAR-Chobby's
+/// `optionsPresets.json`, as the path to the file in each (issue #1297).
+#[tauri::command]
+async fn play_chobby_presets_find(roots: Vec<String>) -> CliResult {
+    let files: Vec<String> = chobby_presets::find(&roots)
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect();
+    CliResult::ok(json!({ "files": files }))
+}
+
+/// `play_chobby_presets_read` returns the records of an `optionsPresets.json`
+/// as one JSON object. A file Chobby could not decode is an error here too.
+#[tauri::command]
+async fn play_chobby_presets_read(path: String) -> CliResult {
+    match chobby_presets::read(Path::new(&path)) {
+        Ok(json) => CliResult::ok(json!({ "json": json })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `play_chobby_presets_write` sets and removes records in an
+/// `optionsPresets.json`, keeping a copy of the file as it was. It refuses
+/// while a game coilbox launched is running.
+#[tauri::command]
+async fn play_chobby_presets_write(path: String, edits: Vec<chobby_presets::Edit>) -> CliResult {
+    if coilbox_proc::game_running() {
+        return CliResult::err(
+            "a game is running, so optionsPresets.json is left alone".to_string(),
+        );
+    }
+    match chobby_presets::apply(Path::new(&path), &edits) {
+        Ok(applied) => CliResult::ok(json!(applied)),
+        Err(e) => CliResult::err(e),
     }
 }
 
@@ -660,6 +698,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_export_script,
             play_export_preset,
             play_import_preset,
+            play_chobby_presets_find,
+            play_chobby_presets_read,
+            play_chobby_presets_write,
             play_launch,
             play_launch_replay,
             play_launch_save,
