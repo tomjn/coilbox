@@ -95,6 +95,7 @@ describe("settings declarations", () => {
       "chat-highlights",
       "ignored-users",
       "account",
+      "open-annihilation",
     ]);
     expect(childrenOf("library")).toEqual([
       "content-folders",

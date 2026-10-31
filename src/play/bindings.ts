@@ -296,3 +296,29 @@ export const playSystemInfo = defineCommand<Record<string, never>, SystemInfo>(
   "coilbox-play",
   "play_system_info",
 );
+
+/** An Open Annihilation program that ran: where it is and what it printed for `--version`. */
+export interface OaProgram {
+  path: string;
+  /** The first line of `--version`, such as `Open Annihilation 0.8.9 (macos-universal arm64, 9eb18ad4)`. */
+  version: string;
+}
+
+/**
+ * Look for Open Annihilation where its installer puts it. `found` is `null` when
+ * it is not there, and always on Linux, which has no fixed location.
+ */
+export const playOaFind = defineCommand<
+  Record<string, never>,
+  { found: OaProgram | null }
+>("coilbox-play", "play_oa_find");
+
+/**
+ * Run the program at `path` with `--version`. Rejects, with a message to show,
+ * when it is not a program, does not run, or does not print an Open Annihilation
+ * version line.
+ */
+export const playOaCheck = defineCommand<{ path: string }, OaProgram>(
+  "coilbox-play",
+  "play_oa_check",
+);
