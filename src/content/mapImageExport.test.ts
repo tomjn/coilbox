@@ -97,6 +97,7 @@ describe("renderMapImage", () => {
         playedFrom: "",
         playedUntil: "",
         replaySet: "",
+        startPosition: "",
         includesShort: false,
       },
       worldWidth: 8192,

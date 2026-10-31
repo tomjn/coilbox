@@ -14,7 +14,8 @@
  * only the player deletes it.
  */
 
-import type { Count, PlaceRecord, StartPlace } from "./mapRecords";
+import type { AggregateMatch } from "./mapAggregate";
+import type { Count, JoinedStart, PlaceRecord, StartPlace } from "./mapRecords";
 
 /** The frame setting holding every map's names, by the map's exact name. */
 export const START_NAMES_KEY = "content.mapPositionNames";
@@ -194,4 +195,54 @@ export function startRows(
   return [...rows.values()].sort(
     (a, b) => b.taken - a.taken || a.number - b.number,
   );
+}
+
+// ---- one named position -------------------------------------------------------
+
+/** The matches where a named position was taken, and the engine teams that
+ *  took it in each, by the match's replay path. */
+export interface PositionPicture {
+  matches: AggregateMatch[];
+  teams: Map<string, Set<number>>;
+  /** The starts taken at the position, one for each team in each match. */
+  starts: JoinedStart[];
+}
+
+/**
+ * The matches in which a start was taken at a position called `name`, and the
+ * teams that took it.
+ *
+ * `places` and `names` are the ones the start table is built from, so the
+ * positions are the rows the player sees and a name finds its positions as the
+ * table does: by key, then by the nearest group (`resolveNames`). Names are
+ * compared without regard to case, as `startRows` joins them. A match whose
+ * starts could not be joined to a team (`joinStarts`) took no position and is
+ * not here. Where two teams of one match took positions with the name, both are
+ * in `teams`.
+ */
+export function pictureAt(
+  matches: readonly AggregateMatch[],
+  places: readonly PlaceRecord[],
+  names: ReadonlyMap<string, string>,
+  name: string,
+): PositionPicture {
+  const wanted = name.toLowerCase();
+  const out: PositionPicture = { matches: [], teams: new Map(), starts: [] };
+  const held = new Map<string, Set<number>>();
+  for (const p of places) {
+    if (names.get(p.place.key)?.toLowerCase() !== wanted) continue;
+    for (const s of p.starts) {
+      out.starts.push(s);
+      const teams = held.get(s.filename);
+      if (teams) teams.add(s.team);
+      else held.set(s.filename, new Set([s.team]));
+    }
+  }
+  for (const m of matches) {
+    const teams = held.get(m.record.filename);
+    if (!teams) continue;
+    out.matches.push(m);
+    out.teams.set(m.record.path, teams);
+  }
+  return out;
 }

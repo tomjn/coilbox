@@ -55,6 +55,10 @@ export interface CountColumns {
   /** Events in each entry, or points of damage on the damage layers, which
    *  can pass what a `Uint16Array` holds. */
   count: Uint16Array | Uint32Array;
+  /** The engine team each entry belongs to, or -1 when none is known. The
+   *  team that gave an order or lost a unit. On damage, the team hit for where
+   *  it landed and the team that dealt it for where it came from. */
+  team: Int16Array;
   /** The unit definition id of each entry, on the buildings layer only. */
   def: Uint32Array | null;
   total: number;
@@ -107,6 +111,7 @@ function unpack(
         ? column(layer.amount, Uint32Array, 4, n, `${name} amount`)
         : column(layer.count, Uint16Array, 2, n, `${name} count`),
     ],
+    ["team", column(layer.team, Int16Array, 2, n, `${name} team`)],
     [
       "def",
       "def" in layer && layer.def
@@ -563,6 +568,7 @@ function matchCells(
   lo: number,
   hi: number,
   keep: ((def: number) => boolean) | null,
+  teams: ReadonlySet<number> | null,
   into: Float32Array,
   scale: number,
   unscaled?: Float32Array,
@@ -572,6 +578,7 @@ function matchCells(
     const slice = columns.slice[i];
     if (slice < lo || slice > hi) continue;
     if (keep && !(columns.def && keep(columns.def[i]))) continue;
+    if (teams && !teams.has(columns.team[i])) continue;
     total += columns.count[i];
     if (scale !== 0) into[columns.cell[i]] += columns.count[i] * scale;
     if (unscaled) unscaled[columns.cell[i]] += columns.count[i];
@@ -604,6 +611,12 @@ export function aggregateLayer(
     /** Which end of a hit the damage layer counts: where it landed (the
      *  default) or where it came from. */
     damageMode?: DamageMode;
+    /**
+     * The engine teams to keep for each replay, by its path. Entries of other
+     * teams are left out, and so is a replay with no entry here. Without it
+     * every team counts.
+     */
+    teams?: ReadonlyMap<string, ReadonlySet<number>>;
   },
 ): LayerAggregate {
   const { width, height } = heatGridSize(
@@ -623,6 +636,8 @@ export function aggregateLayer(
   let events = 0;
 
   for (const replay of replays) {
+    const teams = options.teams ? options.teams.get(replay.path) : null;
+    if (teams === undefined) continue;
     const columns =
       layer === "orders"
         ? replay.orders
@@ -644,7 +659,15 @@ export function aggregateLayer(
     available++;
     const range = windowSlices(options.window, replay.lastFrame);
     if (!range) continue;
-    const total = matchCells(columns, range.lo, range.hi, keep, scratch, 0);
+    const total = matchCells(
+      columns,
+      range.lo,
+      range.hi,
+      keep,
+      teams,
+      scratch,
+      0,
+    );
     if (total === 0) continue;
 
     let scale: number;
@@ -661,7 +684,10 @@ export function aggregateLayer(
       if (!(range.minutes > 0)) continue;
       scale = 1 / range.minutes;
     } else {
-      const key = `${layer}:${range.lo}:${range.hi}:${width}x${height}`;
+      const heldTeams = teams
+        ? [...teams].sort((a, b) => a - b).join(",")
+        : "*";
+      const key = `${layer}:${range.lo}:${range.hi}:${width}x${height}:${heldTeams}`;
       let peaks = ownPeaks.get(columns);
       if (!peaks) {
         peaks = new Map();
@@ -670,7 +696,7 @@ export function aggregateLayer(
       let peak = category ? undefined : peaks.get(key);
       if (peak === undefined) {
         scratch.fill(0);
-        matchCells(columns, range.lo, range.hi, keep, scratch, 1);
+        matchCells(columns, range.lo, range.hi, keep, teams, scratch, 1);
         peak = buildHeatFieldFromCounts(scratch, world, {
           resolution: MAP_GRID_RESOLUTION,
         }).peak;
@@ -681,7 +707,7 @@ export function aggregateLayer(
       if (!(peak > 0)) continue;
       scale = 1 / peak;
     }
-    matchCells(columns, range.lo, range.hi, keep, sum, scale, unscaled);
+    matchCells(columns, range.lo, range.hi, keep, teams, sum, scale, unscaled);
     contributing++;
     events += total;
   }

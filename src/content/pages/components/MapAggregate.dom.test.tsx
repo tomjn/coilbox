@@ -145,17 +145,21 @@ function base64(bytes: Uint8Array): string {
 }
 
 /** `[cell, minute, count, def?]`, packed as Rust packs them. */
-function layer(entries: [number, number, number, number?][]): MapCountLayer {
+function layer(
+  entries: [number, number, number, number?, number?][],
+): MapCountLayer {
   const n = entries.length;
   const cell = new Uint32Array(n);
   const slice = new Uint16Array(n);
   const count = new Uint16Array(n);
   const def = new Uint32Array(n);
-  entries.forEach(([c, s, k, d], i) => {
+  const team = new Int16Array(n);
+  entries.forEach(([c, s, k, d, tm], i) => {
     cell[i] = c;
     slice[i] = s;
     count[i] = k;
     def[i] = d ?? 0;
+    team[i] = tm ?? 0;
   });
   const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
   return {
@@ -163,6 +167,7 @@ function layer(entries: [number, number, number, number?][]): MapCountLayer {
     cell: packed(cell),
     slice: packed(slice),
     count: packed(count),
+    team: packed(team),
     def: entries.some((e) => e[3] !== undefined) ? packed(def) : undefined,
     total: entries.reduce((sum, e) => sum + e[2], 0),
     offMap: 0,
@@ -170,15 +175,19 @@ function layer(entries: [number, number, number, number?][]): MapCountLayer {
 }
 
 /** `[cell, minute, points]`, packed as Rust packs damage: a `u32` each. */
-function amountLayer(entries: [number, number, number][]): MapAmountLayer {
+function amountLayer(
+  entries: [number, number, number, number?][],
+): MapAmountLayer {
   const n = entries.length;
   const cell = new Uint32Array(n);
   const slice = new Uint16Array(n);
   const amount = new Uint32Array(n);
-  entries.forEach(([c, s, k], i) => {
+  const team = new Int16Array(n);
+  entries.forEach(([c, s, k, tm], i) => {
     cell[i] = c;
     slice[i] = s;
     amount[i] = k;
+    team[i] = tm ?? 0;
   });
   const packed = (a: ArrayBufferView) => base64(new Uint8Array(a.buffer));
   return {
@@ -186,6 +195,7 @@ function amountLayer(entries: [number, number, number][]): MapAmountLayer {
     cell: packed(cell),
     slice: packed(slice),
     amount: packed(amount),
+    team: packed(team),
     total: entries.reduce((sum, e) => sum + e[2], 0),
   };
 }
@@ -1048,6 +1058,162 @@ describe("the section's explanation", () => {
     show([record({ filename: "r.sdfz", gameId: "rr", remixed: true })]);
     expect(text("map-aggregate")).toMatch(
       /No match on this map is in your library yet\. 1 remix is here/,
+    );
+  });
+});
+
+describe("limiting the picture to a named start position (#3882)", () => {
+  const NAMES = "content.mapPositionNames";
+  const DECLARED = [
+    { x: 1000, z: 2000 },
+    { x: 7000, z: 6000 },
+  ];
+
+  /** Two matches on two declared positions. In the first, team 0 started at
+   *  the first and team 1 at the second. In the second, team 0 started at the
+   *  first. Each team ordered and built in its own place. */
+  function onNamedPositions(): StatRecord[] {
+    SETTINGS[NAMES] = {
+      [MAP]: [
+        { key: "d1", name: "Front", x: 1000, z: 2000 },
+        { key: "d2", name: "Back", x: 7000, z: 6000 },
+      ],
+    };
+    GRIDS = {
+      "/demos/a.sdfz": {
+        gameId: "aa",
+        starts: [
+          { team: 0, x: 1000, z: 2000 },
+          { team: 1, x: 7000, z: 6000 },
+        ],
+        buildings: layer([
+          [50 * 256 + 50, 0, 4, 1, 0],
+          [100 * 256 + 100, 0, 3, 1, 1],
+        ]),
+        orders: layer([
+          [50 * 256 + 50, 0, 10, undefined, 0],
+          [100 * 256 + 100, 0, 7, undefined, 1],
+        ]),
+      },
+      "/demos/b.sdfz": {
+        gameId: "bb",
+        starts: [{ team: 0, x: 1100, z: 2100 }],
+        buildings: layer([[200 * 256 + 200, 12, 6, 1, 0]]),
+        orders: layer([[200 * 256 + 200, 12, 100, undefined, 0]]),
+      },
+    };
+    return [
+      record({ filename: "a.sdfz", gameId: "aa" }),
+      record({ filename: "b.sdfz", gameId: "bb" }),
+    ];
+  }
+
+  const choose = (name: string) => {
+    fireEvent.click(screen.getByLabelText("Start position"));
+    fireEvent.click(screen.getByRole("option", { name }));
+  };
+
+  it("offers no position when none has a name", async () => {
+    show(twoMatches(), false, { declared: DECLARED });
+    await settled();
+    expect(screen.queryByLabelText("Start position")).toBeNull();
+  });
+
+  it("offers the names the table has, and every position at first", async () => {
+    show(onNamedPositions(), false, { declared: DECLARED });
+    await settled();
+    expect(screen.getByLabelText("Start position").textContent).toBe(
+      "Any start position",
+    );
+    expect(text("layer-buildings")).toBe("Building density · 2");
+    expect(text("layer-events")).toBe(
+      "13 orders to place a building, from 2 matches.",
+    );
+  });
+
+  it("counts the matches that took the position and the team that held it", async () => {
+    show(onNamedPositions(), false, { declared: DECLARED });
+    await settled();
+    choose("Back");
+    expect(text("aggregate-summary")).toMatch(/^1 match of the 2 /);
+    expect(text("layer-buildings")).toBe("Building density · 1");
+    expect(text("layer-orders")).toBe("Order density · 1");
+    // Only team 1's three buildings, and not team 0's four beside them.
+    expect(text("layer-events")).toBe(
+      "3 orders to place a building, from 1 match.",
+    );
+    fireEvent.click(screen.getByTestId("layer-orders"));
+    expect(text("layer-events")).toBe("7 orders, from 1 match.");
+  });
+
+  it("counts both matches for the position both took, and only its team's orders", async () => {
+    show(onNamedPositions(), false, { declared: DECLARED });
+    await settled();
+    choose("Front");
+    expect(text("layer-buildings")).toBe("Building density · 2");
+    expect(text("layer-events")).toBe(
+      "10 orders to place a building, from 2 matches.",
+    );
+    fireEvent.click(screen.getByTestId("layer-orders"));
+    expect(text("layer-events")).toBe("110 orders, from 2 matches.");
+  });
+
+  it("draws only the starts at the position and keeps the table whole", async () => {
+    const { container } = show(onNamedPositions(), false, {
+      declared: DECLARED,
+    });
+    await settled();
+    choose("Back");
+    expect(container.querySelectorAll('[data-layer="starts"]')).toHaveLength(1);
+    expect(text("layer-starts")).toBe("Start positions · 1");
+    expect(screen.getByTestId("start-mark-1")).toBeTruthy();
+    expect(screen.getByTestId("start-mark-2")).toBeTruthy();
+  });
+
+  it("leaves out a match whose starts could not be joined to a team", async () => {
+    const records = onNamedPositions();
+    GRIDS["/demos/c.sdfz"] = {
+      gameId: "cc",
+      starts: [{ team: 0, x: 1000, z: 2000 }],
+      orders: layer([[50 * 256 + 50, 0, 1000, undefined, 0]]),
+    };
+    records.push(
+      record({
+        filename: "c.sdfz",
+        gameId: "cc",
+        players: [
+          { name: "One", allyTeam: 0, spectator: false },
+          { name: "Two", allyTeam: 1, spectator: false },
+        ],
+      }),
+    );
+    show(records, false, { declared: DECLARED });
+    await settled();
+    choose("Front");
+    expect(text("aggregate-summary")).toMatch(/^2 matches of the 3 /);
+    fireEvent.click(screen.getByTestId("layer-orders"));
+    expect(text("layer-events")).toBe("110 orders, from 2 matches.");
+  });
+
+  it("says in the help what the limit keeps and what it leaves out", async () => {
+    show(onNamedPositions(), false, { declared: DECLARED });
+    await settled();
+    choose("Back");
+    expect(help().getByTestId("position-note").textContent).toMatch(
+      /limited to the matches where Back was taken.*could not be joined to a team is left out\./,
+    );
+  });
+
+  it("goes back to every position when the filters are cleared", async () => {
+    show(onNamedPositions(), false, { declared: DECLARED });
+    await settled();
+    choose("Back");
+    fireEvent.click(screen.getByText("Clear filters"));
+    expect(screen.getByLabelText("Start position").textContent).toBe(
+      "Any start position",
+    );
+    expect(text("layer-events")).toBe(
+      "13 orders to place a building, from 2 matches.",
     );
   });
 });

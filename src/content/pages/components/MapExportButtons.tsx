@@ -43,6 +43,7 @@ type Kind = "image" | "layer" | "starts";
  */
 export function MapExportButtons({
   info: basis,
+  startsInfo,
   layer,
   layerSentence,
   damageMode,
@@ -59,6 +60,10 @@ export function MapExportButtons({
   showStarts,
 }: {
   info: MapExportBasis;
+  /** What the start positions file says about its matches, when that is not
+   *  the picture's: the table counts every match, whatever position the
+   *  picture is limited to. */
+  startsInfo?: MapExportBasis;
   layer: HeatLayerId | "";
   /** What the layer counts, as the legend names it. */
   layerSentence: string;
@@ -79,7 +84,8 @@ export function MapExportButtons({
 }) {
   const { t } = useLingui();
   const [busy, setBusy] = useState<Kind | null>(null);
-  const stamped = () => stampExport(basis, new Date());
+  const stamped = (from: MapExportBasis = basis) =>
+    stampExport(from, new Date());
 
   const field = drawn?.field && drawn.field.peak > 0 ? drawn.field : null;
   const nothing = t`Nothing in the picture has anything on this layer, so there is nothing to write.`;
@@ -181,7 +187,7 @@ export function MapExportButtons({
   };
 
   const exportStarts = () => {
-    const info = stamped();
+    const info = stamped(startsInfo);
     return run(
       "starts",
       t`Export the start positions as CSV`,

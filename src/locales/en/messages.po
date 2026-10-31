@@ -429,7 +429,7 @@ msgstr "{0, plural, one {{gameName} has no unit called {builder} any more, so # 
 msgid "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 msgstr "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
@@ -1051,7 +1051,7 @@ msgstr "{0, plural, one {Showing the first {SHOWN_ROWS} of # unit. All of them s
 msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 msgstr "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
@@ -9085,6 +9085,10 @@ msgstr "any sides"
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Any sides"
 msgstr "Any sides"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any start position"
+msgstr "Any start position"
 
 #: src/hub/PublishSection.tsx
 msgid "Anyone browsing the hub will be able to find and import this."
@@ -36194,6 +36198,7 @@ msgid "Start playing"
 msgstr "Start playing"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
+#: src/content/pages/components/MapAggregate.tsx
 msgid "Start position"
 msgstr "Start position"
 
@@ -36209,6 +36214,10 @@ msgstr "Start position {position}"
 #: src/play/pages/components/MinimapPreview.tsx
 msgid "Start position {position} (unclaimed)"
 msgstr "Start position {position} (unclaimed)"
+
+#: src/content/mapImage.ts
+msgid "start position {startPosition}"
+msgstr "start position {startPosition}"
 
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Start position of {says}"
@@ -38890,6 +38899,10 @@ msgstr "The outcome could not be read from the replay. How did the battle end?"
 #: src/lego/projects.ts
 msgid "The picture could not be encoded as a PNG."
 msgstr "The picture could not be encoded as a PNG."
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
+msgstr "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
 
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game."

@@ -529,7 +529,7 @@ msgstr "{0, plural, one {{gameName} hat keine Einheit namens {builder} mehr, dah
 msgid "{0, plural, one {{holder}'s damage table names # armour class this game does not have: {list}. The engine uses the default damage for it instead, so this row has no effect.} other {{holder}'s damage table names # armour classes this game does not have: {list}. The engine uses the default damage for them instead, so these rows have no effect.}}"
 msgstr "{0, plural, one {Die Schadenstabelle von {holder} nennt # Panzerungsklasse, die dieses Spiel nicht hat: {list}. Die Engine verwendet stattdessen den Standardschaden, daher wirkt diese Zeile nicht.} other {Die Schadenstabelle von {holder} nennt # Panzerungsklassen, die dieses Spiel nicht hat: {list}. Die Engine verwendet stattdessen den Standardschaden, daher wirken diese Zeilen nicht.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
@@ -1263,7 +1263,7 @@ msgstr "{0, plural, one {Die ersten {SHOWN_ROWS} von # Einheit werden angezeigt.
 msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
 msgstr "{0, plural, one {Team 1 {team1Record}, Team 2 {team2Record}, in # Partie mit zwei Teams und Ergebnis.} other {Team 1 {team1Record}, Team 2 {team2Record}, in # Partien mit zwei Teams und Ergebnis.}}"
 
-#. placeholder {0}: shown.length
+#. placeholder {0}: pictureMatches.length
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
@@ -11223,6 +11223,10 @@ msgstr "beliebige Seiten"
 #, fuzzy
 msgid "Any sides"
 msgstr "Beliebige Seiten"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any start position"
+msgstr ""
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -44549,6 +44553,7 @@ msgid "Start playing"
 msgstr "Losspielen"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
+#: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Start position"
 msgstr "Startposition"
@@ -44568,6 +44573,10 @@ msgstr "Startposition {position}"
 #, fuzzy
 msgid "Start position {position} (unclaimed)"
 msgstr "Startposition {position} (frei)"
+
+#: src/content/mapImage.ts
+msgid "start position {startPosition}"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -47882,6 +47891,10 @@ msgstr "Der Ausgang konnte nicht aus der Wiederholung gelesen werden. Wie endete
 #, fuzzy
 msgid "The picture could not be encoded as a PNG."
 msgstr "Das Bild konnte nicht als PNG kodiert werden."
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The picture is limited to the matches where {position} was taken, and to what the team that held it built, ordered, lost and dealt. Where damage landed is damage to that team's units. Where it came from is damage that team dealt. A match whose starts could not be joined to a team is left out."
+msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy
