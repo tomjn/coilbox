@@ -1260,6 +1260,8 @@ export interface ReplayEventCounts {
   startUnitReplaced?: number;
   /** Absent from a file written before the logger recorded damage. */
   damage?: number;
+  /** Absent from a file written before the logger recorded damage by unit. */
+  unitDamage?: number;
   gameOver: number;
   /** Lines of a kind this build does not know. */
   unknown: number;
@@ -1983,6 +1985,9 @@ export interface UnitDefEvents {
   finished: number;
   /** Finished units destroyed while the team had them. */
   died: number;
+  /** The damage the units the team finished dealt while it held them. Only
+   *  means something when the replay's `eventsDamage` is true. */
+  dealt: number;
 }
 
 /**
@@ -2026,6 +2031,9 @@ export interface ReplayUnitOrders {
   seats: UnitOrderSeat[];
   /** By team. Absent when the match has no stored analysis with events. */
   events?: { team: number; defs: UnitDefEvents[] }[];
+  /** True when the analysis behind `events` recorded damage for each unit.
+   *  Otherwise `dealt` is nought for want of a record. */
+  eventsDamage?: boolean;
   /** The kept unit list that names the ids in `seats`, if one is kept. */
   streamList?: UnitDefLink;
   /** The kept unit list that names the ids in `events`, if one is kept. */
