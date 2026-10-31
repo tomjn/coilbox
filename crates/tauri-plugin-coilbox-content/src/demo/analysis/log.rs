@@ -26,7 +26,12 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 4;
+pub const LOGGER_VERSION: u32 = 5;
+
+/// The first [`LOGGER_VERSION`] that wrote `unit_damage` lines. An analysis from
+/// before it has no line for any unit, which is not the same as every unit
+/// having dealt nothing.
+pub const UNIT_DAMAGE_SINCE: u32 = 5;
 
 /// The first line: what the gadget saw the run as.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -168,6 +173,26 @@ pub struct DamageLine {
     pub off: Option<f64>,
 }
 
+/// What one unit dealt and took while `team` held it. Written once the unit is
+/// dead, when it changes team, and at game over for a unit still alive, so a unit
+/// can have several and they add up.
+///
+/// Each hit counts for at most the target's maximum health. `taken` holds every
+/// hit. `dealt` leaves out a hit on the unit itself or on an ally, and a hit with
+/// no attacker. Either is absent when it is nothing.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitDamageLine {
+    pub frame: i32,
+    pub unit: i32,
+    pub def: i32,
+    pub team: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dealt: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taken: Option<f64>,
+}
+
 /// One of the engine's unit definitions, as the run's own `UnitDefs` table had
 /// it. The logger writes one for each, in id order, straight after the header.
 /// Every `def` on a later line is an `id` here.
@@ -237,6 +262,7 @@ pub enum LogLine {
     StartUnitPosition(StartUnitPosition),
     StartUnitReplaced(StartUnitReplaced),
     Damage(DamageLine),
+    UnitDamage(UnitDamageLine),
     GameOver(LoggedGameOver),
     /// A kind a later logger writes and this reader does not know.
     #[serde(other)]
@@ -261,6 +287,7 @@ pub struct EventCounts {
     pub start_unit_position: usize,
     pub start_unit_replaced: usize,
     pub damage: usize,
+    pub unit_damage: usize,
     pub game_over: usize,
     /// Lines of a kind this reader does not know.
     pub unknown: usize,
@@ -312,6 +339,7 @@ impl EventLog {
                 LogLine::StartUnitPosition(_) => counts.start_unit_position += 1,
                 LogLine::StartUnitReplaced(_) => counts.start_unit_replaced += 1,
                 LogLine::Damage(_) => counts.damage += 1,
+                LogLine::UnitDamage(_) => counts.unit_damage += 1,
                 LogLine::GameOver(_) => counts.game_over += 1,
                 LogLine::Unknown => counts.unknown += 1,
             }
@@ -419,6 +447,7 @@ pub(super) mod tests {
                 start_unit_position: 2,
                 start_unit_replaced: 0,
                 damage: 0,
+                unit_damage: 0,
                 game_over: 1,
                 unknown: 0,
             }
@@ -505,6 +534,47 @@ pub(super) mod tests {
         assert_eq!(dealt, 96.0);
     }
 
+    #[test]
+    fn a_units_damage_is_read_with_either_total_left_out_when_nothing() {
+        let log = parse_log(UPGRADE_FIXTURE);
+        let lines: Vec<&UnitDamageLine> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::UnitDamage(line) => Some(line),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(log.counts().unit_damage, 2);
+        assert_eq!(
+            lines[1],
+            &UnitDamageLine {
+                frame: 601,
+                unit: 3,
+                def: 13,
+                team: 0,
+                // 20, 30, and a 500 damage hit capped at the target's 100.
+                dealt: Some(150.0),
+                taken: Some(5.5),
+            }
+        );
+        let none = parse_log(
+            "{\"kind\":\"unit_damage\",\"frame\":1,\"unit\":2,\"def\":3,\"team\":0,\"taken\":4}\n",
+        );
+        assert_eq!(
+            none.lines,
+            vec![LogLine::UnitDamage(UnitDamageLine {
+                frame: 1,
+                unit: 2,
+                def: 3,
+                team: 0,
+                dealt: None,
+                taken: Some(4.0),
+            })]
+        );
+    }
+
     /// Ties [`LOGGER_VERSION`] to the gadget. A stored analysis is called
     /// outdated by that number alone, so a gadget that gains a kind without it
     /// being raised would leave old files looking current.
@@ -527,7 +597,7 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                4,
+                5,
                 vec![
                     "damage",
                     "game_over",
@@ -536,6 +606,7 @@ pub(super) mod tests {
                     "start_unit_position",
                     "start_unit_replaced",
                     "unit_created",
+                    "unit_damage",
                     "unit_def",
                     "unit_destroyed",
                     "unit_finished",

@@ -20,6 +20,8 @@ import { gamesFor, isGenuineMatch } from "../../stats";
 import type { UnitCategory } from "../../unitCategory";
 import {
   DEFAULT_USAGE_SORT,
+  type DealtDamage,
+  damagePerMetal,
   nextUsageSort,
   sortUsageRows,
   type UnitUsage,
@@ -148,6 +150,7 @@ function Help({ usage, name }: { usage: UnitUsage; name: string }) {
   const unpricedUnits = formatNumber(usage.unpriced);
   const analysedUnnamedGames = games(usage.analysedUnnamed);
   const analysedNoTeamGames = games(usage.analysedNoTeam);
+  const analysedNoDamageGames = games(usage.analysedNoDamage);
   return (
     <SectionHelp section="units ordered" source="stream">
       <p>
@@ -225,6 +228,20 @@ function Help({ usage, name }: { usage: UnitUsage; name: string }) {
           {t`${analysedNoTeamGames} analysed with no team recorded for ${name} in the library, so their events are not counted.`}
         </p>
       )}
+      <p>
+        <Trans>
+          Damage per metal is the damage a kind of unit dealt divided by what
+          the units of that kind finished by {name}'s team cost, in the same
+          analysed games. Units still alive when the game ended count. Each hit
+          counts for at most its target's maximum health. A hit on an ally or on
+          the unit itself is not counted, and nor is one with no attacker.
+        </Trans>
+      </p>
+      {usage.analysedNoDamage > 0 && (
+        <p>
+          {t`${analysedNoDamageGames} analysed before the recorder kept damage for each unit, so they are not in damage per metal. Analysing them again adds them.`}
+        </p>
+      )}
     </SectionHelp>
   );
 }
@@ -242,7 +259,26 @@ const COLUMNS: {
   { column: "won", label: msg`Won`, numeric: true },
   { column: "finished", label: msg`Finished`, numeric: true },
   { column: "died", label: msg`Died`, numeric: true },
+  { column: "damagePerMetal", label: msg`Damage per metal`, numeric: true },
 ];
+
+/** The ratio to three figures and the games it is drawn from. A dash when those
+ *  games finished none of the unit, so no metal was spent on it. */
+function DamagePerMetal({ damage }: { damage: DealtDamage }) {
+  const ratio = damagePerMetal(damage);
+  return (
+    <>
+      <div>
+        {ratio === null
+          ? "—"
+          : formatNumber(ratio, { maximumSignificantDigits: 3 })}
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        {games(damage.replays)}
+      </div>
+    </>
+  );
+}
 
 export function PlayerUnitUsage({
   records,
@@ -384,6 +420,11 @@ export function PlayerUnitUsage({
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {row.analysed ? formatNumber(row.analysed.died) : ""}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.analysed?.damage && (
+                          <DamagePerMetal damage={row.analysed.damage} />
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
