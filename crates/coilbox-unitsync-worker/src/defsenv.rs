@@ -40,6 +40,13 @@
 /// but a def script that bakes a colour code into a name at parse time bakes in
 /// the wrong one, and showing that raw prints a control character (issue #1664).
 ///
+/// The shim also wraps `Spring.Log` to keep the lines a def script logs at error
+/// level (#4928), which `lua/defs-env/log_errors.lua` explains. That is not a gap
+/// in unitsync's parser. It is how a unit list read learns that a definition
+/// file failed: Beyond All Reason logs the failure and carries on without the
+/// file's units, and unitsync's own error list never sees it. The read sends
+/// `__cb_logged_errors()` back beside its result.
+///
 /// Each shim is applied only where the engine left a hole, so a future engine
 /// build that fills one in wins over the stand-in. `Spring.TimeCheck` is the
 /// exception and is always replaced: builds up to 2026.06 compile it to a no-op
@@ -98,5 +105,6 @@ if type(Game) ~= 'table' then
   }
 end
 "#,
-    include_str!("../../../lua/defs-env/math_random.lua")
+    include_str!("../../../lua/defs-env/math_random.lua"),
+    include_str!("../../../lua/defs-env/log_errors.lua")
 );
