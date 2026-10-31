@@ -1323,6 +1323,11 @@ msgstr "{0} (матч не відтворено)"
 msgid "{0} {resourceName}"
 msgstr "{0} {resourceName}"
 
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -4670,6 +4675,7 @@ msgstr "{n, plural, one {# галактика} few {# галактики} many {
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{n, plural, one {# game} other {# games}}"
@@ -5380,6 +5386,7 @@ msgstr "{pending, plural, one {# файл у цій грі має зміну в�
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr "{pending, plural, one {Це видалить оригінал # файлу, збережений coilbox. Після цього скасування тут неможливе, лише через вашу власну копію чи систему контролю версій.} few {Це видалить оригінали # файлів, збережені coilbox. Після цього скасування тут неможливе, лише через вашу власну копію чи систему контролю версій.} many {Це видалить оригінали # файлів, збережені coilbox. Після цього скасування тут неможливе, лише через вашу власну копію чи систему контролю версій.} other {Це видалить оригінали # файлу, збережені coilbox. Після цього скасування тут неможливе, лише через вашу власну копію чи систему контролю версій.}}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{pending} still being read."
@@ -7228,6 +7235,10 @@ msgstr "{unread, plural, one {# матч, повтор якого не вдал�
 #, fuzzy
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
 msgstr "{unreadable, plural, one {У цьому файлі є ще # запис, який coilbox не може прочитати. Тут ніщо не записує у файл, тому він лишається точно таким, як є.} few {У цьому файлі є ще # записи, які coilbox не може прочитати. Тут ніщо не записує у файл, тому вони лишаються точно такими, як є.} many {У цьому файлі є ще # записів, які coilbox не може прочитати. Тут ніщо не записує у файл, тому вони лишаються точно такими, як є.} other {У цьому файлі є ще # запису, які coilbox не може прочитати. Тут ніщо не записує у файл, тому вони лишаються точно такими, як є.}}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -22814,6 +22825,10 @@ msgstr "З {name}"
 msgid "From {originGame}"
 msgstr "З {originGame}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From {scenarioName}"
@@ -30231,6 +30246,10 @@ msgstr "Згадується в скрипті"
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr "Згадується в кількох Lua-файлах цієї гри ({fileCount}), тож жоден із них окремо не є відповіддю."
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Named states of the project, to go back to in one action"
@@ -36630,6 +36649,7 @@ msgstr "Пози"
 msgid "position"
 msgstr "позиція"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -37904,6 +37924,10 @@ msgstr "Читання гри."
 #, fuzzy
 msgid "Reading the game's files…"
 msgstr "Читання файлів гри…"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -39750,6 +39774,7 @@ msgstr "Матч з обмеженнями – {summary}"
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -45139,6 +45164,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr "Візьміть цей скрипт під свій контроль, щоб редагувати його. Тоді юніт зберігає вашу версію, експорт записує те, що написали ви, а готові анімації перестають його генерувати. Брати його під контроль не потрібно, щоб побачити роботу юніта, бо панель анімації вже відтворює цей скрипт. Пізніше його можна повернути, і тоді вашу версію буде відкинуто, а керування знову перейде до готових анімацій."
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Taken"
@@ -47308,6 +47334,10 @@ msgstr "Компілятор мап, яким coilbox збирає й розби
 #, fuzzy
 msgid "The map could not be drawn."
 msgstr "Не вдалося намалювати мапу."
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy

@@ -1323,6 +1323,11 @@ msgstr "{0} (n’a pas reproduit cette partie)"
 msgid "{0} {resourceName}"
 msgstr "{0} {resourceName}"
 
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -4670,6 +4675,7 @@ msgstr "{n, plural, one {# galaxie} other {# galaxies}}"
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{n, plural, one {# game} other {# games}}"
@@ -5380,6 +5386,7 @@ msgstr "{pending, plural, one {# fichier de ce jeu a une modification de coilbox
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr "{pending, plural, one {Cela supprime l’original que coilbox avait gardé de # fichier. Ensuite, l’annulation n’est plus possible ici, seulement via votre propre copie ou votre gestionnaire de versions.} other {Cela supprime les originaux que coilbox avait gardés de # fichiers. Ensuite, l’annulation n’est plus possible ici, seulement via votre propre copie ou votre gestionnaire de versions.}}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{pending} still being read."
@@ -7228,6 +7235,10 @@ msgstr "{unread, plural, one {# partie dont la rediffusion n’a pas pu être lu
 #, fuzzy
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
 msgstr "{unreadable, plural, one {# autre entrée de ce fichier ne peut pas être lue par coilbox. Rien ici n’écrit dans le fichier, elle reste donc telle quelle.} other {# autres entrées de ce fichier ne peuvent pas être lues par coilbox. Rien ici n’écrit dans le fichier, elles restent donc telles quelles.}}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -22814,6 +22825,10 @@ msgstr "De {name}"
 msgid "From {originGame}"
 msgstr "De {originGame}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From {scenarioName}"
@@ -30231,6 +30246,10 @@ msgstr "Nommé par le script"
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr "Cité dans {fileCount} fichiers Lua de ce jeu, donc aucun d’eux n’est la réponse."
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Named states of the project, to go back to in one action"
@@ -36630,6 +36649,7 @@ msgstr "Poses"
 msgid "position"
 msgstr "position"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -37904,6 +37924,10 @@ msgstr "Lecture du jeu."
 #, fuzzy
 msgid "Reading the game's files…"
 msgstr "Lecture des fichiers du jeu…"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -39750,6 +39774,7 @@ msgstr "Partie restreinte : {summary}"
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -45139,6 +45164,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr "Prenez la main sur ce script pour le modifier. L’unité garde alors votre version, un export écrit ce que vous avez écrit, et les préréglages cessent de le générer. Inutile de le reprendre pour voir l’unité tourner, car le panneau Animation lit déjà ce script. Vous pourrez le rendre plus tard, ce qui supprime votre version et redonne la main aux préréglages."
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Taken"
@@ -47308,6 +47334,10 @@ msgstr "Le compilateur de cartes avec lequel coilbox construit et démonte les c
 #, fuzzy
 msgid "The map could not be drawn."
 msgstr "La carte n’a pas pu être dessinée."
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy

@@ -1323,6 +1323,11 @@ msgstr "{0}（この試合を再現できませんでした）"
 msgid "{0} {resourceName}"
 msgstr "{0} {resourceName}"
 
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -4670,6 +4675,7 @@ msgstr "{n, plural, other {# 個の銀河}}"
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{n, plural, one {# game} other {# games}}"
@@ -5380,6 +5386,7 @@ msgstr "{pending, plural, other {このゲームの # 個のファイルに、�
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr "{pending, plural, other {coilbox が保持していた # 個のファイルの元のファイルを削除します。その後はここで元に戻すことはできず、自分のコピーかバージョン管理でしか戻せません。}}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{pending} still being read."
@@ -7228,6 +7235,10 @@ msgstr "{unread, plural, other {リプレイを読み込めなかった # 試合
 #, fuzzy
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
 msgstr "{unreadable, plural, other {このファイルには coilbox が読めない他のエントリが # 件あります。ここではファイルに書き込まないため、そのまま残ります。}}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -22814,6 +22825,10 @@ msgstr "{name} から"
 msgid "From {originGame}"
 msgstr "{originGame} から"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From {scenarioName}"
@@ -30231,6 +30246,10 @@ msgstr "スクリプトが指定"
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr "このゲームの {fileCount} 個の Lua ファイルで指定されているため、どれか 1 つが答えではありません。"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Named states of the project, to go back to in one action"
@@ -36630,6 +36649,7 @@ msgstr "ポーズ"
 msgid "position"
 msgstr "位置"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -37904,6 +37924,10 @@ msgstr "ゲームを読み込んでいます。"
 #, fuzzy
 msgid "Reading the game's files…"
 msgstr "ゲームのファイルを読み込み中…"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -39750,6 +39774,7 @@ msgstr "制限付きの試合 — {summary}"
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -45139,6 +45164,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr "このスクリプトを編集するには引き継いでください。引き継ぐと、ユニットは自分のバージョンを保持し、エクスポートでは書いた内容が書き出され、プリセットによる生成は止まります。アニメーションパネルですでにこのスクリプトを再生しているので、ユニットの動きを見るだけなら引き継ぐ必要はありません。後で戻すこともでき、その場合は自分のバージョンが破棄され、再びプリセットが管理します。"
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Taken"
@@ -47308,6 +47334,10 @@ msgstr "coilbox がマップの作成と分解に使うマップコンパイラ�
 #, fuzzy
 msgid "The map could not be drawn."
 msgstr "マップを描画できませんでした。"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
