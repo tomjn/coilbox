@@ -21,8 +21,6 @@ import type { BattleConfig } from "./bindings";
 import { resolveCompatTarget } from "./compatTarget";
 import {
   applyRestrictions,
-  gameOptionSchema,
-  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget,
   useSkirmishAis,
@@ -399,11 +397,6 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
           startPosType: draft.startPosType,
           startRects: draft.startRects,
           modOptions: draft.modOptionValues,
-          optionSchema: await gameOptionSchema(
-            target,
-            installedGame.primaryArchive.name,
-          ),
-          mapOptionSchema: await mapOptionSchema(target, draft.mapName),
           disabledUnits: draft.restrictions?.disabledUnits,
         }),
         draft.restrictions,

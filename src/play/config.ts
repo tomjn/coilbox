@@ -1,14 +1,11 @@
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
 import {
-  type ConfigOption,
   type SkirmishAi,
   type SkirmishAisResult,
   unitsyncSkirmishAis,
 } from "../content/bindings";
 import {
-  primeGameInfo,
-  primeMapInfo,
   scannedGameArchive,
   useContentState,
   usePreferredEngine,
@@ -128,56 +125,6 @@ export function usePreferredTarget(wantVersion?: string): {
   }
   const targets = roots.flatMap((r) => r.engines.map((e) => build(r.path, e)));
   return { target, targets, loading, error, refresh };
-}
-
-/**
- * The game's option list, for a caller about to build a `BattleConfig` but with
- * no loaded schema to hand. Reads through the same session cache
- * `useUnitsyncGameInfo` fills, so a screen that already showed the game's
- * options pays nothing, and awaiting it is safe where waiting a render for a
- * hook to settle is not.
- *
- * Answers `[]` rather than throwing. A game unitsync cannot read is one the
- * engine is about to refuse anyway, and a launch without the game's defaults
- * beats no launch at all.
- */
-export async function gameOptionSchema(
-  target: PlayTarget | null | undefined,
-  gameArchive: string | undefined,
-): Promise<ConfigOption[]> {
-  if (!target || !gameArchive) return [];
-  try {
-    const info = await primeGameInfo(
-      target.enginePath,
-      target.dataDir,
-      gameArchive,
-    );
-    return info.options;
-  } catch {
-    return [];
-  }
-}
-
-/**
- * The map's own option list, for a caller about to build a `BattleConfig`. The
- * map-side twin of {@link gameOptionSchema}, reading through the same session
- * cache `useUnitsyncMapInfo` fills and answering `[]` rather than throwing.
- *
- * Fetched at launch rather than read off a hook, because a hook still holds the
- * previous map's options for a render after the map changes, and a launch that
- * lands a render early would write the wrong map's block.
- */
-export async function mapOptionSchema(
-  target: PlayTarget | null | undefined,
-  mapName: string | undefined,
-): Promise<ConfigOption[]> {
-  if (!target || !mapName) return [];
-  try {
-    const info = await primeMapInfo(target.enginePath, target.dataDir, mapName);
-    return info.options;
-  } catch {
-    return [];
-  }
 }
 
 /**

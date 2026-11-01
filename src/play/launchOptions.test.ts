@@ -23,12 +23,9 @@ import type { SkirmishDraft } from "./drafts";
 import { type Participant, toBattleConfig } from "./participants";
 
 /**
- * The bug this guards against (#1835): the skirmish screen wrote the game's
- * declared defaults into the start script and every other screen wrote only
- * what the player had changed, so the same game played differently depending on
- * which screen started it. The assertion worth making is not that the filling
- * helper works, it is that the paths agree, so each one is driven here as far as
- * it can be driven without React and their `[modoptions]` blocks are compared.
+ * A start script holds only what was changed. The engine team's advice is that a
+ * lobby writes nothing else, and it keeps the block the same from every screen
+ * that launches a game.
  */
 
 /** A game declaring three options, one of which the setup below overrides. */
@@ -48,10 +45,7 @@ const SCHEMA: ConfigOption[] = [
 /** The one thing the player changed. Everything else is the game's to decide. */
 const CHOSEN = { deathmode: "com" };
 
-/**
- * A map declaring two of its own options. Nothing in singleplayer can change
- * these, so every launch path should write both at the map's default (#1868).
- */
+/** A map declaring two of its own options, neither of which the setup changes. */
 const MAP_SCHEMA: ConfigOption[] = [
   { key: "atmosphere", name: "Atmosphere Settings", type: "section" },
   {
@@ -68,8 +62,6 @@ const MAP_SCHEMA: ConfigOption[] = [
     default: "100",
   },
 ];
-
-const MAP_DEFAULTS = { fog: "1", extractorradius: "100" };
 
 const GAME = "Splinter Faction test";
 const MAP = "Comet Catcher Redux";
@@ -104,8 +96,6 @@ const fromDraft = (d: SkirmishDraft) =>
     startPosType: d.startPosType,
     modOptions: d.modOptionValues,
     mapOptions: d.mapOptionValues,
-    optionSchema: SCHEMA,
-    mapOptionSchema: MAP_SCHEMA,
   });
 
 describe("the same game and the same choices, launched different ways", () => {
@@ -134,81 +124,32 @@ describe("the same game and the same choices, launched different ways", () => {
     launch.mockResolvedValue({ exitCode: 0 });
   });
 
-  it("writes the game's own defaults, not only what the player changed", () => {
-    expect(fromDraft(draft).modOptions).toEqual({
-      deathmode: "com",
-      startmetal: "1000",
-      zombies: "0",
-    });
+  it("writes only what the player changed", () => {
+    expect(fromDraft(draft).modOptions).toEqual(CHOSEN);
+    expect(fromDraft(draft).mapOptions).toBeUndefined();
   });
 
-  it("writes the map's own defaults, which nothing in singleplayer can change", () => {
-    expect(fromDraft(draft).mapOptions).toEqual(MAP_DEFAULTS);
-  });
-
-  it("agrees between a skirmish and a refight of that skirmish's replay", () => {
-    const skirmish = fromDraft(draft);
-    // The replay the engine records carries whatever the start script said.
+  it("keeps a preset made from a replay to what the match changed", () => {
     const replay = {
       mapName: MAP,
       gameType: GAME,
       startPosType: 0,
       players: [{ name: "Player", allyTeam: 0, spectator: false }],
       ais: [],
-      modOptions: skirmish.modOptions ?? {},
-      mapOptions: skirmish.mapOptions ?? {},
+      modOptions: { ...CHOSEN, startmetal: "1000", zombies: "0" },
+      mapOptions: { fog: "1", extractorradius: "150" },
     } as unknown as DemoInfo;
-    const refought = demoInfoToSkirmishDraft({
+    const preset = demoInfoToSkirmishDraft({
       info: replay,
       ais: [],
       sides: [],
       options: SCHEMA,
       mapOptions: MAP_SCHEMA,
     });
-    if (!refought) throw new Error("the replay had nobody to refight");
+    if (!preset) throw new Error("the replay had nobody to refight");
 
-    // The draft keeps only what the match changed (#1838), so what a preset
-    // made from it would store is the player's one choice and nothing else.
-    expect(refought.modOptionValues).toEqual(CHOSEN);
-    expect(refought.mapOptionValues).toBeUndefined();
-    // Refighting is still exact: filling from the same option list puts every
-    // default back, so the script the engine gets is the one it recorded.
-    expect(fromDraft(refought).modOptions).toEqual(skirmish.modOptions);
-    expect(fromDraft(refought).mapOptions).toEqual(skirmish.mapOptions);
-  });
-
-  it("refights a match on the map options it was hosted with", () => {
-    // The bug (#1886): the replay's `[mapoptions]` was never read, so a match
-    // hosted with the extractor radius raised was refought on the map's 100.
-    const recorded = { fog: "1", extractorradius: "150" };
-    const replay = {
-      mapName: MAP,
-      gameType: GAME,
-      startPosType: 0,
-      players: [{ name: "Player", allyTeam: 0, spectator: false }],
-      ais: [],
-      modOptions: {},
-      mapOptions: recorded,
-    } as unknown as DemoInfo;
-    const refight = (mapOptions: ConfigOption[]) => {
-      const d = demoInfoToSkirmishDraft({
-        info: replay,
-        ais: [],
-        sides: [],
-        options: SCHEMA,
-        mapOptions,
-      });
-      if (!d) throw new Error("the replay had nobody to refight");
-      return d;
-    };
-
-    // With the map's option list, only the changed value is kept.
-    expect(refight(MAP_SCHEMA).mapOptionValues).toEqual({
-      extractorradius: "150",
-    });
-    expect(fromDraft(refight(MAP_SCHEMA)).mapOptions).toEqual(recorded);
-    // Without it everything recorded is kept, and the script is the same.
-    expect(fromDraft(refight([])).mapOptions).toEqual(recorded);
+    expect(preset.modOptionValues).toEqual(CHOSEN);
+    expect(preset.mapOptionValues).toEqual({ extractorradius: "150" });
   });
 
   it("agrees between a skirmish and a scenario built on the same setup", async () => {
@@ -232,21 +173,16 @@ describe("the same game and the same choices, launched different ways", () => {
       reader: "author",
       dataDir: "/data",
       games: [loose],
-      optionSchema: SCHEMA,
-      mapOptionSchema: MAP_SCHEMA,
       rescan,
       launch,
     });
 
     // Everything the skirmish sends, plus the one key that tells the runtime
-    // which mission to arm. That key is the game's to know nothing about, so it
-    // survives the fill rather than being dropped as unrecognised.
+    // which mission to arm.
     expect(result.ok && result.config.modOptions).toEqual({
       ...fromDraft(draft).modOptions,
       [MISSION_MODOPTION]: "s1",
     });
-    // The map's own options are the map's to decide, so a scenario writes the
-    // same block a skirmish on that map would.
-    expect(result.ok && result.config.mapOptions).toEqual(MAP_DEFAULTS);
+    expect(result.ok && result.config.mapOptions).toBeUndefined();
   });
 });

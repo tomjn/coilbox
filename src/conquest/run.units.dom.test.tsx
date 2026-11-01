@@ -64,8 +64,6 @@ vi.mock("../content/replayUserState", () => ({
 vi.mock("../profile/profile", () => ({ getProfile: () => ({}) }));
 vi.mock("../play/config", () => ({
   applyRestrictions: (config: unknown) => config,
-  gameOptionSchema: vi.fn(async () => []),
-  mapOptionSchema: vi.fn(async () => []),
   toBattleConfig: vi.fn((draft: { gameType: string }) => ({
     myPlayerName: "You",
     gameType: draft.gameType,

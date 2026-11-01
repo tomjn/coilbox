@@ -11,8 +11,6 @@ import {
 import { describeError } from "@/i18n/uiError";
 import {
   aiByline,
-  gameOptionSchema,
-  mapOptionSchema,
   type Participant,
   resolveRandomSides,
   toBattleConfig,
@@ -87,7 +85,6 @@ function RefightForm({
     gameCandidates,
     selectedGameName,
     setSelectedGameName,
-    installedGame,
     scanFailure,
     missingGame,
     missingMap,
@@ -212,15 +209,11 @@ function RefightForm({
         mapName: draft.mapName,
         gameType: draft.gameName,
         startPosType: draft.startPosType,
-        modOptions: draft.modOptionValues,
-        mapOptions: draft.mapOptionValues,
-        // The replay's own options win. This only supplies the target game's
-        // defaults for anything the replay did not record.
-        optionSchema: await gameOptionSchema(
-          target,
-          installedGame?.primaryArchive.name,
-        ),
-        mapOptionSchema: await mapOptionSchema(target, draft.mapName),
+        // As recorded, not the draft's sparse copy. An option at the game's
+        // declared default can still differ from what absent means to the
+        // engine, so dropping it would refight a different match.
+        modOptions: info.modOptions,
+        mapOptions: info.mapOptions,
       });
       const res = await launch("skirmish", {
         config,

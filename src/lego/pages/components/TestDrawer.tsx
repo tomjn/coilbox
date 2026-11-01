@@ -41,12 +41,7 @@ import {
   type CompatTarget,
   resolveCompatTarget,
 } from "../../../play/compatTarget";
-import {
-  gameOptionSchema,
-  initialParticipants,
-  mapOptionSchema,
-  toBattleConfig,
-} from "../../../play/config";
+import { initialParticipants, toBattleConfig } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
 import { GamePickerButton } from "../../../play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "../../../play/pages/components/GamePickerPanel";
@@ -312,11 +307,6 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
           modOptions,
           // The scratch game is a mutator over the picked game and declares no
           // options of its own, so the base game's are the ones that apply.
-          optionSchema: await gameOptionSchema(
-            target,
-            game.primaryArchive.name,
-          ),
-          mapOptionSchema: await mapOptionSchema(target, map.name),
         }),
         executable: target.executable,
         dataDir: target.dataDir,

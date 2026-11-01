@@ -26,7 +26,7 @@
 
 import { t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
-import type { ConfigOption, GameItem } from "../content/bindings";
+import type { GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
 import { dependencyBlockReason } from "../content/gameDependencies";
 import { isMutatorArchive } from "../lib/generatedGames";
@@ -294,23 +294,6 @@ export interface ScenarioLaunchInput {
   dataDir: string;
   /** The installed games, from the current content scan. */
   games: GameItem[];
-  /**
-   * The scenario's game's option list, read from unitsync by the caller (see
-   * `gameOptionSchema`). Every option it declares that the setup left alone is
-   * written into the start script at the game's default, so a scenario plays
-   * the game the way the game intends. Empty means the caller could not read
-   * them, and the engine falls back to its own built-in values.
-   */
-  optionSchema: ConfigOption[];
-  /**
-   * The map's own option list, read from unitsync by the caller (see
-   * `mapOptionSchema`). Every option the map declares is written into the start
-   * script at its default, because the engine substitutes nothing for an absent
-   * map option and the map's Lua reads `nil` instead (#1868). Empty means the
-   * caller could not read them, and the scenario runs with no `[mapoptions]`
-   * block at all.
-   */
-  mapOptionSchema: ConfigOption[];
   /**
    * Force a fresh unitsync scan and hand back the games it found. The engine
    * takes its game list from the same archive cache unitsync writes, so a
@@ -608,8 +591,6 @@ export async function launchScenario(
     reader,
     dataDir,
     games,
-    optionSchema,
-    mapOptionSchema,
     rescan,
     launch,
     disabledUnits,
@@ -750,8 +731,6 @@ export async function launchScenario(
         [MISSION_MODOPTION]: folder,
         ...(difficulty ? { [DIFFICULTY_MODOPTION]: difficulty } : {}),
       },
-      optionSchema,
-      mapOptionSchema,
     }),
     captured,
   );

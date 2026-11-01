@@ -16,11 +16,7 @@ import { primeScan } from "../content/config";
 import { sameGameFamily } from "../content/resolveContent";
 import type { BattleConfig } from "../play/bindings";
 import type { CompatTarget } from "../play/compatTarget";
-import {
-  gameOptionSchema,
-  mapOptionSchema,
-  type PlayTarget,
-} from "../play/config";
+import type { PlayTarget } from "../play/config";
 import { scenarioMediaWrite } from "./bindings";
 import { launchScenario, type ScenarioLaunchResult } from "./launch";
 import type { Difficulty, Scenario } from "./model";
@@ -55,18 +51,12 @@ export async function launchScenarioForPlayer(
     unitsGame,
     compat,
   } = opts;
-  // A scenario runs as itself or as a mutator over its game, so the options
-  // are that game's either way. A game that is not installed has none to read,
-  // and `launchScenario` refuses before they would be used.
-  const game = games.find((g) => g.name === scenario.setup.gameName);
   return launchScenario({
     scenario,
     // A refusal here is read on a briefing screen, by whoever is playing.
     reader: "player",
     dataDir: target.dataDir,
     games,
-    optionSchema: await gameOptionSchema(target, game?.primaryArchive.name),
-    mapOptionSchema: await mapOptionSchema(target, scenario.setup.mapName),
     disabledUnits,
     difficulty,
     unitsGame,

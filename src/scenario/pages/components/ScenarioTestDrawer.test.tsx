@@ -62,8 +62,6 @@ vi.mock("@/play/config", () => ({
     },
     loading: false,
   }),
-  gameOptionSchema: async () => ({}),
-  mapOptionSchema: async () => ({}),
 }));
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({

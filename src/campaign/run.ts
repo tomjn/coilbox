@@ -9,12 +9,7 @@ import { useReplayUserState } from "../content/replayUserState";
 import { loadPack } from "../lego/pack";
 import type { BattleConfig } from "../play/bindings";
 import { resolveCompatTarget } from "../play/compatTarget";
-import {
-  gameOptionSchema,
-  mapOptionSchema,
-  toBattleConfig,
-  usePreferredTarget,
-} from "../play/config";
+import { toBattleConfig, usePreferredTarget } from "../play/config";
 import {
   type DetectedResult,
   detectBattleResult,
@@ -366,9 +361,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       } else {
         // Build the engine config exactly as the skirmish launcher does, from
         // the snapshot's five draft fields, plus the mission's disabled-unit
-        // list. The snapshot holds only the options the author set, and the
-        // game's own defaults fill the rest in `toBattleConfig`. A mutator
-        // declares no options of its own, so the base game's apply either way.
+        // list. The snapshot holds only the options the author set.
         launched = toBattleConfig({
           participants: snapshot.participants,
           mapName: map.name,
@@ -378,11 +371,6 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           compatBase: compat.kind === "use" ? compat.baseName : undefined,
           startPosType: snapshot.startPosType,
           modOptions: snapshot.modOptionValues,
-          optionSchema: await gameOptionSchema(
-            target,
-            game.primaryArchive.name,
-          ),
-          mapOptionSchema: await mapOptionSchema(target, map.name),
           disabledUnits: mission.disabledUnits,
         });
         const res = await startEngine(launched);

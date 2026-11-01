@@ -82,8 +82,6 @@ vi.mock("../content/replayUserState", () => ({
 }));
 
 vi.mock("../play/config", () => ({
-  gameOptionSchema: vi.fn(async () => []),
-  mapOptionSchema: vi.fn(async () => []),
   toBattleConfig: vi.fn(() => ({ myPlayerName: "Player" })),
   usePreferredTarget: () => ({
     target: engine.target,

@@ -23,9 +23,8 @@ import type { ConfigOption, DemoInfo, Side, SkirmishAi } from "./bindings";
  * given and records nothing about which of them a player chose, while
  * `modOptionValues` is the "changed away from the default" map everywhere else,
  * so copying the block wholesale saved a preset that pinned 36 of
- * SplinterFaction's 38 defaults and showed every option as changed. Refighting
- * is unaffected, because `toBattleConfig` fills the gaps back in from the same
- * option list and the start script comes out identical either way.
+ * SplinterFaction's 38 defaults and showed every option as changed. A refight
+ * does not use these values: `RefightPanel` launches on the replay's own block.
  *
  * Pure and testable: the caller resolves the target game's sides/AI list
  * first (see `useRefightSetup`), and supplies which AI fills every converted

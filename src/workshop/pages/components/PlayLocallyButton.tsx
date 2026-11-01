@@ -38,9 +38,7 @@ import {
 } from "@/lib/generatedGames";
 import { resolveCompatTarget } from "@/play/compatTarget";
 import {
-  gameOptionSchema,
   initialParticipants,
-  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget,
 } from "@/play/config";
@@ -402,11 +400,6 @@ export function PlayLocallyButton({
           startPosType: START_POS_RANDOM,
           compatBase: compat.kind === "use" ? compat.baseName : undefined,
           modOptions,
-          optionSchema: await gameOptionSchema(
-            target,
-            game.primaryArchive.name,
-          ),
-          mapOptionSchema: await mapOptionSchema(target, map.name),
         }),
         executable: target.executable,
         dataDir: target.dataDir,

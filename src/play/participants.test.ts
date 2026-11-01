@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ConfigOption } from "@/content/bindings";
 import { isBlackHex } from "@/lib/teamColor";
 import type { BattleConfig } from "./bindings";
 import {
@@ -174,8 +173,6 @@ describe("toBattleConfig AI blocks", () => {
     gameType: "SplinterFaction 0.1.75",
     startPosType: 0,
     modOptions: {},
-    optionSchema: [],
-    mapOptionSchema: [],
   };
 
   const withAi = (kind: "native" | "lua", shortName: string) =>
@@ -219,17 +216,6 @@ describe("toBattleConfig AI blocks", () => {
   });
 });
 
-/**
- * The bug this guards against (#1868): singleplayer emitted no `[mapoptions]`
- * block at all, so a map that declares its own options got none of them. The
- * engine substitutes nothing here. `CGameSetup::Init` copies the script's
- * section verbatim and `Spring.GetMapOptions()` hands game Lua exactly that, so
- * an absent key is `nil` where the map author asked for a value.
- *
- * BlockFort v1's real declarations, read from unitsync: fog on, extractor
- * radius 100. Its own `gui_dualfog_gadget.lua` tests `== "1"`, so without the
- * block the map plays with fog off against its author's wishes.
- */
 describe("toBattleConfig compatibility mode", () => {
   const build = (compatBase?: string) =>
     toBattleConfig({
@@ -238,8 +224,6 @@ describe("toBattleConfig compatibility mode", () => {
       gameType: "XTA 9.65 (compat 2)",
       startPosType: 0,
       modOptions: {},
-      optionSchema: [],
-      mapOptionSchema: [],
       compatBase,
     });
 
@@ -254,45 +238,30 @@ describe("toBattleConfig compatibility mode", () => {
   });
 });
 
-describe("toBattleConfig map options", () => {
-  const mapOptionSchema: ConfigOption[] = [
-    { key: "atmosphere", name: "Atmosphere Settings", type: "section" },
-    {
-      key: "fog",
-      name: "Fog",
-      type: "bool",
-      default: "1",
-      section: "atmosphere",
-    },
-    {
-      key: "extractorradius",
-      name: "Extractor Radius",
-      type: "number",
-      default: "100",
-    },
-    { key: "tweak", name: "Tweak", type: "string" },
-  ];
-
-  const build = (schema: ConfigOption[]) =>
+describe("toBattleConfig options", () => {
+  const build = (
+    modOptions: Record<string, string>,
+    mapOptions?: Record<string, string>,
+  ) =>
     toBattleConfig({
       participants: [you(PALETTE[0]), ai("bot1", PALETTE[1])],
       mapName: "BlockFort v1",
       gameType: "SplinterFaction 0.1.75",
       startPosType: 0,
-      modOptions: {},
-      optionSchema: [],
-      mapOptionSchema: schema,
+      modOptions,
+      mapOptions,
     });
 
-  it("writes the map's own declared defaults", () => {
-    expect(build(mapOptionSchema).mapOptions).toEqual({
-      fog: "1",
-      extractorradius: "100",
-    });
+  it("writes what the setup holds and nothing else", () => {
+    const config = build({ maxunits: "6000" }, { fog: "0" });
+    expect(config.modOptions).toEqual({ maxunits: "6000" });
+    expect(config.mapOptions).toEqual({ fog: "0" });
   });
 
-  it("omits the block when the map declares nothing", () => {
-    expect(build([]).mapOptions).toBeUndefined();
+  it("omits both blocks when the setup changed nothing", () => {
+    const config = build({});
+    expect(config.modOptions).toBeUndefined();
+    expect(config.mapOptions).toBeUndefined();
   });
 });
 
@@ -399,8 +368,6 @@ describe("toBattleConfig team slots", () => {
     gameType: "g",
     startPosType: 0,
     modOptions: {},
-    optionSchema: [],
-    mapOptionSchema: [],
   };
 
   it("emits teams in effective slot order with players and AIs following", () => {
@@ -468,8 +435,6 @@ describe("toBattleConfig start boxes", () => {
     mapName: "m",
     gameType: "g",
     modOptions: {},
-    optionSchema: [],
-    mapOptionSchema: [],
   };
   // A roster on allies 0 and 3, so the remap to a contiguous 0..1 range is not
   // the identity and a box keyed by the wrong number would be visible.
@@ -525,8 +490,6 @@ describe("applyRestrictions", () => {
       gameType: "g",
       startPosType: 0,
       modOptions: {},
-      optionSchema: [],
-      mapOptionSchema: [],
     });
 
   it("adds advantage and income onto the player team (team 0)", () => {
@@ -559,8 +522,6 @@ describe("applyRestrictions", () => {
       gameType: "g",
       startPosType: 0,
       modOptions: {},
-      optionSchema: [],
-      mapOptionSchema: [],
     });
     const out = applyRestrictions(permuted, { advantage: 0.1 });
     expect(out.teams[1].advantage).toBeCloseTo(0.1, 5); // yours
@@ -636,8 +597,6 @@ describe("AI bonus", () => {
       gameType: "SplinterFaction 0.1.75",
       startPosType: 0,
       modOptions: {},
-      optionSchema: [],
-      mapOptionSchema: [],
     };
     const aiRef = { kind: "native" as const, shortName: "X" };
     const teamOf = (participants: Participant[]) =>

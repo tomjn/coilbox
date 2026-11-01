@@ -100,7 +100,6 @@ import {
   effectiveTeams,
   initialParticipants,
   makeAiParticipant,
-  mapOptionSchema,
   type Participant,
   RANDOM_SIDE,
   resolveRandomSides,
@@ -607,11 +606,6 @@ export default function SkirmishPage() {
         startPosType,
         startRects,
         modOptions: modOptionValues,
-        optionSchema: modOptions,
-        // Read here rather than off a hook: the map's option list settles a
-        // render behind the picker, and starting in that gap would write the
-        // previous map's block.
-        mapOptionSchema: await mapOptionSchema(target, selectedMap.name),
         mapOptions: mapOptionValues,
         disabledUnits: restrictions?.disabledUnits,
       }),
