@@ -4655,6 +4655,112 @@ mod tests {
         drop(heard);
     }
 
+    /// The relay dying used to go unheard once the battle was open, and the host
+    /// found out from the next player who joined.
+    #[test]
+    fn a_relay_that_stops_under_an_open_battle_tells_the_host_at_once() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        remember_relay(&registry, "alice@bar:8200", a_relay());
+        let seen = recording_events(&registry, "alice@bar:8200");
+
+        let (saw, _heard) = std::sync::mpsc::channel();
+        let listener = relay_host::listening(&registry, "alice@bar:8200", saw, HOSTING_PATIENCE);
+        listener(coilbox_relay_protocol::Event::Stopping {
+            reason: "the TURN credential was refused".to_string(),
+        });
+
+        let told = told_within_patience(&seen, "relayStopped");
+        assert!(
+            told.contains(r#""reason":"the TURN credential was refused""#),
+            "the host has to be told why, and the frontend was sent: {told}"
+        );
+    }
+
+    /// An agent stopping with no battle held against the connection is either the
+    /// end of a battle or a hosting attempt that has its own error on the form.
+    #[test]
+    fn a_relay_that_stops_with_no_battle_open_says_nothing() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        let seen = recording_events(&registry, "alice@bar:8200");
+
+        let (saw, _heard) = std::sync::mpsc::channel();
+        let listener = relay_host::listening(&registry, "alice@bar:8200", saw, HOSTING_PATIENCE);
+        listener(coilbox_relay_protocol::Event::Stopping {
+            reason: "coilbox asked it to stop".to_string(),
+        });
+        listener(coilbox_relay_protocol::Event::RelayDown {
+            reason: "no route to the relay".to_string(),
+        });
+
+        // The forwarding thread hands events over one at a time, so a marker sent
+        // after them proves they have been through it.
+        let sink = lock_or_recover(&registry)
+            .get("alice@bar:8200")
+            .expect("the connection")
+            .sink
+            .clone();
+        conn::emit(
+            &sink,
+            conn::LobbyEvent::Delta {
+                delta: coilbox_lobby_protocol::Delta::RelayBack,
+            },
+        );
+        let told = told_within_patience(&seen, "relayBack");
+        assert!(
+            !told.contains("relayStopped") && !told.contains("relayDown"),
+            "a host with no battle open has nothing to hear about, and was sent: {told}"
+        );
+    }
+
+    /// An agent that cannot get its relay back reports every attempt, and the host
+    /// hears about the outage once. A second outage is a new one.
+    #[test]
+    fn a_relay_outage_is_told_once_and_its_end_is_told_too() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        remember_relay(&registry, "alice@bar:8200", a_relay());
+        let seen = recording_events(&registry, "alice@bar:8200");
+
+        let (saw, _heard) = std::sync::mpsc::channel();
+        let listener = relay_host::listening(&registry, "alice@bar:8200", saw, HOSTING_PATIENCE);
+        let down = || coilbox_relay_protocol::Event::RelayDown {
+            reason: "no route to the relay".to_string(),
+        };
+        // The address the battle already has, so nothing here is a move.
+        let open = || coilbox_relay_protocol::Event::RelayOpen {
+            addr: a_relay().relayed,
+            over_tls: false,
+        };
+        listener(open());
+        listener(down());
+        listener(down());
+        listener(open());
+        listener(down());
+        listener(open());
+
+        let deadline = std::time::Instant::now() + HOSTING_PATIENCE;
+        let told = loop {
+            let told = lock_or_recover(&seen).join("\n");
+            if told.matches("relayBack").count() == 2 || std::time::Instant::now() > deadline {
+                break told;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        assert_eq!(told.matches("relayDown").count(), 2, "got: {told}");
+        assert_eq!(told.matches("relayBack").count(), 2, "got: {told}");
+    }
+
+    /// Wait for an event naming `kind` and return everything sent so far.
+    fn told_within_patience(seen: &Arc<Mutex<Vec<String>>>, kind: &str) -> String {
+        let deadline = std::time::Instant::now() + HOSTING_PATIENCE;
+        loop {
+            let told = lock_or_recover(seen).join("\n");
+            if told.contains(kind) || std::time::Instant::now() > deadline {
+                return told;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     /// The lines a connection has queued, oldest first.
     fn queued(sent: &mut tokio::sync::mpsc::UnboundedReceiver<Outbound>) -> Vec<String> {
         std::iter::from_fn(|| match sent.try_recv() {

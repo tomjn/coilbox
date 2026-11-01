@@ -6022,7 +6022,7 @@ msgid "{user} on {server}"
 msgstr ""
 
 #: src/multiplayer/store.tsx
-msgid "{username} cannot reach your relayed battle"
+msgid "{username} cannot join because your battle's relay has stopped"
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -20249,6 +20249,10 @@ msgstr ""
 msgid "Host on LAN lets you pick another port."
 msgstr ""
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 msgid "Host vs computer"
 msgstr ""
@@ -29936,6 +29940,10 @@ msgstr ""
 msgid "Players can reach you"
 msgstr ""
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 msgid "Players connect straight to you or not at all."
 msgstr ""
@@ -39318,6 +39326,10 @@ msgstr ""
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr ""
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 msgid "The relay's ping could not be measured."
 msgstr ""
@@ -41981,6 +41993,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Try with {chosenLabel}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
 msgstr ""
 
 #: src/workshop/explosionGenerators.ts
@@ -45222,6 +45238,18 @@ msgstr ""
 
 #: src/multiplayer/store.tsx
 msgid "Your battle is running on an expired relay pass"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
 msgstr ""
 
 #: src/challenge/record.ts

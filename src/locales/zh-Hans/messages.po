@@ -7418,9 +7418,8 @@ msgid "{user} on {server}"
 msgstr "{server} 上的 {user}"
 
 #: src/multiplayer/store.tsx
-#, fuzzy
-msgid "{username} cannot reach your relayed battle"
-msgstr "{username} 无法连接到你经中继的对局"
+msgid "{username} cannot join because your battle's relay has stopped"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -24898,6 +24897,10 @@ msgstr "创建局域网房间"
 msgid "Host on LAN lets you pick another port."
 msgstr "“创建局域网房间”可以选择其他端口。"
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Host vs computer"
@@ -36817,6 +36820,10 @@ msgstr "最少玩家数（可选）"
 msgid "Players can reach you"
 msgstr "玩家可以连接到你"
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Players connect straight to you or not at all."
@@ -48345,6 +48352,10 @@ msgstr "无法询问中继代理：{failed}"
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr "以进程 {pid} 运行的中继代理正承载着此 coilbox 正在主持的一个房间。请先离开那个房间再打开另一个。"
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "The relay's ping could not be measured."
@@ -51645,6 +51656,10 @@ msgstr "重新尝试读取单位数据"
 #, fuzzy
 msgid "Try with {chosenLabel}"
 msgstr "使用 {chosenLabel} 尝试"
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -55637,6 +55652,18 @@ msgstr "你的对局没有经过中继"
 #, fuzzy
 msgid "Your battle is running on an expired relay pass"
 msgstr "你的对局正在使用已过期的中继凭证运行"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
+msgstr ""
 
 #: src/challenge/record.ts
 #, fuzzy

@@ -105,7 +105,26 @@ impl std::fmt::Display for NotAllowed {
     }
 }
 
+impl NotAllowed {
+    /// Why the agent is no longer there, when that is what went wrong.
+    ///
+    /// `None` when the agent is alive and this one player failed. The two read
+    /// differently to a host: one is about a player and the other is the battle's
+    /// relay gone for everybody.
+    pub(crate) fn stopped_because(&self) -> Option<String> {
+        match self {
+            NotAllowed::AgentGone(why) => Some(why.clone()),
+            NotAllowed::Unreachable(e) => Some(e.to_string()),
+            NotAllowed::Refused(_) | NotAllowed::NoAnswer(_) => None,
+        }
+    }
+}
+
 impl std::error::Error for NotAllowed {}
+
+/// What an agent's output ending says when the agent gave no reason of its own,
+/// which is a crash or something killing it.
+pub(crate) const CLOSED_WITHOUT_A_REASON: &str = "it closed without saying why";
 
 /// Why no sidecar was started.
 #[derive(Debug)]
@@ -137,8 +156,20 @@ impl std::fmt::Display for NotStarted {
 
 impl std::error::Error for NotStarted {}
 
-/// Answers still being waited on, by request id.
-type Waiting = Arc<Mutex<HashMap<RequestId, mpsc::Sender<Result<(), NotAllowed>>>>>;
+type Waiting = Arc<Mutex<Answers>>;
+
+/// Who is waiting to hear from the agent, and whether anything ever will.
+///
+/// One lock over both, so a request either goes on the list before the reader
+/// empties it or sees that the reader has finished. Otherwise it could wait out
+/// its whole patience for an answer nobody is left to give.
+#[derive(Default)]
+struct Answers {
+    /// Answers still being waited on, by request id.
+    waiting: HashMap<RequestId, mpsc::Sender<Result<(), NotAllowed>>>,
+    /// Why the agent stopped, once its output has ended.
+    ended: Option<String>,
+}
 
 /// How long a rate the agent reported is worth showing before it counts as no
 /// news at all.
@@ -425,13 +456,19 @@ impl RelayAgent {
     pub fn allow_joiner(&self, ip: IpAddr, patience: Duration) -> Result<(), NotAllowed> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let (answered, answer) = mpsc::channel();
-        self.waiting.lock().unwrap().insert(id, answered);
-
-        let asked = self.write(&Request::AllowPeer { id, ip });
-        if let Err(e) = asked {
-            self.waiting.lock().unwrap().remove(&id);
-            return Err(NotAllowed::Unreachable(e));
+        {
+            let mut answers = self.waiting.lock().unwrap();
+            if let Some(why) = &answers.ended {
+                return Err(NotAllowed::AgentGone(why.clone()));
+            }
+            answers.waiting.insert(id, answered);
         }
+
+        // A failed write is still waited on. The pipe breaks because the agent
+        // is exiting, and that closes its output too, so the reader is about to
+        // hand over the reason it gave for stopping, which says far more than
+        // the pipe's own error does.
+        let asked = self.write(&Request::AllowPeer { id, ip });
 
         match answer.recv_timeout(patience) {
             Ok(outcome) => outcome,
@@ -439,11 +476,14 @@ impl RelayAgent {
             // disconnect without an answer means the thread has gone, which is
             // the agent's stdout having closed.
             Err(RecvTimeoutError::Disconnected) => {
-                Err(NotAllowed::AgentGone("its output ended".to_string()))
+                Err(NotAllowed::AgentGone(CLOSED_WITHOUT_A_REASON.to_string()))
             }
             Err(RecvTimeoutError::Timeout) => {
-                self.waiting.lock().unwrap().remove(&id);
-                Err(NotAllowed::NoAnswer(patience))
+                self.waiting.lock().unwrap().waiting.remove(&id);
+                Err(match asked {
+                    Ok(()) => NotAllowed::NoAnswer(patience),
+                    Err(e) => NotAllowed::Unreachable(e),
+                })
             }
         }
     }
@@ -461,14 +501,17 @@ impl RelayAgent {
 /// Ending is not an error. It is what coilbox sees when the agent exits, and
 /// the important part is what happens next: everybody still waiting is told,
 /// rather than being left to wait out their own deadline for an answer that is
-/// never coming.
+/// never coming. So is the listener, with a [`Event::Stopping`] of our own if the
+/// agent went without sending one, because a crash and a clean exit leave the
+/// host's battle in the same state.
 fn read_events<R: Read>(
     from_agent: R,
     waiting: &Waiting,
     carrying: &Mutex<Option<Carrying>>,
     on_event: impl Fn(Event),
 ) {
-    let mut ending = "its output ended".to_string();
+    let mut ending = CLOSED_WITHOUT_A_REASON.to_string();
+    let mut said_it_was_stopping = false;
     for line in BufReader::new(from_agent).lines() {
         let line = match line {
             Ok(line) => line,
@@ -510,15 +553,23 @@ fn read_events<R: Read>(
             }
             Event::Stopping { ref reason } => {
                 ending = reason.clone();
+                said_it_was_stopping = true;
                 on_event(event);
             }
             other => on_event(other),
         }
     }
     // Whatever the agent was doing, it is not doing it any more.
-    let stranded: Vec<_> = waiting.lock().unwrap().drain().collect();
+    let stranded: Vec<_> = {
+        let mut answers = waiting.lock().unwrap();
+        answers.ended = Some(ending.clone());
+        answers.waiting.drain().collect()
+    };
     for (_, answered) in stranded {
         let _ = answered.send(Err(NotAllowed::AgentGone(ending.clone())));
+    }
+    if !said_it_was_stopping {
+        on_event(Event::Stopping { reason: ending });
     }
 }
 
@@ -531,7 +582,7 @@ fn no_pipe() -> NotStarted {
 }
 
 fn hand_over(waiting: &Waiting, id: RequestId, outcome: Result<(), NotAllowed>) {
-    let answered = waiting.lock().unwrap().remove(&id);
+    let answered = waiting.lock().unwrap().waiting.remove(&id);
     if let Some(answered) = answered {
         let _ = answered.send(outcome);
     }
@@ -783,20 +834,124 @@ mod tests {
         drop(scripted);
     }
 
-    /// A request that could not even be written is not worth waiting on.
+    /// What a host hit on Windows: the agent was exiting, so the write failed
+    /// with "the pipe is being closed", and that was all they were told. The
+    /// reason it gave for stopping is what they need.
     #[test]
-    fn a_request_that_cannot_be_written_fails_at_once() {
+    fn a_failed_write_reports_why_the_agent_stopped_rather_than_the_pipe_error() {
+        let (scripted, reading) = Scripted::new();
+        let agent = RelayAgent::driving(reading, Broken, |_| {});
+
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            scripted.line(to_line(&Event::Stopping {
+                reason: "the TURN credential was refused".to_string(),
+            }));
+        });
+
+        let stranded = agent
+            .allow_joiner(joiner(), PATIENCE)
+            .expect_err("an agent that has gone cannot let anybody through");
+        assert!(
+            matches!(&stranded, NotAllowed::AgentGone(why) if why == "the TURN credential was refused"),
+            "got: {stranded}"
+        );
+    }
+
+    /// The same, when the agent had already gone by the time anybody asked. The
+    /// reader has finished, so nothing is left to hand over an answer, and the
+    /// join must not wait out its patience for one.
+    #[test]
+    fn asking_an_agent_that_has_already_gone_fails_at_once_with_its_reason() {
+        let (scripted, reading) = Scripted::new();
+        let (saw, seen) = mpsc::channel();
+        let agent = RelayAgent::driving(reading, Broken, move |event| {
+            let _ = saw.send(event);
+        });
+        scripted.line(to_line(&Event::Stopping {
+            reason: "the TURN credential was refused".to_string(),
+        }));
+        drop(scripted);
+        seen.recv_timeout(PATIENCE)
+            .expect("the agent said stopping");
+        // The reader tells the listener before it has finished, so this is the
+        // other side of that moment.
+        let started = Instant::now();
+        let stranded = agent
+            .allow_joiner(joiner(), PATIENCE)
+            .expect_err("an agent that has gone cannot let anybody through");
+
+        assert!(
+            matches!(&stranded, NotAllowed::AgentGone(why) if why == "the TURN credential was refused"),
+            "got: {stranded}"
+        );
+        assert!(
+            started.elapsed() < PATIENCE,
+            "the join waited out its patience on a reader that had finished"
+        );
+    }
+
+    /// The fallback, for a pipe that broke while the agent's output stayed open.
+    /// Nothing says why, so the pipe's own error is all there is.
+    #[test]
+    fn a_broken_pipe_with_no_reason_behind_it_reports_the_pipe() {
         let (scripted, reading) = Scripted::new();
         let agent = RelayAgent::driving(reading, Broken, |_| {});
 
         let unreachable = agent
-            .allow_joiner(joiner(), PATIENCE)
+            .allow_joiner(joiner(), Duration::from_millis(50))
             .expect_err("a broken pipe lets nobody through");
         assert!(
             matches!(unreachable, NotAllowed::Unreachable(_)),
             "got: {unreachable}"
         );
         drop(scripted);
+    }
+
+    /// An agent that crashes says nothing on its way out. The listener still has
+    /// to hear, or a host goes on advertising a battle nobody can join.
+    #[test]
+    fn an_agent_that_dies_silently_still_tells_the_listener_it_stopped() {
+        let (scripted, reading) = Scripted::new();
+        let (saw, seen) = mpsc::channel();
+        let _agent = RelayAgent::driving(reading, Written::default(), move |event| {
+            let _ = saw.send(event);
+        });
+
+        drop(scripted);
+
+        match seen.recv_timeout(PATIENCE) {
+            Ok(Event::Stopping { reason }) => assert_eq!(reason, CLOSED_WITHOUT_A_REASON),
+            other => panic!("expected the agent to be reported stopped, got: {other:?}"),
+        }
+    }
+
+    /// One stop is one message, so an agent that said why is not reported a
+    /// second time when its output then ends.
+    #[test]
+    fn an_agent_that_said_why_it_stopped_is_only_reported_once() {
+        let (scripted, reading) = Scripted::new();
+        let (saw, seen) = mpsc::channel();
+        let _agent = RelayAgent::driving(reading, Written::default(), move |event| {
+            let _ = saw.send(event);
+        });
+
+        scripted.line(to_line(&Event::Stopping {
+            reason: "the TURN credential was refused".to_string(),
+        }));
+        drop(scripted);
+
+        assert!(matches!(
+            seen.recv_timeout(PATIENCE),
+            Ok(Event::Stopping { .. })
+        ));
+        assert!(
+            matches!(
+                seen.recv_timeout(PATIENCE),
+                Err(RecvTimeoutError::Disconnected)
+            ),
+            "the reader has to finish without saying anything else"
+        );
     }
 
     /// Everything that is not an answer goes to the listener, which is how the

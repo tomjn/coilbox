@@ -492,6 +492,25 @@ export type Delta =
    * seen by the host: the joiner's own client knows nothing about the relay.
    */
   | { kind: "joinerNotLetThrough"; username: string; reason: string }
+  /**
+   * Somebody joined a battle we are hosting through the relay and the relay agent
+   * on this computer has stopped. The player did nothing wrong and their
+   * connection was never tested.
+   */
+  | { kind: "joinerMetStoppedRelay"; username: string; reason: string }
+  /**
+   * The relay agent behind the battle we are hosting has stopped for good. The
+   * battle stays listed at an address nothing answers on until the host opens it
+   * again.
+   */
+  | { kind: "relayStopped"; reason: string }
+  /**
+   * The relay behind the battle we are hosting has failed and the agent is trying
+   * to reopen it. Told once per outage.
+   */
+  | { kind: "relayDown"; reason: string }
+  /** The relay reported by `relayDown` has reopened. */
+  | { kind: "relayBack" }
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }

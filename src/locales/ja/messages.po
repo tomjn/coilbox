@@ -7418,9 +7418,8 @@ msgid "{user} on {server}"
 msgstr "{server} の {user}"
 
 #: src/multiplayer/store.tsx
-#, fuzzy
-msgid "{username} cannot reach your relayed battle"
-msgstr "{username} はリレー経由の試合に到達できません"
+msgid "{username} cannot join because your battle's relay has stopped"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -24898,6 +24897,10 @@ msgstr "LAN でルームを作成"
 msgid "Host on LAN lets you pick another port."
 msgstr "「LAN でルームを作成」では別のポートを選べます。"
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Host vs computer"
@@ -36817,6 +36820,10 @@ msgstr "最低プレイヤー数（任意）"
 msgid "Players can reach you"
 msgstr "プレイヤーが接続できます"
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Players connect straight to you or not at all."
@@ -48345,6 +48352,10 @@ msgstr "リレーエージェントに問い合わせられませんでした：
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr "プロセス {pid} として動作中のリレーエージェントが、この coilbox がホストしている試合を中継しています。別のルームを開く前に、その試合から退出してください。"
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "The relay's ping could not be measured."
@@ -51645,6 +51656,10 @@ msgstr "ユニットデータの読み込みを再試行"
 #, fuzzy
 msgid "Try with {chosenLabel}"
 msgstr "{chosenLabel} で試す"
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -55637,6 +55652,18 @@ msgstr "試合はリレーを経由していません"
 #, fuzzy
 msgid "Your battle is running on an expired relay pass"
 msgstr "試合が期限切れのリレーパスで実行されています"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
+msgstr ""
 
 #: src/challenge/record.ts
 #, fuzzy

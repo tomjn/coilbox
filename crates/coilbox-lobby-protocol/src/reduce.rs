@@ -206,6 +206,29 @@ pub enum Delta {
         username: String,
         reason: String,
     },
+    /// Somebody joined a battle we are hosting through the relay and the relay
+    /// agent on this computer has stopped, so nobody can get through it. The
+    /// player did nothing wrong and their connection was never tested.
+    ///
+    /// Raised by the plugin, like [`Self::JoinerNotLetThrough`].
+    JoinerMetStoppedRelay {
+        username: String,
+        reason: String,
+    },
+    /// The relay agent behind the battle we are hosting has stopped for good,
+    /// with `reason` saying why. Raised by the plugin. The battle stays listed at
+    /// an address nothing answers on until the host opens it again.
+    RelayStopped {
+        reason: String,
+    },
+    /// The relay behind the battle we are hosting has failed and the agent is
+    /// trying to reopen it. Raised by the plugin, once per outage.
+    RelayDown {
+        reason: String,
+    },
+    /// The relay reported by [`Self::RelayDown`] has reopened. Raised by the
+    /// plugin.
+    RelayBack,
     LoggedIn {
         username: String,
     },

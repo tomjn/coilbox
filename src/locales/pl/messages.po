@@ -7418,9 +7418,8 @@ msgid "{user} on {server}"
 msgstr "{user} na {server}"
 
 #: src/multiplayer/store.tsx
-#, fuzzy
-msgid "{username} cannot reach your relayed battle"
-msgstr "{username} nie może połączyć się z twoim meczem przez przekaźnik"
+msgid "{username} cannot join because your battle's relay has stopped"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -24898,6 +24897,10 @@ msgstr "Hostuj w sieci LAN"
 msgid "Host on LAN lets you pick another port."
 msgstr "Hostowanie w sieci LAN pozwala wybrać inny port."
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Host vs computer"
@@ -36817,6 +36820,10 @@ msgstr "Co najmniej graczy (opcjonalne)"
 msgid "Players can reach you"
 msgstr "Gracze mogą do Ciebie dotrzeć"
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Players connect straight to you or not at all."
@@ -48345,6 +48352,10 @@ msgstr "Nie udało się zapytać agenta przekaźnika: {failed}"
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr "Agent przekaźnika działający jako proces {pid} obsługuje mecz hostowany przez ten coilbox. Opuść ten mecz, zanim otworzysz kolejny."
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "The relay's ping could not be measured."
@@ -51645,6 +51656,10 @@ msgstr "Spróbuj ponownie odczytać dane jednostek"
 #, fuzzy
 msgid "Try with {chosenLabel}"
 msgstr "Spróbuj z {chosenLabel}"
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -55637,6 +55652,18 @@ msgstr "Twój mecz nie przechodzi przez przekaźnik"
 #, fuzzy
 msgid "Your battle is running on an expired relay pass"
 msgstr "Twój mecz działa na wygasłej przepustce przekaźnika"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
+msgstr ""
 
 #: src/challenge/record.ts
 #, fuzzy
