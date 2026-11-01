@@ -6,7 +6,7 @@
 import { t } from "@lingui/core/macro";
 import { appFileIO } from "@/blueprint/fileIO";
 import { unitsyncEngineConfig } from "@/content/bindings";
-import { primeScan } from "@/content/config";
+import { settledScan } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
 import { errorText } from "@/lib/helpers";
 import { handlerOf, newConfigText } from "./gameHandler";
@@ -88,10 +88,17 @@ export async function writeSetForLaunch({
   dataDir: string;
   game: string;
 }): Promise<void> {
+  // A launch does not wait on a scan, which can take minutes after a rescan or a
+  // download. The game starts with the widgets it last had.
+  const scan = settledScan(enginePath, dataDir);
+  if (!scan) {
+    throw new Error(
+      t`Coilbox is still scanning your content, so the game starts with the widgets it last had.`,
+    );
+  }
   const engineConfig = await unitsyncEngineConfig({ enginePath, dataDir });
   const writeDir = engineConfigDir(engineConfig.configPath);
   if (!writeDir) return;
-  const scan = await primeScan(enginePath, dataDir);
   const item = scan.games.find((g) => g.name === game);
   if (!item) return;
   const handler = await handlerOf(enginePath, dataDir, item);
