@@ -2508,7 +2508,8 @@ fn mp_firewall<R: Runtime>(app: tauri::AppHandle<R>, engine: Option<String>) -> 
 ///
 /// The answer is read back rather than assumed from a command that exited zero,
 /// so a panel that says the programs are allowed is reporting the rules rather
-/// than reporting its own success.
+/// than reporting its own success. The exception is a machine that refuses the
+/// read, where the programs coilbox added are all there is to go on.
 ///
 /// A host who refuses the administrator prompt gets `problem` saying so and
 /// nothing changed, which is where they already were.

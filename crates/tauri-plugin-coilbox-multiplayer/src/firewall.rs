@@ -47,6 +47,13 @@
 //! the rules say is exactly a host for whom adding them still works, and the
 //! panel has to keep offering that rather than read as broken.
 //!
+//! Nothing is known to be wrong on such a machine, so the answer is
+//! [`Firewall::unread`] rather than a [`Problem`]. Once coilbox has added the
+//! rules there it writes down which programs it added, because the read will
+//! keep being refused and the panel would otherwise offer the same thing for
+//! ever. That record is only used when the read is refused, and it cannot see a
+//! rule somebody removed by hand afterwards.
+//!
 //! ## What it cannot promise
 //!
 //! Reading the rules back matches on the program path Windows stored, so a rule
@@ -138,6 +145,9 @@ pub struct Firewall {
     pub programs: Vec<Program>,
     /// Why the panel cannot say what it usually says, if it cannot.
     pub problem: Option<Problem>,
+    /// What Windows said when it would not let coilbox read the rules. Set when
+    /// any program's answer is still unknown because of that.
+    pub unread: Option<Vec<String>>,
 }
 
 impl Firewall {
@@ -147,6 +157,7 @@ impl Firewall {
             supported: false,
             programs: Vec::new(),
             problem: None,
+            unread: None,
         }
     }
 }
@@ -162,19 +173,29 @@ pub fn state<R: Runtime>(app: &AppHandle<R>, engine: Option<&Path>) -> Firewall 
         return Firewall::unsupported();
     }
     let mut programs = programs(engine);
-    let problem = match read_rules(app, &programs) {
+    let mut problem = None;
+    let mut unread = None;
+    match read_rules(app, &programs) {
         Ok(answers) => {
             for (program, allowed) in programs.iter_mut().zip(answers) {
                 program.allowed = Some(allowed);
             }
-            None
         }
-        Err(e) => Some(e),
-    };
+        Err(e) if e.fault => problem = Some(e),
+        Err(e) => {
+            if let Ok(path) = added_path(app) {
+                mark_added(&mut programs, &read_added(&path));
+            }
+            if programs.iter().any(|p| p.allowed.is_none()) {
+                unread = Some(what_the_read_said(e));
+            }
+        }
+    }
     Firewall {
         supported: true,
         programs,
         problem,
+        unread,
     }
 }
 
@@ -189,11 +210,17 @@ pub fn allow<R: Runtime>(app: &AppHandle<R>, engine: Option<&Path>) -> Firewall 
     }
     let programs = programs(engine);
     if let Err(e) = add_rules(app, &programs) {
+        // Read rather than left unknown, so a host who said no to the prompt is
+        // not also told that nothing could be checked.
         return Firewall {
-            supported: true,
-            programs,
             problem: Some(e),
+            ..state(app, engine)
         };
+    }
+    // The rules are in by now, and these same files were just written beside
+    // this one. Losing the record costs the host one more offer of the button.
+    if let Ok(path) = added_path(app) {
+        let _ = remember_added(&path, &programs);
     }
     state(app, engine)
 }
@@ -422,6 +449,50 @@ fn write_script(path: &Path, script: &str) -> Result<(), Problem> {
     }
     std::fs::write(path, script)
         .map_err(|e| Problem::plain(format!("Coilbox could not write the script: {e}")))
+}
+
+/// Where coilbox writes down the programs it has added rules for.
+fn added_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Problem> {
+    script_path(app, "added.json")
+}
+
+/// The programs coilbox has added rules for. A missing or unreadable record is
+/// the same as an empty one, which leaves the panel offering the button.
+fn read_added(path: &Path) -> Vec<String> {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+/// Add `programs` to the record, keeping the engines already in it.
+fn remember_added(path: &Path, programs: &[Program]) -> std::io::Result<()> {
+    let mut added = read_added(path);
+    for program in programs {
+        if !added.contains(&program.path) {
+            added.push(program.path.clone());
+        }
+    }
+    std::fs::write(path, serde_json::to_vec(&added)?)
+}
+
+/// Count the programs in the record as allowed.
+fn mark_added(programs: &mut [Program], added: &[String]) {
+    for program in programs {
+        if added.contains(&program.path) {
+            program.allowed = Some(true);
+        }
+    }
+}
+
+/// The lines to fold away under a refused read. A problem with no details of its
+/// own, such as PowerShell not starting, has only its title to offer.
+fn what_the_read_said(problem: Problem) -> Vec<String> {
+    if problem.details.is_empty() {
+        vec![problem.title]
+    } else {
+        problem.details
+    }
 }
 
 /// Write `script` and run it, answering with what it printed.
@@ -688,6 +759,69 @@ mod tests {
         );
         assert_eq!(problem.details, vec!["Access is denied.".to_owned()]);
         assert!(!problem.fault);
+    }
+
+    /// A machine that refuses the read will refuse it after the rules go in too,
+    /// so without the record the panel would look the same however many times the
+    /// host pressed the button.
+    #[test]
+    fn programs_coilbox_added_count_as_allowed_when_the_read_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("added.json");
+        remember_added(&path, &[a_program("Coilbox", r"C:\c\coilbox.exe")]).unwrap();
+
+        let mut programs = [
+            a_program("Coilbox", r"C:\c\coilbox.exe"),
+            a_program("Coilbox engine (2)", r"C:\e\2\spring.exe"),
+        ];
+        mark_added(&mut programs, &read_added(&path));
+
+        assert_eq!(programs[0].allowed, Some(true));
+        assert_eq!(
+            programs[1].allowed, None,
+            "a new engine is a program nothing has allowed yet"
+        );
+    }
+
+    /// Windows keeps a rule for every engine the host has allowed, so the record
+    /// has to as well.
+    #[test]
+    fn remembering_one_engine_keeps_the_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("added.json");
+
+        remember_added(&path, &[a_program("one", r"C:\e\1\spring.exe")]).unwrap();
+        remember_added(&path, &[a_program("two", r"C:\e\2\spring.exe")]).unwrap();
+        remember_added(&path, &[a_program("one", r"C:\e\1\spring.exe")]).unwrap();
+
+        assert_eq!(
+            read_added(&path),
+            vec![r"C:\e\1\spring.exe", r"C:\e\2\spring.exe"]
+        );
+    }
+
+    #[test]
+    fn a_missing_or_damaged_record_is_an_empty_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("added.json");
+        assert!(read_added(&path).is_empty());
+
+        std::fs::write(&path, "not json").unwrap();
+        assert!(read_added(&path).is_empty());
+    }
+
+    /// PowerShell not starting has no error record, and the fold still needs
+    /// something in it for a bug report.
+    #[test]
+    fn a_refused_read_with_no_details_keeps_its_title() {
+        assert_eq!(
+            what_the_read_said(Problem::plain("Coilbox could not run PowerShell")),
+            vec!["Coilbox could not run PowerShell".to_owned()]
+        );
+        assert_eq!(
+            what_the_read_said(why_it_failed(Some(1), b"Access is denied.\n", "read")),
+            vec!["Access is denied.".to_owned()]
+        );
     }
 
     /// A refusal at the administrator prompt is a decision. Nothing to unfold,
