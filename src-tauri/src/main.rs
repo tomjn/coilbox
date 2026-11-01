@@ -254,21 +254,34 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_direct::init());
     // picoframe:plugins-end
 
-    // In a dev (non-bundled) build the OS has no record of the `coilbox://`
-    // scheme, so on Windows and Linux register it at runtime so links dispatch
-    // during development. macOS resolves the scheme from the bundled app's
-    // Info.plist only, so runtime registration is neither available nor needed
-    // there. A release build ships the scheme in its bundle, so this is dev-only.
-    #[cfg(all(debug_assertions, any(target_os = "windows", target_os = "linux")))]
-    {
-        builder = builder.setup(|app| {
+    builder = builder.setup(|app| {
+        // Until the page paints, the window shows this colour rather than white. It
+        // matches picoframe's dark background. `Builder::setup` keeps only the last
+        // hook it is given, so everything that needs one goes here.
+        use tauri::Manager;
+        if let Some(window) = app.get_webview_window("main") {
+            if matches!(window.theme(), Ok(tauri::Theme::Dark)) {
+                let dark = tauri::window::Color(17, 17, 19, 255);
+                if let Err(e) = window.set_background_color(Some(dark)) {
+                    eprintln!("coilbox: could not set the window background: {e}");
+                }
+            }
+        }
+
+        // In a dev (non-bundled) build the OS has no record of the `coilbox://`
+        // scheme, so on Windows and Linux register it at runtime so links dispatch
+        // during development. macOS resolves the scheme from the bundled app's
+        // Info.plist only, so runtime registration is neither available nor needed
+        // there. A release build ships the scheme in its bundle, so this is dev-only.
+        #[cfg(all(debug_assertions, any(target_os = "windows", target_os = "linux")))]
+        {
             use tauri_plugin_deep_link::DeepLinkExt;
             if let Err(e) = app.deep_link().register_all() {
                 eprintln!("coilbox: dev deep-link scheme registration failed: {e}");
             }
-            Ok(())
-        });
-    }
+        }
+        Ok(())
+    });
 
     // Dev-only: expose an MCP socket server so AI agents can drive the app
     // (screenshots, DOM, input). The `tauri-mcp` server in .mcp.json connects
