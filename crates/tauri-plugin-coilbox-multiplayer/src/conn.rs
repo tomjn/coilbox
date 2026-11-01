@@ -622,15 +622,17 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                             *ip,
                             crate::relay_host::ALLOW_JOINER_PATIENCE,
                             move |why| {
-                                emit(
-                                    &sink,
-                                    LobbyEvent::Delta {
-                                        delta: Delta::JoinerNotLetThrough {
-                                            username: named,
-                                            reason: why.to_string(),
-                                        },
+                                let delta = match why.stopped_because() {
+                                    Some(reason) => Delta::JoinerMetStoppedRelay {
+                                        username: named,
+                                        reason,
                                     },
-                                );
+                                    None => Delta::JoinerNotLetThrough {
+                                        username: named,
+                                        reason: why.to_string(),
+                                    },
+                                };
+                                emit(&sink, LobbyEvent::Delta { delta });
                             },
                         );
                     }
@@ -1158,18 +1160,22 @@ mod tests {
                 Ok(())
             }
         }
-        struct Nothing;
-        impl std::io::Read for Nothing {
+        // Blocks until the sender is dropped, so this is an agent that is still
+        // there. One whose output has ended has gone, and is not written to.
+        struct StillThere(std::sync::mpsc::Receiver<()>);
+        impl std::io::Read for StillThere {
             fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                let _ = self.0.recv();
                 Ok(0)
             }
         }
+        let (_there, quiet) = std::sync::mpsc::channel();
 
         let written = Written::default();
         put_a_relay_behind(
             &registry,
             &key,
-            crate::relay_agent::RelayAgent::driving(Nothing, written.clone(), |_| {}),
+            crate::relay_agent::RelayAgent::driving(StillThere(quiet), written.clone(), |_| {}),
         );
 
         lobby_says

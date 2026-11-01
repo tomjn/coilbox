@@ -7418,9 +7418,8 @@ msgid "{user} on {server}"
 msgstr "{user} en {server}"
 
 #: src/multiplayer/store.tsx
-#, fuzzy
-msgid "{username} cannot reach your relayed battle"
-msgstr "{username} no puede llegar a tu partida por relé"
+msgid "{username} cannot join because your battle's relay has stopped"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -24898,6 +24897,10 @@ msgstr "Alojar en LAN"
 msgid "Host on LAN lets you pick another port."
 msgstr "Alojar en LAN te permite elegir otro puerto."
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Host vs computer"
@@ -36817,6 +36820,10 @@ msgstr "Mínimo de jugadores (opcional)"
 msgid "Players can reach you"
 msgstr "Los jugadores pueden llegar a ti"
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Players connect straight to you or not at all."
@@ -48345,6 +48352,10 @@ msgstr "No se pudo consultar al agente de relé: {failed}"
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr "El agente de relé que se ejecuta como proceso {pid} lleva una partida que aloja este coilbox. Sal de esa partida antes de abrir otra."
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "The relay's ping could not be measured."
@@ -51645,6 +51656,10 @@ msgstr "Volver a intentar leer los datos de unidades"
 #, fuzzy
 msgid "Try with {chosenLabel}"
 msgstr "Probar con {chosenLabel}"
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -55637,6 +55652,18 @@ msgstr "Tu partida no pasa por el relé"
 #, fuzzy
 msgid "Your battle is running on an expired relay pass"
 msgstr "Tu partida funciona con un pase de relé caducado"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
+msgstr ""
 
 #: src/challenge/record.ts
 #, fuzzy

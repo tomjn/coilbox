@@ -70,6 +70,7 @@
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -80,7 +81,7 @@ use tokio::sync::watch;
 
 use crate::conn::{HostedRelay, Registry};
 use crate::lock_or_recover;
-use crate::relay_agent::{NotAllowed, NotStarted, RelayAgent};
+use crate::relay_agent::{NotAllowed, NotStarted, RelayAgent, CLOSED_WITHOUT_A_REASON};
 use crate::relay_sidecar::{self, Battle};
 use crate::turn::{self, NoCredential};
 
@@ -380,9 +381,10 @@ pub async fn allocate(
 /// hosting form. That half stops mattering the moment the wait ends and the
 /// reading end is dropped. A `relayOpen` also goes to [`rebuilt_at`], and that
 /// half only starts mattering once the battle is open, because until then there
-/// is nothing advertised anywhere to correct.
+/// is nothing advertised anywhere to correct. The relay failing or the agent
+/// stopping goes to [`tell_the_host`], on the same terms.
 ///
-/// So the two are one listener rather than two, and it outlives the wait
+/// So they are one listener rather than several, and it outlives the wait
 /// deliberately. It runs on the agent's own reading thread.
 ///
 /// `patience` is how long the lobby gets to answer the move a rebuild sends, and
@@ -396,11 +398,43 @@ pub(crate) fn listening(
 ) -> impl Fn(Event) + Send + 'static {
     let registry = Arc::clone(registry);
     let server_key = server_key.to_string();
+    // An agent that cannot get its relay back says so on every attempt, and one
+    // warning per outage is enough.
+    let down = AtomicBool::new(false);
     move |event| {
-        if let Event::RelayOpen { addr, over_tls } = &event {
-            rebuilt_at(&registry, &server_key, *addr, *over_tls, patience);
+        match &event {
+            Event::RelayOpen { addr, over_tls } => {
+                rebuilt_at(&registry, &server_key, *addr, *over_tls, patience);
+                if down.swap(false, Ordering::Relaxed) {
+                    tell_the_host(&registry, &server_key, Delta::RelayBack);
+                }
+            }
+            Event::RelayDown { reason } if !down.swap(true, Ordering::Relaxed) => {
+                let reason = reason.clone();
+                tell_the_host(&registry, &server_key, Delta::RelayDown { reason });
+            }
+            Event::Stopping { reason } => {
+                let reason = reason.clone();
+                tell_the_host(&registry, &server_key, Delta::RelayStopped { reason });
+            }
+            _ => {}
         }
         let _ = saw.send(event);
+    }
+}
+
+/// Tell whoever is hosting through this relay what has happened to it.
+///
+/// Says nothing when no battle is held against the connection. Before one is,
+/// the host is waiting on the hosting form and [`waiting_on`] reports there.
+/// After one has ended, an agent stopping is what was asked for.
+fn tell_the_host(registry: &Registry, server_key: &str, delta: Delta) {
+    let held = lock_or_recover(registry)
+        .get(server_key)
+        .map(|conn| (Arc::clone(&conn.relay), conn.sink.clone()));
+    let Some((relay, sink)) = held else { return };
+    if lock_or_recover(&relay).is_some() {
+        crate::conn::emit(&sink, crate::conn::LobbyEvent::Delta { delta });
     }
 }
 
@@ -1052,7 +1086,7 @@ pub fn waiting_on(
             // The agent's output ended without it saying why, which is a
             // sidecar that died rather than one that refused.
             Err(RecvTimeoutError::Disconnected) => {
-                break NoRelay::GaveUp("its output ended".to_string())
+                break NoRelay::GaveUp(CLOSED_WITHOUT_A_REASON.to_string())
             }
             Err(RecvTimeoutError::Timeout) => break NoRelay::Silent(patience),
         }
@@ -2103,10 +2137,8 @@ pub(crate) mod tests {
     }
 
     /// A relay slot holding a relay whose agent has gone: nothing can be written
-    /// to it at all, which is what a sidecar that has exited looks like from
-    /// here. Chosen over an agent whose stdout has ended because that one is only
-    /// noticed once the wait runs out, and a test racing its own patience would
-    /// be measuring the clock.
+    /// to it and its output has ended, which is what a sidecar that has exited
+    /// looks like from here.
     fn hosting_through_an_agent_that_has_gone() -> HostedRelay {
         struct Broken;
         impl Write for Broken {
@@ -2121,7 +2153,7 @@ pub(crate) mod tests {
                 Ok(())
             }
         }
-        hosting_through(Broken)
+        relay_slot(RelayAgent::driving(io::empty(), Broken, |_| {}))
     }
 
     /// Put an agent behind an open allocation and into the slot a connection
@@ -2558,7 +2590,7 @@ pub(crate) mod tests {
             .recv_timeout(PATIENCE)
             .expect("a refusal has to reach the host rather than being swallowed");
         assert!(
-            why.contains("could not be reached"),
+            why.contains("has stopped"),
             "the host has to be told what went wrong, got: {why}"
         );
     }

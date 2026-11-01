@@ -7418,9 +7418,8 @@ msgid "{user} on {server}"
 msgstr "{user} на {server}"
 
 #: src/multiplayer/store.tsx
-#, fuzzy
-msgid "{username} cannot reach your relayed battle"
-msgstr "{username} не може дістатися до вашого матчу через ретранслятор"
+msgid "{username} cannot join because your battle's relay has stopped"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -24898,6 +24897,10 @@ msgstr "Створити в LAN"
 msgid "Host on LAN lets you pick another port."
 msgstr "У режимі «Створити в LAN» можна вибрати інший порт."
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/HostRoomControl.tsx
 #, fuzzy
 msgid "Host vs computer"
@@ -36817,6 +36820,10 @@ msgstr "Гравців щонайменше (необов’язково)"
 msgid "Players can reach you"
 msgstr "Гравці можуть до вас підключитися"
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 #, fuzzy
 msgid "Players connect straight to you or not at all."
@@ -48345,6 +48352,10 @@ msgstr "Не вдалося запитати агента ретранслято
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr "Агент ретранслятора, запущений як процес {pid}, обслуговує матч, який хостить цей coilbox. Вийдіть із цього матчу, перш ніж відкривати інший."
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr ""
+
 #: src/multiplayer/relayPing.ts
 #, fuzzy
 msgid "The relay's ping could not be measured."
@@ -51645,6 +51656,10 @@ msgstr "Спробувати знову прочитати дані юнітів
 #, fuzzy
 msgid "Try with {chosenLabel}"
 msgstr "Спробувати з {chosenLabel}"
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -55637,6 +55652,18 @@ msgstr "Ваш матч не йде через ретранслятор"
 #, fuzzy
 msgid "Your battle is running on an expired relay pass"
 msgstr "Ваш матч працює на простроченому пропуску ретранслятора"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
+msgstr ""
 
 #: src/challenge/record.ts
 #, fuzzy

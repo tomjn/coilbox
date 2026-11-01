@@ -1292,9 +1292,47 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           else if (d.kind === "joinerNotLetThrough") {
             const username = d.username;
             void notify({
-              title: t`${username} cannot reach your relayed battle`,
+              title: t`The relay would not let ${username} through`,
               body: d.reason || undefined,
               level: "error",
+            });
+          }
+          // The same player in the same battle, but the fault is the host's own
+          // relay agent and every other player is locked out too. The player's
+          // name is only here because their join is what found it.
+          else if (d.kind === "joinerMetStoppedRelay") {
+            const username = d.username;
+            const reason = d.reason;
+            void notify({
+              title: t`${username} cannot join because your battle's relay has stopped`,
+              body: t`Host the battle again to open a new relay. Reason: ${reason}`,
+              level: "error",
+            });
+          }
+          // The relay agent is gone for good, and the battle is still listed at
+          // an address nothing answers on. Told as it happens, so the host does
+          // not first hear of it from the next player who joins.
+          else if (d.kind === "relayStopped") {
+            const reason = d.reason;
+            void notify({
+              title: t`Your battle's relay has stopped`,
+              body: t`Players cannot connect through it. Host the battle again to open a new relay. Reason: ${reason}`,
+              level: "error",
+            });
+          }
+          // Lost, and the agent is still trying, so there is nothing for the host
+          // to do yet.
+          else if (d.kind === "relayDown") {
+            const reason = d.reason;
+            void notify({
+              title: t`Your battle's relay is down`,
+              body: t`Trying to reopen it. Reason: ${reason}`,
+              level: "warning",
+            });
+          } else if (d.kind === "relayBack") {
+            void notify({
+              title: t`Your battle's relay is back`,
+              level: "info",
             });
           }
           // The lobby would not advertise the battle at the relay's address. Rust

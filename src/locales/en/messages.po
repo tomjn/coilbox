@@ -6023,8 +6023,8 @@ msgid "{user} on {server}"
 msgstr "{user} on {server}"
 
 #: src/multiplayer/store.tsx
-msgid "{username} cannot reach your relayed battle"
-msgstr "{username} cannot reach your relayed battle"
+msgid "{username} cannot join because your battle's relay has stopped"
+msgstr "{username} cannot join because your battle's relay has stopped"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "{username} may no longer exist, so nothing changed."
@@ -20250,6 +20250,10 @@ msgstr "Host on LAN"
 msgid "Host on LAN lets you pick another port."
 msgstr "Host on LAN lets you pick another port."
 
+#: src/multiplayer/store.tsx
+msgid "Host the battle again to open a new relay. Reason: {reason}"
+msgstr "Host the battle again to open a new relay. Reason: {reason}"
+
 #: src/direct/HostRoomControl.tsx
 msgid "Host vs computer"
 msgstr "Host vs computer"
@@ -29937,6 +29941,10 @@ msgstr "Players at least (optional)"
 msgid "Players can reach you"
 msgstr "Players can reach you"
 
+#: src/multiplayer/store.tsx
+msgid "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+msgstr "Players cannot connect through it. Host the battle again to open a new relay. Reason: {reason}"
+
 #: src/direct/hostingRoute.ts
 msgid "Players connect straight to you or not at all."
 msgstr "Players connect straight to you or not at all."
@@ -39319,6 +39327,10 @@ msgstr "The relay agent could not be asked: {failed}"
 msgid "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 msgstr "The relay agent running as process {pid} is carrying a battle this coilbox is hosting. Leave that battle before opening another one."
 
+#: src/multiplayer/store.tsx
+msgid "The relay would not let {username} through"
+msgstr "The relay would not let {username} through"
+
 #: src/multiplayer/relayPing.ts
 msgid "The relay's ping could not be measured."
 msgstr "The relay's ping could not be measured."
@@ -41983,6 +41995,10 @@ msgstr "Try reading the unit data again"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Try with {chosenLabel}"
 msgstr "Try with {chosenLabel}"
+
+#: src/multiplayer/store.tsx
+msgid "Trying to reopen it. Reason: {reason}"
+msgstr "Trying to reopen it. Reason: {reason}"
 
 #: src/workshop/explosionGenerators.ts
 msgid "ttl, in frames."
@@ -45224,6 +45240,18 @@ msgstr "Your battle is not going through the relay"
 #: src/multiplayer/store.tsx
 msgid "Your battle is running on an expired relay pass"
 msgstr "Your battle is running on an expired relay pass"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay has stopped"
+msgstr "Your battle's relay has stopped"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is back"
+msgstr "Your battle's relay is back"
+
+#: src/multiplayer/store.tsx
+msgid "Your battle's relay is down"
+msgstr "Your battle's relay is down"
 
 #: src/challenge/record.ts
 msgid "Your best: {best}. {attempts}."
