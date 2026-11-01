@@ -55,6 +55,7 @@
 //! `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`, along with the
 //! third: a rebuild signed with a credential coilbox sent since is accepted.
 
+use std::collections::HashSet;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -62,6 +63,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use coilbox_relay_protocol::RelayServer;
+use stun::agent::TransactionId;
 use stun::attributes::ATTR_MESSAGE_INTEGRITY;
 use stun::error_code::{ErrorCodeAttribute, CODE_STALE_NONCE, ERROR_REASONS};
 use stun::message::{
@@ -177,13 +179,18 @@ struct Health {
 
 #[derive(Default)]
 struct HealthState {
-    /// Whether a request carrying MESSAGE-INTEGRITY has gone out yet.
+    /// The requests carrying MESSAGE-INTEGRITY that have not been answered.
     ///
     /// This is what separates the 401 the exchange is supposed to start with
     /// from the 401 that means the credential is no good. The first Allocate
     /// is deliberately unsigned, because the server has to be asked for the
     /// challenge before a key can be derived from it.
-    signed_a_request: bool,
+    ///
+    /// By transaction rather than a flag for "something has been signed", because
+    /// the client retransmits. A server further away than its timer answers the
+    /// unsigned Allocate twice, and the second challenge arrives after the signed
+    /// one has gone out.
+    unanswered_signed: HashSet<TransactionId>,
     /// The lifetime the server last granted, and when it granted it. Together
     /// they are the moment the server will delete the allocation if nothing
     /// else is heard.
@@ -211,7 +218,11 @@ impl Health {
             return;
         };
         if msg.get(ATTR_MESSAGE_INTEGRITY).is_ok() {
-            self.state.lock().unwrap().signed_a_request = true;
+            self.state
+                .lock()
+                .unwrap()
+                .unanswered_signed
+                .insert(msg.transaction_id);
         }
     }
 
@@ -223,6 +234,12 @@ impl Health {
         let Some(msg) = decode(datagram) else {
             return;
         };
+        let answers_a_signed_request = self
+            .state
+            .lock()
+            .unwrap()
+            .unanswered_signed
+            .remove(&msg.transaction_id);
         if typ.class == CLASS_SUCCESS_RESPONSE {
             let mut lifetime = Lifetime::default();
             if lifetime.get_from(&msg).is_ok() {
@@ -235,9 +252,9 @@ impl Health {
         if typ.class != CLASS_ERROR_RESPONSE {
             return;
         }
-        if !self.state.lock().unwrap().signed_a_request {
+        if !answers_a_signed_request {
             // The challenge, which is how a long-term credential exchange is
-            // meant to begin.
+            // meant to begin, or a second copy of an answer already read.
             return;
         }
         let mut code = ErrorCodeAttribute::default();
@@ -718,6 +735,46 @@ mod tests {
                         continue;
                     };
                     let _ = socket.send_to(&reply.raw, from).await;
+                }
+            });
+
+            FakeTurn {
+                addr,
+                relayed,
+                asked,
+                tls: false,
+            }
+        }
+
+        /// The same server, every answer arriving `delay` after the request.
+        async fn start_slow(delay: Duration, lifetime: Duration) -> FakeTurn {
+            let socket = Arc::new(
+                UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))
+                    .await
+                    .expect("a free loopback port"),
+            );
+            let addr = socket.local_addr().expect("a bound address");
+            let relayed = SocketAddr::from(([198, 51, 100, 7], 41641));
+            let (say, asked) = mpsc::unbounded_channel();
+
+            tokio::spawn(async move {
+                let mut buf = vec![0u8; 4096];
+                loop {
+                    let Ok((read, from)) = socket.recv_from(&mut buf).await else {
+                        return;
+                    };
+                    let Some(request) = decode(&buf[..read]) else {
+                        continue;
+                    };
+                    let Some(reply) = answer(&request, relayed, lifetime, OnRefresh::Grant, &say)
+                    else {
+                        continue;
+                    };
+                    let socket = Arc::clone(&socket);
+                    tokio::spawn(async move {
+                        tokio::time::sleep(delay).await;
+                        let _ = socket.send_to(&reply.raw, from).await;
+                    });
                 }
             });
 
@@ -1461,6 +1518,29 @@ mod tests {
         health.saw_inbound(&challenge(&unsigned).raw);
 
         assert_eq!(health.failure(), None);
+    }
+
+    /// A server further away than the client's retransmit timer answers the
+    /// opening request twice, and the second challenge arrives after the client
+    /// has signed its next request. That is a duplicate of the exchange starting,
+    /// and reading it as a refusal ended every battle such a host opened, the
+    /// moment it opened, blaming a credential the server had just accepted.
+    ///
+    /// The client's first retransmit is at 200 ms (`DEFAULT_RTO_IN_MS` in the
+    /// `turn` crate, `client/mod.rs:44`), so 300 ms each way round is enough.
+    #[tokio::test]
+    async fn a_repeated_challenge_from_a_slow_server_is_not_read_as_a_refusal() {
+        let turn = FakeTurn::start_slow(Duration::from_millis(300), Duration::from_secs(600)).await;
+
+        let allocation = TurnAllocation::open(
+            SocketAddr::from((Ipv4Addr::LOCALHOST, 0)),
+            &turn.credentials(),
+            &trusting_the_test_ca(),
+        )
+        .await
+        .expect("a slow server still grants the allocation");
+
+        assert_eq!(allocation.failure(), None);
     }
 
     /// The refusal a real coturn sends, which carries no reason phrase at all.
