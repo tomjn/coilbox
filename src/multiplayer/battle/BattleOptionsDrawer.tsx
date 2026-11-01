@@ -78,7 +78,12 @@ export function BattleOptionsDrawer({
   canEdit: boolean;
   gameMissing: boolean;
   mapMissing: boolean;
-  sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  sendOption: (
+    tagKey: string,
+    spadsName: string,
+    value: string,
+    withdraw?: boolean,
+  ) => void;
   /** Send many edits at once, for a reset. Batches or paces them, never one
    *  `sendOption` per option, which an autohost's flood protection refuses. */
   sendOptions: (edits: OptionEdit[]) => void;
@@ -407,7 +412,12 @@ function OptionSection({
   battle: Battle;
   pending: PendingMap;
   canEdit: boolean;
-  setOption: (tagKey: string, spadsName: string, value: string) => void;
+  setOption: (
+    tagKey: string,
+    spadsName: string,
+    value: string,
+    withdraw?: boolean,
+  ) => void;
   /** Reset the changed options among the parts it is given. Absent while a
    *  reset is already being sent. */
   onReset?: (parts: { scope: OptionScope; options: ConfigOption[] }[]) => void;
@@ -428,12 +438,14 @@ function OptionSection({
           }
           disabled={!canEdit}
           // A field reports `undefined` when the host clears an option they had
-          // set. Writing the game's own default is the right answer, not a
-          // compromise: a battle we host carries a tag for every option the
-          // game declares (#1837), so withdrawing one would hand that option
-          // back to the engine's built-in value rather than to the game's.
+          // set, which withdraws the tag so the script leaves the option out.
           onChange={(o, v) =>
-            setOption(scriptTagKey(scope, o.key), o.key, v ?? o.default ?? "")
+            setOption(
+              scriptTagKey(scope, o.key),
+              o.key,
+              v ?? o.default ?? "",
+              v === undefined,
+            )
           }
           onResetGroup={
             canEdit && onReset

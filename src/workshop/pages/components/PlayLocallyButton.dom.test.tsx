@@ -196,8 +196,6 @@ vi.mock("@/play/config", () => ({
     },
     loading: false,
   }),
-  gameOptionSchema: async () => [],
-  mapOptionSchema: async () => [],
   initialParticipants: () => [
     { id: 1, kind: "you", name: "You", side: "", allyTeam: 0 },
   ],

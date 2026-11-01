@@ -61,10 +61,9 @@ import {
 import {
   battleOptionTags,
   canEditBattleOptions,
-  missingOptionTags,
+  mapOptionTags,
   type OptionEdit,
   optionTagsRefusal,
-  staleMapOptionTags,
 } from "./battleOptions";
 import { battleRoomHref } from "./battleRoomKey";
 import {
@@ -156,7 +155,12 @@ export interface BattleRoomView {
   /** Whether the local user may edit options (founder, or the host is an autohost). */
   canEditOptions: boolean;
   /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
-  sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  sendOption: (
+    tagKey: string,
+    spadsName: string,
+    value: string,
+    withdraw?: boolean,
+  ) => void;
   /**
    * Dispatch many option edits at once (a reset). Founder: one script-tag
    * write. Autohost: the paced, confirmed run a preset load uses, reported in
@@ -1182,11 +1186,19 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     [activeKey, clearErr, setErr],
   );
 
-  // Route one option edit. Founder: set the script tag directly. Autohost battle:
-  // send `!bSet <name> <value>`; the autohost validates + echoes SETSCRIPTTAGS.
+  // Route one option edit. Founder: set the script tag directly, or remove it when
+  // the option was cleared. Autohost battle: send `!bSet <name> <value>`, which the
+  // autohost validates and echoes as SETSCRIPTTAGS.
   const sendOption = useCallback(
-    (tagKey: string, spadsName: string, value: string) => {
+    (tagKey: string, spadsName: string, value: string, withdraw = false) => {
       if (!activeKey) return;
+      if (isFounder && withdraw) {
+        mpRemoveScriptTags({ serverKey: activeKey, tags: [tagKey] }).then(
+          clearErr,
+          setErr,
+        );
+        return;
+      }
       const refusal = optionTagsRefusal({ [tagKey]: value });
       if (refusal) {
         setErr(refusal);
@@ -1204,19 +1216,25 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     [activeKey, isFounder, autohostSend, setErr, clearErr],
   );
 
-  // Many option edits at once, for a reset. The founder's script-tag write takes
-  // any number of tags as one command (the Rust side packs them into lines). An
+  // Many option edits at once, for a reset. The founder withdraws the tags, which
+  // takes any number as one command (the Rust side packs them into lines). An
   // autohost has to be sent them one `!bSet` at a time, and four commands inside
   // four seconds is a two minute ignore from SPADS, so they go through the paced
   // run a preset load uses rather than through `sendOption` in a loop.
   const sendOptions = useCallback(
     (edits: OptionEdit[]) => {
       if (!activeKey || edits.length === 0) return;
-      const tags = Object.fromEntries(edits.map((e) => [e.tagKey, e.value]));
       if (isFounder) {
-        mpSetScriptTags({ serverKey: activeKey, tags }).then(clearErr, setErr);
+        mpRemoveScriptTags({
+          serverKey: activeKey,
+          tags: edits.map((e) => e.tagKey),
+        }).then(clearErr, setErr);
       } else {
-        void presetDelivery.start(optionTagSlots(tags));
+        void presetDelivery.start(
+          optionTagSlots(
+            Object.fromEntries(edits.map((e) => [e.tagKey, e.value])),
+          ),
+        );
       }
     },
     [activeKey, isFounder, clearErr, setErr, presetDelivery.start],
@@ -1231,36 +1249,24 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     async (tags: Record<string, string>): Promise<DeliveryProgress | null> => {
       if (!activeKey || !battle) return null;
       if (isFounder) {
-        // A preset stores only what its author changed, so top the founder's set
-        // up with the game's and the map's own defaults for the rest (#1837,
-        // #1868). Without that, loading one would strip the defaults the room was
-        // seeded with and hand the match back to the engine's built-in values.
-        // The autohost path below stays sparse on purpose: that battle's script
-        // is SPADS's to write, and 177 `!bSet` lines (Beyond All Reason's option
-        // count) is a flood ban.
-        const filled = {
-          ...tags,
-          ...missingOptionTags("mod", modOptionsSchema, tags),
-          ...missingOptionTags("map", mapOptionsSchema, tags),
-        };
         // Before the removal below as well, which would otherwise strip the room
         // of options the refused write was meant to replace.
-        const refusal = optionTagsRefusal(filled);
+        const refusal = optionTagsRefusal(tags);
         if (refusal) {
           setErr(refusal);
           return null;
         }
         const writes: Promise<unknown>[] = [];
-        if (Object.keys(filled).length > 0) {
+        if (Object.keys(tags).length > 0) {
           writes.push(
-            mpSetScriptTags({ serverKey: activeKey, tags: filled }).then(
+            mpSetScriptTags({ serverKey: activeKey, tags }).then(
               clearErr,
               setErr,
             ),
           );
         }
         const current = battleOptionTags(battle.scriptTags);
-        const wanted = new Set(Object.keys(filled).map((k) => k.toLowerCase()));
+        const wanted = new Set(Object.keys(tags).map((k) => k.toLowerCase()));
         const remove = Object.keys(current).filter(
           (k) => !wanted.has(k.toLowerCase()),
         );
@@ -1282,16 +1288,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         return presetDelivery.start(optionTagSlots(tags));
       }
     },
-    [
-      activeKey,
-      battle,
-      isFounder,
-      modOptionsSchema,
-      mapOptionsSchema,
-      clearErr,
-      setErr,
-      presetDelivery.start,
-    ],
+    [activeKey, battle, isFounder, clearErr, setErr, presetDelivery.start],
   );
 
   // The autohost steps of a preset: the map and the room's team shape. Reads go
@@ -1336,95 +1333,27 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     [autohost, activeKey, autohostSend],
   );
 
-  // Publish the game's own option defaults into a battle we found, for every
-  // option no script tag sets yet (#1837). A room opened with no preset behind
-  // it has no option tags at all, so without this its `[modoptions]` block is
-  // empty and the engine substitutes its own values for the lot.
-  //
-  // The tags are shared state the server holds, so this is a real publish: other
-  // clients in the room see every option the game declares, at its default,
-  // rather than nothing. That is the point. The alternative leaves everyone in
-  // the battle playing a game the host's own singleplayer would play
-  // differently.
-  //
-  // Founder only. On an autohost battle SPADS owns the script and writes its own
-  // defaults, and we could only ask via `!bSet`, one flood-protected chat line
-  // per option. Guarded on the exact key set sent for this battle and game, so a
-  // server that drops the write cannot turn this into a resend loop, while a
-  // later game change still seeds the new game's options.
-  const seededDefaultsRef = useRef<string | null>(null);
+  // Clear a room's map options when its map changes, because their keys are
+  // generic enough to collide and a value set for one map means nothing on the
+  // next. The first sight of a battle clears nothing: reloading the page resets
+  // this ref while the room, which the Rust side holds, keeps its tags, so treating
+  // that as a map change would throw away the host's choices.
+  const roomMapRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeKey || !battle || !isFounder) return;
-    const missing = missingOptionTags(
-      "mod",
-      modOptionsSchema,
-      battle.scriptTags,
-    );
-    const keys = Object.keys(missing);
-    if (keys.length === 0) return;
-    const stamp = `${battle.id}::${battle.modname}::${keys.sort().join(",")}`;
-    if (seededDefaultsRef.current === stamp) return;
-    seededDefaultsRef.current = stamp;
-    mpSetScriptTags({ serverKey: activeKey, tags: missing }).then(
-      clearErr,
-      setErr,
-    );
-  }, [activeKey, battle, isFounder, modOptionsSchema, clearErr, setErr]);
-
-  // The same for the map's own options (#1868), which the engine is even less
-  // forgiving about: it substitutes nothing for an absent map option, so game
-  // Lua asking `Spring.GetMapOptions()` gets `nil` where the map author declared
-  // a value and the map plays a way nobody asked for.
-  //
-  // This has to follow the map rather than run once, because the host can change
-  // it mid-room and map option keys are generic enough to collide. BlockFort v1
-  // and airport 0.6 both declare `fog`, wanting opposite defaults, so on a change
-  // the previous map's leftover keys are removed and every key the new map
-  // declares is written afresh rather than filled around. SPADS clears and
-  // republishes the whole scope on a map change for the same reason.
-  //
-  // The first sight of a battle only fills what is missing. Reloading the page
-  // resets this ref while the room, which the Rust side holds, keeps its tags, so
-  // treating that as a map change would throw away the host's choices.
-  const seededMapRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!activeKey || !battle || !isFounder) return;
-    // An unsettled read still holds the previous map's options, and seeding those
-    // would be worse than seeding nothing.
-    if (mapInfo.status !== "ready" || mapInfo.loadedMap !== battle.map) return;
     const stamp = `${battle.id}::${battle.map}`;
-    if (seededMapRef.current === stamp) return;
-    const changedMap = !!seededMapRef.current?.startsWith(`${battle.id}::`);
-    seededMapRef.current = stamp;
-
-    const stale = changedMap
-      ? staleMapOptionTags(mapOptionsSchema, battle.scriptTags)
-      : [];
-    const set = changedMap
-      ? missingOptionTags("map", mapOptionsSchema, {})
-      : missingOptionTags("map", mapOptionsSchema, battle.scriptTags);
+    if (roomMapRef.current === stamp) return;
+    const changedMap = !!roomMapRef.current?.startsWith(`${battle.id}::`);
+    roomMapRef.current = stamp;
+    if (!changedMap) return;
+    const stale = mapOptionTags(battle.scriptTags);
     if (stale.length > 0) {
       mpRemoveScriptTags({ serverKey: activeKey, tags: stale }).then(
         clearErr,
         setErr,
       );
     }
-    if (Object.keys(set).length > 0) {
-      mpSetScriptTags({ serverKey: activeKey, tags: set }).then(
-        clearErr,
-        setErr,
-      );
-    }
-  }, [
-    activeKey,
-    battle,
-    isFounder,
-    mapOptionsSchema,
-    mapInfo.status,
-    mapInfo.loadedMap,
-    clearErr,
-    setErr,
-  ]);
+  }, [activeKey, battle, isFounder, clearErr, setErr]);
 
   // Apply a unit-restriction change (founder only). The engine-native
   // `game/restrict/*` tags are host-authoritative script tags we own directly, so

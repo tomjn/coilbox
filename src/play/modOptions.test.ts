@@ -3,7 +3,6 @@ import type { ConfigOption } from "@/content/bindings";
 import {
   changedOptions,
   defaultLabel,
-  effectiveOptions,
   groupOptions,
   isChanged,
   resetOptionValues,
@@ -103,58 +102,6 @@ describe("withOption", () => {
   });
 });
 
-describe("effectiveOptions", () => {
-  it("sends every option's value, defaults included", () => {
-    // The engine does NOT fall back to the game's declared defaults for absent
-    // keys — it applies its own (MaxUnits 32000, GhostedBuildings 1, ...), so
-    // omitting an unchanged option silently changes the game.
-    const out = effectiveOptions(
-      [
-        opt("maxunits", { default: "5000" }),
-        opt("startmetal", { default: "1000" }),
-      ],
-      { startmetal: "2000" },
-    );
-    expect(out).toEqual({ maxunits: "5000", startmetal: "2000" });
-  });
-
-  it("never sends a section", () => {
-    const out = effectiveOptions(
-      [
-        section("engine", "Engine Options"),
-        opt("maxunits", { default: "5000" }),
-      ],
-      {},
-    );
-    expect(out).toEqual({ maxunits: "5000" });
-  });
-
-  it("skips an option with neither a value nor a default", () => {
-    const out = effectiveOptions(
-      [opt("mystery", { type: "string", default: undefined })],
-      {},
-    );
-    expect(out).toEqual({});
-  });
-
-  it("sends an explicit empty override", () => {
-    const out = effectiveOptions(
-      [opt("note", { type: "string", default: "x" })],
-      {
-        note: "",
-      },
-    );
-    expect(out).toEqual({ note: "" });
-  });
-
-  it("keeps a value the game never declared, which is how a scenario arms the runtime", () => {
-    const out = effectiveOptions([opt("startmetal", { default: "1000" })], {
-      coilbox_mission: "s1",
-    });
-    expect(out).toEqual({ startmetal: "1000", coilbox_mission: "s1" });
-  });
-});
-
 describe("sparseOptions", () => {
   const schema = [
     section("engine", "Engine Options"),
@@ -166,13 +113,6 @@ describe("sparseOptions", () => {
     expect(
       sparseOptions(schema, { maxunits: "5000", startmetal: "2000" }),
     ).toEqual({ startmetal: "2000" });
-  });
-
-  it("undoes effectiveOptions, so filling and sparsifying round-trip exactly", () => {
-    const chosen = { startmetal: "2000" };
-    expect(sparseOptions(schema, effectiveOptions(schema, chosen))).toEqual(
-      chosen,
-    );
   });
 
   it("keeps a value the game never declared, so a scenario keeps its mission", () => {

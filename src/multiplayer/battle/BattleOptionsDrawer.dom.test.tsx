@@ -140,6 +140,7 @@ describe("BattleOptionsDrawer reset (issue #3387)", () => {
         "game/modoptions/maxunits",
         "maxunits",
         "1000",
+        true,
       );
     } finally {
       vi.useRealTimers();

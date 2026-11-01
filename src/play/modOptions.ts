@@ -68,8 +68,7 @@ export const effectiveValue = (
  * Apply one edit to a setup's option values. A value of `undefined` removes the
  * key rather than writing a blank, because these maps are deliberately sparse:
  * an option nobody changed is absent, so a saved preset follows the game when
- * the game changes its default, and the launch paths fill the gaps themselves
- * (see `effectiveOptions`).
+ * the game changes its default, and a start script holds only what was chosen.
  */
 export function withOption(
   values: Record<string, string>,
@@ -127,8 +126,7 @@ export function sameOptionValue(
  *
  * `undefined` means nobody set a value, which is the default. An option with no
  * declared default is taken to default to the empty value, which is what its
- * control shows and what `effectiveOptions` leaves out, so any other value is a
- * change. A section is never changed.
+ * control shows, so any other value is a change. A section is never changed.
  */
 export const isChanged = (o: ConfigOption, value?: string) =>
   o.type !== "section" &&
@@ -149,9 +147,8 @@ export const changedOptions = (
  *
  * Dropping the key is how a sparse setup says "at default" (see `withOption`),
  * so a reset leaves the option following the game if the game changes its mind,
- * and `effectiveOptions` fills the declared default in at launch. An option with
- * no declared default goes back to empty the same way. Keys outside `options`
- * are untouched.
+ * and the start script leaves it out. An option with no declared default goes
+ * back to empty the same way. Keys outside `options` are untouched.
  */
 export function resetOptionValues(
   options: ConfigOption[],
@@ -185,38 +182,8 @@ export function defaultLabel(o: ConfigOption): string {
 }
 
 /**
- * The `[modoptions]` block to write: the caller's values, with the game's
- * declared default added for every option they left unset.
- *
- * Sending only the options a player changed is wrong. The engine does not fall
- * back to the game's declared defaults for absent keys. `CGameSetup::Init`
- * reads its own built-in ones (`MaxUnits` 32000, `GhostedBuildings` 1,
- * `FixedAllies` 1, `MaxSpeed` 20, ...) and hands game Lua whatever the script
- * literally said, so `Spring.GetModOptions()` has a hole where the game's
- * default should be. Everything that launches a game fills first, which is why
- * this is called from `toBattleConfig` rather than from any one screen.
- *
- * Sections carry no value and are skipped, as is any option with neither a
- * value nor a default. A value whose key the schema does not declare is kept:
- * a scenario adds `coilbox_mission`, which the game never declares and the
- * runtime cannot find the mission without.
- */
-export function effectiveOptions(
-  options: ConfigOption[],
-  values: Record<string, string>,
-): Record<string, string> {
-  const out: Record<string, string> = { ...values };
-  for (const o of options) {
-    if (o.type === "section") continue;
-    const v = effectiveValue(o, values[o.key]);
-    if (v !== undefined) out[o.key] = v;
-  }
-  return out;
-}
-
-/**
- * The inverse of {@link effectiveOptions}: drop every value that is only the
- * game's own default, leaving what was actually chosen.
+ * Drop every value that is only the game's own default, leaving what was
+ * actually chosen.
  *
  * For turning a full `[modoptions]` block back into something worth saving. A
  * replay records every option its match ran with and says nothing about who
@@ -225,12 +192,10 @@ export function effectiveOptions(
  * shared scenario and a campaign snapshot all store, and it is what lets a saved
  * setup follow the game when the game changes its mind.
  *
- * A value whose key `options` does not declare is kept, for the same reason
- * `effectiveOptions` keeps it: coilbox cannot tell a stale option from
- * `coilbox_mission`, which the game never declares and the scenario runtime
- * cannot find its mission without. An empty `options` list means "not known
- * yet", so nothing is dropped. The round trip through `effectiveOptions` is
- * exact either way, which is why sparsifying costs a refight nothing.
+ * A value whose key `options` does not declare is kept, because coilbox cannot
+ * tell a stale option from `coilbox_mission`, which the game never declares and
+ * the scenario runtime cannot find its mission without. An empty `options` list
+ * means "not known yet", so nothing is dropped.
  */
 export function sparseOptions(
   options: ConfigOption[],

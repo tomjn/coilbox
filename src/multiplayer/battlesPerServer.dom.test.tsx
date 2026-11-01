@@ -9,7 +9,7 @@
  * rule stands (issue #2848), so the mock setup is `reattachAll.dom.test.tsx`'s.
  */
 
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Battle, LobbyEvent, LobbyState } from "./bindings";
 
@@ -26,6 +26,9 @@ const wire = vi.hoisted(() => ({
   /** Keys whose battle Rust says goes through the relay. */
   relayedOn: new Set<string>(),
   launches: [] as { relayed: boolean }[],
+  tagsSet: [] as Record<string, string>[],
+  tagsRemoved: [] as string[][],
+  gameOptions: [] as { key: string; type: string; default?: string }[],
   /** Battles a Zero-K connection was asked where the match is, as key and id. */
   askedForMatch: [] as { serverKey: string; battleId: number }[],
   /** What the scan hook's `runWithReason` resolves, for the rescan tests. */
@@ -93,6 +96,14 @@ vi.mock("./bindings", () => ({
       relayed: wire.relayedOn.has(serverKey),
     };
   },
+  mpSetScriptTags: async ({ tags }: { tags: Record<string, string> }) => {
+    wire.tagsSet.push(tags);
+    return { sent: true };
+  },
+  mpRemoveScriptTags: async ({ tags }: { tags: string[] }) => {
+    wire.tagsRemoved.push(tags);
+    return { sent: true };
+  },
   mpTachyonSignedIn: async () => ({ signedIn: true }),
   mpZerokRequestConnectSpring: async (args: {
     serverKey: string;
@@ -113,7 +124,7 @@ vi.mock("@/content/config", () => ({
     run: async () => {},
     runWithReason: async () => wire.scanOutcome,
   }),
-  useUnitsyncGameInfo: () => ({ info: null }),
+  useUnitsyncGameInfo: () => ({ info: { options: wire.gameOptions } }),
   useUnitsyncMapInfo: () => ({ info: null, status: "idle", loadedMap: null }),
 }));
 vi.mock("@/play/config", () => ({
@@ -316,6 +327,85 @@ async function openRoom(url: string) {
   );
   await act(async () => {});
 }
+
+describe("the options of a battle the player hosts", () => {
+  const hosted = (scriptTags: Record<string, string>, map = "First Map") => {
+    const own = { ...battle(7, "Own battle", "Zeta"), map, scriptTags };
+    return lobbyState("Zeta", [own], 7);
+  };
+
+  beforeEach(() => {
+    wire.tagsSet.length = 0;
+    wire.tagsRemoved.length = 0;
+    wire.gameOptions = [{ key: "maxunits", type: "number", default: "5000" }];
+  });
+
+  afterEach(() => {
+    wire.gameOptions = [];
+  });
+
+  it("publishes none of the game's defaults", async () => {
+    wire.states.set(KEY_B, hosted({}));
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    expect(room.battle?.host).toBe("Zeta");
+    expect(wire.tagsSet).toEqual([]);
+  });
+
+  it("withdraws a cleared option rather than writing its default", async () => {
+    wire.states.set(KEY_B, hosted({ "game/modoptions/maxunits": "6000" }));
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    act(() =>
+      room.sendOption("game/modoptions/maxunits", "maxunits", "5000", true),
+    );
+    await act(async () => {});
+    expect(wire.tagsRemoved).toEqual([["game/modoptions/maxunits"]]);
+    expect(wire.tagsSet).toEqual([]);
+  });
+
+  it("writes an option the host set to its default by hand", async () => {
+    wire.states.set(KEY_B, hosted({}));
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    act(() => room.sendOption("game/modoptions/maxunits", "maxunits", "5000"));
+    await act(async () => {});
+    expect(wire.tagsSet).toEqual([{ "game/modoptions/maxunits": "5000" }]);
+  });
+
+  it("withdraws every option a reset covers in one command", async () => {
+    wire.states.set(KEY_B, hosted({}));
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    act(() =>
+      room.sendOptions([
+        { tagKey: "game/modoptions/a", spadsName: "a", value: "1" },
+        { tagKey: "game/mapoptions/b", spadsName: "b", value: "2" },
+      ]),
+    );
+    await act(async () => {});
+    expect(wire.tagsRemoved).toEqual([
+      ["game/modoptions/a", "game/mapoptions/b"],
+    ]);
+    expect(wire.tagsSet).toEqual([]);
+  });
+
+  it("keeps the room's map options when first opened, and clears them when the map changes", async () => {
+    const tags = {
+      "game/mapoptions/fog": "1",
+      "game/modoptions/maxunits": "6000",
+    };
+    wire.states.set(KEY_B, hosted(tags));
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    expect(wire.tagsRemoved).toEqual([]);
+
+    wire.states.set(KEY_B, hosted(tags, "Second Map"));
+    await act(async () => {
+      wire.channels.get(KEY_B)?.onmessage?.({
+        kind: "delta",
+        delta: { kind: "battleInfoChanged", id: 7 },
+      });
+    });
+    await waitFor(() => expect(room.battle?.map).toBe("Second Map"));
+    expect(wire.tagsRemoved).toEqual([["game/mapoptions/fog"]]);
+  });
+});
 
 describe("the battle room with two connections", () => {
   beforeEach(() => {

@@ -47,10 +47,8 @@ const {
   composeUnits,
   contentDemoInfo,
   contentListReplays,
-  gameOptionSchema,
   launch,
   launchScenarioForPlayer,
-  mapOptionSchema,
   resolveCompatTarget,
   setProvenance,
   toBattleConfig,
@@ -64,11 +62,9 @@ const {
   composeUnits: vi.fn(),
   contentDemoInfo: vi.fn(),
   contentListReplays: vi.fn(),
-  gameOptionSchema: vi.fn(async () => []),
   launch: vi.fn(),
   launchScenarioForPlayer: vi.fn(),
   resolveCompatTarget: vi.fn(),
-  mapOptionSchema: vi.fn(async () => []),
   setProvenance: vi.fn(),
   toBattleConfig: vi.fn((opts: Record<string, unknown>) => ({ ...opts })),
 }));
@@ -113,8 +109,6 @@ vi.mock("../content/config", () => ({
 vi.mock("../profile/profile", () => ({ getProfile: () => ({}) }));
 vi.mock("./config", () => ({
   applyRestrictions,
-  gameOptionSchema,
-  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget: () => ({
     target: {
@@ -219,8 +213,6 @@ beforeEach(() => {
   launch.mockReset();
   applyRestrictions.mockClear();
   toBattleConfig.mockClear();
-  gameOptionSchema.mockClear();
-  mapOptionSchema.mockClear();
   setProvenance.mockClear();
   scanOverride.current = null;
   composeUnits.mockReset();

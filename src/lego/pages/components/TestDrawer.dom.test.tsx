@@ -48,9 +48,7 @@ vi.mock("@/workshop/project", () => ({
 }));
 
 vi.mock("../../../play/config", () => ({
-  gameOptionSchema: vi.fn(),
   initialParticipants: () => [{}],
-  mapOptionSchema: vi.fn(),
   toBattleConfig: vi.fn(),
   usePreferredTarget: () => ({
     target: {

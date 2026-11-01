@@ -3110,8 +3110,8 @@ fn mp_remove_start_rect(registry: State<'_, Registry>, server_key: String, ally:
 
 /// `mp_set_script_tags` — host: set game script tags.
 ///
-/// Several lines for a long tag list, since a battle publishes its game's whole
-/// option list (#1837) and SPADS packs script tags to 900 characters a line.
+/// Several lines for a long tag list, since a preset can carry many options and
+/// SPADS packs script tags to 900 characters a line.
 #[tauri::command]
 fn mp_set_script_tags(
     registry: State<'_, Registry>,
@@ -3147,13 +3147,24 @@ fn zerok_option_actions(
     server_key: &str,
     tags: &BTreeMap<String, String>,
 ) -> CliResult {
+    zerok_send_option_actions(registry, server_key, |state| {
+        zerok_room::option_actions(state, tags)
+    })
+}
+
+/// Build a Zero-K connection's option commands from its state, and send them.
+fn zerok_send_option_actions(
+    registry: &Registry,
+    server_key: &str,
+    build: impl FnOnce(&LobbyState) -> Vec<zerok_room::RoomAction>,
+) -> CliResult {
     let actions = {
         let map = lock_or_recover(registry);
         let Some(conn) = map.get(server_key) else {
             return CliResult::err("connection is closed");
         };
         let state = lock_or_recover(&conn.state);
-        zerok_room::option_actions(&state, tags)
+        build(&state)
     };
     let mut last = CliResult::ok(json!({ "sent": true }));
     for action in actions {
@@ -3184,6 +3195,11 @@ fn mp_remove_script_tags(
         return CliResult::err(format!(
             "Coilbox did not change the room's options: the option {key:?} has a space or tab in its name."
         ));
+    }
+    if is_zerok(registry.inner(), &server_key) {
+        return zerok_send_option_actions(registry.inner(), &server_key, |state| {
+            zerok_room::option_removal_actions(state, &tags)
+        });
     }
     let refs: Vec<&str> = tags.iter().map(String::as_str).collect();
     enqueue_all(

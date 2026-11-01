@@ -39,11 +39,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { describeError } from "@/i18n/uiError";
 import { playInfolog } from "@/play/bindings";
 import { resolveCompatTarget } from "@/play/compatTarget";
-import {
-  gameOptionSchema,
-  mapOptionSchema,
-  usePreferredTarget,
-} from "@/play/config";
+import { usePreferredTarget } from "@/play/config";
 import { classifyLine } from "@/play/crash";
 import { type DetectedResult, detectBattleResult } from "@/play/detect";
 import { usePlay } from "@/play/PlayProvider";
@@ -302,8 +298,6 @@ export function ScenarioTestDrawer({
         reader,
         dataDir: target.dataDir,
         games: scan.data?.games ?? [],
-        optionSchema: await gameOptionSchema(target, gameUnits.archive),
-        mapOptionSchema: await mapOptionSchema(target, scenario.setup.mapName),
         map: mapExtent,
         units: gameUnits.units,
         // Left out for a scenario that does not vary by it, so its start script
