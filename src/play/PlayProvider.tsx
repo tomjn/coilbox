@@ -6,12 +6,14 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from "react";
 import { contentReplayPlaybackLaunch } from "@/content/bindings";
 import { refreshContentState } from "@/content/contentState";
 import { errorText } from "@/lib/helpers";
+import { mpRelayTraffic } from "@/multiplayer/bindings";
 import { notify } from "@/notify/notify";
 import { setMusicSuspended } from "@/sound/music";
 import { playEvent } from "@/sound/play";
@@ -25,9 +27,11 @@ import {
   playLaunch,
   playLaunchReplay,
   playLaunchSave,
+  playStatus,
 } from "./bindings";
 import { LaunchContentProvider } from "./LaunchContentProvider";
 import { CrashDrawer } from "./pages/components/CrashDrawer";
+import { ASK_EVERY_MS } from "./relayCarrying";
 import { type CrashContext, useCrashTriage } from "./useCrashTriage";
 
 /** Which kind of run is live, for labelling. A campaign mission launches through
@@ -108,8 +112,13 @@ interface SaveOpts {
 }
 
 interface PlayContextValue {
-  /** True while any game/replay is running (app-wide — only one at a time). */
+  /**
+   * True while an engine process is up (app-wide, only one at a time). Getting
+   * ready to start one is `starting`, and is not being in a game.
+   */
   running: boolean;
+  /** True from pressing launch until the engine process exists. */
+  starting: boolean;
   /** Run id of the live game, for `focusGame`. Null when idle. */
   activeRunId: string | null;
   kind: RunKind | null;
@@ -138,9 +147,9 @@ interface PlayContextValue {
   /** Bring the running game's window to the foreground (best-effort). */
   focusGame: () => void;
   /**
-   * Force-quit the running game and immediately clear run state, regardless of
-   * whether the engine cooperates or the launch promise ever settles. The
-   * escape hatch for a stuck "In game" badge (#925).
+   * Force-quit the running game or abandon a launch still getting ready, and
+   * immediately clear run state, regardless of whether the engine cooperates or
+   * the launch promise ever settles. The escape hatch for a stuck badge (#925).
    */
   cancel: () => void;
 }
@@ -152,6 +161,15 @@ export function usePlay(): PlayContextValue {
   const ctx = useContext(PlayContext);
   if (!ctx) throw new Error("usePlay must be used within PlayProvider");
   return ctx;
+}
+
+/** The runs Rust says have an engine up, or null when it could not be asked. */
+async function liveRuns(): Promise<string[] | null> {
+  try {
+    return (await playStatus({})).runs;
+  } catch {
+    return null;
+  }
 }
 
 /** Refresh the content state from disk and refuse an engine it no longer
@@ -193,19 +211,25 @@ async function writeWidgetSet(
 
 export function PlayProvider({ children }: { children: ReactNode }) {
   const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(false);
+  // A run found after a webview reload. Its launch promise went with the old
+  // page, so nothing will say when it ends unless Rust is asked.
+  const [adoptedRunId, setAdoptedRunId] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [kind, setKind] = useState<RunKind | null>(null);
   // The run whose traffic goes through this machine's relay, by id rather than
   // as a flag, so the pill that warns about it is naming a game rather than
   // reading that a relay exists somewhere (#2097).
   const [relayedRunId, setRelayedRunId] = useState<string | null>(null);
-  // Synchronous guard: `running` state lags a render behind, so gate on a ref to
-  // reject a second launch without disturbing the in-flight run.
-  const runningRef = useRef(false);
+  // Synchronous guard: state lags a render behind, so gate on a ref to reject a
+  // second launch without disturbing the in-flight run.
+  const phaseRef = useRef<"idle" | "starting" | "running">("idle");
   // Tracks which run id is current, so a launch promise that settles late (after
   // `cancel` already cleared state, or after a second run started) doesn't
   // clobber a run it no longer belongs to.
   const activeRunIdRef = useRef<string | null>(null);
+  // `start` is built before `adopt`, and reaches it through here.
+  const adoptRef = useRef<(runId: string) => void>(() => {});
   // Crash triage (#379). It lives here because every launch in the app goes
   // through `start`, so one drawer covers all of them.
   const {
@@ -216,10 +240,12 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   } = useCrashTriage();
 
   const clearRun = useCallback(() => {
-    runningRef.current = false;
+    phaseRef.current = "idle";
     activeRunIdRef.current = null;
     setMusicSuspended("game", false);
     setRunning(false);
+    setStarting(false);
+    setAdoptedRunId(null);
     setActiveRunId(null);
     setKind(null);
     setRelayedRunId(null);
@@ -238,31 +264,85 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         relayed,
       }: Pick<LaunchOpts, "onEngineStarted" | "relayed"> = {},
     ) => {
-      if (runningRef.current) throw new Error("a game is already running");
-      runningRef.current = true;
-      // The engine folder can be deleted while coilbox runs. Check the disk now
-      // rather than start a process that cannot exist.
-      let enginePath: string | undefined;
-      try {
-        enginePath = await assertEngineInstalled(ctx.engine);
-      } catch (e) {
-        runningRef.current = false;
-        throw e;
+      // A badge can outlive its engine if a launch promise never settles. Only a
+      // process that is really there may refuse the player.
+      if (phaseRef.current === "running") {
+        const held = activeRunIdRef.current;
+        const live = await liveRuns();
+        if (
+          held &&
+          live &&
+          !live.includes(held) &&
+          activeRunIdRef.current === held
+        ) {
+          console.warn(`play: run ${held} has no engine, clearing it`);
+          clearRun();
+        }
       }
-      // Not for a replay, which mostly does not name its game, so writing for
-      // the one that does would make replays differ by how they were opened.
-      if (enginePath && ctx.game && runKind !== "replay") {
-        await writeWidgetSet(enginePath, ctx.dataDir, ctx.game);
+      if (phaseRef.current === "starting") {
+        console.warn("play: launch refused, another is getting ready");
+        throw new Error(t`A launch is already starting.`);
+      }
+      if (phaseRef.current === "running") {
+        console.warn("play: launch refused, an engine is up");
+        throw new Error("a game is already running");
       }
       const runId = crypto.randomUUID();
+      phaseRef.current = "starting";
       activeRunIdRef.current = runId;
+      setStarting(true);
+      setActiveRunId(runId);
+      setKind(runKind);
+      // Set to null for every ordinary launch as well as recorded for a relayed
+      // one, so a run that has nothing to do with a relay says so rather than
+      // inheriting whatever the last one left behind.
+      setRelayedRunId(relayed ? runId : null);
+      try {
+        // An engine this page never launched, left from before a reload.
+        const found = (await liveRuns())?.[0];
+        if (found && activeRunIdRef.current === runId) {
+          console.warn(`play: launch refused, run ${found} is already up`);
+          adoptRef.current(found);
+          throw new Error("a game is already running");
+        }
+        // The engine folder can be deleted while coilbox runs. Check the disk
+        // now rather than start a process that cannot exist.
+        const enginePath = await assertEngineInstalled(ctx.engine);
+        // Not for a replay, which mostly does not name its game, so writing for
+        // the one that does would make replays differ by how they were opened.
+        if (
+          activeRunIdRef.current === runId &&
+          enginePath &&
+          ctx.game &&
+          runKind !== "replay"
+        ) {
+          await writeWidgetSet(enginePath, ctx.dataDir, ctx.game);
+        }
+      } catch (e) {
+        if (activeRunIdRef.current === runId) clearRun();
+        throw e;
+      }
+      // The player gave up on this launch while it was getting ready. Both nulls
+      // are what a cancelled run answers.
+      if (activeRunIdRef.current !== runId) {
+        return { exitCode: null, signal: null };
+      }
       const onEvent = new Channel<LaunchEvent>();
       // The authoritative unfreeze is the launch promise resolving, so nothing
       // here reads the exit. `started` is the only moment on this channel that
       // says anything the promise cannot: the engine now exists as a process,
-      // which is what a caller needs before it can ask anything about it.
+      // so this is where the player is in a game. An engine that arrives after
+      // the player gave up on its launch has nobody waiting for it.
       onEvent.onmessage = (event) => {
-        if (event.kind === "started") onEngineStarted?.(runId);
+        if (event.kind !== "started") return;
+        if (activeRunIdRef.current !== runId) {
+          void playCancel({ runId }).catch(() => {});
+          return;
+        }
+        phaseRef.current = "running";
+        setStarting(false);
+        setRunning(true);
+        onEngineStarted?.(runId);
       };
       // Every launch comes through here - skirmish, battle, campaign, conquest,
       // a saved game and a replay - so one sound covers the lot. Deliberately
@@ -277,13 +357,6 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       // Recorded before the engine starts, so crash triage can tell this run's
       // log from the one an earlier session left behind (#379).
       const startedAtMs = Date.now();
-      setRunning(true);
-      setActiveRunId(runId);
-      setKind(runKind);
-      // Set to null for every ordinary launch as well as recorded for a relayed
-      // one, so a run that has nothing to do with a relay says so rather than
-      // inheriting whatever the last one left behind.
-      setRelayedRunId(relayed ? runId : null);
       try {
         const outcome = await run(runId, onEvent);
         // Only triage the run that is still current. A run the user cancelled
@@ -306,6 +379,56 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     },
     [clearRun, inspect],
   );
+
+  // Take on a run whose launch this page does not hold. Only the launch knew
+  // whether a relay carries it, so a relay being up is read as carrying it: a
+  // needless question on the X costs far less than ending a game for everybody.
+  const adopt = useCallback((runId: string) => {
+    phaseRef.current = "running";
+    activeRunIdRef.current = runId;
+    setMusicSuspended("game", true);
+    setStarting(false);
+    setRunning(true);
+    setActiveRunId(runId);
+    setKind(null);
+    setRelayedRunId(null);
+    setAdoptedRunId(runId);
+    void mpRelayTraffic({})
+      .then(({ relaying }) => {
+        if (relaying && activeRunIdRef.current === runId) {
+          setRelayedRunId(runId);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  adoptRef.current = adopt;
+
+  useEffect(() => {
+    let mounted = true;
+    void liveRuns().then((runs) => {
+      const found = runs?.[0];
+      if (mounted && found && phaseRef.current === "idle") adopt(found);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [adopt]);
+
+  useEffect(() => {
+    if (!adoptedRunId) return;
+    const timer = setInterval(() => {
+      void liveRuns().then((runs) => {
+        if (
+          runs &&
+          !runs.includes(adoptedRunId) &&
+          activeRunIdRef.current === adoptedRunId
+        ) {
+          clearRun();
+        }
+      });
+    }, ASK_EVERY_MS);
+    return () => clearInterval(timer);
+  }, [adoptedRunId, clearRun]);
 
   const launch = useCallback(
     (
@@ -394,6 +517,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     <PlayContext.Provider
       value={{
         running,
+        starting,
         activeRunId,
         kind,
         relayed: activeRunId !== null && activeRunId === relayedRunId,

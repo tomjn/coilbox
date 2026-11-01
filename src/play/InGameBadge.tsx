@@ -21,6 +21,10 @@ import {
  * (best-effort). The X force-quits it and clears the run state, an escape hatch
  * for when the badge is stuck because a launch never resolved (#925).
  *
+ * Before the engine process exists it says "Starting game" instead, because the
+ * player is not in a game yet and nothing has appeared that they could close. Its
+ * X abandons the launch.
+ *
  * A game the host is relaying gets two things more, and an ordinary game gets
  * neither, because there is nothing to say about one (issue #2024). It says how
  * much the relay is carrying, so a game that has quietly stopped can be told
@@ -56,9 +60,28 @@ import {
  */
 export default function InGameBadge() {
   const { t } = useLingui();
-  const { running, relayed, focusGame, cancel } = usePlay();
+  const { running, starting, relayed, focusGame, cancel } = usePlay();
   const relay = useRelayCarrying(running && relayed);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  if (starting) {
+    return (
+      <div className="flex animate-pulse items-center gap-1 rounded-full bg-orange-500/15 py-1 pl-3 pr-1 text-xs font-medium text-orange-600 motion-reduce:animate-none dark:text-orange-400">
+        <span className="size-2 rounded-full bg-orange-500" />
+        <Trans>Starting game</Trans>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={cancel}
+          title={t`Cancel launch`}
+          aria-label={t`Cancel launch`}
+          className="h-6 shrink-0 px-1 text-orange-600 hover:bg-orange-500/25 hover:text-orange-700 dark:text-orange-400"
+        >
+          <X size={12} />
+        </Button>
+      </div>
+    );
+  }
   if (!running) return null;
   return (
     <div className="flex animate-pulse items-center gap-1 rounded-full bg-orange-500/15 py-1 pl-3 pr-1 text-xs font-medium text-orange-600 hover:bg-orange-500/25 motion-reduce:animate-none dark:text-orange-400">
