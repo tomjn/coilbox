@@ -37,6 +37,7 @@ import {
   mpSetBattleStatus,
   mpSetScriptTags,
   mpSetStartRect,
+  mpSetStatus,
   mpStartBattle,
   mpUnboss,
   mpUpdateBattleInfo,
@@ -335,6 +336,11 @@ export interface BattleRoomView {
    *  the provider's job, since MYSTATUS carries the away bit on the same line. */
   setIngame: (ingame: boolean) => void;
   /**
+   * Tell the server we are not in game, whatever we last told it. The usual path
+   * sends only a change, so it cannot correct a flag the server holds out of date.
+   */
+  clearStaleIngame: () => void;
+  /**
    * Whether the server, not the room, decides our colour, faction and team. True
    * on a Tachyon connection, where colours are assigned when the match starts
    * and the server seats a player within their ally team. The controls for those
@@ -492,6 +498,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
       ? state.battles[String(state.currentBattle)]
       : undefined;
   const me = state?.myUsername ?? null;
+  const myAway = (me && state?.users[me]?.status.away) || false;
+  const clearStaleIngame = useCallback(() => {
+    if (!activeKey) return;
+    mpSetStatus({ serverKey: activeKey, ingame: false, away: myAway }).catch(
+      (e) => console.warn("multiplayer: MYSTATUS failed", e),
+    );
+  }, [activeKey, myAway]);
   const myStatus = me ? battle?.members[me] : undefined;
   const isFounder = !!battle && !!me && battle.host === me;
 
@@ -1556,6 +1569,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
       });
     },
     setIngame,
+    clearStaleIngame,
     hostControls,
     addableAis,
     addableAisReady,

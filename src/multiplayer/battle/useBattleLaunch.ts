@@ -123,84 +123,94 @@ export function useBattleLaunch(
   const { setProvenance } = useReplayUserState();
   const [error, setError] = useState<string | null>(null);
 
-  const doLaunch = useCallback(async () => {
-    if (!serverKey || !target) return;
-    if (blocked) {
-      setError(blocked);
-      return;
-    }
-    setError(null);
-    // Snapshot the replays before the engine runs, so any new file afterwards
-    // can be tagged as multiplayer. Best-effort: a failure here just disables
-    // tagging for this launch, never the launch itself.
-    let beforePaths: Set<string> | null = null;
-    try {
-      const replays = await loadReplays(target.dataDir, true);
-      beforePaths = new Set(replays.map((r) => r.path));
-    } catch {
-      beforePaths = null;
-    }
-    try {
-      // A host connects to nobody, so only joiners get vetted. That holds on
-      // the relay route too: the host binds loopback and the relay agent dials
-      // in, so there is still no remote address for this machine to reach.
-      let config: BattleConfig;
-      // Whether this machine's relay is carrying the game about to start
-      // (issues #2097 and #2099). Two things read it: the in-game pill, which
-      // warns that its X ends the game for everybody, and the sidecar, which is
-      // told which process to stop relaying behind.
-      //
-      // It comes back with the config rather than being worked out here,
-      // because the config is built from the relay handle held against this
-      // connection and this is that same handle said out loud. Nothing out here
-      // can pair the config for one battle with the verdict for another. The
-      // route the hosting form settled on is deliberately not read: it is a
-      // record of what the form chose, not of what the connection is doing,
-      // and `serverKey` here is the battle room's own connection (issue #2844).
-      //
-      // A joiner is never relaying. Only the host runs a sidecar, and only for
-      // the battle they opened.
-      let relayed = false;
-      if (host) {
-        const built = await mpBuildHostConfig({ serverKey });
-        config = built.config;
-        relayed = built.relayed;
-      } else {
-        const built = await mpBuildBattleConfig({ serverKey });
-        const refusal = await vetHostAddress(
-          built.config.hostIp,
-          built.config.hostPort,
-          built.natType,
-        );
-        if (refusal) {
-          setError(refusal);
-          return;
+  const doLaunch = useCallback(
+    async (opts?: {
+      /** Called once the engine process exists. */
+      onEngineStarted?: () => void;
+    }) => {
+      if (!serverKey || !target) return;
+      if (blocked) {
+        setError(blocked);
+        return;
+      }
+      setError(null);
+      // Snapshot the replays before the engine runs, so any new file afterwards
+      // can be tagged as multiplayer. Best-effort: a failure here just disables
+      // tagging for this launch, never the launch itself.
+      let beforePaths: Set<string> | null = null;
+      try {
+        const replays = await loadReplays(target.dataDir, true);
+        beforePaths = new Set(replays.map((r) => r.path));
+      } catch {
+        beforePaths = null;
+      }
+      try {
+        // A host connects to nobody, so only joiners get vetted. That holds on
+        // the relay route too: the host binds loopback and the relay agent dials
+        // in, so there is still no remote address for this machine to reach.
+        let config: BattleConfig;
+        // Whether this machine's relay is carrying the game about to start
+        // (issues #2097 and #2099). Two things read it: the in-game pill, which
+        // warns that its X ends the game for everybody, and the sidecar, which is
+        // told which process to stop relaying behind.
+        //
+        // It comes back with the config rather than being worked out here,
+        // because the config is built from the relay handle held against this
+        // connection and this is that same handle said out loud. Nothing out here
+        // can pair the config for one battle with the verdict for another. The
+        // route the hosting form settled on is deliberately not read: it is a
+        // record of what the form chose, not of what the connection is doing,
+        // and `serverKey` here is the battle room's own connection (issue #2844).
+        //
+        // A joiner is never relaying. Only the host runs a sidecar, and only for
+        // the battle they opened.
+        let relayed = false;
+        if (host) {
+          const built = await mpBuildHostConfig({ serverKey });
+          config = built.config;
+          relayed = built.relayed;
+        } else {
+          const built = await mpBuildBattleConfig({ serverKey });
+          const refusal = await vetHostAddress(
+            built.config.hostIp,
+            built.config.hostPort,
+            built.natType,
+          );
+          if (refusal) {
+            setError(refusal);
+            return;
+          }
+          config = built.config;
         }
-        config = built.config;
+        const tellTheRelay = tellTheRelayAboutTheEngine(relayed, serverKey);
+        const res = await launch("battle", {
+          config,
+          executable: target.executable,
+          dataDir: target.dataDir,
+          relayed,
+          onEngineStarted: (runId) => {
+            opts?.onEngineStarted?.();
+            tellTheRelay?.(runId);
+          },
+        });
+        if (res.exitCode && res.exitCode !== 0) {
+          const code = res.exitCode;
+          setError(t`Engine exited with code ${code}.`);
+        }
+        if (beforePaths && res.exitCode !== null) {
+          tagAndIngestFreshReplay(
+            target,
+            beforePaths,
+            { mode: "multiplayer" },
+            setProvenance,
+          );
+        }
+      } catch (e) {
+        setError(describeError(e));
       }
-      const res = await launch("battle", {
-        config,
-        executable: target.executable,
-        dataDir: target.dataDir,
-        relayed,
-        onEngineStarted: tellTheRelayAboutTheEngine(relayed, serverKey),
-      });
-      if (res.exitCode && res.exitCode !== 0) {
-        const code = res.exitCode;
-        setError(t`Engine exited with code ${code}.`);
-      }
-      if (beforePaths && res.exitCode !== null) {
-        tagAndIngestFreshReplay(
-          target,
-          beforePaths,
-          { mode: "multiplayer" },
-          setProvenance,
-        );
-      }
-    } catch (e) {
-      setError(describeError(e));
-    }
-  }, [serverKey, target, host, blocked, launch, setProvenance]);
+    },
+    [serverKey, target, host, blocked, launch, setProvenance],
+  );
 
   return { running, error, launch: doLaunch };
 }

@@ -8,7 +8,13 @@
 
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,6 +25,12 @@ const state = vi.hoisted(() => ({
   roomHookCalled: false,
   /** What the room gave the chat card last. */
   chatProps: null as { canChangeMap: boolean } | null,
+  /** What `useBattleLaunch` answers. */
+  launch: {
+    running: false,
+    error: null,
+    launch: (() => {}) as (opts?: { onEngineStarted?: () => void }) => unknown,
+  },
 }));
 
 vi.mock("@/components/ui/popover", () => ({
@@ -97,7 +109,7 @@ vi.mock("@/startbox/StartBoxControls", () => ({
   }),
 }));
 vi.mock("../battle/useBattleLaunch", () => ({
-  useBattleLaunch: () => ({ running: false, error: null, launch: vi.fn() }),
+  useBattleLaunch: () => state.launch,
 }));
 vi.mock("../battle/useRejoinRequest", () => ({ useRejoinRequest: vi.fn() }));
 vi.mock("../notes", () => ({
@@ -267,6 +279,7 @@ function roomFor(engine: string, over: Record<string, unknown> = {}) {
     canEditRestrictions: false,
     hostControls: {},
     setIngame: vi.fn(),
+    clearStaleIngame: vi.fn(),
     setReady: vi.fn(),
     setSpectator: vi.fn(),
     setLocked: vi.fn(),
@@ -290,6 +303,7 @@ beforeEach(() => {
   state.joined = null;
   state.roomHookCalled = false;
   state.chatProps = null;
+  state.launch = { running: false, error: null, launch: vi.fn() };
 });
 afterEach(cleanup);
 
@@ -328,5 +342,55 @@ describe("a Recoil battle", () => {
     ]) {
       expect(screen.getByTestId(id)).toBeTruthy();
     }
+  });
+});
+
+describe("a Recoil host's in-game flag", () => {
+  const hosting = { selfHost: true, isFounder: true };
+
+  it("is raised when the engine exists, and dropped when it exits", async () => {
+    let engineStarted: (() => void) | undefined;
+    let engineExits: () => void = () => {};
+    state.launch.launch = (opts) => {
+      engineStarted = opts?.onEngineStarted;
+      return new Promise<void>((resolve) => {
+        engineExits = resolve;
+      });
+    };
+    const setIngame = vi.fn();
+    state.room = roomFor("spring", { ...hosting, setIngame });
+    show();
+
+    fireEvent.click(screen.getByRole("button", { name: /start/i }));
+    expect(setIngame).not.toHaveBeenCalled();
+
+    act(() => engineStarted?.());
+    expect(setIngame).toHaveBeenLastCalledWith(true);
+
+    await act(async () => engineExits());
+    expect(setIngame).toHaveBeenLastCalledWith(false);
+  });
+
+  it("is cleared when the server holds it with no engine behind it", () => {
+    const clearStaleIngame = vi.fn();
+    state.room = roomFor("spring", {
+      ...hosting,
+      hostIngame: true,
+      clearStaleIngame,
+    });
+    show();
+    expect(clearStaleIngame).toHaveBeenCalledTimes(1);
+  });
+
+  it("is left alone while the engine is up", () => {
+    const clearStaleIngame = vi.fn();
+    state.launch.running = true;
+    state.room = roomFor("spring", {
+      ...hosting,
+      hostIngame: true,
+      clearStaleIngame,
+    });
+    show();
+    expect(clearStaleIngame).not.toHaveBeenCalled();
   });
 });

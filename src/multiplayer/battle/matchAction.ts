@@ -28,7 +28,10 @@ export interface MatchState {
 
 export function matchAction(s: MatchState): MatchAction {
   if (!s.hostIngame) return "start";
-  if (s.selfHost || s.running || s.launching) return "ingame";
+  if (s.running || s.launching) return "ingame";
+  // Our own in-game flag with no engine behind it is out of date. Nobody can be
+  // in a match we host and are not running.
+  if (s.selfHost) return "start";
   return s.presentAtStart ? "rejoin" : "watch";
 }
 
