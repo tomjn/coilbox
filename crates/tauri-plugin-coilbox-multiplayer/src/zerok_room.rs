@@ -689,6 +689,52 @@ pub(crate) fn option_actions(
     .collect()
 }
 
+/// The option commands that withdraw a set of script tags.
+///
+/// `SetModOptions` and `SetMapOptions` assign the dictionary they are handed, so
+/// a tag is withdrawn by sending the rest of its namespace. A namespace the tags
+/// do not touch sends nothing. A namespace left with nothing still sends, because
+/// the empty dictionary is what clears the room's last option.
+pub(crate) fn option_removal_actions(state: &LobbyState, tags: &[String]) -> Vec<RoomAction> {
+    let current = state
+        .current_battle
+        .and_then(|id| state.battles.get(&id))
+        .map(|battle| &battle.script_tags);
+    let namespace = |prefix: &str| -> Option<BTreeMap<String, String>> {
+        let removed: Vec<String> = tags
+            .iter()
+            .filter_map(|key| Some(key.to_lowercase().strip_prefix(prefix)?.to_owned()))
+            .collect();
+        if removed.is_empty() {
+            return None;
+        }
+        Some(
+            current
+                .into_iter()
+                .flatten()
+                .filter_map(|(key, value)| {
+                    let key = key.to_lowercase();
+                    let name = key.strip_prefix(prefix)?;
+                    (!removed.iter().any(|r| r == name)).then(|| (name.to_owned(), value.clone()))
+                })
+                .collect(),
+        )
+    };
+
+    let mod_options = namespace("game/modoptions/").map(|mut options| {
+        options.retain(|key, value| !mod_option_stays_out(key, value));
+        options
+    });
+    let map_options = namespace("game/mapoptions/");
+    [
+        mod_options.map(RoomAction::ModOptions),
+        map_options.map(RoomAction::MapOptions),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
 /// The battle mode a room opens in, by the name the frontend picks it by.
 ///
 /// A mode upstream cannot place is answered with "Incorrect battle type" and

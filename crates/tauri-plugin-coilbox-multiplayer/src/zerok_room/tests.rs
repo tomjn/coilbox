@@ -726,6 +726,51 @@ fn editing_one_option_sends_the_rooms_other_options_with_it() {
     );
 }
 
+/// Upstream assigns what it is handed, so a tag is withdrawn by leaving it out.
+#[test]
+fn withdrawing_an_option_sends_the_rest_of_its_namespace() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetModOptions {"Options":{"MaxUnits":"2000","Commanders":"1"}}"#,
+    );
+    feed(
+        &mut state,
+        r#"SetMapOptions {"Options":{"WaterLevel":"-50"}}"#,
+    );
+
+    let actions = option_removal_actions(&state, &["game/modoptions/MaxUnits".to_string()]);
+
+    assert_eq!(
+        replies(&state, &actions),
+        vec![r#"SetModOptions {"Options":{"commanders":"1"}}"#],
+        "the other mod option is kept and the map options are not sent"
+    );
+}
+
+#[test]
+fn withdrawing_the_last_option_sends_an_empty_namespace() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetMapOptions {"Options":{"WaterLevel":"-50"}}"#,
+    );
+
+    let actions = option_removal_actions(&state, &["game/mapoptions/waterlevel".to_string()]);
+
+    assert_eq!(
+        replies(&state, &actions),
+        vec![r#"SetMapOptions {"Options":{}}"#],
+    );
+}
+
+#[test]
+fn withdrawing_a_unit_restriction_sends_nothing() {
+    let state = in_room();
+    let actions = option_removal_actions(&state, &["game/restrict/unit0".to_string()]);
+    assert!(actions.is_empty());
+}
+
 #[test]
 fn an_edit_with_a_differently_cased_key_replaces_the_option_it_names() {
     let mut state = in_room();
