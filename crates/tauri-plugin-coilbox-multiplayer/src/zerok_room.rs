@@ -51,6 +51,7 @@ use coilbox_lobby_protocol::{
 };
 use coilbox_zerok_protocol::types::{self, SayPlace, SyncStatuses};
 use coilbox_zerok_protocol::ZerokMessage;
+use tauri_plugin_coilbox_play::script::mod_option_stays_out;
 
 use crate::tachyon_room::VoteChoice;
 
@@ -654,7 +655,7 @@ pub(crate) fn option_actions(
         .current_battle
         .and_then(|id| state.battles.get(&id))
         .map(|battle| &battle.script_tags);
-    let namespace = |prefix: &str| -> BTreeMap<String, String> {
+    let namespace = |prefix: &str| -> Option<BTreeMap<String, String>> {
         let named = |source: &BTreeMap<String, String>| -> Vec<(String, String)> {
             source
                 .iter()
@@ -666,19 +667,22 @@ pub(crate) fn option_actions(
         };
         let edits = named(tags);
         if edits.is_empty() {
-            return BTreeMap::new();
+            return None;
         }
         let mut whole: BTreeMap<String, String> =
             current.map(named).into_iter().flatten().collect();
         whole.extend(edits);
-        whole
+        Some(whole)
     };
 
-    let mod_options = namespace("game/modoptions/");
+    let mod_options = namespace("game/modoptions/").map(|mut options| {
+        options.retain(|key, value| !mod_option_stays_out(key, value));
+        options
+    });
     let map_options = namespace("game/mapoptions/");
     [
-        (!mod_options.is_empty()).then_some(RoomAction::ModOptions(mod_options)),
-        (!map_options.is_empty()).then_some(RoomAction::MapOptions(map_options)),
+        mod_options.map(RoomAction::ModOptions),
+        map_options.map(RoomAction::MapOptions),
     ]
     .into_iter()
     .flatten()

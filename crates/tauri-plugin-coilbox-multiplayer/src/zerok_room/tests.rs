@@ -756,3 +756,59 @@ fn tags_outside_both_namespaces_send_nothing() {
 
     assert!(option_actions(&state, &edit).is_empty());
 }
+
+/// The server starts the match from these options, so a -1 sent here kills every
+/// commander as surely as one in a script coilbox writes.
+#[test]
+fn sudden_death_switched_off_is_not_sent_to_the_server() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetModOptions {"Options":{"MaxUnits":"2000"}}"#,
+    );
+    let mut edit = BTreeMap::new();
+    edit.insert(
+        "game/modoptions/sudden_death_minutes".to_string(),
+        "-1".to_string(),
+    );
+
+    assert_eq!(
+        replies(&state, &option_actions(&state, &edit)),
+        vec![r#"SetModOptions {"Options":{"maxunits":"2000"}}"#]
+    );
+}
+
+#[test]
+fn switching_sudden_death_off_clears_a_value_the_room_already_holds() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetModOptions {"Options":{"sudden_death_minutes":"30"}}"#,
+    );
+    let mut edit = BTreeMap::new();
+    edit.insert(
+        "game/modoptions/sudden_death_minutes".to_string(),
+        "-1".to_string(),
+    );
+
+    assert_eq!(
+        replies(&state, &option_actions(&state, &edit)),
+        vec![r#"SetModOptions {"Options":{}}"#],
+        "the namespace is replaced whole, so sending nothing would leave the 30 in place"
+    );
+}
+
+#[test]
+fn sudden_death_set_to_a_time_is_sent_to_the_server() {
+    let state = in_room();
+    let mut edit = BTreeMap::new();
+    edit.insert(
+        "game/modoptions/sudden_death_minutes".to_string(),
+        "30".to_string(),
+    );
+
+    assert_eq!(
+        replies(&state, &option_actions(&state, &edit)),
+        vec![r#"SetModOptions {"Options":{"sudden_death_minutes":"30"}}"#]
+    );
+}

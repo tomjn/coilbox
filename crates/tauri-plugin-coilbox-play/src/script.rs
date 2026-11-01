@@ -162,6 +162,19 @@ pub struct AllyTeam {
     pub start_rect: Option<[f32; 4]>,
 }
 
+/// Whether a mod option must not reach the game at all.
+///
+/// Zero-K declares `sudden_death_minutes` with a default of -1, meaning off, but
+/// its gadget only switches off when the option is absent. Given -1 it starts
+/// sudden death before frame 0 and kills every commander.
+pub fn mod_option_stays_out(key: &str, value: &str) -> bool {
+    key.eq_ignore_ascii_case("sudden_death_minutes")
+        && value
+            .trim()
+            .parse::<f64>()
+            .is_ok_and(|minutes| minutes < 0.0)
+}
+
 /// Render a `BattleConfig` into the engine's `[GAME]{ ... }` start-script text.
 ///
 /// Refuses a script holding a value that would change what the script says. See
@@ -278,9 +291,14 @@ pub fn generate_script(cfg: &BattleConfig) -> Result<String, String> {
         });
     }
 
-    if !cfg.mod_options.is_empty() {
+    let mod_options: Vec<_> = cfg
+        .mod_options
+        .iter()
+        .filter(|(k, v)| !mod_option_stays_out(k, v))
+        .collect();
+    if !mod_options.is_empty() {
         section(&mut s, 1, "MODOPTIONS", |s| {
-            for (k, v) in &cfg.mod_options {
+            for (k, v) in mod_options {
                 kv(s, 2, k, v);
             }
         });
@@ -629,6 +647,41 @@ mod tests {
         let s = generate_script(&cfg).unwrap();
         assert!(s.contains("[MODOPTIONS]"));
         assert!(s.contains("startmetal=1000;"));
+    }
+
+    #[test]
+    fn zero_k_sudden_death_stays_out_of_the_script_when_switched_off() {
+        for off in ["-1", "-1.0", " -1 ", "-5"] {
+            let mut cfg = sample();
+            cfg.mod_options
+                .insert("sudden_death_minutes".into(), off.into());
+            cfg.mod_options
+                .insert("sudden_death_sweep_seconds".into(), "60".into());
+            let s = generate_script(&cfg).unwrap();
+            assert!(!s.contains("sudden_death_minutes"), "{off:?}");
+            assert!(s.contains("sudden_death_sweep_seconds=60;"), "{off:?}");
+        }
+    }
+
+    #[test]
+    fn zero_k_sudden_death_stays_in_the_script_when_set() {
+        for on in ["0", "30", "2000"] {
+            let mut cfg = sample();
+            cfg.mod_options
+                .insert("sudden_death_minutes".into(), on.into());
+            let s = generate_script(&cfg).unwrap();
+            assert!(s.contains(&format!("sudden_death_minutes={on};")), "{on:?}");
+        }
+    }
+
+    #[test]
+    fn a_script_with_only_sudden_death_switched_off_has_no_empty_mod_options_block() {
+        let mut cfg = sample();
+        cfg.mod_options.clear();
+        cfg.mod_options
+            .insert("sudden_death_minutes".into(), "-1".into());
+        let s = generate_script(&cfg).unwrap();
+        assert!(!s.contains("[MODOPTIONS]"));
     }
 
     #[test]
