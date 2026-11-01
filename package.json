@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "bash scripts/dev-vite.sh",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "bun scripts/tauri.mjs",

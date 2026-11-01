@@ -14,12 +14,66 @@
     <script>
       try {
         const bg = localStorage.getItem("coilbox.bootBackground");
-        if (bg) document.documentElement.style.background = bg;
+        if (bg) {
+          document.documentElement.style.background = bg;
+          document.documentElement.style.setProperty("--boot-background", bg);
+        }
       } catch {}
+      // Match the theme picoframe will apply, so the boot screen does not flip when
+      // it takes over. It stores the mode as JSON under this key.
+      let dark = matchMedia("(prefers-color-scheme: dark)").matches;
+      try {
+        const mode = JSON.parse(localStorage.getItem("picoframe.theme"));
+        if (mode === "dark" || mode === "light") dark = mode === "dark";
+      } catch {}
+      document.documentElement.classList.toggle("dark", dark);
     </script>
+    <style>
+      .boot-screen {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: var(--boot-background, #fff);
+        color: hsl(240 6% 12%);
+      }
+      .dark .boot-screen {
+        background: var(--boot-background, hsl(240 6% 7%));
+        color: hsl(0 0% 95%);
+      }
+      .boot-screen::after {
+        content: "";
+        width: 28px;
+        height: 28px;
+        border: 3px solid;
+        border-right-color: transparent;
+        border-radius: 50%;
+        opacity: 0.6;
+        animation:
+          boot-screen-in 200ms 300ms both,
+          boot-screen-spin 800ms linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-screen::after {
+          animation: boot-screen-in 200ms 300ms both;
+        }
+      }
+      @keyframes boot-screen-in {
+        from {
+          opacity: 0;
+        }
+      }
+      @keyframes boot-screen-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-screen" role="status" aria-label="Loading"></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
