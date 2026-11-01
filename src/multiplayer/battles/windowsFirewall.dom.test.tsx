@@ -25,7 +25,7 @@
  * A fourth since: that a machine which refuses the read keeps the button. Some
  * machines deny an unelevated `Get-NetFirewallRule` outright, and that host is
  * exactly the one for whom adding the rules still works, because adding them
- * elevates.
+ * elevates. It only offers them there, because nothing is known to be wrong.
  */
 
 import {
@@ -61,6 +61,7 @@ function blocked(): Firewall {
       },
     ],
     problem: null,
+    unread: null,
   };
 }
 
@@ -79,11 +80,8 @@ function unreadable(): Firewall {
   return {
     programs: answer.programs.map((p) => ({ ...p, allowed: null })),
     supported: true,
-    problem: {
-      title: "Windows would not let coilbox check the firewall rules",
-      details: ["Get-NetFirewallRule : Access is denied."],
-      fault: false,
-    },
+    problem: null,
+    unread: ["Get-NetFirewallRule : Access is denied."],
   };
 }
 
@@ -96,7 +94,7 @@ async function draw(engine: string | null = "C:\\e\\105.1.1\\spring.exe") {
 
 /** The button that raises the administrator prompt, or null when there is none. */
 const allowButton = () =>
-  screen.queryByRole("button", { name: /Allow them through/ });
+  screen.queryByRole("button", { name: /Allow them through|Allow in advance/ });
 
 beforeEach(() => {
   firewall.mockReset();
@@ -115,6 +113,7 @@ it("draws nothing when the machine has no Windows Firewall", async () => {
     supported: false,
     programs: [],
     problem: null,
+    unread: null,
   });
   await draw();
 
@@ -236,18 +235,17 @@ it("keeps the button when the call to add the rules fails outright", async () =>
  * The one this was written for. A machine that denies an unelevated
  * `Get-NetFirewallRule` is not a machine coilbox can do nothing for: adding the
  * rules raises an administrator prompt, which is the very thing the read was
- * missing. A panel that only said "could not be checked" three times read as
- * broken and hid a button that would have worked.
+ * missing. Nothing is known to be wrong there, and a card saying "could not be
+ * checked" three times sent a host looking for a port problem.
  */
-it("keeps offering to add the rules when Windows refuses to say what they are", async () => {
+it("offers the rules without a verdict when Windows refuses to say what they are", async () => {
   firewall.mockResolvedValue(unreadable());
   await draw();
 
-  expect(
-    screen.getByText(/would not let coilbox check the firewall rules/),
-  ).toBeTruthy();
-  expect(screen.getByText(/You can still add the rules/)).toBeTruthy();
-  expect(allowButton()).not.toBeNull();
+  expect(screen.getByText(/Windows may ask about the firewall/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Allow in advance" })).toBeTruthy();
+  expect(screen.queryByText(/could not be checked/)).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 /**
@@ -255,27 +253,65 @@ it("keeps offering to add the rules when Windows refuses to say what they are", 
  * out of the way. Folded, they are not in the accessible tree until somebody
  * asks.
  */
-it("folds away what Windows said rather than printing it in the drawer", async () => {
+it("folds away the programs and what Windows said", async () => {
   firewall.mockResolvedValue(unreadable());
   await draw();
 
+  expect(screen.queryByText(/Coilbox relay/)).toBeNull();
   expect(screen.queryByText(/Access is denied/)).toBeNull();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /What does this/ }));
+  });
+  expect(screen.getByText(/Coilbox relay/)).toBeTruthy();
 
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /Details/ }));
   });
-
   expect(screen.getByText(/Access is denied/)).toBeTruthy();
 });
 
-/**
- * Red is for something that went wrong. A machine that will not answer has not
- * gone wrong, and neither has a host who said no to the prompt, so neither gets
- * the alert role that would interrupt a screen reader.
- */
-it("does not raise an alert for a machine that simply will not answer", async () => {
+/** Saying no is still a choice that has to reach the screen on this machine. */
+it("says the administrator prompt was refused when the rules cannot be read", async () => {
   firewall.mockResolvedValue(unreadable());
+  firewallAllow.mockResolvedValue({
+    ...unreadable(),
+    problem: {
+      title: "The Windows administrator prompt was refused, so nothing changed",
+      details: [],
+      fault: false,
+    },
+  });
   await draw();
 
-  expect(screen.queryByRole("alert")).toBeNull();
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Allow in advance" }));
+  });
+
+  expect(screen.getByRole("status").textContent).toMatch(/prompt was refused/);
+  expect(screen.getByText(/Windows may ask about the firewall/)).toBeTruthy();
+  expect(allowButton()).not.toBeNull();
+});
+
+/** Adding the rules failing is a real fault, whatever the read said. */
+it("draws a failure to add the rules as a fault when the rules cannot be read", async () => {
+  firewall.mockResolvedValue(unreadable());
+  firewallAllow.mockResolvedValue({
+    ...unreadable(),
+    problem: {
+      title: "Windows would not let coilbox add the firewall rules",
+      details: ["Access is denied."],
+      fault: true,
+    },
+  });
+  await draw();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Allow in advance" }));
+  });
+
+  expect(screen.getByRole("alert").textContent).toMatch(
+    /would not let coilbox add/,
+  );
+  expect(allowButton()).not.toBeNull();
 });

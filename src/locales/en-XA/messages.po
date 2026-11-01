@@ -8606,6 +8606,10 @@ msgstr ""
 msgid "Allow bosses"
 msgstr ""
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Allow in advance"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Allow self-signed certificate"
 msgstr ""
@@ -21343,6 +21347,10 @@ msgstr ""
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 msgid "it could not be"
+msgstr ""
+
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "It covers {programs}."
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -44541,6 +44549,10 @@ msgstr ""
 msgid "Windows Firewall already allows every program hosting needs"
 msgstr ""
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Windows may ask about the firewall when your game starts. If it does, choose Allow."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Windup"
 msgstr ""
@@ -45045,10 +45057,6 @@ msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 msgid "You are still in your other battle"
-msgstr ""
-
-#: src/multiplayer/battles/WindowsFirewall.tsx
-msgid "You can still add the rules. Windows keeps one per program, so doing it twice changes nothing."
 msgstr ""
 
 #: src/lobby-servers/config.ts

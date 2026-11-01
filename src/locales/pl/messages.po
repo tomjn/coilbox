@@ -10617,6 +10617,10 @@ msgstr "Zezwól ponownie: {name}"
 msgid "Allow bosses"
 msgstr "Zezwól na szefów"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Allow in advance"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Allow self-signed certificate"
@@ -26248,6 +26252,10 @@ msgstr "Będzie kontynuowany, gdy znów będzie można odczytać mapę."
 #, fuzzy
 msgid "it could not be"
 msgstr "nie udało się"
+
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "It covers {programs}."
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -54799,6 +54807,10 @@ msgstr "Zapora systemu Windows"
 msgid "Windows Firewall already allows every program hosting needs"
 msgstr "Zapora systemu Windows już zezwala każdemu programowi potrzebnemu do hostowania"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Windows may ask about the firewall when your game starts. If it does, choose Allow."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Windup"
@@ -55422,11 +55434,6 @@ msgstr ""
 #, fuzzy
 msgid "You are still in your other battle"
 msgstr "Nadal jesteś w innym meczu"
-
-#: src/multiplayer/battles/WindowsFirewall.tsx
-#, fuzzy
-msgid "You can still add the rules. Windows keeps one per program, so doing it twice changes nothing."
-msgstr "Nadal możesz dodać reguły. Windows przechowuje jedną na program, więc dodanie dwa razy niczego nie zmienia."
 
 #: src/lobby-servers/config.ts
 #, fuzzy

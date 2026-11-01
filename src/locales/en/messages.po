@@ -8607,6 +8607,10 @@ msgstr "Allow {name} again"
 msgid "Allow bosses"
 msgstr "Allow bosses"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Allow in advance"
+msgstr "Allow in advance"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Allow self-signed certificate"
 msgstr "Allow self-signed certificate"
@@ -21345,6 +21349,10 @@ msgstr "It carries on once the map can be read again."
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 msgid "it could not be"
 msgstr "it could not be"
+
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "It covers {programs}."
+msgstr "It covers {programs}."
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "It did not record a unit changing hands, so a unit that was given away or captured is counted for its first owner throughout."
@@ -44542,6 +44550,10 @@ msgstr "Windows Firewall"
 msgid "Windows Firewall already allows every program hosting needs"
 msgstr "Windows Firewall already allows every program hosting needs"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Windows may ask about the firewall when your game starts. If it does, choose Allow."
+msgstr "Windows may ask about the firewall when your game starts. If it does, choose Allow."
+
 #: src/content/unitFieldNotes.ts
 msgid "Windup"
 msgstr "Windup"
@@ -45047,10 +45059,6 @@ msgstr "You are still in the Open Annihilation battle"
 #: src/multiplayer/battles/joinBattle.ts
 msgid "You are still in your other battle"
 msgstr "You are still in your other battle"
-
-#: src/multiplayer/battles/WindowsFirewall.tsx
-msgid "You can still add the rules. Windows keeps one per program, so doing it twice changes nothing."
-msgstr "You can still add the rules. Windows keeps one per program, so doing it twice changes nothing."
 
 #: src/lobby-servers/config.ts
 msgid "You cannot register a new account here. This server's verification emails are not being delivered."

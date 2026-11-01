@@ -10617,6 +10617,10 @@ msgstr "Знову дозволити {name}"
 msgid "Allow bosses"
 msgstr "Дозволити босів"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Allow in advance"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Allow self-signed certificate"
@@ -26248,6 +26252,10 @@ msgstr "Продовжиться, щойно мапу знову можна бу
 #, fuzzy
 msgid "it could not be"
 msgstr "це не вдалося"
+
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "It covers {programs}."
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -54799,6 +54807,10 @@ msgstr "Брандмауер Windows"
 msgid "Windows Firewall already allows every program hosting needs"
 msgstr "Брандмауер Windows уже дозволяє всі програми, потрібні для хостингу"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Windows may ask about the firewall when your game starts. If it does, choose Allow."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Windup"
@@ -55422,11 +55434,6 @@ msgstr ""
 #, fuzzy
 msgid "You are still in your other battle"
 msgstr "Ви досі в іншому своєму матчі"
-
-#: src/multiplayer/battles/WindowsFirewall.tsx
-#, fuzzy
-msgid "You can still add the rules. Windows keeps one per program, so doing it twice changes nothing."
-msgstr "Ви все одно можете додати правила. Windows зберігає одне правило на програму, тож повторне додавання нічого не змінить."
 
 #: src/lobby-servers/config.ts
 #, fuzzy

@@ -10617,6 +10617,10 @@ msgstr "{name} wieder erlauben"
 msgid "Allow bosses"
 msgstr "Bosse erlauben"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Allow in advance"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Allow self-signed certificate"
@@ -26248,6 +26252,10 @@ msgstr "Es geht weiter, sobald die Karte wieder lesbar ist."
 #, fuzzy
 msgid "it could not be"
 msgstr "das ging nicht"
+
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "It covers {programs}."
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -54799,6 +54807,10 @@ msgstr "Windows-Firewall"
 msgid "Windows Firewall already allows every program hosting needs"
 msgstr "Die Windows-Firewall erlaubt bereits jedes Programm, das zum Hosten nötig ist"
 
+#: src/multiplayer/battles/WindowsFirewall.tsx
+msgid "Windows may ask about the firewall when your game starts. If it does, choose Allow."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Windup"
@@ -55422,11 +55434,6 @@ msgstr ""
 #, fuzzy
 msgid "You are still in your other battle"
 msgstr "Sie sind noch in Ihrer anderen Partie"
-
-#: src/multiplayer/battles/WindowsFirewall.tsx
-#, fuzzy
-msgid "You can still add the rules. Windows keeps one per program, so doing it twice changes nothing."
-msgstr "Sie können die Regeln trotzdem hinzufügen. Windows behält eine pro Programm, doppelt ändert also nichts."
 
 #: src/lobby-servers/config.ts
 #, fuzzy

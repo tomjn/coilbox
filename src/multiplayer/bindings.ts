@@ -1815,6 +1815,12 @@ export interface Firewall {
   programs: FirewallProgram[];
   /** Why coilbox could not read or change the rules, if it could not. */
   problem: FirewallProblem | null;
+  /**
+   * What Windows said when it would not let coilbox read the rules. Set when any
+   * program's answer is still unknown because of that, which is not a problem:
+   * nothing is known to be wrong.
+   */
+  unread: string[] | null;
 }
 
 /**
@@ -1843,7 +1849,9 @@ export const mpFirewall = defineCommand<{ engine?: string | null }, Firewall>(
  * with what the rules say afterwards (issue #2799).
  *
  * The answer is read back from Windows rather than assumed from a command that
- * worked, so a panel saying the programs are allowed is reporting the rules.
+ * worked, so a panel saying the programs are allowed is reporting the rules. The
+ * exception is a machine that refuses the read, where the programs coilbox added
+ * are all there is to go on.
  *
  * A host who refuses the administrator prompt gets `problem` saying so, and
  * nothing was changed. Waits for them to answer it.
