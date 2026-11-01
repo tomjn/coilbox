@@ -62,6 +62,21 @@ fn pid_of(reg: &RunRegistry, run_id: &str) -> Option<u32> {
     reg.lock().unwrap().get(run_id).map(Child::id)
 }
 
+/// The runs whose engine is still up. Only these can refuse a launch or show as a
+/// running game, because an entry for a process that has gone has nothing left
+/// for the player to close.
+///
+/// `try_wait` here does not take anything from the launch's poll loop: a `Child`
+/// keeps its exit status once it has one, so the loop still reads how the run
+/// ended.
+fn live_runs(reg: &RunRegistry) -> Vec<String> {
+    reg.lock()
+        .unwrap()
+        .iter_mut()
+        .filter_map(|(run_id, child)| matches!(child.try_wait(), Ok(None)).then(|| run_id.clone()))
+        .collect()
+}
+
 /// The process id of the engine `run_id` is still running, for a caller outside
 /// this plugin.
 ///
@@ -302,12 +317,18 @@ fn launch_blocking_with(
         let exited = {
             let mut map = reg.lock().unwrap();
             match map.get_mut(&run_id) {
-                Some(child) => match child.try_wait().map_err(|e| e.to_string())? {
-                    Some(status) => {
+                Some(child) => match child.try_wait() {
+                    Ok(Some(status)) => {
                         map.remove(&run_id);
                         Some(ExitOutcome::from_status(&status))
                     }
-                    None => None,
+                    Ok(None) => None,
+                    // This loop is what clears the entry, so it clears it on the
+                    // way out as well.
+                    Err(e) => {
+                        map.remove(&run_id);
+                        return Err(e.to_string());
+                    }
                 },
                 // Gone from the registry -> play_cancel took it.
                 None => return Ok(None),
@@ -370,7 +391,7 @@ async fn play_launch<R: Runtime>(
         )));
     }
     // Single game at a time.
-    if !reg.lock().unwrap().is_empty() {
+    if !live_runs(&reg).is_empty() {
         return Ok(CliResult::err("a game is already running"));
     }
 
@@ -497,7 +518,7 @@ async fn play_launch_replay<R: Runtime>(
         return Ok(CliResult::err(format!("replay not found: {demo_path}")));
     }
     // Single game/replay at a time.
-    if !reg.lock().unwrap().is_empty() {
+    if !live_runs(&reg).is_empty() {
         return Ok(CliResult::err("a game is already running"));
     }
 
@@ -535,7 +556,7 @@ async fn play_launch_save<R: Runtime>(
         return Ok(CliResult::err(format!("savegame not found: {save_path}")));
     }
     // Single game/replay at a time.
-    if !reg.lock().unwrap().is_empty() {
+    if !live_runs(&reg).is_empty() {
         return Ok(CliResult::err("a game is already running"));
     }
 
@@ -592,7 +613,7 @@ async fn launch_prepared_on(
         return CliResult::err(format!("engine executable not found: {executable}"));
     }
     // Single game at a time.
-    if !reg.lock().unwrap().is_empty() {
+    if !live_runs(&reg).is_empty() {
         return CliResult::err("a game is already running");
     }
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -617,6 +638,14 @@ async fn play_cancel(reg: State<'_, RunRegistry>, run_id: String) -> Result<CliR
         }
         None => CliResult::ok(json!({ "cancelled": false })),
     })
+}
+
+/// `play_status` — the runs with an engine up right now. The frontend's own record
+/// of a run goes with the webview, and this is how it finds a game that is still
+/// running after a reload.
+#[tauri::command]
+async fn play_status(reg: State<'_, RunRegistry>) -> Result<CliResult, ()> {
+    Ok(CliResult::ok(json!({ "runs": live_runs(&reg) })))
 }
 
 /// `play_focus` — bring the running game's window back to the foreground (the user
@@ -757,6 +786,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_launch_replay,
             play_launch_save,
             play_cancel,
+            play_status,
             play_ask_lua_rules,
             play_focus,
             play_infolog,
@@ -898,6 +928,77 @@ mod tests {
              is told from a crash"
         );
     }
+
+    /// A process that has already gone, recorded the way a launch records one but
+    /// with no poll loop left to clear it. Reaped first, so it is certainly over.
+    fn an_entry_nothing_will_clear(reg: &RunRegistry, run_id: &str) {
+        let (bin, args) = if cfg!(windows) {
+            (
+                PathBuf::from("cmd"),
+                vec!["/C".to_string(), "exit".to_string()],
+            )
+        } else {
+            (
+                PathBuf::from("sh"),
+                vec!["-c".to_string(), "exit 0".to_string()],
+            )
+        };
+        let mut child = std::process::Command::new(bin).args(args).spawn().unwrap();
+        child.wait().unwrap();
+        reg.lock().unwrap().insert(run_id.to_string(), child);
+    }
+
+    #[test]
+    fn a_run_whose_engine_has_gone_is_not_live() {
+        let reg = RunRegistry::default();
+        an_entry_nothing_will_clear(&reg, "gone");
+        assert!(live_runs(&reg).is_empty());
+    }
+
+    /// The bug itself: coilbox refusing to start a game because of one that is
+    /// not there, with nothing the player could close to get past it.
+    #[test]
+    fn a_run_whose_engine_has_gone_does_not_refuse_a_launch() {
+        let reg = RunRegistry::default();
+        an_entry_nothing_will_clear(&reg, "gone");
+
+        let answer = tauri::async_runtime::block_on(launch_prepared_on(
+            reg.clone(),
+            any_file(),
+            a_data_dir(),
+            "next".to_string(),
+            nowhere(),
+            || Err("reached the prepare step".to_string()),
+        ));
+
+        assert_eq!(answer.error.as_deref(), Some("reached the prepare step"));
+    }
+
+    /// `live_runs` looks at a process without taking its exit status away from the
+    /// launch that is waiting for it, or a crash would read as a cancel.
+    #[test]
+    fn asking_what_is_live_leaves_the_launch_its_exit_status() {
+        let reg = RunRegistry::default();
+        let (bin, args) = a_process_that_lasts();
+        let launching = {
+            let reg = reg.clone();
+            std::thread::spawn(move || {
+                launch_blocking(bin, args, a_data_dir(), "a-run".to_string(), reg, nowhere())
+            })
+        };
+        eventually_running(&reg, "a-run");
+        assert_eq!(live_runs(&reg), vec!["a-run".to_string()]);
+
+        while pid_of(&reg, "a-run").is_some() {
+            live_runs(&reg);
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(
+            matches!(launching.join().expect("the launch thread"), Ok(Some(_))),
+            "the launch must still report how the engine ended"
+        );
+    }
+
     /// A real file to stand in for an engine that is never started, because
     /// the tests below are refused before the spawn.
     fn any_file() -> String {

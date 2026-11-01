@@ -256,6 +256,15 @@ export const playCancel = defineCommand<
 >("coilbox-play", "play_cancel");
 
 /**
+ * The runs with an engine up right now. The frontend's record of a run goes with
+ * the webview, so this is how it finds a game still running after a reload.
+ */
+export const playStatus = defineCommand<
+  Record<string, never>,
+  { runs: string[] }
+>("coilbox-play", "play_status");
+
+/**
  * Bring the running game's window back to the foreground. Maps the run id to the
  * live engine process on the Rust side. Best-effort — resolves `focused:false`
  * when no window could be raised (e.g. Wayland).

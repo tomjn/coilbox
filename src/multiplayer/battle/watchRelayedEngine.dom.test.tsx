@@ -201,6 +201,30 @@ it("names the run it started to the sidecar when the battle is relayed", async (
   expect(mpWatchEngine).toHaveBeenCalledTimes(1);
 });
 
+it("tells the room when the engine exists, for a host's in-game flag", async () => {
+  const onEngineStarted = vi.fn();
+  function Host() {
+    const { launch } = useBattleLaunch(ALICE, target, true);
+    return (
+      <button type="button" onClick={() => void launch({ onEngineStarted })}>
+        host now
+      </button>
+    );
+  }
+  const { getByText } = render(
+    <PlayProvider>
+      <Host />
+    </PlayProvider>,
+  );
+
+  getByText("host now").click();
+  await waitFor(() => expect(launched).toHaveLength(1));
+  expect(onEngineStarted).not.toHaveBeenCalled();
+
+  launched[0]?.started();
+  expect(onEngineStarted).toHaveBeenCalledTimes(1);
+});
+
 it("waits for the engine to exist rather than firing on any news of it", async () => {
   relayedBattleOn(ALICE);
 

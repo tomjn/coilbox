@@ -494,21 +494,31 @@ function BattleRoomPage() {
     running: launch.running,
   });
 
-  // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
-  // launch the engine in host mode, then clear the flag once it exits. A joined
-  // battle just asks its autohost to start.
+  // Host start: launch the engine in host mode, flip our in-game flag once it
+  // exists (so joiners' clients auto-launch and connect to something), then clear
+  // the flag when it exits. A joined battle just asks its autohost to start.
   async function onStart() {
     if (!room.selfHost) {
       await room.startGame();
       return;
     }
-    room.setIngame(true);
+    if (launching) return;
+    setLaunching(true);
     try {
-      await doLaunch();
+      await doLaunch({ onEngineStarted: () => room.setIngame(true) });
     } finally {
+      setLaunching(false);
       room.setIngame(false);
     }
   }
+
+  // The server still says we are in game, and no engine of ours is up or coming.
+  const { clearStaleIngame } = room;
+  const staleIngame =
+    room.selfHost && room.hostIngame && !launch.running && !launching;
+  useEffect(() => {
+    if (staleIngame) clearStaleIngame();
+  }, [staleIngame, clearStaleIngame]);
 
   if (!room.battle) {
     return (

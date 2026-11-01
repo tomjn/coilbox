@@ -7145,6 +7145,10 @@ msgstr "A join lost its connector. See the problems list."
 msgid "a later date"
 msgstr "a later date"
 
+#: src/play/PlayProvider.tsx
+msgid "A launch is already starting."
+msgstr "A launch is already starting."
+
 #: src/blueprint/pages/BlueprintsPage.tsx
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
 msgstr "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
@@ -11433,6 +11437,10 @@ msgstr "Cancel downloading {label}"
 msgid "Cancel invite"
 msgstr "Cancel invite"
 
+#: src/play/InGameBadge.tsx
+msgid "Cancel launch"
+msgstr "Cancel launch"
+
 #: src/content/pages/components/BrowserToolbar.tsx
 msgid "Cancel scan"
 msgstr "Cancel scan"
@@ -13045,6 +13053,10 @@ msgstr "Coilbox is out of date"
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "Coilbox is sending {game}'s pictures to the hub."
 msgstr "Coilbox is sending {game}'s pictures to the hub."
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
+msgstr "Coilbox is still scanning your content, so the game starts with the widgets it last had."
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "Coilbox is using <0>{effective}</0>, the address your distribution set."
@@ -36515,6 +36527,10 @@ msgstr "Starting and stopping"
 #: src/content/unitFieldNotes.ts
 msgid "Starting fire state"
 msgstr "Starting fire state"
+
+#: src/play/InGameBadge.tsx
+msgid "Starting game"
+msgstr "Starting game"
 
 #: src/scenario/pages/components/ActorControls.tsx
 msgid "Starting health"

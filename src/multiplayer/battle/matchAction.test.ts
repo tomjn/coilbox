@@ -44,8 +44,17 @@ describe("matchAction", () => {
     );
   });
 
-  it("offers nothing when we host, where Start is the launch button", () => {
-    expect(matchAction(state({ selfHost: true }))).toBe("ingame");
+  it("offers nothing while the match we host is running", () => {
+    expect(matchAction(state({ selfHost: true, running: true }))).toBe(
+      "ingame",
+    );
+    expect(matchAction(state({ selfHost: true, launching: true }))).toBe(
+      "ingame",
+    );
+  });
+
+  it("offers Start when our in-game flag has no engine behind it", () => {
+    expect(matchAction(state({ selfHost: true }))).toBe("start");
   });
 });
 

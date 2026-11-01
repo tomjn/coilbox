@@ -406,6 +406,19 @@ export function cancelScan(enginePath?: string, dataDir?: string) {
 }
 
 /**
+ * The scan held for a target, without waiting for one. Null when there is none
+ * yet, or when one is running and the answer is about to change.
+ */
+export function settledScan(
+  enginePath: string,
+  dataDir: string,
+): ScanResult | null {
+  const key = `${dataDir}::${enginePath}`;
+  if (inFlightScans.has(key)) return null;
+  return scanCache.get(key) ?? null;
+}
+
+/**
  * Fetch (or read from cache) a unitsync scan for a target, populating
  * `scanCache`. Shared by the page hook and the launch warm-up so both read the
  * same cache. `force` re-runs the scan even on a cache hit, and clears any
