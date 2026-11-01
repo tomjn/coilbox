@@ -56,6 +56,39 @@ export function aiByline(a: {
   return [v, description].filter(Boolean).join(" · ") || undefined;
 }
 
+/** Which of two AI versions the engine prefers, comparing each dotted part as
+ *  text as `AILibraryManager::VersionCompare` does, so 0.5.9 beats 0.5.10. */
+function compareAiVersions(a: string, b: string): number {
+  const as = a.split(".");
+  const bs = b.split(".");
+  for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+    const x = as[i] ?? "0";
+    const y = bs[i] ?? "0";
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * One entry per AI. Unitsync lists every version folder of a native AI, and
+ * every copy across data folders, under one `shortName`. A start script and a
+ * lobby name an AI by `shortName` alone, so the engine runs its highest version
+ * whichever entry was picked, and that is the one kept.
+ */
+export function latestAiVersions<
+  T extends { kind: string; shortName: string; version?: string },
+>(ais: T[]): T[] {
+  const latest = new Map<string, T>();
+  for (const ai of ais) {
+    const key = aiKey(ai);
+    const kept = latest.get(key);
+    if (!kept || compareAiVersions(ai.version ?? "", kept.version ?? "") > 0) {
+      latest.set(key, ai);
+    }
+  }
+  return [...latest.values()];
+}
+
 /** Narrow a full `SkirmishAi` to the reference stored on a participant. */
 const toAiRef = (a?: SkirmishAi): Participant["ai"] | undefined =>
   a ? { kind: a.kind, shortName: a.shortName, name: a.name } : undefined;

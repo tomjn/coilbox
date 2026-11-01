@@ -111,6 +111,23 @@ describe("the skirmish AI list cache", () => {
     expect(h.ais).toHaveBeenCalledTimes(1);
   });
 
+  it("offers one entry for an AI with several versions installed, fresh and from the stored cache", async () => {
+    h.ais.mockResolvedValue({
+      ais: [
+        { kind: "native", shortName: "ZKGBAI", version: "0.5.1" },
+        { kind: "native", shortName: "ZKGBAI", version: "0.5.3" },
+      ],
+      errors: [],
+    });
+    const fresh = await load("/engine/105", "game_1.sdz");
+    expect(fresh.result.current.ais.map((a) => a.version)).toEqual(["0.5.3"]);
+    fresh.unmount();
+
+    await boot();
+    const stored = await load("/engine/105", "game_1.sdz");
+    expect(stored.result.current.ais.map((a) => a.version)).toEqual(["0.5.3"]);
+  });
+
   it("does not store a list that came with diagnostics", async () => {
     h.ais.mockResolvedValue({ ais: [], errors: ["could not read an AI"] });
     (await load("/engine/105", "game_1.sdz")).unmount();
