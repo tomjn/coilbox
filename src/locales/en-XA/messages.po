@@ -7144,6 +7144,10 @@ msgstr ""
 msgid "a later date"
 msgstr ""
 
+#: src/play/PlayProvider.tsx
+msgid "A launch is already starting."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintsPage.tsx
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
 msgstr ""
@@ -11432,6 +11436,10 @@ msgstr ""
 msgid "Cancel invite"
 msgstr ""
 
+#: src/play/InGameBadge.tsx
+msgid "Cancel launch"
+msgstr ""
+
 #: src/content/pages/components/BrowserToolbar.tsx
 msgid "Cancel scan"
 msgstr ""
@@ -13043,6 +13051,10 @@ msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 msgid "Coilbox is sending {game}'s pictures to the hub."
+msgstr ""
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
 msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
@@ -36513,6 +36525,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Starting fire state"
+msgstr ""
+
+#: src/play/InGameBadge.tsx
+msgid "Starting game"
 msgstr ""
 
 #: src/scenario/pages/components/ActorControls.tsx

@@ -8811,6 +8811,10 @@ msgstr "Eine Verbindung hat ihren Verbinder verloren. Siehe die Problemliste."
 msgid "a later date"
 msgstr "ein späteres Datum"
 
+#: src/play/PlayProvider.tsx
+msgid "A launch is already starting."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintsPage.tsx
 #, fuzzy
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
@@ -14092,6 +14096,10 @@ msgstr "Download von {label} abbrechen"
 msgid "Cancel invite"
 msgstr "Einladung abbrechen"
 
+#: src/play/InGameBadge.tsx
+msgid "Cancel launch"
+msgstr ""
+
 #: src/content/pages/components/BrowserToolbar.tsx
 #, fuzzy
 msgid "Cancel scan"
@@ -16047,6 +16055,10 @@ msgstr "Coilbox ist veraltet"
 #, fuzzy
 msgid "Coilbox is sending {game}'s pictures to the hub."
 msgstr "Coilbox sendet die Bilder von {game} an den Hub."
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
+msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -44890,6 +44902,10 @@ msgstr "Anfahren und Anhalten"
 #, fuzzy
 msgid "Starting fire state"
 msgstr "Anfänglicher Feuerstatus"
+
+#: src/play/InGameBadge.tsx
+msgid "Starting game"
+msgstr ""
 
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy

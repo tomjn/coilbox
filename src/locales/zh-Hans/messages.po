@@ -8811,6 +8811,10 @@ msgstr "某个连接丢失了连接器。请查看问题列表。"
 msgid "a later date"
 msgstr "更晚的时间"
 
+#: src/play/PlayProvider.tsx
+msgid "A launch is already starting."
+msgstr ""
+
 #: src/blueprint/pages/BlueprintsPage.tsx
 #, fuzzy
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
@@ -14092,6 +14096,10 @@ msgstr "取消下载 {label}"
 msgid "Cancel invite"
 msgstr "取消邀请"
 
+#: src/play/InGameBadge.tsx
+msgid "Cancel launch"
+msgstr ""
+
 #: src/content/pages/components/BrowserToolbar.tsx
 #, fuzzy
 msgid "Cancel scan"
@@ -16047,6 +16055,10 @@ msgstr "Coilbox 版本过旧"
 #, fuzzy
 msgid "Coilbox is sending {game}'s pictures to the hub."
 msgstr "Coilbox 正在将 {game} 的图片发送到中心。"
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
+msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -44890,6 +44902,10 @@ msgstr "启动和停止"
 #, fuzzy
 msgid "Starting fire state"
 msgstr "初始开火状态"
+
+#: src/play/InGameBadge.tsx
+msgid "Starting game"
+msgstr ""
 
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
