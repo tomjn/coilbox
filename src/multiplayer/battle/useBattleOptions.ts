@@ -26,8 +26,9 @@ const SEND_DEBOUNCE_MS = 400;
  * / insufficient-privilege edits — the only revert signal on the founder path,
  * which has no per-tag reject reply).
  *
- * `send(tagKey, spadsName, value)` performs the actual dispatch (founder
- * `mpSetScriptTags` vs autohost `!bSet`); this hook is agnostic to which.
+ * `send(tagKey, spadsName, value, withdraw)` performs the actual dispatch (founder
+ * script tags vs autohost `!bSet`), and this hook is agnostic to which. `withdraw`
+ * says the host cleared the option, and `value` is then its default.
  *
  * `setOptions` is the same for many edits at once (a reset). It is not
  * debounced, since a click is one decision and not a stream, and it hands the
@@ -39,7 +40,12 @@ const SEND_DEBOUNCE_MS = 400;
  */
 export function useBattleOptions(
   scriptTags: Record<string, string>,
-  send: (tagKey: string, spadsName: string, value: string) => void,
+  send: (
+    tagKey: string,
+    spadsName: string,
+    value: string,
+    withdraw: boolean,
+  ) => void,
   sendMany?: (edits: OptionEdit[]) => void,
   paced = false,
 ) {
@@ -72,7 +78,7 @@ export function useBattleOptions(
   }, [scriptTags, clearTimer]);
 
   const setOption = useCallback(
-    (tagKey: string, spadsName: string, value: string) => {
+    (tagKey: string, spadsName: string, value: string, withdraw = false) => {
       const lower = tagKey.toLowerCase();
       const prev = lookupTag(scriptTags, tagKey) ?? "";
       // Optimistic control immediately; clear any in-flight send/echo for this key.
@@ -82,7 +88,7 @@ export function useBattleOptions(
       // coalesces to one command (the trailing value wins).
       sendTimers.current[lower] = setTimeout(() => {
         delete sendTimers.current[lower];
-        send(tagKey, spadsName, value);
+        send(tagKey, spadsName, value, withdraw);
         // Start the echo-revert timer only once the value is actually on the wire.
         timers.current[lower] = setTimeout(() => {
           setPending(({ [lower]: _dropped, ...rest }) => rest);
