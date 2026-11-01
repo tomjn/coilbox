@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "play_launch_replay",
     "play_launch_save",
     "play_cancel",
+    "play_status",
     "play_ask_lua_rules",
     "play_focus",
     "play_infolog",
