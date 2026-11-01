@@ -6,6 +6,7 @@ import {
   applyRestrictions,
   effectiveTeams,
   initialParticipants,
+  latestAiVersions,
   makeAiParticipant,
   PALETTE,
   type Participant,
@@ -526,6 +527,45 @@ describe("applyRestrictions", () => {
     const out = applyRestrictions(permuted, { advantage: 0.1 });
     expect(out.teams[1].advantage).toBeCloseTo(0.1, 5); // yours
     expect(out.teams[0].advantage).toBeUndefined(); // the AI's
+  });
+});
+
+describe("latestAiVersions", () => {
+  const native = (shortName: string, version?: string) => ({
+    kind: "native",
+    shortName,
+    version,
+  });
+
+  it("keeps the version the engine would run, in the place the AI first appeared", () => {
+    expect(
+      latestAiVersions([
+        native("ZKGBAI", "0.5.1"),
+        native("NullAI", "0.1"),
+        native("ZKGBAI", "0.5.3"),
+        native("ZKGBAI", "0.5.2"),
+      ]),
+    ).toEqual([native("ZKGBAI", "0.5.3"), native("NullAI", "0.1")]);
+  });
+
+  it("orders each part of a version as text, as the engine does", () => {
+    expect(
+      latestAiVersions([native("ZKGBAI", "0.5.10"), native("ZKGBAI", "0.5.9")]),
+    ).toEqual([native("ZKGBAI", "0.5.9")]);
+  });
+
+  it("collapses the same version installed in two data folders", () => {
+    expect(
+      latestAiVersions([native("ZKGBAI", "0.5.3"), native("ZKGBAI", "0.5.3")]),
+    ).toEqual([native("ZKGBAI", "0.5.3")]);
+  });
+
+  it("leaves a game's Lua AI alone when it shares a native AI's name", () => {
+    const lua = { kind: "lua", shortName: "SimpleAI" };
+    expect(latestAiVersions([native("SimpleAI", "1"), lua])).toEqual([
+      native("SimpleAI", "1"),
+      lua,
+    ]);
   });
 });
 

@@ -19,6 +19,7 @@ import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
 import { withoutGeneratedGames } from "../lib/generatedGames";
 import { createPersistedCache } from "../lib/persistedCache";
 import { type GameListState, gameListState, needsGame } from "./gameListState";
+import { latestAiVersions } from "./participants";
 
 export type { Participant, Rgb } from "./participants";
 // The pure participant model lives in ./participants (no hooks, no frame
@@ -379,7 +380,7 @@ export function useSkirmishAis(
       skirmishAiCache.get(k) ?? (persist ? persistedSkirmishAis.get(k) : null);
     if (cached) {
       skirmishAiCache.set(k, cached);
-      setAis(cached.ais);
+      setAis(latestAiVersions(cached.ais));
       setFailedKey(null);
       setLoadedKey(settled);
       return;
@@ -397,7 +398,7 @@ export function useSkirmishAis(
           persistedSkirmishAis.set(k, res);
           persistedSkirmishAis.save();
         }
-        setAis(res.ais);
+        setAis(latestAiVersions(res.ais));
         setFailedKey(null);
       })
       .catch(() => {
