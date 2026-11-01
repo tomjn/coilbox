@@ -8,13 +8,14 @@ import {
   CircleX,
   Loader2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Details, ResultCard, Verdict } from "@/components/ResultCard";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { getLocale } from "@/i18n";
 import { describeError } from "@/i18n/uiError";
 import { type Firewall, mpFirewall, mpFirewallAllow } from "../bindings";
 
@@ -70,6 +71,7 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
       setState((was) => ({
         supported: true,
         programs: was?.programs ?? [],
+        unread: null,
         problem: {
           title: t`Coilbox could not reach Windows Firewall`,
           details: [describeError(e)],
@@ -96,6 +98,53 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
           </Trans>
         </Verdict>
       </ResultCard>
+    );
+  }
+
+  // Coilbox could not look, so nothing is known to be wrong. A card with a title
+  // and a main button read as a fault to fix, and sent a host looking for a port
+  // problem.
+  if (state.unread && !problem?.fault) {
+    const programs = names(state.programs);
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+        <p className="basis-full">
+          <Trans>
+            Windows may ask about the firewall when your game starts. If it
+            does, choose Allow.
+          </Trans>
+        </p>
+        {problem && (
+          <p role="status" className="basis-full">
+            {problem.title}
+          </p>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={allow}
+          disabled={asking}
+        >
+          {asking ? (
+            <>
+              <Loader2
+                aria-hidden
+                className="size-3.5 shrink-0 motion-safe:animate-spin"
+              />
+              <Trans>Waiting for Windows</Trans>
+            </>
+          ) : (
+            <Trans>Allow in advance</Trans>
+          )}
+        </Button>
+        <WhatThisChanges className="contents">
+          <p>
+            <Trans>It covers {programs}.</Trans>
+          </p>
+          <Details lines={state.unread} />
+        </WhatThisChanges>
+      </div>
     );
   }
 
@@ -148,18 +197,6 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
           ))}
         </ul>
 
-        {/* Said whenever coilbox could not read the rules, because that is
-            exactly when the button looks pointless and is not: the read is what
-            Windows refused, and adding them asks for administrator rights. */}
-        {state.programs.some((p) => p.allowed === null) && !asking && (
-          <span className="pl-5">
-            <Trans>
-              You can still add the rules. Windows keeps one per program, so
-              doing it twice changes nothing.
-            </Trans>
-          </span>
-        )}
-
         <Details lines={problem?.details ?? []} />
 
         <Button
@@ -174,32 +211,53 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
         </Button>
       </ResultCard>
 
-      <Collapsible>
-        <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ChevronRight
-            aria-hidden
-            className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
-          />
-          <Trans>What does this change?</Trans>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-1.5 flex flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
-          <p>
-            <Trans>
-              It adds one Windows Defender Firewall rule per program, allowing
-              incoming connections to that program and nothing else. Windows
-              asks you to confirm as an administrator once, and coilbox changes
-              nothing if you say no.
-            </Trans>
-          </p>
-          <p>
-            <Trans>
-              The rules are grouped under Coilbox, so you can find and remove
-              them in Windows Defender Firewall whenever you like.
-            </Trans>
-          </p>
-        </CollapsibleContent>
-      </Collapsible>
+      <WhatThisChanges />
     </div>
+  );
+}
+
+/** The disclosure explaining the button, with anything the caller adds to it. */
+function WhatThisChanges({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <Collapsible className={className}>
+      <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <ChevronRight
+          aria-hidden
+          className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
+        />
+        <Trans>What does this change?</Trans>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1.5 flex basis-full flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
+        <p>
+          <Trans>
+            It adds one Windows Defender Firewall rule per program, allowing
+            incoming connections to that program and nothing else. Windows asks
+            you to confirm as an administrator once, and coilbox changes nothing
+            if you say no.
+          </Trans>
+        </p>
+        <p>
+          <Trans>
+            The rules are grouped under Coilbox, so you can find and remove them
+            in Windows Defender Firewall whenever you like.
+          </Trans>
+        </p>
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** The programs by name, for a sentence. */
+function names(programs: Firewall["programs"]): string {
+  return new Intl.ListFormat(getLocale(), { type: "conjunction" }).format(
+    programs.map((p) => p.name),
   );
 }
 
