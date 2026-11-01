@@ -4,15 +4,16 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+// lingui() turns the `t` and `Trans` macros into runtime calls, in .ts files
+// as well as .tsx, and compiles a `.po` catalog when it is imported.
+const linguiPlugin = () =>
+  lingui({ macroTransform: true, failOnCompileError: true });
+
 // https://v2.tauri.app/start/frontend/vite/
 export default defineConfig({
-  // lingui() turns the `t` and `Trans` macros into runtime calls, in .ts files
-  // as well as .tsx, and compiles a `.po` catalog when it is imported.
-  plugins: [
-    react(),
-    lingui({ macroTransform: true, failOnCompileError: true }),
-    tailwindcss(),
-  ],
+  plugins: [react(), linguiPlugin(), tailwindcss()],
+  // A production build bundles a worker with this list, not the one above.
+  worker: { plugins: () => [linguiPlugin()] },
   clearScreen: false,
   resolve: {
     alias: {
