@@ -30,6 +30,8 @@ import { Field } from "@/components/Field";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { formatFixed } from "@/lib/format";
 import { useCanvas3D } from "@/lib/useCanvas3D";
+import { attachWheelRelease } from "@/lib/wheelRelease";
+import { boxHit } from "@/mapconv/pages/components/wheelGate";
 import { useReduceMotion } from "../../../general/display";
 import { baseAtlas, type LegoAtlas } from "../../atlas";
 import { useColourwayColours } from "../../colourwayColours";
@@ -791,7 +793,7 @@ function Preview({
 
   useCanvas3D(
     containerRef,
-    ({ renderer }) => {
+    ({ renderer, host }) => {
       const built = build();
       if (!built) return;
 
@@ -818,6 +820,18 @@ function Preview({
       const render = () => renderer.render(scene, camera);
       controls.addEventListener("change", render);
 
+      // The panel sits in a page that scrolls, so a wheel over empty space
+      // belongs to the page and one over the object zooms (issue #2328). The
+      // object's own bounding box, measured once: it does not move, only the
+      // camera does.
+      const box = new THREE.Box3().setFromObject(built.object);
+      const detachWheel = attachWheelRelease(
+        host,
+        renderer.domElement,
+        () => camera,
+        (ray) => boxHit(ray.origin, ray.direction, box.min, box.max),
+      );
+
       // `update` turns the camera and fires "change", which draws.
       controls.autoRotate = spin;
       let frame = 0;
@@ -835,6 +849,7 @@ function Preview({
         },
         dispose: () => {
           cancelAnimationFrame(frame);
+          detachWheel();
           controls.removeEventListener("change", render);
           controls.dispose();
           scene.remove(built.object);

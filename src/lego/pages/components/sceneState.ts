@@ -290,6 +290,10 @@ export interface SceneState {
   /** A slope or uneven ground, kept the same way and reshaped in place, so a
    *  new angle does not paint the mottle again. */
   shaped: THREE.Mesh | null;
+  /** The box round the unit and any reference figure standing beside it, as
+   *  `applySceneScale` last measured it. What the wheel gate tests against, so
+   *  a wheel tick never has to measure the scene. Empty with nothing built. */
+  contentBox: THREE.Box3;
   /** Piece id to the group holding it, so selection and edits can find it. */
   groups: Map<string, THREE.Group>;
   /** Geometry built for playback, which this owns and must free. The shared

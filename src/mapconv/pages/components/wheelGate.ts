@@ -48,16 +48,63 @@ export function releaseWheel(hit: boolean): boolean {
  * beyond the horizon, reports a miss the same way, by the bounds check below.
  */
 export function groundHit(
-  origin: { x: number; y: number; z: number },
-  direction: { x: number; y: number; z: number },
+  origin: Vec3Like,
+  direction: Vec3Like,
   groundY: number,
   halfWidth: number,
   halfDepth: number,
+  centreX = 0,
+  centreZ = 0,
 ): boolean {
   if (Math.abs(direction.y) < 1e-6) return false; // parallel to the plane
   const t = (groundY - origin.y) / direction.y;
   if (t < 0) return false; // the plane is behind the camera
-  const x = origin.x + direction.x * t;
-  const z = origin.z + direction.z * t;
+  const x = origin.x + direction.x * t - centreX;
+  const z = origin.z + direction.z * t - centreZ;
   return Math.abs(x) <= halfWidth && Math.abs(z) <= halfDepth;
 }
+
+/** A point or a direction. Structural, so a three.js `Vector3` fits. */
+export interface Vec3Like {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Whether a ray passes through an axis-aligned box (issue #2328): the slab
+ * test, a handful of multiplications and no allocation. The cheap stand-in for
+ * a triangle-level raycast against a model, for the views whose content is one
+ * object. A box is looser than the model inside it, which is fine for a gate
+ * nobody can tell is a pixel out.
+ *
+ * A box behind the ray's origin is a miss. A ray running parallel to a slab
+ * hits only if its origin lies between that slab's faces.
+ */
+export function boxHit(
+  origin: Vec3Like,
+  direction: Vec3Like,
+  min: Vec3Like,
+  max: Vec3Like,
+): boolean {
+  let near = 0;
+  let far = Number.POSITIVE_INFINITY;
+  for (const axis of AXES) {
+    const o = origin[axis];
+    const d = direction[axis];
+    if (min[axis] > max[axis]) return false; // an empty box holds nothing
+    if (d === 0) {
+      // Parallel to this slab: the ray stays inside it or never enters.
+      if (o < min[axis] || o > max[axis]) return false;
+      continue;
+    }
+    const a = (min[axis] - o) / d;
+    const b = (max[axis] - o) / d;
+    near = Math.max(near, Math.min(a, b));
+    far = Math.min(far, Math.max(a, b));
+    if (near > far) return false;
+  }
+  return true;
+}
+
+const AXES = ["x", "y", "z"] as const;
