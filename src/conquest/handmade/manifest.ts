@@ -138,6 +138,13 @@ export interface MapManifest {
     provinces: string;
     /** A greyscale image, black lowest and white highest. */
     heightmap?: string;
+    /**
+     * A wider picture and heightmap with the map's own in the middle, so the
+     * land carries on past the frame. Give both, and the `heightmap` above.
+     * How far they reach comes from their sizes. Nothing on them is playable,
+     * and a surround that cannot be used never stops the map from loading.
+     */
+    surround?: { picture: string; heightmap: string };
   };
   /** How high a white heightmap pixel is, in map units. */
   heightScale?: number;
@@ -253,8 +260,11 @@ export function describeProvince(name: string, color: string): string {
 export function parseManifest(text: string): {
   manifest: ResolvedManifest | null;
   errors: HandmadeMapError[];
+  /** What is wrong but does not stop the map from loading. */
+  warnings?: HandmadeMapError[];
 } {
   const errors: HandmadeMapError[] = [];
+  const warnings: HandmadeMapError[] = [];
   let data: unknown;
   try {
     data = JSON.parse(text);
@@ -416,6 +426,24 @@ export function parseManifest(text: string): {
     files.picture = fileName(d.files, "picture", true) ?? "";
     files.provinces = fileName(d.files, "provinces", true) ?? "";
     files.heightmap = fileName(d.files, "heightmap", false);
+    const surround = d.files.surround;
+    if (
+      isObj(surround) &&
+      typeof surround.picture === "string" &&
+      isFolderFile(surround.picture) &&
+      typeof surround.heightmap === "string" &&
+      isFolderFile(surround.heightmap)
+    ) {
+      files.surround = {
+        picture: surround.picture,
+        heightmap: surround.heightmap,
+      };
+    } else if (surround !== undefined) {
+      warnings.push({
+        code: "surround-unusable",
+        message: t`${MANIFEST_FILE}: files.surround must name a picture and a heightmap, each a file inside the map folder. The map uses a short fading edge instead.`,
+      });
+    }
   } else {
     field(
       "files",
@@ -1054,6 +1082,7 @@ export function parseManifest(text: string): {
       warpath,
     },
     errors,
+    warnings,
   };
 }
 

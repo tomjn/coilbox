@@ -239,6 +239,45 @@ describe("loading a hand-made map", () => {
     });
   });
 
+  it("loads a map whose surround is a damaged image, and says why", async () => {
+    const edited = JSON.parse(manifest);
+    edited.files.surround = {
+      picture: "broken.png",
+      heightmap: "heightmap.png",
+    };
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({
+          manifest: JSON.stringify(edited),
+          files: [...FILES, "broken.png"],
+        }),
+      ],
+    });
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error("expected the map to load");
+    expect(result.doc.terrain?.surround).toBeUndefined();
+    expect(result.warnings?.map((w) => w.code)).toEqual(["surround-unusable"]);
+    expect(result.warnings?.[0].message).toContain("broken.png");
+  });
+
+  it("reads the sizes of a surround from its files", async () => {
+    const edited = JSON.parse(manifest);
+    // Each is 160 by 96, so it is no wider than the map, which is a warning
+    // about its size rather than about the file.
+    edited.files.surround = {
+      picture: "picture.png",
+      heightmap: "heightmap.png",
+    };
+    hoisted.list.mockResolvedValue({
+      items: [item({ manifest: JSON.stringify(edited) })],
+    });
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error("expected the map to load");
+    expect(result.warnings?.[0].message).toContain(
+      'surround heightmap "heightmap.png" is 160 by 96',
+    );
+  });
+
   describe("a .gltf model that names other files", () => {
     // Put the sample's cairn.gltf in the folder with these uris added.
     const withModel = (

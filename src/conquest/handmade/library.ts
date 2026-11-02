@@ -474,6 +474,13 @@ async function readFolder(
       ],
     ),
   );
+  const { surround } = manifest.files;
+  // A surround that cannot be used is a warning, so a failure here is not one
+  // of the image errors above.
+  const surroundSizes = Promise.all([
+    surround && sizeIfImage(urlFor(surround.picture)),
+    surround && sizeIfImage(urlFor(surround.heightmap)),
+  ]);
   const [provinces, picture, heights] = await Promise.all([
     decode(manifest.files.provinces, () => decodeRgba(provincesUrl)),
     decode(manifest.files.picture, () => imageSize(pictureUrl)),
@@ -492,10 +499,13 @@ async function readFolder(
     if (text !== undefined) scenarios[file] = text;
   }
 
+  const [surroundPicture, surroundHeightmap] = await surroundSizes;
   const read = readHandmadeMap({
     manifest: manifestText,
     provinces,
     picture,
+    heightmap: heights === true ? undefined : heights,
+    surround: { picture: surroundPicture, heightmap: surroundHeightmap },
     urlFor,
     scenarios,
     cache: traces,
@@ -506,6 +516,18 @@ async function readFolder(
     ok: false,
     errors: [...(read.ok ? [] : read.errors), ...modelErrors],
   };
+}
+
+/** The size of an image, or undefined when it is absent or cannot be opened. */
+async function sizeIfImage(
+  url: string | undefined,
+): Promise<{ width: number; height: number } | undefined> {
+  if (url === undefined) return undefined;
+  try {
+    return await imageSize(url);
+  } catch {
+    return undefined;
+  }
 }
 
 /** The text of a file in a map folder, or undefined when it cannot be read. */
@@ -567,6 +589,14 @@ async function readCarried(
   ]);
   const urls = new Map<string, string>();
   const failed: HandmadeMapError[] = [];
+  // A surround that cannot be read must not stop the map, so it is not asked
+  // for with the files above. The reader reports it as not in the folder.
+  const { surround } = manifest.files;
+  for (const file of surround ? [surround.picture, surround.heightmap] : []) {
+    if (!carried.files.includes(file)) continue;
+    const read = await reader.read(carried.game, carried.folder, file);
+    if (read.ok) urls.set(file, read.url);
+  }
   for (const file of wanted) {
     // A file the folder lacks is left for the reader to report as missing.
     if (!carried.files.includes(file)) continue;
@@ -578,7 +608,7 @@ async function readCarried(
   const read = await readFolder(carried.manifest, (file) => urls.get(file));
   if (!read.ok) return read;
   return {
-    ok: true,
+    ...read,
     doc: {
       ...read.doc,
       handmade: {
@@ -591,8 +621,17 @@ async function readCarried(
 }
 
 export type HandmadeImportResult =
-  /** The map is installed. `skipped` counts zip entries that were left out. */
-  | { status: "imported"; id: string; doc: GalaxyDoc; skipped: number }
+  /**
+   * The map is installed. `skipped` counts zip entries that were left out, and
+   * `warnings` is what is wrong but did not stop it.
+   */
+  | {
+      status: "imported";
+      id: string;
+      doc: GalaxyDoc;
+      skipped: number;
+      warnings?: HandmadeMapError[];
+    }
   /** A map with this id is installed. Ask, then import again with `replace`. */
   | { status: "exists"; id: string; title: string }
   /** The zip unpacked but the reader refused the map. Nothing was installed. */
@@ -669,6 +708,7 @@ export async function importHandmadeMap(
       id,
       doc: installed.doc,
       skipped: staged.skipped,
+      warnings: installed.warnings,
     };
   } catch (e) {
     return { status: "refused", message: messageOf(e) };
