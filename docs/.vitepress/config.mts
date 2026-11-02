@@ -241,11 +241,15 @@ export default defineConfig({
           ],
         },
         {
-          text: "Translation",
+          text: "Words on screen",
           items: [
             {
               text: "Translate coilbox",
               link: "/developers/translating-coilbox",
+            },
+            {
+              text: "Write on-screen text",
+              link: "/developers/on-screen-text",
             },
           ],
         },

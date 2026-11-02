@@ -1,6 +1,6 @@
 # Game developer guides
 
-Guides for people who make a game, a campaign, a map or a unit, and want coilbox to carry it to players. Apart from Translate coilbox, these are not guides to working on coilbox itself.
+Guides for people who make a game, a campaign, a map or a unit, and want coilbox to carry it to players. Apart from Translate coilbox and Write on-screen text, these are not guides to working on coilbox itself.
 
 Most of the tools here are hidden until you turn on Advanced mode in Settings > General.
 
@@ -46,8 +46,9 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 
 - [Browse archives and run Lua](archives.md). Look inside any game or map archive, save a file out of it, and run Lua with the archive loaded.
 
-## Translation
+## Words on screen
 
 - [Translate coilbox](translating-coilbox.md). Where each language's catalog is, how to edit and check it, how to add a language, and which words stay in English.
+- [Write on-screen text](on-screen-text.md). The rules for the words coilbox shows, starting with which of its two readers a sentence is for.
 
 The [reference](../reference/index.md) section has the route list a profile points at and the file formats these tools read and write.

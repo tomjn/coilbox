@@ -68,7 +68,7 @@ function SidecarWarning() {
       <AlertCircle size={16} />
       <div className="min-w-0 flex-1">
         <p className="font-medium">
-          <Trans>pr-downloader sidecar unavailable</Trans>
+          <Trans>pr-downloader is unavailable</Trans>
         </p>
         <p className="break-words text-destructive/90">{error}</p>
       </div>

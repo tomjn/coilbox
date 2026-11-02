@@ -377,7 +377,7 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
             ? t`Game running…`
             : run.scanLoading
               ? t`Loading content…`
-              : t`Start Mission`}
+              : t`Start mission`}
         </Button>
       </div>
     </div>
@@ -492,7 +492,7 @@ function Victory({
         {next ? (
           <Trans>Mission complete. The next mission is ready.</Trans>
         ) : (
-          <Trans>Mission complete — you've finished the campaign!</Trans>
+          <Trans>Mission complete. You finished the campaign.</Trans>
         )}
       </p>
       {run.autoDetected && <AutoDetectedNote />}

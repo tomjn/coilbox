@@ -14,7 +14,7 @@ To make your own, see [Campaigns](../developers/campaigns.md) and [Scenarios](..
 1. Open Play > Campaigns in the sidebar.
 2. Select a campaign. Its page lists the missions in order, with how many you have completed.
 3. Select a mission to open its briefing.
-4. Select Start Mission. The game opens in its own window.
+4. Select Start mission. The game opens in its own window.
 
 On the campaign's page, each mission shows its state:
 
@@ -34,7 +34,7 @@ The briefing fills the screen. It shows the campaign's name, the mission's title
 
 Battle history lists your earlier attempts at this mission. Select Back at the top left to return to the campaign's page.
 
-Some missions play differently at each difficulty. Those show Difficulty above Start Mission, with Easy, Normal and Hard. The level you pick applies to the rest of the campaign, and you can change it on any later briefing. A campaign where you never pick a level plays at Normal.
+Some missions play differently at each difficulty. Those show Difficulty above Start mission, with Easy, Normal and Hard. The level you pick applies to the rest of the campaign, and you can change it on any later briefing. A campaign where you never pick a level plays at Normal.
 
 ## If the mission needs something you do not have
 

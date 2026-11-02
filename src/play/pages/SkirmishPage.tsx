@@ -1130,7 +1130,7 @@ export default function SkirmishPage() {
             </Button>
             <Button onClick={() => onStart()} disabled={!canStart}>
               <Play className="size-4 fill-current" />{" "}
-              {running ? t`Game running…` : t`Start Game`}
+              {running ? t`Game running…` : t`Start game`}
             </Button>
           </div>
         </header>

@@ -125,7 +125,7 @@ describe("SkirmishPage when the content scan failed", () => {
   it("keeps Start disabled and does not claim anything is installed or missing", () => {
     renderPage();
 
-    const start = screen.getByRole("button", { name: /Start Game/ });
+    const start = screen.getByRole("button", { name: /Start game/ });
     expect((start as HTMLButtonElement).disabled).toBe(true);
     expect(document.body.textContent).not.toMatch(
       /not installed|No games are installed/,

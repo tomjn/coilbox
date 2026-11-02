@@ -33,7 +33,7 @@ Select an archive to open its page.
 
 The top of the page shows the archive's file name and labels, its size, its checksum and where it is on your computer. Beside them are:
 
-- Lua Console, which opens the [Lua console](#the-lua-console).
+- Lua console, which opens the [Lua console](#the-lua-console).
 - View game or View map, which opens the game's or map's page in the Library.
 - Open folder, which opens the folder that holds the archive. For a `.sdd` archive it opens the folder itself.
 - Delete, which deletes the archive from your computer. It is there for an archive in a `games`, `maps` or `packages` folder, and it asks first. Replays and saves that need the archive stop working, and you would have to download it again.
@@ -58,7 +58,7 @@ Copy puts a text file's contents on the clipboard. Download saves the file out o
 
 The console runs Lua with the archive loaded. Use it to check what a file in the archive returns, or whether a file is where the engine looks for it.
 
-Select Lua Console on an archive's page. The console opens in a panel at the side. Open full page moves it to a page of its own, called Lua REPL, with the same session. You can also go back to the archive from there, by selecting its name at the top.
+Select Lua console on an archive's page. The console opens in a panel at the side. Open full page moves it to a page of its own, called Lua REPL, with the same session. You can also go back to the archive from there, by selecting its name at the top.
 
 1. Type Lua in the box at the bottom.
 2. Press Enter, or select Run. Shift and Enter adds a new line.

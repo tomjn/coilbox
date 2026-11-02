@@ -10769,7 +10769,7 @@ msgid "Browse games to download"
 msgstr ""
 
 #: src/downloads/pages/ExplorerPage.tsx
-msgid "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
+msgid "Browse Spring/Recoil rapid content and download a tag with pr-downloader."
 msgstr ""
 
 #: src/play/PresetLibraryToolbar.tsx
@@ -13126,7 +13126,7 @@ msgid "Coilbox reads maps through an engine, and there is no engine installed to
 msgstr ""
 
 #: src/sound/events.ts
-msgid "Coilbox reports that something went wrong."
+msgid "Coilbox reports an error."
 msgstr ""
 
 #: src/scenario/pages/components/ImportScenarioForm.tsx
@@ -13170,6 +13170,10 @@ msgstr ""
 
 #: src/content/pages/components/GeneratedBadge.tsx
 msgid "Coilbox's own"
+msgstr ""
+
+#: src/lobby-servers/config.ts
+msgid "Coilbox's Tachyon support is incomplete. Use the Beyond All Reason entry instead."
 msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
@@ -17116,7 +17120,7 @@ msgid "Enter it on the battle's row to join."
 msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
-msgid "Enter the email address on your account and we will send you a recovery code."
+msgid "Enter the email address on your account. The server sends a recovery code to it."
 msgstr ""
 
 #: src/direct/lan.ts
@@ -22964,7 +22968,7 @@ msgid "Local IP"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
-msgid "Local Network"
+msgid "Local network"
 msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
@@ -23272,7 +23276,7 @@ msgid "Lua calls to removed or changed APIs"
 msgstr ""
 
 #: src/content/pages/ArchiveDetailPage.tsx
-msgid "Lua Console"
+msgid "Lua console"
 msgstr ""
 
 #: src/content/pages/components/LuaRepl.tsx
@@ -24184,11 +24188,11 @@ msgid "Mission {position} has no map"
 msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
-msgid "Mission complete — you've finished the campaign!"
+msgid "Mission complete. The next mission is ready."
 msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
-msgid "Mission complete. The next mission is ready."
+msgid "Mission complete. You finished the campaign."
 msgstr ""
 
 #: src/campaign/pages/components/MissionScenarioField.tsx
@@ -28896,10 +28900,6 @@ msgstr ""
 msgid "Others see you as away until you turn this off."
 msgstr ""
 
-#: src/lobby-servers/config.ts
-msgid "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead."
-msgstr ""
-
 #: src/campaign/pages/components/StaleScenarioBadge.tsx
 msgid "Out of date"
 msgstr ""
@@ -30176,7 +30176,7 @@ msgid "Power"
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
-msgid "pr-downloader sidecar unavailable"
+msgid "pr-downloader is unavailable"
 msgstr ""
 
 #: src/mapconv/pages/SettingsSection.tsx
@@ -36010,10 +36010,6 @@ msgstr ""
 msgid "something that is gone"
 msgstr ""
 
-#: src/general/ErrorBoundary.tsx
-msgid "Something went wrong"
-msgstr ""
-
 #: src/content/unitFieldNotes.ts
 msgid "Sonar cannot pick the unit up."
 msgstr ""
@@ -36443,7 +36439,7 @@ msgid "Start from the starter"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
-msgid "Start Game"
+msgid "Start game"
 msgstr ""
 
 #: src/profile/health.ts
@@ -36454,12 +36450,9 @@ msgstr ""
 msgid "Start here"
 msgstr ""
 
+#: src/campaign/pages/MissionBriefingPage.tsx
 #: src/home/continue.ts
 msgid "Start mission"
-msgstr ""
-
-#: src/campaign/pages/MissionBriefingPage.tsx
-msgid "Start Mission"
 msgstr ""
 
 #: src/profile/start.ts
@@ -41278,6 +41271,10 @@ msgstr ""
 msgid "This scenario's {mine} hand over to the preset's {theirs} in list order, and every position stays where it is on the new map."
 msgstr ""
 
+#: src/general/ErrorBoundary.tsx
+msgid "This screen crashed"
+msgstr ""
+
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
 msgstr ""
@@ -43416,12 +43413,9 @@ msgstr ""
 #: src/conquest/pages/components/BattleOverlay.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/conquest/pages/ConquestListPage.tsx
+#: src/play/debrief.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Victory"
-msgstr ""
-
-#: src/play/debrief.ts
-msgid "Victory!"
 msgstr ""
 
 #: src/campaign/pages/components/MissionMediaFields.tsx

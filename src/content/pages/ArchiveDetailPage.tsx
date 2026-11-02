@@ -219,7 +219,7 @@ export default function ArchiveDetailPage() {
                 className="gap-1.5"
                 onClick={() =>
                   drawer.open({
-                    title: t`Lua Console`,
+                    title: t`Lua console`,
                     description: t`Run Lua through ${archiveName} via unitsync.`,
                     width: "40rem",
                     content: (
@@ -232,7 +232,7 @@ export default function ArchiveDetailPage() {
                   })
                 }
               >
-                <Terminal className="size-4" /> <Trans>Lua Console</Trans>
+                <Terminal className="size-4" /> <Trans>Lua console</Trans>
               </Button>
             )}
             {linked && (

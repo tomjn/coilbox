@@ -100,7 +100,7 @@ export const EVENTS = {
   },
   uiError: {
     label: msg`Something failed`,
-    description: msg`Coilbox reports that something went wrong.`,
+    description: msg`Coilbox reports an error.`,
     group: "ui",
     sound: "cue-error",
   },

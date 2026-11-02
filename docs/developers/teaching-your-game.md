@@ -225,6 +225,6 @@ If you have one lesson and do not want a campaign around it, `start` can name a 
 1. Run coilbox from your distribution folder, using a fresh profile with no progress.
 2. Open Settings > Distribution profile. The `start` row of the health checklist says what `start` resolved to, or why it did not.
 3. Open the home page. The "Start here" card shows the campaign and mission titles.
-4. Press the card, then Start Mission, and play the lesson through.
+4. Press the card, then Start mission, and play the lesson through.
 
 If the card is missing, the `start` row gives the reason.

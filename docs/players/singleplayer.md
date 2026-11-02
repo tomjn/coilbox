@@ -68,7 +68,7 @@ The map card shows the map's details but has no settings of its own.
 
 ## What you need to start
 
-Start Game stays greyed out until all of these are true:
+Start game stays greyed out until all of these are true:
 
 - An engine is installed.
 - A game and a map are chosen.
@@ -83,11 +83,11 @@ Some games need another archive to run. If that archive is missing, the page sho
 
 ## Start the battle
 
-Select Start Game. The game opens in its own window.
+Select Start game. The game opens in its own window.
 
 While it runs, the setup on the Singleplayer page is frozen. If the game stops responding and never closes, End game on the page closes it.
 
-Host, beside Start Game, takes the same setup to a multiplayer battle instead, so friends can join.
+Host, beside Start game, takes the same setup to a multiplayer battle instead, so friends can join.
 
 ## After the battle
 

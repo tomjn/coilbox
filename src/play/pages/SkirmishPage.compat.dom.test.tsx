@@ -185,7 +185,7 @@ function start() {
       <SkirmishPage />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: /Start Game/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Start game/ }));
 }
 
 type LaunchConfig = {
