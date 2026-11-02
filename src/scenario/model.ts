@@ -158,9 +158,16 @@ export type ScenarioGroup = {
    * Not created at game start. A `spawn_group` action creates a dormant group's
    * units, and `wake_group` releases a created group to run its `orders`. A
    * group that is not dormant is created at start and runs its orders straight
-   * away.
+   * away, unless {@link startsAsleep} holds it.
    */
   dormant: boolean;
+  /**
+   * Created at game start but holding position until `wake_group` releases it
+   * (issue #900). Only ever written `true`, and it means nothing on a dormant
+   * group, which is asleep anyway when `spawn_group` places it. Read it through
+   * {@link holdsAtStart}.
+   */
+  startsAsleep?: boolean;
   /**
    * The difficulties this group exists at. Absent is every one. A group left
    * out is not placed at the start and is not placed by `spawn_group` or
@@ -637,6 +644,11 @@ function parseGroupUnits(value: unknown): GroupUnit[] | null {
   return out;
 }
 
+/** Whether a group stands on the map from the start without running its orders. */
+export function holdsAtStart(group: ScenarioGroup): boolean {
+  return group.startsAsleep === true && !group.dormant;
+}
+
 function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
   const gid = id(g.id);
   const team = id(g.team);
@@ -653,6 +665,7 @@ function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
     pos,
     orders,
     dormant: g.dormant === true,
+    ...(g.startsAsleep === true ? { startsAsleep: true } : {}),
     ...difficultyOf(g.difficulty),
   };
 }

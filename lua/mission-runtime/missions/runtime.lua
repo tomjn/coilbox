@@ -118,8 +118,16 @@
 -- walls, and places a dormant base at the start. So a scenario using either
 -- asks for 10.
 
+-- 11 is a group that starts on the map asleep (issue #900). One format feature:
+--
+--   * a group may carry `startsAsleep`, and then it is placed at the start on
+--     hold position and runs its orders only once `wake_group` releases it
+--
+-- A runtime behind 11 reads past the field and sets the group off on its orders
+-- at the first frame. So a scenario using it asks for 11.
+
 return {
-	version = 10,
+	version = 11,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

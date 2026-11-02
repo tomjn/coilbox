@@ -485,6 +485,51 @@ check("releasing a group the mission is already holding none of says so",
 	logged(engine, "error: group loaned has no units on the map to release"))
 
 --------------------------------------------------------------------------------
+-- A group that starts asleep (issue #900), out of the compiled fixture: on the
+-- map from the start, holding, and running its orders only once woken.
+--------------------------------------------------------------------------------
+
+local sentries = load({ coilbox_mission = "demo" }, missionFiles(support.fixture("sentries")), {
+	defs = { armpw = true },
+})
+sentries.env:Initialize()
+sentries.env:GameStart()
+
+local post = sentries.GG.CoilboxMission.groups.units("post")
+local isPostAwake = sentries.GG.CoilboxMission.groups.isAwake
+local postOrders = function()
+	local out = {}
+	for _, order in ipairs(sentries.ordersFor(post[1])) do
+		out[#out + 1] = order[2]
+	end
+	return table.concat(out, " ")
+end
+local HOLD = sentries.env.CMD.MOVESTATE_HOLDPOS
+
+check("a group that starts asleep is on the map before the first frame", #post == 2, tostring(#post))
+check("holding where it stands", sentries.units[post[1]].movestate == HOLD
+	and sentries.units[post[2]].movestate == HOLD)
+check("and not running its orders", isPostAwake("post") == false)
+check("so it has been given nothing but the hold",
+	postOrders() == tostring(sentries.env.CMD.MOVE_STATE), postOrders())
+
+for tick = 1, 285 do
+	sentries.env:GameFrame(tick)
+end
+check("it is still holding until its trigger wakes it",
+	isPostAwake("post") == false and sentries.units[post[1]].movestate == HOLD
+	and postOrders() == tostring(sentries.env.CMD.MOVE_STATE), postOrders())
+
+for tick = 286, 315 do
+	sentries.env:GameFrame(tick)
+end
+check("wake_group sets it running", isPostAwake("post") == true)
+check("with the move state it came with", sentries.units[post[1]].movestate == sentries.env.CMD.MOVESTATE_MANEUVER)
+check("and its orders", postOrders() == string.format("%d %d %d",
+	sentries.env.CMD.MOVE_STATE, sentries.env.CMD.MOVE_STATE, sentries.env.CMD.PATROL), postOrders())
+check("wake_group did not place a second block", #sentries.GG.CoilboxMission.groups.units("post") == 2)
+
+--------------------------------------------------------------------------------
 -- Groups are synced only.
 --------------------------------------------------------------------------------
 

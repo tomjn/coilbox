@@ -574,3 +574,35 @@ describe("missionPath", () => {
     expect(missionPath("abc-123")).toBe("missions/abc-123/mission.lua");
   });
 });
+
+describe("a group's start state", () => {
+  const group = {
+    id: "post",
+    team: "p1",
+    units: [{ def: "armpw", count: 1 }],
+    pos: { x: 0, z: 0 },
+    orders: [],
+  };
+
+  it("emits nothing new for a group saved before the flag existed", () => {
+    const emitted = compileScenario(build({ groups: [group] }));
+    expect(emitted).toContain("dormant = false");
+    expect(emitted).not.toContain("startsAsleep");
+  });
+
+  it("emits the flag for a group that starts asleep", () => {
+    const emitted = compileScenario(
+      build({ groups: [{ ...group, startsAsleep: true }] }),
+    );
+    expect(emitted).toContain("dormant = false");
+    expect(emitted).toContain("startsAsleep = true");
+  });
+
+  it("leaves it out for a dormant group, where it means nothing", () => {
+    const emitted = compileScenario(
+      build({ groups: [{ ...group, dormant: true, startsAsleep: true }] }),
+    );
+    expect(emitted).toContain("dormant = true");
+    expect(emitted).not.toContain("startsAsleep");
+  });
+});

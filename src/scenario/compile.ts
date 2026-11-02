@@ -13,7 +13,7 @@ import type {
   ScenarioZone,
   TriggerStep,
 } from "./model";
-import { baseBuildings, MISSION_SCHEMA_VERSION } from "./model";
+import { baseBuildings, holdsAtStart, MISSION_SCHEMA_VERSION } from "./model";
 
 /**
  * Compile a scenario document to the Lua the mission runtime reads.
@@ -212,6 +212,8 @@ const group = (g: ScenarioGroup): LuaTable =>
     ["pos", point(g.pos)],
     ["orders", g.orders.map(order)],
     ["dormant", g.dormant],
+    // Only when set, so a scenario without it emits the bytes it always did.
+    ["startsAsleep", holdsAtStart(g) ? true : undefined],
     ["difficulty", difficulty(g.difficulty)],
   ]);
 

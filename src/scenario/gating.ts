@@ -27,6 +27,7 @@ import {
 import type { ScenarioRoute } from "./launch";
 import {
   amountVar,
+  holdsAtStart,
   SCENARIO_RUNTIME_VERSION,
   type Scenario,
   usesDifficulty,
@@ -178,6 +179,13 @@ function usesBaseTerrain(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime that first held a group on the map from the start (issue #900). A
+ * runtime behind this reads past the flag and sets the group off on its orders
+ * at the first frame, so a garrison has walked away before the player arrives.
+ */
+const STARTS_ASLEEP_VERSION = 11;
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -260,6 +268,9 @@ export function requiredRuntimeVersion(
   }
   if (usesBaseTerrain(scenario)) {
     version = Math.max(version, BASE_TERRAIN_VERSION);
+  }
+  if (scenario.groups.some(holdsAtStart)) {
+    version = Math.max(version, STARTS_ASLEEP_VERSION);
   }
   return version;
 }

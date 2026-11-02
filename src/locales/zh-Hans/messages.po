@@ -24753,6 +24753,10 @@ msgstr "当某支队伍建造完足够数量的某种单位后成立。"
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "当某支队伍守住一个区域达到你设定的时间后成立，可选仅在无人争夺时计时。"
 
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Holds units until fully healed"
