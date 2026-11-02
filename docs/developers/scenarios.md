@@ -103,9 +103,11 @@ A group is a block of units spawned and ordered as one: a raiding party, a reinf
 A group has two states, and both matter:
 
 - **On the map or not.** A group is placed at game start unless you tick **Waits for a trigger to spawn it**, which makes it dormant.
-- **Awake or asleep.** Asleep is standing on hold position: the units exist and defend themselves and do not wander off. Awake is running the group's orders.
+- **Awake or asleep.** Asleep is standing on hold position: the units exist and defend themselves and do not wander off. Awake is running the group's orders. A group placed at game start is awake unless you tick **Holds position until woken**, which stores `startsAsleep`.
 
-So a dormant garrison is `spawn_group` when you want it standing there and `wake_group` when you want it moving. A reinforcement wave is `wake_group` on its own, which spawns it and sends it off in one action.
+So a garrison in its post from the first frame is **Holds position until woken**, then `wake_group` when you want it moving. A dormant garrison is `spawn_group` when you want it standing there and `wake_group` when you want it moving. A reinforcement wave is `wake_group` on its own, which spawns it and sends it off in one action.
+
+`startsAsleep` needs mission runtime 11. An older runtime would read past it and send the group off at the first frame, so a game bundling one cannot play the scenario itself. A saved group without the flag keeps its meaning: placed at the start and running its orders.
 
 Orders are one queue given to every unit in the group. **Move along**, **Patrol** and **Fight along** take a list of waypoints you draw by clicking on the map. **Guard** and **Attack** take an actor, a base's building or another group as the target. A patrol closes its loop back to where the group is standing, exactly as it would if a player had shift-clicked the same points.
 
