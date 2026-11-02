@@ -452,11 +452,48 @@ do
 	same("six pieces are watched, one matrix read each a sample", engine.matrixReads - before, 6)
 	looked = engine.positionReads
 	engine.runTo(18)
-	same("a muzzle that is where it was found costs one read", engine.positionReads - looked, 1)
+	same("a muzzle the engine has not worked out again costs no read", engine.positionReads - looked, 0)
 
 	engine.destroy(tank)
 	engine.runTo(21)
 	same("a destroyed unit's pieces are written no more", #engine.rows(21, dump.PIECE_POSES), 0)
+end
+
+-- Until a weapon has a muzzle piece the engine says its muzzle is one up from
+-- the unit's position, which is nearest a leg and is no muzzle (issue #3941).
+do
+	local engine = newEngine(with())
+	local walker = engine.create(1, 0, 1000, 0, 2000, {
+		weapons = 1,
+		-- Tipped over on a slope, so that up is not the same as y.
+		up = { 0.6, 0.8, 0 },
+	})
+	local unit = engine.units[walker]
+	-- base 1, turret 2, sleeve 3, barrel 4, flare 5, leg 6. The leg hangs off
+	-- the base and is above no muzzle.
+	unit.pieces[6] = support.matrix(0.6, 0.8, 0)
+	unit.muzzles[1] = { 0.6, 0.8, 0 }
+	engine.step() -- frame 0
+	same("a weapon with no muzzle piece yet has no piece watched", #engine.rows(0, dump.PIECE_POSES), 0)
+
+	-- The unit walks and has no muzzle piece still. The place moves with it.
+	unit.x = unit.x + 4
+	engine.runTo(3)
+	same("nor while it walks", #engine.rows(3, dump.PIECE_POSES), 0)
+
+	-- The engine now has the muzzle piece.
+	unit.muzzles[1] = { 0, 5, 0 }
+	engine.runTo(6)
+	local pieces = {}
+	for index, row in ipairs(engine.rows(6, dump.PIECE_POSES)) do
+		pieces[index] = row[2]
+	end
+	same("the muzzle and its parents are watched, and no leg", table.concat(pieces, " "), "5 4 3 2 1")
+
+	-- Its place has not changed, so nothing is read to look for it.
+	local looked = engine.positionReads
+	engine.runTo(9)
+	same("a place already looked at is not looked at again", engine.positionReads - looked, 0)
 end
 
 --------------------------------------------------------------------------------
