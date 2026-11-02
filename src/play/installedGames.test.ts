@@ -29,6 +29,26 @@ describe("compareGameVersions / resolveGameByShortname", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("ranks an unversioned game and a $VERSION checkout below a test build", () => {
+    for (const unversioned of ["", "  ", "$VERSION"]) {
+      expect(
+        compareGameVersions(unversioned, "test-30922-8064a43"),
+      ).toBeLessThan(0);
+      expect(
+        compareGameVersions("test-30922-8064a43", unversioned),
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("ranks an unversioned game and a $VERSION checkout below a release", () => {
+    for (const unversioned of ["", "$VERSION"]) {
+      for (const release of ["V15.9.8", "v15.9.8", "1.0"]) {
+        expect(compareGameVersions(unversioned, release)).toBeLessThan(0);
+        expect(compareGameVersions(release, unversioned)).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("recognises a test build by its version", () => {
     expect(isTestBuild("test-7183-001edc3")).toBe(true);
     expect(isTestBuild("Test-7183")).toBe(true);
@@ -166,6 +186,56 @@ describe("a game's test build beside its release (issue #4992)", () => {
         test,
       ]),
     ).toEqual({ kind: "ready", game: test });
+  });
+
+  it("resolves a test build over a $VERSION checkout, as Beyond All Reason has", () => {
+    const bar = (name: string, version?: string) => ({
+      name,
+      info:
+        version === undefined
+          ? { shortname: "BAR" }
+          : { shortname: "BAR", version },
+    });
+    const rapid = bar(
+      "Beyond All Reason test-30922-8064a43",
+      "test-30922-8064a43",
+    );
+    const checkout = bar("Beyond All Reason", "$VERSION");
+    const unversioned = bar("Beyond All Reason 1");
+    const barRef = { shortname: "BAR" };
+    expect(
+      resolveGameByShortname(barRef, [checkout, unversioned, rapid])?.name,
+    ).toBe(rapid.name);
+    expect(
+      candidateGames(barRef, [checkout, rapid, unversioned]).map((g) => g.name),
+    ).toEqual([rapid.name, checkout.name, unversioned.name]);
+  });
+
+  it("never offers a $VERSION checkout or an unversioned game as an upgrade", () => {
+    const checkout = ba("Balanced Annihilation", "$VERSION");
+    const unversioned = {
+      name: "Balanced Annihilation dev",
+      info: { shortname: "BA" },
+    };
+    for (const pinned of [v1598, test]) {
+      expect(
+        decideLaunchGame({ shortname: "BA", pinnedName: pinned.name }, [
+          pinned,
+          checkout,
+          unversioned,
+        ]),
+      ).toEqual({ kind: "ready", game: pinned });
+    }
+  });
+
+  it("still offers a version to a pinned game that has none", () => {
+    const checkout = ba("Balanced Annihilation", "$VERSION");
+    expect(
+      decideLaunchGame({ shortname: "BA", pinnedName: checkout.name }, [
+        checkout,
+        test,
+      ]),
+    ).toEqual({ kind: "upgrade", current: checkout, newer: test });
   });
 
   it("still offers a newer test build to a pinned test build", () => {
