@@ -801,6 +801,40 @@ describe("a battle on a game with compatibility mode", () => {
       });
     });
 
+    it("starts the player on their own side in a game with a known picker", async () => {
+      scanOverride.current = {
+        data: {
+          games: [
+            {
+              name: "Metal Factions v2.58",
+              primaryArchive: { name: "mf.sdz" },
+              dependencyArchives: [],
+              info: { shortname: "ba", version: "2.58" },
+            },
+          ],
+          maps: [{ name: "DeltaSiegeDry", archives: [], info: {} }],
+          errors: [],
+        },
+        loading: false,
+        run: vi.fn(),
+      };
+      await start({
+        playerUnits: ["com"],
+        snapshot: ((installedGame: InstalledGame) => ({
+          ...conquestSnapshot(installedGame),
+          participants: [
+            { kind: "ai", side: "Aven" },
+            { kind: "you", side: "Claw" },
+          ],
+        })) as never,
+      });
+
+      expect(launch.mock.calls[0][1].config.modOptions).toMatchObject({
+        coilbox_player_picker: "faction_selected",
+        coilbox_player_side: "Claw",
+      });
+    });
+
     it("puts the limit in the units mutator when the run has one", async () => {
       composeUnits.mockResolvedValue({ name: "Coilbox run r1", leftOut: [] });
       await start({
