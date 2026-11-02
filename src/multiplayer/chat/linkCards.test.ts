@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { linkCardFor, linkCardsIn } from "./linkCards";
+import { buildMapLink } from "../../deeplink/build";
+import { linkCardFor, linkCardsIn, mapNameForSlug, mapSlug } from "./linkCards";
 
 const ID = "dQw4w9WgXcQ";
 const THUMB = `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`;
@@ -67,4 +68,81 @@ it("keeps to one card per message, the first known link", () => {
     `https://example.com https://youtu.be/${ID} https://youtu.be/aaaaaaaaaaa https://youtu.be/${ID}`,
   );
   expect(cards.map((c) => c.url)).toEqual([`https://youtu.be/${ID}`]);
+});
+
+const HUB = "https://hub.example";
+
+it("reads a coilbox map link as the map's exact name", () => {
+  const href = buildMapLink("Comet Catcher Redux v1.8") as string;
+  expect(linkCardsIn(`try ${href}`)).toEqual([
+    {
+      site: "Coilbox",
+      url: href,
+      map: { kind: "name", name: "Comet Catcher Redux v1.8" },
+    },
+  ]);
+});
+
+it("keeps a final dot of a map name through chat's trailing punctuation rule", () => {
+  const href = buildMapLink("Odd Map v1.") as string;
+  expect(linkCardsIn(`try ${href}`)[0]).toMatchObject({
+    map: { kind: "name", name: "Odd Map v1." },
+  });
+});
+
+it.each([
+  "coilbox://open?screen=game&id=Comet",
+  "coilbox://open?screen=map",
+  "coilbox://open?screen=battles",
+])("gives %s no card", (href) => {
+  expect(linkCardFor(href)).toBeNull();
+});
+
+it("recognises a map page on the trusted hub only", () => {
+  expect(linkCardFor(`${HUB}/map/comet-catcher-1-8`, HUB)).toEqual({
+    site: "Coilbox Hub",
+    url: `${HUB}/map/comet-catcher-1-8`,
+    map: { kind: "slug", slug: "comet-catcher-1-8", anyVersion: false },
+  });
+  expect(linkCardFor(`${HUB}/map/comet-catcher-1-8`, null)).toBeNull();
+  expect(linkCardFor(`${HUB}.evil.test/map/comet`, HUB)).toBeNull();
+  expect(linkCardFor(`${HUB}/maps`, HUB)).toBeNull();
+  expect(linkCardFor(`${HUB}/map/a/b`, HUB)).toBeNull();
+});
+
+it("recognises Beyond All Reason's map pages with no hub set", () => {
+  expect(
+    linkCardFor("https://www.beyondallreason.info/map/supreme-isthmus"),
+  ).toEqual({
+    site: "Beyond All Reason",
+    url: "https://www.beyondallreason.info/map/supreme-isthmus",
+    map: { kind: "slug", slug: "supreme-isthmus", anyVersion: true },
+  });
+  expect(linkCardFor("https://www.beyondallreason.info/maps")).toBeNull();
+  expect(
+    linkCardFor("https://beyondallreason.info.evil.test/map/a"),
+  ).toBeNull();
+});
+
+it("slugs a map name the way the hub does", () => {
+  expect(mapSlug("Comet_Catcher 1.8")).toBe("comet-catcher-1-8");
+  expect(mapSlug("  !!  ")).toBe("map");
+});
+
+it("matches a hub slug exactly and a BAR slug to the newest version", () => {
+  const names = [
+    "Supreme Isthmus v2",
+    "Supreme Isthmus v10",
+    "Comet Catcher 1.8",
+  ];
+  const hub = { kind: "slug", anyVersion: false } as const;
+  const bar = { kind: "slug", anyVersion: true } as const;
+  expect(mapNameForSlug({ ...hub, slug: "comet-catcher-1-8" }, names)).toBe(
+    "Comet Catcher 1.8",
+  );
+  expect(mapNameForSlug({ ...hub, slug: "supreme-isthmus" }, names)).toBeNull();
+  expect(mapNameForSlug({ ...bar, slug: "supreme-isthmus" }, names)).toBe(
+    "Supreme Isthmus v10",
+  );
+  expect(mapNameForSlug({ ...bar, slug: "nowhere" }, names)).toBeNull();
 });
