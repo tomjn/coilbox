@@ -1,5 +1,6 @@
 import type { BaseBlueprint, BlueprintBuilding } from "../blueprint/model";
 import { parseTerrainSteps } from "../blueprint/payload";
+import type { Facing, Point } from "../placement/geometry";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import { type Participant, uniqueParticipantIds } from "../play/participants";
 import {
@@ -52,20 +53,7 @@ export const MISSION_SCHEMA_VERSION = 1;
 /** The runtime version every launch-set feature needs. */
 export const SCENARIO_RUNTIME_VERSION = 1;
 
-/**
- * A position on the map's ground plane, in engine world units. There is no `y`:
- * everything a scenario places sits on the terrain, so the runtime reads the
- * ground height at spawn time and the editor never has to store a height that
- * could drift from the map.
- */
-export type Point = { x: number; z: number };
-
-/**
- * Which way a placed unit faces, as the engine's `Spring.CreateUnit` facing:
- * 0 south, 1 east, 2 north, 3 west. Buildings snap to these four, so scenarios
- * use them for everything rather than carrying two rotation conventions.
- */
-export type Facing = 0 | 1 | 2 | 3;
+export type { Facing, Point };
 
 /**
  * How hard the mission is being played.
@@ -170,9 +158,16 @@ export type ScenarioGroup = {
    * Not created at game start. A `spawn_group` action creates a dormant group's
    * units, and `wake_group` releases a created group to run its `orders`. A
    * group that is not dormant is created at start and runs its orders straight
-   * away.
+   * away, unless {@link startsAsleep} holds it.
    */
   dormant: boolean;
+  /**
+   * Created at game start but holding position until `wake_group` releases it
+   * (issue #900). Only ever written `true`, and it means nothing on a dormant
+   * group, which is asleep anyway when `spawn_group` places it. Read it through
+   * {@link holdsAtStart}.
+   */
+  startsAsleep?: boolean;
   /**
    * The difficulties this group exists at. Absent is every one. A group left
    * out is not placed at the start and is not placed by `spawn_group` or
@@ -649,6 +644,11 @@ function parseGroupUnits(value: unknown): GroupUnit[] | null {
   return out;
 }
 
+/** Whether a group stands on the map from the start without running its orders. */
+export function holdsAtStart(group: ScenarioGroup): boolean {
+  return group.startsAsleep === true && !group.dormant;
+}
+
 function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
   const gid = id(g.id);
   const team = id(g.team);
@@ -665,6 +665,7 @@ function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
     pos,
     orders,
     dormant: g.dormant === true,
+    ...(g.startsAsleep === true ? { startsAsleep: true } : {}),
     ...difficultyOf(g.difficulty),
   };
 }

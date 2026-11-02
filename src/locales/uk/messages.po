@@ -10720,6 +10720,10 @@ msgstr "Уже збережено"
 msgid "already set"
 msgstr "уже задано"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Already set"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 msgid "Already set this way"
 msgstr ""
@@ -10818,12 +10822,8 @@ msgstr "Також записати .obj і .mtl"
 msgid "Also write the build picture"
 msgstr "Також записати зображення будівництва"
 
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "always"
-msgstr "завжди"
-
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Always"
 msgstr "Завжди"
@@ -11782,6 +11782,11 @@ msgstr "щонайбільше"
 #, fuzzy
 msgid "At the origin"
 msgstr "У початку координат"
+
+#: src/scenario/pages/components/triggers.ts
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "At the start"
+msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -22293,6 +22298,10 @@ msgstr "Спрацьовує щоразу"
 msgid "Fires on"
 msgstr "Спрацьовує на"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "fires weapon {weapon}"
@@ -24743,6 +24752,10 @@ msgstr "Виконується, щойно команда завершила б�
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Виконується, щойно команда утримала зону заданий час, за бажанням лише тоді, коли її ніхто не оскаржує."
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -30838,6 +30851,7 @@ msgid "never"
 msgstr "ніколи"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Never"
 msgstr "Ніколи"
@@ -54273,6 +54287,10 @@ msgstr "Коли"
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr "Коли зберігається нова доріжка й доріжки перевищують ліміт, видаляються ті, які переглядали найдавніше, доки вони не вмістяться. Застарілі доріжки видаляються першими. Нова доріжка ніколи не видаляється, тож доріжка, більша за ліміт, зберігається, а всі інші зникають."
 
+#: src/scenario/pages/components/triggers.ts
+msgid "When armed"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "When ChangeHeading is sent"
@@ -54953,16 +54971,6 @@ msgstr "Без швидкості рушій вважає його статич�
 #, fuzzy
 msgid "with none, firing does nothing"
 msgstr "якщо немає, спрацювання нічого не робить"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it fires on the first pass"
-msgstr "якщо немає, спрацьовує на першому проході"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it never fires"
-msgstr "якщо немає, ніколи не спрацьовує"
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

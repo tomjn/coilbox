@@ -31,7 +31,7 @@ import {
   trappingRings,
 } from "@/blueprint/terrainEdit";
 import type { MapScene3D } from "@/lib/mapScene";
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 import { worldToScene } from "./scene";
 import type { OverlayLayer } from "./useMapEditing";
 

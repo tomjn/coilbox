@@ -21,7 +21,8 @@ import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { usePreferredTarget } from "@/play/config";
-import type { Point, Scenario } from "@/scenario/model";
+import type { Scenario } from "@/scenario/model";
+import type { Point } from "./geometry";
 import type { ModelsStage, StageState } from "./mapLoad";
 import { type Placement, teamColor } from "./placements";
 import {

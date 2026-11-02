@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { compileScenario } from "../../compile";
 import { newScenario } from "../../create";
 import { parseExtensions } from "../../extensions";
+import { requiredRuntimeVersion } from "../../gating";
 import {
   parseScenario,
   type Scenario,
@@ -13,14 +15,17 @@ import {
   applyPoint,
   duplicateTrigger,
   editTrigger,
+  isAtTheStart,
   moveStep,
   moveTrigger,
   nextTriggerId,
+  noConditionsLabel,
   paramOrders,
   registryOptions,
   removeStep,
   removeTrigger,
   renameTrigger,
+  setAtTheStart,
   setStepParam,
   stepAt,
   stepDefaults,
@@ -708,7 +713,7 @@ describe("labels", () => {
   });
 
   it("says what a trigger holds", () => {
-    expect(triggerSummary(trigger("t"))).toBe("always · 0 actions");
+    expect(triggerSummary(trigger("t"))).toBe("At the start · 0 actions");
     expect(
       triggerSummary(
         trigger("t", {
@@ -723,5 +728,106 @@ describe("labels", () => {
         }),
       ),
     ).toBe("any of 2 conditions · 1 action");
+  });
+});
+
+describe("a trigger with no conditions (issue #901)", () => {
+  const any: ScenarioTrigger["conditions"] = { op: "any", conditions: [] };
+
+  it("fires at the start only when armed and fire-once under all", () => {
+    expect(isAtTheStart(trigger("t"))).toBe(true);
+    expect(isAtTheStart(trigger("t", { enabled: false }))).toBe(false);
+    expect(isAtTheStart(trigger("t", { repeat: true }))).toBe(false);
+    expect(isAtTheStart(trigger("t", { conditions: any }))).toBe(false);
+    expect(
+      isAtTheStart(
+        trigger("t", {
+          conditions: {
+            op: "all",
+            conditions: [{ type: "time_elapsed", params: { seconds: 1 } }],
+          },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("is called what it does", () => {
+    expect(noConditionsLabel(trigger("t"))).toBe("At the start");
+    expect(noConditionsLabel(trigger("t", { enabled: false }))).toBe(
+      "When armed",
+    );
+    expect(noConditionsLabel(trigger("t", { repeat: true }))).toBe("Always");
+    expect(noConditionsLabel(trigger("t", { conditions: any }))).toBe("Never");
+  });
+
+  it("clears whatever stops a trigger firing at the start", () => {
+    const before: Scenario = {
+      ...document(),
+      triggers: [
+        trigger("t", {
+          enabled: false,
+          repeat: true,
+          conditions: {
+            op: "any",
+            conditions: [{ type: "time_elapsed", params: { seconds: 1 } }],
+          },
+        }),
+      ],
+    };
+
+    const after = setAtTheStart(before, "t").triggers[0];
+
+    expect(isAtTheStart(after)).toBe(true);
+    expect(after.conditions).toEqual({ op: "all", conditions: [] });
+  });
+
+  it("stops being at the start once a condition is added", () => {
+    const before: Scenario = { ...document(), triggers: [trigger("t")] };
+
+    const after = addStep(before, "t", "conditions", {
+      type: "time_elapsed",
+      params: { seconds: 1 },
+    }).triggers[0];
+
+    expect(isAtTheStart(after)).toBe(false);
+  });
+
+  it("compiles to the mission a hand-written empty list always did", () => {
+    const base = document();
+    const written: Scenario = { ...base, triggers: [trigger("t")] };
+    const picked = setAtTheStart(
+      {
+        ...base,
+        triggers: [
+          trigger("t", {
+            conditions: {
+              op: "all",
+              conditions: [{ type: "time_elapsed", params: { seconds: 1 } }],
+            },
+          }),
+        ],
+      },
+      "t",
+    );
+
+    expect(compileScenario(picked)).toBe(compileScenario(written));
+    expect(compileScenario(picked)).toMatch(
+      /conditions = \{\s+op = "all",\s+conditions = \{\},\s+\}/,
+    );
+    expect(requiredRuntimeVersion(picked)).toBe(
+      requiredRuntimeVersion(written),
+    );
+  });
+
+  it("stores an empty list, so a saved document reads back unchanged", () => {
+    const picked = setAtTheStart(
+      { ...document(), triggers: [trigger("t")] },
+      "t",
+    );
+
+    const read = parseScenario(JSON.parse(JSON.stringify(picked)));
+
+    expect(read?.triggers[0].conditions).toEqual({ op: "all", conditions: [] });
+    expect(read?.schemaVersion).toBe(document().schemaVersion);
   });
 });

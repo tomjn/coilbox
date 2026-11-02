@@ -103,9 +103,11 @@ A group is a block of units spawned and ordered as one: a raiding party, a reinf
 A group has two states, and both matter:
 
 - **On the map or not.** A group is placed at game start unless you tick **Waits for a trigger to spawn it**, which makes it dormant.
-- **Awake or asleep.** Asleep is standing on hold position: the units exist and defend themselves and do not wander off. Awake is running the group's orders.
+- **Awake or asleep.** Asleep is standing on hold position: the units exist and defend themselves and do not wander off. Awake is running the group's orders. A group placed at game start is awake unless you tick **Holds position until woken**, which stores `startsAsleep`.
 
-So a dormant garrison is `spawn_group` when you want it standing there and `wake_group` when you want it moving. A reinforcement wave is `wake_group` on its own, which spawns it and sends it off in one action.
+So a garrison in its post from the first frame is **Holds position until woken**, then `wake_group` when you want it moving. A dormant garrison is `spawn_group` when you want it standing there and `wake_group` when you want it moving. A reinforcement wave is `wake_group` on its own, which spawns it and sends it off in one action.
+
+`startsAsleep` needs mission runtime 11. An older runtime would read past it and send the group off at the first frame, so a game bundling one cannot play the scenario itself. A saved group without the flag keeps its meaning: placed at the start and running its orders.
 
 Orders are one queue given to every unit in the group. **Move along**, **Patrol** and **Fight along** take a list of waypoints you draw by clicking on the map. **Guard** and **Attack** take an actor, a base's building or another group as the target. A patrol closes its loop back to where the group is standing, exactly as it would if a player had shift-clicked the same points.
 
@@ -166,7 +168,7 @@ Each trigger has:
 - **Armed at the start**, off for a trigger something else has to enable.
 - **Fires every time**, off for a trigger that fires once and disarms itself. Enabling it again re-arms it.
 - **Waits N seconds between firings**, for a repeating trigger. With no wait, a repeating trigger fires on every pass its conditions hold, which on the polled tick is about twice a second.
-- **Fires when**, a list of conditions with **all of these hold** or **any of these hold** over it. There is no nesting. An empty list holds under `all` and never holds under `any`.
+- **Fires when**, a list of conditions with **all of these hold** or **any of these hold** over it. There is no nesting. An empty list holds under `all` and never holds under `any`. See [At the start](#at-the-start).
 - **Then**, the actions, run in the order you list them.
 - **Only from** and **Only up to**, the difficulties it runs at. See [Difficulty](#difficulty).
 
@@ -175,6 +177,22 @@ A trigger's name is a label. Call it what you like, call two triggers the same t
 A trigger written before names existed shows the id it was called by, which is the name it was displayed under anyway. Nothing to do.
 
 Conditions are checked two ways, and you do not choose which. A condition about a thing that happened, a unit dying or being captured, is checked when it happens. A condition about an aggregate, a count or a zone's contents or a clock, is checked on a slow tick every 15 frames. A trigger with one aggregate condition is checked on the tick.
+
+### At the start
+
+A trigger that is armed, fires once and has no conditions runs its actions on the first tick of the mission. This is where the briefing lines, the opening camera and the markers go. A new trigger starts this way, and the editor shows its condition list as **At the start**.
+
+**At the start** is also in the **Add a condition** list, under **Time**. Picking it empties the condition list, sets **all of these hold**, turns on **Armed at the start** and turns off **Fires every time**. Undo puts them back. Adding any other condition takes its place, because the trigger now waits for that condition.
+
+It is a name in the editor and not a condition type. The saved scenario and the compiled mission hold an empty list, as they always have, so it needs no new runtime and an older coilbox reads the document the same way.
+
+An empty list on any other trigger shows what it does instead:
+
+| The trigger | The editor shows | What it does |
+| --- | --- | --- |
+| Not armed at the start | **When armed** | Fires once, on the first tick after something enables it |
+| Fires every time | **Always** | Fires on every tick, subject to its wait |
+| Uses **any of these hold** | **Never** | Does not fire |
 
 ### Conditions
 

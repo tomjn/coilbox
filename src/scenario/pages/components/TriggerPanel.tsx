@@ -59,14 +59,17 @@ import {
   addTrigger,
   duplicateTrigger,
   editTrigger,
+  isAtTheStart,
   moveStep,
   moveTrigger,
   nextTriggerId,
+  noConditionsLabel,
   type PointTarget,
   removeStep,
   removeTrigger,
   renameTrigger,
   type StepList,
+  setAtTheStart,
   setStepNegate,
   setStepParam,
   stepsOf,
@@ -746,9 +749,7 @@ function StepSection({
         <span className="ml-auto text-[11px] text-muted-foreground">
           {steps.length === 0
             ? conditions
-              ? trigger.conditions.op === "all"
-                ? t`with none, it fires on the first pass`
-                : t`with none, it never fires`
+              ? null
               : t`with none, firing does nothing`
             : conditions
               ? plural(stepCount, {
@@ -758,6 +759,12 @@ function StepSection({
               : plural(stepCount, { one: "# action", other: "# actions" })}
         </span>
       </header>
+
+      {conditions && steps.length === 0 && (
+        <p className="rounded-md border border-border/60 bg-muted/20 p-2 text-xs font-medium">
+          {noConditionsLabel(trigger)}
+        </p>
+      )}
 
       {steps.length > 0 && (
         <ul className="flex flex-col gap-1.5">
@@ -832,6 +839,17 @@ function StepSection({
         extensions={extensions}
         unitDefs={unitDefs}
         gate={gate}
+        atTheStart={
+          conditions
+            ? {
+                active: isAtTheStart(trigger),
+                onPick: () => {
+                  onPick(null);
+                  onChange(setAtTheStart(scenario, trigger.id));
+                },
+              }
+            : undefined
+        }
         onAdd={(step) => onChange(addStep(scenario, trigger.id, list, step))}
       />
     </section>

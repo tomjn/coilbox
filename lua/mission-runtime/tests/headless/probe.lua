@@ -1491,6 +1491,44 @@ plans.stronghold = {
 	},
 }
 
+-- A group that starts asleep (issue #900): a garrison in its post from the first
+-- frame, walking its patrol once the trigger ten seconds in wakes it.
+local sentryX, sentryZ
+
+plans.sentries = {
+	deadline = 520,
+	steps = {
+		{ frame = 1, run = checkPlacement },
+		{ frame = 5, run = function()
+			local unitID = state().groups.units("post")[1]
+			check("a group that starts asleep is on the map", #state().groups.units("post") == 2,
+				#state().groups.units("post"))
+			check("and is not running its orders", state().groups.isAwake("post") == false)
+			local states = Spring.GetUnitStates(unitID)
+			check("it holds position", states.movestate == CMD.MOVESTATE_HOLDPOS, tostring(states.movestate))
+			check("with no orders given", #Spring.GetUnitCommands(unitID, -1) == 0,
+				#Spring.GetUnitCommands(unitID, -1))
+			sentryX, _, sentryZ = Spring.GetUnitPosition(unitID)
+		end },
+		{ frame = 285, run = function()
+			local x, _, z = Spring.GetUnitPosition(state().groups.units("post")[1])
+			check("it stays in its post until it is woken", x == sentryX and z == sentryZ,
+				tostring(x) .. "," .. tostring(z))
+		end },
+		{ frame = 500, run = function()
+			local unitID = state().groups.units("post")[1]
+			check("wake_group sets it running", state().groups.isAwake("post") == true)
+			local states = Spring.GetUnitStates(unitID)
+			check("off hold position", states.movestate ~= CMD.MOVESTATE_HOLDPOS, tostring(states.movestate))
+			check("on its orders", #Spring.GetUnitCommands(unitID, -1) > 0,
+				#Spring.GetUnitCommands(unitID, -1))
+			local x, _, z = Spring.GetUnitPosition(unitID)
+			check("and it has left its post", x ~= sentryX or z ~= sentryZ,
+				tostring(x) .. "," .. tostring(z))
+		end },
+	},
+}
+
 -- No mission at all: the modoption gate. The runtime is a file in the game
 -- whatever happens, so what has to be proved is that a normal game never gets a
 -- gadget out of it.

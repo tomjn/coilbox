@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 2,
+  "id": "sentries",
+  "name": "Sentries",
+  "description": "A garrison that stands in its post from the first frame and walks its patrol when a trigger wakes it ten seconds in. Proves a group can start on the map asleep.",
+  "runtimeVersion": 11,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Commander",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "defenders",
+        "kind": "ai",
+        "name": "Defenders",
+        "side": "core",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {
+    "defenders": {
+      "noCommander": true
+    }
+  },
+  "zones": [],
+  "actors": [],
+  "groups": [
+    {
+      "id": "post",
+      "team": "defenders",
+      "units": [
+        {
+          "def": "armpw",
+          "count": 2
+        }
+      ],
+      "pos": {
+        "x": 2400,
+        "z": 2400
+      },
+      "orders": [
+        {
+          "kind": "patrol",
+          "waypoints": [
+            {
+              "x": 2800,
+              "z": 2400
+            }
+          ]
+        }
+      ],
+      "dormant": false,
+      "startsAsleep": true
+    }
+  ],
+  "blueprints": [],
+  "bases": [],
+  "restrictions": {},
+  "vars": {},
+  "triggers": [
+    {
+      "id": "call-out",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 10
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "wake_group",
+          "params": {
+            "group": "post"
+          }
+        }
+      ]
+    }
+  ],
+  "objectives": [],
+  "dialogue": [],
+  "createdAt": "2026-11-02T00:00:00.000Z",
+  "updatedAt": "2026-11-02T00:00:00.000Z"
+}

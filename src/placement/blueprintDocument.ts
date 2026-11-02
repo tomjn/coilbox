@@ -19,7 +19,8 @@
 
 import type { BaseBlueprint } from "@/blueprint/model";
 import { newScenario } from "@/scenario/create";
-import type { Point, Scenario } from "@/scenario/model";
+import type { Scenario } from "@/scenario/model";
+import type { Point } from "./geometry";
 import { GRID_ORIGIN } from "./ground";
 
 /**

@@ -26,7 +26,7 @@ import type {
 } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
 import { layoutOrigin } from "@/lib/scenarioEditing/layoutPlacing";
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 import { clampToMap } from "./pointer";
 import {
   type NudgeOffer,

@@ -288,6 +288,59 @@ describe("a group standing off the map", () => {
 });
 
 /**
+ * Issue #900. Holding at the start is a choice about a group on the map, so a
+ * dormant group does not offer it.
+ */
+describe("a group that holds position until woken", () => {
+  function open(group: Partial<Scenario["groups"][number]>) {
+    const edits: unknown[] = [];
+    render(
+      <GroupControls
+        group={{
+          id: "post",
+          team: "you",
+          units: [{ def: "armpw", count: 2 }],
+          pos: { x: 100, z: 100 },
+          orders: [],
+          dormant: false,
+          ...group,
+        }}
+        participants={[]}
+        units={[]}
+        unitsLoading={false}
+        targets={[]}
+        issues={[]}
+        onEdit={(patch) => edits.push(patch)}
+        onDelete={() => {}}
+        drawing={null}
+        onDraw={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /unit/i }));
+    return edits;
+  }
+  const hold = () =>
+    screen.queryByRole("switch", { name: "Holds position until woken" });
+
+  it("sets the flag when it is switched on", () => {
+    const edits = open({});
+    fireEvent.click(hold() as HTMLElement);
+    expect(edits).toEqual([{ startsAsleep: true }]);
+  });
+
+  it("takes the flag away when it is switched off", () => {
+    const edits = open({ startsAsleep: true });
+    fireEvent.click(hold() as HTMLElement);
+    expect(edits).toEqual([{ startsAsleep: undefined }]);
+  });
+
+  it("is not offered on a dormant group", () => {
+    open({ dormant: true });
+    expect(hold()).toBeNull();
+  });
+});
+
+/**
  * One of a group's own unit rows naming a def the game has not got (issue
  * #2346). The picker sets the def once and adds a row rather than editing
  * one, so this is a row-level note under that row too, in the validator's own

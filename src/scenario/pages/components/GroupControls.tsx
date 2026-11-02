@@ -176,6 +176,24 @@ export function GroupControls({
             />
           </div>
 
+          {group.dormant ? null : (
+            <div className="flex items-center justify-between gap-3">
+              <Label
+                htmlFor="group-starts-asleep"
+                className="text-xs font-medium"
+              >
+                <Trans>Holds position until woken</Trans>
+              </Label>
+              <Switch
+                id="group-starts-asleep"
+                checked={group.startsAsleep === true}
+                onCheckedChange={(on) =>
+                  onEdit({ startsAsleep: on ? true : undefined })
+                }
+              />
+            </div>
+          )}
+
           {/* Which difficulties this group exists at (issue #2164). A group the
               range leaves out is not placed at the start and is not placed by
               spawn_group or wake_group either, so "the second wave only comes

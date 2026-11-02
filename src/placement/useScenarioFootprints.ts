@@ -11,12 +11,12 @@ import { useEffect, useRef, useState } from "react";
 import type { FootprintMark } from "@/blueprint/footprint";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
-import type { Point } from "@/scenario/model";
 import {
   createFootprintsLayer,
   type FootprintsLayer,
   type MarkAs,
 } from "./footprintsLayer";
+import type { Point } from "./geometry";
 
 export function useScenarioFootprints(
   handle: MapScene3D | null,

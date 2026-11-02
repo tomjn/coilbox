@@ -33,8 +33,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FootprintMark } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/lib/mapScene";
-import type { Point } from "@/scenario/model";
 import { createFootprintsLayer, type FootprintsLayer } from "./footprintsLayer";
+import type { Point } from "./geometry";
 import type { Placement } from "./placements";
 import {
   draggedBuilding,

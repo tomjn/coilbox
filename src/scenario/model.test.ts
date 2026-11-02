@@ -262,6 +262,27 @@ describe("parseScenario — groups", () => {
     units: [{ def: "armpw", count: 4 }],
   };
 
+  it("reads startsAsleep only when it is true, so an old group stays awake", () => {
+    const group = {
+      id: "post",
+      team: "p1",
+      units: [{ def: "armpw", count: 1 }],
+      pos: { x: 0, z: 0 },
+      orders: [],
+    };
+    const read = (extra: object) =>
+      parseScenario({
+        id: "s1",
+        name: "S",
+        setup: { gameName: "G", mapName: "M" },
+        groups: [{ ...group, ...extra }],
+      })?.groups[0];
+
+    expect(read({})).not.toHaveProperty("startsAsleep");
+    expect(read({ startsAsleep: false })).not.toHaveProperty("startsAsleep");
+    expect(read({ startsAsleep: true })?.startsAsleep).toBe(true);
+  });
+
   it("parses a group with orders and defaults dormant to false", () => {
     const s = parseScenario(
       doc({

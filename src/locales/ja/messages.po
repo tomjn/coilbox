@@ -10720,6 +10720,10 @@ msgstr "保存済み"
 msgid "already set"
 msgstr "設定済み"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Already set"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 msgid "Already set this way"
 msgstr ""
@@ -10818,12 +10822,8 @@ msgstr ".obj と .mtl も書き出す"
 msgid "Also write the build picture"
 msgstr "建設画像も書き出す"
 
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "always"
-msgstr "常に"
-
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Always"
 msgstr "常に"
@@ -11782,6 +11782,11 @@ msgstr "以下"
 #, fuzzy
 msgid "At the origin"
 msgstr "原点"
+
+#: src/scenario/pages/components/triggers.ts
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "At the start"
+msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -22293,6 +22298,10 @@ msgstr "毎回発動"
 msgid "Fires on"
 msgstr "発動条件"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "fires weapon {weapon}"
@@ -24743,6 +24752,10 @@ msgstr "チームがユニットタイプを必要な数だけ建設し終える
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "チームがゾーンを設定した時間だけ確保すると成立します。他チームがいないときだけに限定することもできます。"
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -30838,6 +30851,7 @@ msgid "never"
 msgstr "なし"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Never"
 msgstr "なし"
@@ -54273,6 +54287,10 @@ msgstr "タイミング"
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr "新しいトラックを保存して上限を超えると、収まるまで最も前に観戦したトラックから削除されます。古いトラックが最初に削除されます。新しいトラックは削除されないため、上限より大きいトラックは保持され、他はすべて削除されます。"
 
+#: src/scenario/pages/components/triggers.ts
+msgid "When armed"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "When ChangeHeading is sent"
@@ -54953,16 +54971,6 @@ msgstr "速度がないと、エンジンはこれを固定物として扱いま
 #, fuzzy
 msgid "with none, firing does nothing"
 msgstr "ない場合、発動しても何もしません"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it fires on the first pass"
-msgstr "ない場合、最初の判定で発動します"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it never fires"
-msgstr "ない場合、発動しません"
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

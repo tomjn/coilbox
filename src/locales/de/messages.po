@@ -10720,6 +10720,10 @@ msgstr "Bereits gespeichert"
 msgid "already set"
 msgstr "bereits gesetzt"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Already set"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 msgid "Already set this way"
 msgstr ""
@@ -10818,12 +10822,8 @@ msgstr "Auch .obj und .mtl schreiben"
 msgid "Also write the build picture"
 msgstr "Auch das Baubild schreiben"
 
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "always"
-msgstr "immer"
-
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Always"
 msgstr "Immer"
@@ -11782,6 +11782,11 @@ msgstr "höchstens"
 #, fuzzy
 msgid "At the origin"
 msgstr "Am Ursprung"
+
+#: src/scenario/pages/components/triggers.ts
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "At the start"
+msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -22293,6 +22298,10 @@ msgstr "Löst jedes Mal aus"
 msgid "Fires on"
 msgstr "Löst aus bei"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "fires weapon {weapon}"
@@ -24743,6 +24752,10 @@ msgstr "Gilt, sobald ein Team genug von einem Einheitentyp fertig gebaut hat."
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Gilt, sobald ein Team eine Zone so lange gehalten hat, wie Sie festlegen, auf Wunsch nur unangefochten."
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -30838,6 +30851,7 @@ msgid "never"
 msgstr "nie"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Never"
 msgstr "Nie"
@@ -54273,6 +54287,10 @@ msgstr "Wann"
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr "Wird eine neue Spur gespeichert und überschreiten die Spuren die Grenze, werden die am längsten nicht angesehenen entfernt, bis sie passen. Veraltete Spuren gehen zuerst. Die neue Spur wird nie entfernt, eine Spur größer als die Grenze bleibt also, und alle anderen gehen."
 
+#: src/scenario/pages/components/triggers.ts
+msgid "When armed"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "When ChangeHeading is sent"
@@ -54953,16 +54971,6 @@ msgstr "Ohne Geschwindigkeit behandelt die Engine sie als stationär."
 #, fuzzy
 msgid "with none, firing does nothing"
 msgstr "ohne welche bewirkt das Auslösen nichts"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it fires on the first pass"
-msgstr "ohne welche löst er beim ersten Durchlauf aus"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it never fires"
-msgstr "ohne welche löst er nie aus"
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

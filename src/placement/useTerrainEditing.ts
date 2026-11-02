@@ -47,8 +47,9 @@ import {
   moveStepCorner,
   removeStepCorner,
 } from "@/lib/scenarioEditing/terrain";
-import type { Point, Scenario } from "@/scenario/model";
+import type { Scenario } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID } from "./blueprintDocument";
+import type { Point } from "./geometry";
 import {
   createTerrainLayer,
   draggedStep,

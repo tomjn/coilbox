@@ -40,8 +40,8 @@ import {
   unjudged,
 } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/lib/mapScene";
-import type { Point } from "@/scenario/model";
 import { animates, arrivals, eased, fadeAt, pulseAt } from "./arrivals";
+import type { Point } from "./geometry";
 import { worldToScene } from "./scene";
 
 /** What the footprints are drawn under, so they can be found and removed as one

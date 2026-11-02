@@ -398,6 +398,44 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #900. Runtime 10 reads past the flag, so a garrison meant to hold its
+   * post sets off on its orders at the first frame.
+   */
+  describe("a group that starts asleep", () => {
+    const group = {
+      id: "post",
+      team: "enemy",
+      units: [{ def: "armpw", count: 2 }],
+      pos: { x: 600, z: 600 },
+      orders: [],
+      dormant: false,
+    };
+
+    it("needs runtime 11", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...withTrigger([], []),
+          groups: [{ ...group, startsAsleep: true }],
+        }),
+      ).toBe(11);
+    });
+
+    it("asks for nothing when no group holds at the start", () => {
+      const base = withTrigger([], []);
+      expect(requiredRuntimeVersion({ ...base, groups: [group] })).toBe(
+        requiredRuntimeVersion(base),
+      );
+      // A dormant group is asleep whenever it is placed, on any runtime.
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          groups: [{ ...group, dormant: true, startsAsleep: true }],
+        }),
+      ).toBe(requiredRuntimeVersion(base));
+    });
+  });
+
+  /**
    * Issue #4799. Runtime 9 reads past a base's terrain and its dormancy, so it
    * places a walled base with no walls and a dormant base at the start.
    */

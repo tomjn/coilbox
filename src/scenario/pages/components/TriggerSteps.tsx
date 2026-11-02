@@ -295,6 +295,10 @@ export function StepRow({
   );
 }
 
+/** The palette's value for "At the start". The colon keeps it apart from any
+ *  type name a game could declare. */
+const AT_THE_START_OPTION = "coilbox:at_the_start";
+
 /**
  * One condition or action added to the end of a list.
  *
@@ -323,6 +327,7 @@ export function AddStep({
   extensions,
   unitDefs,
   gate,
+  atTheStart,
   onAdd,
 }: {
   list: StepList;
@@ -332,6 +337,9 @@ export function AddStep({
   unitDefs: string[];
   /** Why each type the target runtime cannot run is unavailable, by type name. */
   gate: Record<string, string>;
+  /** The "At the start" entry, on the conditions list only. It is not a type,
+   *  because picking it empties the list rather than adding to it. */
+  atTheStart?: { active: boolean; onPick: () => void };
   onAdd: (step: TriggerStep) => void;
 }) {
   const { t } = useLingui();
@@ -343,22 +351,30 @@ export function AddStep({
   const groupRank = new Map<string, number>(
     groupOrder.map((group, index) => [group, index]),
   );
-  const options = Object.entries(table)
-    .map(([type, spec]) => {
-      const defaults = stepDefaults(spec, { scenario, unitDefs });
-      const reason = gate[type] ?? defaults.needs;
-      return {
-        value: type,
-        label: stepLabel(type, extensions),
-        description:
-          declared[type]?.description ??
-          TYPE_DESCRIPTIONS[type] ??
-          t`No description.`,
-        trailing: reason,
-        disabled: reason !== undefined,
-        group: TYPE_GROUPS[type] ?? GAME_TYPE_GROUP,
-      };
-    })
+  const startOption = atTheStart && {
+    value: AT_THE_START_OPTION,
+    label: t`At the start`,
+    description: t`Fires once, as soon as the mission starts. Replaces this trigger's other conditions.`,
+    trailing: atTheStart.active ? t`Already set` : undefined,
+    disabled: atTheStart.active,
+    group: "Time",
+  };
+  const typeOptions = Object.entries(table).map(([type, spec]) => {
+    const defaults = stepDefaults(spec, { scenario, unitDefs });
+    const reason = gate[type] ?? defaults.needs;
+    return {
+      value: type,
+      label: stepLabel(type, extensions),
+      description:
+        declared[type]?.description ??
+        TYPE_DESCRIPTIONS[type] ??
+        t`No description.`,
+      trailing: reason,
+      disabled: reason !== undefined,
+      group: TYPE_GROUPS[type] ?? GAME_TYPE_GROUP,
+    };
+  });
+  const options = (startOption ? [startOption, ...typeOptions] : typeOptions)
     .sort(
       (a, b) =>
         (groupRank.get(a.group) ?? groupOrder.length) -
@@ -375,6 +391,10 @@ export function AddStep({
       }
       options={options}
       onValueChange={(type) => {
+        if (type === AT_THE_START_OPTION) {
+          atTheStart?.onPick();
+          return;
+        }
         if (gate[type] || !table[type]) return;
         const defaults = stepDefaults(table[type], { scenario, unitDefs });
         if (defaults.params) onAdd({ type, params: defaults.params });
