@@ -117,9 +117,9 @@ export const COMPRESSED_CODE_PREFIX = "cbz1.";
  * and a "corrupted" message. Matches `MAX_IMPORT_BYTES` in
  * `../deeplink/fetchImport.ts`, the same ceiling a fetched import gets.
  */
-const MAX_INFLATED_BYTES = 512 * 1024;
+export const MAX_INFLATED_BYTES = 512 * 1024;
 
-function bytesToBase64Url(bytes: Uint8Array): string {
+export function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary)
@@ -128,7 +128,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
     .replace(/=+$/, "");
 }
 
-function base64UrlToBytes(code: string): Uint8Array {
+export function base64UrlToBytes(code: string): Uint8Array {
   const padded = code.replace(/-/g, "+").replace(/_/g, "/");
   const pad =
     padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
