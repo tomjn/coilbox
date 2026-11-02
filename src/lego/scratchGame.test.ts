@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildLuaRulesEntry,
   buildModInfo,
-  folderIdentity,
   buildSideData,
   buildStartUnitGadget,
   buildUnitScriptGadget,
+  folderIdentity,
   LUARULES_ENTRIES_LUA,
   missingLuaRulesEntries,
   SCRATCH_SIDE,

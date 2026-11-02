@@ -6,8 +6,8 @@ import {
   applyPerks,
   battleRestrictions,
   disabledUnitsFor,
-  playerUnitsFor,
   perkTotals,
+  playerUnitsFor,
 } from "./build";
 import type { Perk, RogueliteRun } from "./model";
 
