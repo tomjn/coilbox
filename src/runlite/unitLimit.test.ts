@@ -279,7 +279,7 @@ describe("unitLimitFor", () => {
       edges,
       morphs,
     );
-    expect(limit).toEqual({ kind: "limited", disabled: [] });
+    expect(limit).toMatchObject({ kind: "limited", disabled: [] });
   });
 
   it("never disables a unit the start unit builds because of a morph", () => {

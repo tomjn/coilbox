@@ -3374,6 +3374,8 @@ const SCRATCH_LUARULES_ENTRIES: [&[&str]; 2] =
 /// The menu entries that put the units on base game builders' build lists,
 /// read by the engine's base content `download_builds.lua` (issue #4515).
 const SCRATCH_BUILD_LIST: &[&str] = &["download", "coilbox_build_list.tdf"];
+/// The gadget that holds a warpath's player to their unlocked units (issue #5005).
+const SCRATCH_PLAYER_LIMIT_GADGET: &[&str] = &["LuaRules", "Gadgets", "coilbox_player_limit.lua"];
 
 /// Write one generated file into the scratch game, creating its folder.
 ///
@@ -3404,16 +3406,19 @@ fn write_scratch_file(dir: &Path, relative: &[&str], contents: &str) -> Result<(
 /// which only a caller launching a single unit wants. `lua_rules` holds
 /// `LuaRules/main.lua` and `LuaRules/draw.lua`, each given only when the base
 /// game lacks it. `build_list` holds the build list menu entries, given only
-/// when a unit names a builder. A file not given is removed in every case,
+/// when a unit names a builder. `player_limit_gadget` holds a warpath's player to
+/// their unlocked units, given only for a warpath battle. A file not given is removed in every case,
 /// because the folder is reused and a copy left from an earlier launch would
 /// hide this game's own, spawn a unit nobody asked for, or list a unit that has
 /// since left.
+#[allow(clippy::too_many_arguments)]
 fn write_scratch_game(
     dir: &Path,
     [modinfo, unit_script_gadget]: [&str; 2],
     start_unit: [Option<&str>; 2],
     lua_rules: [Option<&str>; 2],
     build_list: Option<&str>,
+    player_limit_gadget: Option<&str>,
     sandbox: Option<&sandbox::Sandbox>,
     runtime_src: Option<&Path>,
 ) -> Result<(), String> {
@@ -3432,7 +3437,10 @@ fn write_scratch_game(
         .into_iter()
         .zip(start_unit)
         .chain(SCRATCH_LUARULES_ENTRIES.into_iter().zip(lua_rules))
-        .chain(std::iter::once((SCRATCH_BUILD_LIST, build_list)))
+        .chain([
+            (SCRATCH_BUILD_LIST, build_list),
+            (SCRATCH_PLAYER_LIMIT_GADGET, player_limit_gadget),
+        ])
     {
         match contents {
             Some(contents) => write_scratch_file(dir, relative, contents)?,
@@ -3485,6 +3493,7 @@ async fn lego_scratch_game<R: Runtime>(
     lua_rules_draw: Option<String>,
     sandbox: Option<sandbox::Sandbox>,
     build_list: Option<String>,
+    player_limit_gadget: Option<String>,
 ) -> CliResult {
     if !valid_scratch_folder(&folder) {
         return CliResult::err(format!("not a scratch game folder: {folder}"));
@@ -3511,6 +3520,7 @@ async fn lego_scratch_game<R: Runtime>(
         [sidedata.as_deref(), gadget.as_deref()],
         [lua_rules_main.as_deref(), lua_rules_draw.as_deref()],
         build_list.as_deref(),
+        player_limit_gadget.as_deref(),
         sandbox.as_ref(),
         runtime_src.as_deref(),
     ) {
@@ -5182,6 +5192,7 @@ mod tests {
                 start_unit,
                 [None, None],
                 None,
+                None,
                 Some(&sandbox),
                 Some(src.path()),
             )
@@ -5224,6 +5235,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("write");
         assert_eq!(std::fs::read_to_string(&draw).expect("draw"), "-- handler");
@@ -5234,6 +5246,7 @@ mod tests {
             files,
             start_unit,
             [None, None],
+            None,
             None,
             None,
             None,
@@ -5264,6 +5277,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("write");
         assert!(sidedata.exists() && gadget.exists());
@@ -5276,6 +5290,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("write");
         assert!(!sidedata.exists());
@@ -5285,6 +5300,44 @@ mod tests {
             .path()
             .join("LuaRules/Gadgets/coilbox_unit_script.lua")
             .exists());
+    }
+
+    /// Issue #5005. The folder is reused, so a launch with no limit must not
+    /// inherit the last one's gadget.
+    #[test]
+    fn the_player_limit_gadget_is_written_only_while_a_battle_limits_the_player() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let files = ["modinfo", "unit script"];
+        let gadget = dir.path().join("LuaRules/Gadgets/coilbox_player_limit.lua");
+
+        write_scratch_game(
+            dir.path(),
+            files,
+            [None, None],
+            [None, None],
+            None,
+            Some("-- limit"),
+            None,
+            None,
+        )
+        .expect("write");
+        assert_eq!(
+            std::fs::read_to_string(&gadget).expect("gadget"),
+            "-- limit"
+        );
+
+        write_scratch_game(
+            dir.path(),
+            files,
+            [None, None],
+            [None, None],
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("write");
+        assert!(!gadget.exists());
     }
 
     /// Issue #4515. The build list goes where the engine's `download_builds.lua`
@@ -5303,6 +5356,7 @@ mod tests {
             Some("[MENUENTRY1]"),
             None,
             None,
+            None,
         )
         .expect("write");
         assert_eq!(
@@ -5315,6 +5369,7 @@ mod tests {
             files,
             [None, None],
             [None, None],
+            None,
             None,
             None,
             None,

@@ -38,9 +38,10 @@ import {
   writePreparedMutator,
 } from "../lego/mutator";
 import { type LoadedPack, loadPack } from "../lego/pack";
+import { buildPlayerLimitGadget } from "../lego/playerLimit";
 import { loadRawGeometryIfAny, type RawGeometry } from "../lego/rawGeometry";
 import { footprintSteps, movedUnitDef, renderUnitDef } from "../lego/unitDef";
-import { unitsFolder } from "../lib/generatedGames";
+import { playerLimitFolder, unitsFolder } from "../lib/generatedGames";
 import { readStoredSetting } from "../lib/storedSetting";
 import type { PlayTarget } from "../play/config";
 import { loadUnitDefs } from "../workshop/config";
@@ -530,6 +531,8 @@ export async function composeUnits(
   owner: UnitsOwner,
   target: PlayTarget,
   base: UnitsBaseGame,
+  /** Also hold the player to their unlocked units (issue #5005). */
+  limitsPlayer = false,
 ): Promise<ComposedUnits | null> {
   const units = owner.units ?? [];
   if (units.length === 0) return null;
@@ -585,6 +588,9 @@ export async function composeUnits(
     folder,
     prepared,
     builtBy,
+    ...(limitsPlayer
+      ? { extras: { playerLimitGadget: buildPlayerLimitGadget() } }
+      : {}),
   });
   return {
     name: result.name,
@@ -594,4 +600,32 @@ export async function composeUnits(
       ...result.buildListLeftOut,
     ],
   };
+}
+
+/**
+ * Write the mutator that limits a warpath's player when the run has no builder
+ * units for it to go in with (issue #5005), and answer its name. Throws with a
+ * reason a player can act on. The caller stops the launch, because going ahead
+ * on the game itself would drop the limit.
+ */
+export async function composePlayerLimit(
+  target: PlayTarget,
+  base: UnitsBaseGame,
+): Promise<string> {
+  const { name } = await writePreparedMutator({
+    target,
+    baseGame: base.name,
+    baseArchive: base.archive,
+    workshopProjects: [],
+    gameWeapons: null,
+    gameMovement: null,
+    folder: playerLimitFolder(base.name),
+    prepared: [],
+    builtBy: [],
+    extras: {
+      playerLimitGadget: buildPlayerLimitGadget(),
+      identity: { name: `${base.name} warpath`, version: "limit" },
+    },
+  });
+  return name;
 }

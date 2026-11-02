@@ -33,7 +33,10 @@ describe("UnitLimitNote", () => {
   });
 
   it("says nothing for a run that has a limit", () => {
-    renderNote({ kind: "ready", limit: { kind: "limited", disabled: ["x"] } });
+    renderNote({
+      kind: "ready",
+      limit: { kind: "limited", disabled: ["x"], playerUnits: [] },
+    });
     expect(screen.queryByText(/cannot limit your units/)).toBeNull();
   });
 

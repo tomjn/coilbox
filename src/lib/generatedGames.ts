@@ -120,6 +120,28 @@ export function unitsFolder(
     : `${prefix}${shortId(lower)}.sdd`;
 }
 
+/**
+ * The start of a player limit mutator's folder (issue #5005), which holds no
+ * units. Inside the warpath prefix, so every list treats it as generated and the
+ * Rust side lets it be rewritten. No run's id starts `limit-`.
+ */
+const PLAYER_LIMIT_PREFIX = `${UNITS_PREFIXES.warpath}limit-`;
+
+/**
+ * The folder for a warpath battle with no builder units to limit its player in.
+ * One per base game rather than per run, so a replay still has its game after
+ * the run is deleted, and a new run scans nothing.
+ */
+export function playerLimitFolder(baseGame: string): string {
+  return `${PLAYER_LIMIT_PREFIX}${shortId(baseGame)}.sdd`;
+}
+
+/** Whether a scanned archive is a player limit mutator. */
+export function isPlayerLimitArchive(archiveName: string): boolean {
+  const name = archiveName.toLowerCase();
+  return name.startsWith(PLAYER_LIMIT_PREFIX) && name.endsWith(".sdd");
+}
+
 /** Whether a scanned archive is one campaign's, conquest's or run's units mutator. */
 export function isUnitsArchive(archiveName: string): boolean {
   const name = archiveName.toLowerCase();
@@ -165,6 +187,8 @@ export function generatedGameNote(archiveName: string): string | null {
     return `Coilbox writes this game to test a scenario in when the real game cannot play one, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
   if (isWorkshopMutatorArchive(archiveName))
     return `Coilbox writes this game to test a workshop project in, and rewrites it on every test launch. It is not a game to play. ${UNDO}`;
+  if (isPlayerLimitArchive(archiveName))
+    return `Coilbox writes this game to hold a warpath's player to the units they have unlocked, and warpath replays need it. It is not a game to play. ${UNDO}`;
   if (isUnitsArchive(archiveName))
     return `Coilbox writes this game to put the units from the builder that a campaign, conquest or warpath carries in, and rewrites it when one of its battles launches. It is not a game to play. ${UNDO}`;
   if (isCompatArchive(archiveName))

@@ -7,6 +7,7 @@ import {
   buildSideData,
   buildStartUnitGadget,
   buildUnitScriptGadget,
+  folderIdentity,
   LUARULES_ENTRIES_LUA,
   missingLuaRulesEntries,
   SCRATCH_SIDE,
@@ -167,6 +168,14 @@ describe("buildModInfo", () => {
 
   it("escapes a quote in the base game name so the file still parses", () => {
     expect(buildModInfo('Some "Game"')).toContain('"Some \\"Game\\"",');
+  });
+
+  it("calls itself what it is told, so two folders never share a name", () => {
+    const a = buildModInfo("BAR", folderIdentity("coilbox-lego-run-a.sdd"));
+    const b = buildModInfo("BAR", folderIdentity("coilbox-lego-run-b.sdd"));
+
+    expect(a).toContain(`name = "Coilbox coilbox-lego-run-a"`);
+    expect(b).toContain(`name = "Coilbox coilbox-lego-run-b"`);
   });
 
   it("gives the same output for the same base game, every time", () => {

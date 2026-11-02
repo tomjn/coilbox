@@ -30,7 +30,31 @@ export function disabledUnitsFor(
    * it. These units are available from the start and never disabled. */
   derivedRoots?: string[],
 ): string[] {
-  if (!run.startUnit) return [];
+  return arsenalFor(run, edges, morphEdges, derivedRoots).disabled;
+}
+
+/**
+ * The units a player may build, whichever faction they end up on (issue #5005):
+ * what they have unlocked, their start units, and the forms those open up. This
+ * is the list the player's own gadget allows, so a unit of another faction is
+ * refused without being taken from an AI that plays it.
+ */
+export function playerUnitsFor(
+  run: RogueliteRun,
+  edges: Map<string, string[]>,
+  morphEdges: Map<string, string[]>,
+  derivedRoots?: string[],
+): string[] {
+  return arsenalFor(run, edges, morphEdges, derivedRoots).available;
+}
+
+function arsenalFor(
+  run: RogueliteRun,
+  edges: Map<string, string[]>,
+  morphEdges: Map<string, string[]>,
+  derivedRoots?: string[],
+): { disabled: string[]; available: string[] } {
+  if (!run.startUnit) return { disabled: [], available: [] };
   const roots = derivedRoots ?? [run.startUnit.toLowerCase()];
   const reachable = new Set<string>();
   for (const root of roots) {
@@ -76,7 +100,7 @@ export function disabledUnitsFor(
   for (const form of forms) {
     if (!available.has(form)) disabled.push(form);
   }
-  return disabled;
+  return { disabled, available: [...available] };
 }
 
 /**

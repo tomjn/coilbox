@@ -7,6 +7,7 @@ import {
   battleRestrictions,
   disabledUnitsFor,
   perkTotals,
+  playerUnitsFor,
 } from "./build";
 import type { Perk, RogueliteRun } from "./model";
 
@@ -107,6 +108,36 @@ describe("disabledUnitsFor", () => {
     expect(
       disabledUnitsFor(run(["com", "vplant", "skyfort"]), edges, new Map()),
     ).toEqual(["tank"]);
+  });
+});
+
+describe("playerUnitsFor", () => {
+  it("is the start unit and what has been unlocked", () => {
+    expect(
+      playerUnitsFor(run(["mex", "VPLANT"]), EDGES, new Map()).sort(),
+    ).toEqual(["com", "mex", "vplant"]);
+  });
+
+  it("opens a form with the unit that morphs into it, and what the form builds", () => {
+    const edges = new Map([
+      ["com", ["mex"]],
+      ["mex", []],
+      ["com2", ["tank"]],
+      ["tank", []],
+    ]);
+    const morphs = new Map([["com", ["com2"]]]);
+    expect(playerUnitsFor(run(["mex"]), edges, morphs).sort()).toEqual([
+      "com",
+      "com2",
+      "mex",
+      "tank",
+    ]);
+  });
+
+  it("is empty when there is no start unit", () => {
+    expect(
+      playerUnitsFor({ ...run([]), startUnit: undefined }, EDGES, new Map()),
+    ).toEqual([]);
   });
 });
 

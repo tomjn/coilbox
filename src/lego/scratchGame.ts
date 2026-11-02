@@ -53,17 +53,27 @@ export const SPAWN_FRAME = 30;
  * Anything lower and it would never be offered as a start-script `GameType`.
  * The single `depend` entry is the name unitsync reports for the base game,
  * which is the same string a start script names, so the two cannot drift apart.
+ *
+ * The engine finds a game by its name and takes the first archive that matches
+ * (`ArchiveFromName` in `ArchiveScanner.cpp`). So a folder other than the test
+ * game must pass a name of its own, or a start script could load the wrong one.
  */
-export function buildModInfo(baseGame: string): string {
+export function buildModInfo(
+  baseGame: string,
+  identity: { name: string; version: string } = {
+    name: SCRATCH_NAME,
+    version: SCRATCH_VERSION,
+  },
+): string {
   const lines = [
     "-- The scratch game coilbox's unit builder tests units in.",
     "-- Rewritten on every test launch. Delete this folder to undo it.",
     "",
     "return {",
-    `  name = ${luaString(SCRATCH_NAME)},`,
+    `  name = ${luaString(identity.name)},`,
     '  shortname = "coilbox_lego_test",',
-    `  game = ${luaString(SCRATCH_NAME)},`,
-    `  version = ${luaString(SCRATCH_VERSION)},`,
+    `  game = ${luaString(identity.name)},`,
+    `  version = ${luaString(identity.version)},`,
     `  description = ${luaString(`Units built with coilbox, on top of ${baseGame}.`)},`,
     "  modtype = 1,",
     "  depend = {",
@@ -72,6 +82,17 @@ export function buildModInfo(baseGame: string): string {
     "}",
   ];
   return `${lines.join("\n")}\n`;
+}
+
+/** What a mutator folder calls itself, so no two folders share a name. */
+export function folderIdentity(folder: string): {
+  name: string;
+  version: string;
+} {
+  return {
+    name: `Coilbox ${folder.replace(/\.sdd$/, "")}`,
+    version: SCRATCH_VERSION,
+  };
 }
 
 /**

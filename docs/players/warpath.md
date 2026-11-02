@@ -37,6 +37,8 @@ A run's soul is build variety, and here your build grows by **unlocking units**.
 
 The consequence, by design: a unit unlock raises a **shared tech ceiling**. The war escalates as you descend — the enemy fields the same tech you unlock — and your agency is *which* branch you commit to, not exclusive access to it. You start able to build a small connected kit (commander, economy, a first factory); rewards and shops widen it along the game's real build tree, and each unlock grants a whole buildable branch rather than a stranded unit.
 
+Some games let you change faction in their own picker when the match starts, and SplinterFaction gives you a random faction if you do not pick. The limit follows you there: you can build only what you have unlocked, whichever faction you play, so another faction may have little or nothing open to you. Enemy AIs on that faction keep their units, because this part of the limit applies to your team alone.
+
 Because the ceiling is shared, personal power comes from **perks** instead: per-team levers the engine does support — a resource **Advantage** or an **Income** multiplier applied to your commander alone. Reward cards mark which is which ("raises tech ceiling · both sides" versus "you only").
 
 ## How long a run takes

@@ -3,7 +3,7 @@ import type { UnitDatasetEntry } from "../content/bindings";
 import { buildEdgeMap, reachableFrom } from "../content/buildTree";
 import type { UnitsyncInfoStatus } from "../content/config";
 import { morphEdgeMap } from "../content/morphGraph";
-import { disabledUnitsFor } from "./build";
+import { disabledUnitsFor, playerUnitsFor } from "./build";
 import type { GenBuildGraph } from "./generate";
 import type { RogueliteRun } from "./model";
 
@@ -28,7 +28,13 @@ export type NoLimitReason =
 
 /** What a run's unit limit is, once the game's unit data has been read. */
 export type UnitLimit =
-  | { kind: "limited"; disabled: string[] }
+  | {
+      kind: "limited";
+      /** Turned off for every team by the start script. */
+      disabled: string[];
+      /** All the player's team may build, whichever faction it plays. */
+      playerUnits: string[];
+    }
   | { kind: "none"; reason: NoLimitReason };
 
 /** Whether a launch can go ahead, and with what limit. */
@@ -143,12 +149,17 @@ export function unitLimitFor(
     return {
       kind: "limited",
       disabled: disabledUnitsFor(run, edges, morphEdges, derivedRoots),
+      playerUnits: playerUnitsFor(run, edges, morphEdges, derivedRoots),
     };
   }
   const reason = noLimitReason(run.startUnit, edges);
   return reason
     ? { kind: "none", reason }
-    : { kind: "limited", disabled: disabledUnitsFor(run, edges, morphEdges) };
+    : {
+        kind: "limited",
+        disabled: disabledUnitsFor(run, edges, morphEdges),
+        playerUnits: playerUnitsFor(run, edges, morphEdges),
+      };
 }
 
 /**

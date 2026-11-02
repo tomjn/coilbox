@@ -16,6 +16,7 @@
 import { t } from "@lingui/core/macro";
 import { unitsyncLuaExec } from "@/content/bindings";
 import { primeScan } from "@/content/config";
+import { SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { PlayTarget } from "@/play/config";
 import { workshopCompile } from "@/workshop/compile";
 import type { ModProject } from "@/workshop/project";
@@ -49,6 +50,7 @@ import {
   buildLuaRulesEntry,
   buildModInfo,
   buildUnitScriptGadget,
+  folderIdentity,
   LUARULES_ENTRIES_LUA,
   missingLuaRulesEntries,
 } from "./scratchGame";
@@ -93,6 +95,10 @@ export interface MutatorExtras {
   startUnit?: { sidedata: string; gadget: string };
   /** The sandbox mission's files. */
   sandbox?: ScratchSandbox;
+  /** The gadget that holds a warpath's player to their unlocked units. */
+  playerLimitGadget?: string;
+  /** What the folder calls itself, in place of a name made from the folder. */
+  identity?: { name: string; version: string };
 }
 
 export interface MutatorArgs extends MutatorContext {
@@ -384,7 +390,11 @@ export async function folderFiles({
   return {
     dataDir: target.dataDir,
     folder,
-    modinfo: buildModInfo(baseGame),
+    modinfo: buildModInfo(
+      baseGame,
+      extras?.identity ??
+        (folder === SCRATCH_FOLDER ? undefined : folderIdentity(folder)),
+    ),
     ...(extras?.startUnit
       ? {
           sidedata: extras.startUnit.sidedata,
@@ -395,6 +405,9 @@ export async function folderFiles({
     ...(await luaRulesEntries(target, baseGame, baseArchive)),
     ...(extras?.sandbox ? { sandbox: extras.sandbox } : {}),
     ...(buildList ? { buildList } : {}),
+    ...(extras?.playerLimitGadget
+      ? { playerLimitGadget: extras.playerLimitGadget }
+      : {}),
   };
 }
 
