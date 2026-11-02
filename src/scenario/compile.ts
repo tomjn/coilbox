@@ -194,6 +194,7 @@ const order = (o: ScenarioOrder): LuaTable =>
       "waypoints" in o ? o.waypoints.map((w) => point(w)) : undefined,
     ],
     ["target", "target" in o ? o.target : undefined],
+    ["team", "team" in o ? o.team : undefined],
   ]);
 
 const group = (g: ScenarioGroup): LuaTable =>

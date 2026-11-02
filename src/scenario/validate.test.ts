@@ -76,6 +76,90 @@ function withTrigger(conditions: unknown[], actions: unknown[]) {
 const withStep = (step: unknown, kind: "conditions" | "actions" = "actions") =>
   kind === "conditions" ? withTrigger([step], []) : withTrigger([], [step]);
 
+describe("a guard or attack order with no target", () => {
+  it("says no target given", () => {
+    const m = {
+      schemaVersion: 1,
+      teams: { player: { team: 0 } },
+      groups: [
+        {
+          id: "g",
+          team: "player",
+          orders: [
+            { kind: "guard", target: "" },
+            { kind: "attack", target: "" },
+          ],
+        },
+      ],
+      triggers: [],
+    };
+    expect(validateMission(m).map((i) => i.message)).toEqual([
+      "no target given",
+      "no target given",
+    ]);
+  });
+});
+
+describe("a hunt order", () => {
+  const mission = (order: unknown, actionOrder?: unknown) => ({
+    schemaVersion: 1,
+    teams: { player: { team: 0 }, raiders: { team: 1 } },
+    groups: [{ id: "hunters", team: "raiders", orders: [order] }],
+    triggers: actionOrder
+      ? [
+          {
+            id: "t",
+            actions: [
+              {
+                type: "give_orders",
+                params: { group: "hunters", orders: [actionOrder] },
+              },
+            ],
+          },
+        ]
+      : [],
+  });
+  const paths = (m: Record<string, unknown>) =>
+    validateMission(m).map((issue) => issue.path);
+
+  it("is fine naming another participant", () => {
+    expect(paths(mission({ kind: "hunt", team: "player" }))).toEqual([]);
+  });
+
+  it("names a team nobody has", () => {
+    expect(paths(mission({ kind: "hunt", team: "ghost" }))).toEqual([
+      'groups["hunters"].orders[0].team',
+    ]);
+  });
+
+  it("says when no team is picked", () => {
+    expect(
+      validateMission(mission({ kind: "hunt", team: "" })).map(
+        (i) => i.message,
+      ),
+    ).toEqual(["no team given"]);
+  });
+
+  it("refuses a group hunting its own team", () => {
+    expect(
+      validateMission(mission({ kind: "hunt", team: "raiders" })).map(
+        (i) => i.message,
+      ),
+    ).toEqual(["a group cannot hunt its own team"]);
+  });
+
+  it("refuses the same in a give_orders", () => {
+    expect(
+      paths(
+        mission(
+          { kind: "hunt", team: "player" },
+          { kind: "hunt", team: "raiders" },
+        ),
+      ),
+    ).toEqual(['triggers["t"].actions[0].params.orders[0].team']);
+  });
+});
+
 describe("validateMission", () => {
   it("passes a mission whose references all resolve", () => {
     const full = withTrigger(

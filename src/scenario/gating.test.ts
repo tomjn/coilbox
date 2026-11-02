@@ -436,6 +436,60 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #903. A runtime behind 12 reports a hunt as an order it does not know,
+   * and the group stands still.
+   */
+  describe("a group hunting a participant", () => {
+    const hunter = {
+      id: "hunters",
+      team: "ai",
+      units: [{ def: "armpw", count: 1 }],
+      pos: { x: 1, z: 1 },
+      dormant: false,
+    };
+
+    it("asks for 12 when a group starts on the order", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...withTrigger([], []),
+          groups: [{ ...hunter, orders: [{ kind: "hunt", team: "player" }] }],
+        }),
+      ).toBe(12);
+    });
+
+    it("asks for 12 when a give_orders carries it", () => {
+      const base = withTrigger([], []);
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          triggers: base.triggers.map((trigger) => ({
+            ...trigger,
+            actions: [
+              {
+                type: "give_orders",
+                params: {
+                  group: "hunters",
+                  orders: [{ kind: "hunt", team: "player" }],
+                },
+              },
+            ],
+          })),
+        }),
+      ).toBe(12);
+    });
+
+    it("asks for nothing when a document has no hunt in it", () => {
+      const base = withTrigger([], []);
+      expect(
+        requiredRuntimeVersion({
+          ...base,
+          groups: [{ ...hunter, orders: [{ kind: "attack", target: "a1" }] }],
+        }),
+      ).toBe(requiredRuntimeVersion(base));
+    });
+  });
+
+  /**
    * Issue #4799. Runtime 9 reads past a base's terrain and its dormancy, so it
    * places a walled base with no walls and a dormant base at the start.
    */

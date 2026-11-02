@@ -7109,6 +7109,10 @@ msgstr ""
 msgid "A game's file opens on <0>{gameFile}</0>, where your engine writes. Pick another if you keep your games somewhere else."
 msgstr ""
 
+#: src/scenario/validate.ts
+msgid "a group cannot hunt its own team"
+msgstr ""
+
 #: src/scenario/pages/components/groups.ts
 msgid "a group that is gone"
 msgstr ""
@@ -20603,6 +20607,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Human · host"
+msgstr ""
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Hunt"
 msgstr ""
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
@@ -37326,6 +37334,10 @@ msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Team size"
+msgstr ""
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Team to hunt"
 msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx

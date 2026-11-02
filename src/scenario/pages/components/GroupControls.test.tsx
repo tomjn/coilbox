@@ -28,9 +28,10 @@ import {
   recordEdit,
   undoEdit,
 } from "@/lib/scenarioEditing/history";
+import type { Participant } from "@/play/config";
 import { newScenario } from "../../create";
-import type { GroupUnit, Scenario } from "../../model";
-import { GroupControls, UnitRow } from "./GroupControls";
+import type { GroupUnit, Scenario, ScenarioOrder } from "../../model";
+import { GroupControls, OrderRow, UnitRow } from "./GroupControls";
 import { MAX_GROUP_COUNT } from "./groups";
 import { missionProblemsIn } from "./useMissionProblems";
 
@@ -337,6 +338,77 @@ describe("a group that holds position until woken", () => {
   it("is not offered on a dormant group", () => {
     open({ dormant: true });
     expect(hold()).toBeNull();
+  });
+});
+
+/**
+ * Issue #903. A hunt names a participant rather than a target, out of everybody
+ * playing but the group's own side.
+ */
+describe("an order to hunt a participant", () => {
+  const participants = [
+    { id: "you", name: "Commander", color: [0, 0, 1], spectator: false },
+    { id: "raiders", name: "Raiders", color: [1, 0, 0], spectator: false },
+  ] as Participant[];
+
+  function open(orders: ScenarioOrder[]) {
+    const edits: { orders?: ScenarioOrder[] }[] = [];
+    render(
+      <GroupControls
+        group={{
+          id: "hunters",
+          team: "raiders",
+          units: [{ def: "armpw", count: 2 }],
+          pos: { x: 100, z: 100 },
+          orders,
+          dormant: false,
+        }}
+        participants={participants}
+        units={[]}
+        unitsLoading={false}
+        targets={[]}
+        issues={[]}
+        onEdit={(patch) => edits.push(patch)}
+        onDelete={() => {}}
+        drawing={null}
+        onDraw={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /order/i }));
+    return edits;
+  }
+
+  it("names the team it hunts and has no map drawing", () => {
+    open([{ kind: "hunt", team: "you" }]);
+    expect(
+      screen.getByRole("combobox", { name: "Team to hunt" }).textContent,
+    ).toContain("Commander");
+    expect(screen.queryByRole("button", { name: "Draw" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Order target" })).toBeNull();
+  });
+
+  it("offers everybody but the group's own side", () => {
+    const edits = open([{ kind: "hunt", team: "" }]);
+    fireEvent.click(screen.getByRole("combobox", { name: "Team to hunt" }));
+    expect(screen.queryByRole("option", { name: "Raiders" })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "Commander" }));
+    expect(edits).toEqual([{ orders: [{ kind: "hunt", team: "you" }] }]);
+  });
+
+  it("shows what the validator says about the team", () => {
+    render(
+      <OrderRow
+        order={{ kind: "hunt", team: "gone" }}
+        targets={[]}
+        teams={[]}
+        drawing={false}
+        problem={'no team called "gone"'}
+        onDraw={() => {}}
+        onChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+    expect(screen.getByText('no team called "gone"')).toBeTruthy();
   });
 });
 

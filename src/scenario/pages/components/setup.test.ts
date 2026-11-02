@@ -118,6 +118,50 @@ function populated(): Scenario {
 
 const ids = (s: Scenario) => s.setup.participants.map((p) => p.id);
 
+describe("a hunt order when its participant is handed over", () => {
+  it("follows the participant, on a group and in a give_orders", () => {
+    const you = { id: "you", kind: "you", spectator: false };
+    const ai = { id: "ai", kind: "ai", spectator: false };
+    const heir = { id: "heir", kind: "ai", spectator: false };
+    const hunt = { kind: "hunt", team: "ai" } as const;
+    const scenario = {
+      ...newScenario("x"),
+      setup: { ...newScenario("x").setup, participants: [you, ai, heir] },
+      groups: [
+        {
+          id: "hunters",
+          team: "you",
+          units: [],
+          pos: { x: 0, z: 0 },
+          orders: [hunt],
+          dormant: false,
+        },
+      ],
+      triggers: [
+        {
+          id: "t",
+          enabled: true,
+          repeat: false,
+          conditions: { op: "all", conditions: [] },
+          actions: [
+            {
+              type: "give_orders",
+              params: { group: "hunters", orders: [hunt] },
+            },
+          ],
+        },
+      ],
+    } as unknown as Scenario;
+
+    const next = removeScenarioParticipant(scenario, "ai", "heir");
+
+    expect(next.groups[0].orders).toEqual([{ kind: "hunt", team: "heir" }]);
+    expect(next.triggers[0].actions[0].params.orders).toEqual([
+      { kind: "hunt", team: "heir" },
+    ]);
+  });
+});
+
 describe("a map's extent", () => {
   it("reads a scanned map's proportions as elmos", () => {
     expect(mapExtent({ width: 512, height: 256 })).toEqual({

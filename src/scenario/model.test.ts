@@ -348,8 +348,36 @@ describe("parseScenario — groups", () => {
     expect(
       parseScenario(
         doc({
-          groups: [{ ...group, orders: [{ kind: "guard", target: "" }] }],
+          groups: [{ ...group, orders: [{ kind: "guard", target: 3 }] }],
         }),
+      ),
+    ).toBeNull();
+  });
+
+  it("reads a guard or attack order with no target picked yet", () => {
+    const orders = [
+      { kind: "guard", target: "" },
+      { kind: "attack", target: "" },
+    ];
+    expect(
+      parseScenario(doc({ groups: [{ ...group, orders }] }))?.groups[0].orders,
+    ).toEqual(orders);
+  });
+
+  it("reads a hunt order, including one with no team picked yet", () => {
+    const orders = [
+      { kind: "hunt", team: "player" },
+      { kind: "hunt", team: "" },
+    ];
+    expect(
+      parseScenario(doc({ groups: [{ ...group, orders }] }))?.groups[0].orders,
+    ).toEqual(orders);
+  });
+
+  it("refuses a hunt order with no team field", () => {
+    expect(
+      parseScenario(
+        doc({ groups: [{ ...group, orders: [{ kind: "hunt" }] }] }),
       ),
     ).toBeNull();
   });

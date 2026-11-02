@@ -16,6 +16,7 @@
 
 import { plural, t } from "@lingui/core/macro";
 import type { BaseBlueprint } from "@/blueprint/model";
+import type { Participant } from "@/play/config";
 import {
   baseBuildings,
   type GroupUnit,
@@ -39,6 +40,7 @@ export const ORDER_KINDS: OrderKind[] = [
   "fight",
   "guard",
   "attack",
+  "hunt",
 ];
 
 /** How many of a unit a freshly drawn group holds, and the most one entry may
@@ -76,9 +78,11 @@ export function orderOfKind(
   previous?: ScenarioOrder,
 ): ScenarioOrder {
   if (kind === "guard" || kind === "attack") {
-    const target =
-      previous && !("waypoints" in previous) ? previous.target : "";
+    const target = previous && "target" in previous ? previous.target : "";
     return { kind, target };
+  }
+  if (kind === "hunt") {
+    return { kind, team: previous && "team" in previous ? previous.team : "" };
   }
   return { kind, waypoints: previous ? (orderWaypoints(previous) ?? []) : [] };
 }
@@ -513,6 +517,15 @@ export function targetOptions(
       };
     });
   return [...actors, ...buildings, ...groups];
+}
+
+/** The participants a group can be told to hunt: anybody on the map but its own
+ *  team, which is not known for a `give_orders` until a group is picked. */
+export function huntableTeams(
+  participants: Participant[],
+  own?: string,
+): Participant[] {
+  return participants.filter((p) => !p.spectator && p.id !== own);
 }
 
 /** What an order's target is called, for showing beside an order that has one.
