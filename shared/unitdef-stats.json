@@ -110,9 +110,9 @@
     }
   },
   "morph": {
-    "note": "What a unit turns into (issue #2063), sent as morphTargets: one object per edge. Not part of a unitdef the way the stats above are. Read from two places at once: the def's own customparams (Zero-K's morphto, morphto_1 and upwards, with morphtime, morphcost, level and combatmorph carrying the same suffix) and the game's morph config, tried at luarules/configs/morph_defs.lua then gamedata/morph_defs.lua. A game may write neither, which is most of them.",
+    "note": "What a unit turns into (issue #2063), sent as morphTargets: one object per edge. Not part of a unitdef the way the stats above are. Read from two places at once: the def's own customparams (Zero-K's morphto, morphto_1 and upwards, with morphtime, morphcost, level and combatmorph carrying the same suffix) and the game's morph config, tried at luarules/configs/morph_defs.lua then gamedata/morph_defs.lua. Beyond All Reason's customparams.evolution_target is read as an edge too (issue #2152), with evolves set to true and without its condition, which the game computes from modoptions this read does not have. A game may write none of these, which is most of them.",
     "into": {
-      "from": ["into", "customparams.morphto"],
+      "from": ["into", "customparams.morphto", "customparams.evolution_target"],
       "unit": null,
       "note": "The target's def key, lowercased so the morph graph's edges match the build graph's node names. Always present: an entry without one names nothing and is dropped."
     },

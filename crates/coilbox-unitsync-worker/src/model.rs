@@ -756,7 +756,8 @@ pub struct UnitDatasetEntry {
     /// conditions four ways: `research` and `require` in SplinterFaction,
     /// `morphcost` and `level` in Zero-K, `xp` and `rank` in the shared morph
     /// gadget's documentation, `facing` and `tech` in Spring 1944. A struct
-    /// naming today's set would be wrong by the fifth game.
+    /// naming today's set would be wrong by the fifth game. Beyond All Reason's
+    /// evolution edges carry only `evolves: true` (issue #2152).
     ///
     /// Empty for a unit that morphs nowhere and for a line written before the
     /// column existed. The two are the same claim here, which they are not for
