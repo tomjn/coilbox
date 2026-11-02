@@ -21389,6 +21389,10 @@ msgstr "Tout ce que contient ce scénario, placé ou non"
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr "Tout ce à quoi vous pouvez jouer, et tout ce que le hub sait récupérer."
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Evolves by itself"
+msgstr ""
+
 #: src/placement/mapLoad.ts
 #, fuzzy
 msgid "Exact heights"

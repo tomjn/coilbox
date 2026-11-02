@@ -45,7 +45,54 @@ describe("morphGroups", () => {
       unit("airyard"),
     ];
     expect(morphGroups(units)).toEqual([
-      { base: "factory", stages: ["airyard", "factory", "gunyard"] },
+      { base: "factory", stages: ["factory", "airyard", "gunyard"] },
+    ]);
+  });
+
+  it("orders a ten stage ladder by its edges, not by name", () => {
+    const names = Array.from({ length: 9 }, (_, i) => `armcomlvl${i + 2}`);
+    const units = names.map((name, i) =>
+      unit(name, i + 1 < names.length ? [{ into: names[i + 1] }] : []),
+    );
+    // Listed out of order so the input order cannot be what makes it pass.
+    const groups = morphGroups([...units].reverse());
+    expect(groups).toEqual([{ base: "armcomlvl2", stages: names }]);
+    expect(groups[0].stages[8]).toBe("armcomlvl10");
+  });
+
+  it("lists a branch's siblings by name after the stage they share", () => {
+    const units = [
+      unit("root", [{ into: "zeta" }, { into: "alpha" }]),
+      unit("alpha", [{ into: "alpha2" }]),
+      unit("alpha2"),
+      unit("zeta"),
+    ];
+    expect(morphGroups(units)).toEqual([
+      { base: "root", stages: ["root", "alpha", "zeta", "alpha2"] },
+    ]);
+  });
+
+  it("walks a cycle once from the first by name", () => {
+    const units = [
+      unit("c", [{ into: "a" }]),
+      unit("a", [{ into: "b" }]),
+      unit("b", [{ into: "c" }]),
+    ];
+    expect(morphGroups(units)).toEqual([
+      { base: "a", stages: ["a", "b", "c"] },
+    ]);
+  });
+
+  it("appends a stage the base cannot reach, by name", () => {
+    // Every stage has a parent, so the base is the first by name, `a0`, and it
+    // morphs into nothing. The loop it hangs off is listed after it.
+    const units = [
+      unit("x", [{ into: "y" }]),
+      unit("y", [{ into: "x" }, { into: "a0" }]),
+      unit("a0"),
+    ];
+    expect(morphGroups(units)).toEqual([
+      { base: "a0", stages: ["a0", "x", "y"] },
     ]);
   });
 

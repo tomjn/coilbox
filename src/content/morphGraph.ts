@@ -5,9 +5,8 @@ import type { UnitDatasetEntry } from "./bindings";
  *
  * A commander that upgrades through tech levels is one unit to the player and
  * five unrelated units to everything that reads `buildoptions`. These helpers
- * are how both coilbox and the hub turn the second into the first, and they are
- * vendored into the hub byte identical so the two group the same way by
- * construction rather than by agreement.
+ * turn the second into the first. The hub has its own implementation in
+ * `lib/games/morph.ts`, which orders stages the same way.
  *
  * Morph edges are a graph, not a chain. A unit morphs into either of two
  * things, a game loops back to where it started, and every walk here is cycle
@@ -18,7 +17,8 @@ import type { UnitDatasetEntry } from "./bindings";
 export interface MorphGroup {
   /** The stage the group is named and pictured with. */
   base: string;
-  /** Every stage including the base, sorted, so the list is stable. */
+  /** Every stage including the base, base first and then in the order the
+   * morph edges lead to them (see `orderStages`), so the list is stable. */
   stages: string[];
 }
 
@@ -82,10 +82,12 @@ export function morphGroups(units: UnitDatasetEntry[]): MorphGroup[] {
 
   const incoming = new Map<string, number>();
   const undirected = new Map<string, Set<string>>();
+  const folding = new Map<string, string[]>();
   for (const [from, targets] of edges) {
     for (const to of targets) {
       if (to === from || built.has(to) || parents.get(to) !== 1) continue;
       incoming.set(to, (incoming.get(to) ?? 0) + 1);
+      folding.set(from, [...(folding.get(from) ?? []), to]);
       if (!undirected.has(from)) undirected.set(from, new Set());
       if (!undirected.has(to)) undirected.set(to, new Set());
       undirected.get(from)?.add(to);
@@ -97,24 +99,59 @@ export function morphGroups(units: UnitDatasetEntry[]): MorphGroup[] {
   const groups: MorphGroup[] = [];
   for (const start of [...undirected.keys()].sort()) {
     if (seen.has(start)) continue;
-    const stages: string[] = [];
+    const members: string[] = [];
     const queue = [start];
     seen.add(start);
     while (queue.length > 0) {
       // biome-ignore lint/style/noNonNullAssertion: queue is non-empty in the loop
       const node = queue.shift()!;
-      stages.push(node);
+      members.push(node);
       for (const next of undirected.get(node) ?? []) {
         if (seen.has(next)) continue;
         seen.add(next);
         queue.push(next);
       }
     }
-    stages.sort();
-    const base = stages.find((s) => !incoming.has(s)) ?? stages[0];
-    groups.push({ base, stages });
+    members.sort();
+    const base = members.find((s) => !incoming.has(s)) ?? members[0];
+    groups.push({ base, stages: orderStages(base, members, folding) });
   }
   return groups;
+}
+
+/**
+ * The members in the order a reader meets them: the base first, then each stage
+ * after the one that morphs into it, level by level. A name sort puts
+ * `armcomlvl10` before `armcomlvl2`, so the order comes from the edges.
+ *
+ * A branch lists its siblings by name before going deeper. A cycle is walked
+ * from the base and stops when it returns to a stage already listed. A member
+ * the base cannot reach, such as the second root of a group where two ladders
+ * meet, is appended by name, so every group answers with the same order every
+ * time.
+ */
+function orderStages(
+  base: string,
+  members: string[],
+  folding: Map<string, string[]>,
+): string[] {
+  const ordered: string[] = [];
+  const listed = new Set([base]);
+  const queue = [base];
+  while (queue.length > 0) {
+    // biome-ignore lint/style/noNonNullAssertion: queue is non-empty in the loop
+    const node = queue.shift()!;
+    ordered.push(node);
+    for (const next of [...(folding.get(node) ?? [])].sort()) {
+      if (listed.has(next)) continue;
+      listed.add(next);
+      queue.push(next);
+    }
+  }
+  for (const member of members) {
+    if (!listed.has(member)) ordered.push(member);
+  }
+  return ordered;
 }
 
 /** Every stage to the base of the group holding it, for a caller with an id in

@@ -21389,6 +21389,10 @@ msgstr "此场景包含的所有内容，无论是否已放置"
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr "你可以游玩的所有内容，以及中心知道如何获取的所有内容。"
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Evolves by itself"
+msgstr ""
+
 #: src/placement/mapLoad.ts
 #, fuzzy
 msgid "Exact heights"
