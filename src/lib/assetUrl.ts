@@ -72,6 +72,16 @@ export function campaignMediaUrl(campaignId: string, file: string): string {
 }
 
 /**
+ * URL for an image imported into a user-authored campaign, under
+ * `campaignimage/<id>/<file>`. A home page card shows these through this rather
+ * than through the plugin's `data:` URL command, which would hold the whole file
+ * base64 in memory (issue #1025).
+ */
+export function campaignImageUrl(campaignId: string, file: string): string {
+  return schemeUrl("campaignimage", `${campaignId}/${file}`);
+}
+
+/**
  * URL for one of a scenario's dialogue clips, under `scenario/<id>/<file>`. The
  * scenario editor shows a portrait and plays a voice clip through this rather
  * than through the plugin's `data:` URL command, which would hold the whole file
@@ -249,4 +259,21 @@ export function refIsVideo(ref: ImageRef | undefined): boolean {
   if (ref.kind === "file") return mediaKind(ref.file) === "video";
   if (ref.kind === "local") return mediaKind(ref.path) === "video";
   return false;
+}
+
+/**
+ * A URL an `<img>` can load for a campaign's image ref, with no round trip to the
+ * plugin. `undefined` for a ref naming audio or video.
+ */
+export function imageRefUrl(
+  campaignId: string,
+  ref: ImageRef,
+): string | undefined {
+  if (ref.kind === "data") return ref.dataUri;
+  if (ref.kind === "local") {
+    return mediaKind(ref.path) === "image" ? assetUrl(ref.path) : undefined;
+  }
+  return mediaKind(ref.file) === "image"
+    ? campaignImageUrl(campaignId, ref.file)
+    : undefined;
 }
