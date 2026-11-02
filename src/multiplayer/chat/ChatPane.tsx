@@ -36,6 +36,7 @@ import { readableTeamTextColor } from "@/lib/teamColor";
 import type { ChatMsg } from "../bindings";
 import { NameMarkIcon } from "../NameMarkIcon";
 import { NAME_MARK_CLASS, type NameMark } from "../nameMark";
+import { ChatLinkCards } from "./ChatLinkCards";
 import { composeDraft } from "./compose";
 import { EmojiPicker } from "./EmojiPicker";
 import { type EmojiEntry, loadEmoji, shortcodeIndex } from "./emoji";
@@ -776,6 +777,7 @@ export function ChatPane({
                               </span>
                             )}
                           </div>
+                          <ChatLinkCards text={m.text} own={own} />
                           {messageAction?.(m)}
                         </div>
                       );
