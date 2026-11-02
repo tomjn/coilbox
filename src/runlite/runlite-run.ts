@@ -191,6 +191,10 @@ export function useRunEncounter(
     scenario,
     scenarioDifficulty,
     units,
+    playerUnits:
+      !scenario && limit.kind === "ready" && limit.limit.kind === "limited"
+        ? limit.limit.playerUnits
+        : undefined,
   });
 
   return {

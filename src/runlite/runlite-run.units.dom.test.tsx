@@ -14,11 +14,13 @@ import { resolve } from "node:path";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { composeUnits, engineLaunch, launchScenario } = vi.hoisted(() => ({
-  composeUnits: vi.fn(),
-  engineLaunch: vi.fn(),
-  launchScenario: vi.fn(),
-}));
+const { composePlayerLimit, composeUnits, engineLaunch, launchScenario } =
+  vi.hoisted(() => ({
+    composePlayerLimit: vi.fn(),
+    composeUnits: vi.fn(),
+    engineLaunch: vi.fn(),
+    launchScenario: vi.fn(),
+  }));
 
 const GAMES = [
   {
@@ -35,7 +37,7 @@ const UNITS = [
   { name: "armpw", buildOptions: [] },
 ];
 
-vi.mock("../campaign/units", () => ({ composeUnits }));
+vi.mock("../campaign/units", () => ({ composePlayerLimit, composeUnits }));
 // No game has its compatibility switch on here (issue #4664).
 vi.mock("../content/compatSettings", () => ({
   useCompatSettings: () => [{}],
@@ -74,6 +76,7 @@ vi.mock("../play/config", () => ({
   toBattleConfig: vi.fn(
     (draft: { gameType: string; disabledUnits?: string[] }) => ({
       myPlayerName: "You",
+      players: [{ team: 0 }],
       gameType: draft.gameType,
       disabledUnits: draft.disabledUnits,
     }),
@@ -186,10 +189,16 @@ function disabled(
 }
 
 beforeEach(() => {
-  for (const mock of [composeUnits, engineLaunch, launchScenario]) {
+  for (const mock of [
+    composePlayerLimit,
+    composeUnits,
+    engineLaunch,
+    launchScenario,
+  ]) {
     mock.mockReset();
   }
   composeUnits.mockResolvedValue({ name: "Coilbox run units", leftOut: [] });
+  composePlayerLimit.mockResolvedValue("SplinterFaction 2.0 warpath limit");
   engineLaunch.mockResolvedValue({ exitCode: null });
   launchScenario.mockResolvedValue({
     ok: true,
@@ -209,6 +218,7 @@ describe("a Warpath run carrying units from the unit builder", () => {
     const [owner, , base] = composeUnits.mock.calls[0];
     expect(owner).toEqual({ scope: "warpath", id: "run-1", units: [skyfort] });
     expect(base).toEqual({ name: "SplinterFaction 2.0", archive: "tg.sdz" });
+    expect(composeUnits.mock.calls[0][3]).toBe(true);
     expect(engineLaunch.mock.calls[0][1].config.gameType).toBe(
       "Coilbox run units",
     );
@@ -218,6 +228,8 @@ describe("a Warpath run carrying units from the unit builder", () => {
     const { result } = mount(run([skyfort]), true);
     await act(() => result.current.start());
     expect(launchScenario.mock.calls[0][0].unitsGame).toBe("Coilbox run units");
+    // A scenario plays as its author set it up, without the unit limit.
+    expect(composeUnits.mock.calls[0][3]).toBe(false);
   });
 
   it("locks a carried unit its builder builds until the run unlocks it", async () => {
@@ -237,13 +249,13 @@ describe("a Warpath run carrying units from the unit builder", () => {
     expect(disabled(unlocked.result.current.limit)).toEqual(["armpw"]);
   });
 
-  it("launches the game itself, with only the game's units limited, when it carries none", async () => {
+  it("launches through the limit mutator when it carries none", async () => {
     const { result } = mount(run());
     expect(disabled(result.current.limit)).toEqual(["armlab", "armpw"]);
     await act(() => result.current.start());
     expect(composeUnits).not.toHaveBeenCalled();
-    expect(engineLaunch.mock.calls[0][1].config.gameType).toBe(
-      "SplinterFaction 2.0",
-    );
+    const { config } = engineLaunch.mock.calls[0][1];
+    expect(config.gameType).toBe("SplinterFaction 2.0 warpath limit");
+    expect(config.modOptions.coilbox_player_units).toContain("armcom");
   });
 });

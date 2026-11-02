@@ -8,7 +8,9 @@ import {
   isMutatorArchive,
   isPlaybackArchive,
   isScratchArchive,
+  isPlayerLimitArchive,
   isUnitsArchive,
+  playerLimitFolder,
   isWorkshopMutatorArchive,
   MUTATOR_FOLDER,
   PLAYBACK_FOLDER,
@@ -67,6 +69,21 @@ describe("unitsFolder", () => {
 
 // Issue #4556. The folder names are the ones `compat_build` writes for an .sd7
 // and an .sdd game.
+describe("playerLimitFolder", () => {
+  it("is one folder per base game", () => {
+    expect(playerLimitFolder("Game 1")).toBe(playerLimitFolder("Game 1"));
+    expect(playerLimitFolder("Game 1")).not.toBe(playerLimitFolder("Game 2"));
+  });
+
+  it("is a generated game the pickers leave out", () => {
+    const folder = playerLimitFolder("Game 1");
+    expect(isPlayerLimitArchive(folder)).toBe(true);
+    expect(isUnitsArchive(folder)).toBe(true);
+    expect(generatedGameNote(folder)).toContain("warpath");
+    expect(isPlayerLimitArchive("coilbox-lego-run-abc.sdd")).toBe(false);
+  });
+});
+
 describe("isCompatArchive", () => {
   const packed = "coilbox-compat-xta-9.65-1.sdd";
   const loose = "coilbox-compat-splinterfaction-12.sdd";

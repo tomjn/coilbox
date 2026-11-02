@@ -1,7 +1,11 @@
 import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { describeError } from "@/i18n/uiError";
-import { composeUnits, type UnitsOwner } from "../campaign/units";
+import {
+  composePlayerLimit,
+  composeUnits,
+  type UnitsOwner,
+} from "../campaign/units";
 import type { GameRef, NodeScenario } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
@@ -10,6 +14,7 @@ import { useUnitsyncScan } from "../content/config";
 import { loadReplays } from "../content/replayList";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { useReplayUserState } from "../content/replayUserState";
+import { withPlayerUnits } from "../lego/playerLimit";
 import { getProfile } from "../profile/profile";
 import type { Difficulty } from "../scenario/model";
 import {
@@ -139,6 +144,13 @@ export interface UseBattleRunOptions<TResolved> {
    * game that runs.
    */
   units?: UnitsOwner;
+  /**
+   * All the player's team may build, for a warpath battle with a unit limit
+   * (issue #5005). Given, the battle launches through a mutator whose gadget
+   * holds the player to this list. A mutator that cannot be written stops the
+   * launch with the reason, rather than going ahead without the limit.
+   */
+  playerUnits?: readonly string[];
 }
 
 /**
@@ -164,6 +176,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     scenario,
     scenarioDifficulty,
     units,
+    playerUnits,
   } = opts;
 
   const { target, loading: targetLoading } = usePreferredTarget();
@@ -332,23 +345,23 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         executable: target.executable,
         dataDir: target.dataDir,
       });
-    // The builder units go in a mutator over the game this battle runs, made
-    // now because its `depend` names that game exactly. Undefined when there
-    // are none, so the battle launches the game itself as it always did.
+    // The builder units and the player's limit go in a mutator over the game
+    // this battle runs, made now because its `depend` names that game exactly.
+    // Undefined when there is neither, so the battle launches the game itself.
     const unitsGame = async (): Promise<string | undefined> => {
-      if (!units) return undefined;
-      const composed = await composeUnits(
-        units,
-        target,
+      const base =
         compat.kind === "use"
           ? { name: compat.gameType, archive: compat.gameArchive }
           : {
               name: installedGame.name,
               archive: installedGame.primaryArchive.name,
-            },
-      );
+            };
+      const composed = units
+        ? await composeUnits(units, target, base, !!playerUnits)
+        : null;
       setLeftOut(composed?.leftOut ?? []);
-      return composed?.name;
+      if (composed) return composed.name;
+      return playerUnits ? composePlayerLimit(target, base) : undefined;
     };
     // What starts the engine, and the name the replay will record the player
     // under. A refusal comes back as a message and nothing has run.
@@ -388,7 +401,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
       const draft = snapshot();
       if (!draft) return;
       setLastSnapshot(draft);
-      const config = applyRestrictions(
+      const restricted = applyRestrictions(
         toBattleConfig({
           participants: draft.participants,
           mapName: draft.mapName,
@@ -401,6 +414,9 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         }),
         draft.restrictions,
       );
+      const config = playerUnits
+        ? withPlayerUnits(restricted, playerUnits)
+        : restricted;
       run = async () => {
         const mutator = await unitsGame();
         const launched = mutator ? { ...config, gameType: mutator } : config;
@@ -489,6 +505,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     scenarioDifficulty,
     games,
     units,
+    playerUnits,
     compatSettings,
   ]);
 

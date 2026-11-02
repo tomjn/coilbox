@@ -423,6 +423,11 @@ export const legoScratchGame = defineCommand<
      * builders' build lists (issue #4515). Left out, it is removed.
      */
     buildList?: string;
+    /**
+     * `LuaRules/Gadgets/coilbox_player_limit.lua`, which holds a warpath's player
+     * to their unlocked units (issue #5005). Left out, it is removed.
+     */
+    playerLimitGadget?: string;
   },
   { dir: string }
 >("coilbox-lego", "lego_scratch_game");

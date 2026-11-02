@@ -44,6 +44,7 @@ const scanOverride = vi.hoisted(() => ({
 
 const {
   applyRestrictions,
+  composePlayerLimit,
   composeUnits,
   contentDemoInfo,
   contentListReplays,
@@ -59,6 +60,7 @@ const {
       restrictions,
     }),
   ),
+  composePlayerLimit: vi.fn(),
   composeUnits: vi.fn(),
   contentDemoInfo: vi.fn(),
   contentListReplays: vi.fn(),
@@ -76,6 +78,7 @@ vi.mock("../content/compatSettings", () => ({
 vi.mock("./compatTarget", () => ({ resolveCompatTarget }));
 vi.mock("../campaign/units", async (importActual) => ({
   ...(await importActual<typeof import("../campaign/units")>()),
+  composePlayerLimit,
   composeUnits,
 }));
 vi.mock("../scenario/playerLaunch", async (importActual) => ({
@@ -768,6 +771,54 @@ describe("a battle on a game with compatibility mode", () => {
     expect(composeUnits.mock.calls[0][2]).toEqual({
       name: "Balanced Annihilation",
       archive: "ba.sdz",
+    });
+  });
+
+  describe("a battle that limits the player (issue #5005)", () => {
+    beforeEach(() => {
+      composePlayerLimit.mockReset();
+      composePlayerLimit.mockResolvedValue(
+        "Balanced Annihilation warpath limit",
+      );
+      toBattleConfig.mockImplementationOnce(
+        (opts: Record<string, unknown>) =>
+          ({ ...opts, players: [{ team: 0 }] }) as never,
+      );
+    });
+
+    it("launches through the limit mutator with the list in the script", async () => {
+      await start({ playerUnits: ["com", "lab"] });
+
+      expect(composePlayerLimit.mock.calls[0][1]).toEqual({
+        name: "Balanced Annihilation",
+        archive: "ba.sdz",
+      });
+      const { config } = launch.mock.calls[0][1];
+      expect(config.gameType).toBe("Balanced Annihilation warpath limit");
+      expect(config.modOptions).toMatchObject({
+        coilbox_player_team: "0",
+        coilbox_player_units: "com lab",
+      });
+    });
+
+    it("puts the limit in the units mutator when the run has one", async () => {
+      composeUnits.mockResolvedValue({ name: "Coilbox run r1", leftOut: [] });
+      await start({
+        playerUnits: ["com"],
+        units: { id: "r1", scope: "warpath", units: [{}] } as never,
+      });
+
+      expect(composeUnits.mock.calls[0][3]).toBe(true);
+      expect(composePlayerLimit).not.toHaveBeenCalled();
+      expect(launch.mock.calls[0][1].config.gameType).toBe("Coilbox run r1");
+    });
+
+    it("stops the launch and says why when the mutator cannot be written", async () => {
+      composePlayerLimit.mockRejectedValue(new Error("no LuaRules"));
+      const result = await start({ playerUnits: ["com"] });
+
+      expect(launch).not.toHaveBeenCalled();
+      expect(result.current.error).toContain("no LuaRules");
     });
   });
 
