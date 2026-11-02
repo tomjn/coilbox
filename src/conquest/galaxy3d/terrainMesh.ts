@@ -212,10 +212,11 @@ export interface TerrainSheet {
  * `detail` is off, as it is in performance mode. A hand-made map's painted
  * picture is left as its author drew it.
  *
- * `extension` draws a generated map's land on past its edge as one surface
- * with the sheet, greyed a little past the edge and hazing into the scene's
- * background. A map without one, such as a hand-made map, gets a short apron
- * the same way instead. See handmadeEdge.ts.
+ * `extension` draws the land past a map's edge as one surface with the sheet,
+ * greyed a little past the edge and hazing into the scene's background. Its
+ * picture is then the one drawn, in place of `color`. A generated map always
+ * has one, and a hand-made map has one when it comes with a surround. A map
+ * without one gets a short apron the same way instead. See handmadeEdge.ts.
  *
  * `ground` paints roads into the sheet.
  */
@@ -453,7 +454,11 @@ export function buildTerrainMesh(
     }
   };
 
-  if (typeof color === "string") {
+  if (ext) {
+    const tex = pixelTexture(ext.image);
+    applyTexture(tex);
+    disposables.push(tex);
+  } else if (typeof color === "string") {
     for (const m of pictured) m.color.set(PLACEHOLDER_COLOR);
     let disposed = false;
     let loaded: THREE.Texture | undefined;
@@ -491,7 +496,7 @@ export function buildTerrainMesh(
   } else {
     let tex: THREE.Texture;
     if (isColorPixels(color)) {
-      tex = pixelTexture(ext ? ext.image : widened(color));
+      tex = pixelTexture(widened(color));
     } else if (apron) {
       const picture = drawnPixels(color);
       hazeTo(picture);

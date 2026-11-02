@@ -53,7 +53,11 @@ import {
   terrainSpecOf,
   VIEW_FOV_DEGREES,
 } from "./terrain";
-import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
+import {
+  type TerrainPixels,
+  useTerrainHeights,
+  useTerrainSurround,
+} from "./terrainLoad";
 import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
 import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
@@ -620,17 +624,21 @@ export function GalaxyView({
   // marker is placed at ground height during the build.
   const terrainSpec = terrainSpecOf(galaxy);
   const terrainColor = terrainPixels?.color;
-  const terrainExtension = terrainPixels?.extension;
   const terrainBiomes = terrainPixels?.biomes;
   const { ready: terrainReady, grid: terrainHeights } = useTerrainHeights(
     terrainSpec,
     terrainPixels?.height,
   );
+  const { ready: surroundReady, extension: surroundLand } = useTerrainSurround(
+    terrainSpec,
+    terrainHeights,
+  );
+  const terrainExtension = terrainPixels?.extension ?? surroundLand;
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    if (!terrainReady) return;
+    if (!terrainReady || !surroundReady) return;
 
     // Unlike MapPreview3D there is no async asset load here — the whole scene
     // builds synchronously — so no `cancelled` flag is needed.
@@ -1818,6 +1826,7 @@ export function GalaxyView({
     focusBiasX,
     terrainSpec,
     terrainReady,
+    surroundReady,
     terrainHeights,
     terrainColor,
     terrainExtension,
