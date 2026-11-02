@@ -21,6 +21,8 @@ function runGadget(options: string, script: string): string[] {
     Spring = {
       GetModOptions = function() return { ${options} } end,
       GetTeamUnits = function() return {} end,
+      GetUnitTeam = function(unitID) return unitID == 8 and 1 or 0 end,
+      GetUnitCmdDescs = function(_, index) return { { id = -index } } end,
       FindUnitCmdDesc = function(_, cmdID) return cmdID end,
       EditUnitCmdDesc = function(_, index, desc) edits[-index] = desc.disabled end,
     }
@@ -98,6 +100,20 @@ describe("the player limit gadget", () => {
          print(edits[2], edits[3], edits[4])`,
       ),
     ).toEqual(["nil", "nil\ttrue\ttrue"]);
+  });
+
+  it("keeps a locked entry off when a game's own Lua switches it back on", () => {
+    expect(
+      runGadget(
+        LIMITED,
+        `local function edited(unitID, index)
+           local desc = { disabled = false }
+           Spring.EditUnitCmdDesc(unitID, index, desc)
+           return desc.disabled
+         end
+         print(edited(9, 3), edited(9, 2), edited(8, 3))`,
+      ),
+    ).toEqual(["true\tfalse\tfalse"]);
   });
 
   it("hands a unit leaving the team back to the start script's list", () => {
