@@ -13784,6 +13784,10 @@ msgstr "作者：{author}"
 msgid "by {authorName}"
 msgstr "作者：{authorName}"
 
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "By {authors}"
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "By faction pairing (yours vs theirs)"
@@ -14060,6 +14064,7 @@ msgstr "不会伤害自己的单位"
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/chat/ChannelTopicMenu.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
@@ -17233,6 +17238,10 @@ msgstr "复制通过 {text} 加入的链接，{who}"
 msgid "Copy a link to {itemName}"
 msgstr "复制 {itemName} 的链接"
 
+#: src/content/pages/components/CopyMapLinkButton.tsx
+msgid "Copy a link to {mapName}"
+msgstr ""
+
 #: src/direct/ShareRoomButton.tsx
 #, fuzzy
 msgid "Copy address"
@@ -17291,6 +17300,7 @@ msgid "Copy invite link"
 msgstr "复制邀请链接"
 
 #: src/challenge/ChallengeCodeView.tsx
+#: src/content/pages/components/CopyMapLinkButton.tsx
 #: src/direct/ShareRoomButton.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/hub/PublishSection.tsx
@@ -19601,6 +19611,7 @@ msgstr "门"
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/downloads/DownloadQueueBadge.tsx
@@ -19608,6 +19619,7 @@ msgstr "门"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Download"
 msgstr "下载"
@@ -19843,6 +19855,7 @@ msgstr "已下载到 {writePath}，但引擎仍未列出此地图。该文件可
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Downloading"
 msgstr "下载中"
@@ -26021,6 +26034,7 @@ msgstr "已安装"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/hub/pages/components/FilterCombobox.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Installed"
 msgstr "已安装"
@@ -28948,6 +28962,7 @@ msgid "Map: {mapFilter}"
 msgstr "地图：{mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
@@ -29010,6 +29025,7 @@ msgstr "地图"
 #: src/content/index.ts
 #: src/content/pages/components/DownloadFolders.tsx
 #: src/content/pages/components/GetStartedCard.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
@@ -33349,6 +33365,7 @@ msgstr "不在此预设中"
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Not installed"
 msgstr "未安装"
@@ -34797,6 +34814,7 @@ msgstr "操作码"
 #: src/hub/pages/ItemPage.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battles/BattleList.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Open"
@@ -35016,6 +35034,10 @@ msgstr "打开"
 #, fuzzy
 msgid "Open last time"
 msgstr "上次打开的"
+
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "Open link"
+msgstr ""
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -37641,6 +37663,7 @@ msgstr "排队中"
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Queued"
 msgstr "排队中"
@@ -37681,6 +37704,7 @@ msgid "Queued. It starts when the game you are playing ends."
 msgstr "已加入队列。你正在玩的游戏结束后开始。"
 
 #: src/challenge/SubstitutedMapNote.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -42519,6 +42543,11 @@ msgstr "在内容文件夹设置中设置下载文件夹即可启用下载。"
 #, fuzzy
 msgid "Set a download folder in Content folders settings to enable this."
 msgstr "在内容文件夹设置中设置下载文件夹即可启用此功能。"
+
+#: src/content/pages/components/MapNotInstalled.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "Set a download folder to install maps."
+msgstr ""
 
 #: src/multiplayer/battle/BonusButton.tsx
 #, fuzzy
@@ -50095,6 +50124,10 @@ msgstr "这张地图上没有水：没有任何地方低于水位线，其最低
 #, fuzzy
 msgid "This map has the id \"{mapId}\", which a map in the list above already uses, so the map is not listed. Change the id in its map.json and import it again."
 msgstr "这张地图的 id 为 \"{mapId}\"，上方列表中的一张地图已使用该 id，所以不会列出这张地图。请在其 map.json 中更改 id 后重新导入。"
+
+#: src/content/pages/components/MapNotInstalled.tsx
+msgid "This map is not installed."
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

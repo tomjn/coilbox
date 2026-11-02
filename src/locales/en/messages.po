@@ -11176,6 +11176,10 @@ msgstr "by {author}"
 msgid "by {authorName}"
 msgstr "by {authorName}"
 
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "By {authors}"
+msgstr "By {authors}"
+
 #: src/content/pages/MatchupPage.tsx
 msgid "By faction pairing (yours vs theirs)"
 msgstr "By faction pairing (yours vs theirs)"
@@ -11406,6 +11410,7 @@ msgstr "Can't damage its own unit"
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/chat/ChannelTopicMenu.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
@@ -14016,6 +14021,10 @@ msgstr "Copy a link that joins at {text}, {who}"
 msgid "Copy a link to {itemName}"
 msgstr "Copy a link to {itemName}"
 
+#: src/content/pages/components/CopyMapLinkButton.tsx
+msgid "Copy a link to {mapName}"
+msgstr "Copy a link to {mapName}"
+
 #: src/direct/ShareRoomButton.tsx
 msgid "Copy address"
 msgstr "Copy address"
@@ -14063,6 +14072,7 @@ msgid "Copy invite link"
 msgstr "Copy invite link"
 
 #: src/challenge/ChallengeCodeView.tsx
+#: src/content/pages/components/CopyMapLinkButton.tsx
 #: src/direct/ShareRoomButton.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/hub/PublishSection.tsx
@@ -15949,6 +15959,7 @@ msgstr "Doors"
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/downloads/DownloadQueueBadge.tsx
@@ -15956,6 +15967,7 @@ msgstr "Doors"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 msgid "Download"
 msgstr "Download"
 
@@ -16147,6 +16159,7 @@ msgstr "Downloaded to {writePath}, but the engine still does not list this map. 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 msgid "Downloading"
 msgstr "Downloading"
 
@@ -21168,6 +21181,7 @@ msgstr "installed"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/hub/pages/components/FilterCombobox.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 msgid "Installed"
 msgstr "Installed"
 
@@ -23545,6 +23559,7 @@ msgid "Map: {mapFilter}"
 msgstr "Map: {mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 msgid "Map: {mapName}"
@@ -23596,6 +23611,7 @@ msgstr "maps"
 #: src/content/index.ts
 #: src/content/pages/components/DownloadFolders.tsx
 #: src/content/pages/components/GetStartedCard.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
@@ -27115,6 +27131,7 @@ msgstr "Not in this preset"
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
+#: src/multiplayer/chat/ChatMapCard.tsx
 msgid "Not installed"
 msgstr "Not installed"
 
@@ -28289,6 +28306,7 @@ msgstr "Opcodes"
 #: src/hub/pages/ItemPage.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battles/BattleList.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "Open"
 msgstr "Open"
@@ -28474,6 +28492,10 @@ msgstr "Open it"
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Open last time"
 msgstr "Open last time"
+
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "Open link"
+msgstr "Open link"
 
 #: src/animation/pages/CobPage.tsx
 msgid "Open or drop a .bos to compile, or a .cob to read back."
@@ -30616,6 +30638,7 @@ msgstr "queued"
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 msgid "Queued"
 msgstr "Queued"
 
@@ -30648,6 +30671,7 @@ msgid "Queued. It starts when the game you are playing ends."
 msgstr "Queued. It starts when the game you are playing ends."
 
 #: src/challenge/SubstitutedMapNote.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -34596,6 +34620,11 @@ msgstr "Set a download folder in Content folders settings to enable downloads."
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "Set a download folder in Content folders settings to enable this."
 msgstr "Set a download folder in Content folders settings to enable this."
+
+#: src/content/pages/components/MapNotInstalled.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "Set a download folder to install maps."
+msgstr "Set a download folder to install maps."
 
 #: src/multiplayer/battle/BonusButton.tsx
 msgid "Set a resource bonus"
@@ -40735,6 +40764,10 @@ msgstr "This map has no water on it: nothing on it is below the waterline, and i
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "This map has the id \"{mapId}\", which a map in the list above already uses, so the map is not listed. Change the id in its map.json and import it again."
 msgstr "This map has the id \"{mapId}\", which a map in the list above already uses, so the map is not listed. Change the id in its map.json and import it again."
+
+#: src/content/pages/components/MapNotInstalled.tsx
+msgid "This map is not installed."
+msgstr "This map is not installed."
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "This map leaves {blankCount} of its battles for coilbox to choose, and there are no maps installed to choose from. Install at least one map in Content > Maps, then open it again."
