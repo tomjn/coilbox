@@ -420,6 +420,12 @@ local function morph_from_params(d)
   else
     add('')
   end
+  -- Beyond All Reason's evolution (issue #2152). The unit changes by itself
+  -- rather than on an order, so the edge says so. Its condition stays out,
+  -- because `unitbasedefs/evocom.lua` writes the real one from modoptions and
+  -- this read has none: every def here says `timer` and 99999 seconds.
+  local key, json = morph_entry({ into = cp['evolution_target'], evolves = true })
+  if key then out[#out + 1] = { into = key, json = json } end
   return out
 end
 
@@ -2248,6 +2254,67 @@ mod tests {
             into,
             vec![&serde_json::json!("airyard"), &serde_json::json!("gunyard")]
         );
+    }
+
+    /// Beyond All Reason's evolving commanders (issue #2152). The edge is read
+    /// and marked, and the timer beside it stays out: 99999 is a placeholder
+    /// `unitbasedefs/evocom.lua` replaces in any game that turns evolution on.
+    #[test]
+    fn a_def_that_evolves_names_its_next_stage_without_its_condition() {
+        let defs = r#"{
+          unitdefs = {
+            armcomlvl2 = {
+              name = 'Commander',
+              customparams = {
+                evolution_target = 'ARMCOMLVL3',
+                evolution_condition = 'timer',
+                evolution_timer = 99999,
+                evolution_power_threshold = 22000,
+              },
+            },
+            armcomlvl3 = { name = 'Commander' },
+          },
+        }"#;
+        let units = extract(defs);
+        let com = units.iter().find(|u| u.name == "armcomlvl2").unwrap();
+        assert_eq!(com.morph_targets.len(), 1);
+        assert_eq!(
+            serde_json::Value::Object(com.morph_targets[0].clone()),
+            serde_json::json!({ "into": "armcomlvl3", "evolves": true })
+        );
+    }
+
+    #[test]
+    fn a_unit_with_evolution_settings_and_no_target_evolves_nowhere() {
+        let defs = r#"{
+          unitdefs = {
+            armdecomlvl2 = {
+              name = 'Decoy',
+              customparams = { evolution_condition = 'timer', evolution_timer = 99999 },
+            },
+          },
+        }"#;
+        assert!(extract(defs)[0].morph_targets.is_empty());
+    }
+
+    #[test]
+    fn a_unit_that_both_morphs_and_evolves_into_one_target_has_one_edge() {
+        let defs = r#"{
+          unitdefs = {
+            com = {
+              name = 'Commander',
+              customparams = { morphto = 'next', morphtime = 10, evolution_target = 'next' },
+            },
+            next = { name = 'Commander' },
+          },
+        }"#;
+        let units = extract(defs);
+        let com = units.iter().find(|u| u.name == "com").unwrap();
+        assert_eq!(
+            serde_json::Value::Object(com.morph_targets[0].clone()),
+            serde_json::json!({ "into": "next", "morphtime": 10 })
+        );
+        assert_eq!(com.morph_targets.len(), 1);
     }
 
     #[test]

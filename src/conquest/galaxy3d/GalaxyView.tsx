@@ -8,6 +8,8 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { registerCanvas3D } from "../../lib/renderStats";
 import { drawingPixelRatio } from "../../lib/uiZoom";
+import { attachWheelRelease } from "../../lib/wheelRelease";
+import { groundHit } from "../../mapconv/pages/components/wheelGate";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { planetOf } from "../planets";
 import {
@@ -1460,6 +1462,36 @@ export function GalaxyView({
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
 
+    // A wheel over the map zooms it and one past it scrolls the page
+    // (issue #2328). "Over the map" is the region a pan is clamped to: a ray
+    // against a plane through it, and the rectangle's bounds. The starfield
+    // and nebula beyond it are scenery with nothing to zoom towards, and a
+    // test against the instanced cores would release the wheel everywhere but
+    // on a star. A terrain map's sheet is the region, at half its tallest
+    // ground so a hill reads as inside it.
+    const wheelRegion = surface ? surface.bounds : bounds;
+    const wheelMargin = surface ? 0 : MARGIN;
+    const wheelY = surface ? surface.maxHeight / 2 : 0;
+    const wheelCentreX = (wheelRegion.minX + wheelRegion.maxX) / 2;
+    const wheelCentreZ = (wheelRegion.minZ + wheelRegion.maxZ) / 2;
+    const wheelHalfX = (wheelRegion.maxX - wheelRegion.minX) / 2 + wheelMargin;
+    const wheelHalfZ = (wheelRegion.maxZ - wheelRegion.minZ) / 2 + wheelMargin;
+    const detachWheel = attachWheelRelease(
+      container,
+      renderer.domElement,
+      () => camera,
+      (ray) =>
+        groundHit(
+          ray.origin,
+          ray.direction,
+          wheelY,
+          wheelHalfX,
+          wheelHalfZ,
+          wheelCentreX,
+          wheelCentreZ,
+        ),
+    );
+
     /* ------------------------------ intro warp ----------------------------- */
 
     // The camera eases in from further out and higher up while the stars pop
@@ -1752,6 +1784,7 @@ export function GalaxyView({
       renderer?.domElement.removeEventListener("pointermove", onPointerMove);
       renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer?.domElement.removeEventListener("pointerup", onPointerUp);
+      detachWheel();
       controls?.dispose();
       for (const label of labelObjects) label.removeFromParent();
       disposeLanePair(lanes);

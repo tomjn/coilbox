@@ -170,6 +170,14 @@ export function buildImportCodeLink(code: string): string | null {
   return result.ok ? result.url : null;
 }
 
+/** Build an `open?screen=map&id=` link for a map, by its exact name (issue
+ * #286). A final `.` is written as `%2E`, because chat leaves trailing
+ * punctuation out of a link and would otherwise name a different map. */
+export function buildMapLink(mapName: string): string | null {
+  const result = buildDeepLink({ kind: "open", screen: "map", id: mapName });
+  return result.ok ? result.url.replace(/\.$/, "%2E") : null;
+}
+
 /** Build a `room?address=&port=` link for a room somebody is hosting themselves
  * (issue #1612), which is a nicer way of saying the address and port a host
  * would otherwise be reading out. Returns `null` rather than a broken link. */

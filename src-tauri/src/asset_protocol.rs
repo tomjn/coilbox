@@ -13,6 +13,9 @@
 //!   - `coilbox://localhost/campaign/<id>/<file>` → `<data_dir>/campaign/media/<id>/<file>`
 //!     (user-authored campaign AV; `data_dir` is the OS app-data dir on a normal
 //!     install, so this works with no `.coilbox` folder)
+//!   - `coilbox://localhost/campaignimage/<id>/<file>` → `<data_dir>/campaign/images/<id>/<file>`
+//!     (an image imported into a campaign, so a home page card can show one without
+//!     reading the whole file into JS as base64)
 //!   - `coilbox://localhost/scenario/<id>/<file>` → `<data_dir>/scenario/media/<id>/<file>`
 //!     (a scenario's dialogue portraits and voice clips, so the editor can show a
 //!     portrait and play a clip without holding the whole file base64 in JS)
@@ -132,6 +135,21 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
     }
 }
 
+/// Whether `name` has the shape the campaign plugin gives an image it stores, a
+/// `<uuid>.<ext>`: letters, digits and hyphens, one dot, and an extension of letters
+/// and digits.
+///
+/// Narrower than [`safe_segments`], which allows spaces and extra dots. Windows
+/// strips trailing dots and spaces from a path component, so `.. ` can act as `..`
+/// there. CI only runs Linux, so the rule is the same on every platform.
+fn is_stored_image_name(name: &str) -> bool {
+    name.split_once('.').is_some_and(|(stem, ext)| {
+        coilbox_portable::valid_id(stem)
+            && !ext.is_empty()
+            && ext.chars().all(|c| c.is_ascii_alphanumeric())
+    })
+}
+
 /// Resolve decoded segments to an on-disk path under the selected root, or `None` if
 /// the root is unavailable / the shape is wrong. The bases are injected so this is
 /// unit-testable without the real filesystem or app handle. `data_dir` covers every
@@ -164,6 +182,23 @@ fn resolve_path(
             }
             let base = data_dir()?.join(root).join("media").join(id);
             Some(file.iter().fold(base, |p, s| p.join(s)))
+        }
+        // A campaign's imported images, which the plugin stores flat. Beside the
+        // media root rather than in it, since it re-encodes these and copies AV.
+        "campaignimage" => {
+            let [id, file] = rest else {
+                return None;
+            };
+            if !coilbox_portable::valid_id(id) || !is_stored_image_name(file) {
+                return None;
+            }
+            Some(
+                data_dir()?
+                    .join("campaign")
+                    .join("images")
+                    .join(id)
+                    .join(file),
+            )
         }
         // A hand-made map folder, installed or still being imported. Both are
         // `<root>/<id>/<file...>` under `<data_dir>/conquest/`, guarded the same
@@ -525,6 +560,102 @@ mod tests {
     }
 
     #[test]
+    fn resolve_campaign_image_serves_a_stored_image() {
+        assert_eq!(
+            under_data(&segs(&["campaignimage", "camp-1", "ab-12.jpg"])),
+            Some(PathBuf::from("/data/campaign/images/camp-1/ab-12.jpg"))
+        );
+        // Flat, because the plugin stores flat. Missing or extra segments are not
+        // one of its files.
+        assert_eq!(under_data(&segs(&["campaignimage", "camp-1"])), None);
+        assert_eq!(
+            under_data(&segs(&["campaignimage", "camp-1", "sub", "a.jpg"])),
+            None
+        );
+        // Nothing resolves without an app-data dir.
+        let s = segs(&["campaignimage", "camp-1", "a.jpg"]);
+        assert_eq!(
+            resolve_path(&s, None, || None, || None, || None, |_| None),
+            None
+        );
+    }
+
+    /// Every crafted URL goes through the same two functions the handler uses,
+    /// against real files, so a URL can only ever read a stored image of the
+    /// campaign it names. Files sit next to the image and above it to be reached for.
+    #[test]
+    fn crafted_campaign_image_urls_stay_in_the_images_folder() {
+        let tmp =
+            std::env::temp_dir().join(format!("coilbox-campaignimage-{}", std::process::id()));
+        let images = tmp.join("campaign").join("images");
+        std::fs::create_dir_all(images.join("c1")).unwrap();
+        std::fs::create_dir_all(images.join("c2")).unwrap();
+        std::fs::write(images.join("c1").join("a.jpg"), b"art").unwrap();
+        std::fs::write(images.join("c2").join("b.jpg"), b"other").unwrap();
+        std::fs::write(images.join("c1").join(".hidden"), b"no").unwrap();
+        std::fs::write(images.join("top.jpg"), b"no").unwrap();
+        std::fs::write(tmp.join("campaign").join("progress.json"), b"no").unwrap();
+
+        let fetch = |url: &str| {
+            let segments = safe_segments(url)?;
+            let path = resolve_path(
+                &segments,
+                None,
+                || Some(tmp.clone()),
+                || None,
+                || None,
+                |_| None,
+            )?;
+            let response = serve_file(&path, None, "no-cache");
+            (response.status() == StatusCode::OK).then(|| response.body().to_vec())
+        };
+
+        assert_eq!(fetch("/campaignimage/c1/a.jpg"), Some(b"art".to_vec()));
+        // The same image with its dot percent-encoded is the same request.
+        assert_eq!(fetch("/campaignimage/c1/a%2Ejpg"), Some(b"art".to_vec()));
+
+        for crafted in [
+            // Plain and encoded parent segments, from every position.
+            "/campaignimage/c1/../../progress.json",
+            "/campaignimage/c1/%2e%2e/%2e%2e/progress.json",
+            "/campaignimage/c1/%2E%2E%2F%2E%2E%2Fprogress.json",
+            "/campaignimage/c1/..%2f..%2fprogress.json",
+            "/campaignimage/c1/..%5c..%5cprogress.json",
+            "/campaignimage/../images/c1/a.jpg",
+            "/campaignimage/%2e%2e/progress.json",
+            "/campaignimage/..%2fc2/b.jpg",
+            // Reaching another campaign's folder or the folder above it.
+            "/campaignimage/c1/../c2/b.jpg",
+            "/campaignimage/c1%2f..%2fc2/b.jpg",
+            "/campaignimage/top.jpg",
+            // Double encoding decodes once, to a name no stored image has.
+            "/campaignimage/c1/%252e%252e%252fprogress.json",
+            // What Windows would read as a parent, a drive or a second stream.
+            "/campaignimage/c1/..%20",
+            "/campaignimage/c1/..%20/..%20/progress.json",
+            "/campaignimage/c1/.",
+            "/campaignimage/c1/a.jpg.",
+            "/campaignimage/c1/a.jpg%20",
+            "/campaignimage/c1/C%3A/x.jpg",
+            "/campaignimage/c1/a.jpg%3Astream",
+            "/campaignimage/C%3A/a.jpg",
+            // Names no stored image has.
+            "/campaignimage/c1/.hidden",
+            "/campaignimage/c1/a.b.jpg",
+            "/campaignimage/c1/a%00.jpg",
+            // A bad malformed escape.
+            "/campaignimage/c1/a%2.jpg",
+        ] {
+            assert_eq!(fetch(crafted), None, "{crafted} must not be served");
+        }
+
+        // A name of the right shape with nothing behind it is a miss, not an error.
+        assert_eq!(fetch("/campaignimage/c1/missing.jpg"), None);
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
     fn resolve_scenario_serves_dialogue_media_per_scenario() {
         assert_eq!(
             under_data(&segs(&["scenario", "sc-1", "abc.ogg"])),
@@ -699,6 +830,7 @@ mod tests {
         // which are named after the archive member rather than its bytes.
         assert_eq!(cache_control("unitmodel"), "no-cache");
         assert_eq!(cache_control("campaign"), "no-cache");
+        assert_eq!(cache_control("campaignimage"), "no-cache");
     }
 
     #[test]

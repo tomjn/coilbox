@@ -195,6 +195,7 @@ export function applySceneScale(state: SceneState) {
   if (state.reference.visible) {
     box.union(new THREE.Box3().setFromObject(state.reference));
   }
+  state.contentBox.copy(box);
   if (box.isEmpty()) return;
 
   // Measured from the world origin rather than from the box's own middle,

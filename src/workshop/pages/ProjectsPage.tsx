@@ -56,6 +56,7 @@ import { formatDate } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useCheckpoints } from "../checkpoints";
 import { forgetEditHistory } from "../history";
+import { bindToInstalledGame } from "../importGame";
 import {
   describeEdits,
   gameGroupKey,
@@ -282,13 +283,29 @@ export default function ProjectsPage() {
       return;
     }
     setError(null);
-    const project = createProject(imported);
+    // Pointed at the build installed here, so the editor can say which edits
+    // that build no longer takes (issue #2965).
+    const project = createProject(bindToInstalledGame(imported, games));
     recordHubImport(hubItemId, [project.id], projectPath(project.id));
     navigate(projectPath(project.id));
   };
+  // Held until the scan has answered, which a link opened on a cold start
+  // beats, so the project can be pointed at the build installed here. A scan
+  // that failed or was cancelled has answered too: the import goes ahead
+  // unbound rather than waiting on a list that is not coming.
+  const scanSettled =
+    !selected?.enginePath ||
+    !selected.rootPath ||
+    !!scan.data ||
+    !!scan.error ||
+    !!scan.cancelled;
+  const importedCode = useRef<string | null>(null);
   useEffect(() => {
-    if (importCode) importRef.current(importCode, hubItemId);
-  }, [importCode, hubItemId]);
+    if (!importCode || !scanSettled || importedCode.current === importCode)
+      return;
+    importedCode.current = importCode;
+    importRef.current(importCode, hubItemId);
+  }, [importCode, hubItemId, scanSettled]);
 
   /**
    * Share: a code, a link, a file or a publish to the Coilbox hub (issue

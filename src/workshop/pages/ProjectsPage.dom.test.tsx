@@ -368,6 +368,60 @@ describe("ProjectsPage", () => {
       );
     });
 
+    /**
+     * Issue #2965. A hub project names the build its author had. The editor
+     * finds a project's game by that exact name, so unless the import is
+     * pointed at the build installed here it opens to "not installed" and the
+     * comparison that says which edits no longer apply never runs.
+     */
+    it("opens a project made against an older build on the build installed here", () => {
+      const newer = {
+        ...GAME,
+        name: "Test Game 1.1",
+        info: { shortname: "TG", version: "1.1" },
+      };
+      mockScanGames = [newer];
+      const code = modProjectCode({
+        ...project({
+          id: "shared",
+          name: "Borrowed tanks",
+          gameName: "Test Game 1.0",
+          game: { name: "Test Game 1.0", shortname: "TG" },
+        }),
+        authoredChecksum: "author",
+      });
+      if (!code.ok) throw new Error("test project code did not fit");
+      show(
+        [],
+        `/workshop?import=${encodeURIComponent(code.code)}&hub=hub-item-1`,
+      );
+
+      const [made] = stored();
+      expect(made).toMatchObject({
+        gameName: "Test Game 1.1",
+        game: { name: "Test Game 1.1", shortname: "TG" },
+        // Still the author's, which is what the editor compares the game to.
+        authoredChecksum: "author",
+      });
+      expect(screen.getByText(`editor ${made.id}`)).toBeTruthy();
+    });
+
+    it("keeps the build a project names when that build is not installed and no other is", () => {
+      mockScanGames = [GAME_2];
+      const code = modProjectCode(
+        project({
+          id: "shared",
+          name: "Borrowed tanks",
+          gameName: "Test Game 1.0",
+          game: { name: "Test Game 1.0", shortname: "TG" },
+        }),
+      );
+      if (!code.ok) throw new Error("test project code did not fit");
+      show([], `/workshop?import=${encodeURIComponent(code.code)}`);
+
+      expect(stored()[0]).toMatchObject({ gameName: "Test Game 1.0" });
+    });
+
     it("saves nothing and records nothing for a link that is not a project", () => {
       show([], "/workshop?import=not-a-real-code&hub=hub-item-1");
 

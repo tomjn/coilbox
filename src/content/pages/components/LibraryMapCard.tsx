@@ -12,6 +12,7 @@ import {
 } from "@/downloads/pages/components/ProgressBar";
 import { useCachedImage } from "../../branding";
 import type { LibraryMap } from "../../library";
+import { CopyMapLinkButton } from "./CopyMapLinkButton";
 import { GameCardShell } from "./GameCardShell";
 import { MapThumb } from "./MapThumb";
 
@@ -85,7 +86,13 @@ export function LibraryMapCard({
   const running = state === "downloading" || state === "queued";
   const playable = !!map.installed && !running;
 
-  const actions: ReactNode[] = [];
+  const actions: ReactNode[] = [
+    <CopyMapLinkButton
+      key="share"
+      mapName={map.installed?.name ?? map.id}
+      className={RAISED}
+    />,
+  ];
   if (running) {
     actions.push(
       <Button
@@ -168,11 +175,7 @@ export function LibraryMapCard({
           {failure && !running && (
             <p className="break-words text-xs text-destructive">{failure}</p>
           )}
-          {actions.length > 0 && (
-            <div className="flex items-center justify-end gap-1.5">
-              {actions}
-            </div>
-          )}
+          <div className="flex items-center justify-end gap-1.5">{actions}</div>
         </div>
       }
     >
