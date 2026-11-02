@@ -1,5 +1,5 @@
 /**
- * Narrowing and arranging the Scenario Builder's list (issue #2181).
+ * Narrowing and arranging the Scenario builder's list (issue #2181).
  *
  * The list is everything an author has ever made, newest edit first, and past a
  * screenful the only way to reach a scenario is to scroll to it. These are the

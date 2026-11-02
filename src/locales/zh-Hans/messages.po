@@ -12539,7 +12539,7 @@ msgstr "对局密码"
 #: src/multiplayer/index.tsx
 #: src/multiplayer/navPredicates.ts
 #, fuzzy
-msgid "Battle Room"
+msgid "Battle room"
 msgstr "房间"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -13874,7 +13874,7 @@ msgstr "战役"
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/scenario/index.ts
 #, fuzzy
-msgid "Campaign Builder"
+msgid "Campaign builder"
 msgstr "战役编辑器"
 
 #: src/play/PlayProvider.tsx
@@ -20970,14 +20970,10 @@ msgstr "引擎选项、外观、账号以及其他所有设置。"
 msgid "Engine required"
 msgstr "需要引擎"
 
+#: src/content/index.ts
 #: src/general/index.ts
 #, fuzzy
 msgid "Engine settings"
-msgstr "引擎设置"
-
-#: src/content/index.ts
-#, fuzzy
-msgid "Engine Settings"
 msgstr "引擎设置"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -27729,7 +27725,7 @@ msgstr "传说"
 #: src/lego/index.ts
 #: src/lego/pages/PartsPage.tsx
 #, fuzzy
-msgid "Lego Parts"
+msgid "Lego parts"
 msgstr "Lego 零件"
 
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -28614,7 +28610,7 @@ msgstr "最低"
 
 #: src/animation/index.ts
 #, fuzzy
-msgid "Lua Animations"
+msgid "Lua animations"
 msgstr "Lua 动画"
 
 #: src/content/compatReport.ts
@@ -29016,17 +29012,13 @@ msgstr "引擎会警告的 mapinfo.lua 键"
 
 #: src/mapconv/index.ts
 #, fuzzy
-msgid "Mapping Tools"
+msgid "Mapping tools"
 msgstr "地图制作工具"
 
+#: src/mapconv/index.ts
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Mapping wiki"
-msgstr "地图制作 Wiki"
-
-#: src/mapconv/index.ts
-#, fuzzy
-msgid "Mapping Wiki"
 msgstr "地图制作 Wiki"
 
 #: src/conquest/pages/GalaxyPage.tsx
@@ -30414,12 +30406,12 @@ msgstr "我的数据"
 
 #: src/content/libraryGames.ts
 #, fuzzy
-msgid "My Games"
+msgid "My games"
 msgstr "我的游戏"
 
 #: src/content/libraryMaps.ts
 #, fuzzy
-msgid "My Maps"
+msgid "My maps"
 msgstr "我的地图"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -30944,7 +30936,7 @@ msgstr "新文件"
 
 #: src/content/libraryGames.ts
 #, fuzzy
-msgid "New Games"
+msgid "New games"
 msgstr "新游戏"
 
 #: src/content/pages/FoldersSection.tsx
@@ -30964,7 +30956,7 @@ msgstr "新建登录信息"
 
 #: src/content/libraryMaps.ts
 #, fuzzy
-msgid "New Maps"
+msgid "New maps"
 msgstr "新地图"
 
 #: src/content/pages/FoldersSection.tsx
@@ -32585,7 +32577,7 @@ msgstr "这里已经没有场景了"
 
 #: src/campaign/pages/components/ScenarioPicker.tsx
 #, fuzzy
-msgid "No scenarios are ready to attach. Build one in the <0>Scenario Builder</0> and give it a game and a map first."
+msgid "No scenarios are ready to attach. Build one in the <0>Scenario builder</0> and give it a game and a map first."
 msgstr "没有可附加的场景。请先在<0>场景编辑器</0>中构建一个，并为其指定游戏和地图。"
 
 #: src/scenario/pages/ScenariosPage.tsx
@@ -40942,7 +40934,7 @@ msgstr "从归档中保存文件"
 #: src/play/index.ts
 #: src/play/pages/SavegamesPage.tsx
 #, fuzzy
-msgid "Save Games"
+msgid "Save games"
 msgstr "存档"
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -41437,7 +41429,7 @@ msgstr "场景"
 #: src/scenario/index.ts
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
-msgid "Scenario Builder"
+msgid "Scenario builder"
 msgstr "场景编辑器"
 
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -44827,7 +44819,7 @@ msgstr "静音开始"
 
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
-msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
+msgid "Start one, then drop parts into it. Browse what is available under Lego parts."
 msgstr "新建一个，然后把零件拖进去。在“Lego 零件”下浏览可用零件。"
 
 #: src/onboarding/Wizard.tsx
@@ -49952,7 +49944,7 @@ msgstr "此导入 URL 无效。"
 
 #: src/deeplink/readImport.ts
 #, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
 msgstr "这是 {campaignPhrase}。战役需要从文件导入：请在设置中开启高级模式，然后使用战役编辑器及其“导入”按钮。"
 
 #: src/deeplink/pages/ImportSection.tsx

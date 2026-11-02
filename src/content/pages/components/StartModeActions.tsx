@@ -11,7 +11,7 @@ import { isProfileHidden } from "../../../profile/hidden";
  * with this game preselected via a one-shot `?game=` query param (see
  * `useGamePresetParam`). Each action is hidden when the distribution profile
  * hides that mode's own nav item, matching the sidebar. Campaign creation is
- * also advanced-mode gated, like the Campaign Builder nav item itself.
+ * also advanced-mode gated, like the Campaign builder nav item itself.
  */
 export function StartModeActions({ gameName }: { gameName: string }) {
   const navigate = useNavigate();

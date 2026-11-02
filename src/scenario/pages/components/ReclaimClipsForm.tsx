@@ -34,7 +34,7 @@ function summarize(s: MediaSweepSummary): string {
 }
 
 /**
- * "Reclaim clips" for the Scenario Builder, as the body of a drawer.
+ * "Reclaim clips" for the Scenario builder, as the body of a drawer.
  *
  * Deleting a scenario a campaign mission attached keeps its clips, and so does
  * replacing one that a mission still names, because the mission plays the file

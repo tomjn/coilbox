@@ -2,7 +2,7 @@
 
 A **scenario** is authored content the engine plays: where the units start, what the zones are, what happens when the player reaches one, what they are being asked to do, and who says what along the way. Coilbox's campaigns stop at the engine boundary, so a campaign mission on its own is a skirmish setup with a briefing over it. A scenario is the other half, and it runs inside the game.
 
-The **Scenario Builder** is an advanced-mode tool: turn on Advanced mode in Settings > General and it appears in the sidebar as Campaign Builder > **Scenarios**. A scenario you can play also shows up under Play > **Scenarios**.
+The **Scenario builder** is an advanced-mode tool: turn on Advanced mode in Settings > General and it appears in the sidebar as Campaign builder > **Scenarios**. A scenario you can play also shows up under Play > **Scenarios**.
 
 Two things to know before you spend an evening on this:
 
@@ -35,7 +35,7 @@ The question a packaged `.sd7` or `.sdz` is asked is whether the mission is alre
 
 ## Author a scenario
 
-Go to **Campaign Builder > Scenarios** and press **New scenario**. Give it a name and, if you like, a description.
+Go to **Campaign builder > Scenarios** and press **New scenario**. Give it a name and, if you like, a description.
 
 ### Set the game and map
 
@@ -351,7 +351,7 @@ A [distribution profile](distribution-profile.md) can hand out scenarios the sam
 A bundled scenario is read-only:
 
 - It plays from **Play > Scenarios** exactly as any other scenario does. Its dialogue portraits and voice clips travel inside the export file and are written out the first time it is played, so its radio messages have their pictures and voices.
-- It cannot be edited or deleted. Opening its editor route says so instead of opening the editor, and the Scenario Builder row has no Edit and no Delete.
+- It cannot be edited or deleted. Opening its editor route says so instead of opening the editor, and the Scenario builder row has no Edit and no Delete.
 - It can still be **Shared**. Import the code or the file back and you have a local copy that is yours to change.
 
 Coilbox never writes into `.coilbox/`, so removing a bundled scenario means removing the file from the package. Its clips are cleaned up on the next start once it is gone.
@@ -391,7 +391,7 @@ missions/
     kesh-briefing.ogg
 ```
 
-Write scenarios the ordinary way first. Every scenario starts in coilbox's own store, whoever made it, so nothing you import or write is ever put in somebody's game without you saying so. When one is ready, open it in the Scenario Builder and press **Put this mission in the game** in the Setup card. That moves it: the document and the compiled mission are written into the game and the local copy goes, so there is one of it. **Take it out of the game** is the reverse.
+Write scenarios the ordinary way first. Every scenario starts in coilbox's own store, whoever made it, so nothing you import or write is ever put in somebody's game without you saying so. When one is ready, open it in the Scenario builder and press **Put this mission in the game** in the Setup card. That moves it: the document and the compiled mission are written into the game and the local copy goes, so there is one of it. **Take it out of the game** is the reverse.
 
 Editing follows the archive format. A mission in a loose `.sdd` is edited in place, and each save rewrites both the document and the compiled mission beside it, so the two never disagree. A mission in a packaged `.sd7` or `.sdz` is read-only, because coilbox cannot write into one. It still plays, and it can still be shared as a code or a link.
 
@@ -399,9 +399,9 @@ If the two ever do disagree, because the archive was built by hand or the docume
 
 ## Play the example mission
 
-**Silence the Jericho** is the first mission authored end to end in the Scenario Builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
+**Silence the Jericho** is the first mission authored end to end in the Scenario builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
 
-Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Advanced mode on you can do the same from **Campaign Builder > Scenarios** and get a scenario you can read and edit like any other.
+Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Advanced mode on you can do the same from **Campaign builder > Scenarios** and get a scenario you can read and edit like any other.
 
 Playing it needs the game it was written for. That machine also needs, in this order:
 

@@ -122,14 +122,14 @@ const cardTitles = () =>
     .map((li) => li.querySelector("p[title]")?.getAttribute("title"));
 
 describe("Games page", () => {
-  it("splits the games between My Games and New Games, featured first", () => {
+  it("splits the games between My games and New games, featured first", () => {
     renderPage();
     expect(cardTitles()).toEqual([
       "SplinterFaction",
       "Balanced Annihilation",
       "My Test Game",
     ]);
-    fireEvent.click(screen.getByRole("radio", { name: /New Games/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /New games/ }));
     expect(cardTitles()).toEqual([
       "Zero-K",
       "Evolution RTS",
@@ -142,13 +142,13 @@ describe("Games page", () => {
     renderPage();
     expect(
       screen
-        .getByRole("radio", { name: /My Games/ })
+        .getByRole("radio", { name: /My games/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
     expect(cardTitles()).toHaveLength(3);
   });
 
-  it("opens on New Games when the player has none", () => {
+  it("opens on New games when the player has none", () => {
     hoisted.input = {
       ...LIBRARY_GAMES_INPUT,
       scan: { games: [], maps: [] },
@@ -157,7 +157,7 @@ describe("Games page", () => {
     renderPage();
     expect(
       screen
-        .getByRole("radio", { name: /New Games/ })
+        .getByRole("radio", { name: /New games/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
   });
@@ -169,7 +169,7 @@ describe("Games page", () => {
       within(chips)
         .getAllByRole("radio")
         .map((c) => c.textContent),
-    ).toEqual(["My Games3", "New Games4", "Updates1", "Featured2"]);
+    ).toEqual(["My games3", "New games4", "Updates1", "Featured2"]);
     fireEvent.click(within(chips).getByRole("radio", { name: /Updates/ }));
     expect(cardTitles()).toEqual(["SplinterFaction"]);
   });

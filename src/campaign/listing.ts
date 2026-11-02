@@ -84,7 +84,7 @@ export function campaignIsPlayable(campaign: Campaign): boolean {
  *
  * The builder's Draft badge only has to say "this one is not finished", because
  * the author is one click from the editor that shows which mission is short.
- * The play list has no such click: the Campaign Builder is advanced-mode only
+ * The play list has no such click: the Campaign builder is advanced-mode only
  * and a distribution can hide it outright, so a badge on its own would name a
  * problem the reader cannot even go and look at. Naming the mission is the
  * difference between a dead end and a to-do.

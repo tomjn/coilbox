@@ -36,7 +36,7 @@ const playPlugin: FramePlugin = {
         },
         {
           id: "play.savegames",
-          label: lazyText(msg`Save Games`),
+          label: lazyText(msg`Save games`),
           to: "/play/savegames",
           // Last in the aggregated Play section (Campaigns=1, Conquest=2 arrive
           // from sibling plugins), so keep this clearly above them.
@@ -83,10 +83,10 @@ const playPlugin: FramePlugin = {
     {
       path: "play/savegames",
       lazy: () => import("./pages/SavegamesPage"),
-      crumb: lazyText(msg`Save Games`),
+      crumb: lazyText(msg`Save games`),
     },
   ],
-  // Declared into Engine Settings, which the content plugin owns, because that
+  // Declared into Engine settings, which the content plugin owns, because that
   // is where somebody goes looking for what the engine did. The code stays here
   // because it finds the log the way the crash drawer does.
   settings: [

@@ -12539,7 +12539,7 @@ msgstr "試合のパスワード"
 #: src/multiplayer/index.tsx
 #: src/multiplayer/navPredicates.ts
 #, fuzzy
-msgid "Battle Room"
+msgid "Battle room"
 msgstr "ルーム"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -13874,7 +13874,7 @@ msgstr "キャンペーン"
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/scenario/index.ts
 #, fuzzy
-msgid "Campaign Builder"
+msgid "Campaign builder"
 msgstr "キャンペーンエディター"
 
 #: src/play/PlayProvider.tsx
@@ -20970,14 +20970,10 @@ msgstr "エンジンのオプション、外観、アカウントなど。"
 msgid "Engine required"
 msgstr "エンジンが必要"
 
+#: src/content/index.ts
 #: src/general/index.ts
 #, fuzzy
 msgid "Engine settings"
-msgstr "エンジンの設定"
-
-#: src/content/index.ts
-#, fuzzy
-msgid "Engine Settings"
 msgstr "エンジンの設定"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -27729,7 +27725,7 @@ msgstr "レジェンダリー"
 #: src/lego/index.ts
 #: src/lego/pages/PartsPage.tsx
 #, fuzzy
-msgid "Lego Parts"
+msgid "Lego parts"
 msgstr "Lego パーツ"
 
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -28614,7 +28610,7 @@ msgstr "最低"
 
 #: src/animation/index.ts
 #, fuzzy
-msgid "Lua Animations"
+msgid "Lua animations"
 msgstr "Lua アニメーション"
 
 #: src/content/compatReport.ts
@@ -29016,17 +29012,13 @@ msgstr "エンジンが警告する mapinfo.lua のキー"
 
 #: src/mapconv/index.ts
 #, fuzzy
-msgid "Mapping Tools"
+msgid "Mapping tools"
 msgstr "マッピングツール"
 
+#: src/mapconv/index.ts
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Mapping wiki"
-msgstr "マッピング Wiki"
-
-#: src/mapconv/index.ts
-#, fuzzy
-msgid "Mapping Wiki"
 msgstr "マッピング Wiki"
 
 #: src/conquest/pages/GalaxyPage.tsx
@@ -30414,12 +30406,12 @@ msgstr "自分のデータ"
 
 #: src/content/libraryGames.ts
 #, fuzzy
-msgid "My Games"
+msgid "My games"
 msgstr "マイゲーム"
 
 #: src/content/libraryMaps.ts
 #, fuzzy
-msgid "My Maps"
+msgid "My maps"
 msgstr "マイマップ"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -30944,7 +30936,7 @@ msgstr "新規ファイル"
 
 #: src/content/libraryGames.ts
 #, fuzzy
-msgid "New Games"
+msgid "New games"
 msgstr "新しいゲーム"
 
 #: src/content/pages/FoldersSection.tsx
@@ -30964,7 +30956,7 @@ msgstr "新規ログイン情報"
 
 #: src/content/libraryMaps.ts
 #, fuzzy
-msgid "New Maps"
+msgid "New maps"
 msgstr "新しいマップ"
 
 #: src/content/pages/FoldersSection.tsx
@@ -32585,7 +32577,7 @@ msgstr "ここにはもうシナリオがありません"
 
 #: src/campaign/pages/components/ScenarioPicker.tsx
 #, fuzzy
-msgid "No scenarios are ready to attach. Build one in the <0>Scenario Builder</0> and give it a game and a map first."
+msgid "No scenarios are ready to attach. Build one in the <0>Scenario builder</0> and give it a game and a map first."
 msgstr "添付できるシナリオがありません。先に<0>シナリオエディター</0>でシナリオを作成し、ゲームとマップを設定してください。"
 
 #: src/scenario/pages/ScenariosPage.tsx
@@ -40942,7 +40934,7 @@ msgstr "アーカイブからファイルを保存"
 #: src/play/index.ts
 #: src/play/pages/SavegamesPage.tsx
 #, fuzzy
-msgid "Save Games"
+msgid "Save games"
 msgstr "セーブデータ"
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -41437,7 +41429,7 @@ msgstr "シナリオ"
 #: src/scenario/index.ts
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
-msgid "Scenario Builder"
+msgid "Scenario builder"
 msgstr "シナリオエディター"
 
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -44827,7 +44819,7 @@ msgstr "ミュートで開始"
 
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
-msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
+msgid "Start one, then drop parts into it. Browse what is available under Lego parts."
 msgstr "作成してから、パーツを入れてください。使えるパーツは Lego パーツで確認できます。"
 
 #: src/onboarding/Wizard.tsx
@@ -49952,7 +49944,7 @@ msgstr "このインポート URL は無効です。"
 
 #: src/deeplink/readImport.ts
 #, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
 msgstr "これは {campaignPhrase} です。キャンペーンはファイルからインポートします。設定で上級モードをオンにしてから、キャンペーンビルダーとその「インポート」ボタンを使ってください。"
 
 #: src/deeplink/pages/ImportSection.tsx

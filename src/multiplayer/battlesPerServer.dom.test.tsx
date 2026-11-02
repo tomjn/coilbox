@@ -303,7 +303,7 @@ describe("the battle room nav item with two connections", () => {
     );
     await mount();
     expect(inBattle).toBe(false);
-    expect(label).toBe("Battle Room");
+    expect(label).toBe("Battle room");
   });
 });
 

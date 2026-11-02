@@ -12,7 +12,7 @@ Some sections have their own guides:
 
 ## Engine settings
 
-Engine Settings changes the settings the game reads when it starts. It has five pages of settings:
+Engine settings changes the settings the game reads when it starts. It has five pages of settings:
 
 | Page | What it has |
 | --- | --- |
@@ -32,7 +32,7 @@ If the page says no engines were found, add one first. See [Engines](library.md#
 
 ## Keybinds
 
-Open Engine Settings > Keybinds to see and change what every key does in the game.
+Open Engine settings > Keybinds to see and change what every key does in the game.
 
 The page shows a keyboard. Select a key to see what it does.
 
@@ -77,7 +77,7 @@ Saved configs keeps a copy of all your engine settings at once, so you can switc
 
 To keep a copy:
 
-1. Open Engine Settings > Saved configs.
+1. Open Engine settings > Saved configs.
 2. Under Settings profiles, type a name in New profile name.
 3. Select Back up.
 
@@ -91,7 +91,7 @@ The bin beside a copy deletes it.
 
 The engine writes a log every time the game runs. It is the file to look at after a crash, and the file to send when you ask for help.
 
-Open Engine Settings > Engine log.
+Open Engine settings > Engine log.
 
 - Open the log file opens the log.
 - Show in folder shows the file on your computer.
@@ -157,8 +157,8 @@ It adds the tools for making games, maps and missions to the sidebar and the hom
 - Archives, under Library, to look inside game and map files.
 - Rapid repositories, under Library, to browse a rapid server and download any version it holds. See [Rapid repositories](#rapid-repositories).
 - uberstress, to load test a lobby server.
-- Campaign Builder, to make campaigns and scenarios.
-- Mapping Tools, to build and take apart maps.
+- Campaign builder, to make campaigns and scenarios.
+- Mapping tools, to build and take apart maps.
 - unit builder and workshop, to make units and change existing ones.
 - animation, to convert unit animation scripts.
 

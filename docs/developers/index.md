@@ -25,7 +25,7 @@ Most of the tools here are hidden until you turn on Advanced mode in Settings > 
 
 ## Maps
 
-- [Compile and decompile maps](mapping-tools.md). Build a map for the engine from your images with Mapping Tools, take an existing map apart, and check it in a 3D preview.
+- [Compile and decompile maps](mapping-tools.md). Build a map for the engine from your images with Mapping tools, take an existing map apart, and check it in a 3D preview.
 
 ## Units
 

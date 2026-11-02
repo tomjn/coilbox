@@ -58,9 +58,9 @@ import {
 } from "./components/scenarioList";
 
 /**
- * Scenario Builder landing: create a scenario, import a shared one, and list
+ * Scenario builder landing: create a scenario, import a shared one, and list
  * every stored scenario with the route into its editor. Advanced-gated by its
- * route, beside Campaign Builder.
+ * route, beside Campaign builder.
  *
  * A scenario is the in-engine half of a mission (spawns, zones, triggers,
  * objectives, dialogue) and a standalone document, so it is created here and
@@ -371,7 +371,7 @@ export default function ScenarioBuilderPage() {
   return (
     <div className="flex flex-col gap-5 p-4">
       <PageHeader
-        title={t`Scenario Builder`}
+        title={t`Scenario builder`}
         description={t`Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later.`}
         actions={
           <>

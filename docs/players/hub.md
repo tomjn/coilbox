@@ -102,12 +102,12 @@ Where the Share button is for each kind:
 | --- | --- |
 | Conquest challenge | The share button on a conquest's card on the Conquest page |
 | Warpath challenge | The share button on a run's card on the Warpath page |
-| Scenario | Share in a scenario's menu in Campaign Builder > Scenarios, or in the menu at the top of the scenario editor |
+| Scenario | Share in a scenario's menu in Campaign builder > Scenarios, or in the menu at the top of the scenario editor |
 | Base blueprint | Share on a blueprint's page. See [Publish to the hub](blueprints.md#publish-to-the-hub) |
 | Unit tweak project | Share in a project's menu on the Unit tweaks page |
 | Setup pack | Share, then Share a pack, on the Coilbox hub page |
 
-Campaign Builder and Unit tweaks are in the sidebar once Advanced mode is turned on in Settings > General.
+Campaign builder and Unit tweaks are in the sidebar once Advanced mode is turned on in Settings > General.
 
 A scenario must name a game and a map before you can publish it. Something too large for the hub cannot be published, and the drawer says so in place of the form.
 

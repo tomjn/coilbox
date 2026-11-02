@@ -2,7 +2,7 @@
  * Import a scenario someone shared, from a code or a file.
  *
  * On both scenario surfaces, because getting hold of a scenario is not an
- * authoring step (issue #861). Import used to live on the Scenario Builder
+ * authoring step (issue #861). Import used to live on the Scenario builder
  * alone, which is advanced-only, so a player handed a `.json` had to turn on
  * Advanced mode to open a file dialog and then never used the editor.
  *

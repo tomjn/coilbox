@@ -9,14 +9,14 @@ import { getCachedCampaign, useHasCampaigns } from "./campaigns";
 
 /**
  * The Campaigns plugin's frontend half — a player-facing Campaigns list plus an
- * advanced-mode **Campaign Builder** for authoring sequences of skirmish missions.
+ * advanced-mode **Campaign builder** for authoring sequences of skirmish missions.
  * Campaign documents, imported panorama art and player progress are stored by the
  * `tauri-plugin-coilbox-campaign` crate (ACL id `coilbox-campaign`); the schema
  * lives in `model.ts`.
  *
  * The player-facing Campaigns item joins the existing **Play** group (nav groups
  * merge by id) and is shown only once a campaign exists ({@link useHasCampaigns}).
- * The builder joins the shared **Campaign Builder** group beside Scenarios,
+ * The builder joins the shared **Campaign builder** group beside Scenarios,
  * visible only in advanced mode. Its routes are additionally
  * `gateAdvanced`-wrapped so a deep link isn't reachable while hidden.
  */
@@ -41,7 +41,7 @@ const campaignPlugin: FramePlugin = {
     },
     {
       id: "builder",
-      label: lazyText(msg`Campaign Builder`),
+      label: lazyText(msg`Campaign builder`),
       order: 35,
       items: [
         {
@@ -50,7 +50,7 @@ const campaignPlugin: FramePlugin = {
           to: "/campaign-builder",
           order: 1,
           icon: Hammer,
-          // A distribution can also hide Campaign Builder outright (issue #372).
+          // A distribution can also hide Campaign builder outright (issue #372).
           useVisible: () =>
             useAdvancedMode() && !isProfileHidden("campaign.builder"),
         },
@@ -114,7 +114,7 @@ const campaignPlugin: FramePlugin = {
           () => import("./pages/CampaignBuilderPage"),
         ),
       ),
-      crumb: lazyText(msg`Campaign Builder`),
+      crumb: lazyText(msg`Campaign builder`),
     },
     {
       path: "campaign-builder/:id",

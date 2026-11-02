@@ -5,7 +5,7 @@
  * One frame for a part, a shape and a module: a name line, a size line, a
  * preview, a list of what it is and a row of what can be done with it. A
  * module's actions live here, where they are labelled buttons, rather than on
- * its tile. The Lego Parts page and the builder's drawer both show it.
+ * its tile. The Lego parts page and the builder's drawer both show it.
  *
  * The preview is orbitable, unlike the grid's fixed three quarter view, because
  * checking a piece usually means looking at the face the grid hides.
@@ -96,9 +96,9 @@ interface Props {
   /** Choose something else, such as another colourway of the same part. */
   onSelect: (ref: InventoryRef) => void;
   onClose: () => void;
-  /** The builder's Add, for a shape. Absent on the Lego Parts page. */
+  /** The builder's Add, for a shape. Absent on the Lego parts page. */
   onAddShape?: (shape: ShapeKind) => void;
-  /** The builder's Place, for a module. Absent on the Lego Parts page. */
+  /** The builder's Place, for a module. Absent on the Lego parts page. */
   onPlaceModule?: (module: LegoProject) => void;
   /** A small preview, for the builder's drawer, which is short. */
   compact?: boolean;

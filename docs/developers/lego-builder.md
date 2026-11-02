@@ -2,7 +2,7 @@
 
 Assemble a Recoil or Spring unit out of pre-textured parts, animate it from a preset, and write it into a game. No modelling, no UV work: every part in a pack shares one texture, so anything you build from them is already mapped.
 
-The builder is a modding tool, so it is hidden until you turn on **Advanced mode** in Settings > General. It then appears in the sidebar as **unit builder**, with **Models** for what you have built and **Lego Parts** for what you can build from.
+The builder is a modding tool, so it is hidden until you turn on **Advanced mode** in Settings > General. It then appears in the sidebar as **unit builder**, with **Models** for what you have built and **Lego parts** for what you can build from.
 
 ![The unit builder: a unit on a marked ground plane, tool buttons down the left, the piece tree and the selected piece's settings on the right, and the parts strip along the bottom.](/screenshots/lego-builder.png)
 
@@ -116,7 +116,7 @@ Shapes are listed first in the inventory, before the pack's parts. **Shapes** am
 
 Click a shape to add it at its default size. It hangs off the selected piece, or the root when nothing is selected, at that piece's origin, and is selected. It does not join a face or lie along a bone the way a part does, so move it into place afterwards.
 
-The Lego Parts page shows a shape's kind, size, numbers and tags beside a preview you can turn.
+The Lego parts page shows a shape's kind, size, numbers and tags beside a preview you can turn.
 
 A pack with no [swatches](../reference/lego-parts-pack.md#swatches) offers no shapes.
 
@@ -221,13 +221,13 @@ Delete a module and its copies stay in your units as they are. The piece panel t
 
 ### The inventory
 
-The Inventory tab lists parts and modules in one place. The **All**, **Parts** and **Modules** buttons choose which kinds show, and one search box covers both. **Recent** lists what you last added to any unit, newest first, and keeps the last 24. **Favourites** lists the items you starred. Point at a tile and click its star, or focus one and press `F`, to mark it. Click the button again to see everything. Both lists belong to you, not to a unit, and an item that is no longer installed drops out of them. The Lego Parts page has the same inventory without the add-to-unit step.
+The Inventory tab lists parts and modules in one place. The **All**, **Parts** and **Modules** buttons choose which kinds show, and one search box covers both. **Recent** lists what you last added to any unit, newest first, and keeps the last 24. **Favourites** lists the items you starred. Point at a tile and click its star, or focus one and press `F`, to mark it. Click the button again to see everything. Both lists belong to you, not to a unit, and an item that is no longer installed drops out of them. The Lego parts page has the same inventory without the add-to-unit step.
 
 Everything is in one grid, under the headings Shapes, Parts, Built in modules and Saved modules. Each heading counts its section, as in "Parts 373", and says "Parts 12 of 373" while a search, a category or a list narrows it. A section with nothing to show is left out. The arrow keys move through every section as one list.
 
 **All categories** lists every part, with each shape's colourways side by side. Choose a colourway in the category menu and the Parts section shows each shape once, in that colourway, so clicking a tile adds that colourway. A shape the colourway does not have is left out. The bundled pack's one mixed part spans two colourways, so it is listed under every colourway. The heading then counts the colourway, as in "Parts 125" for the bundled pack's 124 shapes and the mixed part. The Change part drawer narrows the same way.
 
-Clicking a tile also opens it in the panel beside the grid, in place of whatever the panel showed before. A part shows its size, its colourways, its tags and where it came from in the source file. Click another colourway to show that part instead. In the builder, when the part is the one being placed, the new colourway is placed instead. A shape shows its kind and default size, with **Add** in the builder. A module shows its pieces and, when it was lifted from a game, the game and units it came from, with **Place** in the builder. The panel closes with its X or Escape. On the Lego Parts page it stays in view while the grid scrolls.
+Clicking a tile also opens it in the panel beside the grid, in place of whatever the panel showed before. A part shows its size, its colourways, its tags and where it came from in the source file. Click another colourway to show that part instead. In the builder, when the part is the one being placed, the new colourway is placed instead. A shape shows its kind and default size, with **Add** in the builder. A module shows its pieces and, when it was lifted from a game, the game and units it came from, with **Place** in the builder. The panel closes with its X or Escape. On the Lego parts page it stays in view while the grid scrolls.
 
 With **Modules** chosen there is a category menu beside the search box. Search needs every term to appear in a module's name, category or tags. Click one of your own modules to rename it, change its category and tags, save it to a file, share it or delete it from the panel. The name, category and tags save when you press Enter or leave the field, and Escape gives up an edit. A module lifted from a game cannot be saved to a file.
 
@@ -243,7 +243,7 @@ Built in modules are not files. The app builds them each time it loads the parts
 
 ### Share a module as a file
 
-Click a module and choose **Save to file** in the panel to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and at the top of the Lego Parts page, adds a module from a file to your own.
+Click a module and choose **Save to file** in the panel to write it to a `.coilbox-module.json` file, which you can send to someone else. Built in modules can be saved too. **Load from file**, beside the module list in the strip and at the top of the Lego parts page, adds a module from a file to your own.
 
 - A module that uses parts no installed pack has still loads, and a warning lists the parts that are missing.
 - If you already have a module with the same id, coilbox asks whether to **Replace** it or **Keep both**. Closing the question keeps both.
@@ -1038,6 +1038,6 @@ Record any further outcome here, and on [issue #565](https://github.com/tomjn/co
 
 ## Parts packs
 
-The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears once there is more than one, in the strip's parts filters and at the top of the Lego Parts page. The format, where extension packs go and how to build one are in [the parts pack guide](../reference/lego-parts-pack.md).
+The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears once there is more than one, in the strip's parts filters and at the top of the Lego parts page. The format, where extension packs go and how to build one are in [the parts pack guide](../reference/lego-parts-pack.md).
 
 A unit records the pack it was built against. Opening one whose pack is not installed still works: the pieces keep their names, hierarchy and transforms, and any piece whose part is missing draws nothing and is counted in the warnings above the viewport.

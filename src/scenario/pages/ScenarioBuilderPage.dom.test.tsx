@@ -1086,7 +1086,7 @@ describe("a read-only scenario's row", () => {
  * Reclaim clips are housekeeping on the store behind the list, and they were
  * drawn at the same weight as the two actions the page is for.
  */
-describe("the Scenario Builder header", () => {
+describe("the Scenario builder header", () => {
   /** Open the header menu the way a keyboard does, and hand back its items. */
   function openHeaderMenu() {
     const trigger = screen.getByRole("button", {

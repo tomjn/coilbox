@@ -42,8 +42,6 @@ Capitalise the first word and proper nouns only, on buttons, headings and labels
 
 Write the string in sentence case even when CSS changes how it looks. CSS `uppercase` is for small section labels, badges and the Conquest and Warpath HUD. It does not go on an action button.
 
-Some page names in the sidebar are still in title case. Do not copy them for a new page.
-
 ## 6. Speak to the reader
 
 Use "you" when you instruct. Do not use first person, marketing language or exclamation marks. A button that is the reader's own answer, such as "I won", is the one exception.

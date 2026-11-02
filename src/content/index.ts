@@ -41,7 +41,7 @@ import StorageSection from "./pages/StorageSection";
  * where game content lives.
  *
  * Its settings live in two places, because they answer to two different readers.
- * Engine Settings (`/settings/engine-settings`, the `springsettings.cfg` values read
+ * Engine settings (`/settings/engine-settings`, the `springsettings.cfg` values read
  * and written through unitsync) is what a player came to settings for, so it sits
  * near the top. Content folders, Engines and Storage are about files on disk, so
  * they sit in the Content group further down, alongside Downloads and Import,
@@ -294,7 +294,7 @@ const contentPlugin: FramePlugin = {
     },
   ],
   settings: [
-    // Engine Settings: what a player came to settings for, so it sits third,
+    // Engine settings: what a player came to settings for, so it sits third,
     // under the two the frame pins. A group with no Component of its own, which
     // makes the frame render an index of the pages below it. The id is
     // unchanged from when this was one page, so `/settings/engine-settings`
@@ -304,7 +304,7 @@ const contentPlugin: FramePlugin = {
     // added to its catalog lands on the right page with no change here.
     {
       id: "engine-settings",
-      title: lazyText(msg`Engine Settings`),
+      title: lazyText(msg`Engine settings`),
       description: lazyText(
         msg`How the game itself looks, sounds and handles.`,
       ),

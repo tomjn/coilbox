@@ -114,7 +114,7 @@ function readContainerText(text: string): ReadImportResult {
     const campaignPhrase = phraseFor("coilbox-campaign", id.game);
     return {
       outcome: "rejected",
-      reason: t`This is ${campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button.`,
+      reason: t`This is ${campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button.`,
     };
   }
 

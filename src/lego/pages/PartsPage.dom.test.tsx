@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 /**
- * The Lego Parts page's frame (#4535) and what it hands the inventory grid.
+ * The Lego parts page's frame (#4535) and what it hands the inventory grid.
  * The grid is replaced by what it was given, so the test sees only the page's
  * choices. `components/Inventory.dom.test.tsx` covers the detail panel.
  */
@@ -91,7 +91,7 @@ describe("the page frame", () => {
   it("has a title and no description", async () => {
     const { container } = render(<PartsPage />);
     await screen.findByText("pick part");
-    expect(screen.getByRole("heading", { name: "Lego Parts" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Lego parts" })).toBeTruthy();
     expect(container.querySelector("header p")).toBeNull();
   });
 

@@ -9,7 +9,7 @@ This page follows that route in order. Each step links to the page that covers i
 - A game that coilbox can play scenarios on. The game archive must bundle the coilbox mission runtime, with the guards described in [the adoption contract](mission-runtime.md#the-adoption-contract). A game that ships its missions in its own archive plays them whatever its archive format. See [Ship missions in your game](scenarios.md#ship-missions-in-your-game).
 - A distribution that ships `.coilbox/profile.json`. See [Distribution profiles](distribution-profile.md) and [Distributing coilbox with your game](distributing.md).
 - Optionally, the engine, the game and the lesson's map bundled in `.coilbox/content/`, so the first lesson needs no download. Coilbox does not write into that folder, so a loose `.sdd` game that takes your scenario missions stays in a `games/` folder beside the binary. See [Bundle the engine, the game and maps](distributing.md#bundle-the-engine-the-game-and-maps).
-- Advanced mode, which you turn on in Settings > General. The Scenario Builder and Campaign Builder are in the sidebar once it is on.
+- Advanced mode, which you turn on in Settings > General. The Scenario builder and Campaign builder are in the sidebar once it is on.
 
 ## What a teaching mission can use today
 
@@ -41,7 +41,7 @@ A scenario restriction is enforced by the mission runtime, can be lifted mid-mis
 
 ## Step 1: write the missions
 
-Write one scenario per lesson in the [Scenario Builder](scenarios.md#author-a-scenario). Keep each lesson to one idea. Give it one primary objective that says what to do, and use triggers to move the player on.
+Write one scenario per lesson in the [Scenario builder](scenarios.md#author-a-scenario). Keep each lesson to one idea. Give it one primary objective that says what to do, and use triggers to move the player on.
 
 The example below has two lessons.
 
@@ -129,7 +129,7 @@ Use **Test in game** in the editor to play each scenario before you go on. See [
 
 ## Step 2: put the missions in a campaign
 
-Create a campaign in the Campaign Builder, add a mission for each lesson, and attach each scenario to its mission. Missions play in the order you list them. See [Authoring a campaign](campaigns.md#author-a-campaign) and [Missions that play a scenario](campaigns.md#missions-that-play-a-scenario).
+Create a campaign in the Campaign builder, add a mission for each lesson, and attach each scenario to its mission. Missions play in the order you list them. See [Authoring a campaign](campaigns.md#author-a-campaign) and [Missions that play a scenario](campaigns.md#missions-that-play-a-scenario).
 
 Attaching copies the scenario into the mission. If you edit the scenario later, use **Update to latest** on the mission.
 
@@ -173,7 +173,7 @@ Export the campaign when it is ready. The exported file has this shape, shown wi
 }
 ```
 
-Coilbox writes `snapshot`, `scenario`, the ids and the dates for you. Do not write them by hand. Export from the Campaign Builder, and the file arrives complete. See [Export / import](campaigns.md#export-and-import).
+Coilbox writes `snapshot`, `scenario`, the ids and the dates for you. Do not write them by hand. Export from the Campaign builder, and the file arrives complete. See [Export / import](campaigns.md#export-and-import).
 
 ## Step 3: bundle the campaign with the profile
 

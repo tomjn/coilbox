@@ -81,7 +81,7 @@ describe("scenarioContents", () => {
   });
 });
 
-// The Scenario Builder draws the same counts as chips (issue #2180), so it
+// The Scenario builder draws the same counts as chips (issue #2180), so it
 // reads them as data. What it needs from here is that every kind is present
 // whatever the count, and that the order matches the sentence the other screens
 // print.

@@ -1,11 +1,11 @@
 /**
  * The builder's one inventory (issue #3306): the filter row and the grid.
  *
- * The row is the same on the Lego Parts page and in the builder's drawer
+ * The row is the same on the Lego parts page and in the builder's drawer
  * (#4538), where it has a Game units tab as well.
  *
  * Shapes, parts and modules are drawn by one grid in sections (#4536), on the
- * Lego Parts page and in the builder's drawer alike. A section with nothing to
+ * Lego parts page and in the builder's drawer alike. A section with nothing to
  * show is left out. Clicking a tile opens it in the detail panel beside the
  * grid (#4537), which holds a module's actions.
  *
@@ -58,7 +58,7 @@ const KINDS: { value: InventoryKind; label: MessageDescriptor }[] = [
   { value: "modules", label: msg`Modules` },
 ];
 
-/** Only a unit has a game to take from, so the Lego Parts page leaves it out. */
+/** Only a unit has a game to take from, so the Lego parts page leaves it out. */
 const GAME_UNITS_KIND: { value: InventoryKind; label: MessageDescriptor } = {
   value: "units",
   label: msg`Game units`,
@@ -186,16 +186,16 @@ interface GridsProps {
   atlas?: LegoAtlas;
   /** The part being placed in the builder, drawn as chosen. */
   selectedPartId?: string;
-  /** Absent on the Lego Parts page, which has no unit to take a part. */
+  /** Absent on the Lego parts page, which has no unit to take a part. */
   onSelectPart?: (part: LegoPartInfo, alt: boolean) => void;
   /**
    * The panel's Colourway control chose another colourway of the part being
    * placed, which the builder then places instead (#4540).
    */
   onSwitchPlacingPart?: (part: LegoPartInfo) => void;
-  /** The builder adds the shape. Absent on the Lego Parts page. */
+  /** The builder adds the shape. Absent on the Lego parts page. */
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
-  /** Absent on the Lego Parts page, which has no unit to place a module in. */
+  /** Absent on the Lego parts page, which has no unit to place a module in. */
   onInsertModule?: (module: LegoProject, now: boolean) => void;
   placingModuleId?: string;
   onDeleteModule: (id: string) => void;
@@ -219,7 +219,7 @@ interface GridsProps {
    */
   scrollRoot?: RefObject<HTMLElement | null>;
   /**
-   * Whether Escape closes the detail panel wherever focus is. The Lego Parts
+   * Whether Escape closes the detail panel wherever focus is. The Lego parts
    * page has nothing else Escape could mean. In the builder it closes the
    * panel only from inside the grid or the panel.
    */
