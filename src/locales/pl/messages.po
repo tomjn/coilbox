@@ -13784,6 +13784,10 @@ msgstr "autor: {author}"
 msgid "by {authorName}"
 msgstr "autor: {authorName}"
 
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "By {authors}"
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "By faction pairing (yours vs theirs)"
@@ -14060,6 +14064,7 @@ msgstr "Nie może ranić własnej jednostki"
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/chat/ChannelTopicMenu.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
@@ -17233,6 +17238,10 @@ msgstr "Kopiuj link, który dołącza przez {text}, {who}"
 msgid "Copy a link to {itemName}"
 msgstr "Kopiuj link do {itemName}"
 
+#: src/content/pages/components/CopyMapLinkButton.tsx
+msgid "Copy a link to {mapName}"
+msgstr ""
+
 #: src/direct/ShareRoomButton.tsx
 #, fuzzy
 msgid "Copy address"
@@ -17291,6 +17300,7 @@ msgid "Copy invite link"
 msgstr "Kopiuj link z zaproszeniem"
 
 #: src/challenge/ChallengeCodeView.tsx
+#: src/content/pages/components/CopyMapLinkButton.tsx
 #: src/direct/ShareRoomButton.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/hub/PublishSection.tsx
@@ -19601,6 +19611,7 @@ msgstr "Drzwi"
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/downloads/DownloadQueueBadge.tsx
@@ -19608,6 +19619,7 @@ msgstr "Drzwi"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Download"
 msgstr "Pobierz"
@@ -19843,6 +19855,7 @@ msgstr "Pobrano do {writePath}, ale silnik nadal nie wyświetla tej mapy. Plik m
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Downloading"
 msgstr "Pobieranie"
@@ -26021,6 +26034,7 @@ msgstr "zainstalowane"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/hub/pages/components/FilterCombobox.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Installed"
 msgstr "Zainstalowane"
@@ -28948,6 +28962,7 @@ msgid "Map: {mapFilter}"
 msgstr "Mapa: {mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
@@ -29010,6 +29025,7 @@ msgstr "mapy"
 #: src/content/index.ts
 #: src/content/pages/components/DownloadFolders.tsx
 #: src/content/pages/components/GetStartedCard.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
@@ -33349,6 +33365,7 @@ msgstr "Nie ma w tym szablonie"
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Not installed"
 msgstr "Nie zainstalowano"
@@ -34797,6 +34814,7 @@ msgstr "Kody operacji"
 #: src/hub/pages/ItemPage.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battles/BattleList.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Open"
@@ -35016,6 +35034,10 @@ msgstr "Otwórz"
 #, fuzzy
 msgid "Open last time"
 msgstr "Ostatnio otwarte"
+
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "Open link"
+msgstr ""
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -37641,6 +37663,7 @@ msgstr "w kolejce"
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
 #, fuzzy
 msgid "Queued"
 msgstr "W kolejce"
@@ -37681,6 +37704,7 @@ msgid "Queued. It starts when the game you are playing ends."
 msgstr "W kolejce. Rozpocznie się, gdy skończy się gra, w którą grasz."
 
 #: src/challenge/SubstitutedMapNote.tsx
+#: src/content/pages/components/MapNotInstalled.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -42519,6 +42543,11 @@ msgstr "Ustaw folder pobierania w ustawieniach folderów zawartości, aby włąc
 #, fuzzy
 msgid "Set a download folder in Content folders settings to enable this."
 msgstr "Ustaw folder pobierania w ustawieniach folderów zawartości, aby to włączyć."
+
+#: src/content/pages/components/MapNotInstalled.tsx
+#: src/multiplayer/chat/ChatMapCard.tsx
+msgid "Set a download folder to install maps."
+msgstr ""
 
 #: src/multiplayer/battle/BonusButton.tsx
 #, fuzzy
@@ -50095,6 +50124,10 @@ msgstr "Ta mapa nie ma wody: nic na niej nie leży poniżej linii wody, a jej na
 #, fuzzy
 msgid "This map has the id \"{mapId}\", which a map in the list above already uses, so the map is not listed. Change the id in its map.json and import it again."
 msgstr "Ta mapa ma id \"{mapId}\", którego używa już mapa z listy powyżej, więc nie jest wyświetlana. Zmień id w jej map.json i zaimportuj ją ponownie."
+
+#: src/content/pages/components/MapNotInstalled.tsx
+msgid "This map is not installed."
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

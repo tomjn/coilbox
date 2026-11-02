@@ -124,6 +124,11 @@ vi.mock("@/blueprint/pages/components/GameEquivalents", () => ({
   GameEquivalents: () => null,
 }));
 vi.mock("./components/LuaRepl", () => ({ LuaRepl: () => null }));
+// The map page's own answer to a name not in the scan (issue #286), which says
+// the same thing as the other pages' for what this file checks.
+vi.mock("./components/MapNotInstalled", () => ({
+  MapNotInstalled: () => <p>This map isn't in the current scan.</p>,
+}));
 vi.mock("./components/ArchiveTree", () => ({ ArchiveTree: () => null }));
 vi.mock("./components/FilePreview", () => ({ FilePreview: () => null }));
 vi.mock("./components/Convert3doDrawer", () => ({

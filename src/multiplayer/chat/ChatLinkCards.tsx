@@ -2,14 +2,17 @@ import { cn } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { type LinkCardInfo, linkCardsIn } from "./linkCards";
+import { useTrustedHubUrl } from "@/hub/config";
+import { ChatMapCard } from "./ChatMapCard";
+import { linkCardsIn, type SiteLinkCard } from "./linkCards";
 
 /**
  * The cards under a chat message for its links to known sites (issue #284).
  * Draws nothing for a message with no such link.
  *
- * The card is a button that hands the link to the OS browser, as the inline link
- * does. It is never an iframe. The picture is the only thing fetched.
+ * A site's card is a button that hands the link to the OS browser, as the inline
+ * link does. It is never an iframe. The picture is the only thing fetched. A map's
+ * card has buttons of its own, so it is a different shape (`ChatMapCard`).
  */
 export function ChatLinkCards({
   text,
@@ -19,7 +22,14 @@ export function ChatLinkCards({
   /** Own messages sit on the right, so their card does too. */
   own: boolean;
 }) {
-  const cards = linkCardsIn(text);
+  // Most lines have no link, and those need no parse and no hub setting.
+  if (!text.includes("://")) return null;
+  return <LinkCards text={text} own={own} />;
+}
+
+function LinkCards({ text, own }: { text: string; own: boolean }) {
+  const hubUrl = useTrustedHubUrl();
+  const cards = linkCardsIn(text, hubUrl);
   if (cards.length === 0) return null;
   return (
     <div
@@ -28,14 +38,18 @@ export function ChatLinkCards({
         own ? "items-end" : "items-start",
       )}
     >
-      {cards.map((card) => (
-        <ChatLinkCard key={card.url} card={card} />
-      ))}
+      {cards.map((card) =>
+        "map" in card ? (
+          <ChatMapCard key={card.url} card={card} />
+        ) : (
+          <ChatLinkCard key={card.url} card={card} />
+        ),
+      )}
     </div>
   );
 }
 
-function ChatLinkCard({ card }: { card: LinkCardInfo }) {
+function ChatLinkCard({ card }: { card: SiteLinkCard }) {
   // A picture that fails to load (offline, blocked, removed video) is dropped
   // rather than left as a broken-image icon. The card still opens the link.
   const [failed, setFailed] = useState(false);

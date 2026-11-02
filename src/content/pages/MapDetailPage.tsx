@@ -53,17 +53,14 @@ import { usePlayMap } from "../usePlayMap";
 import { useStartNames } from "../useStartNames";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { FindingList } from "./components/CompatFindings";
+import { CopyMapLinkButton } from "./components/CopyMapLinkButton";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { MapAggregate } from "./components/MapAggregate";
+import { MapNotInstalled } from "./components/MapNotInstalled";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
 import { StatCard } from "./components/StatWidgets";
-import {
-  DetailError,
-  DetailLoading,
-  NotFound,
-  WarningBanner,
-} from "./components/states";
+import { DetailError, DetailLoading, WarningBanner } from "./components/states";
 
 function playedAt(ms: number): string {
   if (!ms) return coreT`never`;
@@ -184,7 +181,10 @@ export default function MapDetailPage() {
     );
   if (!data || loading) return <DetailLoading backTo="/library/maps" />;
   const scanned = data.maps.find((m) => m.name === decoded);
-  if (!scanned) return <NotFound backTo="/library/maps" label={t`map`} />;
+  // A shared link can name a map this machine has not got (issue #286).
+  if (!scanned) {
+    return <MapNotInstalled mapName={decoded} onDownloaded={() => run(true)} />;
+  }
   // Proportions and mapinfo arrive after the scan now, so fold in whichever of
   // those tiers has landed.
   const [map] = mergeMapTiers([scanned], thumbs, meta);
@@ -323,6 +323,7 @@ export default function MapDetailPage() {
         >
           <Clapperboard className="size-4" /> <Trans>Replays on this map</Trans>
         </Button>
+        <CopyMapLinkButton mapName={map.name} labelled />
         {advanced && archiveName && (
           <Button
             size="sm"

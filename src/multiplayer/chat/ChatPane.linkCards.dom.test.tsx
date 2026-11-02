@@ -26,6 +26,7 @@ vi.mock("@picoframe/frame", () => ({
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
   useTheme: () => ({ resolved: "dark" }),
+  useSetting: () => ["", () => {}],
 }));
 
 const YOUTUBE = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
