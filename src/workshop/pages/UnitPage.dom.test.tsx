@@ -3971,6 +3971,24 @@ describe("UnitPage", () => {
       expect(await findSectionLink("Checks, 1 blocker found")).toBeTruthy();
     });
 
+    it("keeps the banner sentence and its Checks link in one paragraph", () => {
+      openAt("armcom");
+      type(healthBox(), "5000");
+      cleanup();
+
+      reopen({ armlab: ARMLAB }, "moved on");
+      const description = document.querySelector(
+        '[data-slot="alert-description"]',
+      ) as HTMLElement;
+      const link = description.querySelector("a") as HTMLElement;
+      // The description is a grid, so loose text and a link would each be a
+      // row of their own.
+      expect(link.textContent).toBe("Checks");
+      expect(link.parentElement?.tagName).toBe("P");
+      expect(link.parentElement?.parentElement).toBe(description);
+      expect(link.parentElement?.textContent).toContain("has been updated");
+    });
+
     it("takes a dead reference out as one undoable step", async () => {
       openAt("armcom");
       type(healthBox(), "5000");
