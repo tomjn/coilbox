@@ -1,4 +1,4 @@
-import type { Facing, Point } from "../scenario/model";
+import type { Facing, Point } from "../placement/geometry";
 
 /**
  * A base blueprint: a named layout of buildings, and optionally changes to the
