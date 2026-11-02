@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { contrast, hsl, type Rgb } from "../../../lib/contrast.testhelper";
+import {
+  contrast,
+  contrastOfLuminances,
+  hsl,
+  luminance,
+  type Rgb,
+} from "../../../lib/contrast.testhelper";
 import runlitePlugin from "../../../runlite";
 import conquestPlugin from "../../index";
 import {
@@ -10,6 +16,7 @@ import {
   HUD_CARD_CLASS,
   HUD_DIM_INK_CLASS,
   HUD_INK_CLASS,
+  HUD_PRIMARY_INK_CLASS,
   MAP_BAND_CLASS,
   MAP_DIM_INK_CLASS,
   MAP_INK_CLASS,
@@ -574,6 +581,203 @@ describe("the accent inks clear AA on the band too", () => {
     for (const [name, { ratio, at }] of Object.entries(worst)) {
       expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+/**
+ * The player's accent as an icon on the HUD card (#1847).
+ *
+ * Three icons were `text-primary`: the crossed swords on the battle and encounter
+ * headings, and the filled bookmark that says a fight is already saved. `--primary`
+ * is whatever accent the player picked, a mid-lightness colour on every accent but
+ * the default, and the card lets 22% of the canvas through. Over a bright node the
+ * worst accent (violet) measured 1.04:1. WCAG asks 3:1 of an icon that carries
+ * meaning as a picture.
+ *
+ * The icons now take `--hud-primary`, which `.hud-card` in `src/index.css` sets to
+ * the accent with its lightness raised until it clears 3:1 and no further. This
+ * block reads those rules back out of the stylesheet and measures them against the
+ * accents in picoframe's own `theme.css`, so a new or retuned accent with no rule
+ * fails here. An accent with no rule is measured as `--primary` itself, which is
+ * what it ships as.
+ *
+ * Dark ramp only, for the reason every sweep in this file gives. The two cycling
+ * accents are swept over every whole degree of hue.
+ */
+describe("the accent as an icon on the HUD card clears 3:1 over anything the canvas can paint", () => {
+  const ICON_BAR = 3;
+  const STEPS = [0, 0.25, 0.5, 0.75, 1];
+
+  const read = (path: string) =>
+    readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  const themeCss = read(
+    "../../../../node_modules/@picoframe/frame/src/theme.css",
+  );
+  const indexCss = read("../../../index.css");
+
+  /** `H S% L%` with an optional `var(--pf-accent-hue)` for the hue. */
+  const TRIPLE =
+    "(var\\(--pf-accent-hue\\)|[0-9.]+)\\s+([0-9.]+)%\\s+([0-9.]+)%";
+
+  type Triple = { hue: number | "cycle"; sat: number; light: number };
+
+  function triple(found: RegExpExecArray, at: number): Triple {
+    return {
+      hue: found[at].startsWith("var") ? "cycle" : Number(found[at]),
+      sat: Number(found[at + 1]),
+      light: Number(found[at + 2]),
+    };
+  }
+
+  /**
+   * Every accent's `--primary` on the dark ramp, out of picoframe's `theme.css`.
+   * The dark block wins when an accent has one, and the plain block is what the
+   * cycling rainbow ships in both ramps.
+   */
+  function shippedPrimaries(): Record<string, Triple> {
+    const dark: Record<string, Triple> = {};
+    const plain: Record<string, Triple> = {};
+    for (const block of themeCss.matchAll(
+      /(\.dark)?\[data-accent="([a-z]+)"\](:not\(\.dark\))?\s*\{([^}]*)\}/g,
+    )) {
+      const [, isDark, name, isLight, body] = block;
+      if (isLight) continue;
+      const found = new RegExp(`--primary:\\s*${TRIPLE};`).exec(body);
+      if (found) (isDark ? dark : plain)[name] = triple(found, 1);
+    }
+    return { ...plain, ...dark };
+  }
+
+  /** The rule `.hud-card` ships for one accent, or nothing if it has none. */
+  function shippedRule(name: string): Triple | undefined {
+    const found = new RegExp(
+      `\\[data-accent="${name}"\\]\\s+\\.hud-card\\s*\\{\\s*--hud-primary:\\s*hsl\\(${TRIPLE}\\);`,
+    ).exec(indexCss);
+    return found ? triple(found, 1) : undefined;
+  }
+
+  /** Every card the canvas and a base preset can make, as a luminance. */
+  const cardLuminances: number[] = [];
+  for (const r of STEPS)
+    for (const g of STEPS)
+      for (const b of STEPS)
+        for (const hue of BASE_HUES)
+          for (const sat of BASE_SATS) {
+            cardLuminances.push(
+              luminance(
+                over([r, g, b], DARK_CARD.surface(hue, sat), cardAlpha),
+              ),
+            );
+          }
+
+  function worstOver(ink: Rgb): number {
+    const inkLuminance = luminance(ink);
+    let worst = Number.POSITIVE_INFINITY;
+    for (const card of cardLuminances) {
+      worst = Math.min(worst, contrastOfLuminances(inkLuminance, card));
+    }
+    return worst;
+  }
+
+  /** The colour an accent paints an icon as, at each hue it can have. */
+  function worstFor(primary: Triple): number {
+    const hues =
+      primary.hue === "cycle"
+        ? Array.from({ length: 360 }, (_, i) => i)
+        : [primary.hue];
+    return Math.min(
+      ...hues.map((h) =>
+        worstOver(hsl(h, primary.sat / 100, primary.light / 100)),
+      ),
+    );
+  }
+
+  const primaries = shippedPrimaries();
+
+  it("finds the accents picoframe ships", () => {
+    // A parser that matched nothing would pass every loop below.
+    expect(Object.keys(primaries).sort()).toEqual(
+      [
+        "amber",
+        "blue",
+        "cyan",
+        "green",
+        "indigo",
+        "opal",
+        "orange",
+        "pink",
+        "purple",
+        "rainbow",
+        "red",
+        "rose",
+        "sky",
+        "teal",
+        "violet",
+        "yellow",
+      ].sort(),
+    );
+  });
+
+  for (const [name, original] of Object.entries(primaries)) {
+    it(`clears ${ICON_BAR}:1 on the ${name} accent`, () => {
+      const rule = shippedRule(name);
+      const painted = rule ?? original;
+      if (rule) {
+        // The player's colour, brightened and nothing else.
+        expect(rule.hue, `${name} hue`).toEqual(original.hue);
+        expect(rule.sat, `${name} saturation`).toBe(original.sat);
+        expect(rule.light, `${name} lightness`).toBeGreaterThan(original.light);
+      }
+      expect(worstFor(painted), `${name}`).toBeGreaterThanOrEqual(ICON_BAR);
+    });
+  }
+
+  it("clears 3:1 with no accent set", () => {
+    const found = new RegExp(
+      `\\.dark\\s*\\{[^}]*--primary:\\s*${TRIPLE};`,
+    ).exec(themeCss);
+    if (!found) throw new Error("no .dark --primary in theme.css");
+    expect(worstFor(triple(found, 1))).toBeGreaterThanOrEqual(ICON_BAR);
+  });
+
+  it("defaults the token to the unmodified accent, in every card", () => {
+    expect(indexCss).toMatch(
+      /\.hud-card\s*\{[^}]*--hud-primary:\s*hsl\(var\(--primary\)\);/,
+    );
+  });
+
+  it("names a rule only for an accent that exists", () => {
+    // A rule for an accent picoframe dropped or renamed bounds nothing.
+    const named = [
+      ...indexCss.matchAll(/\[data-accent="([a-z]+)"\]\s+\.hud-card/g),
+    ].map((m) => m[1]);
+    for (const name of named) expect(primaries, name).toHaveProperty(name);
+  });
+
+  const SITES = {
+    "the battle overlay heading": "./BattleOverlay.tsx",
+    "the encounter overlay heading":
+      "../../../runlite/pages/components/EncounterOverlay.tsx",
+    "the saved bookmark":
+      "../../../play/pages/components/SaveAsPresetButton.tsx",
+  };
+
+  for (const [name, file] of Object.entries(SITES)) {
+    it(`paints ${name} with the bounded accent, not text-primary`, () => {
+      const source = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|\s)\/\/.*$/gm, "$1");
+      expect(source).not.toMatch(/(?<![\w-])text-primary(?![\w-])/);
+      expect(source).toContain(
+        file.includes("SaveAsPresetButton")
+          ? HUD_PRIMARY_INK_CLASS
+          : "HUD_PRIMARY_INK_CLASS",
+      );
+    });
+  }
+
+  it("reads the token it measured", () => {
+    expect(HUD_PRIMARY_INK_CLASS).toBe("text-[color:var(--hud-primary)]");
   });
 });
 

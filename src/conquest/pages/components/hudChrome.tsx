@@ -79,6 +79,19 @@ export const HUD_INK_CLASS = "text-[hsl(var(--card-foreground))]";
 /** The quieter ink on the HUD card, for a label, a hint or a meta figure. */
 export const HUD_DIM_INK_CLASS = "text-[hsl(var(--card-foreground)/0.75)]";
 
+/**
+ * The player's accent as an icon on the HUD card (#1847), in place of
+ * `text-primary`.
+ *
+ * `--hud-primary` is set by `.hud-card` in `src/index.css`: the accent with its
+ * lightness raised until it clears 3:1 over any canvas colour, which is the bar for
+ * an icon that carries meaning as a picture. Plain `text-primary` measured 1.04:1
+ * on the violet accent. It only resolves inside a {@link HUD_CARD_CLASS} element,
+ * which every use is. `hudChrome.test.ts` re-measures the rules and checks the
+ * three call sites still use this.
+ */
+export const HUD_PRIMARY_INK_CLASS = "text-[color:var(--hud-primary)]";
+
 /** Semantic accent driving value colour + corner-bracket colour. */
 export type HudAccent = "teal" | "amber" | "neutral" | "danger";
 
