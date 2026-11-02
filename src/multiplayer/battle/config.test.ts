@@ -18,6 +18,8 @@ import {
   shouldNotifyVoteOpened,
   startPosTypeOf,
   usedColorsFromBattle,
+  voteNamesUser,
+  voteTargetsUser,
 } from "./config";
 
 const status = (p: Partial<BattleStatus> = {}): BattleStatus => ({
@@ -524,6 +526,84 @@ describe("shouldNotifyVoteOpened", () => {
     expect(shouldNotifyVoteOpened(null, vote({ subject: "set map DSD" }))).toBe(
       true,
     );
+  });
+});
+
+describe("voteTargetsUser", () => {
+  it.each([
+    "bKick Alice",
+    "gKick Alice",
+    "kickBan Alice",
+    "boss Alice",
+    "joinAs spec Alice",
+    "force Alice spec",
+  ])("matches %s", (subject) => {
+    expect(voteTargetsUser(subject, "Alice")).toBe(true);
+  });
+
+  it("ignores case, since lobby names are unique ignoring case", () => {
+    expect(voteTargetsUser("bKick alice", "ALICE")).toBe(true);
+    expect(voteTargetsUser("BKICK Alice", "Alice")).toBe(true);
+  });
+
+  it.each([
+    ["a name that contains the player's", "bKick Alice2"],
+    ["a name that contains the player's", "kickBan xAlice"],
+    ["a name the player's contains", "bKick Al"],
+    ["a name the player's contains, on a forced spectate", "force Al spec"],
+    ["a name the player's contains, on joinAs", "joinAs spec Al"],
+    ["a bot with the player's name", "force %Alice spec"],
+  ])("does not match %s (%#)", (_label, subject) => {
+    expect(voteTargetsUser(subject, "Alice")).toBe(false);
+  });
+
+  it("does not match a vote about another player", () => {
+    expect(voteTargetsUser("bKick Bob", "Alice")).toBe(false);
+    expect(voteTargetsUser("joinAs spec Bob", "Alice")).toBe(false);
+  });
+
+  it("does not match a map, preset or option named after the player", () => {
+    expect(voteTargetsUser("set map Alice", "Alice")).toBe(false);
+    expect(voteTargetsUser("preset Alice", "Alice")).toBe(false);
+    expect(voteTargetsUser("start", "Alice")).toBe(false);
+  });
+
+  it("does not match the commands that name a player in some other role", () => {
+    expect(voteTargetsUser("joinAs #2 Alice", "Alice")).toBe(false);
+    expect(voteTargetsUser("force Alice team 2", "Alice")).toBe(false);
+    expect(voteTargetsUser("kick Alice now", "Alice")).toBe(false);
+  });
+
+  it("does not match with no username or an empty subject", () => {
+    expect(voteTargetsUser("boss ", "")).toBe(false);
+    expect(voteTargetsUser("", "Alice")).toBe(false);
+  });
+});
+
+describe("voteNamesUser", () => {
+  const vote = (p: Partial<Vote>): Vote => ({
+    subject: "bKick Alice",
+    caller: "Bob",
+    yes: 1,
+    no: 0,
+    yesNeeded: 3,
+    noNeeded: 3,
+    allowAbstain: true,
+    endsAt: 0,
+    ...p,
+  });
+
+  it("is true when somebody else calls a vote against the player", () => {
+    expect(voteNamesUser(vote({}), "Alice")).toBe(true);
+  });
+
+  it("is false when the player called the vote", () => {
+    expect(voteNamesUser(vote({ caller: "Alice" }), "Alice")).toBe(false);
+    expect(voteNamesUser(vote({ caller: "alice" }), "Alice")).toBe(false);
+  });
+
+  it("is false when the player's name is not known", () => {
+    expect(voteNamesUser(vote({}), null)).toBe(false);
   });
 });
 

@@ -53,6 +53,7 @@ import {
   startPositionsUnavailable,
   unitRestrictionsUnavailable,
 } from "../protocol";
+import { triggerAttention } from "../ringEffect";
 import {
   initialMirror,
   useConnection,
@@ -84,6 +85,7 @@ import {
   shouldNotifyVoteOpened,
   startPosTypeOf,
   usedColorsFromBattle,
+  voteNamesUser,
 } from "./config";
 import { battleRequirements } from "./contentBlock";
 import { type EngineMatch, engineMatch } from "./engineMatch";
@@ -761,15 +763,27 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // user has clicked through elsewhere in the app.
   const prevVoteRef = useRef<Vote | null>(null);
   useEffect(() => {
-    if (shouldNotifyVoteOpened(prevVoteRef.current, currentVote)) {
-      void notify({
-        title: t`Vote called`,
-        body: currentVote?.subject || t`A vote is open in your battle.`,
-        to: battleRoomHref(activeKey),
-      });
+    if (
+      currentVote &&
+      shouldNotifyVoteOpened(prevVoteRef.current, currentVote)
+    ) {
+      if (voteNamesUser(currentVote, me)) {
+        // A vote about the player themselves (issue #351) rings through like an
+        // autohost ring, in place of the ordinary notification.
+        triggerAttention(
+          "voteNamesYou",
+          t`${currentVote.caller} called a vote: ${currentVote.subject}`,
+        );
+      } else {
+        void notify({
+          title: t`Vote called`,
+          body: currentVote.subject || t`A vote is open in your battle.`,
+          to: battleRoomHref(activeKey),
+        });
+      }
     }
     prevVoteRef.current = currentVote;
-  }, [currentVote, activeKey, t]);
+  }, [currentVote, activeKey, me, t]);
 
   // The colour we last intended (as the `0xBBGGRR` int), so a status push that
   // omits `color` never reverts to 0 while our colour echo is still in flight —

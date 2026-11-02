@@ -1131,6 +1131,12 @@ msgstr "{0} {resourceName}"
 msgid "{0} at a position with no name."
 msgstr "{0} at a position with no name."
 
+#. placeholder {0}: currentVote.caller
+#. placeholder {1}: currentVote.subject
+#: src/multiplayer/battle/useBattleRoom.ts
+msgid "{0} called a vote: {1}"
+msgstr "{0} called a vote: {1}"
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
@@ -7608,6 +7614,10 @@ msgstr "A view setting. Neither one is saved with the unit or exported."
 #: src/multiplayer/battle/useBattleRoom.ts
 msgid "A vote is open in your battle."
 msgstr "A vote is open in your battle."
+
+#: src/sound/events.ts
+msgid "A vote names you"
+msgstr "A vote names you"
 
 #: src/career/pages/CareerPage.tsx
 msgid "a Warpath run"
@@ -35998,6 +36008,10 @@ msgstr "Some parts of this unit are not tracked."
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Some servers email a verification code to confirm your account."
 msgstr "Some servers email a verification code to confirm your account."
+
+#: src/sound/events.ts
+msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
+msgstr "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 
 #: src/sound/events.ts
 msgid "Someone says your name, or one of your highlight words, in chat or a private message."
