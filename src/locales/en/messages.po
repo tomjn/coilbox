@@ -8695,6 +8695,10 @@ msgstr "Already saved"
 msgid "already set"
 msgstr "already set"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Already set"
+msgstr "Already set"
+
 #: src/play/PresetChanges.tsx
 msgid "Already set this way"
 msgstr "Already set this way"
@@ -8775,11 +8779,8 @@ msgstr "Also write an .obj and .mtl"
 msgid "Also write the build picture"
 msgstr "Also write the build picture"
 
-#: src/scenario/pages/components/triggers.ts
-msgid "always"
-msgstr "always"
-
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 msgid "Always"
 msgstr "Always"
 
@@ -9552,6 +9553,11 @@ msgstr "at most"
 #: src/lego/pages/components/AnchorList.tsx
 msgid "At the origin"
 msgstr "At the origin"
+
+#: src/scenario/pages/components/triggers.ts
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "At the start"
+msgstr "At the start"
 
 #: src/lego/pages/components/AtlasPicker.tsx
 msgid "atlas"
@@ -18148,6 +18154,10 @@ msgstr "Fires every time"
 msgid "Fires on"
 msgstr "Fires on"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+msgstr "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+
 #: src/lego/scriptMarks.ts
 msgid "fires weapon {weapon}"
 msgstr "fires weapon {weapon}"
@@ -25094,6 +25104,7 @@ msgid "never"
 msgstr "never"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 msgid "Never"
 msgstr "Never"
 
@@ -44140,6 +44151,10 @@ msgstr "When"
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 
+#: src/scenario/pages/components/triggers.ts
+msgid "When armed"
+msgstr "When armed"
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "When ChangeHeading is sent"
 msgstr "When ChangeHeading is sent"
@@ -44692,14 +44707,6 @@ msgstr "With no speed the engine treats it as static."
 #: src/scenario/pages/components/TriggerPanel.tsx
 msgid "with none, firing does nothing"
 msgstr "with none, firing does nothing"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-msgid "with none, it fires on the first pass"
-msgstr "with none, it fires on the first pass"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-msgid "with none, it never fires"
-msgstr "with none, it never fires"
 
 #: src/content/pages/PlayerDossierPage.tsx
 msgid "with you: {lastTogether}"

@@ -726,6 +726,38 @@ export function stepDefaults(spec: TypeSpec, ctx: StepContext): StepDefaults {
   return { params };
 }
 
+/**
+ * "At the start" is a name for what the document already says: an armed
+ * fire-once trigger with an empty list under `all`. It is not a stored condition
+ * type, so the compiled mission, the runtime and an older coilbox never meet it.
+ */
+export function isAtTheStart(trigger: ScenarioTrigger): boolean {
+  return (
+    trigger.enabled &&
+    !trigger.repeat &&
+    trigger.conditions.op === "all" &&
+    trigger.conditions.conditions.length === 0
+  );
+}
+
+/** The document with a trigger set to fire at the start. Everything that would
+ *  stop that goes, including its other conditions. */
+export function setAtTheStart(scenario: Scenario, triggerId: string): Scenario {
+  return editTrigger(scenario, triggerId, {
+    enabled: true,
+    repeat: false,
+    conditions: { op: "all", conditions: [] },
+  });
+}
+
+/** When a trigger with an empty condition list fires. Only an armed fire-once
+ *  trigger fires at the start, so the others keep a name that is true of them. */
+export function noConditionsLabel(trigger: ScenarioTrigger): string {
+  if (trigger.conditions.op === "any") return t`Never`;
+  if (trigger.repeat) return t`Always`;
+  return trigger.enabled ? t`At the start` : t`When armed`;
+}
+
 /** One line saying what a trigger holds, for the list and for the picker that
  *  points another trigger at it. */
 export function triggerSummary(trigger: ScenarioTrigger): string {
@@ -733,7 +765,7 @@ export function triggerSummary(trigger: ScenarioTrigger): string {
   const actions = trigger.actions.length;
   const when =
     conditions === 0
-      ? t`always`
+      ? noConditionsLabel(trigger)
       : trigger.conditions.op === "any"
         ? plural(conditions, {
             one: "# condition",
