@@ -76,8 +76,10 @@ use std::path::{Path, PathBuf};
 /// def-script shim now gives `math.random` a fixed answer (#4929), and a unit
 /// list cached under v24 lacks every definition whose script draws a number,
 /// which for Beyond All Reason is the 36 `lootboxnano` units and moves every id
-/// after them.
-pub const INFO_CACHE_VERSION: u32 = 25;
+/// after them. v26: the unit dataset now reads Beyond All Reason's evolution
+/// edges (#2152), and a blob cached under v25 has none, so its commander stages
+/// would go on listing as unrelated units.
+pub const INFO_CACHE_VERSION: u32 = 26;
 
 /// Salts the unit model cache's keys and file names. Bump when the way a model
 /// is flattened or a texture is transcoded changes, so every entry is read again.
@@ -407,9 +409,9 @@ mod tests {
 
     #[test]
     fn a_game_s_keys_are_the_ones_the_worker_wrote_before() {
-        assert_eq!(game_key(&game()), "85bf35c6d9d67321");
-        assert_eq!(dataset_key(&game()), "d16c9b1d3f118972");
-        assert_eq!(archive_hash_key(&game()), "f0a41919ca8642e2");
+        assert_eq!(game_key(&game()), "24b40d9adb3634fb");
+        assert_eq!(dataset_key(&game()), "20b47c081fa1f0e4");
+        assert_eq!(archive_hash_key(&game()), "d4ea1ceae6da47e1");
         assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
@@ -421,11 +423,11 @@ mod tests {
         let map = map();
         assert_eq!(
             map_info_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("c6b12bd8bf720a44")
+            Some("ccc3f3f639b9b3c4")
         );
         assert_eq!(
             map_meta_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("40e4f7001eb09d91")
+            Some("cd603dad17bba480")
         );
         assert_eq!(
             thumb_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -437,11 +439,11 @@ mod tests {
     fn a_map_with_no_archive_path_keys_on_its_name_and_file() {
         assert_eq!(
             map_info_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n7c95e2fd46d2911f")
+            Some("n5d62af671d62b8df")
         );
         assert_eq!(
             map_meta_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n76772968e4ddb2ea")
+            Some("n1a3b1b3f39f2d037")
         );
         assert_eq!(
             thumb_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -513,8 +515,8 @@ mod tests {
             13,
             1_700_000_000,
         );
-        assert_eq!(skirmish_key(&engine, Some(&game())), "addeee25113e77783");
-        assert_eq!(skirmish_key(&engine, None), "aa582ebb6c926eec4");
+        assert_eq!(skirmish_key(&engine, Some(&game())), "aa5267d0f5a5cf5b3");
+        assert_eq!(skirmish_key(&engine, None), "a737c13e4ff50009f");
     }
 
     #[test]
