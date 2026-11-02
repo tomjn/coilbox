@@ -17,7 +17,7 @@ On the conquest and warpath overlays the bookmark sits in its own box just under
 
 ## Replaying a preset
 
-Open Singleplayer, select Presets, and pick a preset. Choose which parts you want, then select Load. It loads the game, map, opponents and options onto the page, ready for Start Game. Every saved battle plays as a singleplayer skirmish, wherever it came from.
+Open Singleplayer, select Presets, and pick a preset. Choose which parts you want, then select Load. It loads the game, map, opponents and options onto the page, ready for Start game. Every saved battle plays as a singleplayer skirmish, wherever it came from.
 
 ## What a preset holds
 

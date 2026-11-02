@@ -10770,8 +10770,8 @@ msgid "Browse games to download"
 msgstr "Browse games to download"
 
 #: src/downloads/pages/ExplorerPage.tsx
-msgid "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
-msgstr "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
+msgid "Browse Spring/Recoil rapid content and download a tag with pr-downloader."
+msgstr "Browse Spring/Recoil rapid content and download a tag with pr-downloader."
 
 #: src/play/PresetLibraryToolbar.tsx
 msgid "Browse the hub"
@@ -13127,8 +13127,8 @@ msgid "Coilbox reads maps through an engine, and there is no engine installed to
 msgstr "Coilbox reads maps through an engine, and there is no engine installed to read {mapName} with."
 
 #: src/sound/events.ts
-msgid "Coilbox reports that something went wrong."
-msgstr "Coilbox reports that something went wrong."
+msgid "Coilbox reports an error."
+msgstr "Coilbox reports an error."
 
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/components/ShareScenarioForm.tsx
@@ -13172,6 +13172,10 @@ msgstr "coilbox writes this script from the presets and the roles on your pieces
 #: src/content/pages/components/GeneratedBadge.tsx
 msgid "Coilbox's own"
 msgstr "Coilbox's own"
+
+#: src/lobby-servers/config.ts
+msgid "Coilbox's Tachyon support is incomplete. Use the Beyond All Reason entry instead."
+msgstr "Coilbox's Tachyon support is incomplete. Use the Beyond All Reason entry instead."
 
 #: src/lego/pages/components/PieceTree.tsx
 msgid "Collapse {pieceName}"
@@ -17117,8 +17121,8 @@ msgid "Enter it on the battle's row to join."
 msgstr "Enter it on the battle's row to join."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
-msgid "Enter the email address on your account and we will send you a recovery code."
-msgstr "Enter the email address on your account and we will send you a recovery code."
+msgid "Enter the email address on your account. The server sends a recovery code to it."
+msgstr "Enter the email address on your account. The server sends a recovery code to it."
 
 #: src/direct/lan.ts
 msgid "Enter the host's address."
@@ -22965,8 +22969,8 @@ msgid "Local IP"
 msgstr "Local IP"
 
 #: src/direct/LanRooms.tsx
-msgid "Local Network"
-msgstr "Local Network"
+msgid "Local network"
+msgstr "Local network"
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Local tweak-slot mod option"
@@ -23273,8 +23277,8 @@ msgid "Lua calls to removed or changed APIs"
 msgstr "Lua calls to removed or changed APIs"
 
 #: src/content/pages/ArchiveDetailPage.tsx
-msgid "Lua Console"
-msgstr "Lua Console"
+msgid "Lua console"
+msgstr "Lua console"
 
 #: src/content/pages/components/LuaRepl.tsx
 msgid "Lua input"
@@ -24185,12 +24189,12 @@ msgid "Mission {position} has no map"
 msgstr "Mission {position} has no map"
 
 #: src/campaign/pages/MissionBriefingPage.tsx
-msgid "Mission complete — you've finished the campaign!"
-msgstr "Mission complete — you've finished the campaign!"
-
-#: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Mission complete. The next mission is ready."
 msgstr "Mission complete. The next mission is ready."
+
+#: src/campaign/pages/MissionBriefingPage.tsx
+msgid "Mission complete. You finished the campaign."
+msgstr "Mission complete. You finished the campaign."
 
 #: src/campaign/pages/components/MissionScenarioField.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -28897,10 +28901,6 @@ msgstr "Other units cannot shove this one out of the way while it is holding its
 msgid "Others see you as away until you turn this off."
 msgstr "Others see you as away until you turn this off."
 
-#: src/lobby-servers/config.ts
-msgid "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead."
-msgstr "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead."
-
 #: src/campaign/pages/components/StaleScenarioBadge.tsx
 msgid "Out of date"
 msgstr "Out of date"
@@ -30177,8 +30177,8 @@ msgid "Power"
 msgstr "Power"
 
 #: src/downloads/pages/components/RapidBrowser.tsx
-msgid "pr-downloader sidecar unavailable"
-msgstr "pr-downloader sidecar unavailable"
+msgid "pr-downloader is unavailable"
+msgstr "pr-downloader is unavailable"
 
 #: src/mapconv/pages/SettingsSection.tsx
 msgid "Pre-fill the file pickers with the folders you used last time."
@@ -36011,10 +36011,6 @@ msgstr "Something finished"
 msgid "something that is gone"
 msgstr "something that is gone"
 
-#: src/general/ErrorBoundary.tsx
-msgid "Something went wrong"
-msgstr "Something went wrong"
-
 #: src/content/unitFieldNotes.ts
 msgid "Sonar cannot pick the unit up."
 msgstr "Sonar cannot pick the unit up."
@@ -36444,8 +36440,8 @@ msgid "Start from the starter"
 msgstr "Start from the starter"
 
 #: src/play/pages/SkirmishPage.tsx
-msgid "Start Game"
-msgstr "Start Game"
+msgid "Start game"
+msgstr "Start game"
 
 #: src/profile/health.ts
 msgid "Start game and map not checked against the bundle"
@@ -36455,13 +36451,10 @@ msgstr "Start game and map not checked against the bundle"
 msgid "Start here"
 msgstr "Start here"
 
+#: src/campaign/pages/MissionBriefingPage.tsx
 #: src/home/continue.ts
 msgid "Start mission"
 msgstr "Start mission"
-
-#: src/campaign/pages/MissionBriefingPage.tsx
-msgid "Start Mission"
-msgstr "Start Mission"
 
 #: src/profile/start.ts
 msgid "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
@@ -41279,6 +41272,10 @@ msgstr "This scenario was made for a newer version of coilbox. Update coilbox to
 msgid "This scenario's {mine} hand over to the preset's {theirs} in list order, and every position stays where it is on the new map."
 msgstr "This scenario's {mine} hand over to the preset's {theirs} in list order, and every position stays where it is on the new map."
 
+#: src/general/ErrorBoundary.tsx
+msgid "This screen crashed"
+msgstr "This screen crashed"
+
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
 msgstr "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
@@ -43417,13 +43414,10 @@ msgstr "Victories"
 #: src/conquest/pages/components/BattleOverlay.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/conquest/pages/ConquestListPage.tsx
+#: src/play/debrief.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Victory"
 msgstr "Victory"
-
-#: src/play/debrief.ts
-msgid "Victory!"
-msgstr "Victory!"
 
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/content/pages/components/BrandingLinks.tsx

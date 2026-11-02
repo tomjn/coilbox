@@ -188,7 +188,7 @@ A friend who opens the link sees "Join a room" and selects Open the join form. T
 
 ### Join a friend's room
 
-A room on your network appears under Local Network on the Battles page. Select Join on it, check Your name, add the password if it has one, and select Join room.
+A room on your network appears under Local network on the Battles page. Select Join on it, check Your name, add the password if it has one, and select Join room.
 
 For a room somewhere else:
 

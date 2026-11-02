@@ -149,7 +149,7 @@ A trigger outside its range is not armed and cannot be armed. `enable_trigger` o
 
 The player picks the difficulty in the same drawer they press **Play** in, and you pick it in **Test in game**. The picker only appears for a scenario that actually varies by it.
 
-In a campaign the level belongs to the whole run rather than to one mission. The picker sits on the briefing of a mission that varies by difficulty, right above **Start Mission**, and what the player picks there holds for every mission after it until they change it again. So a player who finds mission 4 too hard drops the level on mission 4's briefing and plays on. Missions they already beat stay beaten.
+In a campaign the level belongs to the whole run rather than to one mission. The picker sits on the briefing of a mission that varies by difficulty, right above **Start mission**, and what the player picks there holds for every mission after it until they change it again. So a player who finds mission 4 too hard drops the level on mission 4's briefing and plays on. Missions they already beat stay beaten.
 
 A campaign run nobody has picked a level for plays at normal, which is what every campaign did before this existed.
 

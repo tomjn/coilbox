@@ -13285,9 +13285,8 @@ msgid "Browse games to download"
 msgstr "Explorar juegos para descargar"
 
 #: src/downloads/pages/ExplorerPage.tsx
-#, fuzzy
-msgid "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
-msgstr "Explora el contenido rapid de Spring/Recoil y descarga una etiqueta mediante el sidecar incluido."
+msgid "Browse Spring/Recoil rapid content and download a tag with pr-downloader."
+msgstr ""
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy
@@ -16140,9 +16139,8 @@ msgid "Coilbox reads maps through an engine, and there is no engine installed to
 msgstr "Coilbox lee los mapas mediante un motor, y no hay ningún motor instalado con el que leer {mapName}."
 
 #: src/sound/events.ts
-#, fuzzy
-msgid "Coilbox reports that something went wrong."
-msgstr "Coilbox informa de que algo ha salido mal."
+msgid "Coilbox reports an error."
+msgstr ""
 
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/components/ShareScenarioForm.tsx
@@ -16196,6 +16194,10 @@ msgstr "coilbox escribe este script a partir de las plantillas y los papeles de 
 #, fuzzy
 msgid "Coilbox's own"
 msgstr "Propio de Coilbox"
+
+#: src/lobby-servers/config.ts
+msgid "Coilbox's Tachyon support is incomplete. Use the Beyond All Reason entry instead."
+msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
 #, fuzzy
@@ -21029,9 +21031,8 @@ msgid "Enter it on the battle's row to join."
 msgstr "Introdúcela en la fila de la partida para unirte."
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
-#, fuzzy
-msgid "Enter the email address on your account and we will send you a recovery code."
-msgstr "Introduce la dirección de correo de tu cuenta y te enviaremos un código de recuperación."
+msgid "Enter the email address on your account. The server sends a recovery code to it."
+msgstr ""
 
 #: src/direct/lan.ts
 #, fuzzy
@@ -28235,7 +28236,7 @@ msgstr "IP local"
 
 #: src/direct/LanRooms.tsx
 #, fuzzy
-msgid "Local Network"
+msgid "Local network"
 msgstr "Red local"
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
@@ -28614,7 +28615,7 @@ msgstr "Llamadas de Lua a API quitadas o cambiadas"
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #, fuzzy
-msgid "Lua Console"
+msgid "Lua console"
 msgstr "Consola Lua"
 
 #: src/content/pages/components/LuaRepl.tsx
@@ -29732,13 +29733,12 @@ msgstr "La misión {position} no tiene mapa"
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
-msgid "Mission complete — you've finished the campaign!"
-msgstr "Misión completada. ¡Has terminado la campaña!"
-
-#: src/campaign/pages/MissionBriefingPage.tsx
-#, fuzzy
 msgid "Mission complete. The next mission is ready."
 msgstr "Misión completada. La siguiente misión está lista."
+
+#: src/campaign/pages/MissionBriefingPage.tsx
+msgid "Mission complete. You finished the campaign."
+msgstr ""
 
 #: src/campaign/pages/components/MissionScenarioField.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -35529,11 +35529,6 @@ msgstr "Las demás unidades no pueden apartar a esta mientras mantiene su posici
 msgid "Others see you as away until you turn this off."
 msgstr "Los demás te ven como ausente hasta que lo desactives."
 
-#: src/lobby-servers/config.ts
-#, fuzzy
-msgid "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead."
-msgstr "Nuestra compatibilidad con Tachyon está incompleta. Usa la entrada de Beyond All Reason."
-
 #: src/campaign/pages/components/StaleScenarioBadge.tsx
 #, fuzzy
 msgid "Out of date"
@@ -37100,9 +37095,8 @@ msgid "Power"
 msgstr "Potencia"
 
 #: src/downloads/pages/components/RapidBrowser.tsx
-#, fuzzy
-msgid "pr-downloader sidecar unavailable"
-msgstr "El sidecar pr-downloader no está disponible"
+msgid "pr-downloader is unavailable"
+msgstr ""
 
 #: src/mapconv/pages/SettingsSection.tsx
 #, fuzzy
@@ -44253,11 +44247,6 @@ msgstr "Algo terminó"
 msgid "something that is gone"
 msgstr "algo que ya no existe"
 
-#: src/general/ErrorBoundary.tsx
-#, fuzzy
-msgid "Something went wrong"
-msgstr "Algo salió mal"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Sonar cannot pick the unit up."
@@ -44789,7 +44778,7 @@ msgstr "Partir de la base inicial"
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
-msgid "Start Game"
+msgid "Start game"
 msgstr "Iniciar partida"
 
 #: src/profile/health.ts
@@ -44802,14 +44791,10 @@ msgstr "El juego y el mapa iniciales no se comprueban contra el paquete"
 msgid "Start here"
 msgstr "Empieza aquí"
 
+#: src/campaign/pages/MissionBriefingPage.tsx
 #: src/home/continue.ts
 #, fuzzy
 msgid "Start mission"
-msgstr "Empezar misión"
-
-#: src/campaign/pages/MissionBriefingPage.tsx
-#, fuzzy
-msgid "Start Mission"
 msgstr "Empezar misión"
 
 #: src/profile/start.ts
@@ -50760,6 +50745,10 @@ msgstr "Este escenario se creó para una versión más nueva de coilbox. Actuali
 msgid "This scenario's {mine} hand over to the preset's {theirs} in list order, and every position stays where it is on the new map."
 msgstr "Los {mine} de este escenario pasan a los {theirs} de la plantilla en el orden de la lista, y cada posición se queda donde está en el nuevo mapa."
 
+#: src/general/ErrorBoundary.tsx
+msgid "This screen crashed"
+msgstr ""
+
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
 msgid "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
@@ -53393,15 +53382,11 @@ msgstr "Victorias"
 #: src/conquest/pages/components/BattleOverlay.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/conquest/pages/ConquestListPage.tsx
+#: src/play/debrief.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "Victory"
 msgstr "Victoria"
-
-#: src/play/debrief.ts
-#, fuzzy
-msgid "Victory!"
-msgstr "¡Victoria!"
 
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/content/pages/components/BrandingLinks.tsx

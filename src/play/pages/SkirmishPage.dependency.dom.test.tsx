@@ -141,7 +141,7 @@ describe("SkirmishPage on a game with a missing dependency archive", () => {
         .getByRole("link", { name: /Open game downloads/ })
         .getAttribute("href"),
     ).toBe("/library/games");
-    expect(button(/Start Game/).disabled).toBe(true);
+    expect(button(/Start game/).disabled).toBe(true);
     expect(button(/Host/).disabled).toBe(true);
   });
 

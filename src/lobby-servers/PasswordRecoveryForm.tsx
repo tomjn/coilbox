@@ -260,8 +260,8 @@ export function PasswordRecoveryForm({
     <form onSubmit={submitEmail} className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
         <Trans>
-          Enter the email address on your account and we will send you a
-          recovery code.
+          Enter the email address on your account. The server sends a recovery
+          code to it.
         </Trans>
       </p>
       <Field label={t`Server`}>

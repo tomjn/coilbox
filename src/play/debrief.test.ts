@@ -6,7 +6,7 @@ describe("describeOutcome", () => {
   it("reports victory without hedging", () => {
     expect(describeOutcome("victory")).toEqual({
       outcome: "victory",
-      headline: "Victory!",
+      headline: "Victory",
     });
   });
 

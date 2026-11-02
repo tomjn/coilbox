@@ -128,7 +128,7 @@ export function canonicalServerId(id: string): string {
   return RENAMED_BUILTIN_IDS[id] ?? id;
 }
 
-const TACHYON_NOTICE = msg`Our Tachyon support is incomplete. Use the Beyond All Reason entry instead.`;
+const TACHYON_NOTICE = msg`Coilbox's Tachyon support is incomplete. Use the Beyond All Reason entry instead.`;
 const SPRING_OFFICIAL_NOTICE = msg`You cannot register a new account here. This server's verification emails are not being delivered.`;
 
 /**

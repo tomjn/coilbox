@@ -15,7 +15,7 @@ import {
 export type { JoinRoomArgs } from "./JoinRoomForm";
 
 /**
- * "Local Network": the rooms other people are announcing, and the way in for a
+ * "Local network": the rooms other people are announcing, and the way in for a
  * host who was never heard at all.
  *
  * Collapsed to its heading until somebody opens it, and counted there like the
@@ -83,7 +83,7 @@ export function LanRooms({
               collapsed ? "" : "rotate-90"
             }`}
           />
-          <Trans>Local Network</Trans>
+          <Trans>Local network</Trans>
           <span>{rooms.length}</span>
         </button>
         {/* Outside the collapse on purpose. A room heard on nobody's network is

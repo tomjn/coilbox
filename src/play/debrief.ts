@@ -23,7 +23,7 @@ export function describeOutcome(reason: DebriefReason): {
 } {
   switch (reason) {
     case "victory":
-      return { outcome: "victory", headline: t`Victory!` };
+      return { outcome: "victory", headline: t`Victory` };
     case "defeat":
       return { outcome: "defeat", headline: t`Defeat.` };
     case "no-replay":

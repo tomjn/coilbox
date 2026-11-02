@@ -114,7 +114,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <Alert variant="destructive" className="max-w-lg text-left">
           <AlertCircle />
           <AlertTitle>
-            <Trans>Something went wrong</Trans>
+            <Trans>This screen crashed</Trans>
           </AlertTitle>
           <AlertDescription className="grid min-w-0 gap-3">
             <p>

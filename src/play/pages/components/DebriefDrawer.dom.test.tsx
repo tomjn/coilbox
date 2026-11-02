@@ -27,7 +27,7 @@ afterEach(cleanup);
 
 const base: SkirmishDebrief = {
   outcome: "victory",
-  headline: "Victory!",
+  headline: "Victory",
   durationSec: 540,
   replayFilename: "a.sdfz",
   presetLine: null,

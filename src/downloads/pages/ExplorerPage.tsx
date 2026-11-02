@@ -18,8 +18,8 @@ export default function ExplorerPage() {
         </h1>
         <p className="max-w-prose text-sm text-muted-foreground">
           <Trans>
-            Browse Spring/Recoil rapid content and download a tag through the
-            bundled sidecar.
+            Browse Spring/Recoil rapid content and download a tag with
+            pr-downloader.
           </Trans>
         </p>
       </header>

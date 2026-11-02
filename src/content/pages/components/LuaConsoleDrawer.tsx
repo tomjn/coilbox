@@ -2,7 +2,7 @@ import { useDrawer } from "@picoframe/frame";
 import { LuaRepl } from "./LuaRepl";
 
 /**
- * Drawer body for the Archives detail "Lua Console" — a REPL over unitsync's
+ * Drawer body for the Archives detail "Lua console" — a REPL over unitsync's
  * restricted parser with the page's archive mounted. Thin wrapper around
  * {@link LuaRepl}; the "Open full page" link closes the drawer and navigates to
  * the standalone REPL route (state is shared via the module-level session store,

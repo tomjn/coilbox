@@ -47,7 +47,7 @@ describe("a boundary round part of a page", () => {
     // The whole point: the page around it is untouched.
     expect(screen.getByText("The triggers panel")).toBeTruthy();
     // And the window is not taken by the app-wide report.
-    expect(screen.queryByText("Something went wrong")).toBeNull();
+    expect(screen.queryByText("This screen crashed")).toBeNull();
     quiet.mockRestore();
   });
 
@@ -59,7 +59,7 @@ describe("a boundary round part of a page", () => {
       </ErrorBoundary>,
     );
 
-    expect(screen.getByText("Something went wrong")).toBeTruthy();
+    expect(screen.getByText("This screen crashed")).toBeTruthy();
     quiet.mockRestore();
   });
 
