@@ -1529,6 +1529,68 @@ plans.sentries = {
 	},
 }
 
+-- A group told to hunt the player (issue #903). The fixture's player has two solar
+-- collectors and nothing else. The near one dies to real weapons, the far one is
+-- invulnerable so it can be moved, and removing it leaves the team with nothing.
+local huntNear, huntFar
+
+local function huntOrder(unitID)
+	return Spring.GetUnitCommands(unitID, -1)[1]
+end
+
+plans.pursuit = {
+	deadline = 3700,
+	steps = {
+		{ frame = 5, run = function()
+			huntNear, huntFar = state().units.near, state().units.far
+			check("the hunting group is on the map", #state().groups.units("hunters") == 3,
+				#state().groups.units("hunters"))
+			check("and awake", state().groups.isAwake("hunters") == true)
+		end },
+		{ frame = 65, run = function()
+			local order = huntOrder(state().groups.units("hunters")[1])
+			local x, _, z = Spring.GetUnitPosition(huntNear)
+			check("it is sent to fight at the player's nearest unit",
+				order and order.id == CMD.FIGHT and order.params[1] == x and order.params[3] == z,
+				order and tostring(order.id))
+		end },
+		{ frame = 1200, run = function()
+			check("real weapons have killed the near unit", not Spring.ValidUnitID(huntNear)
+				or Spring.GetUnitIsDead(huntNear) == true)
+			local x, _, z = Spring.GetUnitPosition(huntFar)
+			local unitID = state().groups.units("hunters")[1]
+			local order = huntOrder(unitID)
+			check("the group has moved on to the other one",
+				order ~= nil and (order.id == CMD.ATTACK and order.params[1] == huntFar
+					or order.id == CMD.FIGHT and order.params[1] == x and order.params[3] == z),
+				order and (tostring(order.id) .. " " .. tostring(order.params[1])))
+			Spring.SetUnitPosition(huntFar, 2600, 800)
+		end },
+		{ frame = 3000, run = function()
+			local unitID = state().groups.units("hunters")[1]
+			local x, _, z = Spring.GetUnitPosition(unitID)
+			local tx, _, tz = Spring.GetUnitPosition(huntFar)
+			local distance = math.sqrt((x - tx) ^ 2 + (z - tz) ^ 2)
+			check("it has followed that unit to where it went", distance < 500, distance)
+			Spring.DestroyUnit(huntFar, false, true)
+		end },
+		{ frame = 3650, run = function()
+			local left = 0
+			for _, unitID in ipairs(Spring.GetTeamUnits(0)) do
+				if not state().gameOver.isAnchor(unitID) then
+					left = left + 1
+				end
+			end
+			check("the player has nothing left but the anchor", left == 0, left)
+			local busy = 0
+			for _, unitID in ipairs(state().groups.units("hunters")) do
+				busy = busy + #Spring.GetUnitCommands(unitID, -1)
+			end
+			check("and the group is given no more orders", busy == 0, busy)
+		end },
+	},
+}
+
 -- No mission at all: the modoption gate. The runtime is a file in the game
 -- whatever happens, so what has to be proved is that a normal game never gets a
 -- gadget out of it.

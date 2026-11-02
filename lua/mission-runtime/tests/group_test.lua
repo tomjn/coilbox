@@ -530,6 +530,152 @@ check("and its orders", postOrders() == string.format("%d %d %d",
 check("wake_group did not place a second block", #sentries.GG.CoilboxMission.groups.units("post") == 2)
 
 --------------------------------------------------------------------------------
+-- A group hunting a participant (issue #903), out of the compiled fixture.
+--------------------------------------------------------------------------------
+
+-- A human on the hunted team and a def that does nothing, so the team gets its
+-- anchor, which a hunt has to ignore.
+local pursuit = load({ coilbox_mission = "demo" }, missionFiles(support.fixture("pursuit")), {
+	players = { [0] = { team = 0 } },
+	defList = {
+		{ name = "wall", speed = 0, weapons = {} },
+		{ name = "armsolar" },
+		{ name = "corak" },
+	},
+})
+pursuit.env:Initialize()
+pursuit.env:GameStart()
+
+local pursued = pursuit.GG.CoilboxMission
+local pack = pursued.groups.units("hunters")
+local CMDS = pursuit.env.CMD
+local huntFrame = 0
+
+--- Run the game on one hunting look, which is once a second.
+local function nextLook()
+	for _ = 1, 30 do
+		huntFrame = huntFrame + 1
+		pursuit.env:GameFrame(huntFrame)
+	end
+end
+
+--- The last order a unit was given, and how many it has had.
+local function lastOrder(unitID)
+	local given = pursuit.ordersFor(unitID)
+	return given[#given], #given
+end
+
+--- Whether a unit's last order is a fight aimed at an actor.
+local function aimedAt(unitID, name)
+	local order = lastOrder(unitID)
+	local x, _, z = pursuit.env.Spring.GetUnitPosition(pursued.units[name])
+	return order[2] == CMDS.FIGHT and order[3][1] == x and order[3][3] == z and order[4] == 0
+end
+
+local function idleAll()
+	for _, unitID in ipairs(pack) do
+		pursuit.idle(unitID)
+	end
+end
+
+check("a hunt with nothing before it stops the group first",
+	#pack == 3 and lastOrder(pack[1])[2] == CMDS.STOP)
+
+nextLook()
+check("the group is sent at the team's nearest unit", aimedAt(pack[1], "near") and aimedAt(pack[3], "near"))
+
+local _, ordersSoFar = lastOrder(pack[1])
+nextLook()
+check("a unit that still has orders is given no more", select(2, lastOrder(pack[1])) == ordersSoFar)
+
+local nearID = pursued.units.near
+pursuit.env.Spring.DestroyUnit(nearID)
+pursuit.idle(pack[1])
+nextLook()
+check("it moves on when its target is dead and it has run out of orders", aimedAt(pack[1], "far"))
+check("and a unit still on its way is left to arrive", select(2, lastOrder(pack[2])) == ordersSoFar)
+
+local farID = pursued.units.far
+pursuit.move(farID, 3000, 500)
+pursuit.idle(pack[1])
+nextLook()
+check("a target that has moved is followed from where it is now", aimedAt(pack[1], "far"))
+
+-- A thing to walk at beats a thing that is merely nearer.
+local nearerX, nearerZ = pursuit.env.Spring.GetUnitPosition(pack[1])
+local playerTeam = pursued.mission.teams.player.team
+local plane = pursuit.spawn("armsolar", playerTeam)
+pursuit.move(plane, nearerX, nearerZ)
+pursuit.units[plane].cloaked = true
+pursuit.idle(pack[1])
+nextLook()
+check("a cloaked unit is passed over while there is something else", aimedAt(pack[1], "far"))
+
+pursuit.env.Spring.DestroyUnit(farID)
+pursuit.idle(pack[1])
+nextLook()
+local aimed = lastOrder(pack[1])
+check("and is taken over nothing", aimed[3][1] == nearerX and aimed[3][3] == nearerZ)
+
+pursuit.env.Spring.DestroyUnit(plane)
+idleAll()
+local _, beforeEmpty = lastOrder(pack[1])
+nextLook()
+nextLook()
+check("a team left holding only its anchor gets no more orders given about it",
+	select(2, lastOrder(pack[1])) == beforeEmpty)
+
+local late = pursuit.spawn("armsolar", playerTeam)
+pursuit.move(late, 100, 100)
+nextLook()
+check("and the hunt takes up again if the team gets a unit",
+	lastOrder(pack[1])[2] == CMDS.FIGHT and select(2, lastOrder(pack[1])) == beforeEmpty + 1)
+pursuit.env.Spring.DestroyUnit(late)
+
+-- An order replacing a hunt ends it.
+local replacement = pursuit.spawn("armsolar", playerTeam)
+pursuit.move(replacement, 100, 100)
+pursued.groups.orders("hunters", { { kind = "move", waypoints = { { x = 5, z = 5 } } } })
+idleAll()
+nextLook()
+check("orders given later end the hunt", lastOrder(pack[1])[2] == CMDS.MOVE)
+
+-- A path before a hunt is walked first, and anything behind one never comes up.
+pursued.groups.orders("hunters", {
+	{ kind = "move", waypoints = { { x = 7, z = 7 } } },
+	{ kind = "hunt", team = "player" },
+	{ kind = "move", waypoints = { { x = 9, z = 9 } } },
+})
+check("a path before a hunt is walked first", lastOrder(pack[1])[2] == CMDS.MOVE and lastOrder(pack[1])[3][1] == 7)
+nextLook()
+check("with no hunting until it is walked", lastOrder(pack[1])[2] == CMDS.MOVE and lastOrder(pack[1])[3][1] == 7)
+idleAll()
+nextLook()
+check("then the hunt", lastOrder(pack[1])[2] == CMDS.FIGHT)
+
+check("a group is not walked at a team the mission does not have", (function()
+	pursued.groups.orders("hunters", { { kind = "hunt", team = "nobody" } })
+	return logged(pursuit, "error: no team named nobody for a group to hunt")
+end)())
+
+-- A gift or a release takes the units out of the hunt.
+pursued.groups.orders("hunters", { { kind = "hunt", team = "player" } })
+pursued.groups.gift("hunters", "player")
+idleAll()
+local _, afterGift = lastOrder(pack[1])
+nextLook()
+check("a gifted group is not marched off again", select(2, lastOrder(pack[1])) == afterGift)
+
+pursued.groups.orders("hunters", { { kind = "hunt", team = "player" } })
+local kept = pack[1]
+pursued.groups.release("hunters")
+pursuit.idle(kept)
+local _, afterRelease = lastOrder(kept)
+nextLook()
+check("a released group is not ordered", select(2, lastOrder(kept)) == afterRelease)
+pursuit.env.Spring.DestroyUnit(replacement)
+
+--------------------------------------------------------------------------------
 -- Groups are synced only.
 --------------------------------------------------------------------------------
 

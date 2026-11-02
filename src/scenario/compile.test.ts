@@ -606,3 +606,40 @@ describe("a group's start state", () => {
     expect(emitted).not.toContain("startsAsleep");
   });
 });
+
+describe("a hunt order", () => {
+  const group = {
+    id: "hunters",
+    team: "ai",
+    units: [{ def: "armpw", count: 1 }],
+    pos: { x: 1, z: 1 },
+    dormant: false,
+  };
+
+  it("names the participant", () => {
+    const emitted = compileScenario(
+      build({
+        groups: [{ ...group, orders: [{ kind: "hunt", team: "player" }] }],
+      }),
+    );
+    expect(emitted).toContain('{ kind = "hunt", team = "player" }');
+  });
+
+  it("leaves every other order compiling as it did", () => {
+    const emitted = compileScenario(
+      build({
+        groups: [
+          {
+            ...group,
+            orders: [
+              { kind: "attack", target: "a1" },
+              { kind: "move", waypoints: [{ x: 2, z: 2 }] },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(emitted).toContain('{ kind = "attack", target = "a1" }');
+    expect(emitted).not.toContain('kind = "hunt"');
+  });
+});
