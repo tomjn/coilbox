@@ -14,6 +14,7 @@ import {
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MapFacts } from "../../hub/maps/lookup";
+import { linkCardFor } from "../../multiplayer/chat/linkCards";
 import { LIBRARY_MAPS_INPUT, mapFacts } from "../fixtures/libraryMaps";
 import { buildLibrary, type LibraryInput } from "../library";
 
@@ -146,6 +147,23 @@ function pressChip(name: RegExp) {
 }
 
 describe("Maps page", () => {
+  it("copies a link from a card that a chat card recognises as that map", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    renderPage();
+    fireEvent.click(
+      within(card("Comet Catcher Redux")).getByRole("button", {
+        name: "Copy a link to Comet Catcher Redux",
+      }),
+    );
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    const [link] = writeText.mock.calls[0] as unknown as [string];
+    expect(linkCardFor(link)).toMatchObject({
+      map: { kind: "name", name: "Comet Catcher Redux" },
+    });
+    vi.unstubAllGlobals();
+  });
+
   it("opens on the player's own maps", () => {
     renderPage();
     expect(
