@@ -9,8 +9,9 @@
  * decide. A group holds counts, not positions: the runtime lays its units out
  * around `pos`, which is why nothing here writes a position per unit. And
  * `dormant` means only "not on the map at start": a dormant group waits for a
- * `spawn_group`, and waking a group is a separate thing a trigger does, so the
- * editor never offers dormancy as if it were sleep.
+ * `spawn_group`, and waking a group is a separate thing a trigger does. A group
+ * on the map that should hold until woken is `startsAsleep`, a flag of its own,
+ * so the editor never offers dormancy as if it were sleep.
  */
 
 import { plural, t } from "@lingui/core/macro";

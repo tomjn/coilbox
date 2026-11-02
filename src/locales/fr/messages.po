@@ -24753,6 +24753,10 @@ msgstr "Rempli dès qu’une équipe a fini de construire assez d’un type d’
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Rempli dès qu’une équipe a tenu une zone pendant la durée choisie, éventuellement seulement sans contestation."
 
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Holds units until fully healed"

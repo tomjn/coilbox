@@ -24753,6 +24753,10 @@ msgstr "Spełniony, gdy drużyna ukończy budowę wystarczającej liczby jednost
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Spełniony, gdy drużyna utrzyma strefę przez ustawiony czas, opcjonalnie tylko bez rywala."
 
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Holds units until fully healed"

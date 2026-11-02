@@ -20146,6 +20146,10 @@ msgstr ""
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr ""
 
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Holds units until fully healed"
 msgstr ""

@@ -20147,6 +20147,10 @@ msgstr "Holds once a team has finished building enough of a unit type."
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr "Holds position until woken"
+
 #: src/content/unitFieldNotes.ts
 msgid "Holds units until fully healed"
 msgstr "Holds units until fully healed"

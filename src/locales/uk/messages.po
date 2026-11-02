@@ -24753,6 +24753,10 @@ msgstr "Виконується, щойно команда завершила б�
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Виконується, щойно команда утримала зону заданий час, за бажанням лише тоді, коли її ніхто не оскаржує."
 
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Holds position until woken"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Holds units until fully healed"
