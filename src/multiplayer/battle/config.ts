@@ -338,3 +338,48 @@ export function shouldNotifyVoteOpened(
 ): boolean {
   return prevVote === null && vote !== null;
 }
+
+/**
+ * Whether a vote's subject is a command aimed at `username` (issue #351).
+ *
+ * SPADS puts the command it will run in the subject, with the player's name
+ * already resolved to the full lobby name (`canonicalCommandForm` in
+ * `spads.pl`), so the whole name is compared and `Al` never matches `Alice`.
+ * Lobby names are unique ignoring case, so the comparison ignores case.
+ * Only commands that act on a player match, so `set map Alice` does not.
+ *
+ * - `bKick <name>`, `gKick <name>`, `kickBan <name>`, `boss <name>`
+ * - `joinAs spec <name>`
+ * - `force <name> spec` (`hForce`). A bot is written `%name`, which no
+ *   username can equal.
+ */
+export function voteTargetsUser(subject: string, username: string): boolean {
+  const words = subject.trim().toLowerCase().split(/\s+/);
+  const name = username.trim().toLowerCase();
+  if (name === "") return false;
+  const [command, first, second] = words;
+  switch (words.length) {
+    case 2:
+      return (
+        ["bkick", "gkick", "kickban", "boss"].includes(command) &&
+        first === name
+      );
+    case 3:
+      return (
+        (command === "joinas" && first === "spec" && second === name) ||
+        (command === "force" && first === name && second === "spec")
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * Whether this vote should get the player's attention rather than an ordinary
+ * notification: it targets them, and somebody else called it.
+ */
+export function voteNamesUser(vote: Vote, username: string | null): boolean {
+  if (!username) return false;
+  if (vote.caller.toLowerCase() === username.toLowerCase()) return false;
+  return voteTargetsUser(vote.subject, username);
+}

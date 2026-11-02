@@ -1131,6 +1131,12 @@ msgstr ""
 msgid "{0} at a position with no name."
 msgstr ""
 
+#. placeholder {0}: currentVote.caller
+#. placeholder {1}: currentVote.subject
+#: src/multiplayer/battle/useBattleRoom.ts
+msgid "{0} called a vote: {1}"
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
@@ -7606,6 +7612,10 @@ msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts
 msgid "A vote is open in your battle."
+msgstr ""
+
+#: src/sound/events.ts
+msgid "A vote names you"
 msgstr ""
 
 #: src/career/pages/CareerPage.tsx
@@ -35996,6 +36006,10 @@ msgstr ""
 
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Some servers email a verification code to confirm your account."
+msgstr ""
+
+#: src/sound/events.ts
+msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
 msgstr ""
 
 #: src/sound/events.ts

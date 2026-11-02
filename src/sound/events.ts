@@ -67,6 +67,12 @@ export const EVENTS = {
     group: "alerts",
     sound: "gong",
   },
+  voteNamesYou: {
+    label: msg`A vote names you`,
+    description: msg`Someone else calls a vote to kick, ban or move you to spectators, or to make you boss.`,
+    group: "alerts",
+    sound: "gong",
+  },
   mention: {
     label: msg`Mentioned in chat`,
     description: msg`Someone says your name, or one of your highlight words, in chat or a private message.`,

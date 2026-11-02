@@ -1357,6 +1357,12 @@ msgstr "{0} {resourceName}"
 msgid "{0} at a position with no name."
 msgstr ""
 
+#. placeholder {0}: currentVote.caller
+#. placeholder {1}: currentVote.subject
+#: src/multiplayer/battle/useBattleRoom.ts
+msgid "{0} called a vote: {1}"
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -9384,6 +9390,10 @@ msgstr "视图设置。两者都不会随单位保存或导出。"
 #, fuzzy
 msgid "A vote is open in your battle."
 msgstr "你的对局中正在进行投票。"
+
+#: src/sound/events.ts
+msgid "A vote names you"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -44230,6 +44240,10 @@ msgstr "此单位的部分零件未被追踪。"
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Some servers email a verification code to confirm your account."
 msgstr "部分服务器会通过电子邮件发送验证码来确认你的账号。"
+
+#: src/sound/events.ts
+msgid "Someone else calls a vote to kick, ban or move you to spectators, or to make you boss."
+msgstr ""
 
 #: src/sound/events.ts
 #, fuzzy
