@@ -189,7 +189,10 @@ describe("a game's test build beside its release (issue #4992)", () => {
   });
 
   it("resolves a test build over a $VERSION checkout, as Beyond All Reason has", () => {
-    const bar = (name: string, version?: string) => ({
+    const bar = (
+      name: string,
+      version?: string,
+    ): { name: string; info: Record<string, string> } => ({
       name,
       info:
         version === undefined
