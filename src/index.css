@@ -98,6 +98,57 @@
    this file and re-measures it. */
 .hud-card {
   --color-muted-foreground: hsl(var(--card-foreground) / 0.75);
+  --hud-primary: hsl(var(--primary));
+}
+
+/* The player's accent as an icon on the HUD card (#1847).
+
+   `--primary` is a mid-lightness colour on every accent but the default, and the
+   card lets 22% of the starfield through, so over a bright node the crossed swords
+   on the battle and encounter headings and the saved bookmark measured as low as
+   1.04:1. WCAG asks 3:1 of an icon that carries meaning as a picture.
+
+   `--hud-primary` is the accent with its lightness raised until it clears 3:1 over
+   any canvas colour on any base preset, and no further. Hue and saturation are
+   picoframe's own, so the colour stays the one the player picked. An accent that
+   already clears 3:1 has no rule here and takes `--primary` as it is: green, amber,
+   yellow, teal, cyan, sky and opal. The two cycling accents take one lightness for
+   every hue, because the worst hue (a blue) decides it.
+
+   A new token rather than `--color-primary`, so the primary Button keeps its
+   fill. Call sites write `HUD_PRIMARY_INK_CLASS` from `hudChrome.tsx`, never
+   `text-primary`.
+
+   Dark only: both maps hold the dark ramp (#1810), so the light ramp's primaries
+   are never on screen here. `hudChrome.test.ts` reads every rule below back out and
+   measures it against the accents in picoframe's `theme.css`, so a new accent, or
+   a retuned one, fails there rather than shipping unbounded. */
+[data-accent="blue"] .hud-card {
+  --hud-primary: hsl(217.2 91.2% 72%);
+}
+[data-accent="rose"] .hud-card {
+  --hud-primary: hsl(346.8 77.2% 74%);
+}
+[data-accent="violet"] .hud-card {
+  --hud-primary: hsl(263.4 70% 77%);
+}
+[data-accent="orange"] .hud-card {
+  --hud-primary: hsl(20.5 90.2% 65%);
+}
+[data-accent="red"] .hud-card {
+  --hud-primary: hsl(0 72% 74%);
+}
+[data-accent="indigo"] .hud-card {
+  --hud-primary: hsl(242 80% 79%);
+}
+[data-accent="purple"] .hud-card {
+  --hud-primary: hsl(271 76% 76%);
+}
+[data-accent="pink"] .hud-card {
+  --hud-primary: hsl(330 75% 73%);
+}
+[data-accent="rainbow"] .hud-card {
+  --hud-primary: hsl(var(--pf-accent-hue) 68% 78%);
 }
 
 /* The app's content region scrolls down, never sideways (#1804).

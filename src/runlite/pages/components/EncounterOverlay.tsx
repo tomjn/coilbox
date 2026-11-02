@@ -13,6 +13,7 @@ import {
 import {
   BracketFrame,
   HUD_ACCENT_INK,
+  HUD_PRIMARY_INK_CLASS,
 } from "../../../conquest/pages/components/hudChrome";
 import { useUnitsyncUnitDataset } from "../../../content/config";
 import { usePreferredTarget } from "../../../play/config";
@@ -114,7 +115,7 @@ export function EncounterOverlay({
         />
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
-            <Swords className="size-5 text-primary" aria-hidden />
+            <Swords className={`size-5 ${HUD_PRIMARY_INK_CLASS}`} aria-hidden />
             {kindLabel}
           </h1>
         </header>

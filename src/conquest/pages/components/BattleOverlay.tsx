@@ -29,7 +29,12 @@ import {
   BattleLaunchGate,
   BattleResultPrompt,
 } from "./BattleOverlayParts";
-import { BracketFrame, HUD_ACCENT_INK, HUD_CARD_CLASS } from "./hudChrome";
+import {
+  BracketFrame,
+  HUD_ACCENT_INK,
+  HUD_CARD_CLASS,
+  HUD_PRIMARY_INK_CLASS,
+} from "./hudChrome";
 import { FactionDot } from "./RunSetup";
 
 /**
@@ -194,7 +199,10 @@ export function BattleOverlay({
             {mode === "defend" ? (
               <ShieldAlert className="size-5 text-amber-400" aria-hidden />
             ) : (
-              <Swords className="size-5 text-primary" aria-hidden />
+              <Swords
+                className={`size-5 ${HUD_PRIMARY_INK_CLASS}`}
+                aria-hidden
+              />
             )}
             {mode === "defend" ? (
               <Trans>Defend {nodeName}</Trans>

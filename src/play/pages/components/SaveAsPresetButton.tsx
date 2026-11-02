@@ -34,6 +34,11 @@ import { presetMatchesDraft, useSkirmishPresets } from "../../presets";
  * button also renders on ordinary pages that can go light. So the caller passes the
  * box in through `className` and the two overlays pass the measured card, which
  * takes `--muted-foreground` to 4.56:1 for everything inside it.
+ *
+ * The saved bookmark takes `--hud-primary`, the accent bounded to 3:1 by that card
+ * (#1847), where `text-primary` measured as low as 1.04:1. That class is
+ * `HUD_PRIMARY_INK_CLASS` written out in full for the same no-import reason, and
+ * `hudChrome.test.ts` checks the two are the same string.
  */
 export function SaveAsPresetButton({
   getDraft,
@@ -109,7 +114,9 @@ export function SaveAsPresetButton({
       aria-label={title}
       title={title}
       className={`pointer-events-auto flex items-center justify-center p-3.5 backdrop-blur-sm transition-colors hover:border-border disabled:cursor-not-allowed disabled:opacity-50 ${
-        saved ? "text-primary" : "text-muted-foreground hover:text-foreground"
+        saved
+          ? "text-[color:var(--hud-primary)]"
+          : "text-muted-foreground hover:text-foreground"
       } ${className ?? ""}`}
     >
       <Bookmark
