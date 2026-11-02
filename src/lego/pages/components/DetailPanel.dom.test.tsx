@@ -30,7 +30,10 @@ vi.mock("@/lib/useCanvas3D", async () => {
           domElement: document.createElement("canvas"),
           render() {},
         };
-        const scene = build({ renderer });
+        const scene = build({
+          renderer,
+          host: document.createElement("div"),
+        });
         return () => scene?.dispose();
       }, deps);
     },
