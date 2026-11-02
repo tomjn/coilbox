@@ -84,11 +84,13 @@ export function SavedListStatus({
         <Trans>This list could not be checked</Trans>
       </AlertTitle>
       <AlertDescription className="break-words">
-        <Trans>
-          It shows the last saved scan, which may be out of date. Playing is off
-          until a scan succeeds.
-        </Trans>{" "}
-        {reason || <Trans>The scan was cancelled.</Trans>}
+        <p>
+          <Trans>
+            It shows the last saved scan, which may be out of date. Playing is
+            off until a scan succeeds.
+          </Trans>{" "}
+          {reason || <Trans>The scan was cancelled.</Trans>}
+        </p>
       </AlertDescription>
     </Alert>
   );
@@ -108,10 +110,12 @@ export function DependencyBlocked({ reason }: { reason: string }) {
         <Trans>This game is missing something it depends on</Trans>
       </AlertTitle>
       <AlertDescription className="break-words">
-        {reason}{" "}
-        <Link className="underline underline-offset-4" to="/library/games">
-          <Trans>Open game downloads</Trans>
-        </Link>
+        <p>
+          {reason}{" "}
+          <Link className="underline underline-offset-4" to="/library/games">
+            <Trans>Open game downloads</Trans>
+          </Link>
+        </p>
       </AlertDescription>
     </Alert>
   );

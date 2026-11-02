@@ -243,10 +243,13 @@ export default function DecompilePage() {
         >
           <AlertCircle size={15} />
           <AlertDescription>
-            <Trans>
-              The <code>mapdecompile</code> sidecar was not found. Bundle
-              SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
-            </Trans>
+            <p>
+              <Trans>
+                The <code>mapdecompile</code> sidecar was not found. Bundle
+                SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>
+                .
+              </Trans>
+            </p>
           </AlertDescription>
         </Alert>
       )}

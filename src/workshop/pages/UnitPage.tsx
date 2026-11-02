@@ -2646,14 +2646,17 @@ export default function UnitPage() {
             })}
           </AlertTitle>
           <AlertDescription>
-            <Trans>
-              {gameLabel} has been updated since this project was written. Open{" "}
-              <Link to={sectionHref("checks")} className="underline">
-                Checks
-              </Link>{" "}
-              to read what changed underneath it and what can be done about each
-              one.
-            </Trans>
+            <p>
+              <Trans>
+                {gameLabel} has been updated since this project was written.
+                Open{" "}
+                <Link to={sectionHref("checks")} className="underline">
+                  Checks
+                </Link>{" "}
+                to read what changed underneath it and what can be done about
+                each one.
+              </Trans>
+            </p>
             <ul className="mt-2 list-disc pl-5">
               {movedListed.map((finding) => (
                 <li key={finding.id}>{finding.detail}</li>

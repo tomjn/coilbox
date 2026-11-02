@@ -379,10 +379,12 @@ export default function CompilePage() {
         >
           <AlertCircle size={15} />
           <AlertDescription>
-            <Trans>
-              The <code>mapcompile</code> sidecar was not found. Bundle
-              SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
-            </Trans>
+            <p>
+              <Trans>
+                The <code>mapcompile</code> sidecar was not found. Bundle
+                SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
+              </Trans>
+            </p>
           </AlertDescription>
         </Alert>
       )}
@@ -420,11 +422,14 @@ export default function CompilePage() {
             <Alert variant="warning" className="p-2.5">
               <AlertCircle size={14} />
               <AlertDescription className="text-xs">
-                <Trans>
-                  Texture is {textureWidth} × {textureHeight}px — each side must
-                  be a multiple of 1024. mapcompile will likely reject it.
-                </Trans>{" "}
-                <LearnMore href={WIKI.sizes} label={t`Map sizes`} />
+                <p>
+                  <Trans>
+                    Texture is {textureWidth} × {textureHeight}px — each side
+                    must be a multiple of 1024. mapcompile will likely reject
+                    it.
+                  </Trans>{" "}
+                  <LearnMore href={WIKI.sizes} label={t`Map sizes`} />
+                </p>
               </AlertDescription>
             </Alert>
           )}
