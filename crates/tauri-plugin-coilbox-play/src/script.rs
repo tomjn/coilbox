@@ -311,15 +311,16 @@ pub fn generate_script(cfg: &BattleConfig) -> Result<String, String> {
         });
     }
     // RESTRICT is engine-level: it caps build counts for all teams, not just one
-    // side (RecoilEngine/doc/StartScriptFormat.txt).
+    // side (RecoilEngine/doc/StartScriptFormat.txt). The count sits in [GAME],
+    // beside the section, and the engine ignores the list without it.
     if !cfg.restricted_units.is_empty() {
+        kv(
+            &mut s,
+            1,
+            "NumRestrictions",
+            &cfg.restricted_units.len().to_string(),
+        );
         section(&mut s, 1, "RESTRICT", |s| {
-            kv(
-                s,
-                2,
-                "NumRestrictions",
-                &cfg.restricted_units.len().to_string(),
-            );
             for (i, (name, limit)) in cfg.restricted_units.iter().enumerate() {
                 kv(s, 2, &format!("Unit{i}"), name);
                 kv(s, 2, &format!("Limit{i}"), &limit.to_string());
@@ -1065,7 +1066,11 @@ mod tests {
         cfg.restricted_units.insert("armflash".into(), 0);
         let s = generate_script(&cfg).unwrap();
         assert!(s.contains("[RESTRICT]"));
-        assert!(s.contains("NumRestrictions=2;"));
+        // The engine reads GAME\NumRestrictions, so a count inside [RESTRICT]
+        // reads as 0 and the whole list is ignored (issue #3473).
+        let (game_body, restrict) = s.split_once("[RESTRICT]").unwrap();
+        assert!(game_body.contains("\tNumRestrictions=2;"));
+        assert!(!restrict.contains("NumRestrictions"));
         // BTreeMap orders by key, so armcom (Unit0) sorts before armflash (Unit1).
         assert!(s.contains("Unit0=armcom;"));
         assert!(s.contains("Limit0=1;"));
