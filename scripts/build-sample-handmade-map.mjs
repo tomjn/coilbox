@@ -10,10 +10,16 @@
  * into provinces by nearest seed point. `map.json` in the same folder is
  * written by hand and lists the same colours, so change both together.
  *
+ * It also draws the second version of the sample in
+ * `docs/examples/handmade-map-surround/`, where more land lies round the two
+ * land masses and carries on past the frame. That version's `map.json` is
+ * written by hand too, and differs from the first only in its id, its title,
+ * its description and its `files`.
+ *
  * Run with `bun scripts/build-sample-handmade-map.mjs`.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
@@ -21,8 +27,12 @@ import { deflateSync } from "node:zlib";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "docs/examples/handmade-map");
 
+const OUT_SURROUND = join(ROOT, "docs/examples/handmade-map-surround");
+
 const WIDTH = 160;
 const HEIGHT = 96;
+/** Pixels of the surround past every side of the map. See the author guide. */
+const SURROUND = 111;
 
 /** Each land mass: an ellipse with a wavy coast, and its province seeds. */
 const LANDS = [
@@ -159,16 +169,16 @@ function chunk(type, body) {
 }
 
 /** An 8-bit PNG. `channels` is 1 for grey, 3 for RGB and 4 for RGBA. */
-function png(pixels, channels) {
+function png(pixels, channels, width = WIDTH, height = HEIGHT) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(WIDTH, 0);
-  header.writeUInt32BE(HEIGHT, 4);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
   header[8] = 8;
   header[9] = { 1: 0, 3: 2, 4: 6 }[channels];
-  const row = WIDTH * channels;
+  const row = width * channels;
   // Each row starts with a filter byte. 0 is no filter.
-  const raw = Buffer.alloc((row + 1) * HEIGHT);
-  for (let y = 0; y < HEIGHT; y++) {
+  const raw = Buffer.alloc((row + 1) * height);
+  for (let y = 0; y < height; y++) {
     Buffer.from(pixels.buffer, y * row, row).copy(raw, y * (row + 1) + 1);
   }
   return Buffer.concat([
@@ -189,6 +199,87 @@ for (const [name, pixels, channels] of [
   writeFileSync(join(OUT, name), bytes);
   console.log(`${name}: ${bytes.length} bytes`);
 }
+
+/**
+ * More land round the two land masses, in the same coordinates. Each crosses
+ * the frame, so the country on the map carries on past it. None of it is
+ * painted on the province image, so none of it can be played.
+ */
+const OUTER_LANDS = [
+  { cx: -46, cy: 34, rx: 72, ry: 84, wave: 0.6 },
+  { cx: 206, cy: 18, rx: 76, ry: 88, wave: 3.1 },
+  { cx: 96, cy: 146, rx: 104, ry: 56, wave: 4.4 },
+  { cx: 78, cy: -34, rx: 52, ry: 38, wave: 5.2 },
+];
+
+/** Whether a pixel is inside a land mass's wavy coast. */
+function insideCoast(land, x, y) {
+  const dx = (x + 0.5 - land.cx) / land.rx;
+  const dy = (y + 0.5 - land.cy) / land.ry;
+  const angle = Math.atan2(dy, dx);
+  const coast =
+    1 +
+    0.1 * Math.sin(3 * angle + land.wave) +
+    0.05 * Math.sin(7 * angle + 2 * land.wave);
+  return Math.hypot(dx, dy) <= coast;
+}
+
+const wideWidth = WIDTH + 2 * SURROUND;
+const wideHeight = HEIGHT + 2 * SURROUND;
+const widePicture = new Uint8Array(wideWidth * wideHeight * 3);
+const wideHeightmap = new Uint8Array(wideWidth * wideHeight);
+for (let wy = 0; wy < wideHeight; wy++) {
+  for (let wx = 0; wx < wideWidth; wx++) {
+    const x = wx - SURROUND;
+    const y = wy - SURROUND;
+    const i = wy * wideWidth + wx;
+    // Where two land masses overlap the higher ground wins, so they join
+    // with no step between them.
+    let height = -1;
+    for (const land of [...LANDS, ...OUTER_LANDS]) {
+      if (insideCoast(land, x, y)) {
+        height = Math.max(height, heightAt(land, x, y));
+      }
+    }
+    if (height < 0) {
+      widePicture.set([0x2b, 0x4f, 0x73], i * 3);
+      continue;
+    }
+    const stepped = Math.round(height * 7) / 7;
+    wideHeightmap[i] = Math.round(stepped * 255);
+    widePicture.set(
+      [
+        mix(0x6f, 0xd8, stepped),
+        mix(0x8f, 0xd2, stepped),
+        mix(0x4e, 0xc0, stepped),
+      ],
+      i * 3,
+    );
+  }
+}
+
+/** The map's own part of a wide image, with `channels` bytes a pixel. */
+function middleOf(wide, channels) {
+  const out = new Uint8Array(WIDTH * HEIGHT * channels);
+  for (let y = 0; y < HEIGHT; y++) {
+    const from = ((y + SURROUND) * wideWidth + SURROUND) * channels;
+    out.set(wide.subarray(from, from + WIDTH * channels), y * WIDTH * channels);
+  }
+  return out;
+}
+
+mkdirSync(OUT_SURROUND, { recursive: true });
+for (const [name, pixels, channels, width, height] of [
+  ["picture.png", middleOf(widePicture, 3), 3],
+  ["heightmap.png", middleOf(wideHeightmap, 1), 1],
+  ["surround-picture.png", widePicture, 3, wideWidth, wideHeight],
+  ["surround-heightmap.png", wideHeightmap, 1, wideWidth, wideHeight],
+]) {
+  const bytes = png(pixels, channels, width, height);
+  writeFileSync(join(OUT_SURROUND, name), bytes);
+  console.log(`surround version ${name}: ${bytes.length} bytes`);
+}
+copyFileSync(join(OUT, "provinces.png"), join(OUT_SURROUND, "provinces.png"));
 
 /**
  * The sample's placed model: a stone cairn, which is a four sided pyramid 40
@@ -271,4 +362,9 @@ function cairnGltf() {
 
 const cairn = cairnGltf();
 writeFileSync(join(OUT, "cairn.gltf"), cairn);
+writeFileSync(join(OUT_SURROUND, "cairn.gltf"), cairn);
+copyFileSync(
+  join(OUT, "ironcoast-siege.json"),
+  join(OUT_SURROUND, "ironcoast-siege.json"),
+);
 console.log(`cairn.gltf: ${cairn.length} bytes`);

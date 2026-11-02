@@ -59,3 +59,7 @@ What the sample could not confirm for Splinter Faction:
 ## Where the art comes from
 
 Nobody drew these files in an image editor. `scripts/build-sample-handmade-map.mjs` draws `picture.png`, `provinces.png`, `heightmap.png` and `cairn.gltf` from numbers in the script, so the art was made for this repo and has no outside licence. `map.json` is written by hand. `ironcoast-siege.json` is not drawn by the script. It is the scenario fixture run through the scenario builder's export code. If you change a province colour in the script, change it in `map.json` too. Run the script with `bun scripts/build-sample-handmade-map.mjs`.
+
+## A version with land past its frame
+
+[`handmade-map-surround`](../handmade-map-surround/README.md) is this map with a surround, so the land carries on past the frame.

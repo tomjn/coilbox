@@ -251,6 +251,12 @@ export interface GalaxyDoc {
     image: string;
     /** Same, greyscale: black is 0 and white is `heightScale`. */
     heightmap?: string;
+    /**
+     * A hand-made map's wider picture and heightmap, with the map's own in the
+     * middle, so the land carries on past the frame. The view alone reads them.
+     * Each is a URL, as `image` is.
+     */
+    surround?: { image: string; heightmap: string };
     /** Map units. */
     width: number;
     /** Map units. */
@@ -701,11 +707,26 @@ function parseTerrain(
       typeof t.heightmap === "string" && t.heightmap !== ""
         ? t.heightmap
         : undefined,
+    surround: parseTerrainSurround(t.surround),
     width: t.width,
     height: t.height,
     heightScale: isPositive(t.heightScale) ? t.heightScale : undefined,
     projection: t.projection === "flat" ? "flat" : undefined,
   };
+}
+
+/** A terrain's surround, or nothing when it is not two URLs. */
+function parseTerrainSurround(
+  value: unknown,
+): { image: string; heightmap: string } | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const { image, heightmap } = value as Record<string, unknown>;
+  return typeof image === "string" &&
+    image !== "" &&
+    typeof heightmap === "string" &&
+    heightmap !== ""
+    ? { image, heightmap }
+    : undefined;
 }
 
 /**
