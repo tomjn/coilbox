@@ -14,7 +14,9 @@
 --
 -- So a dormant garrison is `spawn_group` now and `wake_group` when the mission
 -- says go, and a reinforcement wave is `wake_group` on its own, which spawns it
--- and sends it off in one action.
+-- and sends it off in one action. A group carrying `startsAsleep` is on the map
+-- from the start and asleep, so a garrison in its post from the first frame needs
+-- only the `wake_group` (issue #900).
 --
 -- `release_group` is the end of a group's life as the mission's. The units stay
 -- on the map and stay whoever's they are, and the mission stops ordering them
@@ -480,9 +482,9 @@ function M.register(engine, state, hooks)
 		end
 	end
 
-	--- Place every group the scenario says is there from the start, awake and
-	-- already running its orders. Returns how many units that took, so the gadget
-	-- can report one figure for everything it put on the map.
+	--- Place every group the scenario says is there from the start, running its
+	-- orders unless it starts asleep. Returns how many units that took, so the
+	-- gadget can report one figure for everything it put on the map.
 	function handle.start()
 		local spawned = 0
 		for _, group in ipairs((state.mission or {}).groups or {}) do
@@ -490,7 +492,7 @@ function M.register(engine, state, hooks)
 			-- the difficulty leaves out is one the mission never asked for here,
 			-- and one line per gated group on every load says nothing useful.
 			if group.dormant ~= true and not excluded[group.id] then
-				awake[group.id] = true
+				awake[group.id] = group.startsAsleep ~= true
 				place(group)
 				settle(group, group.orders)
 				spawned = spawned + #members[group.id]
