@@ -71,6 +71,10 @@ Prefer picoframe's components over native elements or hand-rolled ones:
 
 Don't reach for native `<select>` / `<input type=checkbox>` / `<textarea>`.
 
+### Words on screen
+
+[Write on-screen text](docs/developers/on-screen-text.md) has the rules for interface copy. Follow them in new strings and cite them in review.
+
 ## Before you open a PR
 
 Run the **full** lint and test suite locally. CI (`.github/workflows/lint.yml`) runs the seven commands below, split across parallel jobs, so run all seven even if you only touched one surface. Use the same commands CI runs, not a narrower subset:
