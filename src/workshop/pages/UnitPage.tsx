@@ -364,6 +364,12 @@ const NO_LIBRARY: WeaponLibrary = {};
 const NO_EQUIPPED: EquippedWeapons = {};
 const NO_COLLECTIONS: Collections = {};
 
+/** How many of the edits that no longer fit the banner names itself, so a game
+ *  update that broke a hundred of them does not push the editor off the
+ *  screen. The rest are in Checks, which the banner links to. A choice of
+ *  layout, not a measured limit. */
+const MOVED_LISTED = 5;
+
 /** Which part of a unit the page is showing: its own fields, its weapons one
  *  slot at a time (issue #2639), or its two death explosions, apart from the
  *  weapons since neither is something the unit fires (issue #3105). */
@@ -2311,6 +2317,8 @@ export default function UnitPage() {
   const conflictNames = built.conflicts.join(", ");
   const conflictCount = built.conflicts.length;
   const movedCount = moved?.findings.length ?? 0;
+  const movedListed = moved?.findings.slice(0, MOVED_LISTED) ?? [];
+  const movedUnlisted = movedCount - movedListed.length;
   const checkpointCount = checkpoints.length;
 
   // `h-full` against the frame's own scroll container, so from `lg` up the two
@@ -2646,6 +2654,19 @@ export default function UnitPage() {
               to read what changed underneath it and what can be done about each
               one.
             </Trans>
+            <ul className="mt-2 list-disc pl-5">
+              {movedListed.map((finding) => (
+                <li key={finding.id}>{finding.detail}</li>
+              ))}
+            </ul>
+            {movedUnlisted > 0 && (
+              <p className="mt-1">
+                {plural(movedUnlisted, {
+                  one: "One more is in Checks.",
+                  other: "# more are in Checks.",
+                })}
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       )}

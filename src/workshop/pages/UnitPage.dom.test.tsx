@@ -3971,6 +3971,49 @@ describe("UnitPage", () => {
       expect(await findSectionLink("Checks, 1 blocker found")).toBeTruthy();
     });
 
+    /**
+     * Issue #2965. What the Projects page leaves behind for a hub import made
+     * against an older build: the author's checksum, and the build installed
+     * here. Opening it has to say which edits no longer apply on the page
+     * itself, so nobody has to know to open Checks.
+     */
+    it("names the edits that no longer fit in the banner, as for a hub import from an older build", () => {
+      const imported = {
+        id: "9a1c5e2b-0000-4000-8000-000000000000",
+        name: "Borrowed tanks",
+        gameName: GAME.name,
+        authoredChecksum: "author",
+        edits: {
+          overrides: { armcom: { maxdamage: 5000 } },
+          clones: {},
+          menus: {},
+          text: {},
+          disabled: [],
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      storage.set(PROJECTS_KEY, JSON.stringify([imported]));
+
+      show(
+        { armlab: ARMLAB },
+        `/workshop/${imported.id}?unit=armlab`,
+        dataset,
+        [],
+        {},
+        "moved on",
+      );
+
+      expect(
+        screen.getByText(`One edit no longer fits ${GAME.name}`),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(
+          `${GAME.name} has no unit called armcom any more, so 1 change here changes nothing.`,
+        ),
+      ).toBeTruthy();
+    });
+
     it("takes a dead reference out as one undoable step", async () => {
       openAt("armcom");
       type(healthBox(), "5000");

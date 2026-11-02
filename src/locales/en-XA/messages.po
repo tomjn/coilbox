@@ -3815,6 +3815,10 @@ msgstr ""
 msgid "{movedCount, plural, one {One edit no longer fits {gameLabel}} other {# edits no longer fit {gameLabel}}}"
 msgstr ""
 
+#: src/workshop/pages/UnitPage.tsx
+msgid "{movedUnlisted, plural, one {One more is in Checks.} other {# more are in Checks.}}"
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 msgid "{myFaction} vs {theirFaction}"
 msgstr ""
