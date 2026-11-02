@@ -48,6 +48,9 @@ export type HandmadeMapError =
   /** A file is in a map folder a game archive carries, but coilbox cannot
    * read it out of the archive. */
   | { code: "archive-unreadable"; file: string; message: string }
+  /** The surround cannot be used. A warning: the map still reads, with its
+   * short fading edge in place of the surround. */
+  | { code: "surround-unusable"; message: string }
   /** The province image and the map picture are different sizes. */
   | {
       code: "size-mismatch";

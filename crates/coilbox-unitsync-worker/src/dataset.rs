@@ -561,7 +561,7 @@ pub(crate) fn resolve(
     }
     errors.extend(us.drain_errors());
 
-    let out = read_mounted(us, game_archive, None, errors);
+    let out = read_dataset(us, game_archive, errors);
     us.remove_all_archives();
 
     if let Some((dir, key)) = cache {
@@ -570,6 +570,120 @@ pub(crate) fn resolve(
         }
     }
     out
+}
+
+/// The mod option that turns on Beyond All Reason's evolving commanders.
+/// `unitbasedefs/evocom.lua` only writes a commander's evolution settings
+/// when it is set, and without it the starting commanders (`armcom`,
+/// `corcom`) carry none, so the ladder starts one stage up at `armcomlvl2`.
+const EVOLUTION_OPTION: &str = "evocom";
+
+/// Whether a morph edge is one a unit takes by itself (see `morph_from_params`).
+fn is_evolution_edge(edge: &Map<String, Value>) -> bool {
+    edge.get("evolves") == Some(&Value::Bool(true))
+}
+
+/// A game's unit dataset: [`read_mounted`] on its own, plus the starting
+/// stage of any evolution ladder it declares ([`add_evolution_stage`]).
+fn read_dataset(us: &Unitsync, game_archive: &str, errors: Vec<String>) -> UnitDatasetOutput {
+    let mut out = read_mounted(us, game_archive, None, errors);
+    add_evolution_stage(us, &mut out);
+    out
+}
+
+/// The Lua to read the definitions a second time with [`EVOLUTION_OPTION`]
+/// on, or `None` when the game gets no second read.
+///
+/// A game gets one only when its first read found an evolution edge and the
+/// game declares the option. `facts` is not called otherwise, so a game with
+/// no evolving units never has its options read for this.
+fn evolution_prelude(
+    units: &[UnitDatasetEntry],
+    facts: impl FnOnce() -> MatchFacts,
+) -> Option<String> {
+    let evolves = units
+        .iter()
+        .any(|u| u.morph_targets.iter().any(is_evolution_edge));
+    if !evolves {
+        return None;
+    }
+    let facts = facts();
+    if !facts.options.contains_key(EVOLUTION_OPTION) {
+        return None;
+    }
+    let setup = MatchSetup {
+        mod_options: BTreeMap::from([(EVOLUTION_OPTION.to_string(), "1".to_string())]),
+        ..Default::default()
+    };
+    Some(setup.prelude(&facts.lua_ais))
+}
+
+/// Put the starting stage of each evolution ladder into `out`.
+///
+/// The game only writes a ladder's first stage when evolution is on, and
+/// turning it on changes other values on the commanders too. So the second
+/// read contributes edges and nothing else ([`take_evolution_edges`]). It is a
+/// second full load of the game's definitions, which is why
+/// [`evolution_prelude`] decides whether to do it.
+///
+/// A second read that fails leaves the first read's edges as they were. It
+/// says so on stderr rather than in the dataset's errors, because the dataset
+/// is complete without it.
+fn add_evolution_stage(us: &Unitsync, out: &mut UnitDatasetOutput) {
+    let Some(prelude) = evolution_prelude(&out.units, || match_facts(us)) else {
+        let _ = us.drain_errors();
+        return;
+    };
+    let (read, _logged) = units_via_shim(us, Some(&prelude));
+    let _ = us.drain_errors();
+    match read {
+        Ok(second) if !second.is_empty() => take_evolution_edges(&mut out.units, &second),
+        Ok(_) => eprintln!(
+            "unit dataset: reading the definitions with {EVOLUTION_OPTION} on found no units, \
+             keeping the evolution edges of the first read"
+        ),
+        Err(e) => eprintln!(
+            "unit dataset: reading the definitions with {EVOLUTION_OPTION} on failed ({}), \
+             keeping the evolution edges of the first read",
+            e.trim()
+        ),
+    }
+}
+
+/// Replace each unit's evolution edges with those the same unit has in
+/// `second`. Everything else on the unit stays as the first read had it, as do
+/// units `second` does not hold, and units only `second` holds are not added.
+fn take_evolution_edges(units: &mut [UnitDatasetEntry], second: &[UnitDatasetEntry]) {
+    let theirs: BTreeMap<&str, Vec<&Map<String, Value>>> = second
+        .iter()
+        .map(|u| {
+            let edges = u
+                .morph_targets
+                .iter()
+                .filter(|e| is_evolution_edge(e))
+                .collect();
+            (u.name.as_str(), edges)
+        })
+        .collect();
+    for unit in units {
+        let Some(edges) = theirs.get(unit.name.as_str()) else {
+            continue;
+        };
+        unit.morph_targets.retain(|e| !is_evolution_edge(e));
+        for edge in edges {
+            // One edge to a target, as `morph_of` keeps it: an order and an
+            // evolution to the same unit is the order.
+            let into = edge.get("into");
+            if !unit.morph_targets.iter().any(|e| e.get("into") == into) {
+                unit.morph_targets.push((*edge).clone());
+            }
+        }
+        unit.morph_targets.sort_by(|a, b| {
+            let key =
+                |e: &Map<String, Value>| e.get("into").and_then(Value::as_str).map(str::to_owned);
+            key(a).cmp(&key(b))
+        });
+    }
 }
 
 /// Read the unit graph of a game whose archive set the caller has mounted, and
@@ -713,7 +827,7 @@ pub(crate) fn resolve_for_match(
         .zip(dataset_key.as_deref())
         .and_then(|(dir, key)| infocache::read::<UnitDatasetOutput>(dir, key))
         .unwrap_or_else(|| {
-            let out = read_mounted(us, game_archive, None, Vec::new());
+            let out = read_dataset(us, game_archive, Vec::new());
             if let Some((dir, key)) = cache_dir.zip(dataset_key.as_deref()) {
                 if worth_caching(&out) {
                     infocache::write(dir, key, &out);
@@ -744,8 +858,57 @@ pub(crate) fn resolve_for_match(
 }
 
 /// Whether two reads hold the same units, field for field, in the same order.
-fn same_units(a: &UnitDatasetOutput, b: &UnitDatasetOutput) -> bool {
-    serde_json::to_value(&a.units).ok() == serde_json::to_value(&b.units).ok()
+///
+/// `default` is the game's dataset, which can hold a unit's evolution edges
+/// where a read for one match has none: the starting stage of a ladder
+/// ([`add_evolution_stage`]). A unit `a` gives no such edge is compared
+/// without the ones `default` gives it, so a match played on the game's
+/// defaults still reads as the dataset.
+fn same_units(a: &UnitDatasetOutput, default: &UnitDatasetOutput) -> bool {
+    let (Ok(Value::Array(a)), Ok(Value::Array(mut default))) = (
+        serde_json::to_value(&a.units),
+        serde_json::to_value(&default.units),
+    ) else {
+        return false;
+    };
+    if a.len() != default.len() {
+        return false;
+    }
+    for (mine, theirs) in a.iter().zip(default.iter_mut()) {
+        if !has_evolution_edge(mine) {
+            drop_evolution_edges(theirs);
+        }
+    }
+    a == default
+}
+
+/// Whether a unit, as JSON, has an evolution edge.
+fn has_evolution_edge(unit: &Value) -> bool {
+    unit.get("morphTargets")
+        .and_then(Value::as_array)
+        .is_some_and(|edges| {
+            edges
+                .iter()
+                .any(|e| e.get("evolves") == Some(&Value::Bool(true)))
+        })
+}
+
+/// Remove a unit's evolution edges, and the list with them when they were all
+/// it held, which is how an entry with none is written.
+fn drop_evolution_edges(unit: &mut Value) {
+    let Some(object) = unit.as_object_mut() else {
+        return;
+    };
+    let empty = match object.get_mut("morphTargets").and_then(Value::as_array_mut) {
+        Some(edges) => {
+            edges.retain(|e| e.get("evolves") != Some(&Value::Bool(true)));
+            edges.is_empty()
+        }
+        None => false,
+    };
+    if empty {
+        object.remove("morphTargets");
+    }
 }
 
 /// What the mounted game says that decides whether a setup changes its unit
@@ -2732,5 +2895,214 @@ mod tests {
             units[0].stats["weapons"][0]["projectile"],
             serde_json::json!("Can\tnon\n\"quoted\"")
         );
+    }
+
+    fn edge(into: &str, evolves: bool) -> Map<String, Value> {
+        let mut e = Map::new();
+        e.insert("into".into(), into.into());
+        if evolves {
+            e.insert("evolves".into(), true.into());
+        }
+        e
+    }
+
+    fn unit(name: &str, edges: Vec<Map<String, Value>>) -> UnitDatasetEntry {
+        UnitDatasetEntry {
+            name: name.into(),
+            morph_targets: edges,
+            ..Default::default()
+        }
+    }
+
+    fn facts_declaring(option: Option<&str>) -> MatchFacts {
+        MatchFacts {
+            options: option
+                .map(|key| {
+                    (
+                        key.to_string(),
+                        OptionDefault {
+                            kind: "bool".into(),
+                            default: "0".into(),
+                        },
+                    )
+                })
+                .into_iter()
+                .collect(),
+            lua_ais: vec!["ScavengersAI".into()],
+        }
+    }
+
+    #[test]
+    fn a_game_with_no_evolution_edges_gets_no_second_read() {
+        let units = vec![unit("a", vec![edge("b", false)]), unit("b", vec![])];
+        // The closure panics: the game's options are not even looked at.
+        let prelude = evolution_prelude(&units, || panic!("read the options"));
+        assert_eq!(prelude, None);
+    }
+
+    #[test]
+    fn a_game_that_does_not_declare_the_option_gets_no_second_read() {
+        let units = vec![unit("a", vec![edge("b", true)])];
+        assert_eq!(evolution_prelude(&units, || facts_declaring(None)), None);
+        assert_eq!(
+            evolution_prelude(&units, || facts_declaring(Some("evocomx"))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_game_with_evolution_edges_that_declares_the_option_reads_with_it_on() {
+        let units = vec![unit("a", vec![edge("b", true)])];
+        let prelude =
+            evolution_prelude(&units, || facts_declaring(Some("evocom"))).expect("a second read");
+        assert!(prelude.contains("[\"evocom\"] = \"1\""), "{prelude}");
+    }
+
+    /// The prelude the worker builds reaches the game's definitions as a mod
+    /// option, and the starting commander then evolves, as in Beyond All Reason.
+    #[test]
+    fn the_second_reads_prelude_turns_the_option_on_for_the_definitions() {
+        let defs = r#"
+          local on = Spring.GetModOptions().evocom == '1'
+          return { unitdefs = {
+            armcom = { name = 'Commander',
+              customparams = { evolution_target = on and 'armcomlvl2' or nil } },
+            armcomlvl2 = { name = 'Commander', customparams = { evolution_target = 'armcomlvl3' } },
+            armcomlvl3 = { name = 'Commander' },
+          } }
+        "#;
+        let first = extract_for_match(defs, &MatchSetup::default(), &[]);
+        assert!(first
+            .iter()
+            .find(|u| u.name == "armcom")
+            .unwrap()
+            .morph_targets
+            .is_empty());
+
+        let units = first;
+        let prelude = evolution_prelude(&units, || facts_declaring(Some("evocom"))).unwrap();
+        let lua = mlua::Lua::new();
+        let script = format!(
+            "Spring = {{}}\n\
+             VFS = {{ Include = function(name)\n\
+               if name == 'gamedata/defs.lua' then return (function()\n{defs}\nend)() end\n\
+               error(\"Include() file missing '\" .. name .. \"'\")\n\
+             end }}\n\
+             __cb_chunk = function(s) return s end\n\
+             __cb_with_logged = function(out) return out end\n\
+             return (function()\n{prelude}{}{UNIT_DATASET_SHIM_HEAD}{ENGINE_KEEPS}{UNIT_DATASET_SHIM_TAIL}\nend)()",
+            crate::lua::DEFS_ENV_SHIM
+        );
+        let raw: String = lua
+            .load(script)
+            .eval()
+            .expect("the second read did not run");
+        let second = parse_dataset_units(&raw);
+        let com = second.iter().find(|u| u.name == "armcom").unwrap();
+        assert_eq!(com.morph_targets, vec![edge("armcomlvl2", true)]);
+    }
+
+    #[test]
+    fn the_second_read_gives_edges_and_nothing_else() {
+        let mut first = vec![
+            UnitDatasetEntry {
+                name: "armcom".into(),
+                build_options: vec!["armsolar".into()],
+                ..Default::default()
+            },
+            UnitDatasetEntry {
+                name: "armcomlvl2".into(),
+                build_options: vec!["armsolar".into()],
+                morph_targets: vec![edge("armcomlvl3", true)],
+                ..Default::default()
+            },
+            unit("armcomlvl3", vec![]),
+            unit("armfus", vec![edge("armafus", false)]),
+        ];
+        let second = vec![
+            UnitDatasetEntry {
+                name: "armcom".into(),
+                // The second read changes other values too, and none of them
+                // are wanted.
+                build_options: vec!["armfus".into()],
+                mobile: true,
+                morph_targets: vec![edge("armcomlvl2", true)],
+                ..Default::default()
+            },
+            unit("armcomlvl2", vec![edge("armcomlvl3", true)]),
+            unit("armcomlvl10", vec![edge("armcomlvl11", true)]),
+        ];
+
+        take_evolution_edges(&mut first, &second);
+
+        assert_eq!(first[0].morph_targets, vec![edge("armcomlvl2", true)]);
+        assert_eq!(first[0].build_options, vec!["armsolar"]);
+        assert!(!first[0].mobile);
+        assert_eq!(first[1].morph_targets, vec![edge("armcomlvl3", true)]);
+        assert_eq!(first[1].build_options, vec!["armsolar"]);
+        // Not in the second read: as it was. Only in the second read: not added.
+        assert_eq!(first[3].morph_targets, vec![edge("armafus", false)]);
+        assert_eq!(first.len(), 4);
+    }
+
+    #[test]
+    fn an_order_to_a_target_wins_over_an_evolution_to_it() {
+        let mut first = vec![unit("a", vec![edge("b", false)])];
+        let second = vec![unit("a", vec![edge("b", true), edge("a2", true)])];
+
+        take_evolution_edges(&mut first, &second);
+
+        assert_eq!(
+            first[0].morph_targets,
+            vec![edge("a2", true), edge("b", false)]
+        );
+    }
+
+    #[test]
+    fn a_unit_the_second_read_gives_no_evolution_loses_the_first_reads() {
+        let mut first = vec![unit("a", vec![edge("b", true), edge("c", false)])];
+        let second = vec![unit("a", vec![])];
+
+        take_evolution_edges(&mut first, &second);
+
+        assert_eq!(first[0].morph_targets, vec![edge("c", false)]);
+    }
+
+    fn output(units: Vec<UnitDatasetEntry>) -> UnitDatasetOutput {
+        UnitDatasetOutput {
+            units,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_match_on_the_defaults_is_still_the_dataset_with_a_starting_stage_added() {
+        let in_match = output(vec![
+            unit("armcom", vec![]),
+            unit("armcomlvl2", vec![edge("armcomlvl3", true)]),
+        ]);
+        let dataset = output(vec![
+            unit("armcom", vec![edge("armcomlvl2", true)]),
+            unit("armcomlvl2", vec![edge("armcomlvl3", true)]),
+        ]);
+        assert!(same_units(&in_match, &dataset));
+    }
+
+    #[test]
+    fn a_match_whose_evolution_differs_is_not_the_dataset() {
+        let in_match = output(vec![unit("armcomlvl2", vec![edge("armcomlvl4", true)])]);
+        let dataset = output(vec![unit("armcomlvl2", vec![edge("armcomlvl3", true)])]);
+        assert!(!same_units(&in_match, &dataset));
+    }
+
+    #[test]
+    fn dropping_a_starting_stage_does_not_hide_another_difference() {
+        let in_match = output(vec![UnitDatasetEntry {
+            name: "armcom".into(),
+            mobile: true,
+            ..Default::default()
+        }]);
+        let dataset = output(vec![unit("armcom", vec![edge("armcomlvl2", true)])]);
+        assert!(!same_units(&in_match, &dataset));
     }
 }

@@ -1,5 +1,5 @@
 import type { HeightGrid } from "./terrain";
-import type { ColorPixels } from "./terrainMesh";
+import type { ColorPixels, TerrainExtension } from "./terrainMesh";
 
 /**
  * The ground just past the frame of a hand-made map (issue #3656).
@@ -150,6 +150,94 @@ export function commonEdgeColor(
   let best: [number, number, number, number] = [0, 0, 0, 1];
   for (const group of groups.values()) if (group[3] > best[3]) best = group;
   return [best[0] / best[3], best[1] / best[3], best[2] / best[3]];
+}
+
+export interface ImageSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * How a hand-made map's surround sits round the map (issue #3657), from the
+ * sizes alone. The heightmap must add one whole number of pixels to all four
+ * sides, which is what the margin ring takes. The picture must then reach as
+ * far, at its own resolution, sized as the apron's picture is. A surround that
+ * does not fit says which file is wrong.
+ */
+export function surroundFit(
+  map: { picture: ImageSize; heightmap: ImageSize },
+  wide: { picture: ImageSize; heightmap: ImageSize },
+):
+  | { margin: number; pictureX: number; pictureY: number }
+  | { wrong: "heightmap" }
+  | { wrong: "picture"; expected: ImageSize } {
+  const margin = (wide.heightmap.width - map.heightmap.width) / 2;
+  const down = (wide.heightmap.height - map.heightmap.height) / 2;
+  if (!Number.isInteger(margin) || margin < 1 || margin !== down) {
+    return { wrong: "heightmap" };
+  }
+  const pictureX = Math.round(
+    (margin * map.picture.width) / map.heightmap.width,
+  );
+  const pictureY = Math.round(
+    (margin * map.picture.height) / map.heightmap.height,
+  );
+  const expected = {
+    width: map.picture.width + 2 * pictureX,
+    height: map.picture.height + 2 * pictureY,
+  };
+  if (
+    wide.picture.width !== expected.width ||
+    wide.picture.height !== expected.height
+  ) {
+    return { wrong: "picture", expected };
+  }
+  return { margin, pictureX, pictureY };
+}
+
+/**
+ * A hand-made map's surround as the margin ring draws it, or null when it does
+ * not fit. The map's own picture and heights go in the middle, so the playable
+ * area is exactly what it is without a surround, whatever the surround's middle
+ * holds.
+ */
+export function surroundExtension(
+  picture: ColorPixels,
+  heights: HeightGrid,
+  widePicture: ColorPixels,
+  wideHeights: HeightGrid,
+): TerrainExtension | null {
+  const fit = surroundFit(
+    { picture, heightmap: heights },
+    { picture: widePicture, heightmap: wideHeights },
+  );
+  if ("wrong" in fit) return null;
+  const { margin, pictureX, pictureY } = fit;
+  const image = new Uint8ClampedArray(widePicture.data);
+  for (let y = 0; y < picture.height; y++) {
+    const from = y * picture.width * 4;
+    image.set(
+      picture.data.subarray(from, from + picture.width * 4),
+      ((y + pictureY) * widePicture.width + pictureX) * 4,
+    );
+  }
+  const data = new Float32Array(wideHeights.data);
+  for (let y = 0; y < heights.height; y++) {
+    const from = y * heights.width;
+    data.set(
+      heights.data.subarray(from, from + heights.width),
+      (y + margin) * wideHeights.width + margin,
+    );
+  }
+  return {
+    image: {
+      data: image,
+      width: widePicture.width,
+      height: widePicture.height,
+    },
+    heights: { data, width: wideHeights.width, height: wideHeights.height },
+    margin,
+  };
 }
 
 /** A loaded image, canvas or bitmap read back as raw pixels. */

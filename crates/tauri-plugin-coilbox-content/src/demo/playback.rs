@@ -228,6 +228,11 @@ fn spectator_name(players: &[(i32, &Section)]) -> String {
 /// the one spectator who does connect is numbered after all of them. A team
 /// whose `teamleader` is no player of the replay is led by that spectator.
 ///
+/// Those absent players also stop a playback being reloaded once it has begun.
+/// Splinter Faction's Initial Settings widget only reloads a match with one
+/// player in `Spring.GetPlayerList`, and this script always has at least two
+/// (issue #3984).
+///
 /// `opening` adds the player's two mod options. The replay's own values for
 /// those keys are dropped whether or not `opening` sets them, since they are
 /// the player's and a replay has no business moving where it opens.
@@ -2105,6 +2110,13 @@ end
         );
 
         assert!(!timed_out, "the log never showed the lines. Log:\n{output}");
+        // The game loaded once. The absent players below are what stops Splinter
+        // Faction's Initial Settings widget reloading it (issue #3984).
+        assert_eq!(
+            output.matches("Loading LuaRules").count(),
+            1,
+            "the game did not load exactly once. Log:\n{output}"
+        );
         // Every player of the replay is there under the name it had, and every
         // team's leader is the replay's own, as the game's interface reads them
         // (issue #4012).
@@ -2201,18 +2213,18 @@ end
         "/../../lua/rewind-player/tests/headless/health_probe.lua"
     ));
 
-    /// What the driver said, from the last time it started. Splinter Faction's
-    /// Initial Settings widget reloads the engine four seconds after a settings
-    /// file it has not seen is first read, which a scratch run's is, and the
-    /// match has no countdown to wait behind, so the driver starts, is cut off
-    /// and starts again.
+    /// What the driver said. It says `start` once each time the game loads, so
+    /// a second one is the engine reloading a playback that had begun, and a
+    /// seek made before it would be lost (issue #3984). A scratch run's settings
+    /// file has not seen the game, which is the case that could reload.
     fn driver_lines(output: &str) -> Vec<&str> {
         let all: Vec<&str> = output
             .lines()
             .filter_map(|l| l.split_once("REWIND_DRIVER ").map(|(_, rest)| rest))
             .collect();
-        let last = all.iter().rposition(|l| l.starts_with("start "));
-        all[last.unwrap_or(0)..].to_vec()
+        let starts = all.iter().filter(|l| l.starts_with("start ")).count();
+        assert!(starts <= 1, "the driver started {starts} times:\n{output}");
+        all
     }
 
     /// The value of `key=` in a line of the driver's.
@@ -2858,8 +2870,6 @@ end
         for gadget in gadgets {
             assert!(count(&plain, gadget) >= 1, "{gadget} did not load");
         }
-        // At least once and not once: see `driver_lines` for why a line can be
-        // there twice.
         assert!(
             count(&plain, stranger) >= 1,
             "the base game spawned nothing"
@@ -3117,8 +3127,6 @@ end
         std::fs::write(&inside, &track).unwrap();
         let before = driven_with(&prepared, "driver_resources.lua", &plan);
         report("before", &before);
-        // At least once and not once: see `driver_lines` for why a line can be
-        // there twice.
         assert!(
             count(
                 &before,
@@ -3661,8 +3669,6 @@ end
             return;
         }
         if wants("off") {
-            // Once for each start of the engine, and Splinter Faction's first
-            // run on a settings file restarts it.
             assert!(
                 count(
                     &output,

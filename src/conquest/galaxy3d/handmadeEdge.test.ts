@@ -5,6 +5,8 @@ import {
   apronPixels,
   commonEdgeColor,
   flatGrid,
+  surroundExtension,
+  surroundFit,
 } from "./handmadeEdge";
 import type { HeightGrid } from "./terrain";
 
@@ -140,5 +142,96 @@ describe("commonEdgeColor", () => {
     expect(r).toBeGreaterThanOrEqual(24);
     expect(r).toBeLessThanOrEqual(25);
     expect([g, b]).toEqual([58, 96]);
+  });
+});
+
+describe("surroundFit", () => {
+  const map = {
+    picture: { width: 160, height: 96 },
+    heightmap: { width: 160, height: 96 },
+  };
+
+  it("reads the margin from the sizes", () => {
+    expect(
+      surroundFit(map, {
+        picture: { width: 382, height: 318 },
+        heightmap: { width: 382, height: 318 },
+      }),
+    ).toEqual({ margin: 111, pictureX: 111, pictureY: 111 });
+  });
+
+  it("scales the margin to a finer picture", () => {
+    expect(
+      surroundFit(
+        { ...map, picture: { width: 1600, height: 960 } },
+        {
+          picture: { width: 1800, height: 1160 },
+          heightmap: { width: 180, height: 116 },
+        },
+      ),
+    ).toEqual({ margin: 10, pictureX: 100, pictureY: 100 });
+  });
+
+  it.each([
+    ["no wider", { width: 160, height: 96 }],
+    ["narrower", { width: 150, height: 86 }],
+    ["uneven between its sides", { width: 181, height: 117 }],
+    ["wider by more than it is taller", { width: 200, height: 116 }],
+  ])("refuses a heightmap that is %s", (_, heightmap) => {
+    expect(
+      surroundFit(map, { picture: { width: 382, height: 318 }, heightmap }),
+    ).toEqual({ wrong: "heightmap" });
+  });
+
+  it("says what size the picture should be", () => {
+    expect(
+      surroundFit(map, {
+        picture: { width: 300, height: 300 },
+        heightmap: { width: 382, height: 318 },
+      }),
+    ).toEqual({ wrong: "picture", expected: { width: 382, height: 318 } });
+  });
+});
+
+describe("surroundExtension", () => {
+  const pixels = (width: number, height: number, value: number) => ({
+    data: new Uint8ClampedArray(width * height * 4).fill(value),
+    width,
+    height,
+  });
+  const grid = (width: number, height: number, value: number): HeightGrid => ({
+    data: new Float32Array(width * height).fill(value),
+    width,
+    height,
+  });
+
+  it("draws the map's own picture and heights in the middle", () => {
+    const land = surroundExtension(
+      pixels(2, 2, 200),
+      grid(2, 2, 0.75),
+      pixels(4, 4, 10),
+      grid(4, 4, 0.25),
+    );
+    expect(land?.margin).toBe(1);
+    expect([...(land?.heights.data ?? [])]).toEqual([
+      0.25, 0.25, 0.25, 0.25, 0.25, 0.75, 0.75, 0.25, 0.25, 0.75, 0.75, 0.25,
+      0.25, 0.25, 0.25, 0.25,
+    ]);
+    const red = (x: number, y: number) => land?.image.data[(y * 4 + x) * 4];
+    expect(red(0, 0)).toBe(10);
+    expect(red(1, 1)).toBe(200);
+    expect(red(2, 2)).toBe(200);
+    expect(red(3, 2)).toBe(10);
+  });
+
+  it("gives nothing for a surround that does not fit", () => {
+    expect(
+      surroundExtension(
+        pixels(2, 2, 200),
+        grid(2, 2, 0.75),
+        pixels(5, 4, 10),
+        grid(5, 4, 0.25),
+      ),
+    ).toBeNull();
   });
 });

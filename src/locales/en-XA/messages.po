@@ -3149,6 +3149,10 @@ msgid "{MANIFEST_FILE} must hold one JSON object."
 msgstr ""
 
 #: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE} names a surround in files.surround, but no heightmap in files.heightmap. A surround needs both."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
 msgid "{MANIFEST_FILE} names the heightmap \"{file}\", but the folder has no file with that name."
 msgstr ""
 
@@ -3394,6 +3398,10 @@ msgstr ""
 
 #: src/conquest/handmade/manifest.ts
 msgid "{MANIFEST_FILE}: {where} must name one model: {exampleFile} for a file in the map folder, or {exampleGameModel} for a model the game has."
+msgstr ""
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: files.surround must name a picture and a heightmap, each a file inside the map folder. The map uses a short fading edge instead."
 msgstr ""
 
 #: src/conquest/handmade/library.ts
@@ -39027,6 +39035,10 @@ msgstr ""
 msgid "The map this conquest is played on is no longer installed. Your progress is saved (turn {turn}). Import the map again to carry on."
 msgstr ""
 
+#: src/conquest/handmade/read.ts
+msgid "The map uses a short fading edge instead."
+msgstr ""
+
 #: src/conquest/handmade/library.ts
 msgid "The map was installed as \"{id}\" but could not be read back, and taking it out again failed. Remove it from the Conquest page. {detail}"
 msgstr ""
@@ -39770,6 +39782,22 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "The steepest ground the unit will climb. Clamped to 89."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround file \"{file}\" could not be opened as an image."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround file \"{file}\" is not in the map folder."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround heightmap \"{file}\" is {wideWidth} by {wideHeight} pixels and the heightmap \"{mapHeightmap}\" is {mapWidth} by {mapHeight}. The surround must add the same whole number of pixels to all four sides."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. It must be {wantWidth} by {wantHeight} to reach as far as the surround heightmap."
 msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
@@ -41554,6 +41582,10 @@ msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
+msgstr ""
+
+#: src/lego/playerLimit.ts
+msgid "This warpath's units belong to {side}, so you can build little or nothing on another faction."
 msgstr ""
 
 #: src/deeplink/readImport.ts

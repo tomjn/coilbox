@@ -223,6 +223,7 @@ Each value is the name of a file inside the map folder. It can be a path into a 
 | `picture` | Yes | The map picture shown to the player. |
 | `provinces` | Yes | The province image. It must be the same size in pixels as the picture. |
 | `heightmap` | No | A greyscale image, black lowest and white highest. |
+| `surround` | No | An object naming a wider `picture` and a wider `heightmap`, so the land carries on past the frame. See [The surround](#the-surround). |
 
 ### Factions
 
@@ -338,6 +339,56 @@ The heightmap is stretched over the whole map. The first and last pixels of each
 The terrain is drawn with at most 256 steps along the map's longer side (`TERRAIN_MAX_SEGMENTS`). A heightmap with more pixels than that on its longer side is sampled at those steps, so the extra pixels add little.
 
 If `map.json` names a heightmap that is not in the folder, the reader reports it. A heightmap that is in the folder but cannot be opened as an image is reported too.
+
+## The surround
+
+The surround is optional. Without one, the ground past the frame eases down from the map's edge and fades out over a short distance, coloured by the edge of your picture. With one, the player sees your own land, coast and hills carry on past the frame and fade out, as they do on a generated map.
+
+A surround is two images, a wider picture and a wider heightmap, with your map in the middle. Name both in `files`, and keep `picture` and `heightmap` as they are.
+
+```json
+"files": {
+  "picture": "picture.png",
+  "provinces": "provinces.png",
+  "heightmap": "heightmap.png",
+  "surround": {
+    "picture": "surround-picture.png",
+    "heightmap": "surround-heightmap.png"
+  }
+}
+```
+
+The sample at [`docs/examples/handmade-map-surround`](https://github.com/tomjn/coilbox/tree/main/docs/examples/handmade-map-surround) has one.
+
+The surround changes only how the map looks.
+
+- The province image, `size`, every position and the camera limits stay as they are. Positions still count from the top left of `picture`, not of the surround.
+- Nothing past the frame can be played or picked.
+- Coilbox draws your `picture` and `heightmap` in the middle, over the same part of the surround. So match the surround to them at the frame, or the join shows.
+- It does not change the fingerprint, so a challenge code works with it or without it.
+
+### How big to make it
+
+Coilbox works out how far the surround reaches from the sizes of the images, so `map.json` gives no number.
+
+- The surround heightmap must add the same whole number of pixels to all four sides of `heightmap`. For a heightmap of 160 by 96, adding 111 pixels gives 382 by 318.
+- The surround picture must reach as far at the picture's own resolution. If `picture` is the same size as `heightmap`, the two surround images are the same size too. If `picture` has 10 pixels for each heightmap pixel, it adds 1110 pixels to each side.
+
+The land fades out completely by the end of the surround, so its end never shows, whatever its size. The size sets how long the fade is. A surround that is too short fades out close to the frame, and the player sees the background past it at the furthest zoom.
+
+Use the share below, which is what a generated map gets. At the furthest zoom, looking straight down at the edge of the map, the fade then fills half of the space past the edge. The values come from `terrainMarginPixels` in `src/conquest/galaxy3d/terrain.ts`.
+
+| Locations on the map | Pixels to add to each side, as a share of the longer side |
+| --- | --- |
+| 5 | 0.97 |
+| 10 | 0.69 |
+| 20 | 0.49 |
+| 40 | 0.35 |
+| 80 | 0.31 |
+
+### When a surround cannot be used
+
+A surround never stops a map from loading. If it cannot be used, the map falls back to the short fade, and coilbox gives the reason when the map is imported and on the map's setup panel. See [Problems with the surround](#problems-with-the-surround).
 
 ## Towns
 
@@ -459,7 +510,7 @@ These do not change it.
 
 - The map's `title` and `description`, and a location's `name` and `blurb`.
 - A faction's `name` and `color`, and `playerFaction`.
-- The picture, the heightmap, `heightScale`, `size`, `towns` and the placed models.
+- The picture, the heightmap, the surround, `heightScale`, `size`, `towns` and the placed models.
 - Where a marker sits, from `anchor` or `pos`.
 - The colour a province is painted in, and how the images are compressed.
 - A repaint that leaves every province touching the same neighbours.
@@ -586,6 +637,19 @@ Each of these follows `map.json:` and the key. A province or point location is n
 | `map.json: models[N] names the model file "FILE", but the folder has no file with that name.` | A `file` model is not in the folder. | Check the file name. |
 | `map.json: models[N] names the model "FILE", which needs the file "PATH", but the folder has no file with that name.` | A `.gltf` names a `.bin` or texture that is not in the folder. | Add the file, or save the model with its data inside. |
 | `map.json: models[N] names the model "FILE", which points at "PATH" outside the map folder. Put the file in the folder and point at it there.` | A `.gltf` names a file outside the folder. | Move the file into the folder and edit the path in the `.gltf`. |
+
+### Problems with the surround
+
+These are warnings. The map still loads and uses a short fading edge, and each message ends by saying so.
+
+| Message | What it means | What to do |
+| --- | --- | --- |
+| `map.json: files.surround must name a picture and a heightmap, each a file inside the map folder.` | One of the two is missing, or a name is not a file inside the folder. | Name both, as paths inside the folder written with `/`. |
+| `map.json names a surround in files.surround, but no heightmap in files.heightmap. A surround needs both.` | The map has no heightmap of its own. | Add `files.heightmap`, or remove `files.surround`. |
+| `The surround file "FILE" is not in the map folder.` | A file in `files.surround` is not in the folder, or coilbox could not read it out of a game archive. | Check the file name, including upper and lower case. |
+| `The surround file "FILE" could not be opened as an image.` | The file is not an image coilbox can open. | Save it again as a PNG. |
+| `The surround heightmap "FILE" is W by H pixels and the heightmap "FILE" is W by H. The surround must add the same whole number of pixels to all four sides.` | The two heightmaps do not line up. | Resize the surround heightmap. See [How big to make it](#how-big-to-make-it). |
+| `The surround picture "FILE" is W by H pixels. It must be W by H to reach as far as the surround heightmap.` | The surround picture reaches further or less far than the surround heightmap. | Resize the surround picture to the size the message gives. |
 
 ### Problems with an installed map
 

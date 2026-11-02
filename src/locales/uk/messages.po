@@ -3851,6 +3851,10 @@ msgid "{MANIFEST_FILE} must hold one JSON object."
 msgstr "{MANIFEST_FILE} має містити один об’єкт JSON."
 
 #: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE} names a surround in files.surround, but no heightmap in files.heightmap. A surround needs both."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "{MANIFEST_FILE} names the heightmap \"{file}\", but the folder has no file with that name."
 msgstr "{MANIFEST_FILE} називає карту висот \"{file}\", але в папці немає файлу з такою назвою."
@@ -4159,6 +4163,10 @@ msgstr "{MANIFEST_FILE}: {where} має зіставляти назви пара
 #, fuzzy
 msgid "{MANIFEST_FILE}: {where} must name one model: {exampleFile} for a file in the map folder, or {exampleGameModel} for a model the game has."
 msgstr "{MANIFEST_FILE}: {where} має називати одну модель: {exampleFile} для файлу в папці мапи або {exampleGameModel} для моделі з гри."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: files.surround must name a picture and a heightmap, each a file inside the map folder. The map uses a short fading edge instead."
+msgstr ""
 
 #: src/conquest/handmade/library.ts
 #, fuzzy
@@ -47954,6 +47962,10 @@ msgstr "Мапа ніколи не змінюється. Сід задає, як
 msgid "The map this conquest is played on is no longer installed. Your progress is saved (turn {turn}). Import the map again to carry on."
 msgstr "Мапу, на якій грається це завоювання, більше не встановлено. Ваш прогрес збережено (хід {turn}). Імпортуйте мапу знову, щоб продовжити."
 
+#: src/conquest/handmade/read.ts
+msgid "The map uses a short fading edge instead."
+msgstr ""
+
 #: src/conquest/handmade/library.ts
 #, fuzzy
 msgid "The map was installed as \"{id}\" but could not be read back, and taking it out again failed. Remove it from the Conquest page. {detail}"
@@ -48870,6 +48882,22 @@ msgstr "Стартовий шаблон містить місію: вступн�
 #, fuzzy
 msgid "The steepest ground the unit will climb. Clamped to 89."
 msgstr "Найкрутіший схил, на який підніметься юніт. Обмежується 89."
+
+#: src/conquest/handmade/read.ts
+msgid "The surround file \"{file}\" could not be opened as an image."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround file \"{file}\" is not in the map folder."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround heightmap \"{file}\" is {wideWidth} by {wideHeight} pixels and the heightmap \"{mapHeightmap}\" is {mapWidth} by {mapHeight}. The surround must add the same whole number of pixels to all four sides."
+msgstr ""
+
+#: src/conquest/handmade/read.ts
+msgid "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. It must be {wantWidth} by {wantHeight} to reach as far as the surround heightmap."
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -51084,6 +51112,10 @@ msgstr "Цей похід Шляхом війни потребує гри <0>{na
 #, fuzzy
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
 msgstr "Цей похід Шляхом війни потребує гри <0>{name}</0>, яку не встановлено."
+
+#: src/lego/playerLimit.ts
+msgid "This warpath's units belong to {side}, so you can build little or nothing on another faction."
+msgstr ""
 
 #: src/deeplink/readImport.ts
 #, fuzzy

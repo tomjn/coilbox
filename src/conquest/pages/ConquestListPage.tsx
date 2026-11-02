@@ -989,6 +989,7 @@ function ImportMapForm({
               })}
             </p>
           )}
+          {result.warnings && <MapErrorList errors={result.warnings} />}
           <div className="flex gap-2">
             <Button onClick={() => onOpenMap(result.id)}>
               <Trans>Open the map</Trans>

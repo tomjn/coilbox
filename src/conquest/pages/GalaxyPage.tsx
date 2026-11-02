@@ -373,6 +373,9 @@ function HandmadeGalaxy({
           <ChallengeSetupNote challenge={challenge} onDrop={dropChallenge} />
         ) : (
           <>
+            {result?.ok && result.warnings && (
+              <MapErrorList errors={result.warnings} />
+            )}
             {staleChallenge && (
               <p className="text-sm text-muted-foreground">
                 <Trans>

@@ -673,3 +673,51 @@ describe("the baked ground detail", () => {
     expect(plain?.anisotropy).toBe(1);
   });
 });
+
+describe("buildTerrainMesh with a surround round a picture from a file", () => {
+  const mapGrid: HeightGrid = {
+    data: new Float32Array(16).fill(0.3),
+    width: 4,
+    height: 4,
+  };
+
+  it("draws the surround's picture and never loads the map's", () => {
+    const load = vi.spyOn(THREE.TextureLoader.prototype, "load");
+    const scene = new THREE.Scene();
+    const disposables: { dispose(): void }[] = [];
+    const surface = createTerrainSurface(
+      { width: 90, height: 90, heightScale: 30 },
+      90,
+      mapGrid,
+    );
+    const image = {
+      data: new Uint8ClampedArray(8 * 8 * 4).fill(60),
+      width: 8,
+      height: 8,
+    };
+    const sheet = buildTerrainMesh(
+      scene,
+      disposables,
+      surface,
+      "asset://map/picture.png",
+      { current: null },
+      mapGrid,
+      true,
+      {
+        margin: 2,
+        heights: {
+          data: new Float32Array(64).fill(0.3),
+          width: 8,
+          height: 8,
+        },
+        image,
+      },
+    );
+    expect(load).not.toHaveBeenCalled();
+    load.mockRestore();
+    const mat = sheet.mesh.material as THREE.MeshBasicMaterial;
+    expect((mat.map?.image as { width: number }).width).toBe(8);
+    const ring = scene.getObjectByName("terrain-margin") as THREE.Mesh;
+    expect(ring.raycast).not.toBe(THREE.Mesh.prototype.raycast);
+  });
+});
