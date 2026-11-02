@@ -109,7 +109,11 @@ So a garrison in its post from the first frame is **Holds position until woken**
 
 `startsAsleep` needs mission runtime 11. An older runtime would read past it and send the group off at the first frame, so a game bundling one cannot play the scenario itself. A saved group without the flag keeps its meaning: placed at the start and running its orders.
 
-Orders are one queue given to every unit in the group. **Move along**, **Patrol** and **Fight along** take a list of waypoints you draw by clicking on the map. **Guard** and **Attack** take an actor, a base's building or another group as the target. A patrol closes its loop back to where the group is standing, exactly as it would if a player had shift-clicked the same points.
+Orders are one queue given to every unit in the group. **Move along**, **Patrol** and **Fight along** take a list of waypoints you draw by clicking on the map. **Guard** and **Attack** take an actor, a base's building or another group as the target. **Hunt** takes a participant, and it is how you write "go and kill the player". A patrol closes its loop back to where the group is standing, exactly as it would if a player had shift-clicked the same points.
+
+A hunting group fights its way to the hunted team's nearest unit. When a unit in it runs out of orders, it is sent at whichever unit is then nearest, so the group moves on when its target dies and follows one that has moved once it reaches where that unit was. It engages what it meets on the way. Units in the air and cloaked units are only chosen when the team has nothing else. While the team has no units the group is given no orders, and the hunt takes up again if the team gets one.
+
+Orders before a **Hunt** are walked first. Orders after one never run, because a hunt does not finish. Another `give_orders`, `gift_units` or `release_group` ends it. It needs mission runtime 12, and an older runtime would report an unknown order and leave the group standing, so a game bundling one cannot play the scenario itself.
 
 ### Bases
 
