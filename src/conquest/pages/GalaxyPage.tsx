@@ -1499,7 +1499,7 @@ export function RunSetupPanel({
       )}
       <Button
         disabled={busy || regenBusy}
-        className="font-display uppercase tracking-wide"
+        className="font-display tracking-wide"
         onClick={async () => {
           setBusy(true);
           setStartError(null);
