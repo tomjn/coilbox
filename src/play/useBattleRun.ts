@@ -415,7 +415,12 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         draft.restrictions,
       );
       const config = playerUnits
-        ? withPlayerUnits(restricted, playerUnits)
+        ? withPlayerUnits(
+            restricted,
+            playerUnits,
+            installedGame.name,
+            draft.participants.find((p) => p.kind === "you")?.side,
+          )
         : restricted;
       run = async () => {
         const mutator = await unitsGame();

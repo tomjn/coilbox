@@ -41556,6 +41556,10 @@ msgstr ""
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
 msgstr ""
 
+#: src/lego/playerLimit.ts
+msgid "This warpath's units belong to {side}, so you can build little or nothing on another faction."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr ""

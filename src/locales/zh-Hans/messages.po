@@ -51085,6 +51085,10 @@ msgstr "此征途需要游戏 <0>{name}</0>，但它未安装，coilbox 也不�
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
 msgstr "此征途需要游戏 <0>{name}</0>，但它未安装。"
 
+#: src/lego/playerLimit.ts
+msgid "This warpath's units belong to {side}, so you can build little or nothing on another faction."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 #, fuzzy
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."

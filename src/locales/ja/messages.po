@@ -51085,6 +51085,10 @@ msgstr "このウォーパスにはゲーム <0>{name}</0> が必要ですが、
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
 msgstr "このウォーパスにはゲーム <0>{name}</0> が必要ですが、インストールされていません。"
 
+#: src/lego/playerLimit.ts
+msgid "This warpath's units belong to {side}, so you can build little or nothing on another faction."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 #, fuzzy
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
