@@ -8694,6 +8694,10 @@ msgstr ""
 msgid "already set"
 msgstr ""
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Already set"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 msgid "Already set this way"
 msgstr ""
@@ -8774,11 +8778,8 @@ msgstr ""
 msgid "Also write the build picture"
 msgstr ""
 
-#: src/scenario/pages/components/triggers.ts
-msgid "always"
-msgstr ""
-
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 msgid "Always"
 msgstr ""
 
@@ -9550,6 +9551,11 @@ msgstr ""
 
 #: src/lego/pages/components/AnchorList.tsx
 msgid "At the origin"
+msgstr ""
+
+#: src/scenario/pages/components/triggers.ts
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "At the start"
 msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
@@ -18147,6 +18153,10 @@ msgstr ""
 msgid "Fires on"
 msgstr ""
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 msgid "fires weapon {weapon}"
 msgstr ""
@@ -25093,6 +25103,7 @@ msgid "never"
 msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 msgid "Never"
 msgstr ""
 
@@ -44139,6 +44150,10 @@ msgstr ""
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr ""
 
+#: src/scenario/pages/components/triggers.ts
+msgid "When armed"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "When ChangeHeading is sent"
 msgstr ""
@@ -44690,14 +44705,6 @@ msgstr ""
 
 #: src/scenario/pages/components/TriggerPanel.tsx
 msgid "with none, firing does nothing"
-msgstr ""
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-msgid "with none, it fires on the first pass"
-msgstr ""
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-msgid "with none, it never fires"
 msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx

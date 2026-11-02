@@ -10720,6 +10720,10 @@ msgstr "已保存"
 msgid "already set"
 msgstr "已设置"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Already set"
+msgstr ""
+
 #: src/play/PresetChanges.tsx
 msgid "Already set this way"
 msgstr ""
@@ -10818,12 +10822,8 @@ msgstr "同时写入 .obj 和 .mtl"
 msgid "Also write the build picture"
 msgstr "同时写入建造图片"
 
-#: src/scenario/pages/components/triggers.ts
-#, fuzzy
-msgid "always"
-msgstr "始终"
-
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Always"
 msgstr "始终"
@@ -11782,6 +11782,11 @@ msgstr "至多"
 #, fuzzy
 msgid "At the origin"
 msgstr "在原点"
+
+#: src/scenario/pages/components/triggers.ts
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "At the start"
+msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -22293,6 +22298,10 @@ msgstr "每次都触发"
 msgid "Fires on"
 msgstr "触发时机"
 
+#: src/scenario/pages/components/TriggerSteps.tsx
+msgid "Fires once, as soon as the mission starts. Replaces this trigger's other conditions."
+msgstr ""
+
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "fires weapon {weapon}"
@@ -30838,6 +30847,7 @@ msgid "never"
 msgstr "从未"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Never"
 msgstr "从不"
@@ -54273,6 +54283,10 @@ msgstr "时机"
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
 msgstr "存储新的录制轨道后，如果总量超过上限，会移除最久没有观看的录制轨道，直到不超过上限为止。已过期的录制轨道会最先移除。新的录制轨道永远不会被移除，所以比上限还大的录制轨道会被保留，其他所有录制轨道都会被移除。"
 
+#: src/scenario/pages/components/triggers.ts
+msgid "When armed"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "When ChangeHeading is sent"
@@ -54953,16 +54967,6 @@ msgstr "没有速度时，引擎会将其视为静止。"
 #, fuzzy
 msgid "with none, firing does nothing"
 msgstr "没有时，触发不执行任何操作"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it fires on the first pass"
-msgstr "没有时，首次检查即触发"
-
-#: src/scenario/pages/components/TriggerPanel.tsx
-#, fuzzy
-msgid "with none, it never fires"
-msgstr "没有时，永远不会触发"
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy
