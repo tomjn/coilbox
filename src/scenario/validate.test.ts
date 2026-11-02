@@ -76,6 +76,30 @@ function withTrigger(conditions: unknown[], actions: unknown[]) {
 const withStep = (step: unknown, kind: "conditions" | "actions" = "actions") =>
   kind === "conditions" ? withTrigger([step], []) : withTrigger([], [step]);
 
+describe("a guard or attack order with no target", () => {
+  it("says no target given", () => {
+    const m = {
+      schemaVersion: 1,
+      teams: { player: { team: 0 } },
+      groups: [
+        {
+          id: "g",
+          team: "player",
+          orders: [
+            { kind: "guard", target: "" },
+            { kind: "attack", target: "" },
+          ],
+        },
+      ],
+      triggers: [],
+    };
+    expect(validateMission(m).map((i) => i.message)).toEqual([
+      "no target given",
+      "no target given",
+    ]);
+  });
+});
+
 describe("a hunt order", () => {
   const mission = (order: unknown, actionOrder?: unknown) => ({
     schemaVersion: 1,
