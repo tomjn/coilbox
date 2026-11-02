@@ -6,11 +6,34 @@ import {
 } from "../content/resolveContent";
 
 /**
- * Compare two game version strings segment-wise (numeric segments compare as
- * numbers, the rest lexically), so "1.10" > "1.9" and "test-26575" >
- * "test-9999". Returns <0, 0 or >0.
+ * Whether a version is a development build, which Beyond All Reason and
+ * Balanced Annihilation publish as "test-7183-001edc3".
+ */
+export function isTestBuild(version: string): boolean {
+  return /^test-/i.test(version.trim());
+}
+
+/**
+ * How far a version can be trusted as a release: 0 for none (no version, or a
+ * dev checkout whose modinfo says "$VERSION"), 1 for a test build, 2 for
+ * anything else.
+ */
+function versionTier(version: string): 0 | 1 | 2 {
+  const v = version.trim();
+  if (v === "" || v.startsWith("$")) return 0;
+  return isTestBuild(v) ? 1 : 2;
+}
+
+/**
+ * Compare two game version strings. A version ranks by tier first, so a test
+ * build is below any release, as nothing says it is newer (issue #4992), and a
+ * game with no real version is below both. Within a tier the comparison is
+ * segment-wise (numeric segments compare as numbers, the rest lexically), so
+ * "1.10" > "1.9" and "test-26575" > "test-9999". Returns <0, 0 or >0.
  */
 export function compareGameVersions(a: string, b: string): number {
+  const tier = versionTier(a) - versionTier(b);
+  if (tier !== 0) return tier;
   const split = (v: string) => v.split(/(\d+)/).filter((s) => s !== "");
   const as = split(a);
   const bs = split(b);
@@ -119,14 +142,22 @@ export function decideLaunchGame<T extends InstalledGame>(
   if (game.pinnedName) {
     const current = installed.find((g) => g.name === game.pinnedName);
     if (current) {
-      const newer = candidates.find(
-        (g) =>
+      // A release is not an upgrade on a test build the player chose, since
+      // nothing says it is newer. A test build to another test build is. A
+      // game with no real version is never an upgrade to anything.
+      const currentTier = versionTier(current.info.version ?? "");
+      const newer = candidates.find((g) => {
+        const tier = versionTier(g.info.version ?? "");
+        return (
           g.name !== current.name &&
+          tier > 0 &&
+          (currentTier === 0 || tier === currentTier) &&
           compareGameVersions(
             g.info.version ?? "",
             current.info.version ?? "",
-          ) > 0,
-      );
+          ) > 0
+        );
+      });
       return newer && newer.name !== declinedUpdate
         ? { kind: "upgrade", current, newer }
         : { kind: "ready", game: current };
