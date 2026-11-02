@@ -45,6 +45,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCanvas3D } from "@/lib/useCanvas3D";
+import { attachWheelRelease } from "@/lib/wheelRelease";
 import { useReduceMotion } from "../../../general/display";
 import { type BalanceResult, balanceSummary } from "../../balance";
 import type { BodyPlan } from "../../bodyPlans";
@@ -225,6 +226,7 @@ import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
 import { paintCompass, ViewportBar } from "./ViewportBar";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
+import { viewportHit } from "./wheelHit";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 
@@ -1360,6 +1362,7 @@ export function ModelViewport({
         terrain: null,
         water: null,
         shaped: null,
+        contentBox: new THREE.Box3(),
         groups: new Map(),
         baked: [],
         imported: null,
@@ -1400,6 +1403,16 @@ export function ModelViewport({
         dragging: false,
       };
       sceneRef.current = state;
+
+      // A wheel past the unit and its ground scrolls the page rather than
+      // zooming (issue #2328). `state.camera` is read per event because a
+      // standard view swaps it.
+      const detachWheel = attachWheelRelease(
+        canvas.host,
+        renderer.domElement,
+        () => state.camera,
+        (ray) => viewportHit(state, ray),
+      );
 
       // `mouseDown` and `mouseUp`, not `dragging-changed`: this version of
       // TransformControls does not dispatch that one, so listening for it left
@@ -1508,6 +1521,7 @@ export function ModelViewport({
         },
         dispose: () => {
           cancelAnimationFrame(frame);
+          detachWheel();
           detachPointerHandlers();
           controls.removeEventListener("change", onControlsChange);
           controls.dispose();

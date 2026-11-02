@@ -24,6 +24,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { BUILD_SQUARE, SQUARE_SIZE } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useCanvas3D } from "@/lib/useCanvas3D";
+import { attachWheelRelease } from "@/lib/wheelRelease";
+import { groundHit } from "@/mapconv/pages/components/wheelGate";
 import { GRID_RELIEF } from "./ground";
 
 /** Scene units the longer side is normalised to, the same figure the map
@@ -146,7 +148,7 @@ export function GridScene({
 
   useCanvas3D(
     hostRef,
-    ({ renderer, resize: fitCanvas }) => {
+    ({ renderer, host, resize: fitCanvas }) => {
       if (extent <= 0) return;
 
       const scale = BASE / extent;
@@ -223,6 +225,20 @@ export function GridScene({
       controls.addEventListener("change", render);
       renderer.setClearColor(0x000000, 0);
 
+      // A wheel over the ground zooms and one past it scrolls the page
+      // (issue #2328). The ground is flat unless a terrain step has moved some
+      // of it, so the test is the ray against the floor plane and the ground's
+      // bounds: nobody can tell a release a pixel inside the edge from one a
+      // pixel outside, and the raised corners are not worth a triangle test
+      // against a mesh with a vertex per heightmap corner.
+      const half = plane / 2;
+      const detachWheel = attachWheelRelease(
+        host,
+        renderer.domElement,
+        () => camera,
+        (ray) => groundHit(ray.origin, ray.direction, 0, half, half),
+      );
+
       groundRef.current = { material, texture, render };
       ruleGrid(groundRef.current, wantGrid.current);
 
@@ -251,6 +267,7 @@ export function GridScene({
           // before the scene itself goes.
           if (handedOver) onSceneRef.current?.(null);
           groundRef.current = null;
+          detachWheel();
           controls.removeEventListener("change", render);
           controls.dispose();
           geometry.dispose();

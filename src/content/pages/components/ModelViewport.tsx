@@ -14,6 +14,8 @@ import { useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { useCanvas3D } from "@/lib/useCanvas3D";
+import { attachWheelRelease } from "@/lib/wheelRelease";
+import { boxHit } from "@/mapconv/pages/components/wheelGate";
 import type { UnitModelResult } from "../../bindings";
 import { buildModel, missingTextures } from "../../unitModel";
 
@@ -153,26 +155,17 @@ export function ModelViewport({
       // stop that event before it gets there. A capture-phase listener on
       // `host`, the canvas's own parent, runs before the canvas's own
       // listeners however they were registered, so `stopPropagation` here
-      // keeps OrbitControls from ever seeing the event. `raycaster` and
-      // `pointer` are reused across events rather than built per scroll, and
-      // a miss over empty space costs one bounding-sphere test per mesh, not
-      // one per triangle, because that is where three's own hit test bails
-      // out first.
-      const raycaster = new THREE.Raycaster();
-      const pointer = new THREE.Vector2();
-      const onWheel = (event: WheelEvent) => {
-        const rect = renderer.domElement.getBoundingClientRect();
-        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(pointer, camera);
-        if (raycaster.intersectObject(built.object, true).length === 0) {
-          event.stopPropagation();
-        }
-      };
-      host.addEventListener("wheel", onWheel, {
-        capture: true,
-        passive: true,
-      });
+      // keeps OrbitControls from ever seeing the event. The test is the
+      // model's bounding box rather than its triangles (issue #2328): the
+      // model does not move, and a slab test is a few multiplications where a
+      // raycast against the model visited every mesh on every wheel tick.
+      const detachWheel = attachWheelRelease(
+        host,
+        renderer.domElement,
+        () => camera,
+        (ray) =>
+          boxHit(ray.origin, ray.direction, built.box.min, built.box.max),
+      );
 
       return {
         render,
@@ -181,7 +174,7 @@ export function ModelViewport({
           camera.updateProjectionMatrix();
         },
         dispose: () => {
-          host.removeEventListener("wheel", onWheel, { capture: true });
+          detachWheel();
           controls.removeEventListener("change", render);
           controls.dispose();
           built.dispose();
