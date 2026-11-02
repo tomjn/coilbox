@@ -3816,6 +3816,10 @@ msgstr "{movedCount, plural, one {Building {moved} will not stand where it does 
 msgid "{movedCount, plural, one {One edit no longer fits {gameLabel}} other {# edits no longer fit {gameLabel}}}"
 msgstr "{movedCount, plural, one {One edit no longer fits {gameLabel}} other {# edits no longer fit {gameLabel}}}"
 
+#: src/workshop/pages/UnitPage.tsx
+msgid "{movedUnlisted, plural, one {One more is in Checks.} other {# more are in Checks.}}"
+msgstr "{movedUnlisted, plural, one {One more is in Checks.} other {# more are in Checks.}}"
+
 #: src/content/pages/MatchupPage.tsx
 msgid "{myFaction} vs {theirFaction}"
 msgstr "{myFaction} vs {theirFaction}"
