@@ -6,11 +6,22 @@ import {
 } from "../content/resolveContent";
 
 /**
- * Compare two game version strings segment-wise (numeric segments compare as
- * numbers, the rest lexically), so "1.10" > "1.9" and "test-26575" >
- * "test-9999". Returns <0, 0 or >0.
+ * Whether a version is a development build, which Beyond All Reason and
+ * Balanced Annihilation publish as "test-7183-001edc3".
+ */
+export function isTestBuild(version: string): boolean {
+  return /^test-/i.test(version.trim());
+}
+
+/**
+ * Compare two game version strings. A test build ranks below any release, as
+ * nothing says it is newer (issue #4992). Otherwise the comparison is
+ * segment-wise (numeric segments compare as numbers, the rest lexically), so
+ * "1.10" > "1.9" and "test-26575" > "test-9999". Returns <0, 0 or >0.
  */
 export function compareGameVersions(a: string, b: string): number {
+  const aTest = isTestBuild(a);
+  if (aTest !== isTestBuild(b)) return aTest ? -1 : 1;
   const split = (v: string) => v.split(/(\d+)/).filter((s) => s !== "");
   const as = split(a);
   const bs = split(b);
@@ -119,9 +130,13 @@ export function decideLaunchGame<T extends InstalledGame>(
   if (game.pinnedName) {
     const current = installed.find((g) => g.name === game.pinnedName);
     if (current) {
+      // A release is not an upgrade on a test build the player chose, since
+      // nothing says it is newer. A test build to another test build is.
       const newer = candidates.find(
         (g) =>
           g.name !== current.name &&
+          isTestBuild(g.info.version ?? "") ===
+            isTestBuild(current.info.version ?? "") &&
           compareGameVersions(
             g.info.version ?? "",
             current.info.version ?? "",
