@@ -127,7 +127,7 @@ To import from the [community hub](https://coilbox-hub.vercel.app), open Coilbox
 Campaigns come as a single file. They are not on the community hub and do not have codes.
 
 1. Turn on Advanced mode in Settings > General.
-2. Open Campaign Builder > Campaigns in the sidebar.
+2. Open Campaign builder > Campaigns in the sidebar.
 3. Select Import and pick the campaign file.
 
 If the campaign uses a game or a map you do not have, coilbox offers to download it. The campaign then appears under Play > Campaigns.

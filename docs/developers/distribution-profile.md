@@ -288,7 +288,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `conquest.list`      | Play > Conquest       |
 | `runlite.list`       | Play > Warpath        |
 | `career.overview`    | Records > Career      |
-| `campaign.builder`   | Campaign Builder > Builder |
+| `campaign.builder`   | Campaign builder > Builder |
 | `analytics.matchStats` | The match statistics on a replay's page (the chart, build orders and recorded events, and the roster's totals and APM), the Replays page figures and the player dossier's match figures |
 | `analytics.spatialLayers` | The layers on a replay's map: start positions, buildings ordered, building density and order density, with their toggles. The start boxes stay |
 | `analytics.mapInsight` | The "How this map is played" section on a map's page: one picture of every match on that map in the library. Hiding `multiplayer.stats` hides it too, because it is built from the same records |
@@ -319,7 +319,7 @@ Hides settings sections from the Settings navigation by id. **Any** app settings
 | `general`         | General            |
 | `content-folders` | Content Folders    |
 | `engines`         | Engines            |
-| `engine-settings` | Engine Settings    |
+| `engine-settings` | Engine settings    |
 | `sources`         | Sources            |
 | `lobby-servers`   | Lobby servers      |
 | `uberstress`      | uberstress         |

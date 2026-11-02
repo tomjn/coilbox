@@ -17,12 +17,12 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Play          | Scenarios     | `#/scenarios`        | `scenario.list`    | no¹      |
 | Play          | Conquest      | `#/conquest`         | `conquest.list`    | **yes**  |
 | Play          | Warpath       | `#/warpath`          | `runlite.list`     | **yes**  |
-| Play          | Save Games    | `#/play/savegames`   | `play.savegames`   | no       |
+| Play          | Save games    | `#/play/savegames`   | `play.savegames`   | no       |
 | Multiplayer   | Login         | `#/lobby`            | `multiplayer.lobby`| no²      |
 | Multiplayer   | Chat          | `#/chat`             | `multiplayer.chat` | no²      |
 | Multiplayer   | Battles       | `#/battles`          | `multiplayer.battles` | **yes** |
 | Multiplayer   | Matchmaking   | `#/matchmaking`      | `multiplayer.matchmaking` | no²|
-| Multiplayer   | Battle Room   | `#/battle`           | `multiplayer.battle`  | no²   |
+| Multiplayer   | Battle room   | `#/battle`           | `multiplayer.battle`  | no²   |
 | Multiplayer   | Server admin  | `#/admin`            | `multiplayer.admin`   | **yes**² |
 | Records⁵      | Career        | `#/career`           | `career.overview`  | **yes**  |
 | Records⁵      | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
@@ -46,7 +46,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ³ **Settings** items are not on the `hide` list. They link to settings sections rather than to routes of their own, so `hideSettings` already governs them: hide `engine-settings`, `frame.appearance` or `lobby-servers` and both the settings section and its card here disappear together.
 
-² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle that has a room. An Open Annihilation battle has none, so its route goes to **Battles**. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead. **Server admin** shows only while a connected account is a moderator or admin on an uberserver lobby (never on Teiserver or Zero-K), and is also on the profile's `hide` list, so a distribution can turn it off outright.
+² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle room** shows only while you're in a battle that has a room. An Open Annihilation battle has none, so its route goes to **Battles**. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead. **Server admin** shows only while a connected account is a moderator or admin on an uberserver lobby (never on Teiserver or Zero-K), and is also on the profile's `hide` list, so a distribution can turn it off outright.
 
 > Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `career.overview`, `conquest.list`, `library.games`, `library.rapid`, `hub.browse`, `multiplayer.admin`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
 >
@@ -70,22 +70,22 @@ These are hidden unless **Advanced mode** is on (Settings > General). They're mo
 | Library          | Rapid repositories | `#/library/rapid` | `library.rapid`      |
 | uberstress       | Run         | `#/uberstress`         | `uberstress.run`       |
 | uberstress       | History     | `#/uberstress/history` | `uberstress.history`   |
-| Campaign Builder | Campaigns   | `#/campaign-builder`   | `campaign.builder`     |
-| Campaign Builder | Scenarios   | `#/scenario-builder`   | `scenario.builder`     |
-| Mapping Tools    | Projects    | `#/mapconv/projects`   | `mapconv.projects`     |
-| Mapping Tools    | Compile     | `#/mapconv`            | `mapconv.compile`      |
-| Mapping Tools    | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
+| Campaign builder | Campaigns   | `#/campaign-builder`   | `campaign.builder`     |
+| Campaign builder | Scenarios   | `#/scenario-builder`   | `scenario.builder`     |
+| Mapping tools    | Projects    | `#/mapconv/projects`   | `mapconv.projects`     |
+| Mapping tools    | Compile     | `#/mapconv`            | `mapconv.compile`      |
+| Mapping tools    | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
 | animation        | BOS → Lua   | `#/animation`          | `animation.bos2lua`    |
 | animation        | COB tools   | `#/animation/cob`      | `animation.cob`        |
 | unit builder     | Models      | `#/lego`               | `lego.units`           |
-| unit builder     | Lego Parts  | `#/lego/parts`         | `lego.parts`           |
+| unit builder     | Lego parts  | `#/lego/parts`         | `lego.parts`           |
 | workshop         | Unit tweaks | `#/workshop`           | `workshop.units`       |
 
-(Mapping Tools and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)
+(Mapping tools and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)
 
-The Mapping Tools group keeps the nav group id `mapconv`, the `#/mapconv/*` paths and the `mapconv` settings section. Only the sidebar label changed, because mapconv is the name of the tool itself.
+The Mapping tools group keeps the nav group id `mapconv`, the `#/mapconv/*` paths and the `mapconv` settings section. Only the sidebar label changed, because mapconv is the name of the tool itself.
 
-**Campaign Builder** is one sidebar group (nav group id `builder`), shared by the campaign and scenario plugins. It is not two separate "Campaign Builder" and "Scenario Builder" groups. `src/scenario/index.ts` registers its item into the same `builder` group under the label "Campaign Builder", so the two items merge into one group in the sidebar.
+**Campaign builder** is one sidebar group (nav group id `builder`), shared by the campaign and scenario plugins. It is not two separate "Campaign builder" and "Scenario builder" groups. `src/scenario/index.ts` registers its item into the same `builder` group under the label "Campaign builder", so the two items merge into one group in the sidebar.
 
 ## Detail pages
 
@@ -127,7 +127,7 @@ Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hi
 | ------------------------ | ------------------ | ------------------------------- |
 | General                  | `general`          | `#/settings/general`           |
 | Appearance                | `frame.appearance` | `#/settings/frame.appearance`  |
-| Engine Settings           | `engine-settings`  | `#/settings/engine-settings`   |
+| Engine settings           | `engine-settings`  | `#/settings/engine-settings`   |
 | → Display                | `engine-display`   | `#/settings/engine-display`    |
 | → Graphics                | `engine-graphics`  | `#/settings/engine-graphics`   |
 | → Sound                    | `engine-sound`     | `#/settings/engine-sound`      |

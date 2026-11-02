@@ -20,7 +20,7 @@ Coilbox looks for `.coilbox/legoparts/` beside the executable first, then the bu
 
 A pack can add parts to another pack's atlas. That is an extension pack, and it is how a game adds its own pieces without reworking the texture or losing access to the ones already there.
 
-Extension packs live one folder each under `<data_dir>/lego/packs/`, alongside the projects and thumbnails. In portable mode that is inside `.coilbox`, so a distribution can ship extension packs the same way it ships everything else. The Lego Parts screen shows the exact path, but only when a pack fails to load.
+Extension packs live one folder each under `<data_dir>/lego/packs/`, alongside the projects and thumbnails. In portable mode that is inside `.coilbox`, so a distribution can ship extension packs the same way it ships everything else. The Lego parts screen shows the exact path, but only when a pack fails to load.
 
 ```
 <data_dir>/lego/packs/
@@ -48,7 +48,7 @@ An extension pack is a normal pack with three differences:
 }
 ```
 
-A pack that extends nothing, extends a pack that is not installed, or names a texture other than the base pack's is skipped, and the Lego Parts screen says why. The atlas rule is not a policy choice: an s3o names one texture and every piece in the model samples it, so a unit is bound to exactly one atlas and there is no way to export a mix.
+A pack that extends nothing, extends a pack that is not installed, or names a texture other than the base pack's is skipped, and the Lego parts screen says why. The atlas rule is not a policy choice: an s3o names one texture and every piece in the model samples it, so a unit is bound to exactly one atlas and there is no way to export a mix.
 
 A pack that brings its own atlas *instead of* parts is a different thing. See atlas packs below.
 
@@ -169,7 +169,7 @@ To state connectors, give a part a `connectors` list:
 
 A part with a `connectors` list uses that list and none of the derived ones. An empty list is allowed and means nothing joins to the part. A part with no `connectors` field gets derived ones, which is every part in the bundled pack. Extension packs follow the same rules.
 
-A list is used whole or not at all. If any connector in it is invalid, or two share an id, the part falls back to its derived connectors, and the Lego Parts screen reports the pack and the first part affected. Half a list would leave joins to the missing connectors broken without a word.
+A list is used whole or not at all. If any connector in it is invalid, or two share an id, the part falls back to its derived connectors, and the Lego parts screen reports the pack and the first part affected. Half a list would leave joins to the missing connectors broken without a word.
 
 Overriding a bundled part goes through `scripts/legopack/overrides.json` like the rest of a part's fields.
 
@@ -229,7 +229,7 @@ A shape is cut on a grid one `tile` wide, and each piece samples the swatch with
 
 The bundled pack has three swatches, team colour, tan and grey, each 64 pixels square. The team colour one is all team colour, as most of the team colour column of the atlas is. Tan is grainy concrete. Grey is a flat light grey.
 
-Only the base pack's swatches count. Extension packs and atlas packs use them. A base pack that lists none offers no shapes. A swatch with no id, an id another swatch has, a rectangle outside the atlas or a `tile` that is not a positive number is skipped, and the Lego Parts screen reports how many.
+Only the base pack's swatches count. Extension packs and atlas packs use them. A base pack that lists none offers no shapes. A swatch with no id, an id another swatch has, a rectangle outside the atlas or a `tile` that is not a positive number is skipped, and the Lego parts screen reports how many.
 
 Choose swatches with an 8 pixel margin of the same surface round each one. That keeps the smaller mipmap levels on the same surface at a tile edge, so filtering does not pull in a neighbouring panel.
 
@@ -250,7 +250,7 @@ The panel is fitted to the end, so it stretches as the radius grows. A tube's en
 
 The bundled pack's round panels are the seven spoked wheel drawn in each column, 66 pixels in radius. That is the pack's own density on an end 1.6 units in radius. At 3.2 units, twice that, the panel is soft but still reads as drawn. Past that it is visibly blurred.
 
-Only the base pack's round panels count, as with swatches. A panel with no id, an id another panel has, a circle that leaves the atlas or a radius that is not a positive number is skipped, and the Lego Parts screen reports how many.
+Only the base pack's round panels count, as with swatches. A panel with no id, an id another panel has, a circle that leaves the atlas or a radius that is not a positive number is skipped, and the Lego parts screen reports how many.
 
 ## parts.bin
 

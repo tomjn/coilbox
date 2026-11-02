@@ -10,13 +10,13 @@ Everything below is about authoring and shipping those missions — the mission 
 
 ## Author a campaign
 
-The **Campaign Builder** is an advanced-mode tool: turn on Advanced mode (Settings > General) to see **Campaign Builder** in the sidebar. From there you can create a campaign, add missions, and edit each mission's briefing, objectives, panorama and skirmish setup.
+The **Campaign builder** is an advanced-mode tool: turn on Advanced mode (Settings > General) to see **Campaign builder** in the sidebar. From there you can create a campaign, add missions, and edit each mission's briefing, objectives, panorama and skirmish setup.
 
 ### Step by step
 
-1. **Turn on Advanced mode** — Settings > General. **Campaign Builder** now appears in the sidebar (it lives in its own group, not under Play).
+1. **Turn on Advanced mode** — Settings > General. **Campaign builder** now appears in the sidebar (it lives in its own group, not under Play).
 2. **Set up a skirmish preset first.** A mission reuses a Singleplayer preset as its starting point, so go to **Play > Singleplayer**, configure the map, game, AI opponents, teams and mod options you want, and save it as a preset (the presets drawer, button next to Spectate).
-3. **Create a campaign** — Campaign Builder > New. Give it a title; optionally add a campaign icon and background image.
+3. **Create a campaign** — Campaign builder > New. Give it a title; optionally add a campaign icon and background image.
 4. **Add a mission** and open its editor. Attach the preset from step 2 — this **snapshots** its whole setup into the mission (see the note below). Then write the mission's briefing, objectives, and add any media.
 5. **Repeat** for each mission. Missions play in the order you list them.
 6. **Play-test** from the Campaigns list (visible once the campaign exists). Each mission launches like a normal skirmish; on exit Coilbox works out win/loss.
@@ -34,7 +34,7 @@ Missions carry more than a still panorama:
 
 How the files are stored depends on where the campaign comes from:
 
-- **Local (Campaign Builder)** campaigns import media into app-data: images are decoded and re-encoded, while audio/video are copied verbatim (they're streamed to the app, never re-encoded or inlined as data URIs).
+- **Local (Campaign builder)** campaigns import media into app-data: images are decoded and re-encoded, while audio/video are copied verbatim (they're streamed to the app, never re-encoded or inlined as data URIs).
 - **Bundled / distribution** campaigns reference files by relative path from the `.coilbox/` folder (a `"local"` media reference) — the same mechanism a [distribution profile](distribution-profile.md) uses for welcome-screen media. This is how a campaign ships audio/video, which are too large to inline (see *Export / import* below).
 
 ### Unit restrictions
@@ -52,7 +52,7 @@ A [scenario](scenarios.md#restrictions) has restrictions of its own, which are a
 
 A mission wraps a scenario and adds presentation. The scenario is everything in the game (spawns, zones, triggers, objectives, dialogue), and the mission is everything the player sees before the engine starts (briefing, panorama, side graphic, voiceover, cutscene). A mission with no scenario is the kind campaigns have always had, and still plays as an ordinary skirmish. Nothing needed migrating.
 
-Author the scenario first, in the [Scenario Builder](scenarios.md), then attach it. Two ways:
+Author the scenario first, in the [Scenario builder](scenarios.md), then attach it. Two ways:
 
 - **From scenario** beside the Missions header builds a whole new mission around a scenario, titled after it.
 - The **Scenario** field in a mission's editor attaches one to a mission you already have, with **Attach scenario** or **Change scenario**.
@@ -87,7 +87,7 @@ Export and import carry the copies. The bundled atlas is never put in the file, 
 
 ## Export and import
 
-A campaign can be exported to a single `.json` file (Campaign Builder > a campaign > Export) for sharing. The export format:
+A campaign can be exported to a single `.json` file (Campaign builder > a campaign > Export) for sharing. The export format:
 
 ```json
 {
@@ -97,7 +97,7 @@ A campaign can be exported to a single `.json` file (Campaign Builder > a campai
 }
 ```
 
-Any campaign **images** are inlined as base64 `data:` URIs, so the file is self-contained — no separate images to send along. Each [unit copy](#units-from-the-unit-builder) is carried the same way: export puts its `unit.json` and textures into the file, and import writes them back. Import (Campaign Builder > Import) reads the same file back and validates it before adding it as an editable local campaign; a malformed or unrecognised file is rejected with an inline error rather than crashing anything.
+Any campaign **images** are inlined as base64 `data:` URIs, so the file is self-contained — no separate images to send along. Each [unit copy](#units-from-the-unit-builder) is carried the same way: export puts its `unit.json` and textures into the file, and import writes them back. Import (Campaign builder > Import) reads the same file back and validates it before adding it as an editable local campaign; a malformed or unrecognised file is rejected with an inline error rather than crashing anything.
 
 **Audio and video are not inlined** (they'd be far too large, and can't be streamed from a data URI). A single-file export of a campaign that uses imported audio/video therefore keeps references that only resolve on the machine that authored it. To distribute a campaign with audio/video, bundle it (below) and ship the media files alongside it, referenced by relative path.
 
@@ -119,7 +119,7 @@ A [distribution profile](distribution-profile.md) can ship one or more campaigns
     briefings/
 ```
 
-Each file in `campaigns/` is an exported campaign, dropped in as-is: export from Campaign Builder and save the resulting `.json` as `.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner `campaign` object without the export wrapper — is also accepted.) Images are embedded in the export, so a still-image campaign is a single self-contained file.
+Each file in `campaigns/` is an exported campaign, dropped in as-is: export from Campaign builder and save the resulting `.json` as `.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner `campaign` object without the export wrapper — is also accepted.) Images are embedded in the export, so a still-image campaign is a single self-contained file.
 
 To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](../images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media.
 

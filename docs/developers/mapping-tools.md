@@ -2,7 +2,7 @@
 
 Coilbox can build a map for the engine from a set of images, and take an existing map apart back into those images. It does this with SpringMapConvNG, a map compiler that comes with coilbox, so there is nothing else to install.
 
-The tools are under Mapping Tools in the sidebar:
+The tools are under Mapping tools in the sidebar:
 
 - Projects lists the maps you have compiled or decompiled.
 - Compile builds a map from your images.
@@ -10,14 +10,14 @@ The tools are under Mapping Tools in the sidebar:
 
 This page covers what is on each screen. The detail of the map format, such as how to paint a heightmap or what goes in `mapinfo.lua`, belongs to the engine's own guides. See [Map making guides](#map-making-guides) at the end.
 
-## Turn on Mapping Tools
+## Turn on Mapping tools
 
-Mapping Tools is hidden until you turn on Advanced mode.
+Mapping tools is hidden until you turn on Advanced mode.
 
 1. Open Settings, then General.
 2. Under Advanced tools, turn on Advanced mode.
 
-Mapping Tools now appears in the sidebar, with Projects, Compile and Decompile under it.
+Mapping tools now appears in the sidebar, with Projects, Compile and Decompile under it.
 
 ## What a map is made of
 
@@ -37,7 +37,7 @@ Only the main texture is required. Images can be PNG, BMP, TGA, JPEG or TIFF.
 
 ## Compile a map
 
-1. Open Mapping Tools > Compile.
+1. Open Mapping tools > Compile.
 2. Next to Main texture (-t), select Browse and pick your texture.
 3. Next to Output folder, select Browse and pick the folder to write the map to.
 4. Type a name in Output name (-o). This is the file name of the `.smf` and `.smt`, without the extension.
@@ -118,7 +118,7 @@ The question mark beside a field explains it. Learn more opens the matching page
 
 Decompiling takes a map apart into its images, so you can change a map or see how one was made.
 
-1. Open Mapping Tools > Decompile.
+1. Open Mapping tools > Decompile.
 2. Choose the map. Select Browse to pick a `.smf`, `.sdz` or `.sd7` file, or drag the file onto the window. For a map that is a `.sdd` folder, select Pick a .sdd folder….
 3. Select Decompile.
 
@@ -137,7 +137,7 @@ You can also start from a map you already have. Open Library > Maps, select the 
 
 ## Projects
 
-Every map you compile or decompile is added to Mapping Tools > Projects, so you can come back to it.
+Every map you compile or decompile is added to Mapping tools > Projects, so you can come back to it.
 
 Each project shows a picture of the map, its name, whether it was compile or decompiled, and its folder.
 
