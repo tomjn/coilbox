@@ -99,6 +99,7 @@ import { diffRestrictTags } from "./restrictTags";
 import { type DeliveryProgress, optionTagSlots } from "./tweakDelivery";
 import { useCompatBattle } from "./useCompatBattle";
 import { useEngineVersionCheck } from "./useEngineVersionCheck";
+import { useStartBoxOverride } from "./useStartBoxOverride";
 import { type TweakDelivery, useTweakDelivery } from "./useTweakDelivery";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
@@ -1411,12 +1412,14 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // drives the rects over the protocol (ADDSTARTRECT/REMOVESTARTRECT); an autohost
   // battle goes through SPADS `!addbox`/`!clearbox`, whose teamNb is 1-based (so we
   // send `ally + 1`) and which requires startPosType 2 (gated by `canEditBoxes`).
+  const noteBoxEdit = useStartBoxOverride(battle, rows, sendOption);
   const setStartBox = useCallback(
     (
       ally: number,
       rect: { left: number; top: number; right: number; bottom: number },
     ) => {
       if (!activeKey) return;
+      noteBoxEdit({ ally, rect });
       if (isFounder) {
         mpSetStartRect({ serverKey: activeKey, ally, ...rect }).then(
           clearErr,
@@ -1428,12 +1431,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         );
       }
     },
-    [activeKey, isFounder, autohostSend, clearErr, setErr],
+    [activeKey, isFounder, autohostSend, clearErr, setErr, noteBoxEdit],
   );
 
   const clearStartBox = useCallback(
     (ally: number) => {
       if (!activeKey) return;
+      noteBoxEdit({ ally, rect: null });
       if (isFounder) {
         mpRemoveStartRect({ serverKey: activeKey, ally }).then(
           clearErr,
@@ -1443,7 +1447,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         autohostSend(`!clearbox ${ally + 1}`);
       }
     },
-    [activeKey, isFounder, autohostSend, clearErr, setErr],
+    [activeKey, isFounder, autohostSend, clearErr, setErr, noteBoxEdit],
   );
 
   const rescan = useCallback(async () => {

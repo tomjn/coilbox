@@ -15,10 +15,12 @@ import {
   MapOverlayImage,
   useMapOverlayLayer,
 } from "@/play/pages/components/MapOverlay";
+import { arrangementAreas } from "@/startbox/barBoxes";
 import type { StartRect } from "@/startbox/geometry";
 import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import { StartPolygonOverlay } from "@/startbox/StartPolygonOverlay";
+import { useBarStartBoxes } from "@/startbox/useBarStartBoxes";
 import { useZerokStartBoxes } from "@/startbox/useZerokStartBoxes";
 import { areasFromConfig, mapExtent, roomShape } from "@/startbox/zerok";
 import type { Battle } from "../bindings";
@@ -177,6 +179,24 @@ export function BattleMapCard({
   const fileAreas = fileBoxes ? areasFromConfig(fileBoxes) : null;
   const editBoxes = canEditBoxes && !fileAreas;
 
+  // BAR sends the shapes its game will use in two hidden options, because the
+  // lobby protocol only carries rectangles (issue #343). They are drawn in place
+  // of the rectangles, which need the map's size to place, so a map that is not
+  // installed keeps its rectangles.
+  const barBoxes = useBarStartBoxes(
+    battle.scriptTags,
+    roomShape(players.map((r) => ({ ally: r.ally, bot: r.kind === "bot" })))
+      .length,
+  );
+  const barAreas =
+    boxMode && !fileAreas && barBoxes && extent
+      ? arrangementAreas(barBoxes.arrangement, extent)
+      : null;
+  // A set is not the lobby's rectangles, so the editor starts empty over it. An
+  // override is, because editing sends both together.
+  const editorRects =
+    barAreas && barBoxes?.source === "set" ? {} : battle.startRects;
+
   return (
     <div className="space-y-2">
       <MapCard
@@ -216,16 +236,23 @@ export function BattleMapCard({
             )}
             {fileAreas ? (
               <StartPolygonOverlay areas={fileAreas} extent={extent} />
-            ) : editBoxes ? (
-              <StartBoxEditor
-                rects={battle.startRects}
-                activeAlly={activeAlly}
-                onCommit={onSetBox}
-                onClear={onClearBox}
-              />
-            ) : showBoxes ? (
-              <StartBoxOverlay rects={battle.startRects} />
-            ) : null}
+            ) : (
+              <>
+                {barAreas && (
+                  <StartPolygonOverlay areas={barAreas} extent={extent} />
+                )}
+                {editBoxes ? (
+                  <StartBoxEditor
+                    rects={editorRects}
+                    activeAlly={activeAlly}
+                    onCommit={onSetBox}
+                    onClear={onClearBox}
+                  />
+                ) : barAreas ? null : showBoxes ? (
+                  <StartBoxOverlay rects={battle.startRects} />
+                ) : null}
+              </>
+            )}
           </>
         }
         placeholder={
