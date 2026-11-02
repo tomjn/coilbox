@@ -39,7 +39,7 @@ import * as THREE from "three";
 
 import type { Rect } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/lib/mapScene";
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 import { dragKeys, type Placement } from "./placements";
 import {
   clampToMap,

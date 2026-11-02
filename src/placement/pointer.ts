@@ -8,7 +8,7 @@
  * is the document's own business, and for a scenario it is in `editing.ts`.
  */
 
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 
 /** How far a pointer may travel between press and release and still count as a
  *  click, in CSS pixels. Wide enough to survive a shaky hand, narrow enough that

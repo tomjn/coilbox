@@ -21,7 +21,7 @@
  */
 
 import { BUILD_SQUARE } from "@/blueprint/footprint";
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 
 /**
  * The step an arrow takes, in elmos.

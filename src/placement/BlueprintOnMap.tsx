@@ -41,8 +41,8 @@ import { strayDefs } from "@/lib/scenarioEditing/bases";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { usePreferredTarget } from "@/play/config";
 import { MapPickerDrawer } from "@/play/pages/components/MapPickerDrawer";
-import type { Point } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
+import type { Point } from "./geometry";
 import { layoutFraming } from "./ground";
 import { LayoutNotes, UncheckedNote, WaterlessNote } from "./LayoutControls";
 import {

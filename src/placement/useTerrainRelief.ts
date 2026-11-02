@@ -22,7 +22,7 @@ import {
 import type { BlueprintBuilding, TerrainStep } from "@/blueprint/model";
 import type { LayoutPlacement, StepResult } from "@/blueprint/terraform";
 import type { MapScene3D } from "@/lib/mapScene";
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 import { drawRelief, easeRelief, type HeightRange } from "./reliefSurface";
 import { groundHeight } from "./terrain";
 import {

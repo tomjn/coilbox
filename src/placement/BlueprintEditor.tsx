@@ -75,9 +75,10 @@ import {
   removeStep,
   setStep,
 } from "@/lib/scenarioEditing/terrain";
-import { baseBuildings, type Point } from "@/scenario/model";
+import { baseBuildings } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
+import type { Point } from "./geometry";
 import {
   GRID_EXTENT,
   GRID_ORIGIN,
