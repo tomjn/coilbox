@@ -434,6 +434,36 @@ describe("GameUnitPage", () => {
     expect(section.getByText("150")).toBeTruthy();
   });
 
+  it("lists a ladder past ten stages in order and words an evolution plainly (issue #5000)", async () => {
+    // Beyond All Reason's commander: armcomlvl2 to armcomlvl10, each stage
+    // reaching the next by `evolves: true`. Sorted by name, level 10 came first.
+    const levels = Array.from({ length: 9 }, (_, i) => `armcomlvl${i + 2}`);
+    renderUnit(
+      "armcomlvl2",
+      levels.map((name, i) => ({
+        name,
+        fullName: `Armada Commander Level ${i + 2}`,
+        morphTargets:
+          i + 1 < levels.length ? [{ into: levels[i + 1], evolves: true }] : [],
+      })),
+    );
+    const heading = await screen.findByRole("heading", {
+      name: "Upgrade path",
+    });
+    // biome-ignore lint/style/noNonNullAssertion: the heading's own section is always its parent
+    const section = heading.closest("section")!;
+    const shown = [...section.querySelectorAll("li")]
+      .map((li) => li.textContent ?? "")
+      .map((text) => /armcomlvl\d+/.exec(text)?.[0])
+      .filter((key): key is string => !!key);
+    expect(shown).toEqual(levels);
+
+    const text = section.textContent ?? "";
+    expect(text).toContain("Evolves by itself");
+    expect(text).not.toContain("evolves");
+    expect(text).not.toContain("true");
+  });
+
   it("asks the hero to draw the stage on screen, not another stage's model", async () => {
     // SplinterFaction's real fedcommander/fedcommander_up1..4 (issue #2063
     // again): every stage carries its own `objectname` (fedcommander2.s3o,

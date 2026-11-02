@@ -21389,6 +21389,10 @@ msgstr "Усе, що містить цей сценарій, розміщене 
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr "Усе, у що можна грати, і все, що хаб уміє завантажити."
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Evolves by itself"
+msgstr ""
+
 #: src/placement/mapLoad.ts
 #, fuzzy
 msgid "Exact heights"

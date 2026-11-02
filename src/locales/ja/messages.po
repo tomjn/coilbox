@@ -21389,6 +21389,10 @@ msgstr "このシナリオに含まれるすべてのもの（配置の有無を
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr "プレイできるすべてのものと、ハブが取得できるすべてのもの。"
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Evolves by itself"
+msgstr ""
+
 #: src/placement/mapLoad.ts
 #, fuzzy
 msgid "Exact heights"

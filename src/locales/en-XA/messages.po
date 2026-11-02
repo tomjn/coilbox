@@ -17408,6 +17408,10 @@ msgstr ""
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Evolves by itself"
+msgstr ""
+
 #: src/placement/mapLoad.ts
 msgid "Exact heights"
 msgstr ""

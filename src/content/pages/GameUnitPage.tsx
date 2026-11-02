@@ -14,6 +14,7 @@ import {
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
 } from "../config";
+import { splitMorphConditions } from "../morphConditions";
 import { groupOf, morphEdgeMap, morphGroups } from "../morphGraph";
 import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
@@ -96,9 +97,8 @@ export default function GameUnitPage() {
   const builtBy = [...(builtByMap.get(id) ?? [])];
 
   // This unit's whole morph group: every stage from the ladder's bottom rung
-  // to its top, in the order `morphGroups` (`morphGraph.ts`, vendored byte
-  // identical into the hub, so it is read here rather than reimplemented)
-  // already gives them. A unit with no morph edge at all is in no group, so
+  // to its top, in the order `morphGroups` (`morphGraph.ts`) already gives
+  // them. A unit with no morph edge at all is in no group, so
   // `stageChain` comes back empty and the section built from it stays
   // hidden rather than showing a chain of one.
   const morphGroupList = morphGroups(dataset?.units ?? []);
@@ -511,25 +511,29 @@ export default function GameUnitPage() {
           </h2>
           <ol className="flex flex-col gap-1.5">
             {stageChain.map((stageId, i) => {
-              const conditions =
-                i > 0 ? edgeConditions(stageChain[i - 1], stageId) : [];
+              const { evolves, rest: conditions } = splitMorphConditions(
+                i > 0 ? edgeConditions(stageChain[i - 1], stageId) : [],
+              );
               return (
                 <li key={stageId} className="flex flex-col gap-1.5">
                   {/* What it costs to reach this stage from the one above it,
                       so the cost sits with the stage it buys rather than
                       trailing the stage it leaves. The top stage has nothing
                       above it, so it carries no cost row. */}
-                  {conditions.length > 0 && (
+                  {(evolves || conditions.length > 0) && (
                     <div className="flex items-start gap-2 pl-5 text-xs text-muted-foreground">
                       <ArrowDown className="size-3.5 shrink-0" aria-hidden />
-                      <dl className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {conditions.map(([key, value]) => (
-                          <div key={key} className="flex gap-1">
-                            <dt>{key}:</dt>
-                            <dd>{String(value)}</dd>
-                          </div>
-                        ))}
-                      </dl>
+                      {evolves && <p>{t`Evolves by itself`}</p>}
+                      {conditions.length > 0 && (
+                        <dl className="flex flex-wrap gap-x-3 gap-y-0.5">
+                          {conditions.map(([key, value]) => (
+                            <div key={key} className="flex gap-1">
+                              <dt>{key}:</dt>
+                              <dd>{String(value)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
                     </div>
                   )}
                   <UpgradeStageRow
