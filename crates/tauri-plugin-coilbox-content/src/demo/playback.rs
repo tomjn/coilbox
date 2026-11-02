@@ -3598,8 +3598,8 @@ end
     /// - `COILBOX_PLAYBACK_WALK_PIECES` names the posed pieces that a unit's
     ///   walk turns, which the player leaves to the unit's own script once it
     ///   is told its unit moves (issue #3797), and which the looks then leave
-    ///   out ([`walk_pieces`]). The whole match of Splinter Faction needs
-    ///   `fedstorm:rfoot+rleg+rthigh`.
+    ///   out ([`walk_pieces`]). A track of the whole match of Splinter Faction
+    ///   recorded before issue #3941 needs `fedstorm:rfoot+rleg+rthigh`.
     #[test]
     #[ignore = "needs an engine, a game, a map and a replay of a whole match on them"]
     fn aim_poses_follow_the_track_in_the_engine() {
