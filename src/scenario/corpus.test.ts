@@ -354,13 +354,21 @@ describe("scenario fixture corpus", () => {
   });
 
   /**
-   * `ScenarioOrder` in model.ts allows five kinds: `move`, `patrol` and
-   * `fight` (a waypoint list) or `guard` and `attack` (a target). Before this
+   * `ScenarioOrder` in model.ts allows six kinds: `move`, `patrol` and
+   * `fight` (a waypoint list), `guard` and `attack` (a target) or `hunt` (a
+   * participant). Before this
    * fixture only ever used `guard` and `attack`, which is also the gap issue
    * #811 named. An order appears either as a group's opening orders or as the
    * payload of a `give_orders` action, so both are read.
    */
-  const ORDER_KINDS = ["move", "patrol", "fight", "guard", "attack"] as const;
+  const ORDER_KINDS = [
+    "move",
+    "patrol",
+    "fight",
+    "guard",
+    "attack",
+    "hunt",
+  ] as const;
 
   function orderKindsOf(orders: unknown): string[] {
     if (!Array.isArray(orders)) return [];

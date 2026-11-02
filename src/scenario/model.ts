@@ -137,11 +137,13 @@ export type ScenarioActor = {
 /**
  * An order for a group, used both as a group's opening orders and as the
  * payload of a `give_orders` action. `target` on a guard or attack order is an
- * actor id or a group id.
+ * actor id or a group id. `team` on a hunt order is a participant id, and the
+ * runtime keeps sending the group at the nearest unit that team has (issue #903).
  */
 export type ScenarioOrder =
   | { kind: "move" | "patrol" | "fight"; waypoints: Point[] }
-  | { kind: "guard" | "attack"; target: string };
+  | { kind: "guard" | "attack"; target: string }
+  | { kind: "hunt"; team: string };
 
 /** A count of one unit type within a group. */
 export type GroupUnit = { def: string; count: number };
@@ -539,6 +541,11 @@ function parseOrder(value: unknown): ScenarioOrder | null {
   if (kind === "guard" || kind === "attack") {
     const target = id(value.target);
     return target === undefined ? null : { kind, target };
+  }
+  if (kind === "hunt") {
+    // Empty is an order whose team is not picked yet, which the validator names,
+    // so saving a half made order does not cost the author the document.
+    return typeof value.team === "string" ? { kind, team: value.team } : null;
   }
   return null;
 }

@@ -986,6 +986,7 @@ if gadgetHandler:IsSyncedCode() then
 		-- The engine owns how often it actually evaluates. A mission that has
 		-- ended evaluates nothing: the result is already in the replay.
 		if not gameOver.isOver() then
+			groups.hunt(frame)
 			triggers:frame(frame)
 		end
 	end

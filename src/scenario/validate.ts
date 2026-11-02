@@ -179,15 +179,30 @@ function resolve(
  * A `guard` or `attack` order aims at one thing the mission placed, which the
  * document allows to be an actor, a named prefab building or a group, so the
  * target resolves against both registries. The first two share a registry.
+ *
+ * A `hunt` order names a participant, and one the group itself belongs to is a
+ * group walking at its own side, so `ownTeam` is passed when it is known.
  */
 function checkOrders(
   value: unknown,
   path: string,
   known: Registry,
   issues: MissionIssue[],
+  ownTeam?: unknown,
 ): void {
   asArray(value).forEach((raw, index) => {
     const order = asRecord(raw);
+    if (order.kind === "hunt") {
+      const where = `${path}[${index}].team`;
+      resolve("teamId", order.team, where, known, issues);
+      if (order.team !== "" && order.team === ownTeam) {
+        issues.push({
+          path: where,
+          message: t`a group cannot hunt its own team`,
+        });
+      }
+      return;
+    }
     if (!("target" in order)) return;
     const where = `${path}[${index}].target`;
     const target = order.target;
@@ -236,6 +251,7 @@ function checkStep(
   path: string,
   known: Registry,
   issues: MissionIssue[],
+  groupTeams: Map<unknown, unknown>,
 ): void {
   const step = asRecord(raw);
   const type = typeof step.type === "string" ? step.type : "";
@@ -247,7 +263,7 @@ function checkStep(
     const where = `${path}.params.${name}`;
     const value = params[name];
     if (param.kind === "orders") {
-      checkOrders(value, where, known, issues);
+      checkOrders(value, where, known, issues, groupTeams.get(params.group));
       continue;
     }
     if (param.kind === "amount") {
@@ -701,6 +717,12 @@ export function validateMission(
   }
   const issues: MissionIssue[] = [];
   const known = registries(mission);
+  const groupTeams = new Map<unknown, unknown>(
+    asArray(mission.groups).map((raw) => {
+      const entry = asRecord(raw);
+      return [entry.id, entry.team];
+    }),
+  );
 
   // A team with no engine team number cannot be spawned for. The emitter keeps
   // the entry rather than dropping it precisely so this is sayable.
@@ -719,7 +741,7 @@ export function validateMission(
       const where = at(list, entry, index);
       resolve("teamId", entry.team, `${where}.team`, known, issues);
       if (list === "groups") {
-        checkOrders(entry.orders, `${where}.orders`, known, issues);
+        checkOrders(entry.orders, `${where}.orders`, known, issues, entry.team);
       }
     });
   }
@@ -735,10 +757,18 @@ export function validateMission(
         `${where}.conditions[${i}]`,
         known,
         issues,
+        groupTeams,
       );
     });
     asArray(trigger.actions).forEach((action, i) => {
-      checkStep(action, ACTION_TYPES, `${where}.actions[${i}]`, known, issues);
+      checkStep(
+        action,
+        ACTION_TYPES,
+        `${where}.actions[${i}]`,
+        known,
+        issues,
+        groupTeams,
+      );
     });
   });
 

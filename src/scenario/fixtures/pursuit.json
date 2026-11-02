@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 2,
+  "id": "pursuit",
+  "name": "Pursuit",
+  "description": "A squad told to hunt the player, whose only units are a solar collector near it and an invulnerable one further off. Proves a group attacks a team's nearest unit, moves on when that unit dies, follows a unit that has moved, and stops ordering once the team has nothing left.",
+  "runtimeVersion": 12,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Commander",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "raiders",
+        "kind": "ai",
+        "name": "Raiders",
+        "side": "core",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {
+    "player": {
+      "noCommander": true
+    },
+    "raiders": {
+      "noCommander": true
+    }
+  },
+  "zones": [],
+  "actors": [
+    {
+      "id": "near",
+      "unitDef": "armsolar",
+      "team": "player",
+      "pos": {
+        "x": 1800,
+        "z": 2400
+      },
+      "facing": 0
+    },
+    {
+      "id": "far",
+      "unitDef": "armsolar",
+      "team": "player",
+      "pos": {
+        "x": 1200,
+        "z": 1200
+      },
+      "facing": 0,
+      "state": {
+        "invulnerable": true
+      }
+    }
+  ],
+  "groups": [
+    {
+      "id": "hunters",
+      "team": "raiders",
+      "units": [
+        {
+          "def": "corak",
+          "count": 3
+        }
+      ],
+      "pos": {
+        "x": 2400,
+        "z": 2400
+      },
+      "orders": [
+        {
+          "kind": "hunt",
+          "team": "player"
+        }
+      ],
+      "dormant": false
+    }
+  ],
+  "blueprints": [],
+  "bases": [],
+  "restrictions": {},
+  "vars": {},
+  "triggers": [],
+  "objectives": [],
+  "dialogue": [],
+  "createdAt": "2026-11-02T00:00:00.000Z",
+  "updatedAt": "2026-11-02T00:00:00.000Z"
+}

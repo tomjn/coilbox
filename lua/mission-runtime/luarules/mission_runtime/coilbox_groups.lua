@@ -27,6 +27,13 @@
 -- builder the way a `guard` or an `attack` names its target, out of the same
 -- table, so an actor, a named base building and a group all work.
 --
+-- `hunt` is the order that goes on being given. It names a participant rather
+-- than a unit, so "go and kill the player" holds wherever the player has gone and
+-- whatever they have built since (issue #903). Each time a unit in the group runs
+-- out of orders it is sent to fight its way to the nearest unit that team has, so
+-- it engages what it meets on the way, moves on when that unit is dead or has
+-- left, and is given nothing while the team has nothing.
+--
 -- This module calls the engine, to create, order and hand over units. The
 -- layout of a spawned block is coilbox_start.lua's, and the creation itself is
 -- the gadget's, so the suppression window and the ground read stay in one place.
@@ -55,6 +62,11 @@ local WAYPOINT_COMMAND = {
 -- sane rather than pinning the unit down for the rest of the mission.
 local DEFAULT_MOVE_STATE = CMD.MOVESTATE_MANEUVER
 
+-- How many frames apart a hunting group looks for units with no orders left, which
+-- is once a game second. A unit stands for at most this long between targets, and
+-- the look costs one queue read per hunting unit.
+local HUNT_INTERVAL = Game.gameSpeed
+
 --- Register the group actions on a trigger engine.
 --
 -- @param engine the trigger engine
@@ -77,6 +89,8 @@ function M.register(engine, state, hooks)
 	local resting = {}
 	-- Group id -> true while it is running its orders.
 	local awake = {}
+	-- Group id -> the engine team it is hunting, while it is.
+	local hunting = {}
 
 	-- Trigger params name a participant, not an engine team, and the mapping is
 	-- fixed once the mission has started.
@@ -198,9 +212,26 @@ function M.register(engine, state, hooks)
 	-- Every unit gets the same queue. The first command replaces whatever the unit
 	-- was doing and the rest queue behind it, so an order list is one path rather
 	-- than a series of instructions each cancelling the last.
+	--
+	-- A `hunt` ends the list. Like a guard it never finishes, so nothing behind it
+	-- would come up. It gives no command of its own: the units walk whatever came
+	-- before it and handle.hunt picks them up once that is done. With nothing before
+	-- it they are stopped, because a patrol they were already on would never run
+	-- out.
 	local function issue(id, orders)
+		hunting[id] = nil
 		local commands = {}
 		for _, order in ipairs(orders or {}) do
+			if order.kind == "hunt" then
+				hunting[id] = engineTeam[order.team]
+				if not hunting[id] then
+					engine:report("hunt-team:" .. tostring(order.team), "error",
+						"no team named " .. tostring(order.team) .. " for a group to hunt")
+				elseif not commands[1] then
+					commands[1] = { cmd = CMD.STOP, params = {} }
+				end
+				break
+			end
 			if not commandsFor(order, commands) then
 				engine:report("order-kind:" .. tostring(order.kind), "warning",
 					"no implementation for order " .. tostring(order.kind) .. ", ignoring it")
@@ -212,6 +243,48 @@ function M.register(engine, state, hooks)
 				Spring.GiveOrderToUnit(unitID, command.cmd, command.params, index > 1 and QUEUED or 0)
 			end
 		end
+	end
+
+	--- Whether a unit is the runtime's own: an anchor, which keeps a team's unit
+	-- count above nothing, or a spotter. A team holding only those has nothing left
+	-- to hunt, and an anchor is parked in a corner of the map for nobody to reach.
+	--
+	-- Read through `state` rather than taken once, because both are registered
+	-- after this module and the answer is only ever needed on a later frame.
+	local function placed(unitID)
+		return (state.gameOver ~= nil and state.gameOver.isAnchor(unitID))
+			or (state.reveal ~= nil and state.reveal.isSpotter(unitID))
+	end
+
+	--- What is worth walking at: not something in the air, which a group with no
+	-- way to hit it would follow around the map, and not something cloaked, which it
+	-- would stand beside for good.
+	local function solid(unitID)
+		local def = UnitDefs[Spring.GetUnitDefID(unitID)]
+		return not (def and def.canFly) and not Spring.GetUnitIsCloaked(unitID)
+	end
+
+	--- Where the unit of `team` nearest to x, z stands, preferring a solid one and
+	-- taking anything over nothing. Nil when the team has no units.
+	local function nearestOf(team, x, z)
+		local anyX, anyZ, anyDistance = nil, nil, math.huge
+		local bestX, bestZ, bestDistance = nil, nil, math.huge
+		for _, unitID in ipairs(Spring.GetTeamUnits(team) or {}) do
+			local ux, _, uz = Spring.GetUnitPosition(unitID)
+			if ux and not placed(unitID) then
+				local distance = (ux - x) * (ux - x) + (uz - z) * (uz - z)
+				if distance < anyDistance then
+					anyX, anyZ, anyDistance = ux, uz, distance
+				end
+				if distance < bestDistance and solid(unitID) then
+					bestX, bestZ, bestDistance = ux, uz, distance
+				end
+			end
+		end
+		if bestX then
+			return bestX, bestZ
+		end
+		return anyX, anyZ
 	end
 
 	--- Hold a group where it stands.
@@ -365,6 +438,9 @@ function M.register(engine, state, hooks)
 		if not requireUnits(group, "gift") then
 			return
 		end
+		-- The engine clears a unit's queue when it changes hands, and a unit lent to
+		-- the player is not to be marched off again a second later.
+		hunting[group.id] = nil
 
 		local refused = 0
 		for _, unitID in ipairs(members[group.id]) do
@@ -402,10 +478,48 @@ function M.register(engine, state, hooks)
 			return
 		end
 		rouse(group.id)
+		hunting[group.id] = nil
 		local living = members[group.id]
 		for index = #living, 1, -1 do
 			groupOf[living[index]] = nil
 			living[index] = nil
+		end
+	end
+
+	--- Send every hunting group's unordered units at their quarry. Fed from the
+	-- gadget's GameFrame.
+	--
+	-- A group's units with orders cost one queue read each and nothing more. Only a
+	-- group with a unit standing idle reads the hunted team, and once however many
+	-- are idle: they all go to the unit nearest the first of them, so they stay a
+	-- group rather than each peeling off to its own target. The walk through the
+	-- scenario's list rather than `hunting` keeps the orders in a fixed sequence on
+	-- every client.
+	function handle.hunt(frame)
+		if frame % HUNT_INTERVAL ~= 0 then
+			return
+		end
+		for _, group in ipairs((state.mission or {}).groups or {}) do
+			local team = hunting[group.id]
+			if team then
+				local idle = {}
+				for _, unitID in ipairs(members[group.id]) do
+					local queue = Spring.GetUnitCommands(unitID, 1)
+					if queue and #queue == 0 then
+						idle[#idle + 1] = unitID
+					end
+				end
+				if idle[1] then
+					local x, _, z = Spring.GetUnitPosition(idle[1])
+					local toX, toZ = nearestOf(team, x, z)
+					if toX then
+						local params = { toX, Spring.GetGroundHeight(toX, toZ), toZ }
+						for _, unitID in ipairs(idle) do
+							Spring.GiveOrderToUnit(unitID, CMD.FIGHT, params, 0)
+						end
+					end
+				end
+			end
 		end
 	end
 

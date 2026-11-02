@@ -185,6 +185,10 @@ function M.newEngine(modOptions, files, options)
 		-- the whole of what the runtime does to a group, so they are recorded
 		-- rather than acted on.
 		orders = {},
+		-- unitID -> true while it has something in its queue. Set by any order but a
+		-- move state or a stop, and cleared by engine.idle, which stands for the unit
+		-- having finished what it was told.
+		busy = {},
 		-- Every unit def a Pos2BuildPos call named, so a test can say which
 		-- placements went through the build grid.
 		snapped = {},
@@ -331,6 +335,11 @@ function M.newEngine(modOptions, files, options)
 			end
 		end
 		return given
+	end
+
+	--- The unit has run out of orders.
+	function engine.idle(unitID)
+		engine.busy[unitID] = nil
 	end
 
 	local function fire(callin, ...)
@@ -584,6 +593,12 @@ function M.newEngine(modOptions, files, options)
 				end
 				return ids
 			end,
+			GetUnitCommands = function(unitID)
+				return engine.busy[unitID] and { {} } or {}
+			end,
+			GetUnitIsCloaked = function(unitID)
+				return engine.units[unitID].cloaked == true
+			end,
 			GetTeamUnits = function(team)
 				local ids = {}
 				for _, unitID in ipairs(engine.order) do
@@ -636,6 +651,11 @@ function M.newEngine(modOptions, files, options)
 			-- when it puts a group to sleep, so the stub has to keep it.
 			GiveOrderToUnit = function(unitID, cmd, params, opts)
 				table.insert(engine.orders, { unitID, cmd, params, opts })
+				if cmd == engine.env.CMD.STOP then
+					engine.busy[unitID] = nil
+				elseif cmd ~= engine.env.CMD.MOVE_STATE then
+					engine.busy[unitID] = true
+				end
 				if cmd == engine.env.CMD.MOVE_STATE then
 					engine.units[unitID].movestate = params[1]
 				end

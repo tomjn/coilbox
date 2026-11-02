@@ -186,6 +186,28 @@ function usesBaseTerrain(scenario: Scenario): boolean {
  */
 const STARTS_ASLEEP_VERSION = 11;
 
+/**
+ * The runtime that first hunted a participant (issue #903). A runtime behind this
+ * reports the order as unknown and the group stands where it is, so the attack
+ * the mission was built around never comes.
+ */
+const HUNT_VERSION = 12;
+
+/** Whether any group is told to hunt, at the start or by a `give_orders`. */
+function huntsAParticipant(scenario: Scenario): boolean {
+  const hunts = (orders: unknown) =>
+    Array.isArray(orders) &&
+    orders.some((order) => (order as { kind?: unknown })?.kind === "hunt");
+  return (
+    scenario.groups.some((group) => hunts(group.orders)) ||
+    scenario.triggers.some((trigger) =>
+      trigger.actions.some(
+        (step) => step.type === "give_orders" && hunts(step.params.orders),
+      ),
+    )
+  );
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -271,6 +293,9 @@ export function requiredRuntimeVersion(
   }
   if (scenario.groups.some(holdsAtStart)) {
     version = Math.max(version, STARTS_ASLEEP_VERSION);
+  }
+  if (huntsAParticipant(scenario)) {
+    version = Math.max(version, HUNT_VERSION);
   }
   return version;
 }

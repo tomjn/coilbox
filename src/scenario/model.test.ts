@@ -353,6 +353,24 @@ describe("parseScenario — groups", () => {
       ),
     ).toBeNull();
   });
+
+  it("reads a hunt order, including one with no team picked yet", () => {
+    const orders = [
+      { kind: "hunt", team: "player" },
+      { kind: "hunt", team: "" },
+    ];
+    expect(
+      parseScenario(doc({ groups: [{ ...group, orders }] }))?.groups[0].orders,
+    ).toEqual(orders);
+  });
+
+  it("refuses a hunt order with no team field", () => {
+    expect(
+      parseScenario(
+        doc({ groups: [{ ...group, orders: [{ kind: "hunt" }] }] }),
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("parseScenario — bases", () => {

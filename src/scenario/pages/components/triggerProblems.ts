@@ -20,7 +20,7 @@
  * trigger's list, because `trigger()` maps each list in order with no
  * reindexing. A parameter sits under `.params.<name>`, which also catches
  * what `validate.ts` reports underneath it: an `amount`'s `.var`, and an
- * `orders` parameter's `[n].target`. A group's own `orders` field is checked
+ * `orders` parameter's `[n].target` or `[n].team`. A group's own `orders` field is checked
  * the same `checkOrders` way, directly under `groups["<id>"].orders`, with no
  * `.params` in between.
  */
@@ -99,7 +99,7 @@ export function triggerFieldProblem(
 /**
  * What is wrong with one field of one entry of a registry the validator names
  * by id: an actor's, a group's or a base's own `team`, an actor's, a group's
- * or a base's own `difficulty`, or one of a group's own `orders[<i>].target`
+ * or a base's own `difficulty`, or one of a group's own `orders[<i>].target` or `.team`
  * (issue #2307). The same match {@link triggerFieldProblem} makes for a
  * trigger's own field, generalised to `list` so a caller names the registry
  * it is asking about: `"actors"`, `"groups"` or `"prefabs"` (the compiled

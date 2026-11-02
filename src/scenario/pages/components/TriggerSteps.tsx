@@ -55,7 +55,13 @@ import {
 } from "../../triggerTypes";
 import type { MissionIssue } from "../../validate";
 import { OrderRow } from "./GroupControls";
-import { orderOfKind, targetOptions, withOrder, withoutOrder } from "./groups";
+import {
+  huntableTeams,
+  orderOfKind,
+  targetOptions,
+  withOrder,
+  withoutOrder,
+} from "./groups";
 import { FieldProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
 import { paramProblem } from "./triggerProblems";
@@ -973,6 +979,7 @@ function OrdersField({
 }) {
   const orders = paramOrders(raw);
   const targets = targetOptions(scenario);
+  const teams = huntableTeams(scenario.setup.participants);
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a list of order rows and an "add" button are a role=group cluster, not a form <fieldset>
@@ -994,6 +1001,7 @@ function OrdersField({
           key={`${index}-${order.kind}`}
           order={order}
           targets={targets}
+          teams={teams}
           drawing={isAsking(picking, { ref: at, param: name, order: index })}
           onDraw={(on) =>
             onPick(on ? { ref: at, param: name, order: index } : null)

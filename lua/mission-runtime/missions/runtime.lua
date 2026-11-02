@@ -126,8 +126,17 @@
 -- A runtime behind 11 reads past the field and sets the group off on its orders
 -- at the first frame. So a scenario using it asks for 11.
 
+-- 12 is a group hunting a participant (issue #903). One format feature:
+--
+--   * an order may be `{ kind = "hunt", team = <participant> }`, on a group or in
+--     `give_orders`, and then the group is sent again and again at the nearest
+--     unit that team has
+--
+-- A runtime behind 12 reports the kind as unknown and the group stands still. So
+-- a scenario using it asks for 12.
+
 return {
-	version = 11,
+	version = 12,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

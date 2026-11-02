@@ -51,6 +51,7 @@ import { DifficultyRangeFields } from "./DifficultyRangeFields";
 import {
   clampCount,
   groupSize,
+  huntableTeams,
   ORDER_KINDS,
   type OrderKind,
   orderOfKind,
@@ -72,6 +73,7 @@ const ORDER_LABELS: Record<OrderKind, MessageDescriptor> = {
   fight: msg`Fight along`,
   guard: msg`Guard`,
   attack: msg`Attack`,
+  hunt: msg`Hunt`,
 };
 
 export function GroupControls({
@@ -250,12 +252,13 @@ export function GroupControls({
               key={`${index}-${order.kind}`}
               order={order}
               targets={targets}
+              teams={huntableTeams(participants, group.team)}
               drawing={drawing === index}
               problem={entryFieldProblem(
                 issues,
                 "groups",
                 group.id,
-                `orders[${index}].target`,
+                `orders[${index}].${"team" in order ? "team" : "target"}`,
               )}
               onDraw={(on) => onDraw(on ? index : null)}
               onChange={(next) =>
@@ -391,6 +394,7 @@ function AddUnit({
 export function OrderRow({
   order,
   targets,
+  teams,
   drawing,
   problem = null,
   onDraw,
@@ -399,6 +403,8 @@ export function OrderRow({
 }: {
   order: ScenarioOrder;
   targets: TargetOption[];
+  /** The participants a `hunt` order can name. */
+  teams: Participant[];
   drawing: boolean;
   /** Why this order's target is wrong, in the validator's own words (issue
    *  #2307, `checkOrders` in `validate.ts`): nothing given, or nothing the
@@ -412,7 +418,8 @@ export function OrderRow({
   // Narrowed by the shape rather than by the kind, the way the model splits it:
   // an order either carries a path or carries a target.
   const path = "waypoints" in order ? order : null;
-  const aimed = "waypoints" in order ? null : order;
+  const aimed = "target" in order ? order : null;
+  const hunted = "team" in order ? order : null;
   const describedBy = useId();
   const { t, i18n } = useLingui();
   const pointCount = path?.waypoints.length ?? 0;
@@ -481,6 +488,17 @@ export function OrderRow({
             />
           )
         )}
+        {hunted && (
+          <TeamSelect
+            className="min-w-0 flex-1"
+            participants={teams}
+            value={hunted.team}
+            onValueChange={(team) => onChange({ ...hunted, team })}
+            ariaLabel={t`Team to hunt`}
+            ariaInvalid={problem !== null}
+            describedBy={describedBy}
+          />
+        )}
 
         <Button
           size="sm"
@@ -492,7 +510,7 @@ export function OrderRow({
           <X className="size-3.5" />
         </Button>
       </div>
-      {aimed && <FieldProblem id={describedBy} problem={problem} />}
+      {(aimed || hunted) && <FieldProblem id={describedBy} problem={problem} />}
     </div>
   );
 }

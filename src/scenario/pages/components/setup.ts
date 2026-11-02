@@ -337,6 +337,34 @@ export function participantHoldings(
   };
 }
 
+/** An order list with every hunted participant put through one renaming. Handed
+ *  back as it came when nothing in it changed. */
+function rewriteOrderTeams<T>(
+  orders: T,
+  rename: (id: string) => string | undefined,
+): T {
+  if (!Array.isArray(orders)) return orders;
+  let changed = false;
+  const next = orders.map((order) => {
+    const hunted = order?.kind === "hunt" ? rename(order.team) : undefined;
+    if (hunted === undefined) return order;
+    changed = true;
+    return { ...order, team: hunted };
+  });
+  return changed ? (next as T) : orders;
+}
+
+/** The parameter names of one step that carry an order list. */
+function orderParams(step: TriggerStep, table: Record<string, unknown>) {
+  const spec = (
+    table as Record<string, Record<string, { kind: string }> | undefined>
+  )[step.type];
+  if (!spec) return [];
+  return Object.entries(spec)
+    .filter(([, param]) => param.kind === "orders")
+    .map(([name]) => name);
+}
+
 /** Rewrite every parameter of a step that names a participant the map renames. */
 function rewriteTeamParams(
   step: TriggerStep,
@@ -349,16 +377,25 @@ function rewriteTeamParams(
     const to = typeof value === "string" ? rename(value) : undefined;
     if (to !== undefined) params = { ...params, [name]: to };
   }
+  for (const name of orderParams(step, table)) {
+    const value = params[name];
+    const to = rewriteOrderTeams(value, rename);
+    if (to !== value) params = { ...params, [name]: to };
+  }
   return params === step.params ? step : { ...step, params };
 }
 
-/** Every participant a trigger names put through one renaming. */
+/** Every participant a trigger or a group's orders name put through one renaming. */
 function rewriteTriggerTeams(
   scenario: Scenario,
   rename: (id: string) => string | undefined,
 ): Scenario {
   return {
     ...scenario,
+    groups: scenario.groups.map((group) => {
+      const orders = rewriteOrderTeams(group.orders, rename);
+      return orders === group.orders ? group : { ...group, orders };
+    }),
     triggers: scenario.triggers.map((trigger) => ({
       ...trigger,
       conditions: {
