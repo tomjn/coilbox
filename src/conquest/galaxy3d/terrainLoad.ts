@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { decodeRgba } from "../handmade/decode";
+import { surroundExtension } from "./handmadeEdge";
 import {
   type HeightGrid,
   type HeightPixels,
@@ -114,4 +116,60 @@ export function useTerrainHeights(
   if (!url) return { ready: true, grid: direct };
   if (loaded?.url !== url) return { ready: false };
   return { ready: true, grid: loaded.grid };
+}
+
+/**
+ * A hand-made map's land past its frame, from the surround its document names.
+ * `ready` is false while the images load. A surround that cannot be read or
+ * does not fit gives no extension, so the map draws its apron. The reader has
+ * told the author why, and a failure here is reported once to the console.
+ */
+export function useTerrainSurround(
+  terrain: TerrainSpec | undefined,
+  heights: HeightGrid | undefined,
+): { ready: boolean; extension?: TerrainExtension } {
+  const image = terrain?.image;
+  const wideImage = terrain?.surround?.image;
+  const wideHeightmap = terrain?.surround?.heightmap;
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    heights: HeightGrid;
+    extension?: TerrainExtension;
+  } | null>(null);
+  const key = `${image}\0${wideImage}\0${wideHeightmap}`;
+  const wanted = image && wideImage && wideHeightmap && heights;
+  useEffect(() => {
+    if (!image || !wideImage || !wideHeightmap || !heights) return;
+    let cancelled = false;
+    Promise.all([
+      decodeRgba(image),
+      decodeRgba(wideImage),
+      decodeRgba(wideHeightmap),
+    ])
+      .then(([picture, widePicture, wideHeights]) => {
+        const extension = surroundExtension(
+          picture,
+          heights,
+          widePicture,
+          heightGridFromPixels(wideHeights),
+        );
+        if (!extension) console.warn("terrain surround does not fit the map");
+        return extension ?? undefined;
+      })
+      .catch((err) => {
+        console.warn("terrain surround failed, drawing the apron", err);
+        return undefined;
+      })
+      .then((extension) => {
+        if (!cancelled) setLoaded({ key, heights, extension });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, image, wideImage, wideHeightmap, heights]);
+
+  if (!wanted) return { ready: true };
+  if (loaded?.key !== key || loaded.heights !== heights)
+    return { ready: false };
+  return { ready: true, extension: loaded.extension };
 }

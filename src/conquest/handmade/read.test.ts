@@ -900,3 +900,183 @@ describe("the towns switch", () => {
     expect(parseGalaxyJson(JSON.stringify(doc))?.handmade).toBeUndefined();
   });
 });
+
+describe("a surround", () => {
+  const SURROUND = fileURLToPath(
+    new URL("../../../docs/examples/handmade-map-surround/", import.meta.url),
+  );
+  const sizeOf = (file: string) => {
+    const { width, height } = decodePng(readFileSync(`${SURROUND}${file}`));
+    return { width, height };
+  };
+  const named = (m: MapManifest) => {
+    m.files.surround = { picture: "wide.png", heightmap: "wide-height.png" };
+  };
+  const wide = { width: 382, height: 318 };
+  const withSurround = (change: Partial<HandmadeMapInput> = {}) =>
+    sample({
+      manifest: manifestWith(named),
+      heightmap: { width: 160, height: 96 },
+      surround: { picture: wide, heightmap: wide },
+      urlFor: (name) => `asset://map/${name}`,
+      ...change,
+    });
+  const read = (input: HandmadeMapInput) => {
+    const result = readHandmadeMap(input);
+    if (!result.ok) throw new Error("expected the map to read");
+    return result;
+  };
+  const expectApron = (input: HandmadeMapInput, message: RegExp) => {
+    const { doc, warnings } = read(input);
+    expect(doc.terrain?.surround).toBeUndefined();
+    expect(warnings).toEqual([
+      { code: "surround-unusable", message: expect.stringMatching(message) },
+    ]);
+  };
+
+  it("is absent from a map that names none, with nothing to warn about", () => {
+    const { doc, warnings } = read(sample());
+    expect(doc.terrain?.surround).toBeUndefined();
+    expect(warnings).toBeUndefined();
+  });
+
+  it("reads the sample's version with land past its frame", () => {
+    const manifest = readFileSync(`${SURROUND}map.json`, "utf8");
+    const { doc, warnings } = read(
+      sample({
+        manifest,
+        provinces: decodePng(readFileSync(`${SURROUND}provinces.png`)),
+        picture: sizeOf("picture.png"),
+        heightmap: sizeOf("heightmap.png"),
+        surround: {
+          picture: sizeOf("surround-picture.png"),
+          heightmap: sizeOf("surround-heightmap.png"),
+        },
+        urlFor: (name) => `asset://map/${name}`,
+      }),
+    );
+    expect(warnings).toBeUndefined();
+    expect(doc.terrain?.surround).toEqual({
+      image: "asset://map/surround-picture.png",
+      heightmap: "asset://map/surround-heightmap.png",
+    });
+  });
+
+  it("keeps the sample's version the same map apart from its files", () => {
+    type Loose = Record<string, unknown> & { files: Record<string, unknown> };
+    const plain = JSON.parse(manifestText) as Loose;
+    const version = JSON.parse(
+      readFileSync(`${SURROUND}map.json`, "utf8"),
+    ) as Loose;
+    expect(version.files.surround).toBeDefined();
+    for (const m of [plain, version]) {
+      delete m.id;
+      delete m.title;
+      delete m.description;
+      delete m.files.surround;
+    }
+    expect(version).toEqual(plain);
+    expect(readFileSync(`${SURROUND}provinces.png`)).toEqual(
+      readFileSync(`${SAMPLE}provinces.png`),
+    );
+  });
+
+  it("changes nothing that plays: nodes, links and fingerprint are the same", () => {
+    const plain = read(sample()).doc;
+    const { doc } = read(withSurround());
+    expect(doc.terrain?.surround).toBeDefined();
+    expect(doc.nodes).toEqual(plain.nodes);
+    expect(doc.links).toEqual(plain.links);
+    expect(doc.terrain?.width).toBe(plain.terrain?.width);
+    expect(doc.terrain?.height).toBe(plain.terrain?.height);
+    expect(doc.handmade?.fingerprint).toBe(plain.handmade?.fingerprint);
+  });
+
+  it("stays on a document that is saved and read back", () => {
+    const { doc } = read(withSurround());
+    const filled = {
+      ...doc,
+      nodes: doc.nodes.map((n) =>
+        hasBlankBattle(n) ? { ...n, battle: { mapName: "MapA" } } : n,
+      ),
+    };
+    const back = parseGalaxyJson(JSON.stringify(filled));
+    expect(back?.terrain?.surround).toEqual(doc.terrain?.surround);
+  });
+
+  it("falls back when only one of the two files is named", () => {
+    expectApron(
+      sample({
+        manifest: manifestWith((m) => {
+          (m.files as { surround?: unknown }).surround = {
+            picture: "wide.png",
+          };
+        }),
+      }),
+      /files\.surround must name a picture and a heightmap/,
+    );
+  });
+
+  it("falls back on a file name outside the folder", () => {
+    expectApron(
+      sample({
+        manifest: manifestWith((m) => {
+          m.files.surround = { picture: "../wide.png", heightmap: "h.png" };
+        }),
+      }),
+      /each a file inside the map folder/,
+    );
+  });
+
+  it("falls back when the map has no heightmap of its own", () => {
+    expectApron(
+      withSurround({
+        manifest: manifestWith((m) => {
+          named(m);
+          delete m.files.heightmap;
+        }),
+      }),
+      /no heightmap in files\.heightmap/,
+    );
+  });
+
+  it("falls back when a file is not in the folder", () => {
+    expectApron(
+      withSurround({
+        urlFor: (name) =>
+          name === "wide.png" ? undefined : `asset://map/${name}`,
+      }),
+      /"wide\.png" is not in the map folder.*short fading edge/,
+    );
+  });
+
+  it("falls back when a file cannot be opened", () => {
+    expectApron(
+      withSurround({ surround: { picture: wide } }),
+      /"wide-height\.png" could not be opened/,
+    );
+  });
+
+  it("falls back on a heightmap of the wrong size, and gives both sizes", () => {
+    expectApron(
+      withSurround({
+        surround: { picture: wide, heightmap: { width: 381, height: 318 } },
+      }),
+      /"wide-height\.png" is 381 by 318 pixels and the heightmap "heightmap\.png" is 160 by 96/,
+    );
+  });
+
+  it("falls back on a picture of the wrong size, and gives the right one", () => {
+    expectApron(
+      withSurround({
+        surround: { picture: { width: 300, height: 300 }, heightmap: wide },
+      }),
+      /It must be 382 by 318/,
+    );
+  });
+
+  it("leaves the map's real errors as errors", () => {
+    const errors = errorsOf(withSurround({ picture: { width: 1, height: 1 } }));
+    expect(only(errors, "size-mismatch")).toHaveLength(1);
+  });
+});

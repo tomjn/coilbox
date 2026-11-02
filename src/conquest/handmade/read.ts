@@ -12,6 +12,7 @@ import {
   parseScenarioPayload,
   scenarioImportErrorMessage,
 } from "../../scenario/transfer";
+import { type ImageSize, surroundFit } from "../galaxy3d/handmadeEdge";
 import type {
   GalaxyDoc,
   GalaxyNode,
@@ -23,7 +24,12 @@ import { MIN_DIFFICULTY, NEUTRAL } from "../model";
 import { type TraceCache, traceCacheKey } from "./cache";
 import type { HandmadeMapError } from "./errors";
 import { handmadeMapFingerprint } from "./fingerprint";
-import { describeProvince, MANIFEST_FILE, parseManifest } from "./manifest";
+import {
+  describeProvince,
+  MANIFEST_FILE,
+  parseManifest,
+  type ResolvedManifest,
+} from "./manifest";
 import { type ProvincePixels, type TracedMap, traceProvinces } from "./trace";
 
 /**
@@ -62,6 +68,13 @@ export interface HandmadeMapInput {
   provinces: ProvincePixels;
   /** The size of the map picture in pixels. Its pixels are not needed. */
   picture: { width: number; height: number };
+  /** The size of the heightmap in pixels, when the map has one. */
+  heightmap?: ImageSize;
+  /**
+   * The sizes of the surround's two images. Either is absent when the file
+   * cannot be opened as an image.
+   */
+  surround?: { picture?: ImageSize; heightmap?: ImageSize };
   /**
    * Turn a file name from the manifest into a URL the webview can load, or
    * undefined when the folder has no such file.
@@ -79,7 +92,7 @@ export interface HandmadeMapInput {
 }
 
 export type HandmadeMapResult =
-  | { ok: true; doc: GalaxyDoc }
+  | { ok: true; doc: GalaxyDoc; warnings?: HandmadeMapError[] }
   | { ok: false; errors: HandmadeMapError[] };
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}\0${b}` : `${b}\0${a}`);
@@ -101,7 +114,7 @@ const round = (v: number) => Math.round(v * 1000) / 1000;
  * to the goal is skipped then too, for the same reason.
  */
 export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
-  const { manifest, errors } = parseManifest(input.manifest);
+  const { manifest, errors, warnings = [] } = parseManifest(input.manifest);
   if (!manifest) return { ok: false, errors };
 
   const { provinces: image, picture } = input;
@@ -388,6 +401,9 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
 
   if (errors.length > 0) return { ok: false, errors };
 
+  const surround = readSurround(manifest, input);
+  warnings.push(...surround.warnings);
+
   const warpathKinds: Record<string, MapRunKind> = {};
   for (const l of [...manifest.provinces, ...manifest.locations]) {
     if (l.warpath?.kind) warpathKinds[l.id] = l.warpath.kind;
@@ -410,6 +426,7 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     terrain: {
       image: pictureUrl,
       heightmap: heightmapUrl,
+      ...(surround.urls ? { surround: surround.urls } : {}),
       width: manifest.size.width,
       height: manifest.size.height,
       heightScale: manifest.heightScale,
@@ -441,7 +458,72 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
         ...(manifest.towns ? { towns: true } : {}),
       },
     },
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
+}
+
+/**
+ * The surround `map.json` names, as URLs, or the reasons it cannot be used.
+ * Never an error: a map with a wrong surround loads with its apron instead.
+ */
+function readSurround(
+  manifest: ResolvedManifest,
+  input: HandmadeMapInput,
+): {
+  urls?: { image: string; heightmap: string };
+  warnings: HandmadeMapError[];
+} {
+  const files = manifest.files.surround;
+  if (!files) return { warnings: [] };
+  const instead = t`The map uses a short fading edge instead.`;
+  const warnings: HandmadeMapError[] = [];
+  const warn = (problem: string) =>
+    warnings.push({
+      code: "surround-unusable",
+      message: `${problem} ${instead}`,
+    });
+  const mapHeightmap = manifest.files.heightmap;
+  if (mapHeightmap === undefined) {
+    warn(
+      t`${MANIFEST_FILE} names a surround in files.surround, but no heightmap in files.heightmap. A surround needs both.`,
+    );
+    return { warnings };
+  }
+  const check = (file: string, size: ImageSize | undefined) => {
+    const url = input.urlFor(file);
+    if (url === undefined) {
+      warn(t`The surround file "${file}" is not in the map folder.`);
+    } else if (!size) {
+      warn(t`The surround file "${file}" could not be opened as an image.`);
+    }
+    return url !== undefined && size ? { url, size } : undefined;
+  };
+  const picture = check(files.picture, input.surround?.picture);
+  const heightmap = check(files.heightmap, input.surround?.heightmap);
+  if (!picture || !heightmap || !input.heightmap) return { warnings };
+  const fit = surroundFit(
+    { picture: input.picture, heightmap: input.heightmap },
+    { picture: picture.size, heightmap: heightmap.size },
+  );
+  if ("wrong" in fit) {
+    if (fit.wrong === "heightmap") {
+      const file = files.heightmap;
+      const { width: wideWidth, height: wideHeight } = heightmap.size;
+      const { width: mapWidth, height: mapHeight } = input.heightmap;
+      warn(
+        t`The surround heightmap "${file}" is ${wideWidth} by ${wideHeight} pixels and the heightmap "${mapHeightmap}" is ${mapWidth} by ${mapHeight}. The surround must add the same whole number of pixels to all four sides.`,
+      );
+    } else {
+      const file = files.picture;
+      const { width: wideWidth, height: wideHeight } = picture.size;
+      const { width: wantWidth, height: wantHeight } = fit.expected;
+      warn(
+        t`The surround picture "${file}" is ${wideWidth} by ${wideHeight} pixels. It must be ${wantWidth} by ${wantHeight} to reach as far as the surround heightmap.`,
+      );
+    }
+    return { warnings };
+  }
+  return { urls: { image: picture.url, heightmap: heightmap.url }, warnings };
 }
 
 /**
