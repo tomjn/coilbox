@@ -539,8 +539,11 @@ function parseOrder(value: unknown): ScenarioOrder | null {
     return { kind, waypoints };
   }
   if (kind === "guard" || kind === "attack") {
-    const target = id(value.target);
-    return target === undefined ? null : { kind, target };
+    // Empty is an order whose target is not picked yet, which the validator
+    // names, so saving a half made order does not cost the author the document.
+    return typeof value.target === "string"
+      ? { kind, target: value.target }
+      : null;
   }
   if (kind === "hunt") {
     // Empty is an order whose team is not picked yet, which the validator names,
