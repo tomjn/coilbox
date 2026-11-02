@@ -39,8 +39,9 @@ import { forgetScanHints, rememberScanHints } from "../content/scanHints";
 import { resolveCardArt } from "./art";
 import {
   assignPicks,
+  brokenContentArt,
   type ContentPick,
-  campaignPick,
+  campaignPicks,
   collectionPicks,
   contentArtStorageKey,
   contentArtVersion,
@@ -62,7 +63,7 @@ import {
   rememberedFrom,
   replayPick,
   resetContentArt,
-  scenarioPick,
+  scenarioPicks,
   skirmishPick,
   subscribeContentArt,
   validateRememberedArt,
@@ -174,7 +175,7 @@ describe("replayPick", () => {
   });
 });
 
-describe("campaignPick", () => {
+describe("campaignPicks", () => {
   it("shows the map of the mission you last played", () => {
     const progress = progressFile({
       c1: {
@@ -183,10 +184,9 @@ describe("campaignPick", () => {
         updatedAt: "2026-08-01T09:32:25.999Z",
       },
     });
-    expect(campaignPick([{ campaign: campaign() }], progress)).toEqual({
-      kind: "map",
-      mapName: "Bismuth Valley v2.4.1",
-    });
+    expect(campaignPicks([{ campaign: campaign() }], progress)).toEqual([
+      { kind: "map", mapName: "Bismuth Valley v2.4.1" },
+    ]);
   });
 
   it("still answers once every mission is complete", () => {
@@ -200,7 +200,7 @@ describe("campaignPick", () => {
         updatedAt: "2026-08-01T09:32:25.999Z",
       },
     });
-    expect(campaignPick([{ campaign: campaign() }], finished)).toBeDefined();
+    expect(campaignPicks([{ campaign: campaign() }], finished)).toHaveLength(1);
   });
 
   it("prefers the campaign touched most recently, whichever order it is in", () => {
@@ -229,12 +229,12 @@ describe("campaignPick", () => {
         updatedAt: "2026-08-01T00:00:00Z",
       },
     });
-    const expected = { kind: "map", mapName: "Bismuth Valley v2.4.1" };
+    const expected = [{ kind: "map", mapName: "Bismuth Valley v2.4.1" }];
     expect(
-      campaignPick([{ campaign: older }, { campaign: recent }], progress),
+      campaignPicks([{ campaign: older }, { campaign: recent }], progress),
     ).toEqual(expected);
     expect(
-      campaignPick([{ campaign: recent }, { campaign: older }], progress),
+      campaignPicks([{ campaign: recent }, { campaign: older }], progress),
     ).toEqual(expected);
   });
 
@@ -242,13 +242,13 @@ describe("campaignPick", () => {
     const progress = progressFile({
       c1: { completedMissionIds: [], lastPlayedMissionId: "m1", updatedAt: "" },
     });
-    expect(campaignPick([{ campaign: campaign() }], progress)).toBeUndefined();
+    expect(campaignPicks([{ campaign: campaign() }], progress)).toEqual([]);
   });
 
   it("answers nothing for a campaign you have never opened", () => {
-    expect(
-      campaignPick([{ campaign: campaign() }], progressFile()),
-    ).toBeUndefined();
+    expect(campaignPicks([{ campaign: campaign() }], progressFile())).toEqual(
+      [],
+    );
   });
 
   it("answers nothing when the played mission names no map", () => {
@@ -262,22 +262,148 @@ describe("campaignPick", () => {
         updatedAt: "2026-08-01T00:00:00Z",
       },
     });
-    expect(campaignPick([{ campaign: noMap }], progress)).toBeUndefined();
+    expect(campaignPicks([{ campaign: noMap }], progress)).toEqual([]);
+  });
+
+  const played = progressFile({
+    c1: {
+      completedMissionIds: [],
+      lastPlayedMissionId: "m1",
+      updatedAt: "2026-08-01T00:00:00Z",
+    },
+  });
+  const map = { kind: "map", mapName: "Bismuth Valley v2.4.1" };
+  const panorama = {
+    kind: "image",
+    url: "coilbox://localhost/campaignimage/c1/pano.jpg",
+  };
+  const background = {
+    kind: "image",
+    url: "coilbox://localhost/campaignimage/c1/back.jpg",
+  };
+
+  it("offers the panorama, then the background, then the map", () => {
+    const art = campaign({
+      background: { kind: "file", file: "back.jpg" },
+      missions: [mission({ panorama: { kind: "file", file: "pano.jpg" } })],
+    });
+    expect(campaignPicks([{ campaign: art }], played)).toEqual([
+      panorama,
+      background,
+      map,
+    ]);
+  });
+
+  it("reads each kind of image ref", () => {
+    const art = campaign({
+      background: { kind: "data", dataUri: "data:image/png;base64,AAAA" },
+      missions: [
+        mission({ panorama: { kind: "local", path: "images/my pano.jpg" } }),
+      ],
+    });
+    expect(campaignPicks([{ campaign: art }], played)).toEqual([
+      {
+        kind: "image",
+        url: "coilbox://localhost/portable/images/my%20pano.jpg",
+      },
+      { kind: "image", url: "data:image/png;base64,AAAA" },
+      map,
+    ]);
+  });
+
+  it("leaves out a video, which a card's image cannot draw", () => {
+    const art = campaign({
+      background: { kind: "file", file: "loop.mp4" },
+      missions: [mission({ panorama: { kind: "local", path: "intro.webm" } })],
+    });
+    expect(campaignPicks([{ campaign: art }], played)).toEqual([map]);
+  });
+
+  it("ignores a panorama a live preview has replaced", () => {
+    const art = campaign({
+      missions: [
+        mission({
+          panorama: { kind: "file", file: "pano.jpg" },
+          panoramaMap: {} as CampaignMission["panoramaMap"],
+        }),
+      ],
+    });
+    expect(campaignPicks([{ campaign: art }], played)).toEqual([map]);
+  });
+
+  it("still shows the background once the played mission has gone", () => {
+    const art = campaign({
+      background: { kind: "file", file: "back.jpg" },
+      missions: [],
+    });
+    expect(campaignPicks([{ campaign: art }], played)).toEqual([background]);
+  });
+
+  it("shows art on a mission that names no map", () => {
+    const art = campaign({
+      missions: [
+        mission({
+          panorama: { kind: "file", file: "pano.jpg" },
+          snapshot: { ...mission().snapshot, mapName: "" },
+        }),
+      ],
+    });
+    expect(campaignPicks([{ campaign: art }], played)).toEqual([panorama]);
   });
 });
 
-describe("scenarioPick", () => {
+describe("scenarioPicks", () => {
   it("shows the map of the scenario you edited most recently", () => {
     expect(
-      scenarioPick([
-        { scenario: { setup: { mapName: "Bismuth Valley v2.4.1" } } },
-        { scenario: { setup: { mapName: "AcidicQuarry 5.17" } } },
+      scenarioPicks([
+        { scenario: { id: "s1", setup: { mapName: "Bismuth Valley v2.4.1" } } },
+        { scenario: { id: "s2", setup: { mapName: "AcidicQuarry 5.17" } } },
       ]),
-    ).toEqual({ kind: "map", mapName: "Bismuth Valley v2.4.1" });
+    ).toEqual([{ kind: "map", mapName: "Bismuth Valley v2.4.1" }]);
   });
 
   it("answers nothing on an install with no scenarios", () => {
-    expect(scenarioPick([])).toBeUndefined();
+    expect(scenarioPicks([])).toEqual([]);
+  });
+
+  const scenarios = [
+    { scenario: { id: "s1", setup: { mapName: "Tabula-v6" } } },
+  ];
+  const attached = (campaignId: string, scenarioId: string) => ({
+    campaign: campaign({
+      id: campaignId,
+      missions: [
+        mission({
+          panorama: { kind: "file", file: "pano.jpg" },
+          scenario: { id: scenarioId } as CampaignMission["scenario"],
+        }),
+      ],
+    }),
+  });
+
+  it("offers the panorama of the mission it is attached to, then its map", () => {
+    expect(scenarioPicks(scenarios, [attached("c1", "s1")])).toEqual([
+      { kind: "image", url: "coilbox://localhost/campaignimage/c1/pano.jpg" },
+      { kind: "map", mapName: "Tabula-v6" },
+    ]);
+  });
+
+  it("keeps its minimap when no mission holds it", () => {
+    expect(scenarioPicks(scenarios, [attached("c1", "other")])).toEqual([
+      { kind: "map", mapName: "Tabula-v6" },
+    ]);
+  });
+
+  it("answers the same whichever order the campaigns are read in", () => {
+    const expected = [
+      { kind: "image", url: "coilbox://localhost/campaignimage/a/pano.jpg" },
+      { kind: "image", url: "coilbox://localhost/campaignimage/b/pano.jpg" },
+      { kind: "map", mapName: "Tabula-v6" },
+    ];
+    const a = attached("a", "s1");
+    const b = attached("b", "s1");
+    expect(scenarioPicks(scenarios, [a, b])).toEqual(expected);
+    expect(scenarioPicks(scenarios, [b, a])).toEqual(expected);
   });
 });
 
@@ -440,7 +566,7 @@ describe("contentPicks", () => {
         updatedAt: "2026-08-01T09:32:25.999Z",
       },
     }),
-    scenarios: [{ scenario: { setup: { mapName: SHARED } } }],
+    scenarios: [{ scenario: { id: "s1", setup: { mapName: SHARED } } }],
     maps: [{ name: SHARED }, { name: "Isthmus v3" }],
     games: [{ name: "Metal Factions v2.58" }],
   };
@@ -473,7 +599,7 @@ describe("contentPicks", () => {
     const picks = contentPicks({
       ...populated,
       replays: [{ mapName: "Isthmus v3" }],
-      scenarios: [{ scenario: { setup: { mapName: "Tabula-v6" } } }],
+      scenarios: [{ scenario: { id: "s1", setup: { mapName: "Tabula-v6" } } }],
     });
     expect(picks.get("play.replays")).toEqual({
       kind: "map",
@@ -645,6 +771,67 @@ describe("contentPicks", () => {
     expect([...contentPicks({ ...populated, claimed: [] })]).toEqual([
       ...contentPicks(populated),
     ]);
+  });
+});
+
+describe("a campaign's own art on the page", () => {
+  const art = campaign({
+    missions: [
+      mission({
+        panorama: { kind: "file", file: "pano.jpg" },
+        scenario: { id: "s1" } as CampaignMission["scenario"],
+      }),
+    ],
+  });
+  const sources = {
+    draft: emptyDraft,
+    replays: [],
+    campaigns: [{ campaign: art }],
+    progress: progressFile({
+      c1: {
+        completedMissionIds: [],
+        lastPlayedMissionId: "m1",
+        updatedAt: "2026-08-01T00:00:00Z",
+      },
+    }),
+    scenarios: [{ scenario: { id: "s1", setup: { mapName: "Tabula-v6" } } }],
+    ...noCollections,
+  };
+  const url = "coilbox://localhost/campaignimage/c1/pano.jpg";
+
+  it("stays on the campaign's card when a scenario is attached to the mission", () => {
+    const picks = contentPicks(sources);
+    expect(picks.get("campaign.list")).toEqual({ kind: "image", url });
+    expect(picks.get("scenario.list")).toEqual({
+      kind: "map",
+      mapName: "Tabula-v6",
+    });
+  });
+
+  it("goes to the scenario's card when the campaign's card has a distribution's art", () => {
+    const picks = contentPicks({
+      ...sources,
+      overridden: new Set(["campaign.list"]),
+    });
+    expect(picks.get("scenario.list")).toEqual({ kind: "image", url });
+  });
+
+  it("falls back to the map once the image has failed to load", () => {
+    const picks = contentPicks({ ...sources, brokenImages: new Set([url]) });
+    expect(picks.get("campaign.list")).toEqual({
+      kind: "map",
+      mapName: "Bismuth Valley v2.4.1",
+    });
+  });
+
+  it("changes the picks key when the image changes", () => {
+    const other = new Map<string, ContentPick>([
+      ["campaign.list", { kind: "image", url: `${url}2` }],
+    ]);
+    const first = new Map<string, ContentPick>([
+      ["campaign.list", { kind: "image", url }],
+    ]);
+    expect(picksKey(first)).not.toBe(picksKey(other));
   });
 });
 
@@ -862,9 +1049,7 @@ describe("pruneRemembered", () => {
     const painted = new Map(fresh);
     for (const [toolId, entry] of kept)
       if (!painted.has(toolId)) painted.set(toolId, entry.pick);
-    const keys = [...painted.values()].map((p) =>
-      p.kind === "map" ? `m:${p.mapName}` : `g:${p.gameName}`,
-    );
+    const keys = [...painted.values()].map((p) => JSON.stringify(p));
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
@@ -912,6 +1097,55 @@ describe("rememberedFrom", () => {
       snapshot([["library.maps", mapPick("B"), "coilbox://old"]]),
     );
     expect(next.has("library.maps")).toBe(false);
+  });
+});
+
+describe("remembering a campaign's art", () => {
+  const url = "coilbox://localhost/campaignimage/c1/pano.jpg";
+
+  it("reads an image pick back from storage", () => {
+    const entries = new Map<string, RememberedArt>([
+      ["campaign.list", { pick: { kind: "image", url }, url }],
+    ]);
+    expect(decodeRemembered(encodeRemembered(entries))).toEqual(entries);
+  });
+
+  it("does not write an embedded image into storage", () => {
+    const dataUrl = "data:image/png;base64,AAAA";
+    const next = rememberedFrom(
+      new Map([
+        ["campaign.list", dataUrl],
+        ["scenario.list", url],
+      ]),
+      new Map<string, ContentPick>([
+        ["campaign.list", { kind: "image", url: dataUrl }],
+        ["scenario.list", { kind: "image", url }],
+      ]),
+      new Map(),
+    );
+    expect([...next.keys()]).toEqual(["scenario.list"]);
+  });
+});
+
+describe("an image that will not load", () => {
+  const url = "coilbox://localhost/campaignimage/c1/gone.jpg";
+
+  beforeEach(() => resetContentArt());
+
+  it("is recorded and wakes the page so the next pick can answer", () => {
+    publishContentArt(new Map([["campaign.list", url]]));
+    const listener = vi.fn();
+    const unsubscribe = subscribeContentArt(listener);
+    forgetContentArt(url);
+    expect(brokenContentArt().has(url)).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("is forgotten by a hard refresh", () => {
+    forgetContentArt(url);
+    resetContentArt();
+    expect(brokenContentArt().has(url)).toBe(false);
   });
 });
 
@@ -1188,6 +1422,21 @@ describe("resolvePicks", () => {
   beforeEach(() => {
     minimap.mockReset();
     resetContentArt();
+  });
+
+  it("resolves a campaign's image with no engine and no worker", async () => {
+    const url = "coilbox://localhost/campaignimage/c1/pano.jpg";
+    const resolved = await resolvePicks(
+      new Map<string, ContentPick>([
+        ["campaign.list", { kind: "image", url }],
+        ["play.skirmish", { kind: "map", mapName: "Needs An Engine" }],
+      ]),
+      undefined,
+      undefined,
+      new Map(),
+    );
+    expect(resolved).toEqual(new Map([["campaign.list", url]]));
+    expect(minimap).not.toHaveBeenCalled();
   });
 
   it("starts no worker for a map the scan does not list", async () => {

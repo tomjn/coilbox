@@ -29,6 +29,7 @@ import { useSkirmishDraft } from "../play/drafts";
 import { useScenarios } from "../scenario/scenarios";
 import { overriddenTools } from "./artOverride";
 import {
+  brokenContentArt,
   type ContentPick,
   contentArtVersion,
   contentPicks,
@@ -89,22 +90,26 @@ async function minimapUrl(
  * Two cards on the same map render it once, because the loader shares the
  * running render and caches the result.
  *
+ * An image pick already holds its URL, and needs neither a worker nor an engine.
+ *
  * A pick that resolves to nothing is left out of the result rather than mapped
  * to an empty string, because the chain reads an empty string as an answer and a
  * missing key as a fall-through.
  */
 export async function resolvePicks(
   picks: ReadonlyMap<string, ContentPick>,
-  enginePath: string,
-  dataDir: string,
+  enginePath: string | undefined,
+  dataDir: string | undefined,
   headers: ReadonlyMap<string, string>,
 ): Promise<Map<string, string>> {
   const resolved = new Map<string, string>();
   for (const [toolId, pick] of picks) {
-    const url =
-      pick.kind === "game"
-        ? headers.get(pick.gameName)
-        : await minimapUrl(enginePath, dataDir, pick.mapName);
+    let url: string | null | undefined;
+    if (pick.kind === "image") url = pick.url;
+    else if (pick.kind === "game") url = headers.get(pick.gameName);
+    else if (enginePath && dataDir) {
+      url = await minimapUrl(enginePath, dataDir, pick.mapName);
+    }
     if (url) resolved.set(toolId, url);
   }
   return resolved;
@@ -172,6 +177,7 @@ export function useContentCardArt(claimed: readonly ContentPick[] = []): void {
     // never showing it.
     overridden: overriddenTools(),
     claimed,
+    brokenImages: brokenContentArt(),
   });
 
   // What the last launch painted is standing in for these until they resolve, so
@@ -192,7 +198,7 @@ export function useContentCardArt(claimed: readonly ContentPick[] = []): void {
   const dataDir = selected?.rootPath;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !key) return;
+    if (!key) return;
     let cancelled = false;
     resolvePicks(picksRef.current, enginePath, dataDir, headers)
       .then((resolved) => {

@@ -19,6 +19,11 @@
  * carries no information at all once repeated, while the drawings it displaced
  * were six different pictures. That is why {@link PICK_PRIORITY} exists.
  *
+ * A campaign's own art earns it by the same test: nothing else on the page is that
+ * picture, and the campaign's author chose it to stand for the campaign. So
+ * {@link campaignPicks} offers the played mission's panorama, then the campaign's
+ * background, and only then the map (issue #1025).
+ *
  * Warpath earns nothing at any priority, so it offers no content: a run is a
  * journey across a galaxy and one battle's map is a fact about a fight the card
  * does not stand for. Its diamond lattice says more, and rendering the run
@@ -147,8 +152,13 @@
  * wash of the terrain rather than as detail competing with the label.
  */
 
-import type { Campaign, ProgressFile } from "../campaign/model";
+import type {
+  Campaign,
+  CampaignMission,
+  ProgressFile,
+} from "../campaign/model";
 import { hashString } from "../conquest/rng";
+import { imageRefUrl } from "../lib/assetUrl";
 import type { CardArtSource } from "./art";
 
 /* -------------------------------------------------------------------------- *
@@ -158,12 +168,14 @@ import type { CardArtSource } from "./art";
 /**
  * What a card should show, before anything renders it.
  *
- * Two kinds because there are two renderers behind them: a map name resolves
- * through unitsync's minimap cache, a game name through its header-art cache.
+ * A map name resolves through unitsync's minimap cache and a game name through
+ * its header-art cache. A campaign's image needs no renderer, so its pick already
+ * holds the URL.
  */
 export type ContentPick =
   | { kind: "map"; mapName: string }
-  | { kind: "game"; gameName: string };
+  | { kind: "game"; gameName: string }
+  | { kind: "image"; url: string };
 
 /** The fields of a saved skirmish setup a pick reads. */
 export type DraftSummary = { gameName: string; mapName: string };
@@ -172,7 +184,7 @@ export type DraftSummary = { gameName: string; mapName: string };
 export type ReplaySummary = { mapName?: string };
 
 /** The fields of a scenario a pick reads. */
-export type ScenarioSummary = { setup: { mapName: string } };
+export type ScenarioSummary = { id: string; setup: { mapName: string } };
 
 /** The one field of an installed map or game a collection pick reads. */
 export type NamedContent = { name: string };
@@ -216,6 +228,12 @@ export interface ContentPickSources {
    * that cannot use a picture, this is a picture no card may use.
    */
   claimed?: readonly ContentPick[];
+  /**
+   * Image URLs that have already failed to load, which are not offered again, so
+   * a campaign whose art file has gone falls back to its map. See
+   * {@link brokenContentArt}.
+   */
+  brokenImages?: ReadonlySet<string>;
 }
 
 /** The map your saved Singleplayer setup is pointed at. */
@@ -245,19 +263,39 @@ export function replayPick(
 }
 
 /**
- * The map of the mission you last played, in the campaign you last touched.
+ * The URL of a mission's panorama, where one can be drawn on a card.
+ *
+ * A slot has one source, so a live map or unit preview stands in for any file the
+ * mission still names. A video has no place in a card's `<img>`.
+ */
+function panoramaUrl(
+  campaignId: string,
+  mission: CampaignMission,
+): string | undefined {
+  if (mission.panoramaMap || mission.panoramaUnit || !mission.panorama) {
+    return undefined;
+  }
+  return imageRefUrl(campaignId, mission.panorama);
+}
+
+/**
+ * What the campaign you last touched has to show, best first: the panorama of the
+ * mission you last played, the campaign's background, then that mission's map.
  *
  * Progress is the index rather than the campaign list, because a campaign you
  * have never opened says nothing about you. An unreadable timestamp is dropped
  * the way `rankCandidates` drops one, so the pick cannot turn on a `NaN`
  * comparison.
+ *
+ * A mission that has since been deleted still leaves the campaign's background,
+ * which does not depend on it.
  */
-export function campaignPick(
+export function campaignPicks(
   campaigns: readonly { campaign: Campaign }[],
   progress: ProgressFile,
-): ContentPick | undefined {
+): readonly ContentPick[] {
   let bestAt = -Infinity;
-  let bestMap: string | undefined;
+  let best: readonly ContentPick[] = [];
   for (const { campaign } of campaigns) {
     const saved = progress.campaigns[campaign.id];
     if (!saved?.lastPlayedMissionId) continue;
@@ -266,21 +304,50 @@ export function campaignPick(
     const mission = campaign.missions.find(
       (m) => m.id === saved.lastPlayedMissionId,
     );
+    const panorama = mission && panoramaUrl(campaign.id, mission);
+    const background =
+      campaign.background && imageRefUrl(campaign.id, campaign.background);
     const mapName = mission?.snapshot?.mapName;
-    if (!mapName) continue;
+    const picks: ContentPick[] = [
+      ...imagePicks([panorama, background]),
+      ...(mapName ? [{ kind: "map" as const, mapName }] : []),
+    ];
+    if (picks.length === 0) continue;
     bestAt = at;
-    bestMap = mapName;
+    best = picks;
   }
-  return bestMap ? { kind: "map", mapName: bestMap } : undefined;
+  return best;
 }
 
-/** The map of the scenario you edited most recently. */
-export function scenarioPick(
+/** URLs as image picks, leaving out the ones that are not there. */
+function imagePicks(urls: readonly (string | undefined)[]): ContentPick[] {
+  return urls.flatMap((url) => (url ? [{ kind: "image" as const, url }] : []));
+}
+
+/**
+ * What the scenario you edited most recently has to show, best first.
+ *
+ * A scenario has no header art of its own by design. Its presentation belongs to
+ * the campaign mission it is attached to, so the panorama of any such mission
+ * comes first and the scenario's map after it. An attached copy keeps the
+ * scenario's id, which is what connects the two. Campaigns are walked in id order,
+ * because the list arrives in whatever order the folder was read.
+ */
+export function scenarioPicks(
   scenarios: readonly { scenario: ScenarioSummary }[],
-): ContentPick | undefined {
+  campaigns: readonly { campaign: Campaign }[] = [],
+): readonly ContentPick[] {
   const named = scenarios.find((s) => s.scenario.setup.mapName);
-  const mapName = named?.scenario.setup.mapName;
-  return mapName ? { kind: "map", mapName } : undefined;
+  if (!named) return [];
+  const { id, setup } = named.scenario;
+  const panoramas = [...campaigns]
+    .sort((a, b) => a.campaign.id.localeCompare(b.campaign.id))
+    .flatMap(({ campaign }) =>
+      campaign.missions
+        .filter((m) => m.scenario?.id === id)
+        .map((m) => panoramaUrl(campaign.id, m)),
+    );
+  return [...imagePicks(panoramas), { kind: "map", mapName: setup.mapName }];
 }
 
 /**
@@ -302,7 +369,7 @@ export function scenarioPick(
  */
 export function collectionPicks(
   items: readonly NamedContent[],
-  kind: ContentPick["kind"],
+  kind: "map" | "game",
 ): readonly ContentPick[] {
   const names = [...new Set(items.map((i) => i.name).filter(Boolean))].sort();
   if (names.length === 0) return [];
@@ -325,7 +392,8 @@ export function collectionPicks(
  * at the head of this file. Your skirmish setup's map is the setup. Your newest
  * replay's map is where that match was fought. A scenario's map is the ground it
  * is set on. A campaign's is one stop on a journey the road drawing describes
- * better, so it yields to all three. The two collection cards come last because
+ * better, so it yields to all three. Its own art is a different matter, and
+ * {@link contentOffers} keeps a scenario card from taking it. The two collection cards come last because
  * they are the only ones that lose nothing by yielding: they have another
  * member to offer.
  */
@@ -347,11 +415,26 @@ export function contentOffers(
     if (sources.overridden?.has(toolId)) return;
     if (picks.length > 0) offers.set(toolId, picks);
   };
+  const loadable = (picks: readonly ContentPick[]) =>
+    picks.filter(
+      (p) => p.kind !== "image" || !sources.brokenImages?.has(p.url),
+    );
   const one = (pick: ContentPick | undefined) => (pick ? [pick] : []);
   add("play.skirmish", one(skirmishPick(sources.draft)));
   add("play.replays", one(replayPick(sources.replays)));
-  add("scenario.list", one(scenarioPick(sources.scenarios)));
-  add("campaign.list", one(campaignPick(sources.campaigns, sources.progress)));
+  const campaign = sources.overridden?.has("campaign.list")
+    ? []
+    : loadable(campaignPicks(sources.campaigns, sources.progress));
+  // The scenario card goes first, and would otherwise take the panorama of the
+  // mission it is attached to from the campaign whose art that is.
+  const campaignArt = new Set(campaign.map(contentKey));
+  add(
+    "scenario.list",
+    loadable(scenarioPicks(sources.scenarios, sources.campaigns)).filter(
+      (p) => p.kind !== "image" || !campaignArt.has(contentKey(p)),
+    ),
+  );
+  add("campaign.list", campaign);
   // The game in your saved setup first, then the rest of the shelf. It is a
   // member of the collection like any other, and it is the one you play.
   add("library.games", [
@@ -363,16 +446,18 @@ export function contentOffers(
 }
 
 /**
- * A piece of content, as one string. Maps and games are separate namespaces.
+ * A piece of content, as one string. Maps, games and images are separate
+ * namespaces.
  *
- * Case-insensitive, because the names being compared do not all come from the
- * same place. A card's own pick is a unitsync scan name, while a claim from the
- * suggested map is the spring name the catalog downloads it by, and the two are
- * written by different hands. `suggestedMapState` already compares them
+ * Names compare case-insensitively, because the names being compared do not all
+ * come from the same place. A card's own pick is a unitsync scan name, while a
+ * claim from the suggested map is the spring name the catalog downloads it by, and
+ * the two are written by different hands. `suggestedMapState` already compares them
  * lowercased for the same reason. Two installed maps whose names differ only in
- * case are the same map to a reader either way.
+ * case are the same map to a reader either way. A URL is compared exactly.
  */
 function contentKey(pick: ContentPick): string {
+  if (pick.kind === "image") return `i:${pick.url}`;
   const name = pick.kind === "map" ? pick.mapName : pick.gameName;
   return `${pick.kind === "map" ? "m" : "g"}:${name.toLowerCase()}`;
 }
@@ -418,14 +503,16 @@ export function contentPicks(
   return assignPicks(contentOffers(sources), sources.claimed);
 }
 
+/** The one string that names what a pick is of. */
+function pickName(pick: ContentPick): string {
+  if (pick.kind === "image") return pick.url;
+  return pick.kind === "map" ? pick.mapName : pick.gameName;
+}
+
 /** A stable string for a set of picks, so an effect can depend on their value. */
 export function picksKey(picks: ReadonlyMap<string, ContentPick>): string {
   return [...picks]
-    .map(([toolId, p]) =>
-      p.kind === "map"
-        ? `${toolId}=m:${p.mapName}`
-        : `${toolId}=g:${p.gameName}`,
-    )
+    .map(([toolId, p]) => `${toolId}=${p.kind[0]}:${pickName(p)}`)
     .sort()
     .join("|");
 }
@@ -450,6 +537,20 @@ let remembered: ReadonlyMap<string, RememberedArt> = new Map();
 
 /** The text last written, so an unchanged snapshot is not written again. */
 let written: string | undefined;
+
+/** Every URL a card has failed to load this launch. */
+const broken = new Set<string>();
+
+/**
+ * The URLs that would not load, for the next set of picks to avoid.
+ *
+ * A map name resolves afresh, but an image pick is its URL, so a campaign whose art
+ * file has gone would otherwise offer the same URL for ever and never reach its
+ * map. Held for the launch: a replaced image gets a new file name, so a new URL.
+ */
+export function brokenContentArt(): ReadonlySet<string> {
+  return broken;
+}
 
 /** Bumped whenever the cache changes value, for the store subscription. */
 let version = 0;
@@ -509,6 +610,7 @@ export function resetContentArt(): void {
   urls = new Map();
   remembered = new Map();
   written = undefined;
+  broken.clear();
   wake();
 }
 
@@ -687,8 +789,9 @@ export function rememberedFrom(
   for (const [toolId, url] of resolved) {
     const pick = picks.get(toolId);
     // A URL with no pick behind it cannot be checked next launch, so it is not
-    // worth remembering.
-    if (!pick) continue;
+    // worth remembering. An embedded image is the picture itself rather than a
+    // name for it, and one of those can fill the storage quota alone.
+    if (!pick || (pick.kind === "image" && url.startsWith("data:"))) continue;
     next.set(toolId, { pick, url });
     taken.add(contentKey(pick));
   }
@@ -716,6 +819,7 @@ export function rememberedFrom(
  * whichever half of this module produced it.
  */
 export function forgetContentArt(url: string): void {
+  broken.add(url);
   const keptUrls = new Map([...urls].filter(([, u]) => u !== url));
   const keptEntries = new Map(
     [...remembered].filter(([, entry]) => entry.url !== url),
@@ -736,7 +840,7 @@ export function encodeRemembered(
     entries: [...entries].map(([tool, { pick, url }]) => ({
       tool,
       kind: pick.kind,
-      name: pick.kind === "map" ? pick.mapName : pick.gameName,
+      name: pickName(pick),
       url,
     })),
   });
@@ -776,6 +880,8 @@ export function decodeRemembered(
     if (kind === "map") out.set(tool, { pick: { kind, mapName: name }, url });
     else if (kind === "game")
       out.set(tool, { pick: { kind, gameName: name }, url });
+    else if (kind === "image")
+      out.set(tool, { pick: { kind, url: name }, url });
     else return empty();
   }
   return out;
