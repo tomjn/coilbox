@@ -1,7 +1,7 @@
 /**
  * Which scenarios a player is offered, and what a row says about one.
  *
- * The Scenarios page and the Scenario Builder list the same documents for
+ * The Scenarios page and the Scenario builder list the same documents for
  * different reasons, so the two questions they share live here: what a scenario
  * holds, and whether it is a document worth putting in front of the engine at
  * all.
@@ -32,7 +32,7 @@ export type ScenarioCount = {
  * The counts are given as data rather than as a finished string because the two
  * screens listing scenarios want different pictures of them. The Scenarios page
  * and the campaign pickers read them as a sentence, in the middle of a
- * paragraph. The Scenario Builder draws them as chips (issue #2180), where a
+ * paragraph. The Scenario builder draws them as chips (issue #2180), where a
  * wall of near identical sentences was the problem. Both start here, so neither
  * can drift from the other about what a placement is.
  */

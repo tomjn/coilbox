@@ -134,7 +134,7 @@ export default function SavegamesPage() {
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold">
-          <Trans>Save Games</Trans>
+          <Trans>Save games</Trans>
         </h1>
         <p className="text-sm text-muted-foreground">
           <Trans>

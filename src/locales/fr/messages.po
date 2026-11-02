@@ -12539,7 +12539,7 @@ msgstr "Mot de passe de la partie"
 #: src/multiplayer/index.tsx
 #: src/multiplayer/navPredicates.ts
 #, fuzzy
-msgid "Battle Room"
+msgid "Battle room"
 msgstr "Salon"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -13874,7 +13874,7 @@ msgstr "Campagne"
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/scenario/index.ts
 #, fuzzy
-msgid "Campaign Builder"
+msgid "Campaign builder"
 msgstr "Éditeur de campagnes"
 
 #: src/play/PlayProvider.tsx
@@ -20970,14 +20970,10 @@ msgstr "Options du moteur, apparence, comptes, et tout le reste."
 msgid "Engine required"
 msgstr "Moteur requis"
 
+#: src/content/index.ts
 #: src/general/index.ts
 #, fuzzy
 msgid "Engine settings"
-msgstr "Paramètres du moteur"
-
-#: src/content/index.ts
-#, fuzzy
-msgid "Engine Settings"
 msgstr "Paramètres du moteur"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -27729,7 +27725,7 @@ msgstr "Légendaire"
 #: src/lego/index.ts
 #: src/lego/pages/PartsPage.tsx
 #, fuzzy
-msgid "Lego Parts"
+msgid "Lego parts"
 msgstr "Éléments Lego"
 
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -28614,7 +28610,7 @@ msgstr "le plus bas"
 
 #: src/animation/index.ts
 #, fuzzy
-msgid "Lua Animations"
+msgid "Lua animations"
 msgstr "Animations Lua"
 
 #: src/content/compatReport.ts
@@ -29016,17 +29012,13 @@ msgstr "Clés de mapinfo.lua signalées par le moteur"
 
 #: src/mapconv/index.ts
 #, fuzzy
-msgid "Mapping Tools"
+msgid "Mapping tools"
 msgstr "Outils de cartographie"
 
+#: src/mapconv/index.ts
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Mapping wiki"
-msgstr "Wiki de cartographie"
-
-#: src/mapconv/index.ts
-#, fuzzy
-msgid "Mapping Wiki"
 msgstr "Wiki de cartographie"
 
 #: src/conquest/pages/GalaxyPage.tsx
@@ -30414,12 +30406,12 @@ msgstr "Mes chiffres"
 
 #: src/content/libraryGames.ts
 #, fuzzy
-msgid "My Games"
+msgid "My games"
 msgstr "Mes jeux"
 
 #: src/content/libraryMaps.ts
 #, fuzzy
-msgid "My Maps"
+msgid "My maps"
 msgstr "Mes cartes"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -30944,7 +30936,7 @@ msgstr "Nouveau fichier"
 
 #: src/content/libraryGames.ts
 #, fuzzy
-msgid "New Games"
+msgid "New games"
 msgstr "Nouveaux jeux"
 
 #: src/content/pages/FoldersSection.tsx
@@ -30964,7 +30956,7 @@ msgstr "Nouvel identifiant"
 
 #: src/content/libraryMaps.ts
 #, fuzzy
-msgid "New Maps"
+msgid "New maps"
 msgstr "Nouvelles cartes"
 
 #: src/content/pages/FoldersSection.tsx
@@ -32585,7 +32577,7 @@ msgstr "ce scénario n’existe plus ici"
 
 #: src/campaign/pages/components/ScenarioPicker.tsx
 #, fuzzy
-msgid "No scenarios are ready to attach. Build one in the <0>Scenario Builder</0> and give it a game and a map first."
+msgid "No scenarios are ready to attach. Build one in the <0>Scenario builder</0> and give it a game and a map first."
 msgstr "Aucun scénario n’est prêt à être associé. Créez-en un dans le <0>créateur de scénarios</0> et donnez-lui d’abord un jeu et une carte."
 
 #: src/scenario/pages/ScenariosPage.tsx
@@ -40942,7 +40934,7 @@ msgstr "Enregistrer le fichier depuis l’archive"
 #: src/play/index.ts
 #: src/play/pages/SavegamesPage.tsx
 #, fuzzy
-msgid "Save Games"
+msgid "Save games"
 msgstr "Sauvegardes"
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -41437,7 +41429,7 @@ msgstr "Scénario"
 #: src/scenario/index.ts
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
-msgid "Scenario Builder"
+msgid "Scenario builder"
 msgstr "Créateur de scénarios"
 
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -44827,7 +44819,7 @@ msgstr "Démarrer en sourdine"
 
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
-msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
+msgid "Start one, then drop parts into it. Browse what is available under Lego parts."
 msgstr "Créez-en un, puis ajoutez-y des éléments. Parcourez ce qui est disponible dans Éléments Lego."
 
 #: src/onboarding/Wizard.tsx
@@ -49952,7 +49944,7 @@ msgstr "Cette URL d’import n’est pas valide."
 
 #: src/deeplink/readImport.ts
 #, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
 msgstr "C’est {campaignPhrase}. Les campagnes s’importent depuis un fichier : activez le mode avancé dans Paramètres, puis utilisez le créateur de campagnes et son bouton Importer."
 
 #: src/deeplink/pages/ImportSection.tsx

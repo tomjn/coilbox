@@ -1,6 +1,6 @@
 /**
  * Sidebar nav-badge derivations (issue #273). Pure summaries over the lobby state
- * mirror, computing the counts shown on the Chat and Battle Room sidebar items.
+ * mirror, computing the counts shown on the Chat and Battle room sidebar items.
  *
  * These reuse the store's existing read bookkeeping: callers pass `unreadOf`
  * (the store's `unreadFor`), from which each conversation's seen index is derived
@@ -63,7 +63,7 @@ function currentBattle(state: LobbyState) {
  * Chat nav badge count: signal-focused unread — direct messages (skipping ignored
  * peers) plus highlight-word hits across joined channels. General channel chatter
  * that doesn't mention you is deliberately not counted, so a busy channel can't
- * inflate the badge. Battle chat is excluded here; it feeds the Battle Room badge.
+ * inflate the badge. Battle chat is excluded here; it feeds the Battle room badge.
  */
 export function chatBadgeCount(
   state: LobbyState,
@@ -95,7 +95,7 @@ export function chatBadgeCount(
 }
 
 /**
- * Battle Room nav badge count: unread news in the current battle's chat channel
+ * Battle room nav badge count: unread news in the current battle's chat channel
  * (its synthetic `__battle__<id>` bucket). Zero when not in a battle or the
  * channel has no bucket yet.
  */
@@ -118,7 +118,7 @@ export function battleBadgeCount(
 
 /**
  * Whether the current battle's game is running, i.e. its host is in-game. Drives
- * the Battle Room status dot: an actionable "your game has started" cue while you
+ * the Battle room status dot: an actionable "your game has started" cue while you
  * are on another page. False when not in a battle or the host is unknown.
  */
 export function battleLive(state: LobbyState): boolean {

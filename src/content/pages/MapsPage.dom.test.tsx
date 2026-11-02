@@ -168,16 +168,16 @@ describe("Maps page", () => {
     renderPage();
     expect(
       screen
-        .getByRole("radio", { name: /My Maps/ })
+        .getByRole("radio", { name: /My maps/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
     expect(cards()).toHaveLength(2);
   });
 
-  it("splits the maps between My Maps and New Maps", () => {
+  it("splits the maps between My maps and New maps", () => {
     renderPage();
     expect(cardTitles()).toEqual(["Comet Catcher Redux", "my_test_map v3"]);
-    pressChip(/New Maps/);
+    pressChip(/New maps/);
     expect(cardTitles()).toEqual(["Isis", "Supreme Isthmus v2"]);
   });
 
@@ -197,7 +197,7 @@ describe("Maps page", () => {
     expect(
       within(card("my_test_map v3")).getByText("12 × 12 · not on any mirror"),
     ).toBeTruthy();
-    pressChip(/New Maps/);
+    pressChip(/New maps/);
     expect(within(card("Isis")).getByText("Queued")).toBeTruthy();
     expect(within(card("Isis")).getByRole("button", { name: "Cancel" }));
     const isthmus = card("Supreme Isthmus v2");
@@ -216,12 +216,12 @@ describe("Maps page", () => {
     const chips = within(screen.getByRole("radiogroup", { name: "Show" }))
       .getAllByRole("radio")
       .map((c) => c.textContent);
-    expect(chips).toEqual(["My Maps2", "New Maps2", "1v1", "Team", "Water"]);
+    expect(chips).toEqual(["My maps2", "New maps2", "1v1", "Team", "Water"]);
   });
 
   it("filters by start count and tag through the play type chips", () => {
     renderPage();
-    pressChip(/^My Maps/);
+    pressChip(/^My maps/);
     expect(cardTitles()).toEqual(["Comet Catcher Redux", "my_test_map v3"]);
     pressChip(/^1v1/);
     expect(cardTitles()).toEqual(["Supreme Isthmus v2"]);
@@ -245,7 +245,7 @@ describe("Maps page", () => {
     const chips = within(screen.getByRole("radiogroup", { name: "Show" }))
       .getAllByRole("radio")
       .map((c) => c.textContent);
-    expect(chips).toEqual(["My Maps2", "New Maps2"]);
+    expect(chips).toEqual(["My maps2", "New maps2"]);
   });
 
   it("names a mirror index that could not be read", () => {

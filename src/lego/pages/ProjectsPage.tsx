@@ -498,7 +498,7 @@ export default function ProjectsPage() {
           <p className="max-w-prose text-sm text-muted-foreground">
             <Trans>
               Start one, then drop parts into it. Browse what is available under
-              Lego Parts.
+              Lego parts.
             </Trans>
           </p>
           <NewUnitPopover

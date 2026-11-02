@@ -149,7 +149,7 @@ describe("readImport: a wrong paste is a sentence, not a validation failure", ()
     expect(r.reason).toContain(
       "a coilbox campaign for Balanced Annihilation 12.1",
     );
-    expect(r.reason).toMatch(/Campaign Builder/);
+    expect(r.reason).toMatch(/Campaign builder/);
     expect(r.reason).toMatch(/Advanced mode/);
   });
 

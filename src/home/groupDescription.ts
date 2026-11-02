@@ -6,7 +6,7 @@ import { msg } from "@lingui/core/macro";
  * is for.
  *
  * The headings alone leave a lot unsaid. "Play" and "Library" are guessable,
- * but a heading reading "Mapping Tools" tells a first-time player nothing about whether it is
+ * but a heading reading "Mapping tools" tells a first-time player nothing about whether it is
  * for them.
  *
  * ## Why a table here rather than a field on each group

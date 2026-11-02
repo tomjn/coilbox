@@ -37,7 +37,7 @@ const legoPlugin: FramePlugin = {
         },
         {
           id: "lego.parts",
-          label: lazyText(msg`Lego Parts`),
+          label: lazyText(msg`Lego parts`),
           to: "/lego/parts",
           order: 1,
           icon: ToyBrick,
@@ -84,7 +84,7 @@ const legoPlugin: FramePlugin = {
     {
       path: "lego/parts",
       lazy: gateAdvanced(() => import("./pages/PartsPage")),
-      crumb: lazyText(msg`Lego Parts`),
+      crumb: lazyText(msg`Lego parts`),
     },
     {
       // Before the model route so the two are read in the order they are

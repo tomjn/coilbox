@@ -106,7 +106,7 @@ export function BattleChatCard({
   const conv = useConversation(desc, serverKey);
 
   // Reading the room is reading its chat, so being here marks it seen. Without
-  // this the Battle Room nav badge counted every line while you sat in front of
+  // this the Battle room nav badge counted every line while you sat in front of
   // it. Only the chat hub ever marked anything read, and it cannot mark a room
   // it was never opened for.
   const seenId = desc ? convId(desc) : null;

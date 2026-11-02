@@ -1,7 +1,7 @@
 /**
  * The inventory as one grid of tiles: shapes, parts and modules (#4536).
  *
- * The Lego Parts page and the builder's drawer both list these through here.
+ * The Lego parts page and the builder's drawer both list these through here.
  * The tiles are split into sections, each under a heading with its count, and
  * `./sectionGrid` says where every tile goes.
  *

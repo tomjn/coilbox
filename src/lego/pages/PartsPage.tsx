@@ -71,7 +71,7 @@ export default function PartsPage() {
         <PageHeader
           title={
             <>
-              <ToyBrick size={18} /> <Trans>Lego Parts</Trans>
+              <ToyBrick size={18} /> <Trans>Lego parts</Trans>
             </>
           }
           actions={

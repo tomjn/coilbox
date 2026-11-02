@@ -58,7 +58,7 @@ const animationPlugin: FramePlugin = {
         },
         {
           id: "animation.lua-animations",
-          label: lazyText(msg`Lua Animations`),
+          label: lazyText(msg`Lua animations`),
           href: "https://springrts.com/wiki/Animation-LuaScripting",
           icon: ScrollText,
           sidebar: false,

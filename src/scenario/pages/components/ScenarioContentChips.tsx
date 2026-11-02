@@ -1,7 +1,7 @@
 /**
  * What a scenario holds, as one chip per kind of content (issue #2180).
  *
- * The Scenario Builder row used to say this as a sentence, and a screenful of
+ * The Scenario builder row used to say this as a sentence, and a screenful of
  * rows all reading "8 unit placements · 1 zone · 1 trigger · 1 objective" is a
  * wall of text with the interesting part buried in it. An icon and a number put
  * each kind in the same place on every row, so the triggers of the whole list

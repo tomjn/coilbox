@@ -10168,7 +10168,7 @@ msgstr ""
 
 #: src/multiplayer/index.tsx
 #: src/multiplayer/navPredicates.ts
-msgid "Battle Room"
+msgid "Battle room"
 msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -11251,7 +11251,7 @@ msgstr ""
 #: src/campaign/index.ts
 #: src/campaign/pages/CampaignBuilderPage.tsx
 #: src/scenario/index.ts
-msgid "Campaign Builder"
+msgid "Campaign builder"
 msgstr ""
 
 #: src/play/PlayProvider.tsx
@@ -17072,12 +17072,9 @@ msgstr ""
 msgid "Engine required"
 msgstr ""
 
+#: src/content/index.ts
 #: src/general/index.ts
 msgid "Engine settings"
-msgstr ""
-
-#: src/content/index.ts
-msgid "Engine Settings"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -22556,7 +22553,7 @@ msgstr ""
 
 #: src/lego/index.ts
 #: src/lego/pages/PartsPage.tsx
-msgid "Lego Parts"
+msgid "Lego parts"
 msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -23278,7 +23275,7 @@ msgid "lowest"
 msgstr ""
 
 #: src/animation/index.ts
-msgid "Lua Animations"
+msgid "Lua animations"
 msgstr ""
 
 #: src/content/compatReport.ts
@@ -23607,15 +23604,12 @@ msgid "mapinfo.lua keys the engine warns on"
 msgstr ""
 
 #: src/mapconv/index.ts
-msgid "Mapping Tools"
-msgstr ""
-
-#: src/mapconv/pages/CompilePage.tsx
-msgid "Mapping wiki"
+msgid "Mapping tools"
 msgstr ""
 
 #: src/mapconv/index.ts
-msgid "Mapping Wiki"
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Mapping wiki"
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
@@ -24744,11 +24738,11 @@ msgid "My figures"
 msgstr ""
 
 #: src/content/libraryGames.ts
-msgid "My Games"
+msgid "My games"
 msgstr ""
 
 #: src/content/libraryMaps.ts
-msgid "My Maps"
+msgid "My maps"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -25177,7 +25171,7 @@ msgid "New file"
 msgstr ""
 
 #: src/content/libraryGames.ts
-msgid "New Games"
+msgid "New games"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
@@ -25193,7 +25187,7 @@ msgid "New login"
 msgstr ""
 
 #: src/content/libraryMaps.ts
-msgid "New Maps"
+msgid "New maps"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
@@ -26504,7 +26498,7 @@ msgid "no scenario here any more"
 msgstr ""
 
 #: src/campaign/pages/components/ScenarioPicker.tsx
-msgid "No scenarios are ready to attach. Build one in the <0>Scenario Builder</0> and give it a game and a map first."
+msgid "No scenarios are ready to attach. Build one in the <0>Scenario builder</0> and give it a game and a map first."
 msgstr ""
 
 #: src/scenario/pages/ScenariosPage.tsx
@@ -33321,7 +33315,7 @@ msgstr ""
 
 #: src/play/index.ts
 #: src/play/pages/SavegamesPage.tsx
-msgid "Save Games"
+msgid "Save games"
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -33729,7 +33723,7 @@ msgstr ""
 
 #: src/scenario/index.ts
 #: src/scenario/pages/ScenarioBuilderPage.tsx
-msgid "Scenario Builder"
+msgid "Scenario builder"
 msgstr ""
 
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -36482,7 +36476,7 @@ msgid "Start muted"
 msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
-msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
+msgid "Start one, then drop parts into it. Browse what is available under Lego parts."
 msgstr ""
 
 #: src/onboarding/Wizard.tsx
@@ -40633,7 +40627,7 @@ msgid "This import URL is not valid."
 msgstr ""
 
 #: src/deeplink/readImport.ts
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
 msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx

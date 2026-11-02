@@ -1,6 +1,6 @@
 /**
  * Sidebar nav-item badges (issue #273): live notification counts on the Chat and
- * Battle Room items, so activity is visible without opening those pages.
+ * Battle room items, so activity is visible without opening those pages.
  *
  * The frame calls a nav item's `badge()` inside the sidebar item's render, but only
  * when the sidebar is expanded — a *conditional* call. So `badge` returns one of
@@ -59,7 +59,7 @@ export function ChatNavBadge() {
 }
 
 /**
- * Battle Room item badge: unread battle-chat count, plus an accent status dot when
+ * Battle room item badge: unread battle-chat count, plus an accent status dot when
  * the game is running (host in-game) — an actionable "your game has started" cue
  * shown even at zero unread. Read off the connection the battle is on.
  */

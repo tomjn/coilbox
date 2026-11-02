@@ -269,7 +269,7 @@ export default function CampaignBuilderPage() {
   return (
     <div className="flex flex-col gap-5 p-4">
       <PageHeader
-        title={t`Campaign Builder`}
+        title={t`Campaign builder`}
         description={t`Author a sequence of skirmish missions from your saved presets. Local campaigns are editable; bundled campaigns are read-only.`}
         actions={
           <>

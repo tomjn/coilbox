@@ -53,7 +53,7 @@ describe("chip filters", () => {
     expect(matchesPlayType(undefined, "1v1")).toBe(false);
   });
 
-  it("narrow to what is on disk under My Maps, and the rest under New Maps", () => {
+  it("narrow to what is on disk under My maps, and the rest under New maps", () => {
     const installed = maps.filter((m) => matchesMapScope(m, "installed"));
     expect(installed.map((m) => m.id)).toEqual([
       "Comet Catcher Redux",

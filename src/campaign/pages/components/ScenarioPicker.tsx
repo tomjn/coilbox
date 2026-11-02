@@ -54,7 +54,7 @@ export function ScenarioPickerList({
             to="/scenario-builder"
             onClick={onNavigate}
           >
-            Scenario Builder
+            Scenario builder
           </Link>{" "}
           and give it a game and a map first.
         </Trans>

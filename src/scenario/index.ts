@@ -7,13 +7,13 @@ import { lazyText } from "../i18n/pluginText";
 import { getCachedScenario, useHasScenarios } from "./scenarios";
 
 /**
- * The Scenarios plugin's frontend half: an advanced-mode **Scenario Builder**
+ * The Scenarios plugin's frontend half: an advanced-mode **Scenario builder**
  * for authoring the in-engine content of a mission (spawns, zones, triggers,
  * objectives, dialogue). Documents and dialogue clips are stored by the
  * `tauri-plugin-coilbox-scenario` crate (ACL id `coilbox-scenario`). The schema
  * lives in `model.ts`.
  *
- * The builder joins the shared **Campaign Builder** group beside Campaigns (nav
+ * The builder joins the shared **Campaign builder** group beside Campaigns (nav
  * groups merge by id), and its routes are `gateAdvanced`-wrapped so a deep
  * link is not reachable while advanced mode is off.
  *
@@ -47,7 +47,7 @@ const scenarioPlugin: FramePlugin = {
     },
     {
       id: "builder",
-      label: lazyText(msg`Campaign Builder`),
+      label: lazyText(msg`Campaign builder`),
       order: 35,
       items: [
         {
@@ -81,7 +81,7 @@ const scenarioPlugin: FramePlugin = {
     {
       path: "scenario-builder",
       lazy: gateAdvanced(() => import("./pages/ScenarioBuilderPage")),
-      crumb: lazyText(msg`Scenario Builder`),
+      crumb: lazyText(msg`Scenario builder`),
     },
     {
       // The route param is an opaque uuid, so the crumb resolves the scenario's

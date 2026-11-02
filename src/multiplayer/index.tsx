@@ -125,7 +125,7 @@ const multiplayerPlugin: FramePlugin = {
         {
           id: "multiplayer.battle",
           // Static fallback; the live battle title comes from `useLabel`.
-          label: lazyText(msg`Battle Room`),
+          label: lazyText(msg`Battle room`),
           to: "/battle",
           end: true,
           order: 4,
@@ -220,7 +220,7 @@ const multiplayerPlugin: FramePlugin = {
     {
       path: "battle",
       lazy: () => import("./pages/BattleRoomPage"),
-      crumb: lazyText(msg`Battle Room`),
+      crumb: lazyText(msg`Battle room`),
     },
     {
       path: "admin",

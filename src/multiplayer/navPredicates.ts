@@ -70,7 +70,7 @@ export function useMpMatchmaking(): boolean {
 
 /**
  * Nav/route predicate: is the user currently in a battle with a room, on any
- * connection? Gates the Battle Room sidebar item + route so it appears on join
+ * connection? Gates the Battle room sidebar item + route so it appears on join
  * and vanishes on leave. An Open Annihilation battle has no room (issue #4972).
  */
 export function useMpInBattle(): boolean {
@@ -99,7 +99,7 @@ export function useMpServerAdmin(): boolean {
 }
 
 /**
- * The dynamic label for the Battle Room nav item: the joined battle's title,
+ * The dynamic label for the Battle room nav item: the joined battle's title,
  * on whichever connection it is (issue #2844), or
  * a generic fallback. Read reactively so picoframe re-renders it as the battle
  * changes (`NavItem.useLabel`).
@@ -111,5 +111,5 @@ export function useBattleRoomLabel(): string {
     state?.currentBattle != null
       ? state.battles[String(state.currentBattle)]
       : undefined;
-  return battle?.title?.trim() || t`Battle Room`;
+  return battle?.title?.trim() || t`Battle room`;
 }

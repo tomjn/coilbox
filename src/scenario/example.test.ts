@@ -7,7 +7,7 @@ import { encodeScenarioExport, readScenarioExport } from "./transfer";
 
 /**
  * The committed export of "Silence the Jericho", the mission authored in the
- * Scenario Builder (issue #773).
+ * Scenario builder (issue #773).
  *
  * `fixtures/jericho.json` is a bare scenario document, which is what the compile
  * corpus and the headless harness read, and which the app's Import does not

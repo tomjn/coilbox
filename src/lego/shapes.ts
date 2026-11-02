@@ -1307,7 +1307,7 @@ export function parseShape(value: unknown): LegoShape | null {
 /**
  * What the parts strip lists for a kind (#3337): its name, the size and options
  * a click adds it with, and the words search finds it by. Each kind added to
- * `GENERATORS` adds a line here and appears in the strip and on the Lego Parts
+ * `GENERATORS` adds a line here and appears in the strip and on the Lego parts
  * page with no other change. A new shape is 1 along every side, near the
  * pack's smaller blocks. Its swatch is chosen when it is added.
  */

@@ -19,8 +19,8 @@ import type { LibraryGame, LibrarySource } from "./library";
  * descriptors, resolved at render.
  */
 export const GAME_CHIPS = [
-  { value: "installed", label: msg`My Games` },
-  { value: "notInstalled", label: msg`New Games` },
+  { value: "installed", label: msg`My games` },
+  { value: "notInstalled", label: msg`New games` },
   { value: "updates", label: msg`Updates` },
   { value: "featured", label: msg`Featured` },
 ] as const;

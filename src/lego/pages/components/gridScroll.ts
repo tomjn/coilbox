@@ -5,7 +5,7 @@
  * layer of buttons. By default it scrolls itself: the canvas fills a box and a
  * scroller under it moves the buttons, which is what the builder's drawer
  * wants. Given a `scrollRoot`, the grid is as tall as its tiles and scrolls
- * with that root instead, so the Lego Parts page has one scroll bar. The canvas
+ * with that root instead, so the Lego parts page has one scroll bar. The canvas
  * is then a sticky box no taller than the root, so only the rows on screen are
  * drawn either way.
  */

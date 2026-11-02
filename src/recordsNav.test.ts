@@ -87,7 +87,7 @@ describe("the Records nav group", () => {
     }
   });
 
-  it("leaves Save Games under Play", () => {
+  it("leaves Save games under Play", () => {
     expect(group("play").items.map((i) => i.id)).toContain("play.savegames");
   });
 });

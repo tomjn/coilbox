@@ -783,7 +783,7 @@ describe("the Recent and Favourites toggle", () => {
 });
 
 /**
- * The Lego Parts page scrolls as one (#4468). The builder's drawer keeps a
+ * The Lego parts page scrolls as one (#4468). The builder's drawer keeps a
  * scroller in the grid.
  */
 describe("one scroll for the page", () => {
@@ -868,7 +868,7 @@ describe("the detail panel", () => {
     expect(selectedKey()).toBe("");
   });
 
-  it("closes with Escape from anywhere on the Lego Parts page", () => {
+  it("closes with Escape from anywhere on the Lego parts page", () => {
     render(<Harness escapeAnywhere />);
     fireEvent.click(screen.getByRole("button", { name: "pick leg" }));
     fireEvent.keyDown(document.body, { key: "Escape" });

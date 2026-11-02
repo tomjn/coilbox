@@ -31,7 +31,7 @@ const mapconvPlugin: FramePlugin = {
       // The group is the map making tools, of which mapconv is one. The id,
       // the routes and the settings section keep the tool's own name, because
       // that is what a distribution profile and the docs refer to.
-      label: lazyText(msg`Mapping Tools`),
+      label: lazyText(msg`Mapping tools`),
       order: 40,
       items: [
         {
@@ -63,7 +63,7 @@ const mapconvPlugin: FramePlugin = {
         // the system browser via the Tauri opener.
         {
           id: "mapconv.mapping-wiki",
-          label: lazyText(msg`Mapping Wiki`),
+          label: lazyText(msg`Mapping wiki`),
           href: "https://springrts.com/wiki/Mapdev:Main",
           icon: BookOpen,
           sidebar: false,
