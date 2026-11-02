@@ -21,7 +21,7 @@ import {
 } from "@/blueprint/footprint";
 import type { UnknownBuilding } from "@/blueprint/units";
 import type { Participant, Rgb } from "@/play/config";
-import type { Facing, Point } from "@/scenario/model";
+import type { Facing, Point } from "./geometry";
 
 /** One unit to draw, and the document entry it came from. */
 export interface Placement {

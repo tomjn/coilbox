@@ -38,12 +38,8 @@ import {
   unjudged,
 } from "@/blueprint/footprint";
 import { turnFacing } from "@/lib/scenarioEditing/editing";
-import {
-  baseBuildings,
-  type Facing,
-  type Point,
-  type Scenario,
-} from "@/scenario/model";
+import { baseBuildings, type Scenario } from "@/scenario/model";
+import type { Facing, Point } from "./geometry";
 import {
   type BuildingUnit,
   type Placement,

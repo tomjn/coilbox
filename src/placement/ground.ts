@@ -13,7 +13,7 @@
  */
 
 import { BUILD_SQUARE } from "@/blueprint/footprint";
-import type { Point } from "@/scenario/model";
+import type { Point } from "./geometry";
 
 /**
  * How much ground the map-free surface offers, in elmos.
