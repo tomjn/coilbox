@@ -8764,6 +8764,10 @@ msgstr "Die Bauplandatei eines Spiels sagt nicht, für welches Spiel sie ist, da
 msgid "A game's file opens on <0>{gameFile}</0>, where your engine writes. Pick another if you keep your games somewhere else."
 msgstr "Die Datei eines Spiels öffnet sich bei <0>{gameFile}</0>, wo Ihre Engine schreibt. Wählen Sie eine andere, falls Sie Ihre Spiele woanders aufbewahren."
 
+#: src/scenario/validate.ts
+msgid "a group cannot hunt its own team"
+msgstr ""
+
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
 msgid "a group that is gone"
@@ -25322,6 +25326,10 @@ msgstr "Rumpfbreite"
 #, fuzzy
 msgid "Human · host"
 msgstr "Mensch · Host"
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Hunt"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #, fuzzy
@@ -45859,6 +45867,10 @@ msgstr "Team-Setup"
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Team size"
+msgstr ""
+
+#: src/scenario/pages/components/GroupControls.tsx
+msgid "Team to hunt"
 msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx

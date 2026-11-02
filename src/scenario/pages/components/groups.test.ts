@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Participant } from "@/play/config";
 import { newScenario } from "../../create";
 import type { Scenario, ScenarioGroup } from "../../model";
 import {
@@ -10,6 +11,7 @@ import {
   editGroup,
   groupLabel,
   groupSize,
+  huntableTeams,
   MAX_GROUP_COUNT,
   moveWaypoint,
   orderOfKind,
@@ -112,6 +114,22 @@ describe("unit lists", () => {
 
   it("counts what a group puts on the map", () => {
     expect(groupSize(raiders)).toBe(5);
+  });
+});
+
+describe("huntableTeams", () => {
+  const participants = [
+    { id: "you", spectator: false },
+    { id: "ai", spectator: false },
+    { id: "watcher", spectator: true },
+  ] as Participant[];
+
+  it("lists everybody playing but the group's own team", () => {
+    expect(huntableTeams(participants, "ai").map((p) => p.id)).toEqual(["you"]);
+  });
+
+  it("lists everybody playing when the group is not known", () => {
+    expect(huntableTeams(participants).map((p) => p.id)).toEqual(["you", "ai"]);
   });
 });
 
