@@ -7,11 +7,7 @@ import { buildPlayerLimitGadget, withPlayerUnits } from "./playerLimit";
  * Load the gadget under luajit with a stand-in for the engine, where team 0 is
  * limited to `com` and `lab`, then run `script` and read back what it printed.
  */
-function runGadget(
-  options: string,
-  script: string,
-  synced = true,
-): string[] {
+function runGadget(options: string, script: string, synced = true): string[] {
   const harness = `
     local source = io.read("*a")
     UnitDefs = {
@@ -147,7 +143,10 @@ describe("starting the player on the run's side", () => {
 
   it("writes a side name to a picker that reads one", () => {
     expect(
-      runGadget(METAL, "gadget:Initialize() print(params['0faction_selected'])"),
+      runGadget(
+        METAL,
+        "gadget:Initialize() print(params['0faction_selected'])",
+      ),
     ).toEqual(["claw"]);
   });
 
@@ -224,7 +223,9 @@ describe("withPlayerUnits", () => {
   } as unknown as BattleConfig;
 
   it("names the player's team and the units, sorted", () => {
-    expect(withPlayerUnits(config, ["b", "a"], "Zero-K v1", "Robots").modOptions).toEqual({
+    expect(
+      withPlayerUnits(config, ["b", "a"], "Zero-K v1", "Robots").modOptions,
+    ).toEqual({
       other: "1",
       coilbox_player_team: "2",
       coilbox_player_units: "a b",
@@ -269,6 +270,8 @@ describe("withPlayerUnits", () => {
 
   it("leaves a spectator's config alone", () => {
     const spectating = { players: [{}] } as unknown as BattleConfig;
-    expect(withPlayerUnits(spectating, ["a"], "Zero-K v1", "Robots")).toBe(spectating);
+    expect(withPlayerUnits(spectating, ["a"], "Zero-K v1", "Robots")).toBe(
+      spectating,
+    );
   });
 });
