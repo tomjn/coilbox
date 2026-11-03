@@ -198,6 +198,7 @@ pub fn random_track(seed: u64, windows: u32, window_length: u32, units: usize) -
             targets: vec![],
             poses: vec![],
             queue: vec![],
+            teams: vec![],
         };
         let mut pos = [
             rng.range(0, 30000) as i32,

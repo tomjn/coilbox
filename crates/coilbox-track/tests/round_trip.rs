@@ -62,6 +62,7 @@ fn a_curve_that_crosses_a_window_boundary_reads_the_same_either_side() {
         targets: vec![],
         poses: vec![],
         queue: vec![],
+        teams: vec![],
     });
     let mut reader = open(&track);
     let step = 1.0 / 8.0;
@@ -101,7 +102,25 @@ fn a_curve_that_crosses_a_window_boundary_reads_the_same_either_side() {
 #[test]
 fn every_value_matches_the_curve_within_the_quantisation_step() {
     for seed in 1..=4u64 {
-        let track = random_track(seed, 5, 60, 8);
+        let mut track = random_track(seed, 5, 60, 8);
+        // Every other unit is given to team 1 half way through its life and
+        // back to team 0 on its last frame.
+        for unit in track.units.iter_mut().filter(|u| u.serial % 2 == 1) {
+            let (first, last) = (unit.first_frame, unit.last_frame);
+            let middle = first + (last - first) / 2;
+            if middle > first {
+                unit.teams.push(TeamKey {
+                    frame: middle,
+                    team: 1,
+                });
+            }
+            if last > middle {
+                unit.teams.push(TeamKey {
+                    frame: last,
+                    team: 0,
+                });
+            }
+        }
         let q = track.quantiser().unwrap();
         let mut reader = open(&track);
         let step = 1.0 / 8.0;
@@ -133,6 +152,7 @@ fn every_value_matches_the_curve_within_the_quantisation_step() {
                     frame,
                 );
                 assert_eq!(got.flags, flags, "flags at frame {frame}");
+                assert_eq!(got.team, unit.team_at(frame), "team at frame {frame}");
 
                 for track in &unit.poses {
                     let want = pose_at(&track.keys, &q, frame).unwrap();
@@ -307,6 +327,7 @@ fn a_value_over_the_limit_is_refused() {
         targets: vec![],
         poses: vec![],
         queue: vec![],
+        teams: vec![],
     });
     let err = track.to_bytes().unwrap_err();
     assert!(matches!(err, TrackError::OutOfRange { .. }), "{err}");
