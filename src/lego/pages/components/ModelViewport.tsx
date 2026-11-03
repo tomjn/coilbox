@@ -122,8 +122,7 @@ import { disposeBalance } from "./balanceLayer";
 import {
   boundsBox,
   focusSelection,
-  frameBounds,
-  homeView,
+  resetFrame,
   showView,
 } from "./cameraFraming";
 import {
@@ -826,21 +825,14 @@ export function ModelViewport({
   //
   // The box comes from the document rather than the scene because the scene's
   // root holds the pivot dot as well as the geometry, which would make an
-  // empty unit look like a unit the size of a point at the origin. A unit with
-  // no geometry has nothing to frame, and keeps the old behaviour: the home
-  // camera, looking at the origin.
+  // empty unit look like a unit the size of a point at the origin. The
+  // reference figure is not in the document, so `resetFrame` adds it when it
+  // is standing. With nothing at all to frame, the camera goes home, looking
+  // at the origin.
   function resetView() {
     const state = sceneRef.current;
     if (!state) return;
-    const bounds = unitBounds(project, pack, raw);
-    const box = boundsBox(bounds);
-    if (box) {
-      // Frames from the home direction, which also leaves a standard view.
-      frameBounds(state, box, HOME_CAMERA);
-    } else {
-      homeView(state);
-    }
-    state.render();
+    resetFrame(state, boundsBox(unitBounds(project, pack, raw)));
   }
 
   // The scene is built once and never rebuilt on a prop change, because that
