@@ -217,6 +217,27 @@ A mark draws as a tick above the bar. Marks that fall in one column of the bar, 
 
 When playback does not start there is no player, so none of the other parameters is set. The timeline then draws the note and nothing else.
 
+#### Keeping clear of the game's panels
+
+A game can have panels of its own along the bottom left of the view that stay on in a playback, as Splinter Faction's tooltip panel does. The timeline is centred, which in a view as narrow as 1,472 pixels is over them (issue #5026). The adapter's `hooks.timelineClearance()` gives how far from the left of the view the game's panels reach, in pixels. The widget reads the adapter file itself, as the ghosts widget does, and calls the hook on every draw, so it follows a panel the viewer moves.
+
+When the centred panel would begin less than a margin from that edge, the timeline begins a margin to the right of it instead, 16 pixels in a view 1,080 high. If that leaves it too little room it gets narrower, down to 400 pixels in a view 1,080 high, which is what its buttons and a time of an hour or more need. With less room than that it stays centred and the game's panels are under it. A panel the viewer has dragged is where they put it, and the hook does not move it. A hook that raises is logged once and the timeline stays centred. A game with no hook, or a hook that gives 0 or anything that is not a number, is centred as before.
+
+Seen in a window on engine `2026.09.01` and Splinter Faction 0.1.96, on 3 November 2026, in a playback of the fixture match paused at track frame 330 with one unit selected. The game's tooltip panel and the timeline's left edge, in pixels from the left of the window:
+
+| Window | Tooltip panel | Timeline before | Timeline after |
+| --- | --- | --- | --- |
+| 1472 by 900 | 259 to 505 | 470, over the panel and the play backward button | 518 |
+| 1920 by 1080 | 338 to 658 | 640, over the panel by 18 | 674 |
+
+The panel's edges are what the game's layout widget reported. The timeline's left edge is where the widget said the pointer would be over it. Other window sizes were not run.
+
+![The timeline beside the tooltip panel at 1472 by 900, before](screenshots/timeline-clear-before-1472.jpg)
+
+![The timeline beside the tooltip panel at 1472 by 900, after](screenshots/timeline-clear-after-1472.jpg)
+
+![The timeline beside the tooltip panel at 1920 by 1080, after](screenshots/timeline-clear-after-1920.jpg)
+
 #### How a game comes to load it
 
 Nothing is asked of the game. A widget handler that comes from the engine's `cont/LuaUI/widgets.lua` lists `luaui/widgets/*.lua` out of the game and everything it depends on, and turns on a widget it has no saved state for when the widget's `enabled` is true. The playback game is a new game to the handler, so it has no saved state for it. Read in the handlers of Splinter Faction (`luaui/widgets_custom.lua`), THIS (`luaui/widgets.lua`) and Beyond All Reason (`luaui/barwidgets.lua`), and run in four: see [In a real engine](#in-a-real-engine).
@@ -1450,6 +1471,7 @@ A hook is an optional function in `hooks`. The player calls these and no others,
 | `afterFrame` | at the end of every simulation frame, after every stage | the track frame, the clock |
 | `drawQueuedBuilding` | not the player's. The ghosts widget calls it in `DrawWorld` for each queued building, in its own Lua state ([An adapter's own drawing](#an-adapters-own-drawing)) | the unit definition's engine id, the team, x, y, z, the facing |
 | `queuedBuildingsDrawn` | not the player's. The ghosts widget calls it at the end of every pass of `DrawWorld` and when it shuts down | how many buildings the pass drew |
+| `timelineClearance` | not the player's. The timeline widget calls it on every draw, in its own Lua state ([Keeping clear of the game's panels](#keeping-clear-of-the-games-panels)). It gives how far from the left of the view, in pixels, the game's panels along the bottom reach | none |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
 
@@ -1516,7 +1538,7 @@ What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and
 | A heal station healed the units round it and drew the heal effect on each | `unit_area_heal_radius.lua` | the gadget is switched off |
 | A feature of the track was destroyed a moment early | the death explosion of a unit that died while the match was watched | nothing needed. The player's `FeaturePreDamaged` gives it no damage ([Death explosions](#death-explosions)) |
 
-With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter had a `started` hook that gave each team what that gadget gave it. The track now has each team's storage and the resources stage sets it on every frame, so the hook is gone and the adapter has no hooks.
+With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter had a `started` hook that gave each team what that gadget gave it. The track now has each team's storage and the resources stage sets it on every frame, so the hook is gone. The adapter's one hook now is the timeline's, which keeps the timeline clear of the game's tooltip panel ([Keeping clear of the game's panels](#keeping-clear-of-the-games-panels)).
 
 The adapter names three team rules parameters, `supplyUsed`, `supplyMax` and `researchPoints`. The game's resource bar reads all three for its supply and research panels. It is `gui_static_resourcebar.lua` up to 0.1.89 and `gui_bastion_resourcebar.lua` in 0.1.95 and 0.1.96. `unit_supply_requirement.lua` writes the first two on every unit event and `game_researchpoints_ledger.lua` the third in `GameFrame`. Both gadgets stay, because the game's build menu asks them what a team may build, and in a playback they count the units the player has placed. The recording has the last word: the stage sets the three after every unit is in place and again in `GameFramePost`.
 

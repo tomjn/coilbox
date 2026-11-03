@@ -138,6 +138,25 @@ return {
 		"gui_bastion_playerslist.lua",
 		"gfx_timecyclesweathereffects_weather.lua",
 	},
+
+	hooks = {
+		-- How far from the left of the view the game's tooltip panel reaches (issue
+		-- #5026). It stays on in a playback, and stands over the bottom left, where
+		-- the timeline's left end would be at most window sizes. The game places it
+		-- beside its order menu and scales it with the window, and its layout widget
+		-- keeps the place it has, so this asks that widget and does not work the place
+		-- out. All three releases above have the widget and the panel's name for it.
+		-- The panel's rectangle is there whether or not it shows, so the timeline
+		-- does not move each time a unit is selected.
+		timelineClearance = function()
+			local layout = WG and WG.StaticLayout
+			if not (layout and layout.GetRect) then
+				return 0
+			end
+			local _, _, right = layout.GetRect("tooltip")
+			return right or 0
+		end,
+	},
 }
 ```
 
@@ -155,7 +174,7 @@ Every key is optional. A key that is not in this table is refused, so a misspell
 | `teamParams` | list of names | Team rules parameters that are the recording's to set, described under [Your game's own numbers](#your-games-own-numbers). |
 | `gameParams` | list of names | The same for game rules parameters. |
 | `matchTimeWidgets` | list of file names | Widgets told the match's time when they ask the engine for the game's frame or seconds, as paths inside `luaui/widgets/`, described under [The match's time](#the-matchs-time). |
-| `hooks` | table of functions | Three optional functions, described under [Hooks](#hooks). |
+| `hooks` | table of functions | Optional functions, described under [Hooks](#hooks). |
 
 Coilbox runs the file in `coilbox-springlua`, the sandboxed Spring Lua evaluator it uses for a game's other config. The file has no `io`, no `os` and no way to read another file, but it can compute its lists in Lua. Coilbox reads everything except `hooks` before the engine starts. The player reads the file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
 
@@ -194,7 +213,7 @@ A recording made before a name was added to the adapter does not have that param
 
 ### Hooks
 
-A hook is an optional function in `hooks`. The player calls the first three and no others. It logs a name in `hooks` that is not one of them, or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
+A hook is an optional function in `hooks`. The player calls the first three and no others, and knows the names of the rest. It logs a name in `hooks` that is not one of them, or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
 
 | Hook | Called | Arguments |
 | --- | --- | --- |
@@ -203,10 +222,13 @@ A hook is an optional function in `hooks`. The player calls the first three and 
 | `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
 | `drawQueuedBuilding` | Not the player's. The ghosts widget calls it in unsynced Lua, in `DrawWorld`, once for each queued building it would draw, inside a matrix of its own. It replaces the engine's own shape and the footprint outline, so use it to draw the building the way your game does. | The unit definition's engine id, the team, x, the height the engine would build at (`Spring.Pos2BuildPos`), z and the facing from 0 to 3. A facing of 0 is south, 1 east, 2 north and 3 west. |
 | `queuedBuildingsDrawn` | Not the player's. The ghosts widget calls it once at the end of every pass of `DrawWorld`, after the last `drawQueuedBuilding`, and once more when the widget shuts down. It is called for a pass that drew nothing too, and while the ghosts are switched off. | How many buildings the pass drew. 0 for a pass that drew none and for the call at shutdown. |
+| `timelineClearance` | Not the player's. The timeline widget calls it in unsynced Lua on every draw. It gives how far from the left of the view, in pixels, your game's panels along the bottom reach. The timeline keeps to the right of that, and gets narrower if it has to. | None. Give 0 or nothing when there is no such panel. |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step. `clock.direction` is 1 or -1. `clock.speed` is how many frames of the track one simulation frame covers.
 
 The first three run in synced Lua, in the gadget's environment. `drawQueuedBuilding` and `queuedBuildingsDrawn` run in the ghosts widget, which reads the adapter file itself, so `gl` and `WG` are there and the synced calls are not. A `drawQueuedBuilding` that raises is logged once and the engine's shape and outline take over. Coilbox does not read either. Write the hooks so that the same file still loads in synced Lua, where they are never called, and in coilbox's sandbox, which has no engine at all: reach for `Spring`, `UnitDefs`, `Game`, `gl` and `WG` only inside a hook.
+
+`timelineClearance` is for a game that keeps a panel of its own along the bottom left of the view in a playback. The timeline is centred, and without the hook it is drawn over the panel in a narrow window. It runs in the timeline widget, which reads the adapter file itself like the ghosts widget, so `WG` is there. A hook that raises is logged once and the timeline stays centred. A timeline the viewer has dragged is not moved. Splinter Faction's adapter asks the game's layout widget for the right edge of its tooltip panel.
 
 `queuedBuildingsDrawn` is for a game whose way of drawing a building keeps the shape until it is told to drop it, as Beyond All Reason's unit shape widget does. Hand a building to it the first time `drawQueuedBuilding` asks for it, note in each pass which ones were asked for, and drop the rest in `queuedBuildingsDrawn`. Beyond All Reason's adapter in `lua/rewind-player/adapters/beyond_all_reason.lua` does this.
 
