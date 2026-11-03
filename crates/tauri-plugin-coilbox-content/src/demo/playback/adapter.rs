@@ -126,6 +126,9 @@ pub struct Adapter {
     /// Widget files, relative to `luaui/widgets/`, that are told the match's
     /// time when they ask the engine for the game's frame or seconds.
     pub match_time_widgets: Vec<String>,
+    /// Whether the player keeps the units a seek removes hidden and uses them
+    /// again (issue #5029). The player reads it, and coilbox only checks it.
+    pub unit_pool: bool,
 }
 
 /// The keys of an adapter. `hooks` is the player's and is dropped before this
@@ -146,6 +149,8 @@ struct Raw {
     game_params: List,
     #[serde(rename = "matchTimeWidgets")]
     match_time_widgets: List,
+    #[serde(rename = "unitPool")]
+    unit_pool: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -312,6 +317,7 @@ impl Adapter {
             team_params: raw.team_params.0,
             game_params: raw.game_params.0,
             match_time_widgets: raw.match_time_widgets.0,
+            unit_pool: raw.unit_pool.unwrap_or(false),
         })
     }
 
@@ -582,6 +588,14 @@ mod tests {
             assert!(err.contains("matchTimeWidgets"), "{bad}: {err}");
         }
         assert!(Adapter::parse("return { matchTimeWidgets = 'x.lua' }").is_err());
+    }
+
+    #[test]
+    fn an_adapter_can_turn_the_unit_pool_on() {
+        assert!(Adapter::parse("return { unitPool = true }").unwrap().unit_pool);
+        assert!(!Adapter::parse("return { unitPool = false }").unwrap().unit_pool);
+        assert!(!Adapter::parse("return {}").unwrap().unit_pool);
+        assert!(Adapter::parse("return { unitPool = 'yes' }").is_err());
     }
 
     #[test]
