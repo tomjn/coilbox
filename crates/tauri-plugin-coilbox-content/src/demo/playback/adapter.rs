@@ -979,7 +979,13 @@ mod tests {
     fn splinter_factions_adapter_is_for_every_version_of_it_and_no_other_game() {
         let shipped = super::super::REWIND_PLAYER_ADAPTERS;
 
-        for version in [Some("0.1.88"), Some("0.1.89"), Some("$VERSION"), None] {
+        for version in [
+            Some("0.1.89"),
+            Some("0.1.93"),
+            Some("0.1.96"),
+            Some("$VERSION"),
+            None,
+        ] {
             let chosen = choose(Ok(None), shipped, "SF", version);
             assert_eq!(chosen.source, Source::App, "{version:?}");
             let adapter = chosen.adapter.unwrap();
@@ -994,9 +1000,17 @@ mod tests {
                     "luarules/gadgets/unit_auto_health_regeneration.lua",
                     "luarules/gadgets/unit_area_heal_radius.lua",
                     "luaui/widgets/gui_static_factionchooser.lua",
+                    "luaui/widgets/gui_rml_factionchooser.lua",
+                    "luaui/widgets/gui_bastion_factionchooser.lua",
                     "luaui/widgets/gui_static_placement.lua",
+                    "luaui/widgets/gui_rml_placement.lua",
+                    "luaui/widgets/gui_bastion_placement.lua",
                     "luaui/widgets/gui_static_sharemenu.lua",
+                    "luaui/widgets/gui_rml_share.lua",
+                    "luaui/widgets/gui_bastion_share.lua",
                     "luaui/widgets/gui_static_selected_units_buttons.lua",
+                    "luaui/widgets/gui_rml_selection.lua",
+                    "luaui/widgets/gui_bastion_selection.lua",
                     "luaui/widgets/gui_build_eta.lua",
                 ]
             );
@@ -1016,12 +1030,91 @@ mod tests {
                 adapter.match_time_widgets,
                 [
                     "gui_static_playerslist.lua",
+                    "gui_rml_playerslist.lua",
+                    "gui_bastion_playerslist.lua",
                     "gfx_timecyclesweathereffects_weather.lua"
                 ]
             );
         }
         for other in ["MF", "BA"] {
             assert_eq!(choose(Ok(None), shipped, other, Some("1")), Chosen::none());
+        }
+    }
+
+    /// Each job the adapter does has to reach a widget that each installed
+    /// release of the game loads, whatever the release calls it (issue #5022).
+    /// A rename fails here, which is the only sign of one: a name the game does
+    /// not have is written and ignored without a word. The game's handler lists
+    /// `LuaUI/Widgets/` and not its folders, so a file in `disabled/` is not
+    /// loaded.
+    #[test]
+    #[ignore = "needs a SplinterFaction_*.sdz in ~/.spring/games, or in the folder COILBOX_SPRING_DATA names"]
+    fn splinter_factions_adapter_names_what_each_release_loads() {
+        let data = std::env::var("COILBOX_SPRING_DATA")
+            .unwrap_or_else(|_| format!("{}/.spring", std::env::var("HOME").unwrap()));
+        let archives: Vec<_> = std::fs::read_dir(Path::new(&data).join("games"))
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| {
+                let name = path.file_name().unwrap().to_string_lossy();
+                name.starts_with("SplinterFaction_") && name.ends_with(".sdz")
+            })
+            .collect();
+        assert!(!archives.is_empty(), "no Splinter Faction in {data}");
+
+        let shipped = super::super::REWIND_PLAYER_ADAPTERS;
+        let adapter = choose(Ok(None), shipped, "SF", None).adapter.unwrap();
+
+        // What each job's widget has been called, after a `gui_<set>_` prefix.
+        let widget_jobs: [&[&str]; 4] = [
+            &["factionchooser"],
+            &["placement"],
+            &["sharemenu", "share"],
+            &["selected_units_buttons", "selection"],
+        ];
+        for archive in archives {
+            let name = archive.file_name().unwrap().to_string_lossy().into_owned();
+            let file = std::fs::File::open(&archive).unwrap();
+            let zip = zip::ZipArchive::new(file).unwrap();
+            let in_folder = |folder: &str| -> Vec<String> {
+                zip.file_names()
+                    .map(str::to_lowercase)
+                    .filter_map(|path| path.strip_prefix(folder).map(str::to_owned))
+                    .filter(|rest| !rest.contains('/'))
+                    .collect()
+            };
+            let widgets = in_folder("luaui/widgets/");
+            let gadgets = in_folder("luarules/gadgets/");
+            let loaded = |folder: &[String], file: &str| folder.contains(&file.to_lowercase());
+
+            for gadget in &adapter.gadgets {
+                assert!(loaded(&gadgets, gadget), "{name} has no gadget {gadget}");
+            }
+            assert!(adapter.widgets.iter().any(|n| n == "gui_build_eta.lua"));
+            assert!(loaded(&widgets, "gui_build_eta.lua"), "{name}");
+            let mut jobs: Vec<(&[String], &[&str])> = vec![
+                (adapter.match_time_widgets.as_slice(), &["playerslist"]),
+                (
+                    adapter.match_time_widgets.as_slice(),
+                    &["timecyclesweathereffects_weather"],
+                ),
+            ];
+            jobs.extend(
+                widget_jobs
+                    .iter()
+                    .map(|job| (adapter.widgets.as_slice(), *job)),
+            );
+            for (named, job) in jobs {
+                let of_job = |file: &str| {
+                    job.iter()
+                        .any(|stem| file.ends_with(&format!("_{stem}.lua")))
+                };
+                assert!(
+                    named.iter().any(|n| of_job(n) && loaded(&widgets, n)),
+                    "{name} loads no widget the adapter names for {job:?}"
+                );
+            }
         }
     }
 

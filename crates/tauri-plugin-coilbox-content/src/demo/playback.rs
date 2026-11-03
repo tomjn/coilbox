@@ -2904,7 +2904,7 @@ end
         assert!(
             count(
                 &adapted,
-                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 6 gadgets and 5 widgets"
+                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 6 gadgets and 13 widgets"
             ) >= 1,
             "{adapted}"
         );
