@@ -49,8 +49,8 @@ RECORDER_TESTS="$ROOT/lua/rewind-recorder/tests"
 
 # The values this script knows, and what they are for: the game and map named
 # here, played by the fixture in lua/rewind-recorder/tests/headless/.
-KNOWN_GAME_ARCHIVE="SplinterFaction_0.1.89.sdz"
-KNOWN_GAME_VERSION="SplinterFaction 0.1.89"
+KNOWN_GAME_ARCHIVE="SplinterFaction_0.1.96.sdz"
+KNOWN_GAME_VERSION="SplinterFaction 0.1.96"
 KNOWN_MAP_ARCHIVE="Tumult.sd7"
 KNOWN_MAP_NAME="Tumult"
 # The two units the fixture creates. Splinter Faction spawns no commander in
