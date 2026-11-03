@@ -39,7 +39,8 @@
 #   COILBOX_SPRING_HEADLESS  the binary, as for scripts/mission-headless.sh.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_REWIND_GAME      the Splinter Faction archive's filename under
-#                            games/.
+#                            games/. Default is the newest
+#                            SplinterFaction_<version>.sdz installed.
 #   COILBOX_REWIND_MAP       the map archive's filename under maps/.
 #   UNITSYNC_WORKER          the unitsync worker. Default
 #                            target/debug/coilbox-unitsync-worker.
@@ -61,7 +62,14 @@ DATA_DIR="${COILBOX_SPRING_DATA:-$HOME/.spring}"
 # The engine and the base content to run it on, shared with every harness.
 . "$ROOT/scripts/mission-engine.sh"
 
-GAME_ARCHIVE="${COILBOX_REWIND_GAME:-SplinterFaction_0.1.89.sdz}"
+if [ -z "${COILBOX_REWIND_GAME:-}" ]; then
+  COILBOX_REWIND_GAME="$(ls "$DATA_DIR"/games/ 2>/dev/null | grep -E '^SplinterFaction_[0-9.]+\.sdz$' | sort -V | tail -n 1 || true)"
+  if [ -z "$COILBOX_REWIND_GAME" ]; then
+    echo "no SplinterFaction_<version>.sdz in $DATA_DIR/games, and COILBOX_REWIND_GAME is not set" >&2
+    exit 2
+  fi
+fi
+GAME_ARCHIVE="$COILBOX_REWIND_GAME"
 MAP_ARCHIVE="${COILBOX_REWIND_MAP:-Tumult.sd7}"
 for needed in "games/$GAME_ARCHIVE" "maps/$MAP_ARCHIVE"; do
   if [ ! -e "$DATA_DIR/$needed" ]; then
