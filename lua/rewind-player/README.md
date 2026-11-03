@@ -1075,6 +1075,69 @@ In a window, on 14 October 2026, the Beyond All Reason match, one launch before 
 
 The first seek's slowest frame, 30.6 ms, made 61 units, after the start and the ground. Headless, on a machine with a load average of 7 to 12, the start frames took 11.5 to 22.8 ms. That run logged two slow frames of the seeks' own budgets, 289 removals in 103.4 ms where the next frame did 289 in 10.8 ms, and 39.6 ms of ground, which is the machine.
 
+### The unit pool
+
+Issue #5029. Creating a unit and destroying one cost the engine far more than hiding one and showing it again, so a game's adapter can turn on a pool of hidden units with `unitPool = true` ([Game adapters](#game-adapters)). It is off without that. With it on, the units stage does this:
+
+- A finished unit that a seek removes is parked, not destroyed. Parking sets every blocking flag false with `Spring.SetUnitBlocking`, every one of the seven sensors to 0 with `Spring.SetUnitSensorRadius`, makes the unit neutral, and moves it under move control to x -2000, y -5000, z -2000, off the map and below it. The gadget's unsynced half then sets `Spring.SetUnitNoDraw`, `Spring.SetUnitNoSelect` and `Spring.SetUnitNoMinimap`, which only unsynced Lua has. Taking selection away also deselects it.
+- A unit the track needs, finished at the time shown, is a parked unit of the same definition and team when there is one. Unparking restores the blocking flags and sensors from what the first parked unit of the definition had, and the stage then places the unit as it does any other. Otherwise the unit is created.
+- A unit that dies while somebody watches is destroyed, so its explosion stays. A nanoframe is destroyed, and a nanoframe is never taken from the pool.
+- A parked unit is stunned, with `Spring.SetUnitHealth` and a paralysis of `1e30`, and unparking takes the paralysis back to nothing. The engine makes and uses a unit's resources in `CUnit::SlowUpdate`, its `energyMake` and `metalMake` whatever the unit does, and returns before any of it for a stunned unit, at 105.0 as now. Without that a parked power plant would go on adding to its team's income, and the resource bars show the playback's own income whenever it is above the match's ([Team resources](#team-resources)). An audit of Splinter Faction found that first. Leaving such units out of the pool instead cost too much: a third of the crowd below made or used resources, and a later seek of 2,000 units took 194 to 374 frames.
+- Parking reads the unit's team from the engine, so a unit that changed team since it was made goes to its new team's pool. The player does not yet follow a team change (issue #5037). If that is done with `Spring.TransferUnit` it needs nothing more here, and if it is done by destroying and creating it needs nothing at all.
+- A seek's sweep for strangers leaves parked units alone. A parked unit the base game destroys leaves the pool, and the log says so once.
+
+How much the pool holds:
+
+- One pool for each definition and team. `Spring.TransferUnit` costs more than creating a unit, and Splinter Faction refused 69% of them (#4010).
+- A pool holds at most the most units of its definition and team that were ever in the world at once while the player ran. A later seek cannot need more. It is learnt during the run, so it never holds more than the track has.
+- The pool and the most units the track has had at once stay under `Game.maxUnits` together. A unit the engine refuses at its team's limit while parked units hold the room makes room by destroying a parked unit, and is made on the next frame.
+- The pool fills during the run, as seeks remove units, and not while the game loads. Filling it at load made 2,000 units cost one frame of 2,056 to 2,208 ms in the spike.
+
+Parking and unparking each have a budget of their own, apart from making and removing ([How many a frame](#how-many-a-frame)). A seek parks every unit it can before it destroys any, and unparks every unit it can before it creates any, so a frame mostly does one kind of work, which is what timing each kind needs. With one budget for both, the spike had frames of up to 2,993 ms, since a budget learnt from cheap parks was spent on real destroys. The budget message then carries five numbers: make, remove, ground, park and unpark. While a seek's units arrive, the pool walks them in the view's order, or the window's list without a view, putting first the ones a parked unit is there for.
+
+The animation stage is told before a unit is parked. It tells the unit's script that it stopped moving and building, clears its work's rules parameters and tells the build stream, and gives it no velocity, since a reused unit is learnt afresh under its new serial number and is only told what changes. The aim stage learns a reused unit in the frame it comes back, as it does a new one.
+
+`GG.coilboxRewindParked` is the set of parked units, by id, for a game's gadgets. Nothing reads it yet.
+
+What the base game is not told is why the pool is opt in. A reused unit fires no `UnitCreated`, and a parked one no `UnitDestroyed`. `GetAllUnits` and `GetTeamUnitCount` still count parked units. A reused unit keeps its script's pieces, experience, stun and rules parameters. A game can turn it on when all four of these hold:
+
+1. No gadget or widget left on in the playback needs those call-ins to be right about who is in the world. Otherwise the adapter switches it off, or the pool stays off.
+2. A unit's script state can be left as it is, or the player poses everything that shows.
+3. Nothing the game draws or counts reads every unit without checking for hidden ones.
+4. No state the player does not set shows on a unit, such as cloak or experience.
+
+#### Measured
+
+Headless, on engine 2026.09.01 and Splinter Faction 0.1.96, with the ignored test `a_seek_across_a_whole_match_settles_in_frames_that_fit` and its eight seeks. The crowds were made from the track of the fixture match of `scripts/rewind-playback-headless.sh` with `COILBOX_CROWD_DEFS` set to the 13 definitions #4010 used, `fedcommander_up1,f1landfac,fedmetalextractor_up1,fedstorm,fedak,lozscorpion,smallstorage,fedengineer,lozengineer,fedthud,lozreaper,lozcommander,lozairplant`. "Off" is `COILBOX_PLAYBACK_UNIT_POOL=off`, which overrides what the adapter says, and "on" is the shipped adapter. Seek 1 starts from an empty world and seek 6 moves inside the same units, so seeks 2 to 5, 7 and 8 are the later ones that make or remove the whole crowd.
+
+| Units | Pool | Frames to settle, seeks 1 to 8 | Slowest frame of the later seeks | Test |
+| --- | --- | --- | --- | --- |
+| 400 | off | 24, 18, 23, 18, 22, 3, 18, 23 | | passed |
+| 400 | on | 28, 6, 6, 6, 5, 2, 6, 5 | 7.2 ms | passed |
+| 2,000 | off | 585, 340, 644, 318, 567, 12, 333, 581 | 196.6 ms | failed, slow frames |
+| 2,000 | on | 692, 36, 18, 40, 23, 17, 67, 25 | 22.1 ms | passed |
+
+The first seek gains nothing, since the pool is empty and it creates every unit as before. A later seek of 2,000 units settles in 18 to 67 frames against 318 to 644 without the pool. Every seek ended with the track's units in the world and no parked unit counted among them, and every parked unit stood at the parking place. The 2,000 run with the pool on passed with the machine at a load average of 14. Without the pool it failed on slow frame lines in six of the seven seeks that made or removed the crowd, up to 196.6 ms, as the run in [Where it stops holding](#where-it-stops-holding) warned it could. The driver now waits up to 1,800 frames for a seek to settle, where it waited 300, since a seek of 2,000 units with nothing to reuse took 585 to 711 frames.
+
+A test in `tests/pool_test.lua` runs the synced player and the gadget's unsynced half together, with each kind of work costing what the spike measured, and shows that a pool smaller than a seek makes no frame slower than one simulation frame.
+
+#### In a window
+
+With the 400 unit crowd at 1,920 by 1,080 on the same engine and game, a seek from frame 800 to frame 0 parked all 400. All 400 were `NoDraw`, `NoSelect` and `NoMinimap`, `Spring.SelectUnitArray` on every unit selected none of them, nothing was drawn over the crowd's ground and the minimap had no mark for them. A seek back used all of them again and showed 400 units, every one selectable. The run logged no slow frame line.
+
+![The crowd of 400 at frame 800](screenshots/pool-crowd.jpg)
+
+![The same view at frame 0, with all 400 parked](screenshots/pool-parked.jpg)
+
+#### Splinter Faction
+
+Splinter Faction 0.1.96's gadgets and widgets were read for the four conditions (issue #5029), and its adapter turns the pool on.
+
+1. Holds. Supply and research points count parked units, and the adapter's `teamParams` write the recording's over them. Two files see a little: `map_grass_gl4.lua` keeps by unit id that it cleared grass under a building, so on a map with grass a reused building at a new place has grass through it, and `unit_morph.lua` keeps a team's tech level up while its factories are parked, which shows only as whether a selected unit's Upgrade button is enabled. Switching either off would lose more than it fixes.
+2. Holds. 120 of its 139 unit definitions have Lua scripts and 18 COB. Pieces are shown or hidden in `Create` by definition, and no deployed or folded pose is kept in a script. What shows is walking, building, on and off, and aim, which the player tells or poses.
+3. Holds once a parked unit is stunned, which is why it is. Before that a parked unit went on making resources. `Spring.GetVisibleUnits` leaves hidden units out, selection refuses them and the minimap does not draw them. `gui_world_labels.lua` caches its commander name tags for 0.5 seconds, so a parked commander's tag can stay that long.
+4. Holds. Nothing gains experience in a playback, since no weapon fires. A parked cloaking tower that is on can cloak the parked units near it, which all stand on one point, and `unit_cloak_shield.lua` takes it off a reused unit within 6 frames.
+
 ### Which units first
 
 After a seek the units the viewer is looking at are made first (issue #4008).
@@ -1392,9 +1455,10 @@ Every key is optional except `shortname` in an adapter that coilbox ships. A key
 | `teamParams` | list of names | team rules parameters that are the recording's to set, see [Rules parameters](#rules-parameters) |
 | `gameParams` | list of names | the same for game rules parameters |
 | `matchTimeWidgets` | list of file names | widgets told the match's time when they ask the engine for the game's frame or seconds, as paths inside `luaui/widgets/`. See [The match's time](#the-matchs-time) |
+| `unitPool` | true or false | whether a seek parks the units it removes and uses them again, off without it. See [The unit pool](#the-unit-pool) |
 | `hooks` | table of functions | see [Hooks](#hooks) |
 
-The file is run by `coilbox-springlua`, the sandboxed Spring Lua evaluator that reads a game's other config, so the lists can be worked out in Lua. It has no `io`, no `os` and no way to read another file. Coilbox reads everything but `hooks` from it before the engine starts, and the player reads the same file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
+The file is run by `coilbox-springlua`, the sandboxed Spring Lua evaluator that reads a game's other config, so the lists can be worked out in Lua. It has no `io`, no `os` and no way to read another file. Coilbox reads everything but `hooks` from it before the engine starts, and the player reads the same file again in the engine, for `units`, `features`, `teamParams`, `gameParams`, `unitPool` and `hooks`.
 
 ### Where an adapter lives
 
@@ -1493,9 +1557,10 @@ A gadget that an adapter switches off is not in the engine's `Loaded SYNCED gadg
 
 1. Play a recorded match with no adapter and read the `COILBOX_REWIND_PLAYER` lines. Each says something the base game did that the track does not have. Then list the gadgets in the engine's log, `Loaded SYNCED gadget:  <name>  <file>.lua`, and read the ones that end a game, spawn units or kill teams.
 2. Put the file names in `gadgets` and `widgets`, and the definitions in `units` and `features`.
-3. For a game coilbox ships an adapter for, add `lua/rewind-player/adapters/<anything>.lua` with a `shortname` and, if it only holds for some releases, `versions`. For a game's own, add `coilbox_rewind/adapter.lua` to the archive.
-4. Run `cargo test -p tauri-plugin-coilbox-content`. It reads every shipped adapter and fails on one with a key that is not in the table, a file name that is not a `.lua` file inside its folder, or no `shortname`.
-5. Run `scripts/rewind-playback-headless.sh` and read the log for the same lines. `lua/rewind-player/tests/headless/fixture_adapter.lua` is an adapter that the run uses, and `tests/headless/adapter_probe.lua` is a widget that says what was loaded and created.
+3. Read the game's gadgets and widgets for the four conditions in [The unit pool](#the-unit-pool), and set `unitPool = true` if they hold.
+4. For a game coilbox ships an adapter for, add `lua/rewind-player/adapters/<anything>.lua` with a `shortname` and, if it only holds for some releases, `versions`. For a game's own, add `coilbox_rewind/adapter.lua` to the archive.
+5. Run `cargo test -p tauri-plugin-coilbox-content`. It reads every shipped adapter and fails on one with a key that is not in the table, a file name that is not a `.lua` file inside its folder, or no `shortname`.
+6. Run `scripts/rewind-playback-headless.sh` and read the log for the same lines. `lua/rewind-player/tests/headless/fixture_adapter.lua` is an adapter that the run uses, and `tests/headless/adapter_probe.lua` is a widget that says what was loaded and created.
 
 The team guard and the player's removal of units and features that the track does not have stay in place, whatever an adapter says. An adapter makes them unnecessary for a game, and they are the safety net for a game with none.
 
