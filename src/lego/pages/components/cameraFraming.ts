@@ -119,6 +119,26 @@ export function homeView(state: SceneState) {
   state.controls.update();
 }
 
+/**
+ * What the compass does: frame the unit from the home direction, with the
+ * reference figure as well when it is standing, so the thing turned on to
+ * measure against is not left half out of shot. `unit` is the unit's own box,
+ * or null when it has no geometry. The figure is included under the rule
+ * `applySceneScale` uses for the zoom-out reach: only while it is visible.
+ *
+ * With no unit geometry but a standing figure, the figure is framed alone.
+ * With nothing to frame at all, the camera goes home.
+ */
+export function resetFrame(state: SceneState, unit: THREE.Box3 | null) {
+  const box = unit ? unit.clone() : new THREE.Box3();
+  if (state.reference.visible) {
+    box.union(new THREE.Box3().setFromObject(state.reference));
+  }
+  // Frames from the home direction, which also leaves a standard view.
+  if (!frameBounds(state, box, HOME_CAMERA)) homeView(state);
+  state.render();
+}
+
 /** The unit's own measured box, or null when it has no geometry to frame: a
  *  unit with no vertices measures zero on every axis. */
 export function boundsBox(bounds: UnitBounds): THREE.Box3 | null {
