@@ -100,6 +100,9 @@ pub(crate) trait Sink {
     /// `piece` is an index in the posed pieces of the unit's definition, and
     /// the sample is the piece relative to its parent.
     fn piece(&mut self, serial: u32, frame: u32, piece: u16, sample: &PieceSample) -> Result<()>;
+    /// The unit is on `team` from `frame` on: given to another team, or
+    /// captured. Comes before the unit's point for that frame.
+    fn given(&mut self, serial: u32, frame: u32, team: u8) -> Result<()>;
     fn unit_end(&mut self, serial: u32, last_frame: u32) -> Result<()>;
     fn projectile_start(&mut self, projectile: &ProjectileStart) -> Result<()>;
     fn projectile_point(
@@ -612,6 +615,16 @@ impl Interpreter {
             );
         }
 
+        // Changes of team, before anything else is said about the unit on
+        // this frame. The recorder finds one on a sample frame, so it can be
+        // up to 2 frames late. A unit the dump does not know is ignored, as a
+        // build queue for one is.
+        for row in &block.given {
+            if let Some(serial) = self.units.get(&row.unit).map(|u| u.serial) {
+                sink.given(serial, frame, team(row.team))?;
+            }
+        }
+
         // Projectiles. The engine says nothing when one is made and reuses
         // ids, so one is new when its id was not in the block before, or when
         // its definition, team or firing unit is not what that id had.
@@ -864,10 +877,6 @@ impl Interpreter {
             unit.last = point(frame, &row.pose);
             sink.unit_point(unit.serial, &unit.last)?;
         }
-
-        // The track has one team for a unit, so a unit that is given away
-        // keeps the team it was made on. Issue #3948.
-        let _ = &block.given;
 
         for row in &block.terrain {
             let corner = |v: u32| {

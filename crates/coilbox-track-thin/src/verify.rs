@@ -41,6 +41,8 @@ struct Loaded {
 
 struct Expected {
     start: UnitStart,
+    /// The team the dump last gave the unit.
+    team: u8,
     targets: Vec<(u8, TargetValue)>,
     queue: Vec<QueueItem>,
     /// Each posed piece as it was last recorded.
@@ -316,6 +318,7 @@ impl<R: Read + Seek> Sink for Verifier<R> {
             start.serial,
             Expected {
                 start: start.clone(),
+                team: start.team,
                 targets: vec![],
                 queue: vec![],
                 pieces: vec![],
@@ -342,10 +345,15 @@ impl<R: Read + Seek> Sink for Verifier<R> {
                     unit.first_frame, unit.last_frame
                 )));
             }
-            if (unit.engine_id, unit.unit_def, unit.team)
-                != (e.start.engine_id, e.start.def, e.start.team)
-            {
-                return Err(wrong("its id, definition or team is not the dump's".into()));
+            if (unit.engine_id, unit.unit_def) != (e.start.engine_id, e.start.def) {
+                return Err(wrong("its id or definition is not the dump's".into()));
+            }
+            let team = unit.team_at(frame);
+            if team != e.team {
+                return Err(wrong(format!(
+                    "it is on team {team} in window {k} and on team {} in the dump",
+                    e.team
+                )));
             }
 
             let radius = e.start.radius;
@@ -467,6 +475,11 @@ impl<R: Read + Seek> Sink for Verifier<R> {
                 });
             }
         }
+        Ok(())
+    }
+
+    fn given(&mut self, serial: u32, _: u32, team: u8) -> Result<()> {
+        self.units.get_mut(&serial).expect("started").team = team;
         Ok(())
     }
 
