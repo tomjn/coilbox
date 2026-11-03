@@ -140,7 +140,7 @@ export function MissionFacts({ mission }: { mission: CampaignMission }) {
   const briefed = mission.briefing.trim() !== "";
   const scenarioName = mission.scenario?.name;
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
       {/* No digit: a briefing is written or it is not, and "1 briefing" would
           be a count of something nobody counts. The icon still holds its place
           in the column, dimmed, so an unwritten briefing reads as a gap in the
@@ -163,9 +163,15 @@ export function MissionFacts({ mission }: { mission: CampaignMission }) {
           scenario it was built from, but it can be renamed afterwards, and then
           the name of the document it actually plays is on this row or nowhere.
           The staleness of that copy has its own warning line below, so the badge
-          says only that there is one. */}
+          says only that there is one. Badge is `shrink-0` by default, which
+          would hold a long name at its 14rem cap even on a row narrower than
+          that, so it shrinks and the name ends in an ellipsis instead. */}
       {mission.scenario && (
-        <Badge variant="secondary" className="max-w-56 text-[10px]">
+        <Badge
+          variant="secondary"
+          title={scenarioName}
+          className="min-w-0 max-w-56 shrink text-[10px]"
+        >
           <span className="truncate">
             <Trans>Scenario: {scenarioName}</Trans>
           </span>
