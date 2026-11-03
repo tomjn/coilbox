@@ -78,7 +78,9 @@ do
 	t.same("the ghosts widget's drawing hook is a hook of the format", table.concat(adapter.hookNames, ","), "drawQueuedBuilding")
 	adapter = Adapter.normalize({ hooks = { queuedBuildingsDrawn = hook } })
 	t.same("so is the hook that hears a pass of drawing is over", table.concat(adapter.hookNames, ","), "queuedBuildingsDrawn")
-	t.same("and neither is taken for a misspelling", #adapter.unknownHooks, 0)
+	adapter = Adapter.normalize({ hooks = { timelineClearance = hook } })
+	t.same("and the timeline widget's hook (issue #5026)", table.concat(adapter.hookNames, ","), "timelineClearance")
+	t.same("and none is taken for a misspelling", #adapter.unknownHooks, 0)
 	t.same("and not one the player does not know", #adapter.unknownHooks, 0)
 end
 
@@ -136,7 +138,7 @@ do
 	t.same(
 		"and logs what it has",
 		Adapter.describe(adapter),
-		"adapter loaded: Splinter Faction. 6 gadgets and 13 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: none"
+		"adapter loaded: Splinter Faction. 6 gadgets and 13 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: timelineClearance"
 	)
 	t.same("it has no hook the player does not call", #adapter.unknownHooks, 0)
 	t.same(
@@ -145,6 +147,33 @@ do
 		"supplyUsed,supplyMax,researchPoints"
 	)
 	t.same("and the seed of the game's weather as a game parameter (issue #4013)", table.concat(adapter.gameParams, ","), "weather_seed")
+end
+
+-- Splinter Faction's timeline clearance (issue #5026) asks the game's layout
+-- widget where the tooltip panel is, and says how far from the left it reaches.
+-- The hook runs in the timeline widget's environment, so `WG` is its own.
+
+do
+	local function hook(WG)
+		local chunk = assert(loadfile(t.root() .. "/adapters/splinter_faction.lua"))
+		setfenv(chunk, { WG = WG })
+		return chunk().hooks.timelineClearance
+	end
+
+	local asked = {}
+	local layout = {
+		GetRect = function(name)
+			asked[#asked + 1] = name
+			if name == "tooltip" then
+				return 259, 6, 505, 168
+			end
+		end,
+	}
+	t.same("the hook gives the right edge of the game's tooltip panel", hook({ StaticLayout = layout })(), 505)
+	t.same("and asks for that panel only", table.concat(asked, ","), "tooltip")
+	t.same("a layout that does not know the panel gives nothing", hook({ StaticLayout = { GetRect = function() end } })(), 0)
+	t.same("a game with no layout widget gives nothing", hook({})(), 0)
+	t.same("so does an environment with no WG", hook(nil)(), 0)
 end
 
 -- Beyond All Reason's adapter (issue #3801), whose hooks do work of their own.

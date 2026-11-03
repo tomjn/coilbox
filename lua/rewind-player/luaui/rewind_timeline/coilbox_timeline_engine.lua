@@ -82,13 +82,13 @@ M.ROWS = {
 	},
 	{
 		id = "marks",
-		feature = "marks on the bar",
+		feature = "marks on the bar and keeping clear of the game's panels",
 		calls = { "VFS.FileExists", "VFS.ZIP" },
 		how = "presence",
-		used = "coilbox_timeline.lua, loadMarks",
+		used = "coilbox_timeline.lua, loadMarks, and coilbox_rewind_timeline.lua, clearanceOf",
 		required = false,
 		since = "105.0",
-		without = "The bar has no marks",
+		without = "The bar has no marks, and the timeline stays centred, over any panel of the game's there",
 		visible = false,
 	},
 }

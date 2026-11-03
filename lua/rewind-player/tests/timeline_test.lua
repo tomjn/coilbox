@@ -478,6 +478,96 @@ do
 	end
 end
 
+-- It stays to the right of the game's own panels along the bottom left of the
+-- view (issue #5026). The game says how far they reach, and the timeline keeps a
+-- margin clear of that. It does not shrink below what its buttons need, and a
+-- panel the player has moved is where they put it.
+
+do
+	local function placed(vsx, vsy, reach, long)
+		local e = engine(params())
+		if long then
+			e.params.coilbox_rewind_last_frame = 600 + 30 * 36000
+		end
+		local game = { reach = reach }
+		local tl = Timeline.new({
+			Spring = e.Spring,
+			gl = e.gl,
+			GL = e.GL,
+			VFS = e.VFS,
+			keepClear = function()
+				return game.reach
+			end,
+		})
+		tl:resize(vsx, vsy)
+		tl:read()
+		return tl, e, game
+	end
+
+	local function buttons(tl)
+		local left = math.huge
+		for _, id in ipairs({ "reverse", "toggle", "slower", "faster", "help", "bar", "time" }) do
+			left = math.min(left, tl.rects[id].x1)
+		end
+		return left
+	end
+
+	-- 1472 by 900 is the size the overlap was seen at, where the game's tooltip
+	-- panel reached 505 pixels and the centred panel began at 469. The margin is
+	-- 16 at 1080 high, and 13 at 900.
+	local tl = placed(1472, 900, 505)
+	t.same("the panel begins a margin to the right of the game's panels", tl.rects.panel.x1, 505 + 13)
+	t.check("so every button is clear of them", buttons(tl) > 505, buttons(tl))
+	t.check("and the panel is inside the view", tl.rects.panel.x2 <= 1472, tl.rects.panel.x2)
+
+	local full = placed(1920, 1080, 658)
+	t.same("at 1920 by 1080 it begins a margin past them", full.rects.panel.x1, 658 + 16)
+	t.same("with the width it has centred", full.rects.panel.x2 - full.rects.panel.x1, 640)
+
+	local free = placed(1920, 1080, 300)
+	t.same("panels that end before the centred panel begins leave it centred", (free.rects.panel.x1 + free.rects.panel.x2) / 2, 960)
+	for _, none in ipairs({ 0, -5, "wide", false }) do
+		local tl2 = placed(1920, 1080, none)
+		t.same("a reach of " .. tostring(none) .. " is no reach", (tl2.rects.panel.x1 + tl2.rects.panel.x2) / 2, 960)
+	end
+	local silent = placed(1920, 1080, nil)
+	t.same("a game that says nothing leaves it centred", (silent.rects.panel.x1 + silent.rects.panel.x2) / 2, 960)
+
+	-- The game's panels move, as when the viewer drags them in the game's layout
+	-- mode, and the timeline follows on its next draw with no resize.
+	local moving, e, game = placed(1472, 900, 505)
+	moving:draw()
+	game.reach = 120
+	moving:draw()
+	t.same("when the game's panels move away the panel comes back to the centre", (moving.rects.panel.x1 + moving.rects.panel.x2) / 2, 736)
+	game.reach = 505
+	e.clear()
+	moving:draw()
+	t.same("and goes out again when they come back", moving.rects.panel.x1, 505 + 13)
+	t.check("everything drawn is inside the view", e.box.x1 >= 505 and e.box.x2 <= 1472, e.box.x1 .. " to " .. e.box.x2)
+
+	-- Little room: the panel gives up width before it gives up the margin, down
+	-- to what its buttons and a long time need, and then it stays centred.
+	-- 640 by 480 is 0.75 scale, so a panel of 400 is 300 pixels.
+	local narrow = placed(640, 480, 300, true)
+	t.same("with less room the panel is narrower", narrow.rects.panel.x2 - narrow.rects.panel.x1, 640 - 12 - (300 + 12))
+	t.check("and its time still ends before the help button", narrow.rects.time.x2 <= narrow.rects.help.x1, narrow.rects.time.x2 .. " against " .. narrow.rects.help.x1)
+	t.check("and it is inside the view", narrow.rects.panel.x2 <= 640)
+	local cramped = placed(640, 480, 340, true)
+	t.same("with too little room it stays centred", (cramped.rects.panel.x1 + cramped.rects.panel.x2) / 2, 320)
+
+	-- The key list and a note stay with the panel.
+	local help = placed(1472, 900, 505)
+	click(help, help.rects.help)
+	help:draw()
+	t.check("the key list is to the right of the game's panels too", help.rects.helpPanel.x1 > 505, help.rects.helpPanel.x1)
+
+	-- A panel the viewer has moved is where they put it.
+	local kept = placed(1472, 900, 505)
+	kept:setConfig({ x = 0.2, y = 0.05 })
+	t.same("a panel the viewer moved is not pushed", (kept.rects.panel.x1 + kept.rects.panel.x2) / 2, math.floor(0.2 * 1472 + 0.5))
+end
+
 -- It can be moved, and remembers where to.
 
 do
@@ -755,6 +845,118 @@ do
 	t.same("a press on the bar begins a drag", began, true)
 	widget:Shutdown()
 	t.same("a widget switched off in the middle of a drag ends it", e.sent[#e.sent], "coilbox_rewind:drag 0")
+end
+
+-- The widget asks the game's adapter how far its panels reach (issue #5026),
+-- through a hook that runs in the widget's environment, so `WG` is there.
+
+do
+	local ADAPTER = "coilbox_rewind/adapter.lua"
+	local function started(adapter, vsx, vsy)
+		local files = {}
+		if adapter then
+			files[ADAPTER] = adapter
+		end
+		local e = engine(params(), files)
+		local env = t.unsyncedEnv()
+		env.widget, env.WG = {}, {}
+		env.Spring = e.Spring
+		env.Spring.GetViewGeometry = function()
+			return vsx, vsy
+		end
+		e.lines = {}
+		env.Spring.Echo = function(line)
+			e.lines[#e.lines + 1] = line
+		end
+		-- The widget's lines go to the playback's own log file.
+		env.io = {
+			open = function()
+				return {
+					write = function(_, line)
+						e.lines[#e.lines + 1] = line
+					end,
+					flush = function() end,
+					close = function() end,
+				}
+			end,
+		}
+		env.gl, env.GL = e.gl, e.GL
+		env.VFS = {
+			ZIP = "z",
+			FileExists = e.VFS.FileExists,
+			Include = function(path, _, mode)
+				if files[path] then
+					-- The engine runs the adapter in the widget's environment.
+					local made = files[path]()
+					for _, hook in pairs(type(made) == "table" and made.hooks or {}) do
+						setfenv(hook, env)
+					end
+					return made
+				end
+				local chunk = assert(loadfile(t.root() .. "/" .. path))
+				setfenv(chunk, env)
+				return chunk()
+			end,
+		}
+		local chunk = assert(loadfile(WIDGET))
+		setfenv(chunk, env)
+		chunk()
+		env.widget:Initialize()
+		return env, e
+	end
+
+	-- The hook reads the game's layout, as Splinter Faction's does.
+	local env, e = started(function()
+		return {
+			hooks = {
+				timelineClearance = function()
+					return WG.reach
+				end,
+			},
+		}
+	end, 1472, 900)
+	env.WG.reach = 505
+	e.clear()
+	env.widget:DrawScreen()
+	t.check("a panel the adapter says is there keeps the timeline right of it", e.box.x1 >= 505 + 13, e.box.x1)
+	env.WG.reach = 0
+	e.clear()
+	env.widget:DrawScreen()
+	t.check("and with it gone the timeline is centred again", e.box.x1 < 505, e.box.x1)
+
+	env, e = started(function()
+		return { hooks = { timelineClearance = function() error("no layout here") end } }
+	end, 1472, 900)
+	e.clear()
+	env.widget:DrawScreen()
+	env.widget:DrawScreen()
+	t.check("a hook that raises leaves the timeline centred", e.box.x1 < 505, e.box.x1)
+	local raised = 0
+	for _, line in ipairs(e.lines) do
+		if line:find("timelineClearance hook raised", 1, true) then
+			raised = raised + 1
+		end
+	end
+	t.same("and is logged once", raised, 1)
+
+	env, e = started(function()
+		return { hooks = {} }
+	end, 1472, 900)
+	e.clear()
+	env.widget:DrawScreen()
+	t.check("an adapter with no such hook leaves it centred", e.box.x1 < 505, e.box.x1)
+
+	env, e = started(function()
+		error("not Lua")
+	end, 1472, 900)
+	e.clear()
+	env.widget:DrawScreen()
+	t.check("an adapter that cannot be read leaves it centred", e.box.x1 < 505, e.box.x1)
+
+	env, e = started(nil, 1472, 900)
+	e.clear()
+	env.widget:DrawScreen()
+	t.check("a game with no adapter leaves it centred", e.box.x1 < 505, e.box.x1)
 end
 
 -- What the widget needs from the engine (issue #3802). The table is the
