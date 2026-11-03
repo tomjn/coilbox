@@ -633,6 +633,10 @@ function M.new(options)
 			vz = 0,
 			extrapolate = true,
 			params = {},
+			-- GetUnitBlocking's seven, as a unit that stands on the ground has them.
+			blocking = { true, true, true, true, true, true, true },
+			sensors = { los = 300, airLos = 300, radar = found.radar or 0, sonar = 0, seismic = 0, radarJammer = 0, sonarJammer = 0 },
+			neutral = false,
 		}
 		for number = 1, #found.pieces do
 			world.units[id].rot[number] = { 0, 0, 0 }
@@ -706,6 +710,10 @@ function M.new(options)
 		if value.health then
 			found.health = math.min(found.maxHealth, value.health)
 		end
+		-- A unit is stunned while its paralysis is above its maximum health.
+		if value.paralyze then
+			found.stunned = value.paralyze > found.maxHealth
+		end
 		if value.build then
 			found.build = value.build
 			if value.build >= 1 then
@@ -738,6 +746,65 @@ function M.new(options)
 			if not found.dead and not found.beingBuilt and found.health < found.maxHealth then
 				found.health = math.min(found.maxHealth, found.health + amount)
 			end
+		end
+	end
+
+	--- The unit pool's calls (issue #5029). SetSolidObjectBlocking leaves a value
+	-- that is nil as it was, and SetUnitSensorRadius raises for a sensor it does
+	-- not know.
+	world.blockingSets = 0
+	function Spring.GetUnitBlocking(id)
+		local found = unit(id)
+		if found then
+			return unpack(found.blocking)
+		end
+	end
+
+	function Spring.SetUnitBlocking(id, ...)
+		local found = unit(id)
+		if not found then
+			return
+		end
+		world.blockingSets = world.blockingSets + 1
+		local given = { ... }
+		for k = 1, 7 do
+			if given[k] ~= nil then
+				found.blocking[k] = given[k]
+			end
+		end
+		return found.blocking[1]
+	end
+
+	function Spring.GetUnitSensorRadius(id, kind)
+		local found = unit(id)
+		if found then
+			return found.sensors[kind]
+		end
+	end
+
+	function Spring.SetUnitSensorRadius(id, kind, radius)
+		local found = unit(id)
+		if not found then
+			return
+		end
+		if found.sensors[kind] == nil then
+			error("Unknown sensor type to SetUnitSensorRadius()", 2)
+		end
+		found.sensors[kind] = math.max(0, radius)
+		return found.sensors[kind]
+	end
+
+	function Spring.SetUnitNeutral(id, neutral)
+		local found = unit(id)
+		if found then
+			found.neutral = neutral
+		end
+	end
+
+	function Spring.GetUnitTeam(id)
+		local found = unit(id)
+		if found then
+			return found.team
 		end
 	end
 
@@ -1591,6 +1658,12 @@ function M.new(options)
 				world.lines[#world.lines + 1] = phase
 				return
 			end
+			if name == "coilbox_rewind_park" then
+				-- A unit parked or taken back: its id, and 1 to hide it.
+				world.hidden = world.hidden or {}
+				world.hidden[phase] = a == 1
+				return
+			end
 			if name == "coilbox_rewind_arrive" then
 				-- A unit that wants an arrival effect: its id, where it is, its team.
 				-- It is one of the world's events, as a creation is.
@@ -1602,10 +1675,11 @@ function M.new(options)
 			-- The end of a frame's work also says the budgets the frame worked to,
 			-- and how many of its units were the first of their definition.
 			if phase == 1 then
-				local make, remove, earth, firsts, started = ...
+				local make, remove, earth, firsts, started, parked, unparked, park, unpark = ...
 				world.sentBudgets = { make, remove, earth }
 				world.sentFirsts = firsts
 				world.sentStarted = started
+				world.sentPool = parked ~= nil and { parked, unparked, park, unpark } or nil
 			end
 		end,
 		next = next,

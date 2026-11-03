@@ -235,6 +235,30 @@ do
 	t.same("the hook ran with the gadget's environment", w.lines[#w.lines], "hook ran")
 end
 
+-- An adapter that turns the unit pool on (issue #5029): the gadget hands the
+-- base game's gadgets the set of parked units, and says with each frame's work
+-- what it parked and unparked and to which budgets.
+
+do
+	local w = world()
+	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "return { name = 'Pooled', unitPool = true }" })
+	w.gadget = gadget
+	gadget:Initialize()
+	local env = w.globals
+	t.same("the parked units are in GG for the base game", type(env.GG.coilboxRewindParked), "table")
+	settle(gadget, w, 1)
+	t.same("the work says what the frame parked and unparked, and the budgets", w.sentPool and table.concat(w.sentPool, " "), "0 0 1 1")
+end
+
+do
+	local w = world()
+	local gadget = synced(PLAYER, w, { [TRACK] = bytes })
+	w.gadget = gadget
+	gadget:Initialize()
+	settle(gadget, w, 1)
+	t.same("without the pool the work says nothing of it", w.sentPool, nil)
+end
+
 do
 	local w = world()
 	local gadget = synced(PLAYER, w, { [TRACK] = bytes, ["coilbox_rewind/adapter.lua"] = "return { problem = 'it was not for this game' }" })
@@ -436,6 +460,36 @@ do
 	sent = #clock.messages
 	work(5, 2, 0, 100)
 	t.same("a frame that made units and set ground says what neither costs", #clock.messages, sent)
+end
+
+-- With the unit pool on, parking and unparking have a budget each, judged on
+-- frames that did only that, and sent as the fourth and fifth numbers (issue
+-- #5029).
+
+do
+	local lines, clock = {}, { now = 0, micros = true }
+	local gadget = unsynced(PLAYER, lines, clock)
+	local frame = 0
+	local function work(milliseconds, made, removed, parked, unparked, had)
+		frame = frame + 1
+		gadget:RecvFromSynced("coilbox_rewind_work", 0, frame)
+		clock.now = clock.now + milliseconds
+		gadget:RecvFromSynced("coilbox_rewind_work", 1, frame, made, removed, 0, had[1], had[2], 1, 0, 0, parked, unparked, had[3], had[4])
+	end
+	local function last()
+		return clock.messages[#clock.messages]
+	end
+	work(1, 0, 0, 1, 0, { 1, 1, 1, 1 })
+	t.same("a frame of parks sets the park budget and sends all five", last(), "coilbox_rewind_budget:1 1 1 16 1")
+	work(2, 0, 0, 0, 16, { 1, 1, 16, 1 })
+	t.same("a frame of unparks sets the unpark budget", last(), "coilbox_rewind_budget:1 1 1 16 133")
+	local sent = #clock.messages
+	work(5, 0, 3, 16, 0, { 1, 1, 16, 133 })
+	t.same("a frame that parked and removed says what neither costs", #clock.messages, sent)
+	work(5, 3, 0, 0, 4, { 1, 1, 16, 133 })
+	t.same("nor does one that unparked and made", #clock.messages, sent)
+	work(1, 0, 0, 0, 0, { 1, 1, 16, 133 })
+	t.same("a frame with nothing to do sends all four unit budgets back to one", last(), "coilbox_rewind_budget:1 1 1 1 1")
 end
 
 -- A budget is judged by the budget the frame worked to, and not the one last

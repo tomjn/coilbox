@@ -102,6 +102,9 @@ function M.normalize(raw)
 	if raw.hooks ~= nil and type(raw.hooks) ~= "table" then
 		return nil, "the adapter's hooks is not a table"
 	end
+	if raw.unitPool ~= nil and type(raw.unitPool) ~= "boolean" then
+		return nil, "the adapter's unitPool is not true or false"
+	end
 
 	local adapter = {
 		name = type(raw.name) == "string" and raw.name or "unnamed",
@@ -115,6 +118,10 @@ function M.normalize(raw)
 		-- Coilbox reads the same two lists to tell the recorder what to record.
 		teamParams = copied(raw.teamParams),
 		gameParams = copied(raw.gameParams),
+		-- Whether a seek parks the units it removes and uses them again, which is
+		-- off unless the adapter says so (issue #5029). The units stage has how,
+		-- and lua/rewind-player/README.md what a game has to hold for it.
+		unitPool = raw.unitPool == true,
 		hooks = {},
 		hookNames = {},
 		unknownHooks = {},

@@ -33,7 +33,7 @@
 -- the spike on issue #3791, which read ten tags. The camera and drawing calls
 -- of the `view` and `arrivalEffect` rows were read at those and at 2025.03.9,
 -- and those of the `nanoPieces`, `buildStream` and `workerAnswer` rows at all
--- five. A name found at 105.0 is given
+-- five, as were those of the `unitPool` and `unitHide` rows (issue #5029). A name found at 105.0 is given
 -- as 105.0. No older engine was read, so the player does not say that one older
 -- lacks it. The rows of the resources stage (issue #3982) were read at 105.0,
 -- 105.1.1, 2025.01.6, 2025.03.9 and 2026.07.04, and the one call that is not at
@@ -441,6 +441,24 @@ M.SYNCED = {
 		visible = false,
 	},
 	{
+		id = "unitPool",
+		feature = "the unit pool",
+		calls = {
+			"Spring.GetUnitBlocking",
+			"Spring.SetUnitBlocking",
+			"Spring.GetUnitSensorRadius",
+			"Spring.SetUnitSensorRadius",
+			"Spring.SetUnitNeutral",
+			"Spring.GetUnitTeam",
+		},
+		how = "presence",
+		used = "coilbox_player_units.lua, Units:park and Units:unpark",
+		required = false,
+		since = "105.0",
+		without = "A game whose adapter turns the unit pool on has a seek destroy and create units, as one without it does",
+		visible = false,
+	},
+	{
 		id = "adapter",
 		feature = "the game adapter",
 		calls = { "VFS.FileExists" },
@@ -566,6 +584,17 @@ M.UNSYNCED = {
 		required = false,
 		since = "105.0",
 		without = "A builder at work shows no stream of build particles, and a game's own build effect that asks the engine gets nothing",
+		visible = false,
+	},
+	{
+		id = "unitHide",
+		feature = "hiding a parked unit",
+		calls = { "Spring.SetUnitNoDraw", "Spring.SetUnitNoSelect", "Spring.SetUnitNoMinimap" },
+		how = "presence",
+		used = "coilbox_rewind_player.lua, park in the unsynced half",
+		required = false,
+		since = "105.0",
+		without = "A unit the unit pool parks off the map is still drawn there, can be selected and shows on the minimap",
 		visible = false,
 	},
 	{

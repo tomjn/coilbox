@@ -272,6 +272,18 @@ function M.new(clock)
 	-- The engine's own answers about a builder's work, which nobody gives in a
 	-- playback: nothing for every unit.
 	e.workerAsks = 0
+	-- What the unit pool hides (issue #5029), by unit id.
+	e.noDraw, e.noSelect, e.noMinimap = {}, {}, {}
+	function Spring.SetUnitNoDraw(id, value)
+		e.noDraw[id] = value
+	end
+	function Spring.SetUnitNoSelect(id, value)
+		e.noSelect[id] = value
+	end
+	function Spring.SetUnitNoMinimap(id, value)
+		e.noMinimap[id] = value
+	end
+
 	function Spring.GetUnitWorkerTask()
 		e.workerAsks = e.workerAsks + 1
 	end

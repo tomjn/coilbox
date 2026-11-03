@@ -61,6 +61,12 @@
 -- something the engine hands out, so this file wraps the call a game's script
 -- framework gives them to the engine with, as it loads, and keeps them.
 --
+-- A game's adapter can turn on a pool of hidden units (issue #5029,
+-- coilbox_player_units.lua). The synced half parks a unit and tells this half,
+-- which is the one that can stop it being drawn, selected or shown on the
+-- minimap. A pool has budgets of its own, which this half works out and sends
+-- with the others.
+--
 -- The base game's own gadgets still run, except those the game's adapter
 -- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
 -- team or ending the match.
@@ -108,6 +114,10 @@ local BUILD = "coilbox_rewind_build"
 -- would read them as errors, so none goes to the engine's log, which the
 -- console shows.
 local LOG = "coilbox_rewind_log"
+
+--- What the synced half sends the unsynced one when it parks a unit or takes
+-- one back (issue #5029): the unit's id, and 1 to hide it or 0 to show it.
+local PARK = "coilbox_rewind_park"
 
 if gadgetHandler:IsSyncedCode() then
 	local player
@@ -236,6 +246,11 @@ if gadgetHandler:IsSyncedCode() then
 			work = engine.on.workTiming and function(unitID, command, target, power, x, y, z, frame, jumped)
 				SendToUnsynced(BUILD, unitID, command, target, power, x, y, z, frame, jumped)
 			end or nil,
+			-- The unsynced half hides a parked unit, so without SendToUnsynced there
+			-- is no pool.
+			park = engine.on.workTiming and function(unitID, hide)
+				SendToUnsynced(PARK, unitID, hide and 1 or 0)
+			end or nil,
 			log = log,
 			adapter = adapter,
 			adapterWhy = adapterWhy,
@@ -246,6 +261,11 @@ if gadgetHandler:IsSyncedCode() then
 			return
 		end
 		player = made
+		-- The units the pool holds, by id, for the base game's gadgets: a parked
+		-- unit is in the engine and not in the playback (issue #5029).
+		if GG then
+			GG.coilboxRewindParked = player.units.parkedKey
+		end
 
 		local h, info = track.header, track:info()
 		log(
@@ -280,9 +300,9 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		player:frame()
 		if engine.on.workTiming then
-			local made, removed, ground = player:worked()
-			local make, remove, earth = player:budgets()
-			SendToUnsynced(WORK, 1, frame, made, removed, ground, make, remove, earth, player:firstUnits(), player:started() and 1 or 0)
+			local made, removed, ground, parked, unparked = player:worked()
+			local make, remove, earth, park, unpark = player:budgets()
+			SendToUnsynced(WORK, 1, frame, made, removed, ground, make, remove, earth, player:firstUnits(), player:started() and 1 or 0, parked, unparked, park, unpark)
 		end
 	end
 
@@ -489,6 +509,17 @@ else
 		end
 	end
 
+	-- A parked unit is not drawn, cannot be selected, and is not on the
+	-- minimap (issue #5029). Taking selection away deselects it too.
+	local function park(unitID, hide)
+		if engine.on.unitHide then
+			local hidden = hide == 1
+			Spring.SetUnitNoDraw(unitID, hidden)
+			Spring.SetUnitNoSelect(unitID, hidden)
+			Spring.SetUnitNoMinimap(unitID, hidden)
+		end
+	end
+
 	-- The engine's own pause and speed (issue #4033). The player's pause is its
 	-- own, and the world only moves on simulation frames, so a paused engine
 	-- would hold a seek too, and a faster one would play faster than the timeline
@@ -557,7 +588,9 @@ else
 		return math.max(0, (b.sw * b.sxy - b.sx * b.sy) / d)
 	end
 	local makes, removes, grounds = newBudget(), newBudget(), newBudget()
-	local budgets = { makes, removes, grounds }
+	-- Those of the unit pool, which only a playback with the pool on sends.
+	local parks, unparks = newBudget(), newBudget()
+	local budgets = { makes, removes, grounds, parks, unparks }
 
 	--- The most that fit in `TARGET` when the first costs `per` more than `rise`
 	-- times `ahead`, and each after it `rise` more again. Each is taken to cost
@@ -636,7 +669,9 @@ else
 
 	--- A frame made `made` units, removed `removed` and set `ground` corners of a
 	-- seek's ground in `took` milliseconds, working to the budgets `hadMake`,
-	-- `hadRemove` and `hadGround`. Each costs the engine something of its own, so
+	-- `hadRemove` and `hadGround`. With the unit pool on it also parked
+	-- `parked` and unparked `unparked`, to the budgets `hadPark` and
+	-- `hadUnpark`, and without it those are nil. Each costs the engine something of its own, so
 	-- only a frame that did one of them says what that one costs. A frame that
 	-- did none ends a seek, and the unit budgets go back to one. What a unit
 	-- costs moves with how many there are, so what one seek ended on is not safe
@@ -644,41 +679,68 @@ else
 	-- next, since what a corner costs is the engine's work round it and does not
 	-- move with what else is in the world (lua/rewind-player/README.md has the
 	-- measurements).
-	local function retune(frame, took, made, removed, ground, hadMake, hadRemove, hadGround, firsts, start)
+	local function retune(frame, took, made, removed, ground, hadMake, hadRemove, hadGround, firsts, start, parked, unparked, hadPark, hadUnpark)
+		local pooled = parked ~= nil
 		arrived(makes, frame, hadMake)
 		arrived(removes, frame, hadRemove)
 		arrived(grounds, frame, hadGround)
+		if pooled then
+			arrived(parks, frame, hadPark)
+			arrived(unparks, frame, hadUnpark)
+		end
 		-- The first frame of a seek into another window only read the window
 		-- (issue #4037). It does not end a seek and says nothing of what a unit
 		-- or a corner costs.
 		if start == 1 then
 			return
 		end
-		if made + removed + ground == 0 then
+		parked, unparked = parked or 0, unparked or 0
+		-- Each kind of work costs the engine something of its own, so only a
+		-- frame that did one kind says what that one costs.
+		local units = made + removed + parked + unparked
+		if units + ground == 0 then
 			makes.budget, removes.budget = FIRST_BUDGET, FIRST_BUDGET
+			parks.budget, unparks.budget = FIRST_BUDGET, FIRST_BUDGET
 			for _, b in ipairs(budgets) do
 				b.done, b.frames, b.sw, b.sx, b.sy, b.sxx, b.sxy = 0, 0, 0, 0, 0, 0, 0
 			end
-		elseif ground > 0 and made + removed == 0 then
+		elseif ground > 0 and units == 0 then
 			judge(grounds, frame, took, ground, hadGround, 0)
-		elseif made > 0 and removed + ground == 0 then
+		elseif made > 0 and units == made and ground == 0 then
 			judge(makes, frame, took, made, hadMake, firsts)
-		elseif removed > 0 and made + ground == 0 then
+		elseif removed > 0 and units == removed and ground == 0 then
 			judge(removes, frame, took, removed, hadRemove, 0)
+		elseif parked > 0 and units == parked and ground == 0 then
+			judge(parks, frame, took, parked, hadPark, 0)
+		elseif unparked > 0 and units == unparked and ground == 0 then
+			judge(unparks, frame, took, unparked, hadUnpark, 0)
 		end
-		if makes.budget ~= makes.sent or removes.budget ~= removes.sent or grounds.budget ~= grounds.sent then
+		local changed = makes.budget ~= makes.sent or removes.budget ~= removes.sent or grounds.budget ~= grounds.sent
+		if pooled then
+			changed = changed or parks.budget ~= parks.sent or unparks.budget ~= unparks.sent
+		end
+		if changed then
 			for _, b in ipairs(budgets) do
 				if b.budget ~= b.sent then
 					b.sent, b.sentAt, b.waiting = b.budget, frame, true
 				end
 			end
-			Spring.SendLuaRulesMsg(BUDGET .. makes.budget .. " " .. removes.budget .. " " .. grounds.budget)
+			local text = BUDGET .. makes.budget .. " " .. removes.budget .. " " .. grounds.budget
+			if pooled then
+				text = text .. " " .. parks.budget .. " " .. unparks.budget
+			end
+			Spring.SendLuaRulesMsg(text)
 		end
 	end
 
-	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground, hadMake, hadRemove, hadGround, firsts, start)
+	function gadget:RecvFromSynced(name, phase, frame, made, removed, ground, hadMake, hadRemove, hadGround, firsts, start, parked, unparked, hadPark, hadUnpark)
 		if name == LOG then
 			write(phase)
+			return true
+		end
+		if name == PARK then
+			-- A unit's id and whether to hide it, where the work's arguments are.
+			park(phase, frame)
 			return true
 		end
 		if name == ARRIVE then
@@ -735,7 +797,7 @@ else
 		else
 			framed = took
 			if made and removed and engine.on.budgetMessage then
-				retune(frame, took, made, removed, ground or 0, hadMake, hadRemove, hadGround or 0, firsts or 0, start)
+				retune(frame, took, made, removed, ground or 0, hadMake, hadRemove, hadGround or 0, firsts or 0, start, parked, unparked, hadPark, hadUnpark)
 			end
 		end
 		if took <= LIMIT then

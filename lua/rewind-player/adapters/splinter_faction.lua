@@ -112,6 +112,13 @@ return {
 		"gfx_timecyclesweathereffects_weather.lua",
 	},
 
+	-- A seek parks the units it removes and uses them again (issue #5029). The
+	-- gadgets and widgets of 0.1.96 were read for the four things the pool needs
+	-- of a game, and lua/rewind-player/README.md has what was found: four small
+	-- things a viewer can see, none of which switching a file off would fix
+	-- without losing more.
+	unitPool = true,
+
 	hooks = {
 		-- How far from the left of the view the game's tooltip panel reaches (issue
 		-- #5026). It stays on in a playback, and stands over the bottom left, where

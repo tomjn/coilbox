@@ -247,7 +247,8 @@ function Aim:place(t, clock)
 	if not w then
 		return
 	end
-	if changed or clock.jumped or units.made > 0 then
+	-- A unit the pool gave back is one made in the frame too (issue #5029).
+	if changed or clock.jumped or units.made > 0 or units.unparks > 0 then
 		local unitOf, known = units.unitOf, self.unitID
 		if changed or clock.jumped then
 			-- A unit that has gone since it was learnt.

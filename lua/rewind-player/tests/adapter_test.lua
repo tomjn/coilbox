@@ -72,6 +72,13 @@ do
 	t.same("a hook the player does not call is listed apart", table.concat(adapter.unknownHooks, ","), "frame,onTuesday")
 	t.same("an adapter with no name is unnamed", Adapter.normalize({}).name, "unnamed")
 
+	-- The unit pool is off unless the adapter turns it on (issue #5029).
+	t.same("an adapter that says nothing leaves the unit pool off", Adapter.normalize({}).unitPool, false)
+	t.same("one that turns it on has it on", Adapter.normalize({ unitPool = true }).unitPool, true)
+	adapter, why = Adapter.normalize({ unitPool = "yes" })
+	t.same("a unitPool that is not true or false is refused", adapter, nil)
+	t.check("and says so", why ~= nil and why:find("unitPool", 1, true) ~= nil, why)
+
 	-- The ghosts widget's hook (issue #3804) is in the adapter's format, and the
 	-- player never calls it, so it is not a misspelling.
 	adapter = Adapter.normalize({ hooks = { drawQueuedBuilding = hook } })
