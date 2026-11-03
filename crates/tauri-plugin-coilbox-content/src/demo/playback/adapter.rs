@@ -592,8 +592,16 @@ mod tests {
 
     #[test]
     fn an_adapter_can_turn_the_unit_pool_on() {
-        assert!(Adapter::parse("return { unitPool = true }").unwrap().unit_pool);
-        assert!(!Adapter::parse("return { unitPool = false }").unwrap().unit_pool);
+        assert!(
+            Adapter::parse("return { unitPool = true }")
+                .unwrap()
+                .unit_pool
+        );
+        assert!(
+            !Adapter::parse("return { unitPool = false }")
+                .unwrap()
+                .unit_pool
+        );
         assert!(!Adapter::parse("return {}").unwrap().unit_pool);
         assert!(Adapter::parse("return { unitPool = 'yes' }").is_err());
     }

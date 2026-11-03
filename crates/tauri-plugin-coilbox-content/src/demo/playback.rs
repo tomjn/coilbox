@@ -3523,19 +3523,21 @@ end
         };
         let pooled: Vec<(&str, String)> = REWIND_PLAYER_ADAPTERS
             .iter()
-            .map(|(name, source)| match var("COILBOX_PLAYBACK_UNIT_POOL").as_deref() {
-                Some(on @ ("on" | "off")) => (
-                    *name,
-                    format!(
-                        "local adapter = (function()\n{source}\nend)()\n\
+            .map(
+                |(name, source)| match var("COILBOX_PLAYBACK_UNIT_POOL").as_deref() {
+                    Some(on @ ("on" | "off")) => (
+                        *name,
+                        format!(
+                            "local adapter = (function()\n{source}\nend)()\n\
                          if type(adapter) == 'table' then adapter.unitPool = {} end\n\
                          return adapter\n",
-                        on == "on"
+                            on == "on"
+                        ),
                     ),
-                ),
-                Some(other) => panic!("COILBOX_PLAYBACK_UNIT_POOL is on or off, not {other}"),
-                None => (*name, source.to_string()),
-            })
+                    Some(other) => panic!("COILBOX_PLAYBACK_UNIT_POOL is on or off, not {other}"),
+                    None => (*name, source.to_string()),
+                },
+            )
             .collect();
         let adapters: Vec<(&str, &str)> = pooled.iter().map(|(n, s)| (*n, s.as_str())).collect();
         prepared.rewrite(&adapters);
