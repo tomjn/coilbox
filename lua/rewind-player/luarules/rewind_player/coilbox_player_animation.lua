@@ -78,8 +78,9 @@
 -- So the first time a unit of a definition is told that
 -- it moves, the stage asks which turns and moves of the posed pieces the
 -- script started in answer (Spring.UnitScript.IsInTurn and IsInMove, before
--- and after). Those are the walk's, and the aim stage leaves them to the
--- script from then on, for every unit of the definition.
+-- and after). Those are the walk's, and for every unit of the definition the aim
+-- stage leaves them to the script while that unit walks with no target and no
+-- work (issue #5023). It reads what a script was last told from `told`.
 --
 -- A frame of play allocates nothing here. A call into a Lua script allocates
 -- whatever that script does.
@@ -224,6 +225,10 @@ function M.new(context, units, aim, features)
 		probeDef = 0,
 		probeFound = false,
 	}, Animation)
+
+	if aim then
+		aim.told = self.told
+	end
 
 	local isInTurn, isInMove = UnitScript and UnitScript.IsInTurn, UnitScript and UnitScript.IsInMove
 	local before = self.probeBefore
@@ -415,7 +420,7 @@ local function tellMoving(self, serial, unitID, def, state)
 		end
 		self.context.report(
 			"walk " .. self.names[def],
-			"the walk of " .. self.names[def] .. " turns " .. table.concat(turned, ", ") .. ", which the track has poses for, so those turns are left to the unit's own script and the rest of each piece's pose is the track's"
+			"the walk of " .. self.names[def] .. " turns " .. table.concat(turned, ", ") .. ", which the track has poses for, so while a unit of it walks with no target and no work those turns are left to its own script, and the rest of its pose is the track's"
 		)
 	end
 end

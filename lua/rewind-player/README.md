@@ -684,15 +684,17 @@ Nothing in a frame of the player's work: the stage hands a change of a builder's
 
 The aim stage sets every piece the track has poses for at the end of every frame ([Aim poses](#aim-poses)), and a walk can turn one of those. `fedstorm` in a track of the match below recorded before issue #3941 has its right leg among its posed pieces, and its walk turns both legs. Left to the aim stage, the right leg followed the recording and the left followed the script, out of step whenever the walk had not started on the frame the match's did, which is after every seek into a walk, and always while paused or played backward.
 
-So the first time a unit of a definition is told that it moves, the stage asks which turns and moves of the posed pieces the script started in answer, with `Spring.UnitScript.IsInTurn` and `IsInMove` before and after the call. Those are the walk's, and the aim stage leaves them to the script from then on, for every unit of the definition. The rest of each piece's pose is the track's. The player logs it once for the definition:
+So the first time a unit of a definition is told that it moves, the stage asks which turns and moves of the posed pieces the script started in answer, with `Spring.UnitScript.IsInTurn` and `IsInMove` before and after the call. Those are the walk's. The aim stage leaves them to the script while a unit of the definition walks with no target and no work, and sets the rest of each piece's pose from the track. The player logs it once for the definition:
 
 ```
-COILBOX_REWIND_PLAYER the walk of fedstorm turns rfoot, rleg, rthigh, which the track has poses for, so those turns are left to the unit's own script and the rest of each piece's pose is the track's
+COILBOX_REWIND_PLAYER the walk of fedstorm turns rfoot, rleg, rthigh, which the track has poses for, so while a unit of it walks with no target and no work those turns are left to its own script, and the rest of its pose is the track's
 ```
 
 - Only what the script starts as it is told is taken. Splinter Faction's walk turns its feet, legs and thighs at once and its pelvis a step later, so the pelvis, the root of the turret, stays the track's. A turn that was already running, such as a turret coming back after work, is not taken.
-- A unit of the definition that has not walked yet in the run has its leg posed. One that stands after a walk has its leg where its script put it.
-- A script whose walk turns an aiming piece as it starts loses that piece's aim on that axis. Balanced Annihilation's `armpw` logged no such line. On Beyond All Reason's benchmark match, `armcom` and `corak` do, with their torsos and arms.
+- A unit that stands, is paused, has a weapon target or has builder work has the whole of the track's pose (issue #5023). Beyond All Reason's `armcom` shows why: its walk and its dgun both turn `luparm` and `biggun` about x, and its script does not know it is aiming, because nothing fires in a playback. The track has what the match showed.
+- `corak` aims on `aimy1` and `aimx1`, which its walk does not turn, and its torso and arms carry its walk and its idle animation.
+- A piece jumps to the track's pose when its unit stops or gets a target, by as much as the script's step was out from the recording's. The next key of the walk turns it back smoothly when the target goes.
+- A track recorded before issue #3941 can have a leg among its posed pieces. While that unit walks with a target, that leg follows the recording and the other its script, out of step. A new track does not name those pieces.
 
 #### What it costs
 
