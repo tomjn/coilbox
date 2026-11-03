@@ -125,11 +125,18 @@ local AIM = "coilbox_rewind/driver_aim.lua"
 -- definition name, the posed pieces a walk turns, which are the script's.
 local ANIMATION = "coilbox_rewind/driver_animation.lua"
 
+-- And one that asks for the plan that compares a unit's aim before and after a
+-- unit of its kind has walked (issue #5023). It returns a table: `names`, the
+-- unit definitions to look at, and `samples`, how many frames to look at for
+-- each.
+local WALK_AIM = "coilbox_rewind/driver_walk_aim.lua"
+
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
 
 local aimAsked = VFS.FileExists(AIM) and VFS.Include(AIM) or nil
 local animationAsked = VFS.FileExists(ANIMATION) and VFS.Include(ANIMATION) or nil
+local walkAimAsked = VFS.FileExists(WALK_AIM) and VFS.Include(WALK_AIM) or nil
 -- The driver keeps the call for itself, and takes it out of the table every
 -- gadget shares before the player's gadget looks at what the engine has. The
 -- player then finds the aim stage's row off, as on an engine without the call.
@@ -1418,6 +1425,36 @@ local function apart(a, b)
 	return math.min(d, TURN - d)
 end
 
+local AXES = { "x", "y", "z" }
+local WALK_MOVING = 0.01 * 0.01
+local walkVelocity = { 0, 0, 0 }
+local walkTarget = { 0, 0, 0, 0, 0, 0 }
+
+--- Whether unit `i` of window `w` is shown moving at `frame`, as the player
+-- works it out.
+local function shownMoving(w, i, frame)
+	if not w:sampleVelocity(i, frame, walkVelocity) then
+		return false
+	end
+	local v = walkVelocity
+	return v[1] * v[1] + v[2] * v[2] + v[3] * v[3] > WALK_MOVING
+end
+
+--- What unit `i` of window `w` is doing at `frame`: "aiming" with a weapon that
+-- has a target, "building" with builder work and "idle" with neither.
+local function shownDoing(w, i, frame)
+	local building = false
+	for t = w.unitTargetFirst[i], w.unitTargetFirst[i] + w.unitTargetCount[i] - 1 do
+		if w:sampleTarget(t, frame, walkTarget) and walkTarget[1] ~= 0 then
+			if w.targetWeapon[t] ~= 0 then
+				return "aiming"
+			end
+			building = true
+		end
+	end
+	return building and "building" or "idle"
+end
+
 --- Looks at every posed piece of every unit the track has at the time the
 -- player last showed, and adds to `sum` what it finds: `pieces` looked at,
 -- `turned` of them that the track has away from rest, `bad` of them that are
@@ -1425,10 +1462,16 @@ end
 -- engine does not have yet, `missing` pieces a script lacks, and of all the
 -- engine's units, `wounded` ones and ones whose maximum health is not their
 -- definition's (issue #4002). `skip` is, by unit definition name, the posed
--- pieces that a walk turns, which the aim stage leaves to the unit's own
--- script (issue #3797) and this does not look at.
+-- pieces that a walk turns. The aim stage leaves those to the unit's own script
+-- while it walks with no target and no work (issue #5023), and this does not look
+-- at them then. A unit is shown walking only while play runs, and the look reads
+-- what the frame before left, so a frame that has just paused counts as playing.
+local aimPlayed = false
 local function aimLook(sum, skip)
 	local frame = param("frame")
+	local playing = param("playing") == 1
+	local running = playing or aimPlayed
+	aimPlayed = playing
 	local w = assert(track:seek(frame))
 	local moveLimit = track.header.positionStep / 2
 	local UnitScript = Spring.UnitScript
@@ -1662,6 +1705,177 @@ local function aimPlan(asked)
 			aimSay("rest frame=" .. frame, sum)
 		end)
 	end
+	push("run", function()
+		SendToUnsynced(REPORT)
+	end)
+end
+
+-- A walk and the aim of a unit (issue #5023).
+
+--- Adds to `sums`, by definition and then by what a unit is doing, how far each
+-- turn of each posed piece is from the track, at the time the player last
+-- showed. A piece is named with its axis, and an offset with `move`.
+local function walkAimLook(sums, names)
+	local frame = param("frame")
+	local w = assert(track:seek(frame))
+	local byPlace = {}
+	for _, unitID in ipairs(liveUnits()) do
+		local x, y, z = Spring.GetUnitPosition(unitID)
+		byPlace[string.format("%d %.3f %.3f %.3f", Spring.GetUnitDefID(unitID), x, y, z)] = unitID
+	end
+	local UnitScript = Spring.UnitScript
+	local moveLimit = track.header.positionStep / 2
+	for i = 1, w.unitCount do
+		local name = info.unitDefs[w.unitDef[i] + 1]
+		local def = UnitDefNames[name]
+		if names[name] and def and w:unitExistsAt(i, frame) then
+			w:sampleTransform(i, frame, transform)
+			local unitID = byPlace[string.format("%d %.3f %.3f %.3f", def.id, transform[1], transform[2], transform[3])]
+			if unitID then
+				local state = (shownMoving(w, i, frame) and "walking" or "standing") .. "_" .. shownDoing(w, i, frame)
+				local byState = sums[name] or {}
+				sums[name] = byState
+				local sum = byState[state] or { units = 0, turns = 0, off = 0, worst = {} }
+				byState[state] = sum
+				sum.units = sum.units + 1
+				local script = getUnitScriptNames(unitID)
+				local trackOf = {}
+				for poseTrack = w.unitPoseFirst[i], w.unitPoseFirst[i] + w.unitPoseCount[i] - 1 do
+					trackOf[w.posePiece[poseTrack] + 1] = poseTrack
+				end
+				for k, piece in ipairs(posedNames[w.unitDef[i] + 1] or {}) do
+					local number = script[piece]
+					if number then
+						pose[1], pose[2], pose[3], pose[4], pose[5], pose[6] = 0, 0, 0, 0, 0, 0
+						if trackOf[k] then
+							w:samplePose(trackOf[k], frame, pose)
+						end
+						local turns = { UnitScript.CallAsUnit(unitID, UnitScript.GetPieceRotation, number + 1) }
+						local moves = { UnitScript.CallAsUnit(unitID, UnitScript.GetPieceTranslation, number + 1) }
+						for axis = 1, 3 do
+							local off = apart(turns[axis], (pose[axis] % 65536) * TURN / 65536)
+							sum.turns = sum.turns + 1
+							if off > TURN_LIMIT then
+								sum.off = sum.off + 1
+								local key = piece .. "." .. AXES[axis]
+								sum.worst[key] = math.max(sum.worst[key] or 0, math.deg(off))
+							end
+							local moved = math.abs(moves[axis] - pose[axis + 3])
+							if moved > moveLimit then
+								local key = piece .. ".move" .. AXES[axis]
+								sum.worst[key] = math.max(sum.worst[key] or 0, moved)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+--- Says what `sums` holds, one line for a definition and what its units do.
+local function walkAimSay(label, sums)
+	for name, byState in pairs(sums) do
+		for state, sum in pairs(byState) do
+			local worst = {}
+			for key, value in pairs(sum.worst) do
+				worst[#worst + 1] = string.format("%s:%.2f", key, value)
+			end
+			table.sort(worst)
+			say(string.format("walk_aim %s def=%s state=%s units=%d turns=%d off=%d worst=%s", label, name, state, sum.units, sum.turns, sum.off, #worst > 0 and table.concat(worst, ",") or "none"))
+		end
+	end
+end
+
+--- The frames to look at for one definition: up to `samples` of them on which a
+-- unit of it stands with a weapon that has a target, and as many on which one
+-- walks with one, stands building and walks building, among every 10th frame of
+-- the track, no two of a kind within 300 frames. Also the first frame on which one walks for at least 60 frames, and
+-- how many units were seen doing each thing.
+local function walkAimFrames(name, samples)
+	local h = track.header
+	local frames, walk = {}, nil
+	local seen = { standing_aiming = 0, walking_aiming = 0, standing_building = 0, walking_building = 0, standing_idle = 0, walking_idle = 0 }
+	local last = { standing_aiming = -1000, walking_aiming = -1000, standing_building = -1000, walking_building = -1000 }
+	local taken = { standing_aiming = 0, walking_aiming = 0, standing_building = 0, walking_building = 0 }
+	for frame = h.firstFrame, h.lastFrame - 120, 10 do
+		local w = assert(track:seek(frame))
+		for i = 1, w.unitCount do
+			if info.unitDefs[w.unitDef[i] + 1] == name and w:unitExistsAt(i, frame) then
+				local moving = shownMoving(w, i, frame)
+				local state = (moving and "walking" or "standing") .. "_" .. shownDoing(w, i, frame)
+				seen[state] = seen[state] + 1
+				if moving and not walk and w:unitExistsAt(i, frame + 60) and shownMoving(w, i, frame + 60) then
+					walk = frame
+				end
+				if last[state] and taken[state] < samples and frame - last[state] >= 300 then
+					frames[#frames + 1], last[state], taken[state] = frame, frame, taken[state] + 1
+				end
+			end
+		end
+	end
+	return frames, walk, seen
+end
+
+--- The plan: looks at each definition's aim on frames where it stands and fires,
+-- with no unit of it told yet that it moves. Then makes one of each walk, looks
+-- at the same frames again, and last plays on from each, to see the same units
+-- walk and stand with the player's stages at work.
+local function walkAimPlan(asked)
+	local h = track.header
+	posedNames = {}
+	for _, posed in ipairs(info.posedPieces) do
+		posedNames[posed.unitDef + 1] = posed.pieces
+	end
+	local names, frames, walks = {}, {}, {}
+	for _, name in ipairs(asked.names) do
+		names[name] = true
+		local found, walk, seen = walkAimFrames(name, asked.samples)
+		say(string.format("walk_aim frames def=%s frames=%d walk=%s standing_aiming=%d walking_aiming=%d standing_building=%d walking_building=%d standing_idle=%d walking_idle=%d", name, #found, tostring(walk), seen.standing_aiming, seen.walking_aiming, seen.standing_building, seen.walking_building, seen.standing_idle, seen.walking_idle))
+		for _, frame in ipairs(found) do
+			frames[#frames + 1] = frame
+		end
+		walks[#walks + 1] = walk
+	end
+	table.sort(frames)
+	say(string.format("start first=%d last=%d seeks=%d", h.firstFrame, h.lastFrame, #frames))
+	send("pause")
+	seekTo(h.firstFrame)
+	local function looks(label, play)
+		local sums = {}
+		for _, frame in ipairs(frames) do
+			send("seek " .. frame)
+			push("await", frame)
+			push("settled")
+			push("wait", 1)
+			push("run", function()
+				walkAimLook(sums, names)
+			end)
+			if play then
+				send("play 1")
+				push("each", 90, function()
+					walkAimLook(sums, names)
+				end)
+				send("pause")
+			end
+			push("wait", SETTLE)
+		end
+		push("run", function()
+			walkAimSay(label, sums)
+		end)
+	end
+	looks("before", false)
+	for _, frame in ipairs(walks) do
+		send("seek " .. frame)
+		push("await", frame)
+		push("settled")
+		send("play 1")
+		push("wait", 60)
+		send("pause")
+		push("wait", SETTLE)
+	end
+	looks("after", false)
+	looks("played", true)
 	push("run", function()
 		SendToUnsynced(REPORT)
 	end)
@@ -2442,6 +2656,8 @@ function gadget:GameFrame()
 		-- track. Without it the plan is the fixture match's.
 		if animationAsked then
 			animationPlan(animationAsked)
+		elseif walkAimAsked then
+			walkAimPlan(walkAimAsked)
 		elseif aimAsked then
 			aimPlan(aimAsked)
 		elseif VFS.FileExists(RESOURCES) then
