@@ -18,7 +18,7 @@ local TAG = "ADAPTER_PROBE "
 -- then, and the base game has had time to ask to kill a team.
 local REPORT_AT = 320
 
-local WATCHED_WIDGET = "gui_static_resourcebar.lua"
+local WATCHED_WIDGET = "gui_build_eta.lua"
 
 local done = false
 

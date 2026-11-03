@@ -2,8 +2,11 @@
 -- Rust test an_adapter_switches_things_off_in_the_engine hands it to the launch
 -- as if coilbox shipped it.
 --
--- It names two real Splinter Faction 0.1.89 gadgets and a widget, a unit the
--- fixture match builds, and two hooks that say they ran. Both gadgets kill teams:
+-- It names two real Splinter Faction gadgets and a widget, a unit the fixture
+-- match builds, and two hooks that say they ran. The widget is
+-- gui_build_eta.lua, which 0.1.93, 0.1.95 and 0.1.96 all load unchanged. The
+-- game's GUI widgets are being renamed from one version to the next, so a
+-- widget named here is checked against the version in use. Both gadgets kill teams:
 -- game_end.lua when a team has no units, and game_team_com_ends.lua when it has
 -- no commander. Switching off only the first leaves the second asking.
 
@@ -15,7 +18,7 @@ return {
 	versions = { min = "0.1.80", max = "0.1.99" },
 
 	gadgets = { "game_end.lua", "game_team_com_ends.lua" },
-	widgets = { "gui_static_resourcebar.lua" },
+	widgets = { "gui_build_eta.lua" },
 	units = { "lozscorpion" },
 	features = {},
 
