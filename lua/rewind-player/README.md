@@ -1477,7 +1477,19 @@ The team guard and the player's removal of units and features that the track doe
 
 ### Splinter Faction
 
-`adapters/splinter_faction.lua` is the adapter for Splinter Faction (issue #3800). It has no version range. The archives of 0.1.88 and 0.1.89 and the game's repository at its commit of 24 August 2026 all hold every file it names, and a range would leave a game folder under development, which declares `$VERSION`, with no adapter.
+`adapters/splinter_faction.lua` is the adapter for Splinter Faction (issue #3800). It has no version range. The game has rebuilt its interface twice under new file names, and it moves a widget it has stopped using to `LuaUI/Widgets/disabled/`, where its handler does not look (issue #5022). So the adapter names each widget once for each set of names:
+
+| What the widget does | Up to 0.1.89 | 0.1.93 | 0.1.95 and 0.1.96 |
+| --- | --- | --- | --- |
+| Picks a faction | `gui_static_factionchooser.lua` | `gui_rml_factionchooser.lua` | `gui_bastion_factionchooser.lua` |
+| Picks a start position | `gui_static_placement.lua` | `gui_rml_placement.lua` | `gui_bastion_placement.lua` |
+| Shares units and resources | `gui_static_sharemenu.lua` | `gui_rml_share.lua` | `gui_bastion_share.lua` |
+| Shows the selection at the bottom centre | `gui_static_selected_units_buttons.lua` | `gui_rml_selection.lua` | `gui_bastion_selection.lua` |
+| Lists the players, with the match's time | `gui_static_playerslist.lua` | `gui_rml_playerslist.lua` | `gui_bastion_playerslist.lua` |
+
+A list of names costs nothing on a release without one of them. Its shadow is one more file that returns `false`, and a name in `matchTimeWidgets` matches no widget. A version range for each set would need a new field, and would leave a game folder under development, which declares `$VERSION`, with no names at all. 0.1.94 was not installed to read.
+
+A rename gives no sign in a playback, so the ignored test `splinter_factions_adapter_names_what_each_release_loads` reads every `SplinterFaction_*.sdz` in `~/.spring/games`. Each job has to reach a widget that the release loads from `LuaUI/Widgets/`, and each gadget the adapter names has to be there. Run it when a release arrives. It takes no engine.
 
 What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and what the adapter does about it:
 
@@ -1485,10 +1497,10 @@ What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and
 | --- | --- | --- |
 | A team with no units was asked to be killed, at frame 182 in a window and 303 headless | `game_end.lua` and `game_team_com_ends.lua`, which also logged a `[com_ends]` line 7 to 28 times | both gadgets are switched off |
 | A commander the track does not have was created for each team at frame 181 and removed a frame later | `game_spawn.lua`, which runs the start of a match: it waits for a faction and a start position, picks both when nobody answers and spawns | the gadget is switched off |
-| The faction picker and the start position picker of a match's first seconds | `gui_static_factionchooser.lua` and `gui_static_placement.lua` | both widgets are switched off |
+| The faction picker and the start position picker of a match's first seconds | the faction picker and the placement widget in the table above | both widgets are switched off |
 | A container was left where a unit died, picked at random, and also where a seek removed a unit | `unit_deathContainerSpawn.lua`. The track has the containers the match left | the gadget is switched off |
-| A menu that gives units and resources to another team | `gui_static_sharemenu.lua` | the widget is switched off, and the menu's Sharing button then does nothing |
-| A strip of buttons for the selection drew under the timeline | `gui_static_selected_units_buttons.lua`, which sits at the bottom centre of the view | the widget is switched off |
+| A menu that gives units and resources to another team | the share widget in the table above | the widget is switched off, and the menu hides its Sharing button |
+| A strip of buttons for the selection drew under the timeline | the selection widget in the table above, which sits at the bottom centre of the view | the widget is switched off |
 | The time left over a building under construction was not the match's, and read `???` while paused | `gui_build_eta.lua`, which works the time out from how fast build progress moved between the frames it watched. A playback's build progress moves as the track has it, at the speed of play, backward too, and not at all while paused | the widget is switched off (issue #4029). Build progress still shows |
 | A wounded unit healed while the time stood still | `unit_auto_health_regeneration.lua`, which sets a commander's health once a second. The game turns the engine's own healing off in `alldefs_post.lua` | the gadget is switched off. The player stops the engine's healing for every game ([Nothing heals](#nothing-heals)) |
 | A heal station healed the units round it and drew the heal effect on each | `unit_area_heal_radius.lua` | the gadget is switched off |
@@ -1500,8 +1512,8 @@ The adapter names three team rules parameters, `supplyUsed`, `supplyMax` and `re
 
 What stays, because it tells a viewer about the match: the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars, build progress, the metal and geothermal spot markers, and the game's own effects, lights and weather. Two things stay for want of a way to take them out (issue #3983):
 
-- The menu at the top right is one widget, `gui_static_menu.lua`, with Settings, Keybinds, Economy, Graph, Log and Quit in it, so it stays whole. Its Resign button sends the engine's `spectator` command, which does nothing for somebody who already is one.
-- The build menu and order buttons of a selected unit, `gui_static_buildordermenu.lua`. A spectator's orders go nowhere. Switched off, the engine's own command menu takes its place and `game_buildHotkeys.lua` raises, both seen in a window.
+- The game's menu is one widget, `gui_bastion_menu.lua` in 0.1.96, with Settings, Keybinds, Economy, Graph, Log and Quit in it, so it stays whole. It hides its Resign button from a spectator and its Sharing button when the share widget is gone.
+- The build menu and order buttons of a selected unit, `gui_bastion_buildorder.lua` in 0.1.96. A spectator's orders go nowhere. It is what hides the engine's own command menu, through `widgetHandler:ConfigLayoutHandler`. On 0.1.89, with the widget switched off, the engine's menu took its place and `game_buildHotkeys.lua` raised, both seen in a window.
 
 What the kept panels show was not all the recording's until issue #3982. A track held no team resources, so everything on the resource bars was the playback game's own economy, run by the engine on the units the player had placed. The track now has them and the resources stage sets them ([Team resources](#team-resources)). Measured in the same match for team 0: in the real replay, in the playback before the stage, and in the playback now. The first two columns are from the look of issue #3800 and the third from the look of 14 October 2026, paused at the frame, on engine `2026.07.01-102-g6e5c5a0` and Splinter Faction 0.1.89.
 
