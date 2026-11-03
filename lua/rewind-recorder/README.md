@@ -246,9 +246,11 @@ The 12 numbers are the piece's model space matrix as `Spring.GetUnitPieceMatrix`
 
 A piece is written when its matrix differs from the last one written for it, checked on every sample frame. The pieces watched are each weapon's muzzle piece and every parent up to the root.
 
-The engine does not tell Lua which piece a unit script named as a weapon's muzzle, only where the muzzle is. So the recorder takes the piece nearest that place, and the deeper one in the tree when two sit on the same spot. It looks once the unit is built, and again while the weapon has a target whenever the piece it found is no longer exactly at the muzzle. A script that fires from two barrels in turn gets both watched that way. A weapon whose script names no muzzle gets whichever piece is nearest where the engine puts it.
+The engine does not tell Lua which piece a unit script named as a weapon's muzzle, only where the muzzle is. So the recorder takes the piece nearest that place, and the deeper one in the tree when two sit on the same spot. It looks once the unit is built, and again while the weapon has a target whenever the piece it found is no longer exactly at the muzzle. A script that fires from two barrels in turn gets both watched that way.
 
-Most rows are walk cycles, because a muzzle can hang off a leg. That is issue #3941.
+Until a weapon has a muzzle piece, the engine's place for it is one up from the unit's position (`relWeaponMuzzlePos` in `rts/Sim/Weapons/Weapon.cpp`). The piece nearest that is usually a leg, so the recorder passes over that place and looks again later. A weapon whose script never names a muzzle has no piece watched. The engine only works the place out now and then, so a place already looked at is not looked at again.
+
+A piece above a real muzzle is still written when a walk moves it, such as a pelvis or a torso, because the pieces below it are stored relative to it and playback composes the aim on top of it. On BAR, most pose keys are those pieces. Issue #3941 has the counts.
 
 ### Features
 

@@ -72,10 +72,10 @@
 -- own, as Splinter Faction's do.
 --
 -- The aim stage sets the pieces the track has poses for at the end of every
--- frame, and a walk can turn one of those too: the track of the match this was
--- written on has the right leg of one unit, because the recorder took a piece
--- on it for a muzzle (issue #3941). That leg would follow the recording and
--- the other the script. So the first time a unit of a definition is told that
+-- frame, and a walk can turn one of those too: a track recorded before issue
+-- #3941 has the right leg of one unit, because the recorder took a piece on it
+-- for a muzzle. That leg would follow the recording and the other the script.
+-- So the first time a unit of a definition is told that
 -- it moves, the stage asks which turns and moves of the posed pieces the
 -- script started in answer (Spring.UnitScript.IsInTurn and IsInMove, before
 -- and after). Those are the walk's, and the aim stage leaves them to the

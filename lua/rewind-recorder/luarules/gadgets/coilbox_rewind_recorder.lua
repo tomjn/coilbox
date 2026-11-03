@@ -380,6 +380,8 @@ local function remember(unitID, unitDefID, team, frame)
 		targets = {},
 		-- weapon -> the piece its muzzle was last found at.
 		muzzles = {},
+		-- Three numbers for each weapon: the place last looked for a muzzle at.
+		looked = {},
 		-- The pieces being watched, in the order they were first needed, and
 		-- piece -> the twelve numbers last written for it.
 		watched = {},
@@ -571,21 +573,34 @@ end
 -- two barrels takes turns, so while a weapon has a target the muzzle is looked
 -- for again whenever the piece it was last found at is no longer exactly where
 -- the engine says the muzzle is.
+--
+-- Until a weapon has a muzzle piece the engine's place for it is one up from
+-- the unit's position (relWeaponMuzzlePos in rts/Sim/Weapons/Weapon.cpp). That
+-- is no muzzle, and the piece nearest to it is any piece near the unit's feet,
+-- which is how a leg came to be recorded as aiming (issue #3941). So that place
+-- is passed over, and the weapon is looked at again on the next sample. The
+-- engine only works the place out now and then, so a place already looked at
+-- says nothing new and is not looked at twice.
 local function samplePieces(unitID, unit, built)
-	local def = unit.def
+	local def, held = unit.def, unit.pose
 	for weapon = 1, def.weapons do
 		local at = unit.muzzles[weapon]
 		if (not at and built) or (unit.targets[(weapon - 1) * 4 + 1] or 0) ~= 0 then
 			local mx, my, mz = GetUnitWeaponVectors(unitID, weapon)
-			if mz then
-				local px, py, pz
-				if at then
-					px, py, pz = GetUnitPiecePosDir(unitID, at)
-				end
-				if px ~= mx or py ~= my or pz ~= mz then
-					at = findMuzzle(unitID, def, mx, my, mz)
-					unit.muzzles[weapon] = at
-					watch(unit, at)
+			local looked, slot = unit.looked, (weapon - 1) * 3
+			if mz and (looked[slot + 1] ~= mx or looked[slot + 2] ~= my or looked[slot + 3] ~= mz) then
+				looked[slot + 1], looked[slot + 2], looked[slot + 3] = mx, my, mz
+				-- The pose's seventh to ninth numbers are the unit's up direction.
+				if mx ~= held[1] + held[7] or my ~= held[2] + held[8] or mz ~= held[3] + held[9] then
+					local px, py, pz
+					if at then
+						px, py, pz = GetUnitPiecePosDir(unitID, at)
+					end
+					if px ~= mx or py ~= my or pz ~= mz then
+						at = findMuzzle(unitID, def, mx, my, mz)
+						unit.muzzles[weapon] = at
+						watch(unit, at)
+					end
 				end
 			end
 		end
