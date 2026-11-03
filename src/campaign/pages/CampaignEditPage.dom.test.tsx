@@ -1244,9 +1244,11 @@ describe("what a mission row says", () => {
 
   /** Every chip in a row, by the phrase it carries. */
   const chipsOf = (title: string) =>
-    [...columnOf(title).querySelectorAll("span[title]")].map((el) =>
-      el.getAttribute("title"),
-    );
+    [
+      ...columnOf(title).querySelectorAll(
+        'span[title]:not([data-slot="badge"])',
+      ),
+    ].map((el) => el.getAttribute("title"));
 
   it("puts the subtitle, the setup and the facts on one metadata row", () => {
     show([{ ...plain("m1", "Ridge"), subtitle: "Northern Isles" }]);
@@ -1408,6 +1410,31 @@ describe("what a mission row says", () => {
     // The dot before the fact chips, the same way.
     expect(dots[1].parentElement).not.toBe(row);
     expect(dots[1].parentElement?.querySelector("span[title]")).toBeTruthy();
+  });
+
+  /**
+   * jsdom does no layout, so this pins the classes that let a long game, map
+   * or scenario name give way on a narrow row (issue #2403). A flex item that
+   * cannot shrink holds the whole row open instead of truncating, and the
+   * row's rounded corners then clip it.
+   */
+  it("lets the setup text and the scenario badge shrink on a narrow row", () => {
+    show([{ ...mission(), title: "Landing" }]);
+
+    const row = metadataRowOf("1. Landing");
+    const setup = screen
+      .getByText(/No game/)
+      .closest("span.flex") as HTMLElement;
+    expect(setup.parentElement).toBe(row);
+    expect(setup.className).toContain("min-w-0");
+    expect(setup.className).not.toContain("shrink-0");
+
+    const badge = screen
+      .getByText("Scenario: Beachhead")
+      .closest('[data-slot="badge"]') as HTMLElement;
+    expect(badge.className).toContain("min-w-0");
+    expect(badge.className).not.toContain("shrink-0");
+    expect(badge.getAttribute("title")).toBe("Beachhead");
   });
 
   it("drops the first separator along with the subtitle when there is none", () => {

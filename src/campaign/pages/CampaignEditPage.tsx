@@ -943,7 +943,7 @@ export default function CampaignEditPage() {
                             wraps when it runs out of width, and a standalone
                             "·" is free to be the thing that lands alone on
                             the new line. */}
-                        <span className="flex shrink-0 items-center gap-1.5">
+                        <span className="flex min-w-0 items-center gap-1.5">
                           {m.subtitle && <span aria-hidden="true">·</span>}
                           <MissionSetup snapshot={m.snapshot} />
                         </span>
