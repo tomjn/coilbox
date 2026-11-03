@@ -662,6 +662,28 @@ function Animation:resync() end
 
 function Animation:remove() end
 
+--- The units stage is about to park unit `unitID` of serial number `serial`,
+-- of the track's definition `def`, at `t` (issue #5029). A parked unit is used
+-- again for another of the track's units, which is learnt afresh and told only
+-- what changes, so its script is told now that it has stopped and does no
+-- work, its work's rules parameters are cleared and the build stream told, and
+-- its velocity is none.
+function Animation:parked(serial, unitID, def, t)
+	if self.unitID[serial] ~= unitID then
+		return
+	end
+	if self.told[serial] ~= 0 then
+		tellStopped(self, serial, unitID, def)
+	end
+	if self.jobKind[serial] ~= 0 or (self.command[serial] or 0) ~= 0 or (self.power[serial] or 0) ~= 0 then
+		labour(self, nil, nil, t, serial, unitID, def, 0, 0, 0, -1, 0, false)
+	end
+	if self.setVelocity and (self.vx[serial] ~= 0 or self.vy[serial] ~= 0 or self.vz[serial] ~= 0) then
+		self.setVelocity(unitID, 0, 0, 0)
+	end
+	self.unitID[serial] = nil
+end
+
 --- Gives every unit of the track the velocity it is shown moving at, and tells
 -- each script what has changed since it was last told.
 function Animation:place(t, clock)

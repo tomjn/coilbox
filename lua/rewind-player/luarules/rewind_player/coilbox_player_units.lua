@@ -77,8 +77,52 @@
 --   destroys the unit and creates it as a nanoframe when it is still finished.
 -- - A unit the base game destroys is created again on the next frame, and a
 --   unit the base game creates is removed on the next frame.
+--
+-- A game's adapter can turn on a pool of hidden units (issue #5029). With it on,
+-- a finished unit that a seek removes, quietly, is parked and not destroyed:
+-- nothing blocks on it, it sees nothing, it is neutral, it is stunned so that
+-- it makes and uses no resources, it stands off the map
+-- under move control, and the gadget's unsynced half stops it being drawn,
+-- selected or shown on the minimap. A unit the track needs is then a parked
+-- unit of the same definition and team when there is one, and is created only
+-- when there is not. Creating and destroying a unit cost the engine far more
+-- than parking and unparking one (#4010 has the numbers). A unit that dies
+-- while somebody watches and a nanoframe are still destroyed. A parked unit is
+-- never a stranger, and one that dies leaves the pool.
+--
+-- Parking and unparking have a budget each, apart from removing and making,
+-- and come first: a seek parks every unit it can before it destroys any, and
+-- unparks every unit it can before it creates any. A frame then mostly does one
+-- kind of work, which is what the unsynced half needs to time each. A pool for
+-- a definition and team holds at most as many as were ever alive at once while
+-- the player ran, which is all a later seek can need, and the pool and the
+-- most alive at once stay under `Game.maxUnits` together. A unit the engine
+-- refuses at its team's limit makes room by destroying a parked unit.
+--
+-- The base game is not told: a reused unit fires no UnitCreated and a parked
+-- one no UnitDestroyed. `parkedKey` is the set of parked units, and the gadget
+-- puts it in GG for the base game's gadgets to read. lua/rewind-player/README.md
+-- has what a game has to hold for its adapter to turn the pool on.
 
 local M = {}
+
+--- A pool's key is a definition and a team, as `defID * KEY + team`.
+local KEY = 4096
+
+--- Where a parked unit stands: off the map and below it.
+local PARK_X, PARK_Y, PARK_Z = -2000, -5000, -2000
+
+--- The paralysis a parked unit is given. The engine makes and uses a unit's
+-- resources in CUnit::SlowUpdate, its `energyMake` and `metalMake` whatever the
+-- unit does, and returns before any of it for a stunned unit, at 105.0 as now.
+-- So a parked unit is stunned, or it would go on adding to its team's income,
+-- which the resource bars show. Paralysis wears off by the unit's health over
+-- the game's `paralyzeDeclineRate` each second (CUnit::SlowUpdate), so this
+-- outlasts any playback.
+local STUNNED = 1e30
+
+--- The sensors a parked unit has none of.
+local SENSORS = { "los", "airLos", "radar", "sonar", "seismic", "radarJammer", "sonarJammer" }
 
 local Units = {}
 Units.__index = Units
@@ -114,6 +158,19 @@ function M.new(context, rotation)
 		end
 		if not def and not (hidden and hidden[names[i]:lower()]) then
 			context.report("unit " .. names[i], "the game has no unit called " .. names[i] .. ", so the track's units of that kind are left out")
+		end
+	end
+	-- The pool is the adapter's to turn on, and needs the engine's calls and the
+	-- unsynced half, which hides a parked unit.
+	local pooled = false
+	if context.adapter and context.adapter.unitPool then
+		if not context.on.unitPool then
+			context.report("pool", "the adapter turns the unit pool on, and this engine lacks a call it needs, so a seek destroys and creates units")
+		elseif not context.park then
+			context.report("pool", "the adapter turns the unit pool on, and nothing can hide a parked unit without SendToUnsynced, so a seek destroys and creates units")
+		else
+			pooled = true
+			context.report("pool", "the adapter turns the unit pool on, so a finished unit a seek removes is parked hidden and used again")
 		end
 	end
 	return setmetatable({
@@ -204,6 +261,38 @@ function M.new(context, rotation)
 		healthArg = { health = 0 },
 		buildArg = { health = 0, build = 0 },
 		onArg = { 0 },
+		-- The pool (issue #5029). `pooled` is whether it is on. `parkedKey` is the
+		-- pool key of each parked unit, by id, and `pools` a stack of ids for each
+		-- key, which can hold ids that have since left the pool. `poolCount` is
+		-- how many each key has parked, and `parkedTeam` how many each team has.
+		pooled = pooled,
+		-- What parks a unit's own economy, and what gives it back.
+		stunArg = { paralyze = STUNNED },
+		unstunArg = { paralyze = 0 },
+		maxUnits = Game.maxUnits or math.huge,
+		parkedKey = {},
+		parkedCount = 0,
+		pools = {},
+		poolCount = {},
+		parkedTeam = {},
+		-- The key a unit of the track was made or unparked under, by serial
+		-- number, how many of the track's units each key has in the world, the
+		-- most it has had at once, and the same for all of them together.
+		keyOf = {},
+		defOf = {},
+		alive = {},
+		most = {},
+		aliveTotal = 0,
+		mostTotal = 0,
+		-- What a definition's units have that parking takes away, by the engine's
+		-- definition id, read from the first of them parked.
+		saved = {},
+		parkBudget = math.huge,
+		unparkBudget = math.huge,
+		parks = 0,
+		unparks = 0,
+		-- The animation stage, told of a unit as it is parked.
+		animation = nil,
 	}, Units)
 end
 
@@ -252,14 +341,26 @@ function Units:inView(x, z)
 	return true
 end
 
---- Sets the most units made in a frame and the most removed, each at least one.
--- With one number, both.
-function Units:setBudget(make, remove)
+--- Sets the most units made in a frame and the most removed, each at least one,
+-- and with the pool the most parked and the most unparked. With one number,
+-- all four, and with two the pool's are left as they are.
+function Units:setBudget(make, remove, park, unpark)
 	self.makeBudget = math.max(1, make)
 	self.removeBudget = math.max(1, remove or make)
+	if park or not remove then
+		self.parkBudget = math.max(1, park or make)
+		self.unparkBudget = math.max(1, unpark or park or make)
+	end
 end
 
 function Units:forget(serial, unitID)
+	local key = self.keyOf[serial]
+	if key then
+		self.keyOf[serial] = nil
+		self.defOf[serial] = nil
+		self.alive[key] = self.alive[key] - 1
+		self.aliveTotal = self.aliveTotal - 1
+	end
 	self.unitOf[serial] = nil
 	self.serialOf[unitID] = nil
 	self.maxHealth[serial] = nil
@@ -280,10 +381,150 @@ function Units:destroy(serial, unitID, loud)
 	self:forget(serial, unitID)
 end
 
---- Destroys a unit that is not the track's, quietly.
+--- Notes that a unit of the track, of the track's definition `def`, is in the
+-- world under `key`.
+function Units:counted(serial, key, def)
+	self.keyOf[serial] = key
+	self.defOf[serial] = def
+	local alive = (self.alive[key] or 0) + 1
+	self.alive[key] = alive
+	if alive > (self.most[key] or 0) then
+		self.most[key] = alive
+	end
+	self.aliveTotal = self.aliveTotal + 1
+	if self.aliveTotal > self.mostTotal then
+		self.mostTotal = self.aliveTotal
+	end
+end
+
+--- Whether a unit of the track that is to go can be parked: the pool is on, it
+-- is finished, its key's pool holds fewer than the most of it ever alive at
+-- once, and one more parked unit leaves room under the engine's limit for the
+-- most units the track has had at once.
+function Units:keeps(serial)
+	local key = self.keyOf[serial]
+	return key ~= nil
+		and not self.nanoframe[serial]
+		and (self.poolCount[key] or 0) < (self.most[key] or 0)
+		and self.parkedCount + 1 + self.mostTotal <= self.maxUnits
+end
+
+--- Takes a finished unit of the track out of the world and keeps it. Its key
+-- is its definition and the team the engine has it on now.
+function Units:park(serial, unitID, t)
+	local Spring = self.Spring
+	if self.held[serial] then
+		self:release(serial, unitID)
+	end
+	local key = self.keyOf[serial]
+	local defID = (key - key % KEY) / KEY
+	local team = Spring.GetUnitTeam(unitID) or key % KEY
+	key = defID * KEY + team
+	if self.animation then
+		self.animation:parked(serial, unitID, self.defOf[serial], t)
+	end
+	local saved = self.saved[defID]
+	if not saved then
+		saved = { Spring.GetUnitBlocking(unitID) }
+		for i = 1, #SENSORS do
+			saved[7 + i] = Spring.GetUnitSensorRadius(unitID, SENSORS[i]) or 0
+		end
+		self.saved[defID] = saved
+	end
+	Spring.SetUnitBlocking(unitID, false, false, false, false, false, false, false)
+	for i = 1, #SENSORS do
+		Spring.SetUnitSensorRadius(unitID, SENSORS[i], 0)
+	end
+	Spring.SetUnitNeutral(unitID, true)
+	Spring.SetUnitHealth(unitID, self.stunArg)
+	self.MoveCtrl.SetPosition(unitID, PARK_X, PARK_Y, PARK_Z)
+	self.context.park(unitID, true)
+	self:forget(serial, unitID)
+	self.parkedKey[unitID] = key
+	self.parkedCount = self.parkedCount + 1
+	self.poolCount[key] = (self.poolCount[key] or 0) + 1
+	self.parkedTeam[team] = (self.parkedTeam[team] or 0) + 1
+	local list = self.pools[key]
+	if not list then
+		list = {}
+		self.pools[key] = list
+	end
+	list[#list + 1] = unitID
+	self.parks = self.parks + 1
+end
+
+--- Takes a unit out of the pool, without putting it back in the world.
+function Units:unpool(unitID)
+	local key = self.parkedKey[unitID]
+	self.parkedKey[unitID] = nil
+	self.parkedCount = self.parkedCount - 1
+	self.poolCount[key] = self.poolCount[key] - 1
+	local team = key % KEY
+	self.parkedTeam[team] = self.parkedTeam[team] - 1
+end
+
+--- Whether the pool has a unit for unit `i` of window `w` at `t`: one of its
+-- definition and team, for a unit that is finished at `t`.
+function Units:reusable(w, i, t)
+	local id = self.defID[w.unitDef[i] + 1]
+	if not id or (self.poolCount[id * KEY + self.context.teamOf(w.unitTeam[i])] or 0) == 0 then
+		return false
+	end
+	local status = self.status
+	return w:sampleStatus(i, t, status) and status[2] >= 1
+end
+
+--- A parked unit of `key` put back as it was before it was parked, but still
+-- off the map, or nil when the key's pool has none.
+function Units:unpark(key)
+	local list = self.pools[key]
+	local n = list and #list or 0
+	while n > 0 do
+		local unitID = list[n]
+		list[n] = nil
+		n = n - 1
+		-- An id can be in a list after it left the pool, and the engine can have
+		-- given it to a unit of another key since.
+		if self.parkedKey[unitID] == key then
+			self:unpool(unitID)
+			local Spring = self.Spring
+			local saved = self.saved[(key - key % KEY) / KEY]
+			Spring.SetUnitBlocking(unitID, saved[1], saved[2], saved[3], saved[4], saved[5], saved[6], saved[7])
+			for i = 1, #SENSORS do
+				Spring.SetUnitSensorRadius(unitID, SENSORS[i], saved[7 + i])
+			end
+			Spring.SetUnitNeutral(unitID, false)
+			Spring.SetUnitHealth(unitID, self.unstunArg)
+			self.context.park(unitID, false)
+			self.unparks = self.unparks + 1
+			return unitID
+		end
+	end
+	return nil
+end
+
+--- Destroys a parked unit of `team`, or any parked unit when the team has
+-- none, to make room for a unit the engine refused. True when it did.
+function Units:makeRoom(team)
+	local any = (self.parkedTeam[team] or 0) == 0
+	for unitID, key in next, self.parkedKey do
+		if any or key % KEY == team then
+			self:unpool(unitID)
+			self.destroying = true
+			self.Spring.DestroyUnit(unitID, false, true)
+			self.destroying = false
+			self.context.report("pool room", "the engine refused a unit at its unit limit while parked units held the room, so the player destroys a parked unit for each. Later ones are not logged")
+			return true
+		end
+	end
+	return false
+end
+
+--- Destroys a unit that is not the track's, quietly. A parked unit is the
+-- player's.
 function Units:evict(unitID)
 	local Spring = self.Spring
-	if self.serialOf[unitID] or not Spring.ValidUnitID(unitID) or Spring.GetUnitIsDead(unitID) then
+	if self.serialOf[unitID] or self.parkedKey[unitID] or not Spring.ValidUnitID(unitID) or Spring.GetUnitIsDead(unitID) then
 		return
 	end
 	self.destroying = true
@@ -305,8 +546,14 @@ function Units:created(unitID)
 end
 
 --- The engine destroyed a unit. When it is one of the track's and the stage did
--- not ask, the base game did, and the unit is made again on the next frame.
+-- not ask, the base game did, and the unit is made again on the next frame. A
+-- parked unit that dies leaves the pool.
 function Units:destroyed(unitID)
+	if self.parkedKey[unitID] then
+		self:unpool(unitID)
+		self.context.report("parked died", "the base game destroyed a parked unit (unit " .. unitID .. "), so the pool has one fewer. Later ones are not logged")
+		return
+	end
 	local serial = self.serialOf[unitID]
 	if not serial or self.destroying then
 		return
@@ -476,6 +723,7 @@ end
 -- where another stood earlier.
 function Units:remove(t, clock)
 	self.made, self.removed, self.firsts = 0, 0, 0
+	self.parks, self.unparks = 0, 0
 	self.removing = false
 	local track = self.track
 	local w, why = track:seek(t)
@@ -501,15 +749,33 @@ function Units:remove(t, clock)
 	-- What the ground of a seek used of the frame comes off the share first, and
 	-- the start of a seek uses all of it.
 	local ground = self.share.start and 1 or self.share.ground
-	for serial, unitID in next, self.unitOf do
-		local i = indexOf[serial]
-		if not i or not w:unitExistsAt(i, t) then
-			if ground + self.removed / budget >= 1 then
-				self.removing = true
-				break
+	-- With the pool, what can be parked is parked first, and only then is the
+	-- rest destroyed. The parks use their own share of the frame.
+	if self.pooled and not loud then
+		local parkBudget = self.parkBudget
+		for serial, unitID in next, self.unitOf do
+			local i = indexOf[serial]
+			if (not i or not w:unitExistsAt(i, t)) and self:keeps(serial) then
+				if ground + self.parks / parkBudget >= 1 then
+					self.removing = true
+					break
+				end
+				self:park(serial, unitID, t)
 			end
-			self.removed = self.removed + 1
-			self:destroy(serial, unitID, loud)
+		end
+		ground = ground + self.parks / parkBudget
+	end
+	if not self.removing then
+		for serial, unitID in next, self.unitOf do
+			local i = indexOf[serial]
+			if not i or not w:unitExistsAt(i, t) then
+				if ground + self.removed / budget >= 1 then
+					self.removing = true
+					break
+				end
+				self.removed = self.removed + 1
+				self:destroy(serial, unitID, loud)
+			end
 		end
 	end
 
@@ -542,12 +808,30 @@ function Units:create(w, i, serial, nanoframe, t)
 		return nil
 	end
 	local team = self.context.teamOf(w.unitTeam[i])
+	local key = id * KEY + team
+	if self.pooled and not nanoframe then
+		local reused = self:unpark(key)
+		if reused then
+			local _, maxHealth = Spring.GetUnitHealth(reused)
+			self.unitOf[serial] = reused
+			self.serialOf[reused] = serial
+			self.maxHealth[serial] = maxHealth
+			self.nanoframe[serial] = false
+			self:counted(serial, key, def)
+			return reused
+		end
+	end
 	local at = self.transform
 	self.made = self.made + 1
 	self.creating = true
 	-- The ground is the track's, so the engine is not to flatten it.
 	local unitID = Spring.CreateUnit(id, at[1], at[2], at[3], 0, team, nanoframe, false)
 	self.creating = false
+	if not unitID and self.parkedCount > 0 and self:makeRoom(team) then
+		-- Tried again on the next frame, in the room the parked unit left.
+		self.roomMade = true
+		return nil
+	end
 	if not unitID then
 		-- A dead team and a full one both give nothing and raise nothing.
 		self.failed[serial] = true
@@ -573,6 +857,9 @@ function Units:create(w, i, serial, nanoframe, t)
 	self.serialOf[unitID] = serial
 	self.maxHealth[serial] = maxHealth
 	self.nanoframe[serial] = nanoframe
+	if self.pooled then
+		self:counted(serial, key, def)
+	end
 	return unitID
 end
 
@@ -721,6 +1008,11 @@ function Units:sortPending(w, t)
 		order[k] = nil
 	end
 	self.orderCount = n
+	-- With no view the order is the window's list.
+	if not self.viewed then
+		self.orderStale = false
+		return
+	end
 	if not self.nearer then
 		-- Made once. Two units as far are in the order of the window's list, so
 		-- that the order is the same every time.
@@ -738,28 +1030,38 @@ function Units:sortPending(w, t)
 	self.orderStale = false
 end
 
+--- The share of the frame used so far: the ground's, and what the units stage
+-- has made, removed, parked and unparked, each against its budget.
+function Units:spent(ground)
+	return ground + self.removed / self.removeBudget + self.made / self.makeBudget + self.parks / self.parkBudget + self.unparks / self.unparkBudget
+end
+
 --- Creates every unit of the track at `t` that is not there, as far as the
 -- budget goes, and puts each one where the track has it. A unit the budget
 -- leaves is made on a later frame, where the track has it then.
+--
+-- With the pool, a seek's units are walked in the order below even with no
+-- view, and the units a parked unit can be found for are put first, so that no
+-- unit is created while one that could be unparked waits.
 function Units:place(t, clock)
 	local w = self.window
 	self.unsettled = self.removing
 	if not w then
 		return
 	end
-	local makeBudget, removeBudget, defID = self.makeBudget, self.removeBudget, self.defID
+	local defID = self.defID
 	local unitOf, failed = self.unitOf, self.failed
 	local ground = self.share.start and 1 or self.share.ground
 	local serials = w.unitSerial
 	-- While a seek's units arrive and the viewer's place is known, a unit to be
 	-- made waits for the walk in the view's order below.
-	local sorted = self.arriving and self.viewed
+	local sorted = self.arriving and (self.viewed or self.pooled)
 	local waiting = 0
 	for i = 1, w.unitCount do
 		if w:unitExistsAt(i, t) then
 			local serial = serials[i]
 			local unitID = unitOf[serial]
-			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or ground + self.removed / removeBudget + self.made / makeBudget >= 1) then
+			if not unitID and not failed[serial] and defID[w.unitDef[i] + 1] and (sorted or self.removing or self:spent(ground) >= 1) then
 				-- Nothing is made while a removal is left, and what the frame has
 				-- removed uses up its share of the time. A definition the game lacks
 				-- costs nothing, so it is not held back.
@@ -775,23 +1077,47 @@ function Units:place(t, clock)
 			self:sortPending(w, t)
 		end
 		local order = self.order
-		for k = 1, self.orderCount do
-			if ground + self.removed / removeBudget + self.made / makeBudget >= 1 then
-				break
+		-- Whether a unit that could be unparked waits for a later frame.
+		local reusing = false
+		if self.pooled then
+			for k = 1, self.orderCount do
+				local i = order[k]
+				local serial = serials[i]
+				if not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) and self:reusable(w, i, t) then
+					if self:spent(ground) >= 1 then
+						reusing = true
+						break
+					end
+					self:put(w, i, serial, nil, t, clock)
+					waiting = waiting - 1
+				end
 			end
-			local i = order[k]
-			local serial = serials[i]
-			if not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) then
-				self:put(w, i, serial, nil, t, clock)
-				waiting = waiting - 1
+		end
+		if not reusing then
+			for k = 1, self.orderCount do
+				if self:spent(ground) >= 1 then
+					break
+				end
+				local i = order[k]
+				local serial = serials[i]
+				if not unitOf[serial] and not failed[serial] and w:unitExistsAt(i, t) then
+					self:put(w, i, serial, nil, t, clock)
+					waiting = waiting - 1
+				end
 			end
 		end
 		-- A unit that play brought in since the order was worked out is not in
 		-- it, so the order is worked out again for the next frame.
-		if waiting > 0 and ground + self.removed / removeBudget + self.made / makeBudget < 1 then
+		if waiting > 0 and self:spent(ground) < 1 then
 			self.orderStale = true
 		end
 		self.unsettled = waiting > 0
+	end
+	-- A unit the engine refused while parked units held the room is tried again
+	-- in the room one of them left.
+	if self.roomMade then
+		self.roomMade = false
+		self.unsettled = true
 	end
 	if not self.unsettled then
 		self.arriving = false

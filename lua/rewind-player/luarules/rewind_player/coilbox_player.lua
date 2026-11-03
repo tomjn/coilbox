@@ -78,7 +78,9 @@ M.PARAMS = {
 
 --- The Lua message that sets the most units made in a frame and the most
 -- removed, as two whole numbers after the text. The gadget's unsynced half sends
--- it, for example `coilbox_rewind_budget:40 30`. `coilbox_rewind_budget:none`
+-- it, for example `coilbox_rewind_budget:40 30`. A third number is the most
+-- corners of the ground set in a frame, and with the unit pool (issue #5029) a
+-- fourth and a fifth are the most units parked and unparked. `coilbox_rewind_budget:none`
 -- says that no budget will come, because the unsynced half cannot time a frame,
 -- and takes the limit off.
 M.BUDGET = "coilbox_rewind_budget:"
@@ -167,6 +169,9 @@ end
 -- stage calls with a builder's id, its work's command, target and power, where
 -- the work is, the frame of the track and whether a seek brought it there,
 -- when its work changes (issue #4029), and without it nothing draws the stream.
+-- `options.park` is a function the units stage calls with a unit's id and true
+-- when it parks the unit and false when it takes it back (issue #5029), for the
+-- unsynced half to hide it, and without it there is no unit pool.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -261,6 +266,7 @@ function M.new(track, options)
 		arrive = options.arrive,
 		scriptCallIns = options.scriptCallIns,
 		work = options.work,
+		park = options.park,
 	}
 	-- A stage whose calls the engine lacks is the one that does nothing.
 	local terrain = on.terrain and Terrain.new(context) or OFF
@@ -277,6 +283,8 @@ function M.new(track, options)
 	-- Scripts are told what their units do, and builders' work is published.
 	-- Each of its rows switches off a part of it, so the stage is always made.
 	local animation = Animation.new(context, units, aim ~= OFF and aim or nil, featureStage ~= OFF and featureStage or nil)
+	-- A unit the pool parks is told it stops (issue #5029).
+	units.animation = animation
 	local projectiles = on.shots and Projectiles.new(context, units, Clock, terrain) or OFF
 	-- A track from before recorder version 4 has no team's resources in it.
 	local resources = OFF
@@ -451,9 +459,14 @@ function Player:settled()
 end
 
 --- How many units the last frame made, how many it removed, and how many
--- corners of the ground it set for a seek.
+-- corners of the ground it set for a seek. With the unit pool on, how many it
+-- parked and how many it unparked as well (issue #5029).
 function Player:worked()
-	return self.units.made, self.units.removed, self.terrain.done or 0
+	local units = self.units
+	if units.pooled then
+		return units.made, units.removed, self.terrain.done or 0, units.parks, units.unparks
+	end
+	return units.made, units.removed, self.terrain.done or 0
 end
 
 --- The budgets the last frame worked to: the most units it could make and
@@ -461,7 +474,11 @@ end
 -- reaches the synced half some frames after it is sent, so the unsynced half
 -- is told which one a frame had (issue #4016).
 function Player:budgets()
-	return self.units.makeBudget, self.units.removeBudget, self.terrain.budget or 0
+	local units = self.units
+	if units.pooled then
+		return units.makeBudget, units.removeBudget, self.terrain.budget or 0, units.parkBudget, units.unparkBudget
+	end
+	return units.makeBudget, units.removeBudget, self.terrain.budget or 0
 end
 
 --- How many of the units the last frame made were the first of their
@@ -490,18 +507,23 @@ function Player:message(text)
 		end
 		local rest = text:sub(#M.BUDGET + 1)
 		local make, remove, ground = rest:match("^(%S+) (%S+)$")
+		local park, unpark
 		if not make then
 			make, remove, ground = rest:match("^(%S+) (%S+) (%S+)$")
+			if not make then
+				make, remove, ground, park, unpark = rest:match("^(%S+) (%S+) (%S+) (%S+) (%S+)$")
+				park, unpark = whole(park) or false, whole(unpark) or false
+			end
 			ground = whole(ground) or false
 		end
 		make, remove = whole(make), whole(remove)
-		if make and remove and ground ~= false then
-			self.units:setBudget(make, remove)
+		if make and remove and ground ~= false and park ~= false and unpark ~= false then
+			self.units:setBudget(make, remove, park, unpark)
 			if ground and self.terrain.setBudget then
 				self.terrain:setBudget(ground)
 			end
 		else
-			self.log("the message \"" .. text .. "\" was refused: the budget is two or three whole numbers of 1 or more, the most units made and the most removed in a frame, and the most corners of the ground set in a frame")
+			self.log("the message \"" .. text .. "\" was refused: the budget is two, three or five whole numbers of 1 or more, the most units made and the most removed in a frame, the most corners of the ground set in a frame, and the most units parked and unparked in a frame")
 		end
 		return true
 	end
