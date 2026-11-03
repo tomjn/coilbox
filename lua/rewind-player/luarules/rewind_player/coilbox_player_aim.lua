@@ -42,7 +42,12 @@
 -- A unit's walk can turn a piece the track has poses for (issue #3797). The
 -- animation stage finds those turns and moves when a unit of a definition is
 -- first told that it moves, and writes them into `free`. This stage leaves
--- them to the unit's own script, and sets the rest of the piece's pose.
+-- them to the unit's own script only while the script has been told its unit
+-- moves and the unit has no target and no work (issue #5023), and sets the rest
+-- of the piece's pose. A unit that stands, is paused, fires or builds has the
+-- whole of the track's pose, since a walk and an aim can turn one piece on one
+-- axis, as Beyond All Reason's `armcom` does, and the track has what the match
+-- showed.
 
 local M = {}
 
@@ -88,6 +93,10 @@ function M.new(context, units)
 		-- six flags, true for a turn about x, y or z and a move along x, y or z
 		-- that is the script's. The animation stage fills it in.
 		free = {},
+		-- What the animation stage last told each unit's script, by serial number:
+		-- 0 or nothing for stopped. The animation stage gives its table.
+		told = {},
+		target = { 0, 0, 0, 0, 0, 0 },
 		-- The flags of the unit that `poseUnit` is to pose, or nil for none.
 		frees = nil,
 		-- What `poseUnit` is to pose: the unit's piece numbers and its pose tracks.
@@ -187,6 +196,18 @@ local function learn(self, serial, unitID, def)
 	self.pieces[serial] = numbers
 end
 
+--- Whether unit `i` has a target or builder work at time `t`.
+local function engaged(self, w, i, t)
+	local sample = self.target
+	local first = w.unitTargetFirst[i]
+	for track = first, first + w.unitTargetCount[i] - 1 do
+		if w:sampleTarget(track, t, sample) and sample[1] ~= 0 then
+			return true
+		end
+	end
+	return false
+end
+
 --- Sets every posed piece of every unit of the track to its pose at the time
 -- shown.
 local function poseAll(self)
@@ -196,12 +217,16 @@ local function poseAll(self)
 	end
 	local unitOf, indexOf, known = units.unitOf, units.indexOf, self.unitID
 	local callAsUnit, poseUnit, t = self.callAsUnit, self.poseUnit, self.t
-	local firsts, counts, defs, free = w.unitPoseFirst, w.unitPoseCount, w.unitDef, self.free
+	local firsts, counts, defs, free, told = w.unitPoseFirst, w.unitPoseCount, w.unitDef, self.free, self.told
 	for serial, numbers in next, self.pieces do
 		local unitID, i = unitOf[serial], indexOf[serial]
 		if unitID and i and unitID == known[serial] and w:unitExistsAt(i, t) then
 			self.numbers, self.first, self.count = numbers, firsts[i], counts[i]
-			self.frees = free[defs[i] + 1]
+			local frees = free[defs[i] + 1]
+			if frees and ((told[serial] or 0) == 0 or engaged(self, w, i, t)) then
+				frees = nil
+			end
+			self.frees = frees
 			callAsUnit(unitID, poseUnit)
 		end
 	end

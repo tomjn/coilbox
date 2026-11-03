@@ -3771,6 +3771,69 @@ end
         assert_eq!(said.len(), wanted.len(), "{said:#?}");
     }
 
+    /// A unit's aim, before and after a unit of its kind has walked, against a
+    /// real engine (issue #5023). The driver's plan finds frames on which a unit
+    /// of each definition named stands with a weapon that has a target, and
+    /// reads its posed pieces there. It makes one of each walk and reads them
+    /// again, and last plays 90 frames on from each frame, reading on each. Each
+    /// piece has the track's pose, unless the unit walks with no target and no
+    /// work.
+    ///
+    /// Give it a replay of a whole match in `COILBOX_ANALYSIS_REPLAY`, with the
+    /// variables the tests above read, and the definitions in
+    /// `COILBOX_PLAYBACK_WALK_AIM`, with commas between them.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay of a whole match on them"]
+    fn a_walk_leaves_a_units_aim_alone_in_the_engine() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        if let Some(track) = var("COILBOX_PLAYBACK_TRACK") {
+            // The recorded track is a hard link to the stored one.
+            let at = prepared.game_dir.join("coilbox_rewind/track.cbtrack");
+            std::fs::remove_file(&at).unwrap();
+            std::fs::copy(track, &at).unwrap();
+        }
+        let names = var("COILBOX_PLAYBACK_WALK_AIM").expect("COILBOX_PLAYBACK_WALK_AIM");
+        let quoted: Vec<String> = names
+            .split(',')
+            .map(|n| format!("{:?}", n.trim()))
+            .collect();
+        let output = driven_with(
+            &prepared,
+            "driver_walk_aim.lua",
+            &format!(
+                "return {{ names = {{ {} }}, samples = 6 }}\n",
+                quoted.join(", ")
+            ),
+        );
+        for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
+            eprintln!("{l}");
+        }
+        let driver = driver_lines(&output);
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+        let errors = lua_errors(&output);
+        assert!(errors.is_empty(), "{errors:#?}");
+        let looks: Vec<&&str> = driver
+            .iter()
+            .filter(|l| l.starts_with("walk_aim ") && !l.starts_with("walk_aim frames "))
+            .collect();
+        for name in names.split(',') {
+            assert!(
+                looks.iter().any(|l| l.starts_with("walk_aim after ")
+                    && l.contains(&format!("def={} ", name.trim()))
+                    && (l.contains("state=standing_aiming")
+                        || l.contains("state=standing_building"))),
+                "no look at a {name} standing at its work: {driver:?}"
+            );
+        }
+        // Only a unit that walks with nothing to do leaves its walk to its script.
+        for l in looks.iter().filter(|l| !l.contains("state=walking_idle")) {
+            assert_eq!(field(l, "worst"), "none", "{l}");
+        }
+    }
+
     /// The gadget that hears what unit scripts are told is the driver, which
     /// has the plan below. This is a stand-in for the animation stage that does
     /// nothing, for a run that is to show the looks can tell the stage is off.

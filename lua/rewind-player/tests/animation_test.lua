@@ -793,8 +793,42 @@ do
 	player:message("coilbox_rewind:seek 300")
 	run(3)
 	rx = world.pieceOf(unit, "rleg")
-	t.same("it stays the script's when the unit stands again", rx, 1.25)
+	t.near("a unit that stands again has the track's turn", rx, TURN / 8, 1e-9)
 	t.same("the line is logged once for the definition", said(world, "the walk of walker turns rleg"), 1)
+
+	-- Paused in a walk, a unit is told it stopped and has the track's pose. With
+	-- a target or work, it has it while it walks too, since a walk and an aim can
+	-- turn one piece on one axis.
+	local engaged = legged()
+	engaged.work = function(frame)
+		if frame >= 160 then
+			return 129, 0, 255, 0, 0, 0
+		end
+		return 0
+	end
+	world, player, run = setup({ last = 600, posedPieces = POSED, units = { engaged } })
+	world.economy = function()
+		for _, id in ipairs(world.Spring.GetAllUnits()) do
+			world.scriptTurn(world.units[id], "rleg", 1.25, 1.25, 0)
+		end
+	end
+	player:message("coilbox_rewind:seek 120")
+	run(5)
+	unit = world.unitNamed("walker")
+	rx = world.pieceOf(unit, "rleg")
+	t.same("a unit that walks with no work leaves its walk's turn to its script", rx, 1.25)
+	player:message("coilbox_rewind:pause")
+	run(2)
+	rx = world.pieceOf(unit, "rleg")
+	t.near("paused, it has the track's turn", rx, TURN / 8, 1e-9)
+	player:message("coilbox_rewind:play 1")
+	run(5)
+	rx = world.pieceOf(unit, "rleg")
+	t.same("played on, its walk's turn is its script's again", rx, 1.25)
+	player:message("coilbox_rewind:seek 165")
+	run(3)
+	rx = world.pieceOf(unit, "rleg")
+	t.near("walking with work, it has the track's turn", rx, TURN / 8, 1e-9)
 
 	-- A turn that was already running when the unit was told is not the walk's.
 	world, player, run = setup({ last = 600, posedPieces = POSED, units = { legged() } })
