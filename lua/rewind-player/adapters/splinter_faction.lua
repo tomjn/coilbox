@@ -4,19 +4,25 @@
 -- something to do that means nothing. Everything that tells a viewer about the
 -- match stays: the resource bars, the tooltip and its unit descriptions, the
 -- minimap, the players list, the menu, health bars and the game's own effects.
--- The menu keeps its Resign and Sharing buttons, because it is one widget with
--- Settings and Quit in it. Neither does anything for a spectator.
+-- The menu stays, because it is one widget with Settings and Quit in it. It
+-- hides its Resign button from a spectator, and its Sharing button once the
+-- share menu is gone.
 --
--- gui_static_buildordermenu.lua stays too, though it shows a spectator the
--- build and order buttons of a selected unit. It is what hides the engine's own
--- command menu, which takes its place when it is gone, and
--- game_buildHotkeys.lua raises without it.
+-- The build menu stays too, though it shows a spectator the build and order
+-- buttons of a selected unit. It is what hides the engine's own command menu,
+-- which takes its place when it is gone.
 --
--- The file names were read from the archives of 0.1.88 and 0.1.89 and from the
--- game's repository at the commit of 24 August 2026, which declares no version.
--- All three have every file below, so there is no version range. A range would
--- also leave a game folder under development, which declares `$VERSION`, with
--- no adapter at all.
+-- The game rebuilds its interface under new file names, and moves a widget it
+-- has stopped using to LuaUI/Widgets/disabled/, where its handler does not look.
+-- So each widget below is named once for each set of names a release has used:
+-- gui_static_ up to 0.1.89, gui_rml_ in 0.1.93 and gui_bastion_ in 0.1.95 and
+-- 0.1.96. A name a release does not have costs nothing: it is one more file that
+-- returns false, and its handler treats that as a widget that asked not to load.
+-- So there is no version range, which would also leave a game folder under
+-- development, which declares `$VERSION`, with no adapter at all.
+--
+-- When a new release arrives, run the ignored test that checks this list against
+-- the installed archives, splinter_factions_adapter_names_what_each_release_loads.
 --
 -- lua/rewind-player/README.md has what each of these did to a playback.
 
@@ -52,12 +58,20 @@ return {
 		-- The faction picker and the start position picker of a match's first
 		-- seconds, with their ready buttons.
 		"gui_static_factionchooser.lua",
+		"gui_rml_factionchooser.lua",
+		"gui_bastion_factionchooser.lua",
 		"gui_static_placement.lua",
+		"gui_rml_placement.lua",
+		"gui_bastion_placement.lua",
 		-- Gives units and resources to another team.
 		"gui_static_sharemenu.lua",
-		-- A strip of buttons for the selection at the bottom centre of the view,
-		-- which is where the timeline is, so the two draw over each other.
+		"gui_rml_share.lua",
+		"gui_bastion_share.lua",
+		-- A strip for the selection at the bottom centre of the view, which is
+		-- where the timeline is, so the two draw over each other.
 		"gui_static_selected_units_buttons.lua",
+		"gui_rml_selection.lua",
+		"gui_bastion_selection.lua",
 		-- Writes the time left over a unit under construction, worked out from
 		-- how fast its build progress moved between the frames it watched. A
 		-- playback simulates nothing: its build progress moves as the track
@@ -67,8 +81,9 @@ return {
 	},
 
 	-- The numbers on the game's resource bar that are the game's own and not the
-	-- engine's (issue #3982). gui_static_resourcebar.lua reads all three as team
-	-- rules parameters. unit_supply_requirement.lua writes the supply a team
+	-- engine's (issue #3982). The game's resource bar reads all three as team
+	-- rules parameters. It was gui_static_resourcebar.lua up to 0.1.89, and is
+	-- gui_bastion_resourcebar.lua in 0.1.95 and 0.1.96. unit_supply_requirement.lua writes the supply a team
 	-- uses and has, and game_researchpoints_ledger.lua its research points. Both
 	-- gadgets stay, since the game's build menu asks them what a team may
 	-- build. In a playback they count the units the player has placed, which is
@@ -90,5 +105,10 @@ return {
 	-- match, and the weather widget works the sun, the rain and the fog out from
 	-- it and the seed. Every other widget keeps the engine's count, which only
 	-- goes up, since a playback's time jumps and runs backward.
-	matchTimeWidgets = { "gui_static_playerslist.lua", "gfx_timecyclesweathereffects_weather.lua" },
+	matchTimeWidgets = {
+		"gui_static_playerslist.lua",
+		"gui_rml_playerslist.lua",
+		"gui_bastion_playerslist.lua",
+		"gfx_timecyclesweathereffects_weather.lua",
+	},
 }

@@ -2561,7 +2561,7 @@ end
         }
         assert_eq!(count(&plain, kill), 1, "the base game never asked");
         assert!(
-            plain.contains("gui_static_resourcebar.lua=1"),
+            plain.contains("gui_build_eta.lua=1"),
             "the widget the adapter names did not load without it"
         );
         let units = lines_with(&plain, &["ADAPTER_PROBE units"])[0].to_string();
@@ -2577,7 +2577,7 @@ end
             [
                 "luarules/gadgets/game_end.lua",
                 "luarules/gadgets/game_team_com_ends.lua",
-                "luaui/widgets/gui_static_resourcebar.lua"
+                "luaui/widgets/gui_build_eta.lua"
             ]
         );
         let adapted = probed(&prepared, &|_| {});
@@ -2593,10 +2593,7 @@ end
             assert_eq!(count(&adapted, gadget), 0, "{gadget} loaded");
         }
         assert_eq!(count(&adapted, kill), 0, "the base game still asked");
-        assert!(
-            adapted.contains("gui_static_resourcebar.lua=0"),
-            "the widget loaded"
-        );
+        assert!(adapted.contains("gui_build_eta.lua=0"), "the widget loaded");
         let units = lines_with(&adapted, &["ADAPTER_PROBE units"])[0].to_string();
         assert!(!units.contains("lozscorpion"), "{units}");
         assert!(units.contains("fedak="), "{units}");
@@ -2604,7 +2601,7 @@ end
         let first = lines_with(&adapted, &["ADAPTER_FIXTURE unitPlaced first"])[0].to_string();
         assert!(!first.contains("def=lozscorpion"), "{first}");
         assert_eq!(count(&adapted, "ADAPTER_FIXTURE afterFrame first"), 1);
-        for name in ["game_end", "game_team_com_ends", "gui_static_resourcebar"] {
+        for name in ["game_end", "game_team_com_ends", "gui_build_eta"] {
             let errors: Vec<&str> = lines_with(&adapted, &[name])
                 .into_iter()
                 .filter(|l| l.to_lowercase().contains("error") || l.contains("Failed"))
@@ -2631,7 +2628,7 @@ end
             );
         }
         assert!(
-            emptied.contains("Failed to load: gui_static_resourcebar.lua  (no GetInfo() call)"),
+            emptied.contains("Failed to load: gui_build_eta.lua  (no GetInfo() call)"),
             "an empty widget was not an error"
         );
     }
@@ -2907,7 +2904,7 @@ end
         assert!(
             count(
                 &adapted,
-                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 6 gadgets and 5 widgets"
+                "COILBOX_REWIND_PLAYER adapter loaded: Splinter Faction. 6 gadgets and 13 widgets"
             ) >= 1,
             "{adapted}"
         );
