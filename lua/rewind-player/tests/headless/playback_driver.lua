@@ -22,6 +22,8 @@ end
 
 local SEND = "rewind_driver_send"
 local REPORT = "rewind_driver_report"
+-- The seeks plan's marks round each seek, for the work of that seek alone.
+local SEEK_MARK = "rewind_driver_seek_mark"
 -- What the player's synced half sends its unsynced half around a frame's work.
 -- The driver listens to the same two calls to say how long the work took.
 local WORK = "coilbox_rewind_work"
@@ -37,11 +39,17 @@ if not gadgetHandler:IsSyncedCode() then
 	local micros = Spring.GetTimerMicros ~= nil
 	local clock = micros and Spring.GetTimerMicros or Spring.GetTimer
 
+	-- The frames, the summed work and the slowest frame since the last seek mark.
+	local seekFrames, seekTotal, seekWorst = 0, 0, 0
 	local function close()
 		if currentFrame >= 0 then
 			frames, total = frames + 1, total + current
 			if current > worst then
 				worst, worstFrame = current, currentFrame
+			end
+			seekFrames, seekTotal = seekFrames + 1, seekTotal + current
+			if current > seekWorst then
+				seekWorst = current
 			end
 		end
 		current, currentFrame = 0, -1
@@ -50,6 +58,13 @@ if not gadgetHandler:IsSyncedCode() then
 	function gadget:RecvFromSynced(name, a, b)
 		if name == SEND then
 			Spring.SendLuaRulesMsg(a)
+			return true
+		elseif name == SEEK_MARK then
+			close()
+			if b then
+				Spring.Echo(string.format("REWIND_DRIVER seek_work n=%d frames=%d sum_ms=%.1f worst_ms=%.2f", b, seekFrames, seekTotal, seekWorst))
+			end
+			seekFrames, seekTotal, seekWorst = 0, 0, 0
 			return true
 		elseif name == WORK then
 			if a == 0 then
@@ -100,6 +115,10 @@ local PARAM = "coilbox_rewind_"
 local SETTLE = 3
 -- Frames a message is waited for before the step is called lost.
 local PATIENCE = 300
+--- Frames the world is waited for to settle after a seek before it is called
+-- lost. A seek of 2,000 units with nothing to reuse took more than 300 frames
+-- in a headless engine (issue #5029), which is slow and not lost.
+local SETTLE_PATIENCE = 1800
 -- The distance said for a unit or a shot of the track that the engine does not
 -- have. It is a number and not an infinity, because the string.format of the
 -- engine's Lua raises for one, which left a run with no report at all.
@@ -374,14 +393,33 @@ local function seekTo(frame)
 	push("wait", SETTLE)
 end
 
+--- The units in the world. A unit the player's pool holds (issue #5029) is in
+-- the engine and not in the playback, so it is left out.
 local function liveUnits()
 	local list = {}
+	local parked = GG.coilboxRewindParked
 	for _, unitID in ipairs(Spring.GetAllUnits()) do
-		if not Spring.GetUnitIsDead(unitID) then
+		if not Spring.GetUnitIsDead(unitID) and not (parked and parked[unitID]) then
 			list[#list + 1] = unitID
 		end
 	end
 	return list
+end
+
+--- How many units the player's pool holds, and how many of those are not where
+-- a parked unit stands, off the map.
+local function parkedUnits()
+	local count, away = 0, 0
+	for unitID in pairs(GG.coilboxRewindParked or {}) do
+		if Spring.ValidUnitID(unitID) and not Spring.GetUnitIsDead(unitID) then
+			count = count + 1
+			local x, y, z = Spring.GetUnitPosition(unitID)
+			if x ~= -2000 or y ~= -5000 or z ~= -2000 then
+				away = away + 1
+			end
+		end
+	end
+	return count, away
 end
 
 --- The front and up a track's quaternion stands for.
@@ -450,7 +488,7 @@ local function measure(label, frame)
 	end
 	say(
 		string.format(
-			"%s frame=%s shown=%s track_units=%d engine_units=%d track_features=%d engine_features=%d place=%.4f turn=%.5f health=%.5f build=%.5f health_over=%.8f build_over=%.8f wrong_build_state=%d",
+			"%s frame=%s shown=%s track_units=%d engine_units=%d track_features=%d engine_features=%d place=%.4f turn=%.5f health=%.5f build=%.5f health_over=%.8f build_over=%.8f wrong_build_state=%d parked=%d parked_away=%d",
 			label,
 			tostring(frame),
 			tostring(param("frame")),
@@ -464,7 +502,8 @@ local function measure(label, frame)
 			worstBuild,
 			overHealth,
 			overBuild,
-			wrongState
+			wrongState,
+			parkedUnits()
 		)
 	)
 end
@@ -1387,11 +1426,13 @@ local function seeksPlan()
 		local sent
 		push("run", function()
 			sent = Spring.GetGameFrame()
+			SendToUnsynced(SEEK_MARK, "begin")
 		end)
 		send("seek " .. frame)
 		push("await", frame)
 		push("settled")
 		push("run", function()
+			SendToUnsynced(SEEK_MARK, "end", n)
 			say(string.format("seek_settle n=%d to=%d frames=%d settled=%s", n, frame, Spring.GetGameFrame() - sent, tostring((param("settled")))))
 		end)
 		push("wait", SETTLE)
@@ -2691,7 +2732,7 @@ function gadget:GameFrame()
 			-- A player that publishes no such parameter has nothing to wait for.
 			if param("settled") == 0 then
 				item.waited = item.waited + 1
-				if item.waited < PATIENCE then
+				if item.waited < SETTLE_PATIENCE then
 					return
 				end
 				say("lost settle")

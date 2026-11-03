@@ -3510,13 +3510,35 @@ end
     /// with more units than any replay has: `crates/coilbox-track/tests/crowd.rs`
     /// makes one from the recorded track. A machine doing other work can fail
     /// this on a slow frame that is not the player's.
+    ///
+    /// `COILBOX_PLAYBACK_UNIT_POOL` set to `on` or `off` overrides what the
+    /// game's shipped adapter says about the unit pool (issue #5029), so a run
+    /// can show what the pool changes. A parked unit is never counted among
+    /// the engine's units, and every parked unit has to stand off the map.
     #[test]
     #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
     fn a_seek_across_a_whole_match_settles_in_frames_that_fit() {
         let Some(prepared) = prepared(false) else {
             return;
         };
-        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        let pooled: Vec<(&str, String)> = REWIND_PLAYER_ADAPTERS
+            .iter()
+            .map(|(name, source)| match var("COILBOX_PLAYBACK_UNIT_POOL").as_deref() {
+                Some(on @ ("on" | "off")) => (
+                    *name,
+                    format!(
+                        "local adapter = (function()\n{source}\nend)()\n\
+                         if type(adapter) == 'table' then adapter.unitPool = {} end\n\
+                         return adapter\n",
+                        on == "on"
+                    ),
+                ),
+                Some(other) => panic!("COILBOX_PLAYBACK_UNIT_POOL is on or off, not {other}"),
+                None => (*name, source.to_string()),
+            })
+            .collect();
+        let adapters: Vec<(&str, &str)> = pooled.iter().map(|(n, s)| (*n, s.as_str())).collect();
+        prepared.rewrite(&adapters);
         if let Some(track) = var("COILBOX_PLAYBACK_TRACK") {
             // The recorded track is a hard link to the stored one.
             let at = prepared.game_dir.join("coilbox_rewind/track.cbtrack");
@@ -3559,6 +3581,7 @@ end
             );
             assert!(number(l, "place") <= 0.01, "{l}");
             assert_eq!(number(l, "wrong_build_state"), 0.0, "{l}");
+            assert_eq!(field(l, "parked_away"), "0", "{l}");
         }
         let slow = lines_with(&output, &["slow frame:"]);
         assert!(slow.is_empty(), "{slow:#?}");
