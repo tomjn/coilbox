@@ -1491,6 +1491,14 @@ A list of names costs nothing on a release without one of them. Its shadow is on
 
 A rename gives no sign in a playback, so the ignored test `splinter_factions_adapter_names_what_each_release_loads` reads every `SplinterFaction_*.sdz` in `~/.spring/games`. Each job has to reach a widget that the release loads from `LuaUI/Widgets/`, and each gadget the adapter names has to be there. Run it when a release arrives. It takes no engine.
 
+What was seen in a window on engine `2026.09.01`, on 3 November 2026, with one track from a replay of an 8:21 match on 0.1.95, paused at three points:
+
+| Release | Names switched off | What it showed |
+| --- | --- | --- |
+| 0.1.96 | only the `gui_static_` names | the faction picker over the whole playback, the selection's card over the timeline, and a players list reading 0:13 with the timeline at 4:10 |
+| 0.1.96 | every name | no picker, no card, and the players list and the timeline both at 4:10 and at 7:31. The resource bars, tooltip and minimap showed the match, and the sky changed between the two |
+| 0.1.93 | every name | the same at 4:10, and a log with no error from the adapter |
+
 What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and what the adapter does about it:
 
 | What went wrong | Where it came from | With the adapter |

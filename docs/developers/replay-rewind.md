@@ -108,8 +108,9 @@ return {
 	},
 
 	-- The numbers on the game's resource bar that are the game's own and not the
-	-- engine's (issue #3982). gui_static_resourcebar.lua reads all three as team
-	-- rules parameters. unit_supply_requirement.lua writes the supply a team
+	-- engine's (issue #3982). The game's resource bar reads all three as team
+	-- rules parameters. It was gui_static_resourcebar.lua up to 0.1.89, and is
+	-- gui_bastion_resourcebar.lua in 0.1.95 and 0.1.96. unit_supply_requirement.lua writes the supply a team
 	-- uses and has, and game_researchpoints_ledger.lua its research points. Both
 	-- gadgets stay, since the game's build menu asks them what a team may
 	-- build. In a playback they count the units the player has placed, which is
