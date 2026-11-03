@@ -111,4 +111,23 @@ return {
 		"gui_bastion_playerslist.lua",
 		"gfx_timecyclesweathereffects_weather.lua",
 	},
+
+	hooks = {
+		-- How far from the left of the view the game's tooltip panel reaches (issue
+		-- #5026). It stays on in a playback, and stands over the bottom left, where
+		-- the timeline's left end would be at most window sizes. The game places it
+		-- beside its order menu and scales it with the window, and its layout widget
+		-- keeps the place it has, so this asks that widget and does not work the place
+		-- out. All three releases above have the widget and the panel's name for it.
+		-- The panel's rectangle is there whether or not it shows, so the timeline
+		-- does not move each time a unit is selected.
+		timelineClearance = function()
+			local layout = WG and WG.StaticLayout
+			if not (layout and layout.GetRect) then
+				return 0
+			end
+			local _, _, right = layout.GetRect("tooltip")
+			return right or 0
+		end,
+	},
 }

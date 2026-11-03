@@ -132,6 +132,11 @@ local NOTE_H = 28
 local HELP_W = 340
 local HELP_ROW = 26
 local RESET_H = 30
+-- The least width the panel is made, when the game's panels leave it little
+-- room: the buttons and speed, which are 244 across with their padding, a time of
+-- an hour or more at 100 or so, the help button and its padding. If that does
+-- not fit, the panel stays centred and the game's panels are drawn under it.
+local MIN_PANEL_W = 400
 -- The width of a mark, and so of a column of the bar. Marks closer together
 -- than this are one mark, as on the replay page.
 local COLUMN = 8
@@ -247,6 +252,9 @@ function M.new(engine)
 		GL = engine.GL,
 		-- The widgets' shared table, where the ghosts widget offers its switch.
 		WG = engine.WG,
+		-- () how far from the left of the view the game's own panels reach, in
+		-- pixels, or nil for a game that has none (issue #5026).
+		keepClear = engine.keepClear,
 		-- Whether the player is there, as of the last read.
 		present = false,
 		keys = defaultKeys(),
@@ -405,11 +413,25 @@ local function stack(self, height, gap)
 	return max(0, self.vsy - height)
 end
 
+--- How far from the left of the view the game's own panels reach along the
+-- bottom, in pixels, as the game says it now. 0 when the game has none, says
+-- nothing or says something that is not a distance.
+function Timeline:reach()
+	local ask = self.keepClear
+	local x = ask and ask()
+	if type(x) ~= "number" or not (x > 0) then
+		return 0
+	end
+	return math.ceil(x)
+end
+
 --- Works out where everything is. Called when the view changes size, when the
--- panel is moved and when the note or the key list comes or goes, and never by
--- a draw that changes none of those.
-function Timeline:layout()
+-- panel is moved, when the note or the key list comes or goes and when the
+-- game's panels move, and never by a draw that changes none of those. `reach`
+-- is `Timeline:reach` if the caller has it already.
+function Timeline:layout(reach)
 	local vsx, vsy, rects = self.vsx, self.vsy, self.rects
+	self.clear = reach or self:reach()
 	local s = max(vsy / BASE_HEIGHT, MIN_SCALE)
 	self.scale = s
 	local function px(value)
@@ -429,7 +451,19 @@ function Timeline:layout()
 		w = w - 1
 	end
 	local h = pad + px(BAR_H) + px(ROW_GAP) + px(BUTTON_H) + pad
-	local x1 = self.x and floor(self.x * vsx - w / 2 + 0.5) or (vsx - w) / 2
+	local x1
+	if self.x then
+		x1 = floor(self.x * vsx - w / 2 + 0.5)
+	else
+		x1 = (vsx - w) / 2
+		-- Centred is where it goes, unless that is over the game's panels (issue
+		-- #5026). Then it moves right of them, and gives up width if it must.
+		local from = self.clear + margin
+		if self.clear > 0 and x1 < from and vsx - margin - from >= px(MIN_PANEL_W) then
+			x1 = from
+			w = min(w, vsx - margin - from)
+		end
+	end
 	local y1 = self.y and floor(self.y * vsy + 0.5) or margin
 	x1 = max(0, min(x1, vsx - w))
 	y1 = max(0, min(y1, vsy - h))
@@ -967,6 +1001,10 @@ end
 function Timeline:draw()
 	if not self.scale then
 		return
+	end
+	local reach = self:reach()
+	if reach ~= self.clear then
+		self:layout(reach)
 	end
 	local present = self:read()
 	if not present and not self.note then

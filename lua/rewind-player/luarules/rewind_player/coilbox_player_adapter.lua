@@ -46,6 +46,11 @@ M.HOOKS = {
 	-- shape helper keeps a shape until told to drop it uses it to drop the ones
 	-- a pass no longer asked for.
 	queuedBuildingsDrawn = true,
+	-- () for the timeline widget, not the player (issue #5026). How far from the
+	-- left of the view, in pixels, the game's own panels reach along the bottom,
+	-- which the timeline keeps right of. The widget reads the adapter file itself,
+	-- in unsynced Lua, where `WG` is.
+	timelineClearance = true,
 }
 
 local LISTS = { "gadgets", "widgets", "units", "features", "teamParams", "gameParams", "matchTimeWidgets" }

@@ -47,6 +47,42 @@ end
 -- Initialize.
 local saved
 
+local ADAPTER_PATH = "coilbox_rewind/adapter.lua"
+
+--- The game's answer to how far its own panels reach along the bottom left of
+-- the view, from the adapter's `timelineClearance` hook (issue #5026), or nil
+-- when the game has none. The adapter file is read here as the ghosts widget
+-- reads it, and its hook runs in this widget's environment, where `WG` is. A
+-- hook that raises is logged once and says nothing from then on.
+local function clearanceOf(say, engine)
+	if not engine.on.marks or not VFS.FileExists(ADAPTER_PATH, VFS.ZIP) then
+		return nil
+	end
+	local ok, adapter = pcall(function()
+		return VFS.Include(ADAPTER_PATH, nil, VFS.ZIP)
+	end)
+	if not ok then
+		say("COILBOX_REWIND_TIMELINE the game's adapter could not be read, so the timeline stays centred: " .. tostring(adapter))
+		return nil
+	end
+	local hook = type(adapter) == "table" and type(adapter.hooks) == "table" and adapter.hooks.timelineClearance
+	if type(hook) ~= "function" then
+		return nil
+	end
+	local broken = false
+	return function()
+		if broken then
+			return nil
+		end
+		local called, reach = pcall(hook)
+		if called then
+			return reach
+		end
+		broken = true
+		say("COILBOX_REWIND_TIMELINE the adapter's timelineClearance hook raised and is switched off for the rest of the run: " .. tostring(reach))
+	end
+end
+
 function widget:Initialize()
 	local say = logWriter()
 	-- What the engine has comes first. A widget that lacks a call it cannot do
@@ -68,7 +104,14 @@ function widget:Initialize()
 		say("COILBOX_REWIND_TIMELINE failed: " .. tostring(Timeline))
 		return
 	end
-	local made = Timeline.new({ Spring = Spring, gl = gl, GL = GL, WG = WG, VFS = engine.on.marks and VFS or nil })
+	local made = Timeline.new({
+		Spring = Spring,
+		gl = gl,
+		GL = GL,
+		WG = WG,
+		VFS = engine.on.marks and VFS or nil,
+		keepClear = clearanceOf(say, engine),
+	})
 	made:setConfig(saved)
 	made:resize(Spring.GetViewGeometry())
 	timeline = made
