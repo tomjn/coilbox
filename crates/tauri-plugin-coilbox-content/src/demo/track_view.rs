@@ -708,6 +708,7 @@ mod tests {
             targets: vec![],
             poses: vec![],
             queue: vec![],
+            teams: vec![],
         };
         track.units = vec![
             unit(

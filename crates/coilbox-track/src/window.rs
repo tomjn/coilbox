@@ -173,6 +173,7 @@ impl Window {
         let mut queue_len = Vec::new();
         let (mut item_def, mut item_x, mut item_z, mut item_facing) =
             (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        let (mut team_keys, mut team_time, mut team_value) = (Vec::new(), Vec::new(), Vec::new());
 
         for wu in &self.units {
             let u = &wu.unit;
@@ -307,6 +308,22 @@ impl Window {
                     item_facing.push(i.facing);
                 }
             }
+
+            team_keys.push(count16(u.teams.len(), &format!("the team keys of {what}"))?);
+            let what = format!("the team of {what}");
+            if let Some(k) = u.teams.first().filter(|k| k.frame <= u.first_frame) {
+                return Err(TrackError::invalid(format!(
+                    "{what} changes at frame {}, which is not after its first frame in the window",
+                    k.frame
+                )));
+            }
+            push_times(
+                &mut team_time,
+                u.teams.iter().map(|k| k.frame),
+                start,
+                &what,
+            )?;
+            team_value.extend(u.teams.iter().map(|k| k.team));
         }
 
         c.set_u16(1, unit_cols.0);
@@ -327,6 +344,9 @@ impl Window {
         }
         if unit_cols.11.iter().any(|n| *n != 0) {
             c.set_u16(12, unit_cols.11);
+        }
+        if team_keys.iter().any(|n| *n != 0) {
+            c.set_u16(13, team_keys);
         }
         c.set_u16(16, transform_time);
         let [x, y, z] = xyz;
@@ -370,6 +390,8 @@ impl Window {
         c.set_s32(75, item_x);
         c.set_s32(76, item_z);
         c.set_u8(77, item_facing);
+        c.set_u16(14, team_time);
+        c.set_u8(15, team_value);
 
         self.projectiles_to_chunk(&mut c)?;
         self.values_to_chunk(&mut c)?;
@@ -614,6 +636,7 @@ impl Window {
         let n_targets = counts(c.u8s(10)?, n, 10)?;
         let n_poses = counts(c.u16s(11)?, n, 11)?;
         let n_queue = counts(c.u16s(12)?, n, 12)?;
+        let n_teams = counts(c.u16s(13)?, n, 13)?;
 
         let mut units: Vec<WindowUnit> = (0..n)
             .map(|i| WindowUnit {
@@ -629,6 +652,7 @@ impl Window {
                     targets: vec![],
                     poses: vec![],
                     queue: vec![],
+                    teams: vec![],
                 },
                 continues_before: unit_flags[i] & 1 != 0,
                 continues_after: unit_flags[i] & 2 != 0,
@@ -640,6 +664,7 @@ impl Window {
         decode_targets(c, &mut units, &n_targets, start_frame)?;
         decode_poses(c, &mut units, &n_poses, start_frame)?;
         decode_queue(c, &mut units, &n_queue, start_frame)?;
+        decode_teams(c, &mut units, &n_teams, start_frame)?;
         let projectiles = decode_projectiles(c, start_frame)?;
         let values = decode_values(c, start_frame)?;
 
@@ -889,6 +914,25 @@ fn decode_queue(c: &Chunk, units: &mut [WindowUnit], counts: &[usize], start: u3
     Ok(())
 }
 
+fn decode_teams(c: &Chunk, units: &mut [WindowUnit], counts: &[usize], start: u32) -> Result<()> {
+    let total: usize = counts.iter().sum();
+    let times = exactly(c.u16s(14)?, total, 14)?;
+    let teams = exactly(c.u8s(15)?, total, 15)?;
+    let mut key = 0;
+    for (u, k) in units.iter_mut().zip(counts) {
+        let what = format!("the team of unit {}", u.unit.serial);
+        let at = frames(&times[key..key + k], start, &what)?;
+        u.unit.teams = (0..*k)
+            .map(|i| TeamKey {
+                frame: at[i],
+                team: teams[key + i],
+            })
+            .collect();
+        key += k;
+    }
+    Ok(())
+}
+
 fn decode_projectiles(c: &Chunk, start: u32) -> Result<Vec<WindowProjectile>> {
     let serials = c.u32s(80)?;
     let n = serials.len();
@@ -1087,7 +1131,7 @@ impl Window {
                 serial: u.serial,
                 engine_id: u.engine_id,
                 unit_def: u.unit_def,
-                team: u.team,
+                team: u.team_at(frame),
                 position,
                 rotation,
                 health,

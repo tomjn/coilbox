@@ -121,6 +121,13 @@ pub struct ProjectileKey {
     pub velocity: [i32; 3],
 }
 
+/// A unit's team from `frame` on, until its next key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TeamKey {
+    pub frame: u32,
+    pub team: u8,
+}
+
 /// One number of a team's, or of the game's, at one frame: what a team holds,
 /// its storage, a rules parameter. The number is a 32 bit float, which is what
 /// the engine holds, kept as its bits so that two keys compare exactly.
@@ -195,7 +202,8 @@ keyed!(
     PoseKey,
     QueueKey,
     ProjectileKey,
-    ValueKey
+    ValueKey,
+    TeamKey
 );
 
 /// One unit, over the whole match when written and over one window when read.
@@ -208,6 +216,7 @@ pub struct Unit {
     /// being written must give each unit its own.
     pub serial: u32,
     pub unit_def: u16,
+    /// The team at `first_frame`. [`Unit::teams`] has each change after it.
     pub team: u8,
     /// The first and last frame at which the unit exists.
     pub first_frame: u32,
@@ -219,6 +228,21 @@ pub struct Unit {
     pub targets: Vec<TargetTrack>,
     pub poses: Vec<PoseTrack>,
     pub queue: Vec<QueueKey>,
+    /// Each time the unit changed team after `first_frame`: given to an ally,
+    /// or captured. A team holds until the next key. Empty for a unit that
+    /// stayed on one team.
+    pub teams: Vec<TeamKey>,
+}
+
+impl Unit {
+    /// The team the unit was on at `frame`.
+    pub fn team_at(&self, frame: u32) -> u8 {
+        let upto = self.teams.partition_point(|k| k.frame <= frame);
+        match upto {
+            0 => self.team,
+            n => self.teams[n - 1].team,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

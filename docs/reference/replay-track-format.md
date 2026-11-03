@@ -91,6 +91,7 @@ The recorder version is separate. It changes when the recorder would produce dif
 | 2 | Pose keys are relative to the parent piece (issue #3783) |
 | 3 | The info chunk has a footprint for each unit definition, columns 181 and 182 (issue #3807). The format version is still 1, because a column was added and nothing changed its meaning |
 | 4 | The main chunk has the [team numbers](#team-numbers), columns 104 to 108, the header has their tolerance and fraction in bytes that were reserved, and the info chunk names the rules parameters, columns 183 to 186 (issue #3982). The format version is still 1. Columns and header fields were added, one of them of a new type, and a reader skips a type it does not know. Playback depends on the numbers, so a track without them is stale |
+| 5 | The main chunk has [team keys](#team-keys), columns 13 to 15, so a unit that was given to another team or captured is on its new team from the frame it changed (issue #3948). The format version is still 1, because columns were added. A track from recorder version 4 has a unit on the team it was made on for the whole match, so it is stale |
 
 ## Window index
 
@@ -124,7 +125,7 @@ u32     number of values
 - Each column's data starts at a multiple of 4 bytes and is padded with zero bytes to the next one.
 - A column that is not listed has no values. For a column with one value per unit, that means 0 for every unit.
 - A reader ignores a column id it does not know, and a column of a type it does not know.
-- A writer lists only columns that have values. It also leaves out a count column (ids 10, 11 and 12) whose value is 0 for every unit, as the worked example does.
+- A writer lists only columns that have values. It also leaves out a count column (ids 10, 11, 12 and 13) whose value is 0 for every unit, as the worked example does.
 - A decompressed chunk is at most 16,777,215 bytes, so every offset in it is exact in Lua.
 - The 4 zero bytes at the end mean no column ends on the last byte of the chunk, which `VFS.Unpack*` cannot read from.
 - A zlib stream ends with a checksum of the data, and `uncompress` checks it. A chunk that fails to decompress is an error for that window only. The header, the index and every other window still read.
@@ -234,7 +235,7 @@ One entry for each unit that exists at any frame of the window.
 | 1 | `u16` | the engine's unit id. The engine's `MAX_UNITS` is 32,000 |
 | 2 | `u32` | serial number, counting from 0 in order of first appearance in the match |
 | 3 | `u16` | unit definition |
-| 4 | `u8` | team |
+| 4 | `u8` | team at the unit's first frame in this window. [Team keys](#team-keys) has each change after it |
 | 5 | `u8` | flags. Bit 0: it existed before this window. Bit 1: it exists after this window |
 | 6 | `u16` | offset of the first frame in this window at which it exists |
 | 7 | `u16` | offset of the last frame in this window at which it exists |
@@ -243,6 +244,7 @@ One entry for each unit that exists at any frame of the window.
 | 10 | `u8` | number of target tracks |
 | 11 | `u16` | number of pose tracks |
 | 12 | `u16` | number of build queue keys |
+| 13 | `u16` | number of team keys |
 
 The engine reuses unit ids, so the serial number is what identifies a unit across windows. Two entries in one window can share a unit id when one unit died and a later one took its id.
 
@@ -364,6 +366,21 @@ Column 12 says how many keys each unit has. A unit with none has an empty queue 
 | 77 | `u8` | for each item, the facing, 0 to 3 |
 
 A queue holds until the next key.
+
+### Team keys
+
+A unit can change team during a match: a player gives it to an ally, or an enemy captures it. Column 13 says how many times each unit's team changed in the window. A unit with none is on the team in column 4 for the whole window, and that is almost every unit.
+
+| Id | Type | Column |
+| --- | --- | --- |
+| 14 | `u16` | time |
+| 15 | `u8` | the team from this frame on |
+
+A team holds until the next key. A key is a change, so it is later than the unit's first offset in the window. A window that starts after a change has the new team in column 4 and no key for it.
+
+The recorder finds a change on a sample frame, so a key can be up to 2 frames after the engine made the change. The track has the frame the recorder wrote.
+
+A reader that does not know these columns gives the team in column 4 for the whole window, which is the team a track from before recorder version 5 gives for the whole match. The Lua reader in `lua/rewind-player` is one of those for now, so playback keeps a unit on one team (issue #5037). The replay page's map view is sent column 4 only (issue #5038).
 
 ### Projectiles
 
@@ -502,7 +519,8 @@ To give every value at frame `f`:
 4. For each curve, find the keys either side of `f`. Before a curve's first key in the window its value is that key's value. After its last key its value is that key's value.
 5. A feature exists when its first and last frame say so.
 6. For terrain, apply the rows between the frame last shown and `f`.
-7. A team number is its track's value at `f`. A resource with no track in the window is 0. A rules parameter with no track, or with a first key after `f`, is not set.
+7. A unit's team is the team of its last team key at or before `f`. When no key is at or before `f`, it is the team in column 4.
+8. A team number is its track's value at `f`. A resource with no track in the window is 0. A rules parameter with no track, or with a first key after `f`, is not set.
 
 A reader that holds a whole track as one Lua string can only address the first 16,777,216 bytes of it exactly. Past that it either needs `io`, with `file:seek` to the block and `file:read` of the length, or has to cut the string into pieces short enough to address. The Lua reader in `lua/rewind-player` takes the way bytes are fetched as a function. Its string fetch cuts the string, since the player runs in synced Lua, which has no `io`.
 

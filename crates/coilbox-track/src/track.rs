@@ -234,6 +234,13 @@ impl Track {
             for p in &u.poses {
                 rising(&what, &p.keys, u.first_frame, u.last_frame)?;
             }
+            rising(&what, &u.teams, u.first_frame, u.last_frame)?;
+            if let Some(k) = u.teams.first().filter(|k| k.frame == u.first_frame) {
+                return Err(TrackError::invalid(format!(
+                    "{what} changes team on frame {}, its first, where `team` says what it is",
+                    k.frame
+                )));
+            }
         }
         let mut serials = HashSet::new();
         for p in &self.projectiles {
@@ -365,7 +372,15 @@ impl Track {
                     engine_id: u.engine_id,
                     serial: u.serial,
                     unit_def: u.unit_def,
-                    team: u.team,
+                    // The team at the window's first frame for the unit, and
+                    // the changes after it.
+                    team: u.team_at(first),
+                    teams: u
+                        .teams
+                        .iter()
+                        .filter(|k| k.frame > first && k.frame <= last)
+                        .copied()
+                        .collect(),
                     first_frame: first,
                     last_frame: last,
                     transform: slice_linear(&u.transform, first, last, false, q)?,

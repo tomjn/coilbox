@@ -98,6 +98,7 @@ fn example_track() -> Track {
         targets: vec![],
         poses: vec![],
         queue: vec![],
+        teams: vec![],
     });
     track
 }

@@ -282,6 +282,7 @@ fn a_crowd_of_real_definitions_is_written() {
             targets,
             poses,
             queue: vec![],
+            teams: vec![],
         });
     }
     if std::env::var("COILBOX_CROWD_SHARING").is_ok() {

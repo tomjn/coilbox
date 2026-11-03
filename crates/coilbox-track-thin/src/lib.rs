@@ -48,10 +48,12 @@ use std::path::Path;
 /// 3 is the first with a footprint for each unit definition, which the map
 /// view sizes its marks from (issue #3807). 4 is the first with each team's
 /// resources and the rules parameters a game's adapter names, which playback
-/// sets in the engine (issue #3982).
+/// sets in the engine (issue #3982). 5 is the first that keeps a unit's
+/// changes of team, so a unit that was given away or captured is on its new
+/// team from the frame it changed (issue #3948).
 ///
 /// The writer's default and the app's stale check both read this constant.
-pub const RECORDER_VERSION: u16 = 4;
+pub const RECORDER_VERSION: u16 = 5;
 
 /// The resource tolerance a track made today has: the furthest a recorded
 /// sample of what a team holds, pulls, makes, spends, sends, receives or

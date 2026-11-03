@@ -12,8 +12,8 @@ use crate::pose::{self, PieceSample};
 use crate::thin::{Rules, Stretch};
 use crate::SampleCounts;
 use coilbox_track::{
-    Keyed, PoseTrack, Projectile, QueueItem, QueueKey, TargetKey, TargetTrack, Unit, ValueKey,
-    ValueTrack,
+    Keyed, PoseTrack, Projectile, QueueItem, QueueKey, TargetKey, TargetTrack, TeamKey, Unit,
+    ValueKey, ValueTrack,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -148,6 +148,7 @@ impl Sink for Thinner {
                     targets: vec![],
                     poses: vec![],
                     queue: vec![],
+                    teams: vec![],
                 },
                 transform_curve: TransformCurve {
                     radius: start.radius,
@@ -288,6 +289,19 @@ impl Sink for Thinner {
         };
         posing.last = next;
         posing.stretch.push(&posing.curve, &rules, next, keys)
+    }
+
+    fn given(&mut self, serial: u32, frame: u32, team: u8) -> Result<()> {
+        let unit = &mut self.unit(serial).unit;
+        // A unit made on this frame is on the new team from its first.
+        if frame == unit.first_frame {
+            unit.team = team;
+            return Ok(());
+        }
+        step(&mut unit.teams, TeamKey { frame, team }, |k| {
+            k.team == unit.team
+        });
+        Ok(())
     }
 
     fn unit_end(&mut self, serial: u32, last_frame: u32) -> Result<()> {
