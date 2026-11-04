@@ -428,6 +428,11 @@ function M.truncate(text, width, measure, size)
 			hi = mid - 1
 		end
 	end
+	-- back off to the start of a UTF-8 character, so no part of one is left
+	-- before the "..."
+	while lo > 0 and lo < #text and text:byte(lo + 1) >= 128 and text:byte(lo + 1) < 192 do
+		lo = lo - 1
+	end
 	return text:sub(1, lo) .. "..."
 end
 

@@ -318,6 +318,12 @@ local function measureWide(str, size)
 	return w
 end
 
+--- True when every byte of a string is part of a whole UTF-8 character.
+local function validUtf8(str)
+	str = str:gsub("[%z\1-\127]", ""):gsub("[\194-\223][\128-\191]", ""):gsub("[\224-\239][\128-\191][\128-\191]", "")
+	return str:gsub("[\240-\244][\128-\191][\128-\191][\128-\191]", "") == ""
+end
+
 --- Labels on a button or tab cut short with "...".
 local function cutLabels(layout)
 	local found = {}
@@ -366,10 +372,25 @@ for _, code in ipairs(LOCALES) do
 
 	local words, picked = I18N.pick(TABLES, { coilbox_lang = code })
 	check(code .. " is picked by its code", picked == code, tostring(picked))
-	for _, panel in ipairs({ fullPanel(), savePanel() }) do
-		local layout = MODEL.layout(panel, measureWide, VIEW, words)
+	for _, panel in ipairs({ fullPanel, savePanel }) do
+		local layout = MODEL.layout(panel(), measureWide, VIEW, words)
 		check(code .. " puts no text past its button or box", #overruns(layout, measureWide) == 0, show(overruns(layout, measureWide)))
 		check(code .. " cuts no button or tab label", #cutLabels(layout) == 0, show(cutLabels(layout)))
+		-- the same panel in English, text for text, so a line English draws
+		-- whole is whole here too
+		local english = MODEL.layout(panel(), measureWide, VIEW, ENGLISH)
+		local cut = {}
+		for i, entry in ipairs(layout.texts) do
+			local other = english.texts[i]
+			if entry.text:sub(-3) == "..." and not (other and other.text:sub(-3) == "...") then
+				cut[#cut + 1] = entry.text
+			end
+			if not validUtf8(entry.text) then
+				cut[#cut + 1] = "broken: " .. entry.text
+			end
+		end
+		check(code .. " draws as many texts as English", #layout.texts == #english.texts)
+		check(code .. " cuts no text English draws whole", #cut == 0, show(cut))
 	end
 	-- every count reads, including the ones with no _one form
 	for _, n in ipairs({ 0, 1, 2, 5, 22 }) do
@@ -381,13 +402,15 @@ for _, code in ipairs(LOCALES) do
 end
 
 -- a label cut short keeps whole characters, so it is never broken UTF-8
+-- With Chinese counted wider than its first two bytes, a cut by bytes alone
+-- fits more text by stopping inside a character.
 local broken = {}
-for width = 20, 90 do
-	local whole = "ЗберегтиЗберегти"
-	local cut = MODEL.truncate(whole, width, measure, 10)
-	local partial = cut ~= whole and (cut:sub(-3) ~= "..." or cut:sub(1, -4):find("[\192-\255]$"))
-	if partial or measure(cut, 10) > width then
-		broken[#broken + 1] = width .. ": " .. cut
+for _, whole in ipairs({ "ЗберегтиЗберегти", "2 个来自其他阵营 | 1 个需要升级" }) do
+	for width = 20, 120 do
+		local cut = MODEL.truncate(whole, width, measureWide, 10)
+		if not validUtf8(cut) or measureWide(cut, 10) > width then
+			broken[#broken + 1] = width .. ": " .. cut
+		end
 	end
 end
 check("a cut label ends on a whole character and fits its width", #broken == 0, show(broken))
