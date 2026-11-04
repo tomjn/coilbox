@@ -288,6 +288,13 @@ function M.plural(words, key, n, ...)
 	return string.format(words[key .. (n == 1 and "_one" or "_other")], n, ...)
 end
 
+--- A line the strings hold under `key`, filled in with any values. A module
+-- that fails returns the key and the values, so the widget says it in the
+-- player's language and writes the same failure to the console in English.
+function M.sentence(words, key, ...)
+	return string.format(words[key], ...)
+end
+
 --- What placing a layout costs, as the placing panel says it.
 -- @param cost table? { metal, energy, seconds }, seconds nil with no builder
 -- @param words table the strings (strings.lua)

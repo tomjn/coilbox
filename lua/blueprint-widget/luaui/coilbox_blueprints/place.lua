@@ -1404,7 +1404,7 @@ end
 --   first building, so none reaches a building before the ground is done.
 -- @param terrain table? { steps = from M.laySteps, on = boolean, why = string,
 --   ground = table[]? }. When on is false the steps are counted as skipped,
---   for the reason why. ground is the terraform model's results for steps,
+--   for the reason why, a key of strings.lua. ground is the terraform model's results for steps,
 --   from session.apply(steps, foot). With it, each builder is sent clear of a
 --   step's ground with a move ahead of the step's level command (#4816).
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
@@ -1412,7 +1412,7 @@ end
 --   terraform = { { unitID, params, tag, levelAt = { { unitID, index } }, where
 --   each builder's level step is in its orders } }, stepRemainder
 --   = steps kept for when a builder is selected, skipped = steps not ordered
---   for skippedWhy, offMap = steps with a point off the map, clear = { {
+--   for skippedWhy (a key of strings.lua), offMap = steps with a point off the map, clear = { {
 --   unitID, tag, spots, range, stop, apart, defID } } for step_clear.lua to
 --   keep each builder clear while it works on each step, gathers = { tag =
 --   unitID[] } the builders that wait for each other before a step }
@@ -1476,7 +1476,7 @@ function M.plan(foot, can, shift, mode, terrain)
 			end
 		elseif #usable > 0 then
 			out.skipped = out.skipped + #usable
-			out.skippedWhy = "no selected builder can terraform"
+			out.skippedWhy = "whyNoTerraformer"
 		end
 	end
 

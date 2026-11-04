@@ -169,11 +169,11 @@ end
 -- @param opts table nameFor (function(defs) -> a name saying what they are),
 --   now (seconds, for recordedAt). designedFor is the map, the same field the
 --   library uses for the map a layout was drawn on.
--- @return table? entry, or nil and a message when there is nothing to record
+-- @return table? entry, or nil and a key of strings.lua when there is nothing to record
 function M.selection(opts)
 	local selected = Spring.GetSelectedUnits()
 	if #selected == 0 then
-		return nil, "nothing is selected"
+		return nil, "saveNothingSelected"
 	end
 	local found = {}
 	local minX, minZ
@@ -196,7 +196,7 @@ function M.selection(opts)
 		end
 	end
 	if #found == 0 then
-		return nil, "no buildings are selected"
+		return nil, "saveNoBuildings"
 	end
 
 	-- The ground under the buildings, and any change that reaches into it
@@ -258,17 +258,17 @@ end
 -- the changes inside the rectangle are kept.
 -- @param x0 number, z0, x1, z1 the rectangle's corners, in elmos, either way round
 -- @param opts table now (seconds, for recordedAt)
--- @return table? entry, or nil and a message when there is nothing to record
+-- @return table? entry, or nil and a key of strings.lua when there is nothing to record
 function M.ground(x0, z0, x1, z1, opts)
 	x0, x1 = math.min(x0, x1), math.max(x0, x1)
 	z0, z1 = math.min(z0, z1), math.max(z0, z1)
 	local grid, footprints = readGrid(x0, z0, x1, z1, deltaReader())
 	if grid.w == 0 then
-		return nil, "the area is off the map"
+		return nil, "saveAreaOffMap"
 	end
 	local regions = GROUND.find(grid, { footprints = footprints })
 	if #regions == 0 then
-		return nil, "no ground has been changed there"
+		return nil, "saveNoGroundChanged"
 	end
 	local ax, az
 	for _, r in ipairs(regions) do

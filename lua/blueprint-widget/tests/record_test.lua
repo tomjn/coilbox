@@ -53,11 +53,11 @@ check(
 
 E.selected = { 202 }
 local none, nerr = RECORD.selection({ nameFor = tostring, now = 0 })
-check("a selection with no buildings is refused with a message", none == nil and type(nerr) == "string", nerr)
+check("a selection with no buildings is refused with a key", none == nil and nerr == "saveNoBuildings", nerr)
 
 E.selected = {}
 local empty, eerr = RECORD.selection({ nameFor = tostring, now = 0 })
-check("an empty selection is refused", empty == nil and type(eerr) == "string", eerr)
+check("an empty selection is refused with a key", empty == nil and eerr == "saveNothingSelected", eerr)
 
 --------------------------------------------------------------------------------
 -- the ground (issue #4798)
@@ -155,9 +155,9 @@ check("Save ground's entry is named for what it holds", cutout and cutout.name =
 check("Save ground's entry is from the ground, on the map it was read from", cutout and cutout.fromGround == true and cutout.designedFor == "Test Map v2" and cutout.recordedAt == 2)
 
 local none, nerr = RECORD.ground(600, 600, 700, 700, { now = 3 })
-check("Save ground over unchanged ground is refused with a message", none == nil and nerr == "no ground has been changed there", nerr)
-local off = RECORD.ground(2000, 2000, 2100, 2100, { now = 3 })
-check("Save ground off the map is refused", off == nil)
+check("Save ground over unchanged ground is refused with a key", none == nil and nerr == "saveNoGroundChanged", nerr)
+local off, offErr = RECORD.ground(2000, 2000, 2100, 2100, { now = 3 })
+check("Save ground off the map is refused with a key", off == nil and offErr == "saveAreaOffMap", offErr)
 
 check("names count raised and dug areas", RECORD.groundName({ { height = 5 }, { height = 9 }, { height = -3 } }) == "2 raised areas, dug ground", RECORD.groundName({ { height = 5 }, { height = 9 }, { height = -3 } }))
 check("a single dug area is named so", RECORD.groundName({ { height = -3 } }) == "Dug ground")

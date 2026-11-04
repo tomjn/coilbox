@@ -138,7 +138,9 @@ local WIDGET_ONLY = {
 	planned = true, cannotBuild = true, planRemoved = true, savedEntry = true, dragToSave = true,
 	saveGroundCancelled = true, saveGroundNeedsDrag = true, sentTo_one = true, sentTo_other = true,
 	blocked = true, skipped_one = true, skipped_other = true, offMap_one = true, offMap_other = true,
-	leftForAnother = true, leftPlanned = true, nothingPlaced = true, whyNoTerraform = true,
+	leftForAnother = true, leftPlanned = true, nothingPlaced = true, whyNoTerraform = true, whyNoTerraformer = true,
+	saveNothingSelected = true, saveNoBuildings = true, saveAreaOffMap = true, saveNoGroundChanged = true,
+	saveCannotWriteFiles = true, saveSpoolUnreadable = true, saveSpoolVersion = true, saveCannotWrite = true,
 	-- the panel draws one of each pair or the other
 	buildings_one = true, buildings_other = true, terrainChanges_one = true, terrainChanges_other = true,
 	stopNoTerraform = true, emptyNoBuilder = true, keyLeft = true, keyRight = true, keyAcross = true, keyDown = true,
@@ -168,6 +170,64 @@ check("no text the panel draws is left as English in the pseudo-locale", #unmove
 -- a tab is its name inside the tab format, each pseudo, so the brackets nest
 check("the tab names are pseudo", hasTextMatching(PL, "^%[~%[~") and not hasTextMatching(PL, "^Now"))
 check("the Terrain row's buttons are pseudo", not hasText(PL, "On") and not hasText(PL, "Off"))
+
+--------------------------------------------------------------------------------
+-- Why a save or a placing fell short (issue #5053): the modules return a key,
+-- and the message line says it in the picked language.
+--------------------------------------------------------------------------------
+
+-- Values with no letters in them, so the message's own letters can be told
+-- apart from them.
+local PATH, REASON = "/1", "!2"
+
+--- The ASCII letters left in a message. In the pseudo-locale every letter of
+-- the wording is an accented one, so one left over is English the table did
+-- not reach.
+local function unaccented(message)
+	return (message:gsub("[^A-Za-z]", ""))
+end
+
+--- The message line as the panel draws it, which cuts a line too long for
+-- the panel short with "...". Nil when the panel draws no such line.
+local function messageLine(text)
+	local state = MODEL.new()
+	state.open = true
+	state.counts = { now = 0, partly = 0, all = 0 }
+	state.message = text
+	for _, entry in ipairs(MODEL.layout(state, measure, VIEW, PSEUDO).texts) do
+		if entry.text:sub(1, 8) == text:sub(1, 8) then
+			return entry.text
+		end
+	end
+	return nil
+end
+
+local FAILURES = {
+	{ "saveNothingSelected" },
+	{ "saveNoBuildings" },
+	{ "saveAreaOffMap" },
+	{ "saveNoGroundChanged" },
+	{ "saveCannotWriteFiles" },
+	{ "saveSpoolUnreadable", PATH, REASON },
+	{ "saveSpoolVersion", PATH, "7" },
+	{ "saveCannotWrite", PATH, REASON },
+}
+for _, failure in ipairs(FAILURES) do
+	local key = failure[1]
+	local said = MODEL.sentence(PSEUDO, unpack(failure))
+	check(key .. " is in the strings", TABLES.en[key] ~= nil)
+	local drawn = messageLine(said)
+	check(key .. " in the pseudo-locale is on the message line", drawn ~= nil, said)
+	check(key .. " in the pseudo-locale has no unaccented English", drawn ~= nil and unaccented(drawn) == "" and unaccented(said) == "" and said ~= MODEL.sentence(ENGLISH, unpack(failure)), tostring(drawn))
+	check(key .. " keeps its values", said:find(failure[2] or "", 1, true) ~= nil and said:find(failure[3] or "", 1, true) ~= nil, said)
+end
+check("the console gets the failure in English", MODEL.sentence(TABLES.en, "saveCannotWrite", "spool.json", "Permission denied") == "cannot write spool.json: Permission denied")
+
+for _, why in ipairs({ "whyNoTerraformer", "whyNoTerraform", "stopTerrainOff" }) do
+	local said = MODEL.plural(PSEUDO, "skipped", 2, PSEUDO[why])
+	local drawn = messageLine(said)
+	check("terrain skipped for " .. why .. " is drawn with no unaccented English", drawn ~= nil and unaccented(drawn) == "" and unaccented(said) == "", tostring(drawn))
+end
 
 --- A button holds its label, and nothing goes past the panel or tray it is in.
 local function overruns(layout)

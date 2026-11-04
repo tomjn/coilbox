@@ -92,6 +92,24 @@ return {
 		leftPlanned = "%d planned, right click it with builders to build",
 		nothingPlaced = "nothing could be placed",
 		whyNoTerraform = "terraforming is not available here",
+		whyNoTerraformer = "no selected builder can terraform",
+
+		-- Why a save did not happen (record.lua and store.lua), said in the
+		-- message line. The console gets the English table's wording.
+		saveNothingSelected = "nothing is selected",
+		saveNoBuildings = "no buildings are selected",
+		saveAreaOffMap = "the area is off the map",
+		saveNoGroundChanged = "no ground has been changed there",
+		saveCannotWriteFiles = "this Lua state cannot write files",
+		-- The spool file's path, then why it cannot be read: the reason is the
+		-- JSON decoder's own, in English, or the name of the value it found.
+		saveSpoolUnreadable = "%s is unreadable, not overwriting it: %s",
+		-- The spool file's path, then the version number found in it.
+		saveSpoolVersion = "%s is unreadable, not overwriting it: version %s",
+		-- The spool file's path, then the reason the file could not be opened.
+		-- The reason is the operating system's, as Lua's io reports it, so it is
+		-- shown as it comes.
+		saveCannotWrite = "cannot write %s: %s",
 	},
 	["pt-BR"] = {
 		help = "Plantas do Coilbox: /%s mostra ou oculta o painel. Atribua teclas a %s, %s, %s, %s, %s e %s para girar, inverter e escolher layouts.",

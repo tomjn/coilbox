@@ -395,10 +395,11 @@ end
 --- Append a recorded entry to the spool.
 -- @param entry table name, game, designedFor, recordedAt, ordered, buildings,
 --   footprints, and terrain when the layout has any
--- @return boolean ok, string? message
+-- @return boolean ok, string? key, any ... values. On failure the key is one of
+--   strings.lua's save keys and the values fill it in.
 function Store:append(entry)
 	if self.io == nil then
-		return false, "this Lua state cannot write files"
+		return false, "saveCannotWriteFiles"
 	end
 	local text = self:readSpoolText()
 	local doc
@@ -407,8 +408,11 @@ function Store:append(entry)
 	else
 		local err
 		doc, err = json.decode(text)
-		if type(doc) ~= "table" or doc.version ~= VERSION then
-			return false, M.SPOOL_PATH .. " is unreadable, not overwriting it: " .. tostring(err or "version " .. tostring(doc and doc.version))
+		if type(doc) ~= "table" then
+			return false, "saveSpoolUnreadable", M.SPOOL_PATH, tostring(err or type(doc))
+		end
+		if doc.version ~= VERSION then
+			return false, "saveSpoolVersion", M.SPOOL_PATH, tostring(doc.version)
 		end
 		if type(doc.blueprints) ~= "table" then
 			doc.blueprints = {}
@@ -418,7 +422,7 @@ function Store:append(entry)
 	local out = json.encode(doc)
 	local file, oerr = self.io.open(M.SPOOL_PATH, "w")
 	if not file then
-		return false, "cannot write " .. M.SPOOL_PATH .. ": " .. tostring(oerr)
+		return false, "saveCannotWrite", M.SPOOL_PATH, tostring(oerr)
 	end
 	file:write(out)
 	file:close()
