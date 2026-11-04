@@ -10,6 +10,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { Participant } from "@/play/config";
+import { useParticipantLabel } from "@/play/participantLabel";
 
 export function TeamSelect({
   participants,
@@ -33,6 +34,7 @@ export function TeamSelect({
   describedBy?: string;
 }) {
   const { t } = useLingui();
+  const labelOf = useParticipantLabel();
   return (
     <OptionSelect
       size="sm"
@@ -45,7 +47,7 @@ export function TeamSelect({
       describedBy={describedBy}
       options={participants.map((p) => ({
         value: p.id,
-        label: p.name,
+        label: labelOf(p),
         icon: <Swatch participant={p} />,
       }))}
     />

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StatAi, StatPlayer, StatRecord } from "@/content/bindings";
 import { bonusSuggestionsFor, suggestAiBonus } from "./aiBonusSuggestion";
 import { HANDICAP_TWEAKS } from "./debrief";
-import type { Participant } from "./participants";
+import { initialParticipants, type Participant } from "./participants";
 
 const GAME = "Beyond All Reason test-1";
 
@@ -328,6 +328,22 @@ describe("bonusSuggestionsFor", () => {
     const out = setup([you, bot("a", "SimpleAI")], [won]);
     expect(out.rows.a?.percent).toBe(harder);
     expect(out.all).toBeNull();
+  });
+
+  it("still counts a result recorded under the default name You (#5042)", () => {
+    // Replays from before the setup's names were shown translated hold "You".
+    // The stored name has not changed, so they keep matching in any language.
+    const [defaultYou, defaultAi] = initialParticipants();
+    const older = game({ won: true });
+    older.players = [{ name: "You", allyTeam: 0, won: true, spectator: false }];
+    const out = setup(
+      [
+        defaultYou,
+        { ...defaultAi, ai: { kind: "native", shortName: "SimpleAI" } },
+      ],
+      [older],
+    );
+    expect(out.rows[defaultAi.id]?.percent).toBe(harder);
   });
 
   it("gives different AIs each their own row", () => {
