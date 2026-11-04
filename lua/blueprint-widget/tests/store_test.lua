@@ -212,9 +212,15 @@ check("append shows the new entry at once", store:find("spool:3") ~= nil)
 
 files[STORE.SPOOL_PATH] = "{ broken"
 store:refresh(100)
-local ok2, err2 = store:append(entry)
-check("append refuses to overwrite an unreadable spool", ok2 == false and type(err2) == "string", err2)
+local ok2, err2, path2, reason2 = store:append(entry)
+check("append refuses to overwrite an unreadable spool, with a key and the path and the reason", ok2 == false and err2 == "saveSpoolUnreadable" and path2 == STORE.SPOOL_PATH and type(reason2) == "string", show({ ok2, err2, path2, reason2 }))
 check("refusal leaves the file alone", #written == 1)
+
+files[STORE.SPOOL_PATH] = json.encode({ version = 7, blueprints = {} })
+store:refresh(150)
+local ok2b, err2b, path2b, reason2b = store:append(entry)
+check("append refuses a spool of another version, with its number", ok2b == false and err2b == "saveSpoolVersion" and path2b == STORE.SPOOL_PATH and reason2b == "7", show({ ok2b, err2b, path2b, reason2b }))
+check("and leaves that file alone too", #written == 1)
 
 files[STORE.SPOOL_PATH] = nil
 store:refresh(200)
@@ -224,7 +230,23 @@ check("append creates the spool when missing", ok3 == true and json.decode(files
 -- a store with no io cannot append
 local readOnly = STORE.new({ vfs = vfs, io = nil, log = function() end })
 local ok4, err4 = readOnly:append(entry)
-check("append without io fails with a message", ok4 == false and type(err4) == "string", err4)
+check("append without io fails with a key", ok4 == false and err4 == "saveCannotWriteFiles", err4)
+
+-- a spool that cannot be opened for writing
+local refusing = STORE.new({
+	vfs = vfs,
+	io = {
+		open = function(_, mode)
+			if mode == "w" then
+				return nil, "Permission denied"
+			end
+			return nil, "no such file"
+		end,
+	},
+	log = function() end,
+})
+local ok5, err5, path5, reason5 = refusing:append(entry)
+check("append that cannot open the spool fails with a key, the path and the reason as io gave it", ok5 == false and err5 == "saveCannotWrite" and path5 == STORE.SPOOL_PATH and reason5 == "Permission denied", show({ ok5, err5, path5, reason5 }))
 
 --------------------------------------------------------------------------------
 -- terrain steps (issue #4790)

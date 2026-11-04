@@ -335,13 +335,14 @@ local off = PLACE.plan(foot2, canAll, false, nil, { steps = { step(0, { blocked 
 check("a step off the map is counted and not ordered", off.offMap == 1 and #off.terraform == 1 and off.skipped == 0)
 check("the steps that are on the map still go in order", off.orders[1].cmds[1][1] == -1 and off.orders[1].cmds[2][1] == 39736)
 
-local switchedOff = PLACE.plan(foot2, canAll, false, nil, { steps = { step(0), step(1) }, on = false, why = "Terrain is off" })
-check("with terrain off the buildings are ordered and the steps are counted as skipped", switchedOff.skipped == 2 and #switchedOff.terraform == 0 and #switchedOff.orders[1].cmds == 2 and switchedOff.skippedWhy == "Terrain is off", show(switchedOff))
+local switchedOff = PLACE.plan(foot2, canAll, false, nil, { steps = { step(0), step(1) }, on = false, why = "stopTerrainOff" })
+check("with terrain off the buildings are ordered and the steps are counted as skipped", switchedOff.skipped == 2 and #switchedOff.terraform == 0 and #switchedOff.orders[1].cmds == 2 and switchedOff.skippedWhy == "stopTerrainOff", show(switchedOff))
 check("skipped steps are not kept for later", #switchedOff.stepRemainder == 0)
 
 local noTerraformer = PLACE.plan(foot2, PLACE.capabilities({ 202 }), false, nil, { steps = { step(0) }, on = true })
 check("a builder that cannot terraform leaves the steps unordered and the buildings ordered", #noTerraformer.orders[1].cmds == 2 and #noTerraformer.terraform == 0, show(noTerraformer))
 check("with builders selected and none able to terraform the steps are skipped, not kept", noTerraformer.skipped == 1 and #noTerraformer.stepRemainder == 0)
+check("and the reason is a key of strings.lua", noTerraformer.skippedWhy == "whyNoTerraformer")
 
 local nobody = PLACE.plan(foot2, PLACE.capabilities({}), false, nil, { steps = { step(0), step(1) }, on = true })
 check("with no builders selected, nothing is ordered and the steps are kept with the buildings", #nobody.orders == 0 and #nobody.stepRemainder == 2 and #nobody.remainder == 2 and nobody.skipped == 0 and #nobody.terraform == 0, show(nobody))

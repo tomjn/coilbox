@@ -811,7 +811,7 @@ local function describe(plan, sent)
 		parts[#parts + 1] = string.format(TEXT.blocked, plan.blocked)
 	end
 	if (plan.skipped or 0) > 0 then
-		parts[#parts + 1] = MODEL.plural(TEXT, "skipped", plan.skipped, plan.skippedWhy or "")
+		parts[#parts + 1] = MODEL.plural(TEXT, "skipped", plan.skipped, TEXT[plan.skippedWhy] or "")
 	end
 	if (plan.offMap or 0) > 0 then
 		parts[#parts + 1] = MODEL.plural(TEXT, "offMap", plan.offMap)
@@ -850,7 +850,7 @@ local function terrainArg(steps, foot)
 	return {
 		steps = steps,
 		on = on,
-		why = not available and TEXT.whyNoTerraform or TEXT.stopTerrainOff,
+		why = not available and "whyNoTerraform" or "stopTerrainOff",
 		ground = on and steps[1] and TERRAFORM.session(groundEnv()).apply(steps, foot) or nil,
 	}
 end
@@ -1050,15 +1050,17 @@ end
 --------------------------------------------------------------------------------
 
 --- Put a recorded entry in the spool, or say why there is none.
-local function keep(entry, err)
+local function keep(entry, key)
 	if not entry then
-		say(err)
+		say(MODEL.sentence(TEXT, key))
 		return false
 	end
-	local ok, werr = store:append(entry)
+	-- a failure is a key of strings.lua and the values that fill it in: said in
+	-- the player's language, and written to the console in English
+	local ok, wkey, path, reason = store:append(entry)
 	if not ok then
-		say(werr)
-		log(LOG.WARNING, werr)
+		say(MODEL.sentence(TEXT, wkey, path, reason))
+		log(LOG.WARNING, MODEL.sentence(STRINGS.en, wkey, path, reason))
 		return false
 	end
 	say(string.format(TEXT.savedEntry, entry.name))
