@@ -125,7 +125,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER, CLEAR
+local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER, CLEAR, I18N, STRINGS
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -1279,7 +1279,13 @@ function widget:Initialize()
 	if LATER then
 		CLEAR, err = include("step_clear.lua")
 	end
-	if not CLEAR then
+	if CLEAR then
+		I18N, err = include("coilbox_i18n.lua")
+	end
+	if I18N then
+		STRINGS, err = include("strings.lua")
+	end
+	if not STRINGS then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1405,7 +1411,9 @@ function widget:Initialize()
 	-- A widget that loads and then draws nothing looks like one that did not
 	-- load. Say how to reach it, and the very first time it ever runs, open
 	-- the panel so there is something to see.
-	Spring.Echo("Coilbox blueprints: /coilbox_blueprints toggles the panel. Bind keys to " .. ACTION_LEFT .. ", " .. ACTION_RIGHT .. ", " .. ACTION_FLIP_X .. ", " .. ACTION_FLIP_Z .. ", " .. ACTION_PREV .. " and " .. ACTION_NEXT .. " to turn, flip and pick layouts.")
+	-- In the player's language (issue #4597).
+	local text = I18N.pick(STRINGS, Spring.GetModOptions(), Spring.GetConfigString("language", ""))
+	Spring.Echo(string.format(text.help, ACTION_TOGGLE, ACTION_LEFT, ACTION_RIGHT, ACTION_FLIP_X, ACTION_FLIP_Z, ACTION_PREV, ACTION_NEXT))
 	if not (saved and saved.seen) then
 		open()
 	end
