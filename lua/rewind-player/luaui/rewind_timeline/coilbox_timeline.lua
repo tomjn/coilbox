@@ -61,25 +61,26 @@ M.LARGE_STEP_SECONDS = 10
 --- Every action, in the order the key list shows them, with the keys of the
 -- replay page's table. A key is the engine's name for it, the one
 -- `Spring.GetKeyCode` takes. `shift` is whether Shift must be held, and absent
--- means it is not looked at.
+-- means it is not looked at. What an action does is in strings.lua, under its
+-- id.
 M.ACTIONS = {
-	{ id = "toggle", does = "Play or pause", keys = { { key = "space" } } },
-	{ id = "reverse", does = "Play the other way", keys = { { key = "r" } } },
-	{ id = "back", does = "Back 1 second", keys = { { key = "left", shift = false } } },
-	{ id = "forward", does = "Forward 1 second", keys = { { key = "right", shift = false } } },
-	{ id = "backLarge", does = "Back 10 seconds", keys = { { key = "left", shift = true } } },
-	{ id = "forwardLarge", does = "Forward 10 seconds", keys = { { key = "right", shift = true } } },
-	{ id = "frameBack", does = "Back one frame", keys = { { key = "," } } },
-	{ id = "frameForward", does = "Forward one frame", keys = { { key = "." } } },
-	{ id = "start", does = "Go to the start", keys = { { key = "home" } } },
-	{ id = "finish", does = "Go to the end", keys = { { key = "end" } } },
-	{ id = "markBack", does = "Go to the previous mark", keys = { { key = "[" } } },
-	{ id = "markForward", does = "Go to the next mark", keys = { { key = "]" } } },
-	{ id = "slower", does = "Slower", keys = { { key = "-" } } },
-	{ id = "faster", does = "Faster", keys = { { key = "=" }, { key = "+" } } },
+	{ id = "toggle", keys = { { key = "space" } } },
+	{ id = "reverse", keys = { { key = "r" } } },
+	{ id = "back", keys = { { key = "left", shift = false } } },
+	{ id = "forward", keys = { { key = "right", shift = false } } },
+	{ id = "backLarge", keys = { { key = "left", shift = true } } },
+	{ id = "forwardLarge", keys = { { key = "right", shift = true } } },
+	{ id = "frameBack", keys = { { key = "," } } },
+	{ id = "frameForward", keys = { { key = "." } } },
+	{ id = "start", keys = { { key = "home" } } },
+	{ id = "finish", keys = { { key = "end" } } },
+	{ id = "markBack", keys = { { key = "[" } } },
+	{ id = "markForward", keys = { { key = "]" } } },
+	{ id = "slower", keys = { { key = "-" } } },
+	{ id = "faster", keys = { { key = "=" }, { key = "+" } } },
 	-- Not the replay page's. It switches the ghosts of queued buildings, which
 	-- are another widget's (issue #3804), through the switch that widget offers.
-	{ id = "ghosts", does = "Show queued buildings", keys = { { key = "g" } } },
+	{ id = "ghosts", keys = { { key = "g" } } },
 }
 
 local ACTION = {}
@@ -198,12 +199,23 @@ local function clock(seconds)
 	return string.format("%d:%02d", minutes, seconds % 60)
 end
 
--- Keys whose own character is too small a mark to read in a list.
-local SPELLED = { [","] = "Comma", ["."] = "Full stop", ["-"] = "Minus" }
+-- Keys that the list names from strings.lua: the ones whose own character is
+-- too small a mark to read, and the ones with a name a player would say.
+local SPELLED = {
+	[","] = "keyComma",
+	["."] = "keyFullStop",
+	["-"] = "keyMinus",
+	space = "keySpace",
+	left = "keyLeft",
+	right = "keyRight",
+	home = "keyHome",
+	["end"] = "keyEnd",
+}
 
 --- A key's name as the list shows it: "space" as "Space" and "r" as "R".
-local function shown(key)
-	return SPELLED[key] or (key:sub(1, 1):upper() .. key:sub(2))
+local function shown(text, key)
+	local spelled = SPELLED[key]
+	return spelled and text[spelled] or (key:sub(1, 1):upper() .. key:sub(2))
 end
 
 --- The frames of the marks the game holds, in order. A game with no marks
@@ -228,6 +240,20 @@ local function loadMarks(VFS)
 	return frames
 end
 
+--- The least width the key list needs for what it says, in pixels: the title
+-- beside its hint, and the widest row of what an action does beside its keys.
+-- A language that says it in more letters than English gets a wider list.
+local function helpWidth(self, pad, gap)
+	local gl, text, small = self.gl, self.text, self.smallSize
+	local widest = gl.GetTextWidth(text.keys) * self.textSize + gl.GetTextWidth(text.clickToChange) * small
+	for i = 1, #M.ACTIONS do
+		local id = M.ACTIONS[i].id
+		local keys = max(gl.GetTextWidth(self.labels[id] or ""), gl.GetTextWidth(text.pressAKey))
+		widest = max(widest, (gl.GetTextWidth(text[id]) + keys) * small)
+	end
+	return math.ceil(widest + 2 * (pad + self.buttonRadius + 1) + gap)
+end
+
 local function defaultKeys()
 	local keys = {}
 	for i = 1, #M.ACTIONS do
@@ -244,9 +270,11 @@ end
 local Timeline = {}
 Timeline.__index = Timeline
 
---- A timeline. `engine` has the engine's `Spring`, `gl`, `GL` and `VFS`.
+--- A timeline. `engine` has the engine's `Spring`, `gl`, `GL` and `VFS`, and
+-- `text`, what the timeline says, from strings.lua through coilbox_i18n.lua.
 function M.new(engine)
 	local self = setmetatable({
+		text = engine.text,
 		Spring = engine.Spring,
 		gl = engine.gl,
 		GL = engine.GL,
@@ -284,7 +312,7 @@ end
 --- Works out, from the bindings, which action a key code does and what the
 -- key list and the tooltips say.
 function Timeline:rebind()
-	local Spring = self.Spring
+	local Spring, text = self.Spring, self.text
 	self.byCode = {}
 	for i = 1, #M.ACTIONS do
 		local action = M.ACTIONS[i]
@@ -296,11 +324,16 @@ function Timeline:rebind()
 				self.byCode[code] = list
 				list[#list + 1] = { shift = binding.shift, action = action.id }
 			end
-			names[#names + 1] = (binding.shift and "Shift+" or "") .. shown(binding.key)
+			local name = shown(text, binding.key)
+			names[#names + 1] = binding.shift and string.format(text.withShift, name) or name
 		end
-		local label = table.concat(names, " or ")
-		self.labels[action.id] = label ~= "" and label or "No key"
-		self.tips[action.id] = label ~= "" and (action.does .. " (" .. label .. ")") or action.does
+		local label = names[1]
+		for n = 2, #names do
+			label = string.format(text.eitherKey, label, names[n])
+		end
+		local does = text[action.id]
+		self.labels[action.id] = label or text.noKey
+		self.tips[action.id] = label and string.format(text.tip, does, label) or does
 	end
 end
 
@@ -502,7 +535,7 @@ function Timeline:layout(reach)
 	end
 	if self.helpOpen then
 		local row = px(HELP_ROW)
-		local hw = min(px(HELP_W), vsx)
+		local hw = min(max(px(HELP_W), helpWidth(self, pad, gap)), vsx)
 		local hh = pad + row + #M.ACTIONS * row + gap + px(RESET_H) + pad
 		local hx = max(0, min(x2 - hw, vsx - hw))
 		local hy = stack(self, hh, margin)
@@ -692,7 +725,7 @@ function Timeline:tooltip(x, y)
 		end
 	end
 	if inside(self.rects.help, x, y) then
-		return "Keys"
+		return self.text.keys
 	end
 	return ""
 end
@@ -974,8 +1007,8 @@ local function drawHelp(self, mx, my)
 	panel(self, help)
 	local first = rects["row:" .. M.ACTIONS[1].id]
 	local inset = self.buttonRadius + 1
-	text(self, "Keys", first.x1 + inset, self.helpTitleY, self.textSize, LOOK.accent, "x")
-	text(self, "Click a key to change it", first.x2 - inset, self.helpTitleY, self.smallSize, LOOK.textDim, "rx")
+	text(self, self.text.keys, first.x1 + inset, self.helpTitleY, self.textSize, LOOK.accent, "x")
+	text(self, self.text.clickToChange, first.x2 - inset, self.helpTitleY, self.smallSize, LOOK.textDim, "rx")
 	for i = 1, #M.ACTIONS do
 		local action = M.ACTIONS[i]
 		local row = rects["row:" .. action.id]
@@ -984,16 +1017,16 @@ local function drawHelp(self, mx, my)
 		if waiting or insideRow(row, mx, my) then
 			fill(self, row.x1, row.y1, row.x2, row.y2, self.buttonRadius, waiting and LOOK.buttonActive or LOOK.buttonHover)
 		end
-		text(self, action.does, row.x1 + inset, y, self.smallSize, LOOK.text, "x")
+		text(self, self.text[action.id], row.x1 + inset, y, self.smallSize, LOOK.text, "x")
 		if waiting then
-			text(self, "Press a key", row.x2 - inset, y, self.smallSize, LOOK.warn, "rx")
+			text(self, self.text.pressAKey, row.x2 - inset, y, self.smallSize, LOOK.warn, "rx")
 		else
 			text(self, self.labels[action.id], row.x2 - inset, y, self.smallSize, LOOK.accent, "rx")
 		end
 	end
 	local reset = rects.reset
 	button(self, reset, mx, my, false)
-	text(self, "Reset keys", (reset.x1 + reset.x2) / 2, (reset.y1 + reset.y2) / 2, self.smallSize, LOOK.text, "cx")
+	text(self, self.text.resetKeys, (reset.x1 + reset.x2) / 2, (reset.y1 + reset.y2) / 2, self.smallSize, LOOK.text, "cx")
 end
 
 --- Draws the timeline, from `widget:DrawScreen`. In a game with no player only

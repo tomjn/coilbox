@@ -31,6 +31,8 @@ Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do
   luaui/
     widgets/coilbox_mission_ui.lua
     mission_ui/coilbox_panel_model.lua
+    mission_ui/coilbox_i18n.lua
+    mission_ui/strings.lua
   missions/
     runtime.lua
 ```

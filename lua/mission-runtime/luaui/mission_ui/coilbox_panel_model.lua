@@ -52,9 +52,6 @@ M.MAX_QUEUED = 6
 -- read anything under luaui/.
 M.DISMISSED_MESSAGE = "coilbox_mission_dismissed:"
 
--- What a held line says under its text, so the player knows it is waiting.
-M.HOLD_HINT = "Click to continue"
-
 local DEFAULT_GAME_SPEED = 30
 
 --- The scenario id from the modoption, or nothing.
@@ -386,25 +383,19 @@ M.MARKER = {
 	failed = "x",
 }
 
-M.HEADLINE = {
-	victory = "Mission accomplished",
-	defeat = "Mission failed",
-	undecided = "Mission ended",
-}
-
 --------------------------------------------------------------------------------
 -- Layout.
 --------------------------------------------------------------------------------
 
 --- Lay a list of objectives out as drawable rows: a heading before the
 -- secondaries, and one row per wrapped line with the marker on the first.
-local function objectiveRows(entries, wrapWidth, measure)
+local function objectiveRows(entries, wrapWidth, measure, text)
 	local rows = {}
 	local secondaries = false
 	for _, entry in ipairs(entries) do
 		if entry.kind == "secondary" and not secondaries then
 			secondaries = true
-			rows[#rows + 1] = { heading = "Secondary" }
+			rows[#rows + 1] = { heading = text.secondary }
 		end
 		for index, line in ipairs(M.wrap(entry.text, wrapWidth / M.TEXT_SIZE, measure)) do
 			rows[#rows + 1] = {
@@ -436,13 +427,13 @@ local function rowTexts(texts, rows, x, y)
 	return y
 end
 
-local function objectivesPanel(L, entries, measure, view)
+local function objectivesPanel(L, entries, measure, view, text)
 	if #entries == 0 then
 		return
 	end
 
 	local width = math.min(M.OBJECTIVES_WIDTH, view.w * 0.25)
-	local rows = objectiveRows(entries, width - (M.PAD * 2) - M.MARKER_WIDTH, measure)
+	local rows = objectiveRows(entries, width - (M.PAD * 2) - M.MARKER_WIDTH, measure, text)
 
 	local x0 = M.OBJECTIVES_LEFT
 	local top = view.h * M.OBJECTIVES_TOP
@@ -453,11 +444,11 @@ local function objectivesPanel(L, entries, measure, view)
 
 	local y = top - M.PAD - M.TITLE_SIZE
 	L.texts[#L.texts + 1] = { x = x0 + M.PAD, y = y, size = M.TITLE_SIZE,
-		text = "Objectives", color = M.COLOUR.title, options = "o" }
+		text = text.objectives, color = M.COLOUR.title, options = "o" }
 	rowTexts(L.texts, rows, x0 + M.PAD, y)
 end
 
-local function dialoguePanel(L, scene, measure, view)
+local function dialoguePanel(L, scene, measure, view, text)
 	local line = scene.line
 	if not line then
 		return
@@ -504,17 +495,17 @@ local function dialoguePanel(L, scene, measure, view)
 	if scene.hold then
 		y = y - M.LINE_HEIGHT
 		L.texts[#L.texts + 1] = { x = textLeft, y = y, size = M.TEXT_SIZE,
-			text = M.HOLD_HINT, color = M.COLOUR.heading, options = "o" }
+			text = text.holdHint, color = M.COLOUR.heading, options = "o" }
 	end
 end
 
-local function debriefPanel(L, debrief, measure, view)
+local function debriefPanel(L, debrief, measure, view, text)
 	if not debrief then
 		return
 	end
 
 	local width = math.min(M.DEBRIEF_WIDTH, view.w * 0.6)
-	local rows = objectiveRows(debrief.objectives, width - (M.PAD * 2) - M.MARKER_WIDTH, measure)
+	local rows = objectiveRows(debrief.objectives, width - (M.PAD * 2) - M.MARKER_WIDTH, measure, text)
 	local height = (M.PAD * 3) + (M.TITLE_SIZE * 2) + (#rows * M.LINE_HEIGHT)
 	local x0 = (view.w - width) * 0.5
 	local y0 = (view.h - height) * 0.5
@@ -526,7 +517,7 @@ local function debriefPanel(L, debrief, measure, view)
 
 	local y = y1 - M.PAD - (M.TITLE_SIZE * 2)
 	L.texts[#L.texts + 1] = { x = (x0 + x1) * 0.5, y = y, size = M.TITLE_SIZE * 2,
-		text = M.HEADLINE[debrief.outcome], color = M.COLOUR[debrief.outcome], options = "co" }
+		text = text[debrief.outcome], color = M.COLOUR[debrief.outcome], options = "co" }
 	rowTexts(L.texts, rows, x0 + M.PAD, y - M.PAD)
 end
 
@@ -537,16 +528,19 @@ end
 --   portrait would not load), debrief (from M.debrief)
 -- @param measure function(text) -> width in multiples of the font size
 -- @param view table w, h of the screen
+-- @param text table what the panels say themselves, from strings.lua through
+--   coilbox_i18n.lua: objectives, secondary, holdHint, and the headline for
+--   each outcome
 -- @return table rects { x, y, w, h, color, kind }, texts { x, y, size, text,
 --   color, options }, portrait { x, y, w, h, file } or nil, and debriefBox
 --   and dialogueBox, each { x0, y0, x1, y1 } or nil, which are what a
 --   dismissing click is tested against. dialogueBox is there only for a held
 --   line.
-function M.layout(scene, measure, view)
+function M.layout(scene, measure, view, text)
 	local L = { rects = {}, texts = {} }
-	objectivesPanel(L, scene.objectives or {}, measure, view)
-	dialoguePanel(L, scene, measure, view)
-	debriefPanel(L, scene.debrief, measure, view)
+	objectivesPanel(L, scene.objectives or {}, measure, view, text)
+	dialoguePanel(L, scene, measure, view, text)
+	debriefPanel(L, scene.debrief, measure, view, text)
 	return L
 end
 

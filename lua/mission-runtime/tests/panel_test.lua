@@ -17,6 +17,8 @@ local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check = support.check
 
 local MODEL = dofile(support.root() .. "/luaui/mission_ui/coilbox_panel_model.lua")
+-- What the panels say themselves, in English.
+local TEXT = dofile(support.root() .. "/luaui/mission_ui/strings.lua").en
 
 --------------------------------------------------------------------------------
 -- Scaffolding.
@@ -298,13 +300,13 @@ local function textsWith(L, needle)
 	return found
 end
 
-local L = MODEL.layout({ objectives = {} }, measure, VIEW)
+local L = MODEL.layout({ objectives = {} }, measure, VIEW, TEXT)
 check("a scene with nothing to say lays out nothing",
 	#L.rects == 0 and #L.texts == 0 and L.portrait == nil and L.debriefBox == nil)
 
 -- The objectives panel.
 
-L = MODEL.layout({ objectives = MODEL.objectives(MISSION, read) }, measure, VIEW)
+L = MODEL.layout({ objectives = MODEL.objectives(MISSION, read) }, measure, VIEW, TEXT)
 
 check("objectives lay a backdrop first", L.rects[1] ~= nil and L.rects[1].kind == "objectives")
 check("in the backdrop colour", L.rects[1].color == MODEL.BACKDROP)
@@ -324,7 +326,7 @@ local long = { objectives = { {
 	text = string.rep("word ", 12) .. "end",
 	state = "active",
 } } }
-L = MODEL.layout(long, measure, VIEW)
+L = MODEL.layout(long, measure, VIEW, TEXT)
 check("a long objective wraps into more rows",
 	L.rects[1].h > 2 * MODEL.PAD + 2 * MODEL.LINE_HEIGHT, L.rects[1].h)
 check("with the marker on the first row only", #textsWith(L, "-") == 1)
@@ -332,7 +334,7 @@ check("with the marker on the first row only", #textsWith(L, "-") == 1)
 -- The dialogue panel.
 
 local LINE = { speaker = "HQ", text = "Contact!", portrait = "hq.png" }
-L = MODEL.layout({ objectives = {}, line = LINE }, measure, VIEW)
+L = MODEL.layout({ objectives = {}, line = LINE }, measure, VIEW, TEXT)
 
 check("dialogue lays a backdrop", L.rects[1] ~= nil and L.rects[1].kind == "dialogue")
 check("tall enough for its portrait",
@@ -343,14 +345,14 @@ check("and the speaker starts past it",
 	textsWith(L, "HQ")[1].x == L.rects[1].x + MODEL.PAD + MODEL.PORTRAIT_SIZE + MODEL.PAD)
 check("with the line under the speaker", #textsWith(L, "Contact!") == 1)
 
-L = MODEL.layout({ objectives = {}, line = LINE, portraitBad = true }, measure, VIEW)
+L = MODEL.layout({ objectives = {}, line = LINE, portraitBad = true }, measure, VIEW, TEXT)
 check("a portrait that would not load is left out", L.portrait == nil)
 check("and the text takes its room", textsWith(L, "HQ")[1].x == L.rects[1].x + MODEL.PAD)
 
 -- The debrief.
 
 local DEBRIEF = { outcome = "victory", objectives = MODEL.objectives(MISSION, read) }
-L = MODEL.layout({ objectives = {}, debrief = DEBRIEF }, measure, VIEW)
+L = MODEL.layout({ objectives = {}, debrief = DEBRIEF }, measure, VIEW, TEXT)
 
 check("the debrief lays a backdrop", L.rects[1] ~= nil and L.rects[1].kind == "debrief")
 check("centred on the screen", L.debriefBox ~= nil

@@ -26,6 +26,7 @@ local check, load, logged, sent = support.check, support.load, support.logged, s
 local missionFiles, fixture = support.missionFiles, support.fixture
 
 local MODEL = dofile(support.root() .. "/luaui/mission_ui/coilbox_panel_model.lua")
+local TEXT = dofile(support.root() .. "/luaui/mission_ui/strings.lua").en
 
 -- Hard-coded rather than read off the runtime, because each one is a contract.
 local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
@@ -249,11 +250,11 @@ local function hasText(layout, text)
 end
 
 local VIEW = { w = 1920, h = 1080 }
-local timed = MODEL.layout({ line = LINES.a }, measure, VIEW)
-local held = MODEL.layout({ line = LINES.a, hold = true }, measure, VIEW)
+local timed = MODEL.layout({ line = LINES.a }, measure, VIEW, TEXT)
+local held = MODEL.layout({ line = LINES.a, hold = true }, measure, VIEW, TEXT)
 
-check("a held line says how to dismiss it", hasText(held, MODEL.HOLD_HINT))
-check("and a timed line does not", not hasText(timed, MODEL.HOLD_HINT))
+check("a held line says how to dismiss it", hasText(held, "Click to continue"))
+check("and a timed line does not", not hasText(timed, "Click to continue"))
 check("a held line has a box for the click to land in",
 	held.dialogueBox ~= nil and held.dialogueBox[3] > held.dialogueBox[1]
 	and held.dialogueBox[4] > held.dialogueBox[2])

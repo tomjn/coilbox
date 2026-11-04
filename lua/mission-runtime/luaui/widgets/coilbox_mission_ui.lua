@@ -67,6 +67,8 @@ local ready = false
 local registered = false
 
 local MODEL
+-- What the panels say themselves, in the player's language (issue #4597).
+local TEXT
 local MISSION
 local MISSION_DIR
 
@@ -312,7 +314,7 @@ local function relayout()
 	if layoutVersion == sceneVersion and layoutW == vsx and layoutH == vsy then
 		return
 	end
-	layout = MODEL.layout(scene, measure, { w = vsx, h = vsy })
+	layout = MODEL.layout(scene, measure, { w = vsx, h = vsy }, TEXT)
 	layoutVersion, layoutW, layoutH = sceneVersion, vsx, vsy
 	local verts, idx = MODEL.pack(layout.rects)
 	panelIndices = upload(panelSet, verts, idx)
@@ -400,6 +402,17 @@ function widget:Initialize()
 		widgetHandler:RemoveWidget()
 		return
 	end
+
+	local i18n, i18nError = includeTable("luaui/mission_ui/coilbox_i18n.lua")
+	local strings, stringsError = includeTable("luaui/mission_ui/strings.lua", {})
+	if not (i18n and strings) then
+		log("error", i18nError or stringsError)
+		widgetHandler:RemoveWidget()
+		return
+	end
+	local code
+	TEXT, code = i18n.pick(strings, Spring.GetModOptions(), Spring.GetConfigString("language", ""))
+	log("notice", "mission UI draws in " .. code)
 
 	MISSION_DIR = "missions/" .. id .. "/"
 	local mission, missionError = includeTable(MISSION_DIR .. "mission.lua", {})

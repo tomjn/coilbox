@@ -205,7 +205,8 @@ local steps = {
 			-- A timeline of the probe's own, for where the bar is. The widget's
 			-- is in the same place, since nothing has moved it.
 			local Timeline = VFS.Include("luaui/rewind_timeline/coilbox_timeline.lua", nil, VFS.ZIP)
-			local own = Timeline.new({ Spring = Spring, gl = gl, GL = GL, VFS = VFS })
+			local text = VFS.Include("luaui/rewind_timeline/strings.lua", {}, VFS.ZIP).en
+			local own = Timeline.new({ text = text, Spring = Spring, gl = gl, GL = GL, VFS = VFS })
 			own:resize(VIEW_X, VIEW_Y)
 			local bar = own.rects.bar
 			local x, y = (bar.x1 + bar.x2) / 2, (bar.y1 + bar.y2) / 2

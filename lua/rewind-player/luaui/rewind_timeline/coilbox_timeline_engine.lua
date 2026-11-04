@@ -91,6 +91,17 @@ M.ROWS = {
 		without = "The bar has no marks, and the timeline stays centred, over any panel of the game's there",
 		visible = false,
 	},
+	{
+		id = "language",
+		feature = "the player's language",
+		calls = { "Spring.GetModOptions", "Spring.GetConfigString" },
+		how = "presence",
+		used = "coilbox_rewind_timeline.lua, strings",
+		required = false,
+		since = "105.0",
+		without = "The timeline is in English",
+		visible = false,
+	},
 }
 
 --- The value at a dotted name, or nil when any part of it is not there.
