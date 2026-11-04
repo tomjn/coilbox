@@ -108,7 +108,10 @@ mod tests {
     /// script, so a networked host writes it for itself alone.
     #[test]
     fn the_language_is_a_key_of_its_own() {
-        assert_eq!(text(None, Some("fr")).as_deref(), Some("CoilboxLanguage = fr\n"));
+        assert_eq!(
+            text(None, Some("fr")).as_deref(),
+            Some("CoilboxLanguage = fr\n")
+        );
         let both = text(Some(53344), Some("de")).expect("text");
         assert!(both.contains("AutohostPort = 53344\n"), "{both}");
         assert!(both.ends_with("CoilboxLanguage = de\n"), "{both}");
