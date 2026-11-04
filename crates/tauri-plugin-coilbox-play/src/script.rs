@@ -74,6 +74,29 @@ pub struct BattleConfig {
     /// Script password the client presents to the host (client scripts only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub my_passwd: Option<String>,
+    /// The locale coilbox is showing, such as `fr` or `zh-Hans`. Written as the
+    /// [`LANGUAGE_OPTION`] mod option so coilbox's in-game widgets draw in it
+    /// (issue #4597). See [`language_option`] for when it is left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+}
+
+/// The mod option coilbox's in-game widgets read their language from, in
+/// `coilbox_i18n.lua` beside each of them.
+pub const LANGUAGE_OPTION: &str = "coilbox_lang";
+
+/// The language to write as [`LANGUAGE_OPTION`], or `None` to leave it out.
+///
+/// English is the widgets' own language, so it is never written. Nor is any
+/// language on a networked host: the engine sends the host's script to every
+/// player who joins, so the host's language would become theirs. Those
+/// players' widgets read the engine's `language` config key instead.
+pub fn language_option(cfg: &BattleConfig) -> Option<&str> {
+    let code = cfg.language.as_deref()?.trim();
+    if code.is_empty() || code.eq_ignore_ascii_case("en") || cfg.host_port.is_some() {
+        return None;
+    }
+    Some(code)
 }
 
 fn default_true() -> bool {
@@ -104,6 +127,7 @@ impl Default for BattleConfig {
             host_loopback_reason: None,
             host_port: None,
             my_passwd: None,
+            language: None,
         }
     }
 }
@@ -291,11 +315,17 @@ pub fn generate_script(cfg: &BattleConfig) -> Result<String, String> {
         });
     }
 
-    let mod_options: Vec<_> = cfg
+    let language = language_option(cfg);
+    let mut mod_options: Vec<_> = cfg
         .mod_options
         .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
         .filter(|(k, v)| !mod_option_stays_out(k, v))
+        .filter(|(k, _)| language.is_none() || !k.eq_ignore_ascii_case(LANGUAGE_OPTION))
         .collect();
+    if let Some(code) = language {
+        mod_options.push((LANGUAGE_OPTION, code));
+    }
     if !mod_options.is_empty() {
         section(&mut s, 1, "MODOPTIONS", |s| {
             for (k, v) in mod_options {
@@ -451,6 +481,9 @@ fn host_script_refusal(cfg: &BattleConfig) -> Option<String> {
     ];
     if let Some(ip) = &cfg.host_ip {
         texts.push(("host address", ip));
+    }
+    if let Some(language) = &cfg.language {
+        texts.push(("language", language));
     }
     for p in &cfg.players {
         texts.push(("player name", &p.name));
@@ -639,6 +672,56 @@ mod tests {
         let s = generate_script(&sample()).unwrap();
         assert!(s.contains("RgbColor=0.9 0.1 0.1;"));
         assert!(s.contains("RgbColor=0.1 0.4 1;"));
+    }
+
+    /// Issue #4597: the in-game widgets read the language from the script.
+    #[test]
+    fn a_language_other_than_english_is_a_mod_option() {
+        let mut cfg = sample();
+        cfg.language = Some("de".into());
+        let s = generate_script(&cfg).unwrap();
+        assert!(s.contains("[MODOPTIONS]"));
+        assert!(s.contains("coilbox_lang=de;"));
+    }
+
+    #[test]
+    fn english_is_left_out() {
+        let mut cfg = sample();
+        cfg.language = Some("en".into());
+        let s = generate_script(&cfg).unwrap();
+        assert!(!s.contains("coilbox_lang"));
+        assert!(!s.contains("[MODOPTIONS]"));
+        cfg.language = None;
+        assert!(!generate_script(&cfg).unwrap().contains("coilbox_lang"));
+    }
+
+    #[test]
+    fn the_language_sits_beside_the_games_own_options_and_replaces_a_stale_one() {
+        let mut cfg = sample();
+        cfg.language = Some("zh-Hans".into());
+        cfg.mod_options.insert("startmetal".into(), "1000".into());
+        cfg.mod_options.insert("coilbox_lang".into(), "fr".into());
+        let s = generate_script(&cfg).unwrap();
+        assert!(s.contains("startmetal=1000;"));
+        assert_eq!(s.matches("coilbox_lang=").count(), 1);
+        assert!(s.contains("coilbox_lang=zh-Hans;"));
+    }
+
+    /// Every player who joins gets the host's script, so a networked host
+    /// writes no language of its own.
+    #[test]
+    fn a_networked_host_writes_no_language() {
+        let mut cfg = sample();
+        cfg.language = Some("de".into());
+        cfg.host_port = Some(8452);
+        assert!(!generate_script(&cfg).unwrap().contains("coilbox_lang"));
+    }
+
+    #[test]
+    fn a_language_that_would_break_the_script_is_refused() {
+        let mut cfg = sample();
+        cfg.language = Some("de;IsHost=0".into());
+        assert!(generate_script(&cfg).is_err());
     }
 
     #[test]

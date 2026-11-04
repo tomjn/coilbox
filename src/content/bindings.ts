@@ -1852,6 +1852,8 @@ export const contentReplayPlaybackLaunch = defineCommand<
     game?: string;
     startFrame?: number;
     paused?: boolean;
+    /** The locale coilbox is showing, for the timeline's own text (#4597). */
+    language?: string;
   },
   LaunchOutcome
 >("coilbox-content", "content_replay_playback_launch");

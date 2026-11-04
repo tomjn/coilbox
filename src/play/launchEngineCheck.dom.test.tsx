@@ -90,6 +90,18 @@ it("launches an engine the disk check still lists, and asks the backend", async 
   expect(contentStateLoad).toHaveBeenCalledTimes(1);
 });
 
+it("hands the backend coilbox's language for the in-game widgets (#4597)", async () => {
+  contentStateLoad.mockResolvedValue({
+    state: withEngine("/engines/a/spring"),
+  });
+  await run();
+  await waitFor(() => expect(playLaunch).toHaveBeenCalledTimes(1));
+  const [args] = playLaunch.mock.calls[0] as unknown as [
+    { config: { language?: string } },
+  ];
+  expect(args.config.language).toBe("en");
+});
+
 it("launches when the content read fails", async () => {
   contentStateLoad.mockRejectedValue(new Error("unreadable"));
   await run();

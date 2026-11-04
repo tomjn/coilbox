@@ -90,6 +90,12 @@ export interface BattleConfig {
   hostPort?: number;
   /** Script password presented to the host (client scripts only). */
   myPasswd?: string;
+  /**
+   * The locale coilbox is showing. Written as the `coilbox_lang` mod option so
+   * the in-game widgets draw in it, unless it is English or the script is a
+   * networked host's (#4597).
+   */
+  language?: string;
 }
 
 /** Engine lifecycle event streamed while a game runs. */

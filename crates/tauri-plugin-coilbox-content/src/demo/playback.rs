@@ -36,6 +36,7 @@ use std::path::{Path, PathBuf};
 
 use picoframe_core::CliResult;
 use tauri::{ipc::Channel, AppHandle, Runtime};
+use tauri_plugin_coilbox_play::script::LANGUAGE_OPTION;
 use tauri_plugin_coilbox_play::LaunchEvent;
 
 use super::analysis::game::lua_string;
@@ -104,13 +105,17 @@ const START_FRAME_OPTION: &str = "coilbox_rewind_start_frame";
 /// The mod option the player reads for opening paused.
 const START_PAUSED_OPTION: &str = "coilbox_rewind_start_paused";
 
-/// Where the player opens. The default is the track's first frame, playing.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Where the player opens, and the language its timeline says things in. The
+/// default is the track's first frame, playing, in English.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Opening {
     /// The frame to open on. The player holds it inside the track.
     pub frame: Option<u32>,
     /// Open on the player's own pause. The engine keeps running.
     pub paused: bool,
+    /// The locale coilbox is showing, for the timeline (issue #4597). English
+    /// and none both leave the mod option out.
+    pub language: Option<String>,
 }
 
 impl Opening {
@@ -122,6 +127,16 @@ impl Opening {
         }
         if self.paused {
             options.push((START_PAUSED_OPTION, "1".to_string()));
+        }
+        // A locale code is letters, digits and hyphens. Anything else is not
+        // one, and a `;` in it would end the value and start a key of its own.
+        let language = self.language.as_deref().map(str::trim).filter(|code| {
+            !code.is_empty()
+                && !code.eq_ignore_ascii_case("en")
+                && code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        });
+        if let Some(code) = language {
+            options.push((LANGUAGE_OPTION, code.to_string()));
         }
         options
     }
@@ -233,9 +248,11 @@ fn spectator_name(players: &[(i32, &Section)]) -> String {
 /// player in `Spring.GetPlayerList`, and this script always has at least two
 /// (issue #3984).
 ///
-/// `opening` adds the player's two mod options. The replay's own values for
-/// those keys are dropped whether or not `opening` sets them, since they are
-/// the player's and a replay has no business moving where it opens.
+/// `opening` adds the player's two mod options and the language. The replay's
+/// own values for those keys are dropped whether or not `opening` sets them,
+/// since they are the player's and a replay has no business moving where it
+/// opens. The language a replay was recorded in is its recorder's, not the
+/// language of whoever watches it.
 pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, String> {
     let game = find_game(&parse_tdf(replay_script));
     let map = game
@@ -317,7 +334,7 @@ pub fn start_script(replay_script: &str, opening: &Opening) -> Result<String, St
     }
     let options = opening.options();
     let extra: Vec<(&str, &str)> = options.iter().map(|(k, v)| (*k, v.as_str())).collect();
-    let skip = [START_FRAME_OPTION, START_PAUSED_OPTION];
+    let skip = [START_FRAME_OPTION, START_PAUSED_OPTION, LANGUAGE_OPTION];
     for (name, section) in &game.children {
         if name == "modoptions" {
             write_section(&mut out, name, section, &skip, &extra);
@@ -574,10 +591,12 @@ pub(crate) async fn content_replay_playback_launch<R: Runtime>(
     game: Option<String>,
     start_frame: Option<u32>,
     paused: Option<bool>,
+    language: Option<String>,
 ) -> CliResult {
     let opening = Opening {
         frame: start_frame,
         paused: paused.unwrap_or(false),
+        language,
     };
     let tracks = match track_store::app_store_dir(&app) {
         Ok(dir) => dir,
@@ -898,6 +917,7 @@ mod tests {
         let opening = Opening {
             frame: Some(550),
             paused: true,
+            language: None,
         };
         let game = parsed(&start_script(REPLAY_SCRIPT, &opening).unwrap());
         let options = game.child("modoptions").unwrap();
@@ -908,11 +928,46 @@ mod tests {
         assert_eq!(options.get("deathmode"), Some("com"));
     }
 
+    /// Issue #4597: the timeline draws in the language of whoever watches,
+    /// not the one the replay was recorded in.
+    #[test]
+    fn the_watchers_language_is_a_mod_option_and_the_recorders_is_dropped() {
+        let script =
+            REPLAY_SCRIPT.replace("[modoptions]\n{\n", "[modoptions]\n{\ncoilbox_lang=fr;\n");
+        let opening = Opening {
+            language: Some("de".into()),
+            ..Opening::default()
+        };
+        let text = start_script(&script, &opening).unwrap();
+        let game = parsed(&text);
+        assert_eq!(
+            game.child("modoptions").unwrap().get("coilbox_lang"),
+            Some("de")
+        );
+        assert_eq!(text.matches("coilbox_lang").count(), 1);
+
+        let english = Opening {
+            language: Some("en".into()),
+            ..Opening::default()
+        };
+        assert!(!start_script(&script, &english)
+            .unwrap()
+            .contains("coilbox_lang"));
+        let broken = Opening {
+            language: Some("de;x=1".into()),
+            ..Opening::default()
+        };
+        assert!(!start_script(&script, &broken)
+            .unwrap()
+            .contains("coilbox_lang"));
+    }
+
     #[test]
     fn a_frame_without_paused_opens_playing() {
         let opening = Opening {
             frame: Some(0),
             paused: false,
+            language: None,
         };
         let game = parsed(&start_script(REPLAY_SCRIPT, &opening).unwrap());
         let options = game.child("modoptions").unwrap();
@@ -926,6 +981,7 @@ mod tests {
         let opening = Opening {
             frame: None,
             paused: true,
+            language: None,
         };
         let game = parsed(&start_script(REPLAY_SCRIPT, &opening).unwrap());
         let options = game.child("modoptions").unwrap();
@@ -950,6 +1006,7 @@ mod tests {
         let opening = Opening {
             frame: Some(9),
             paused: true,
+            language: None,
         };
         let game = parsed(&start_script(script, &opening).unwrap());
         let options = game.child("modoptions").unwrap();
@@ -970,6 +1027,7 @@ mod tests {
         let opening = Opening {
             frame: Some(550),
             paused: false,
+            language: None,
         };
         let text = start_script(&script, &opening).unwrap();
         let options = parsed(&text);
@@ -1438,6 +1496,7 @@ mod tests {
                 opening: Opening {
                     frame: Some(40),
                     paused: true,
+                    language: None,
                 },
             },
             |_| Ok(base("SHORT")),
@@ -1960,6 +2019,7 @@ end
             Opening {
                 frame: Some(first + (last - first) / 2),
                 paused: true,
+                language: None,
             }
         } else {
             Opening::default()

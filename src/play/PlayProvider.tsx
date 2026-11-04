@@ -12,6 +12,7 @@ import {
 } from "react";
 import { contentReplayPlaybackLaunch } from "@/content/bindings";
 import { refreshContentState } from "@/content/contentState";
+import { getLocale } from "@/i18n";
 import { errorText } from "@/lib/helpers";
 import { mpRelayTraffic } from "@/multiplayer/bindings";
 import { notify } from "@/notify/notify";
@@ -444,7 +445,14 @@ export function PlayProvider({ children }: { children: ReactNode }) {
           map: args.config.mapName,
           engine: args.executable,
         },
-        (runId, onEvent) => playLaunch({ ...args, runId, onEvent }),
+        // The in-game widgets draw in coilbox's language (#4597).
+        (runId, onEvent) =>
+          playLaunch({
+            ...args,
+            config: { ...args.config, language: getLocale() },
+            runId,
+            onEvent,
+          }),
         { onEngineStarted, relayed },
       );
     },
@@ -478,7 +486,12 @@ export function PlayProvider({ children }: { children: ReactNode }) {
           file: opts.replayPath,
         },
         (runId, onEvent) =>
-          contentReplayPlaybackLaunch({ ...opts, runId, onEvent }),
+          contentReplayPlaybackLaunch({
+            ...opts,
+            language: getLocale(),
+            runId,
+            onEvent,
+          }),
       ),
     [start],
   );
