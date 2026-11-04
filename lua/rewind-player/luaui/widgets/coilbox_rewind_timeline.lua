@@ -83,6 +83,22 @@ local function clearanceOf(say, engine)
 	end
 end
 
+--- What the timeline says, in the player's language (issue #4597). Nothing
+-- when the tables do not load. An engine without the calls that say the
+-- language gets English.
+local function strings(say, engine)
+	local found, i18n = pcall(VFS.Include, "luaui/rewind_timeline/coilbox_i18n.lua", nil, VFS.ZIP)
+	local loaded, tables = pcall(VFS.Include, "luaui/rewind_timeline/strings.lua", {}, VFS.ZIP)
+	if not (found and loaded) then
+		say("COILBOX_REWIND_TIMELINE failed: " .. tostring(found and tables or i18n))
+		return nil
+	end
+	if not engine.on.language then
+		return i18n.pick(tables)
+	end
+	return i18n.pick(tables, Spring.GetModOptions(), Spring.GetConfigString("language", ""))
+end
+
 function widget:Initialize()
 	local say = logWriter()
 	-- What the engine has comes first. A widget that lacks a call it cannot do
@@ -104,7 +120,12 @@ function widget:Initialize()
 		say("COILBOX_REWIND_TIMELINE failed: " .. tostring(Timeline))
 		return
 	end
+	local text = strings(say, engine)
+	if not text then
+		return
+	end
 	local made = Timeline.new({
+		text = text,
 		Spring = Spring,
 		gl = gl,
 		GL = GL,

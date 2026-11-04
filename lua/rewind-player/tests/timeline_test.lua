@@ -13,6 +13,8 @@ local here = arg[0]:match("^(.*)/[^/]+$") or "."
 local t = dofile(here .. "/support.lua")
 
 local MODULE = t.root() .. "/luaui/rewind_timeline/coilbox_timeline.lua"
+-- What the timeline says, in English.
+local TEXT = dofile(t.root() .. "/luaui/rewind_timeline/strings.lua").en
 local WIDGET = t.root() .. "/luaui/widgets/coilbox_rewind_timeline.lua"
 
 -- Key codes as `widget:KeyPress` is given them, from
@@ -85,6 +87,13 @@ local function engine(values, files)
 		GetKeySymbol = function(code)
 			return NAMES[code] or string.format("0x%x", code)
 		end,
+		-- Where the widget reads the language from (issue #4597).
+		GetModOptions = function()
+			return e.modOptions or {}
+		end,
+		GetConfigString = function(_, default)
+			return e.configLanguage or default
+		end,
 	}
 	e.gl = {
 		Color = function() end,
@@ -144,7 +153,7 @@ end
 
 --- A timeline in a view of `vsx` by `vsy`, having read the parameters.
 local function timeline(e, vsx, vsy)
-	local tl = Timeline.new({ Spring = e.Spring, gl = e.gl, GL = e.GL, VFS = e.VFS })
+	local tl = Timeline.new({ text = TEXT, Spring = e.Spring, gl = e.gl, GL = e.GL, VFS = e.VFS })
 	tl:resize(vsx or 1920, vsy or 1080)
 	tl:read()
 	return tl
@@ -228,7 +237,7 @@ do
 	local switched = 0
 	local WG = {}
 	local function made()
-		local tl = Timeline.new({ Spring = e.Spring, gl = e.gl, GL = e.GL, VFS = e.VFS, WG = WG })
+		local tl = Timeline.new({ text = TEXT, Spring = e.Spring, gl = e.gl, GL = e.GL, VFS = e.VFS, WG = WG })
 		tl:resize(1920, 1080)
 		tl:read()
 		return tl
@@ -247,7 +256,7 @@ do
 	t.same("and does not switch them again", switched, 1)
 	t.same("G with Ctrl is left alone", tl:keyPress(CODES.g, { alt = false, ctrl = true, meta = false, shift = false }, false), false)
 	t.same("the player is sent nothing", #e.sent, 0)
-	t.same("a timeline given no WG leaves G alone", Timeline.new({ Spring = e.Spring, gl = e.gl, GL = e.GL }):keyPress(CODES.g, NONE, false), false)
+	t.same("a timeline given no WG leaves G alone", Timeline.new({ text = TEXT, Spring = e.Spring, gl = e.gl, GL = e.GL }):keyPress(CODES.g, NONE, false), false)
 
 	tl:draw()
 	click(tl, tl.rects.help)
@@ -491,6 +500,7 @@ do
 		end
 		local game = { reach = reach }
 		local tl = Timeline.new({
+			text = TEXT,
 			Spring = e.Spring,
 			gl = e.gl,
 			GL = e.GL,
@@ -760,6 +770,45 @@ do
 	t.same("300 draws inside one shown second allocate nothing, in kilobytes", grew, 0)
 end
 
+-- What it says comes from the table it is handed (issue #4597). A fixture
+-- French table, with keys left out, stands for a half translated one.
+
+do
+	local I18N = dofile(t.root() .. "/luaui/rewind_timeline/coilbox_i18n.lua")
+	local tables = dofile(t.root() .. "/luaui/rewind_timeline/strings.lua")
+	tables.fr = { toggle = "Lecture ou pause", keySpace = "Espace", keys = "Touches", withShift = "Maj+%s" }
+	local e = engine(params())
+	local tl = Timeline.new({
+		text = I18N.pick(tables, { coilbox_lang = "fr" }, ""),
+		Spring = e.Spring,
+		gl = e.gl,
+		GL = e.GL,
+	})
+	tl:resize(1920, 1080)
+	tl:read()
+	t.same("a button's tooltip is in the language picked", tl:tooltip(middle(tl.rects.toggle)), "Lecture ou pause (Espace)")
+	t.same("and so is the help button's", tl:tooltip(middle(tl.rects.help)), "Touches")
+	t.same("a key the table lacks is in English", tl:tooltip(middle(tl.rects.reverse)), "Play the other way (R)")
+	click(tl, tl.rects.help)
+	e.clear()
+	tl:draw()
+	t.check("the key list says Shift the French way", e.texts["Maj+Left"], next(e.texts))
+	t.check("and the reset button, which the table lacks, in English", e.texts["Reset keys"])
+
+	-- The pseudo-locale is longer than English, and the key list widens to fit.
+	local english = timeline(engine(params()))
+	click(english, english.rects.help)
+	local long = Timeline.new({ text = I18N.pick(tables, { coilbox_lang = "en-XA" }, ""), Spring = e.Spring, gl = e.gl, GL = e.GL })
+	long:resize(1920, 1080)
+	long:read()
+	click(long, long.rects.help)
+	local function width(r)
+		return r.x2 - r.x1
+	end
+	t.check("a longer language gets a wider key list", width(long.rects.helpPanel) > width(english.rects.helpPanel),
+		width(long.rects.helpPanel) .. " against " .. width(english.rects.helpPanel))
+end
+
 -- The widget file, loaded the way a widget handler loads one.
 
 do
@@ -812,7 +861,15 @@ do
 
 	t.same("before it starts a key is left alone", widget:KeyPress(CODES.space, NONE, false), false)
 	widget:SetConfigData({ keys = { toggle = { { key = "p" } } } })
+	e.modOptions = { coilbox_lang = "en-XA" }
 	widget:Initialize()
+	local tip
+	for y = 20, 80, 4 do
+		for x = 0, 1920, 4 do
+			tip = tip or (widget:GetTooltip(x, y) ~= "" and widget:GetTooltip(x, y)) or nil
+		end
+	end
+	t.check("the widget draws in the language the mod option names", tip and tip:find("Þĺáý ţĥé óţĥéŕ ŵáý", 1, true), tip)
 	t.same("a key reaches the timeline and is taken", widget:KeyPress(CODES.p, NONE, false), true)
 	t.same("its message goes to the player", e.sent[1], "coilbox_rewind:toggle")
 	t.same("the bindings set before it started are kept", widget:KeyPress(CODES.space, NONE, false), false)
