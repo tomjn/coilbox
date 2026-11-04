@@ -13,6 +13,7 @@ export const LOCALES = [
   "es",
   "pl",
   "uk",
+  "pt-BR",
   "ja",
   "zh-Hans",
 ] as const;
@@ -54,7 +55,9 @@ export function isLocale(code: string): code is LocaleCode {
  * The locale for a BCP 47 tag such as `navigator.language`. The base language
  * picks the locale, so `fr-CA` is `fr`. Every `zh` tag is `zh-Hans` unless it
  * is Traditional (`zh-Hant`, `zh-TW`, `zh-HK`, `zh-MO`), which has no catalog
- * and so gets `en`. Anything else without a catalog gets `en`.
+ * and so gets `en`. Every `pt` tag is `pt-BR`, including `pt-PT`, because
+ * there is no European Portuguese catalog. Anything else without a catalog
+ * gets `en`.
  */
 export function resolveLocaleTag(tag: string): LocaleCode {
   const [base, ...rest] = tag.toLowerCase().split(/[-_]/);
@@ -63,6 +66,7 @@ export function resolveLocaleTag(tag: string): LocaleCode {
       ? SOURCE_LOCALE
       : "zh-Hans";
   }
+  if (base === "pt") return "pt-BR";
   return LOCALES.find((l) => l.toLowerCase() === base) ?? SOURCE_LOCALE;
 }
 
