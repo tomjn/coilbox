@@ -3,7 +3,11 @@
 -- Each widget keeps a strings.lua beside its modules that returns one table
 -- per locale code, `en` complete and the rest filled as they are translated.
 -- This picks one of them. The `coilbox_lang` mod option comes first, which
--- coilbox writes into the start script of a game it launches. The engine
+-- coilbox writes into the start script of a game it launches on its own
+-- machine. The engine config key `CoilboxLanguage` comes next, which coilbox
+-- sets for every game it launches through a settings file of that launch's
+-- own (issue #5046). A networked game reaches it, because the host's script
+-- goes to every player but each player's settings stay their own. The engine
 -- config key `language` comes next, for a game coilbox did not launch: the
 -- engine has no such setting of its own, but it is where a game's language
 -- picker writes. Then `en`.
@@ -16,7 +20,7 @@
 -- with "~" and bracketed, as lingui.config.ts makes coilbox's own, so text that
 -- was never moved into a table and text that clips both show up on screen.
 --
--- Pure. The caller hands in the mod options and the config value, which is
+-- Pure. The caller hands in the mod options and the config values, which is
 -- what lets the tests run this with plain luajit.
 --
 -- Each tree that ships on its own carries a copy: lua/mission-runtime,
@@ -29,6 +33,9 @@ local M = {}
 M.SOURCE = "en"
 M.PSEUDO = "en-XA"
 M.OPTION = "coilbox_lang"
+-- Spelt the same as LANGUAGE_KEY in crates/tauri-plugin-coilbox-play/src/
+-- launch_settings.rs. The engine reads config keys case and all.
+M.CONFIG = "CoilboxLanguage"
 
 --- A locale code with `_` read as `-` and the space around it dropped, or nil.
 local function tidy(code)
@@ -106,11 +113,25 @@ function M.match(tables, wanted)
 	return nil
 end
 
---- The code to draw in: the mod option's, then the config key's, then `en`.
--- A source naming a language there is no table for is passed over.
-function M.code(tables, modOptions, configLanguage)
+--- The code to draw in: the mod option's, then each config value given after
+-- it in turn, then `en`. A source naming a language there is no table for is
+-- passed over.
+function M.code(tables, modOptions, ...)
 	local option = type(modOptions) == "table" and modOptions[M.OPTION] or nil
-	return M.match(tables, option) or M.match(tables, configLanguage) or M.SOURCE
+	local found = M.match(tables, option)
+	for i = 1, select("#", ...) do
+		if found then
+			break
+		end
+		found = M.match(tables, (select(i, ...)))
+	end
+	return found or M.SOURCE
+end
+
+--- The config values to hand `code` after the mod options, in the order they
+-- count: coilbox's per-launch key, then the engine's `language`.
+function M.config(Spring)
+	return Spring.GetConfigString(M.CONFIG, ""), Spring.GetConfigString("language", "")
 end
 
 -- Every ASCII letter's pseudo-locale stand-in.
@@ -161,8 +182,8 @@ function M.strings(tables, code)
 end
 
 --- The strings to draw: `strings` for the code `code` picks.
-function M.pick(tables, modOptions, configLanguage)
-	local code = M.code(tables, modOptions, configLanguage)
+function M.pick(tables, modOptions, ...)
+	local code = M.code(tables, modOptions, ...)
 	return M.strings(tables, code), code
 end
 

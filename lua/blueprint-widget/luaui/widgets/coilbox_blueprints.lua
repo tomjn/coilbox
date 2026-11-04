@@ -1412,7 +1412,7 @@ function widget:Initialize()
 	-- load. Say how to reach it, and the very first time it ever runs, open
 	-- the panel so there is something to see.
 	-- In the player's language (issue #4597).
-	local text = I18N.pick(STRINGS, Spring.GetModOptions(), Spring.GetConfigString("language", ""))
+	local text = I18N.pick(STRINGS, Spring.GetModOptions(), I18N.config(Spring))
 	Spring.Echo(string.format(text.help, ACTION_TOGGLE, ACTION_LEFT, ACTION_RIGHT, ACTION_FLIP_X, ACTION_FLIP_Z, ACTION_PREV, ACTION_NEXT))
 	if not (saved and saved.seen) then
 		open()
