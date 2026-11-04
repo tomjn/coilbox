@@ -8,6 +8,11 @@ local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check, same, show = support.check, support.same, support.show
 local MODEL = support.module("model.lua")
 local PLACE = support.module("place.lua")
+local I18N = support.module("coilbox_i18n.lua")
+local TABLES = support.module("strings.lua")
+-- English, which is what the layout tests below read their text from. The
+-- other languages are proved in i18n_test.lua.
+local TEXT = I18N.pick(TABLES, {})
 
 local SOLAR = support.def(1, "armsolar", { isBuilding = true, xsize = 8, zsize = 8, humanName = "Solar Collector", energyUpkeep = -20 })
 local LLT = support.def(2, "armllt", { isBuilding = true, xsize = 6, zsize = 6, humanName = "Light Laser Tower", weapons = { { weaponDef = 1 } } })
@@ -89,7 +94,7 @@ local VIEW = { w = 1920, h = 1080 }
 
 state.open = true
 state.tab = "now"
-local L = MODEL.layout(state, measure, VIEW)
+local L = MODEL.layout(state, measure, VIEW, TEXT)
 
 check("layout has a background rect first", L.rects[1].kind == "panel", show(L.rects[1]))
 check("the panel sits a margin in from the right edge, inside the view", L.rects[1].x + L.rects[1].w == VIEW.w - MODEL.PAD and L.rects[1].y >= 0 and L.rects[1].y + L.rects[1].h <= VIEW.h, show(L.rects[1]))
@@ -202,7 +207,7 @@ end)(), show(L.texts))
 local longState = MODEL.new()
 MODEL.refresh(longState, { { key = "library:long", name = string.rep("x", 200), source = "library", ordered = false, buildings = { b("armsolar") } } }, PLACE, game, CAN)
 longState.open = true
-local LL = MODEL.layout(longState, measure, VIEW)
+local LL = MODEL.layout(longState, measure, VIEW, TEXT)
 local longText = textsWith(LL, "xxx")[1]
 check("a long name is cut with an ellipsis", longText and #longText.text < 200 and longText.text:sub(-3) == "...", longText and longText.text)
 check("one row still gets a three row panel", LL.rects[1].h == L.rects[1].h, LL.rects[1].h .. " vs " .. L.rects[1].h)
@@ -219,14 +224,14 @@ check("a hovered background lifts", (function()
 		end
 	end
 	state.hover = MODEL.actionId({ kind = "save" })
-	local LH = MODEL.layout(state, measure, VIEW)
+	local LH = MODEL.layout(state, measure, VIEW, TEXT)
 	state.hover = nil
 	local plain, hot = saveRect(L), saveRect(LH)
 	return plain and hot and hot.color[1] > plain.color[1]
 end)())
 check("a hovered row lifts", (function()
 	state.hover = MODEL.actionId({ kind = "place", key = "library:eco" })
-	local LH = MODEL.layout(state, measure, VIEW)
+	local LH = MODEL.layout(state, measure, VIEW, TEXT)
 	state.hover = nil
 	local function rowColor(layout)
 		for _, r in ipairs(layout.rects) do
@@ -240,9 +245,9 @@ end)())
 check("the opener lifts under the cursor", (function()
 	local closed = MODEL.new()
 	MODEL.refresh(closed, ENTRIES, PLACE, game, CAN)
-	local plain = MODEL.layout(closed, measure, VIEW)
+	local plain = MODEL.layout(closed, measure, VIEW, TEXT)
 	closed.hover = MODEL.actionId({ kind = "toggle" })
-	local hot = MODEL.layout(closed, measure, VIEW)
+	local hot = MODEL.layout(closed, measure, VIEW, TEXT)
 	return hot.rects[1].color[1] > plain.rects[1].color[1]
 end)())
 
@@ -251,7 +256,7 @@ state.placing = { key = "library:eco", name = "Eco", rotation = 1, flip = { x = 
 state.keys = { left = { "[" }, right = { "]" }, flipX = { "f" }, flipZ = {} }
 state.remainder = { count = 3 }
 state.message = "Saved Base on Map 2"
-local LP = MODEL.layout(state, measure, VIEW)
+local LP = MODEL.layout(state, measure, VIEW, TEXT)
 local function trayHits(L, kind)
 	local out = {}
 	for _, h in ipairs(hitsOf(L, kind)) do
@@ -345,20 +350,20 @@ check("the active row has a gold outline", (function()
 	return false
 end)())
 state.placing, state.remainder, state.message, state.keys = nil, nil, nil, {}
-check("nothing placing, no placing panel", MODEL.layout(state, measure, VIEW).tray == nil)
+check("nothing placing, no placing panel", MODEL.layout(state, measure, VIEW, TEXT).tray == nil)
 
 local leftSide = MODEL.new()
 leftSide.open = true
 leftSide.pos = { x = 0, y = 0.9, right = false }
 leftSide.placing = { key = "x", name = "X", rotation = 0 }
-local LL = MODEL.layout(leftSide, measure, VIEW)
+local LL = MODEL.layout(leftSide, measure, VIEW, TEXT)
 check("with the panel on the left the placing panel opens to its right", LL.tray.x >= LL.box.x + LL.box.w, show(LL.tray))
 leftSide.open = false
-local LC = MODEL.layout(leftSide, measure, VIEW)
+local LC = MODEL.layout(leftSide, measure, VIEW, TEXT)
 check("with the panel closed the placing panel sits beside its tab", LC.tray ~= nil and LC.tray.x >= LC.box.x + LC.box.w)
 
 check("a key label puts a letter in capitals", MODEL.keyLabel({ "g" }, "Down") == "G" and MODEL.keyLabel({ "Shift+[" }, "x") == "Shift+[" and MODEL.keyLabel({}, "Down") == "Down")
-check("the cost line leaves out the time with no builder", MODEL.costLine({ metal = 10, energy = 0 }) == "10 metal, 0 energy")
+check("the cost line leaves out the time with no builder", MODEL.costLine({ metal = 10, energy = 0 }, TEXT) == "10 metal, 0 energy")
 check("times read as minutes and seconds", MODEL.clockTime(5) == "0:05" and MODEL.clockTime(3599.6) == "60:00")
 local assisting = MODEL.new()
 check("builders help each other unless told otherwise", assisting.assist == "help")
@@ -373,13 +378,13 @@ MODEL.refresh(sided, ENTRIES, PLACE, game, CAN, { reach = reachNone })
 check("with a reach given, a layout outside it goes under no tab but All", sided.counts.now == 0 and sided.counts.partly == 0 and sided.counts.all > 0, show(sided.counts))
 sided.tab = "all"
 sided.open = true
-check("a row says how many buildings are from another side", #textsWith(MODEL.layout(sided, measure, VIEW), "from another side") > 0)
+check("a row says how many buildings are from another side", #textsWith(MODEL.layout(sided, measure, VIEW, TEXT), "from another side") > 0)
 check("stepping skips layouts from another side", MODEL.step(sided, 1) == nil)
 
 local upgrading = MODEL.new()
 MODEL.refresh(upgrading, ENTRIES, PLACE, game, CAN, { standIns = { [1] = 2 } })
 upgrading.tab, upgrading.open = "all", true
-check("a row says how many buildings start a tier lower, to upgrade", #textsWith(MODEL.layout(upgrading, measure, VIEW), "to upgrade") > 0)
+check("a row says how many buildings start a tier lower, to upgrade", #textsWith(MODEL.layout(upgrading, measure, VIEW, TEXT), "to upgrade") > 0)
 
 -- stepping through the blueprints with a key
 local stepping = MODEL.new()
@@ -405,17 +410,17 @@ check("a step follows the current tab", MODEL.step(stepping, 1) == "library:lab"
 local emptyState = MODEL.new()
 MODEL.refresh(emptyState, ENTRIES, PLACE, game, NOBODY)
 emptyState.open = true
-local LE = MODEL.layout(emptyState, measure, VIEW)
+local LE = MODEL.layout(emptyState, measure, VIEW, TEXT)
 check("an empty now tab says to select a builder", #textsWith(LE, "Select a builder") == 1, show(LE.texts))
 local nothing = MODEL.new()
 MODEL.refresh(nothing, {}, PLACE, game, CAN)
 nothing.open = true
 nothing.tab = "all"
-check("an empty library says where to get blueprints", #textsWith(MODEL.layout(nothing, measure, VIEW), "coilbox") >= 1)
+check("an empty library says where to get blueprints", #textsWith(MODEL.layout(nothing, measure, VIEW, TEXT), "coilbox") >= 1)
 
 -- a closed panel leaves a pill that opens it
 state.open = false
-local LC = MODEL.layout(state, measure, VIEW)
+local LC = MODEL.layout(state, measure, VIEW, TEXT)
 check("a closed panel shows only the opener", #LC.rects == 1 and LC.rects[1].kind == "opener", show(LC.rects))
 check("the opener is a vertical tab with rounded corners", LC.rects[1].h > LC.rects[1].w and LC.rects[1].radius == MODEL.BUTTON_RADIUS, show(LC.rects[1]))
 check("the opener's label reads downward", (function()
@@ -447,7 +452,7 @@ local big = MODEL.new()
 MODEL.refresh(big, ENTRIES, PLACE, game, CAN)
 big.open = true
 big.scale = 2
-local LB = MODEL.layout(big, measure, VIEW)
+local LB = MODEL.layout(big, measure, VIEW, TEXT)
 check("scale multiplies the panel's sizes", LB.rects[1].w == L.rects[1].w * 2 and math.abs(LB.rects[1].h - L.rects[1].h * 2) <= 2, LB.rects[1].w .. " vs " .. L.rects[1].w)
 check("text sizes scale with the panel", (function()
 	for _, t in ipairs(LB.texts) do
@@ -466,39 +471,39 @@ check("a saved position must be fractions of the view with a side", MODEL.validP
 
 local moved = MODEL.new()
 MODEL.refresh(moved, ENTRIES, PLACE, game, CAN)
-local before = MODEL.layout(moved, measure, VIEW).box
+local before = MODEL.layout(moved, measure, VIEW, TEXT).box
 MODEL.drag(moved, before, true, -300, 100, VIEW)
-local after = MODEL.layout(moved, measure, VIEW).box
+local after = MODEL.layout(moved, measure, VIEW, TEXT).box
 check("a drag moves the pill by the mouse's travel", after.x == before.x - 300 and after.y == before.y + 100, show({ before, after }))
 
 MODEL.drag(moved, before, true, -5000, 5000, VIEW)
-local clamped = MODEL.layout(moved, measure, VIEW).box
+local clamped = MODEL.layout(moved, measure, VIEW, TEXT).box
 check("a drag past the edges stops flush with them", clamped.x == 0 and clamped.y + clamped.h == VIEW.h, show(clamped))
 
-MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
+MODEL.settle(moved, MODEL.layout(moved, measure, VIEW, TEXT), VIEW)
 check("dropped on the left half, the pill hangs from its left corner", moved.pos.right == false and moved.pos.x == 0 and moved.pos.y == 1, show(moved.pos))
-local settled = MODEL.layout(moved, measure, VIEW).box
+local settled = MODEL.layout(moved, measure, VIEW, TEXT).box
 check("settling does not move the pill", same(settled, clamped), show({ settled, clamped }))
 moved.open = true
-local openLeft = MODEL.layout(moved, measure, VIEW)
+local openLeft = MODEL.layout(moved, measure, VIEW, TEXT)
 check("opened there, the panel hangs from the same corner", openLeft.box.x == 0 and openLeft.box.y + openLeft.box.h == VIEW.h, show(openLeft.box))
 
 MODEL.drag(moved, openLeft.box, false, 1500, -200, VIEW)
-MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
-local openRight = MODEL.layout(moved, measure, VIEW).box
+MODEL.settle(moved, MODEL.layout(moved, measure, VIEW, TEXT), VIEW)
+local openRight = MODEL.layout(moved, measure, VIEW, TEXT).box
 check("dropped on the right half, the panel hangs from its right corner", moved.pos.right == true and math.abs(moved.pos.x * VIEW.w - (openRight.x + openRight.w)) < 1e-6, show(moved.pos))
 moved.open = false
-local pillRight = MODEL.layout(moved, measure, VIEW).box
+local pillRight = MODEL.layout(moved, measure, VIEW, TEXT).box
 check("closing it there leaves the pill under the panel's right corner", pillRight.x + pillRight.w == openRight.x + openRight.w and pillRight.y + pillRight.h == openRight.y + openRight.h, show({ pillRight, openRight }))
 
 local snapping = MODEL.new()
-local start = MODEL.layout(snapping, measure, VIEW).box
+local start = MODEL.layout(snapping, measure, VIEW, TEXT).box
 MODEL.drag(snapping, start, true, -(start.x - 20), 0, VIEW)
-check("dropped near the left edge, the box snaps flush to it", MODEL.layout(snapping, measure, VIEW).box.x == 0, show(MODEL.layout(snapping, measure, VIEW).box))
+check("dropped near the left edge, the box snaps flush to it", MODEL.layout(snapping, measure, VIEW, TEXT).box.x == 0, show(MODEL.layout(snapping, measure, VIEW, TEXT).box))
 MODEL.drag(snapping, start, true, -(start.x - 20 - MODEL.SNAP), 0, VIEW)
-check("further out than the snap distance, it stays where it was dropped", MODEL.layout(snapping, measure, VIEW).box.x == 20 + MODEL.SNAP, show(MODEL.layout(snapping, measure, VIEW).box))
+check("further out than the snap distance, it stays where it was dropped", MODEL.layout(snapping, measure, VIEW, TEXT).box.x == 20 + MODEL.SNAP, show(MODEL.layout(snapping, measure, VIEW, TEXT).box))
 MODEL.drag(snapping, start, true, 0, VIEW.h - start.y - start.h - 10, VIEW)
-local nearTop = MODEL.layout(snapping, measure, VIEW).box
+local nearTop = MODEL.layout(snapping, measure, VIEW, TEXT).box
 check("dropped near the top, the box snaps flush to it", nearTop.y + nearTop.h == VIEW.h, show(nearTop))
 
 --------------------------------------------------------------------------------
@@ -512,7 +517,7 @@ end
 local tall = MODEL.new()
 MODEL.refresh(tall, many, PLACE, game, CAN)
 tall.open = true
-local LT = MODEL.layout(tall, measure, VIEW)
+local LT = MODEL.layout(tall, measure, VIEW, TEXT)
 local shown = #hitsOf(LT, "place")
 check("rows past the panel's height are not drawn", shown < 30 and shown >= 3, shown)
 check("the shown rows fit the view", (function()
@@ -532,7 +537,7 @@ end
 check("on the first page only the next page button can be clicked", pagerOf(LT)[1] ~= nil and pagerOf(LT)[-1] == nil)
 check("the pager says which page of how many", #textsWith(LT, "1 / " .. math.ceil(30 / shown)) == 1)
 MODEL.turnPage(tall, 1)
-local page2 = MODEL.layout(tall, measure, VIEW)
+local page2 = MODEL.layout(tall, measure, VIEW, TEXT)
 check("the next page starts after the last row of the first", hitsOf(page2, "place")[1].action.key == "library:" .. (shown + 1))
 check("the pager sits right of Save selection", (function()
 	for _, h in ipairs(page2.hits) do
@@ -552,16 +557,16 @@ do
 	local long = MODEL.new()
 	MODEL.refresh(long, lots, PLACE, game, CAN)
 	long.open = true
-	MODEL.layout(long, measure, VIEW)
+	MODEL.layout(long, measure, VIEW, TEXT)
 	MODEL.turnPage(long, 9)
-	local LL = MODEL.layout(long, measure, VIEW)
+	local LL = MODEL.layout(long, measure, VIEW, TEXT)
 	local ground = hitsOf(LL, "saveGround")[1]
 	check("a pager label too long for the footer is left out rather than drawn over Save ground", pagerOf(LL)[-1].x > ground.x + ground.w and #textsWith(LL, "10 / 40") == 0, show(pagerOf(LL)[-1]))
 end
 MODEL.turnPage(tall, -100)
 check("turning back stops at the first page", tall.page == 0)
 MODEL.turnPage(tall, 1000)
-local last = MODEL.layout(tall, measure, VIEW)
+local last = MODEL.layout(tall, measure, VIEW, TEXT)
 local lastHits = hitsOf(last, "place")
 check("turning on stops at the last page, which ends with the last entry", lastHits[#lastHits].action.key == "library:30" and pagerOf(last)[1] == nil and pagerOf(last)[-1] ~= nil, tall.page)
 check("a short last page keeps the panel's height", last.box.h == LT.box.h)
@@ -571,7 +576,7 @@ MODEL.reveal(tall, "library:" .. (shown + 2))
 check("revealing an entry on another page turns to that page", tall.page == 1)
 check("a panel with one page has no pager and does not turn", (function()
 	MODEL.turnPage(state, 5)
-	local L = MODEL.layout(state, measure, VIEW)
+	local L = MODEL.layout(state, measure, VIEW, TEXT)
 	return state.page == 0 and next(pagerOf(L)) == nil
 end)())
 
@@ -596,9 +601,9 @@ check("it moves down, flush to the screen's edge when that is what clears it", d
 check("with nowhere clear it stays put", MODEL.clearOffset(base, VIEW.h, coveredBy({ { x = 0, y = 0, w = VIEW.w, h = VIEW.h } }), 24) == 0)
 local nudged = MODEL.new()
 nudged.open = true
-local before = MODEL.layout(nudged, measure, VIEW).box.y
+local before = MODEL.layout(nudged, measure, VIEW, TEXT).box.y
 nudged.nudge = 50
-check("the layout applies the nudge", MODEL.layout(nudged, measure, VIEW).box.y == before + 50)
+check("the layout applies the nudge", MODEL.layout(nudged, measure, VIEW, TEXT).box.y == before + 50)
 
 --------------------------------------------------------------------------------
 -- packing
@@ -816,7 +821,7 @@ local tiles = MODEL.new()
 MODEL.refresh(tiles, plenty, PLACE, game, CAN)
 tiles.open = true
 MODEL.setView(tiles, "grid")
-local LG = MODEL.layout(tiles, measure, VIEW)
+local LG = MODEL.layout(tiles, measure, VIEW, TEXT)
 local function rectsOf(layout, kind)
 	local found = {}
 	for _, r in ipairs(layout.rects) do
@@ -835,11 +840,11 @@ end)(), show(shownTiles[1]))
 check("each tile is clickable to place and draws its layout map", #hitsOf(LG, "place") == #shownTiles and #rectsOf(LG, "map") == #shownTiles)
 check("with nothing hovered the strip under the tiles is empty", #rectsOf(LG, "info") == 1 and #rectsOf(LG, "row") == 0)
 tiles.hover = MODEL.actionId({ kind = "place", key = "library:2" })
-local LGH = MODEL.layout(tiles, measure, VIEW)
+local LGH = MODEL.layout(tiles, measure, VIEW, TEXT)
 check("hovering a tile shows it in the strip as a list row", #rectsOf(LGH, "row") == 1 and rectsOf(LGH, "row")[1].key == "library:2" and #textsWith(LGH, "Entry 2") == 1, show(rectsOf(LGH, "row")))
 tiles.hover = nil
 tiles.placing = { key = "library:3", name = "Entry 3", rotation = 0 }
-local LGP = MODEL.layout(tiles, measure, VIEW)
+local LGP = MODEL.layout(tiles, measure, VIEW, TEXT)
 check("with nothing hovered the strip shows the one being placed, outlined only in the grid", (function()
 	local inPanel = 0
 	for _, t in ipairs(textsWith(LGP, "Entry 3")) do
@@ -851,7 +856,7 @@ check("with nothing hovered the strip shows the one being placed, outlined only 
 end)())
 tiles.placing = nil
 MODEL.turnPage(tiles, 1)
-check("a grid page is whole rows of tiles", hitsOf(MODEL.layout(tiles, measure, VIEW), "place")[1].action.key == "library:" .. (#shownTiles + 1) and #shownTiles % MODEL.GRID_COLUMNS == 0)
+check("a grid page is whole rows of tiles", hitsOf(MODEL.layout(tiles, measure, VIEW, TEXT), "place")[1].action.key == "library:" .. (#shownTiles + 1) and #shownTiles % MODEL.GRID_COLUMNS == 0)
 MODEL.setView(tiles, "list")
 check("switching view goes back to the first page", tiles.page == 0 and tiles.view == "list")
 MODEL.setView(tiles, "sideways")
@@ -888,12 +893,12 @@ local terrainState = MODEL.new()
 MODEL.refresh(terrainState, TERRAIN_ENTRIES, PLACE, game, CAN)
 terrainState.open = true
 terrainState.tab = "all"
-local LT2 = MODEL.layout(terrainState, measure, VIEW)
+local LT2 = MODEL.layout(terrainState, measure, VIEW, TEXT)
 check("a layout of walls only is in the list", #terrainState.items == 3 and terrainState.counts.all == 3, show(terrainState.counts))
 local function detailOf(key)
 	for _, item in ipairs(terrainState.items) do
 		if item.entry.key == key then
-			return MODEL.rowDetail(item)
+			return MODEL.rowDetail(item, TEXT)
 		end
 	end
 end
@@ -944,14 +949,14 @@ check("a layout of walls only draws terrain in its map and no building", (functi
 	local wallsOnly = MODEL.new()
 	MODEL.refresh(wallsOnly, { TERRAIN_ENTRIES[1] }, PLACE, game, CAN)
 	wallsOnly.open, wallsOnly.tab = true, "all"
-	local L = MODEL.layout(wallsOnly, measure, VIEW)
+	local L = MODEL.layout(wallsOnly, measure, VIEW, TEXT)
 	return #kindsOf(L, "map") == 1 and #kindsOf(L, "terrain") > 0 and #kindsOf(L, "building") == 0
 end)())
 check("steps are drawn after the map and before the buildings", (function()
 	local both = MODEL.new()
 	MODEL.refresh(both, { TERRAIN_ENTRIES[2] }, PLACE, game, CAN)
 	both.open, both.tab = true, "all"
-	local L = MODEL.layout(both, measure, VIEW)
+	local L = MODEL.layout(both, measure, VIEW, TEXT)
 	local map, terrain, building = kindsOf(L, "map")[1], kindsOf(L, "terrain"), kindsOf(L, "building")
 	return #terrain > 0 and #building == 1 and map < terrain[1] and terrain[#terrain] < building[1]
 end)())
@@ -988,13 +993,13 @@ check("terrain is on unless the player turns it off", tf.terrain == true)
 MODEL.refresh(tf, TERRAIN_ENTRIES, PLACE, game, CAN_TF)
 tf.open, tf.tab = true, "all"
 check("with a builder that can terraform, a layout of walls only is now", tf.items[1].tab == "now" and tf.items[1].placeable == true and tf.items[1].stop == nil and tf.counts.now == 3, show(tf.counts))
-check("its row has no reason", MODEL.rowDetail(tf.items[1]) == "coilbox | No buildings, 3 terrain changes", MODEL.rowDetail(tf.items[1]))
+check("its row has no reason", MODEL.rowDetail(tf.items[1], TEXT) == "coilbox | No buildings, 3 terrain changes", MODEL.rowDetail(tf.items[1], TEXT))
 check("it can be stepped to", MODEL.step(tf, 1) == "library:walls")
 MODEL.setTerrain(tf, false)
 MODEL.setTerrain(tf, "sideways")
 check("the terrain choice switches off, and a value that is not a boolean is ignored", tf.terrain == false)
 MODEL.refresh(tf, TERRAIN_ENTRIES, PLACE, game, CAN_TF)
-check("with terrain off a layout of walls only cannot be picked up, and its row says so", tf.items[1].placeable == false and tf.items[1].tab == "never" and MODEL.rowDetail(tf.items[1]) == "Terrain is off | coilbox | No buildings, 3 terrain changes", MODEL.rowDetail(tf.items[1]))
+check("with terrain off a layout of walls only cannot be picked up, and its row says so", tf.items[1].placeable == false and tf.items[1].tab == "never" and MODEL.rowDetail(tf.items[1], TEXT) == "Terrain is off | coilbox | No buildings, 3 terrain changes", MODEL.rowDetail(tf.items[1], TEXT))
 check("a layout with buildings can still be picked up with terrain off", tf.items[2].placeable == true and tf.items[2].stop == nil)
 check("a layout with nothing in this game is not placeable", (function()
 	local gone = MODEL.new()
@@ -1026,10 +1031,10 @@ end
 local tray = MODEL.new()
 tray.open = true
 tray.placing = { key = "x", name = "X", rotation = 0, flip = { x = false, z = false } }
-local plain = MODEL.layout(tray, measure, VIEW)
+local plain = MODEL.layout(tray, measure, VIEW, TEXT)
 check("the placing panel has no Terrain choice unless the blueprint has steps and terraform is there", #terrainHits(plain) == 0 and #textsWith(plain, "Terrain") == 0)
 tray.placing.terrain = true
-local withTerrain = MODEL.layout(tray, measure, VIEW)
+local withTerrain = MODEL.layout(tray, measure, VIEW, TEXT)
 check("with them it has On and Off", #terrainHits(withTerrain) == 2)
 check("the row is labelled Terrain", #textsWith(withTerrain, "Terrain") == 1)
 check("the tray grows by the row and its controls stay inside it", withTerrain.tray.h > plain.tray.h and (function()
@@ -1120,7 +1125,7 @@ do
 		MODEL.refresh(panel, EXAMPLES, PLACE, ZK.Game, zkCan)
 		panel.open, panel.tab = true, "all"
 		MODEL.setView(panel, view)
-		local drawn = MODEL.layout(panel, measure, VIEW)
+		local drawn = MODEL.layout(panel, measure, VIEW, TEXT)
 		local S = MODEL.scaleFor(panel, VIEW)
 		local maps = {}
 		for _, r in ipairs(drawn.rects) do
