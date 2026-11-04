@@ -45,9 +45,22 @@ end
 --- Languages written under another code: Norwegian "no" is Bokmål, `nb`.
 local SAME_LANGUAGE = { no = "nb" }
 
+--- Subtags that mark Chinese as Traditional, as src/i18n/locales.ts lists them.
+local TRADITIONAL = { hant = true, tw = true, hk = true, mo = true }
+
 --- The language part of a code: "pt" for "pt-BR", and "nb" for "no".
+-- Traditional Chinese is a language of its own here, so "zh-TW" never draws
+-- the `zh-Hans` table, as coilbox's own interface falls back to English then.
 local function language(code)
-	local base = (code:match("^([^-]+)") or code):lower()
+	code = code:lower()
+	local base = code:match("^([^-]+)") or code
+	if base == "zh" then
+		for subtag in code:gmatch("-([^-]+)") do
+			if TRADITIONAL[subtag] then
+				return "zh-hant"
+			end
+		end
+	end
 	return SAME_LANGUAGE[base] or base
 end
 
