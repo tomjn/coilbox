@@ -12,6 +12,7 @@ mod chobby_presets;
 mod focus;
 mod infolog;
 mod launch;
+mod launch_settings;
 pub mod oa;
 mod oa_launch;
 pub mod script;
@@ -268,7 +269,7 @@ fn launch_blocking(
 }
 
 /// [`launch_blocking`], with `extra_datadir` added after every content folder.
-/// The autohost's settings file is the one thing that goes there.
+/// That folder holds the launch's settings file, see [`launch_settings`].
 fn launch_blocking_with(
     bin: PathBuf,
     args: Vec<String>,
@@ -282,7 +283,7 @@ fn launch_blocking_with(
     // folder other than its own.
     let mut datadir = coilbox_proc::spring_datadir(&data_dir);
     if let Some(extra) = &extra_datadir {
-        datadir = autohost::with_extra_datadir(&datadir, extra)?;
+        datadir = launch_settings::with_extra_datadir(&datadir, extra)?;
     }
     let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
@@ -412,13 +413,29 @@ async fn play_launch<R: Runtime>(
         return Ok(CliResult::err(format!("could not write script.txt: {e}")));
     }
 
-    let extra_datadir = if autohost == Some(true) {
-        match open_autohost(&app, &hosts, &run_id) {
-            Ok(dir) => Some(dir),
+    let language = match launch_settings::language(&config) {
+        Ok(language) => language,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let port = if autohost == Some(true) {
+        match open_autohost(&hosts, &run_id) {
+            Ok(port) => Some(port),
             Err(e) => return Ok(CliResult::err(e)),
         }
     } else {
         None
+    };
+    let extra_datadir = match launch_settings::text(port, language) {
+        Some(text) => match write_launch_settings(&app, &text) {
+            Ok(dir) => Some(dir),
+            Err(e) => {
+                if let Some(host) = hosts.lock().unwrap().remove(&run_id) {
+                    host.close();
+                }
+                return Ok(CliResult::err(e));
+            }
+        },
+        None => None,
     };
 
     let args = build_engine_args(&path.to_string_lossy(), None);
@@ -435,21 +452,21 @@ async fn play_launch<R: Runtime>(
     Ok(launch_result(result))
 }
 
-/// Bind the autohost socket for `run_id` and write the settings file that
-/// points the engine at it. Answers the folder to add to `SPRING_DATADIR`.
-fn open_autohost<R: Runtime>(
-    app: &AppHandle<R>,
-    hosts: &AutohostRegistry,
-    run_id: &str,
-) -> Result<PathBuf, String> {
+/// Bind the autohost socket for `run_id`. Answers its port, for the launch's
+/// settings file.
+fn open_autohost(hosts: &AutohostRegistry, run_id: &str) -> Result<u16, String> {
     let host = autohost::Autohost::bind()
         .map_err(|e| format!("could not open a port for the game to talk to: {e}"))?;
-    let dir = autohost::settings_dir(&coilbox_portable::data_dir(app)?);
-    if let Err(e) = autohost::write_settings(&dir, host.port()) {
-        host.close();
-        return Err(e);
-    }
+    let port = host.port();
     hosts.lock().unwrap().insert(run_id.to_string(), host);
+    Ok(port)
+}
+
+/// Write this launch's settings file. Answers the folder to add to
+/// `SPRING_DATADIR`.
+fn write_launch_settings<R: Runtime>(app: &AppHandle<R>, text: &str) -> Result<PathBuf, String> {
+    let dir = launch_settings::settings_dir(&coilbox_portable::data_dir(app)?);
+    launch_settings::write(&dir, text)?;
     Ok(dir)
 }
 

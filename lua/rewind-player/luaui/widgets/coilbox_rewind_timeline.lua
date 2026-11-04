@@ -96,7 +96,7 @@ local function strings(say, engine)
 	if not engine.on.language then
 		return i18n.pick(tables)
 	end
-	return i18n.pick(tables, Spring.GetModOptions(), Spring.GetConfigString("language", ""))
+	return i18n.pick(tables, Spring.GetModOptions(), i18n.config(Spring))
 end
 
 function widget:Initialize()

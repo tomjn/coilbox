@@ -67,6 +67,26 @@ check("the mod option comes first", I18N.code(T, { coilbox_lang = "fr" }, "zh-Ha
 check("then the engine's language key", I18N.code(T, {}, "fr") == "fr")
 check("then English", I18N.code(T, {}, "") == "en")
 check("with no mod options at all", I18N.code(T, nil, nil) == "en")
+-- Issue #5046: a networked game's script carries no mod option, so each
+-- player's own launch settings come next, ahead of the engine's `language`.
+check("each config value counts in the order given", I18N.code(T, {}, "de", "fr") == "de")
+check("one with no table is passed over for the next", I18N.code(T, {}, "nn", "fr") == "fr")
+check("and an empty one too", I18N.code(T, {}, "", "fr") == "fr")
+check("the mod option still comes before them", I18N.code(T, { coilbox_lang = "fr" }, "de", "zh-Hans") == "fr")
+local asked = {}
+local stub = {
+	GetConfigString = function(key, default)
+		asked[#asked + 1] = key
+		return ({ CoilboxLanguage = "de", language = "fr" })[key] or default
+	end,
+}
+check("config reads coilbox's launch key, then the engine's",
+	I18N.code(T, {}, I18N.config(stub)) == "de"
+		and asked[1] == "CoilboxLanguage" and asked[2] == "language")
+check("a launch with no key of its own falls to the engine's",
+	I18N.code(T, {}, I18N.config({ GetConfigString = function(key, default)
+		return key == "language" and "fr" or default
+	end })) == "fr")
 check("a mod option naming a language with no table is passed over",
 	I18N.code(T, { coilbox_lang = "nn" }, "fr") == "fr")
 check("and with nothing after it, English", I18N.code(T, { coilbox_lang = "nn" }, "") == "en")

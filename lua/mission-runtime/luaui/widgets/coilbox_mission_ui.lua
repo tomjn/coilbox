@@ -411,7 +411,7 @@ function widget:Initialize()
 		return
 	end
 	local code
-	TEXT, code = i18n.pick(strings, Spring.GetModOptions(), Spring.GetConfigString("language", ""))
+	TEXT, code = i18n.pick(strings, Spring.GetModOptions(), i18n.config(Spring))
 	log("notice", "mission UI draws in " .. code)
 
 	MISSION_DIR = "missions/" .. id .. "/"

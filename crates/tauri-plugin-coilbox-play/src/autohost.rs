@@ -9,7 +9,6 @@
 
 use coilbox_ui_error::UiError;
 use std::net::{SocketAddr, UdpSocket};
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -160,42 +159,6 @@ impl Autohost {
             state = self.changed.wait_timeout(state, deadline - now).unwrap().0;
         }
     }
-}
-
-/// The folder a launch adds to `SPRING_DATADIR` to carry the port, under
-/// coilbox's own app data. The engine reads a `springsettings.cfg` in any data
-/// folder as extra settings and never writes to one that is not its write
-/// folder, which this never is, since it goes last.
-pub fn settings_dir(app_data: &Path) -> PathBuf {
-    app_data.join("play").join("autohost")
-}
-
-/// Write the settings file that points the engine at `port`.
-pub fn write_settings(dir: &Path, port: u16) -> Result<(), String> {
-    std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
-    let file = dir.join("springsettings.cfg");
-    std::fs::write(
-        &file,
-        format!("AutohostIP = 127.0.0.1\nAutohostPort = {port}\n"),
-    )
-    .map_err(|e| format!("could not write {}: {e}", file.display()))
-}
-
-/// `datadir` with `extra` after every folder already in it, so the engine's
-/// write folder and the player's own settings both stay first.
-pub fn with_extra_datadir(datadir: &str, extra: &Path) -> Result<String, String> {
-    let extra = extra.to_string_lossy();
-    if extra.contains(coilbox_proc::DATADIR_SEP) {
-        return Err(format!(
-            "{extra} cannot be a data folder: its name has a {} in it",
-            coilbox_proc::DATADIR_SEP
-        ));
-    }
-    Ok(if datadir.is_empty() {
-        extra.into_owned()
-    } else {
-        format!("{datadir}{}{extra}", coilbox_proc::DATADIR_SEP)
-    })
 }
 
 #[cfg(test)]
@@ -349,23 +312,5 @@ mod tests {
         assert_eq!(err.params["seconds"], "0");
         assert_eq!(engine.heard(), "/luarules coilbox_sandbox reload_scripts");
         host.close();
-    }
-
-    #[test]
-    fn the_settings_point_the_engine_at_the_port() {
-        let dir = std::env::temp_dir().join(format!("coilbox-autohost-{}", std::process::id()));
-        write_settings(&dir, 53344).expect("write");
-        let text = std::fs::read_to_string(dir.join("springsettings.cfg")).expect("read");
-        assert!(text.contains("AutohostPort = 53344\n"), "{text}");
-        assert!(text.contains("AutohostIP = 127.0.0.1\n"), "{text}");
-        std::fs::remove_dir_all(&dir).expect("clean up");
-    }
-
-    #[test]
-    fn the_settings_folder_goes_after_every_other_data_folder() {
-        let sep = coilbox_proc::DATADIR_SEP;
-        let joined = with_extra_datadir(&format!("/a{sep}/b"), Path::new("/c")).expect("joined");
-        assert_eq!(joined, format!("/a{sep}/b{sep}/c"));
-        assert!(with_extra_datadir("/a", Path::new(&format!("/c{sep}d"))).is_err());
     }
 }
