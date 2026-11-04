@@ -75,10 +75,12 @@ M.TERRAIN_FILL = 0.3
 M.TERRAIN_OUTLINE = 0.62
 M.TERRAIN_START = 0.85
 
-local TITLE = "BLUEPRINTS"
 local TABS_LIST = { "now", "partly", "all" }
-local TAB_LABELS = { now = "Now", partly = "Partly", all = "All" }
-local SOURCE_TAGS = { library = "coilbox", spool = "saved", bar = "BAR" }
+-- The key of each tab's name in the strings (strings.lua).
+local TAB_KEYS = { now = "tabNow", partly = "tabPartly", all = "tabAll" }
+-- Where a layout came from. These are names, so they stay as they are, except
+-- the spool, which is said as a word (the key `sourceSaved`).
+local SOURCE_TAGS = { library = "coilbox", bar = "BAR" }
 -- Arrows for the pager, as steps of bars in a unit square, pointing right and
 -- left.
 local ARROW_NEXT = { { 0.36, 0.28, 0.1, 0.44 }, { 0.46, 0.36, 0.1, 0.28 }, { 0.56, 0.44, 0.1, 0.12 } }
@@ -175,10 +177,11 @@ function M.refresh(state, entries, place, game, can, side)
 			-- a layout of steps alone can only be placed when they will be ordered
 			local stop
 			if steps > 0 and #resolved.buildings == 0 and #resolved.missing == 0 and foreign == 0 then
+				-- the key of what to say, so the language is picked at draw time
 				if not available then
-					stop = "no terraforming here"
+					stop = "stopNoTerraform"
 				elseif not state.terrain then
-					stop = "Terrain is off"
+					stop = "stopTerrainOff"
 				end
 				tab = stop and "never" or "now"
 			end
@@ -278,17 +281,25 @@ function M.clockTime(seconds)
 	return string.format("%d:%02d", math.floor(whole / 60), whole % 60)
 end
 
+--- A count said in the form that fits it: the strings' `<key>_one` for 1 and
+-- `<key>_other` for any other number, filled in with the count and then any
+-- further values.
+function M.plural(words, key, n, ...)
+	return string.format(words[key .. (n == 1 and "_one" or "_other")], n, ...)
+end
+
 --- What placing a layout costs, as the placing panel says it.
 -- @param cost table? { metal, energy, seconds }, seconds nil with no builder
-function M.costLine(cost)
+-- @param words table the strings (strings.lua)
+function M.costLine(cost, words)
 	if not cost then
 		return ""
 	end
-	local parts = { string.format("%d metal", math.floor(cost.metal + 0.5)), string.format("%d energy", math.floor(cost.energy + 0.5)) }
+	local metal, energy = math.floor(cost.metal + 0.5), math.floor(cost.energy + 0.5)
 	if cost.seconds then
-		parts[#parts + 1] = M.clockTime(cost.seconds) .. " to build"
+		return string.format(words.costWithTime, metal, energy, M.clockTime(cost.seconds))
 	end
-	return table.concat(parts, ", ")
+	return string.format(words.costNoTime, metal, energy)
 end
 
 --- Switch between builders helping each other and splitting the work.
@@ -309,7 +320,7 @@ end
 
 --- Switch tab and go back to the first page.
 function M.setTab(state, tab)
-	if TAB_LABELS[tab] and tab ~= state.tab then
+	if TAB_KEYS[tab] and tab ~= state.tab then
 		state.tab = tab
 		state.page = 0
 		M.touch(state)
@@ -414,31 +425,32 @@ function M.truncate(text, width, measure, size)
 end
 
 --- The one line that says what a row is.
-local function rowDetail(item)
+local function rowDetail(item, words)
 	local parts = {}
 	-- what stops or changes placing goes first, so a narrow row never cuts
 	-- it off
 	if (item.foreign or 0) > 0 then
-		parts[1] = item.foreign .. " from another side"
+		parts[1] = string.format(words.fromAnotherSide, item.foreign)
 	elseif item.stop then
-		parts[1] = item.stop
+		parts[1] = words[item.stop]
 	end
 	if (item.upgrades or 0) > 0 then
-		parts[#parts + 1] = item.upgrades .. " to upgrade"
+		parts[#parts + 1] = string.format(words.toUpgrade, item.upgrades)
 	end
-	parts[#parts + 1] = SOURCE_TAGS[item.entry.source] or item.entry.source
+	local source = item.entry.source
+	parts[#parts + 1] = source == "spool" and words.sourceSaved or SOURCE_TAGS[source] or source
 	local n = #item.entry.buildings
 	local steps = #(item.entry.terrain or {})
-	local count = (n == 0 and steps > 0) and "No buildings" or (n .. (n == 1 and " building" or " buildings"))
+	local count = (n == 0 and steps > 0) and words.noBuildings or M.plural(words, "buildings", n)
 	if steps > 0 then
-		count = count .. ", " .. steps .. (steps == 1 and " terrain change" or " terrain changes")
+		count = string.format(words.buildingsAndTerrain, count, M.plural(words, "terrainChanges", steps))
 	end
 	parts[#parts + 1] = count
 	if item.entry.ordered then
-		parts[#parts + 1] = "ordered"
+		parts[#parts + 1] = words.rowOrdered
 	end
 	if #item.resolved.missing > 0 then
-		parts[#parts + 1] = "missing " .. table.concat(item.resolved.missing, ", ")
+		parts[#parts + 1] = string.format(words.missing, table.concat(item.resolved.missing, ", "))
 	end
 	return table.concat(parts, " | ")
 end
@@ -674,14 +686,14 @@ function M.layoutMap(resolved, size, terrain)
 	return out, marks
 end
 
-local function emptyText(state)
+local function emptyText(state, words)
 	if #state.items == 0 then
-		return "No blueprints for this game. Make one in coilbox, or save a selection."
+		return words.emptyLibrary
 	end
 	if state.tab ~= "all" and not state.hasBuilders then
-		return "Select a builder to see what it can build."
+		return words.emptyNoBuilder
 	end
-	return "Nothing under this tab."
+	return words.emptyTab
 end
 
 --- The scale the panel is drawn at for a view.
@@ -805,16 +817,46 @@ function M.settle(state, L, view)
 	M.touch(state)
 end
 
+--- Widths that fit side by side in `avail`: each button keeps its own width if
+-- it can, and the ones too wide share what the rest leave. A translation
+-- longer than English makes a wider button, and this stops a row of them
+-- running past the panel by cutting the longest labels instead.
+local function fitWidths(widths, avail)
+	local out, fixed = {}, {}
+	local left, count = avail, #widths
+	local changed = true
+	while changed and count > 0 do
+		changed = false
+		local cap = left / count
+		for i, w in ipairs(widths) do
+			if not fixed[i] and w <= cap then
+				fixed[i], out[i] = true, w
+				left, count = left - w, count - 1
+				changed = true
+			end
+		end
+	end
+	for i in ipairs(widths) do
+		if not fixed[i] then
+			out[i] = math.max(0, left / count)
+		end
+	end
+	return out
+end
+
 --- Lay the panel out.
 -- @param state table
 -- @param measure function(text, size) -> width in pixels
 -- @param view table w, h of the screen
+-- @param words table what the panel says, from strings.lua through
+--   coilbox_i18n.lua. A key the table lacks is the caller's to fill from
+--   English, as I18N.strings does.
 -- @return table rects, texts, pics, hits and box. Each rect is { x, y, w, h,
 --   color, kind, radius?, border?, key?, active? }, each text { x, y, size,
 --   text, color, rotate? } with y the middle of its capitals, each pic { x, y,
 --   w, h, radius, defID, row }, each hit { x, y, w, h, action }. box is the
 --   opener or the panel, whichever is shown.
-function M.layout(state, measure, view)
+function M.layout(state, measure, view, words)
 	local L = { rects = {}, texts = {}, pics = {}, hits = {} }
 	local rects, texts, pics, hits = L.rects, L.texts, L.pics, L.hits
 	local S = M.scaleFor(state, view)
@@ -851,8 +893,13 @@ function M.layout(state, measure, view)
 	local function buttonW(label)
 		return measure(label, SMALL) + 2 * PAD
 	end
-	local function button(x, y, label, action)
+	-- a button no wider than maxW, its label cut to fit when it has to be
+	local function button(x, y, label, action, maxW)
 		local w = buttonW(label)
+		if maxW and w > maxW then
+			w = maxW
+			label = M.truncate(label, maxW - 2 * PAD, measure, SMALL)
+		end
 		rect(x, y, w, PILL, hovered(action) and lift(C.button) or C.button, "button", { radius = BR })
 		text(x + PAD, y + PILL / 2, SMALL, label)
 		hit(x, y, w, PILL, action)
@@ -877,20 +924,20 @@ function M.layout(state, measure, view)
 	-- The widget turns a text with a rotate field, so the label reads downward.
 	if not state.open then
 		local w = LINE
-		local h = measure(TITLE, SMALL) + 2 * PAD
+		local h = measure(words.title, SMALL) + 2 * PAD
 		local x, y = placeBox(state, view, w, h, PAD)
 		rect(x, y, w, h, hovered(toggle) and lift(C.panel) or C.panel, "opener", { radius = BR })
 		texts[#texts + 1] = {
 			x = x + w / 2,
 			y = y + h - PAD,
 			size = SMALL,
-			text = TITLE,
+			text = words.title,
 			color = hovered(toggle) and C.text or C.title,
 			rotate = -90,
 		}
 		hit(x, y, w, h, toggle)
 		L.box = { x = x, y = y, w = w, h = h }
-		M.layoutTray(state, L, measure, view)
+		M.layoutTray(state, L, measure, view, words)
 		return L
 	end
 
@@ -947,13 +994,24 @@ function M.layout(state, measure, view)
 	local tx = px + W - PAD - PILL
 	iconButton(tx, ty, { { 0.28, 0.44, 0.44, 0.12 } }, { kind = "close" })
 	tx = tx - GAP
+	-- the tabs take at most four fifths of what the close button leaves, so the
+	-- title keeps a handle, and share it when their labels are too long for it
+	local labels, labelWidths = {}, {}
+	for i, tab in ipairs(TABS_LIST) do
+		labels[i] = string.format(words.tabLabel, words[TAB_KEYS[tab]], state.counts[tab])
+		labelWidths[i] = measure(labels[i], SMALL) + 2 * 6 * S
+	end
+	local tabWidths = fitWidths(labelWidths, (inner - PILL - GAP) * 0.8 - GAP * #TABS_LIST)
 	for i = #TABS_LIST, 1, -1 do
 		local tab = TABS_LIST[i]
 		local active = tab == state.tab
 		local base = active and C.pillActive or C.pill
 		local tabAction = { kind = "tab", tab = tab }
-		local label = TAB_LABELS[tab] .. " " .. state.counts[tab]
-		local tw = measure(label, SMALL) + 2 * 6 * S
+		local label = labels[i]
+		local tw = tabWidths[i]
+		if labelWidths[i] > tw then
+			label = M.truncate(label, tw - 2 * 6 * S, measure, SMALL)
+		end
 		tx = tx - tw
 		rect(tx, ty, tw, PILL, hovered(tabAction) and lift(base) or base, "tab", { tab = tab, active = active, radius = BR })
 		text(tx + 6 * S, ty + PILL / 2, SMALL, label, active and C.text or C.dim)
@@ -961,17 +1019,22 @@ function M.layout(state, measure, view)
 		tx = tx - GAP
 	end
 	local handleW = tx - px
-	text(px + PAD, y + HEADER / 2, FONT, M.truncate(TITLE, handleW - 2 * PAD, measure, FONT), hovered(toggle) and C.text or C.title)
+	text(px + PAD, y + HEADER / 2, FONT, M.truncate(words.title, handleW - 2 * PAD, measure, FONT), hovered(toggle) and C.text or C.title)
 	hit(px, y, handleW, HEADER, toggle)
 
 	-- remainder
 	if state.remainder then
 		y = y - LINE
 		local n = state.remainder.count
-		local dismissW, placeW = buttonW("Dismiss"), buttonW("Place")
-		text(px + PAD, y + LINE / 2, SMALL, n .. " left to build", C.warn)
-		button(px + W - PAD - dismissW - GAP - placeW, y + (LINE - PILL) / 2, "Place", { kind = "remainder" })
-		button(px + W - PAD - dismissW, y + (LINE - PILL) / 2, "Dismiss", { kind = "dismiss" })
+		-- the buttons keep their room, at most two thirds of the row between
+		-- them, and the count is cut to what they leave
+		local fitted = fitWidths({ buttonW(words.place), buttonW(words.dismiss) }, (inner - 2 * GAP) * 2 / 3)
+		local placeW, dismissW = fitted[1], fitted[2]
+		local rowY = y + (LINE - PILL) / 2
+		local buttonsX = px + W - PAD - dismissW - GAP - placeW
+		text(px + PAD, y + LINE / 2, SMALL, M.truncate(string.format(words.remainderLeft, n), buttonsX - GAP - (px + PAD), measure, SMALL), C.warn)
+		button(buttonsX, rowY, words.place, { kind = "remainder" }, placeW)
+		button(px + W - PAD - dismissW, rowY, words.dismiss, { kind = "dismiss" }, dismissW)
 	end
 
 	local function isActive(item)
@@ -1101,7 +1164,7 @@ function M.layout(state, measure, view)
 		local textX = x + inset + mapSize + inset
 		local nameW = x + w - inset - picsW - textX
 		text(textX, y + h - inset - FONT / 2, FONT, M.truncate(item.name, nameW, measure, FONT), item.tab == "never" and C.faint or C.text)
-		text(textX, y + inset + SMALL / 2, SMALL, M.truncate(rowDetail(item), nameW, measure, SMALL), C.dim)
+		text(textX, y + inset + SMALL / 2, SMALL, M.truncate(rowDetail(item, words), nameW, measure, SMALL), C.dim)
 		local defIDs = rowPics(item)
 		for p, defID in ipairs(defIDs) do
 			pics[#pics + 1] = {
@@ -1121,7 +1184,7 @@ function M.layout(state, measure, view)
 
 	local bodyTop = y
 	if linesShown == 0 then
-		text(px + PAD, bodyTop - ROW / 2, SMALL, M.truncate(emptyText(state), inner, measure, SMALL), C.dim)
+		text(px + PAD, bodyTop - ROW / 2, SMALL, M.truncate(emptyText(state, words), inner, measure, SMALL), C.dim)
 	end
 	for line = firstLine, lastLine do
 		y = y - lineH
@@ -1176,11 +1239,15 @@ function M.layout(state, measure, view)
 
 	-- footer: the two saves on the left, the list and grid switch on the right
 	local by = py + (FOOTER - PILL) / 2
-	button(px + PAD, by, "Save selection", { kind = "save" })
-	local groundX = px + PAD + buttonW("Save selection") + GAP
-	button(groundX, by, "Save ground", { kind = "saveGround" })
-	local savesEnd = groundX + buttonW("Save ground")
 	local gx = px + W - PAD - PILL
+	-- the saves have the room left of the two view buttons, and share it when
+	-- their labels are too long for it
+	local saveRoom = (gx - GAP - PILL) - GAP - (px + PAD) - GAP
+	local saves = fitWidths({ buttonW(words.saveSelection), buttonW(words.saveGround) }, saveRoom)
+	button(px + PAD, by, words.saveSelection, { kind = "save" }, saves[1])
+	local groundX = px + PAD + saves[1] + GAP
+	button(groundX, by, words.saveGround, { kind = "saveGround" }, saves[2])
+	local savesEnd = groundX + saves[2]
 	iconButton(gx, by, {
 		{ 0.25, 0.25, 0.22, 0.22 },
 		{ 0.53, 0.25, 0.22, 0.22 },
@@ -1212,7 +1279,7 @@ function M.layout(state, measure, view)
 	end
 
 	panel.h = top - py
-	M.layoutTray(state, L, measure, view)
+	M.layoutTray(state, L, measure, view, words)
 	return L
 end
 
@@ -1220,7 +1287,7 @@ end
 -- room: the name and Cancel, the cost, the keys that turn, flip and switch
 -- the layout, and whether builders help each other or split the work. Every
 -- key is a button too, so it works with nothing bound.
-function M.layoutTray(state, L, measure, view)
+function M.layoutTray(state, L, measure, view, words)
 	local placing = state.placing
 	if not placing then
 		return
@@ -1246,8 +1313,13 @@ function M.layoutTray(state, L, measure, view)
 	local function buttonW(label)
 		return math.max(PILL, measure(label, SMALL) + 2 * 6 * S)
 	end
-	local function button(x, y, label, action, active)
+	-- a button no wider than maxW, its label cut to fit when it has to be
+	local function button(x, y, label, action, active, maxW)
 		local w = buttonW(label)
+		if maxW and w > maxW then
+			w = maxW
+			label = M.truncate(label, maxW - 2 * 6 * S, measure, SMALL)
+		end
 		local base = active and C.pillActive or C.button
 		rects[#rects + 1] = { x = x, y = y, w = w, h = PILL, color = hovered(action) and lift(base) or base, kind = "button", radius = BR }
 		text(x + 6 * S, y + PILL / 2, SMALL, label, active and C.text or nil)
@@ -1265,45 +1337,66 @@ function M.layoutTray(state, L, measure, view)
 
 	-- name and Cancel
 	local row = y + TH - HEADER
-	local cancelX = edge - buttonW("Cancel")
-	button(cancelX, row + (HEADER - PILL) / 2, "Cancel", { kind = "cancel" })
+	local cancelW = math.min(buttonW(words.cancel), (TW - 2 * PAD) / 2)
+	local cancelX = edge - cancelW
+	button(cancelX, row + (HEADER - PILL) / 2, words.cancel, { kind = "cancel" }, nil, cancelW)
 	text(x + PAD, row + HEADER / 2, FONT, M.truncate(placing.name or "", cancelX - GAP - x - PAD, measure, FONT))
 
 	-- cost
 	row = row - LINE
-	text(x + PAD, row + LINE / 2, SMALL, M.truncate(M.costLine(placing.cost), TW - 2 * PAD, measure, SMALL), C.dim)
+	text(x + PAD, row + LINE / 2, SMALL, M.truncate(M.costLine(placing.cost, words), TW - 2 * PAD, measure, SMALL), C.dim)
 
 	-- one labelled row of buttons, lined up on the right
 	local keys = state.keys or {}
+	-- The buttons keep what they need of the row, and the label on the left
+	-- takes what they leave, cut to fit when it is longer. When the buttons
+	-- need more than the row can give them, the label keeps a third of it and
+	-- the buttons share the rest.
 	local function controls(label, buttons)
 		row = row - LINE
-		text(x + PAD, row + LINE / 2, SMALL, label, C.dim)
-		local bx = edge + GAP
-		for _, b in ipairs(buttons) do
-			bx = bx - buttonW(b[1]) - GAP
+		local rowWidth = TW - 2 * PAD
+		local widths = {}
+		-- a gap before each button, which is the one between the label and
+		-- the first and those between the buttons
+		local total = GAP * #buttons
+		for i, b in ipairs(buttons) do
+			widths[i] = buttonW(b[1])
+			total = total + widths[i]
 		end
-		for _, b in ipairs(buttons) do
-			button(bx, row + (LINE - PILL) / 2, b[1], b[2], b[3])
-			bx = bx + buttonW(b[1]) + GAP
+		local labelW = measure(label, SMALL)
+		local labelRoom = math.max(rowWidth / 3, rowWidth - total)
+		if labelW > labelRoom then
+			label = M.truncate(label, labelRoom, measure, SMALL)
+			labelW = labelRoom
+		end
+		text(x + PAD, row + LINE / 2, SMALL, label, C.dim)
+		local fitted = fitWidths(widths, rowWidth - labelW - GAP * #buttons)
+		local bx = edge + GAP
+		for i in ipairs(buttons) do
+			bx = bx - fitted[i] - GAP
+		end
+		for i, b in ipairs(buttons) do
+			button(bx, row + (LINE - PILL) / 2, b[1], b[2], b[3], fitted[i])
+			bx = bx + fitted[i] + GAP
 		end
 	end
 	local flip = placing.flip or {}
-	controls("Turn", {
-		{ M.keyLabel(keys.left, "Left"), { kind = "turn", delta = -1 } },
-		{ M.keyLabel(keys.right, "Right"), { kind = "turn", delta = 1 } },
+	controls(words.trayTurn, {
+		{ M.keyLabel(keys.left, words.keyLeft), { kind = "turn", delta = -1 } },
+		{ M.keyLabel(keys.right, words.keyRight), { kind = "turn", delta = 1 } },
 	})
-	controls("Flip", {
-		{ M.keyLabel(keys.flipX, "Across"), { kind = "flip", axis = "x" }, flip.x },
-		{ M.keyLabel(keys.flipZ, "Down"), { kind = "flip", axis = "z" }, flip.z },
+	controls(words.trayFlip, {
+		{ M.keyLabel(keys.flipX, words.keyAcross), { kind = "flip", axis = "x" }, flip.x },
+		{ M.keyLabel(keys.flipZ, words.keyDown), { kind = "flip", axis = "z" }, flip.z },
 	})
-	controls("Builders", {
-		{ "Together", { kind = "assist", mode = "help" }, state.assist ~= "split" },
-		{ "Split up", { kind = "assist", mode = "split" }, state.assist == "split" },
+	controls(words.trayBuilders, {
+		{ words.together, { kind = "assist", mode = "help" }, state.assist ~= "split" },
+		{ words.splitUp, { kind = "assist", mode = "split" }, state.assist == "split" },
 	})
 	if placing.terrain then
-		controls("Terrain", {
-			{ "On", { kind = "terrain", mode = "on" }, state.terrain },
-			{ "Off", { kind = "terrain", mode = "off" }, not state.terrain },
+		controls(words.trayTerrain, {
+			{ words.on, { kind = "terrain", mode = "on" }, state.terrain },
+			{ words.off, { kind = "terrain", mode = "off" }, not state.terrain },
 		})
 	end
 end

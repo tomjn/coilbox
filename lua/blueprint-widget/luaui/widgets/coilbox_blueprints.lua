@@ -127,6 +127,10 @@ end
 
 local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER, CLEAR, I18N, STRINGS
 
+-- What the widget says, in the player's language (issue #5045). Picked in
+-- Initialize from strings.lua, and the model draws from it too.
+local TEXT = nil
+
 local function include(name)
 	local path = MODULE_DIR .. name
 	if not VFS.FileExists(path, VFS.RAW_FIRST) then
@@ -638,11 +642,11 @@ local function startPlacing(key)
 	end
 	if not item.placeable then
 		if item.stop then
-			say(item.name .. " only changes the ground: " .. item.stop)
+			say(string.format(TEXT.onlyGround, item.name, TEXT[item.stop]))
 		elseif item.foreign > 0 then
-			say(item.name .. " has buildings your side cannot build")
+			say(string.format(TEXT.foreignBuildings, item.name))
 		else
-			say("Nothing in " .. item.name .. " exists in this game")
+			say(string.format(TEXT.nothingExists, item.name))
 		end
 		return
 	end
@@ -798,31 +802,26 @@ local function addPlan(positions, steps)
 	end
 end
 
-local function terrainChanges(n)
-	return n .. (n == 1 and " terrain change" or " terrain changes")
-end
-
 local function describe(plan, sent)
 	local parts = {}
 	if sent > 0 then
-		parts[#parts + 1] = "ordered to " .. sent .. (sent == 1 and " builder" or " builders")
+		parts[#parts + 1] = MODEL.plural(TEXT, "sentTo", sent)
 	end
 	if plan.blocked > 0 then
-		parts[#parts + 1] = plan.blocked .. " blocked"
+		parts[#parts + 1] = string.format(TEXT.blocked, plan.blocked)
 	end
 	if (plan.skipped or 0) > 0 then
-		parts[#parts + 1] = terrainChanges(plan.skipped) .. " skipped (" .. (plan.skippedWhy or "") .. ")"
+		parts[#parts + 1] = MODEL.plural(TEXT, "skipped", plan.skipped, plan.skippedWhy or "")
 	end
 	if (plan.offMap or 0) > 0 then
-		parts[#parts + 1] = terrainChanges(plan.offMap) .. " off the map"
+		parts[#parts + 1] = MODEL.plural(TEXT, "offMap", plan.offMap)
 	end
 	local left = #plan.remainder + #(plan.stepRemainder or {})
 	if left > 0 then
-		local what = sent > 0 and " left for another builder" or " planned, right click it with builders to build"
-		parts[#parts + 1] = left .. what
+		parts[#parts + 1] = string.format(sent > 0 and TEXT.leftForAnother or TEXT.leftPlanned, left)
 	end
 	if #parts == 0 then
-		return "nothing could be placed"
+		return TEXT.nothingPlaced
 	end
 	return table.concat(parts, ", ")
 end
@@ -851,7 +850,7 @@ local function terrainArg(steps, foot)
 	return {
 		steps = steps,
 		on = on,
-		why = not available and "terraforming is not available here" or "Terrain is off",
+		why = not available and TEXT.whyNoTerraform or TEXT.stopTerrainOff,
 		ground = on and steps[1] and TERRAFORM.session(groundEnv()).apply(steps, foot) or nil,
 	}
 end
@@ -865,7 +864,7 @@ local function placeNow()
 	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot, exitPoint())
 	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps, placing.foot))
 	local sent = PLACE.issue(plan, LATER, CLEAR)
-	say(placing.item.name .. ": " .. describe(plan, sent))
+	say(string.format(TEXT.placeResult, placing.item.name, describe(plan, sent)))
 	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
 	-- Holding shift keeps the blueprint on the cursor for another copy.
@@ -947,7 +946,7 @@ local function placeRemainder()
 		sent = math.max(sent, n)
 	end
 	dropEmptyPlans()
-	say("Planned: " .. describe(total, sent))
+	say(string.format(TEXT.planned, describe(total, sent)))
 end
 
 --- The plan with a building under a point on the ground, if any.
@@ -986,9 +985,9 @@ local function clickPlan(mx, my)
 		local name = plans[index].positions[position].def
 		local plan, sent = buildPlan(index, not whole and position or nil)
 		if not whole and sent == 0 and plan.blocked == 0 then
-			say("The selected builders cannot build " .. (name.translatedHumanName or name.humanName or name.name))
+			say(string.format(TEXT.cannotBuild, name.translatedHumanName or name.humanName or name.name))
 		else
-			say("Planned: " .. describe(plan, sent))
+			say(string.format(TEXT.planned, describe(plan, sent)))
 		end
 		dropEmptyPlans()
 		return true
@@ -996,7 +995,7 @@ local function clickPlan(mx, my)
 	if #Spring.GetSelectedUnits() == 0 then
 		table.remove(plans, index)
 		plansChanged()
-		say("Plan removed")
+		say(TEXT.planRemoved)
 		return true
 	end
 	return false
@@ -1062,7 +1061,7 @@ local function keep(entry, err)
 		log(LOG.WARNING, werr)
 		return false
 	end
-	say("Saved " .. entry.name .. ". Coilbox picks it up next time it runs.")
+	say(string.format(TEXT.savedEntry, entry.name))
 	refreshPanel()
 	return true
 end
@@ -1079,7 +1078,7 @@ end
 --- Wait for a drag on the map, and save the ground in it.
 local function pickGround()
 	picking = {}
-	say("Drag over the ground to save")
+	say(TEXT.dragToSave)
 end
 
 local function groundUnder(mx, my)
@@ -1168,7 +1167,7 @@ local function setTerrain(on)
 			if item.entry.key == placing.item.entry.key then
 				placing.item = item
 				if not item.placeable then
-					say(item.name .. " only changes the ground: " .. (item.stop or ""))
+					say(string.format(TEXT.onlyGround, item.name, item.stop and TEXT[item.stop] or ""))
 					stopPlacing()
 				end
 				break
@@ -1290,6 +1289,7 @@ function widget:Initialize()
 		widgetHandler:RemoveWidget(self)
 		return
 	end
+	TEXT = I18N.pick(STRINGS, Spring.GetModOptions(), I18N.config(Spring))
 
 	STORE.use(JSON)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
@@ -1412,8 +1412,7 @@ function widget:Initialize()
 	-- load. Say how to reach it, and the very first time it ever runs, open
 	-- the panel so there is something to see.
 	-- In the player's language (issue #4597).
-	local text = I18N.pick(STRINGS, Spring.GetModOptions(), I18N.config(Spring))
-	Spring.Echo(string.format(text.help, ACTION_TOGGLE, ACTION_LEFT, ACTION_RIGHT, ACTION_FLIP_X, ACTION_FLIP_Z, ACTION_PREV, ACTION_NEXT))
+	Spring.Echo(string.format(TEXT.help, ACTION_TOGGLE, ACTION_LEFT, ACTION_RIGHT, ACTION_FLIP_X, ACTION_FLIP_Z, ACTION_PREV, ACTION_NEXT))
 	if not (saved and saved.seen) then
 		open()
 	end
@@ -1590,7 +1589,7 @@ function widget:MousePress(x, y, button)
 			picking.to = picking.from
 		else
 			picking = nil
-			say("Save ground cancelled")
+			say(TEXT.saveGroundCancelled)
 		end
 		return true
 	end
@@ -1645,7 +1644,7 @@ function widget:MouseRelease()
 		if from and to then
 			saveGround(from.x, from.z, to.x, to.z)
 		else
-			say("Save ground needs a drag on the map")
+			say(TEXT.saveGroundNeedsDrag)
 		end
 		return true
 	end
@@ -1703,7 +1702,7 @@ end
 function widget:KeyPress(key, mods, isRepeat)
 	if picking and key == KEY_ESCAPE then
 		picking = nil
-		say("Save ground cancelled")
+		say(TEXT.saveGroundCancelled)
 		return true
 	end
 	if placing and key == KEY_ESCAPE then
@@ -1735,7 +1734,7 @@ function relayout()
 	if layoutVersion == panel.version and layoutW == vsx and layoutH == vsy then
 		return
 	end
-	layout = MODEL.layout(panel, measure, { w = vsx, h = vsy })
+	layout = MODEL.layout(panel, measure, { w = vsx, h = vsy }, TEXT)
 	layoutVersion, layoutW, layoutH = panel.version, vsx, vsy
 	local verts, idx = MODEL.pack(layout.rects)
 	panelIndices = upload(panelSet, verts, idx)
