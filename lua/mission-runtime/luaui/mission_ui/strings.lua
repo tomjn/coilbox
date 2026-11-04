@@ -18,4 +18,12 @@ return {
 		defeat = "Mission failed",
 		undecided = "Mission ended",
 	},
+	["pt-BR"] = {
+		objectives = "Objetivos",
+		secondary = "Secundários",
+		holdHint = "Clique para continuar",
+		victory = "Missão cumprida",
+		defeat = "Missão fracassada",
+		undecided = "Missão encerrada",
+	},
 }

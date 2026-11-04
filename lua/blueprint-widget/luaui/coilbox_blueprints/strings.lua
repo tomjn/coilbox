@@ -8,4 +8,7 @@ return {
 		-- the rest turn, flip and pick layouts.
 		help = "Coilbox blueprints: /%s toggles the panel. Bind keys to %s, %s, %s, %s, %s and %s to turn, flip and pick layouts.",
 	},
+	["pt-BR"] = {
+		help = "Plantas do Coilbox: /%s mostra ou oculta o painel. Atribua teclas a %s, %s, %s, %s, %s e %s para girar, inverter e escolher layouts.",
+	},
 }
