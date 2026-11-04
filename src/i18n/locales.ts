@@ -14,6 +14,7 @@ export const LOCALES = [
   "pl",
   "uk",
   "pt-BR",
+  "nb",
   "ja",
   "zh-Hans",
 ] as const;
@@ -56,8 +57,9 @@ export function isLocale(code: string): code is LocaleCode {
  * picks the locale, so `fr-CA` is `fr`. Every `zh` tag is `zh-Hans` unless it
  * is Traditional (`zh-Hant`, `zh-TW`, `zh-HK`, `zh-MO`), which has no catalog
  * and so gets `en`. Every `pt` tag is `pt-BR`, including `pt-PT`, because
- * there is no European Portuguese catalog. Anything else without a catalog
- * gets `en`.
+ * there is no European Portuguese catalog. `no` (Norwegian) is `nb`
+ * (Bokmål), and `nn` (Nynorsk) has no catalog and so gets `en`. Anything else
+ * without a catalog gets `en`.
  */
 export function resolveLocaleTag(tag: string): LocaleCode {
   const [base, ...rest] = tag.toLowerCase().split(/[-_]/);
@@ -67,6 +69,7 @@ export function resolveLocaleTag(tag: string): LocaleCode {
       : "zh-Hans";
   }
   if (base === "pt") return "pt-BR";
+  if (base === "no") return "nb";
   return LOCALES.find((l) => l.toLowerCase() === base) ?? SOURCE_LOCALE;
 }
 
