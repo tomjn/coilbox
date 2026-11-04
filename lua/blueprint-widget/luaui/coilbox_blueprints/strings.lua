@@ -143,8 +143,8 @@ return {
 		stopTerrainOff = "Terreno desligado",
 
 		cancel = "Cancelar",
-		costNoTime = "%d de metal, %d de energia",
-		costWithTime = "%d de metal, %d de energia, %s para construir",
+		costNoTime = "%d metal, %d energia",
+		costWithTime = "%d metal, %d energia, em %s",
 		trayTurn = "Girar",
 		trayFlip = "Inverter",
 		trayBuilders = "Construtores",
@@ -224,7 +224,7 @@ return {
 
 		cancel = "Avbryt",
 		costNoTime = "%d metall, %d energi",
-		costWithTime = "%d metall, %d energi, %s byggetid",
+		costWithTime = "%d metall, %d energi, på %s",
 		trayTurn = "Drei",
 		trayFlip = "Vend",
 		trayBuilders = "Byggere",
@@ -304,7 +304,7 @@ return {
 
 		cancel = "Annuler",
 		costNoTime = "%d métal, %d énergie",
-		costWithTime = "%d métal, %d énergie, %s de construction",
+		costWithTime = "%d métal, %d énergie, en %s",
 		trayTurn = "Tourner",
 		trayFlip = "Retourner",
 		trayBuilders = "Constructeurs",
@@ -384,7 +384,7 @@ return {
 
 		cancel = "Abbrechen",
 		costNoTime = "%d Metall, %d Energie",
-		costWithTime = "%d Metall, %d Energie, %s Bauzeit",
+		costWithTime = "%d Metall, %d Energie, in %s",
 		trayTurn = "Drehen",
 		trayFlip = "Spiegeln",
 		trayBuilders = "Baueinheiten",
@@ -463,8 +463,8 @@ return {
 		stopTerrainOff = "Terreno desactivado",
 
 		cancel = "Cancelar",
-		costNoTime = "%d de metal, %d de energía",
-		costWithTime = "%d de metal, %d de energía, %s de construcción",
+		costNoTime = "%d metal, %d energía",
+		costWithTime = "%d metal, %d energía, en %s",
 		trayTurn = "Girar",
 		trayFlip = "Voltear",
 		trayBuilders = "Constructores",
@@ -674,7 +674,7 @@ return {
 	pl = {
 		help = "Plany budowy Coilbox: /%s pokazuje lub ukrywa panel. Przypisz klawisze do %s, %s, %s, %s, %s i %s, aby obracać, odwracać i wybierać układy.",
 
-		title = "PLANY BUDOWY",
+		title = "PLANY",
 		tabNow = "Teraz",
 		tabPartly = "Częściowo",
 		tabAll = "Wszystkie",
@@ -704,7 +704,7 @@ return {
 
 		cancel = "Anuluj",
 		costNoTime = "metal: %d, energia: %d",
-		costWithTime = "metal: %d, energia: %d, czas budowy: %s",
+		costWithTime = "metal: %d, energia: %d, w %s",
 		trayTurn = "Obróć",
 		trayFlip = "Odwróć",
 		trayBuilders = "Budujące",
@@ -784,7 +784,7 @@ return {
 
 		cancel = "Скасувати",
 		costNoTime = "метал: %d, енергія: %d",
-		costWithTime = "метал: %d, енергія: %d, час будівництва: %s",
+		costWithTime = "метал: %d, енергія: %d, за %s",
 		trayTurn = "Повернути",
 		trayFlip = "Перевернути",
 		trayBuilders = "Будівельники",
