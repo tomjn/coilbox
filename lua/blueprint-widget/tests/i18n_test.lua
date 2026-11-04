@@ -230,7 +230,8 @@ for _, why in ipairs({ "whyNoTerraformer", "whyNoTerraform", "stopTerrainOff" })
 end
 
 --- A button holds its label, and nothing goes past the panel or tray it is in.
-local function overruns(layout)
+local function overruns(layout, width)
+	width = width or measure
 	local found = {}
 	local boxes = { layout.box, layout.tray }
 	local function inBox(x, y)
@@ -244,7 +245,7 @@ local function overruns(layout)
 	for _, entry in ipairs(layout.texts) do
 		if not entry.rotate then
 			local box = inBox(entry.x, entry.y)
-			local right = entry.x + measure(entry.text, entry.size)
+			local right = entry.x + width(entry.text, entry.size)
 			if not box then
 				found[#found + 1] = "outside: " .. entry.text
 			elseif right > box.x + box.w + 0.001 then
@@ -299,5 +300,96 @@ local DOUBLED = setmetatable({}, {
 })
 local doubled = overruns(MODEL.layout(fullPanel(), measure, VIEW, DOUBLED))
 check("strings twice as long still stay in their boxes", #doubled == 0, show(doubled))
+
+--------------------------------------------------------------------------------
+-- Each translated table (issue #5052): every key, and every label whole.
+--------------------------------------------------------------------------------
+
+--- Width with a Chinese, Japanese or Korean character a whole size across,
+-- since those are square, and any other character 0.55 of it.
+local function measureWide(str, size)
+	local w = 0
+	for ch in str:gmatch("[%z\1-\127\192-\255][\128-\191]*") do
+		local b = ch:byte(1)
+		-- three byte sequences from U+2E80 on: E2 BA 80 and up, E3 to EF
+		local wide = #ch >= 3 and (b > 0xE2 or (b == 0xE2 and ch:byte(2) >= 0xBA))
+		w = w + size * (wide and 1 or 0.55)
+	end
+	return w
+end
+
+--- Labels on a button or tab cut short with "...".
+local function cutLabels(layout)
+	local found = {}
+	for _, entry in ipairs(layout.texts) do
+		for _, rect in ipairs(layout.rects) do
+			local isButton = rect.kind == "button" or rect.kind == "tab"
+			if isButton and entry.x >= rect.x - 0.001 and entry.x < rect.x + rect.w and math.abs(entry.y - (rect.y + rect.h / 2)) < 0.001 and entry.text:sub(-3) == "..." then
+				found[#found + 1] = entry.text
+			end
+		end
+	end
+	return found
+end
+
+--- A panel with the remainder row swapped for the message, so the save
+-- buttons and the message line are drawn too.
+local function savePanel()
+	local state = fullPanel()
+	state.remainder = nil
+	return state
+end
+
+check("the widest English labels are whole", #cutLabels(MODEL.layout(fullPanel(), measureWide, VIEW, ENGLISH)) == 0, show(cutLabels(MODEL.layout(fullPanel(), measureWide, VIEW, ENGLISH))))
+check("the label check can see a cut label", #cutLabels({
+	texts = { { x = 1, y = 5, size = 10, text = "Sav..." } },
+	rects = { { x = 0, y = 0, w = 10, h = 10, kind = "button" } },
+}) == 1)
+
+local LOCALES = { "fr", "de", "es", "ja", "zh-Hans", "pl", "uk", "pt-BR", "nb" }
+for _, code in ipairs(LOCALES) do
+	local own = TABLES[code] or {}
+	local missing, extra = {}, {}
+	for key in pairs(TABLES.en) do
+		if own[key] == nil then
+			missing[#missing + 1] = key
+		end
+	end
+	for key in pairs(own) do
+		if TABLES.en[key] == nil then
+			extra[#extra + 1] = key
+		end
+	end
+	table.sort(missing)
+	check(code .. " has every key English has", #missing == 0, show(missing))
+	check(code .. " has no key English lacks", #extra == 0, show(extra))
+
+	local words, picked = I18N.pick(TABLES, { coilbox_lang = code })
+	check(code .. " is picked by its code", picked == code, tostring(picked))
+	for _, panel in ipairs({ fullPanel(), savePanel() }) do
+		local layout = MODEL.layout(panel, measureWide, VIEW, words)
+		check(code .. " puts no text past its button or box", #overruns(layout, measureWide) == 0, show(overruns(layout, measureWide)))
+		check(code .. " cuts no button or tab label", #cutLabels(layout) == 0, show(cutLabels(layout)))
+	end
+	-- every count reads, including the ones with no _one form
+	for _, n in ipairs({ 0, 1, 2, 5, 22 }) do
+		for _, key in ipairs({ "buildings", "terrainChanges", "sentTo", "offMap" }) do
+			check(code .. " " .. key .. " formats " .. n, pcall(MODEL.plural, words, key, n))
+		end
+		check(code .. " skipped formats " .. n, pcall(MODEL.plural, words, "skipped", n, words.whyNoTerraform))
+	end
+end
+
+-- a label cut short keeps whole characters, so it is never broken UTF-8
+local broken = {}
+for width = 20, 90 do
+	local whole = "ЗберегтиЗберегти"
+	local cut = MODEL.truncate(whole, width, measure, 10)
+	local partial = cut ~= whole and (cut:sub(-3) ~= "..." or cut:sub(1, -4):find("[\192-\255]$"))
+	if partial or measure(cut, 10) > width then
+		broken[#broken + 1] = width .. ": " .. cut
+	end
+end
+check("a cut label ends on a whole character and fits its width", #broken == 0, show(broken))
 
 support.report()
