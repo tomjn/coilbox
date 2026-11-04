@@ -76,7 +76,8 @@ pub struct BattleConfig {
     pub my_passwd: Option<String>,
     /// The locale coilbox is showing, such as `fr` or `zh-Hans`. Written as the
     /// [`LANGUAGE_OPTION`] mod option so coilbox's in-game widgets draw in it
-    /// (issue #4597). See [`language_option`] for when it is left out.
+    /// (issue #4597). See [`language_option`] for when it is left out. The
+    /// launch's own settings carry it as well (issue #5046).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
 }
@@ -89,8 +90,9 @@ pub const LANGUAGE_OPTION: &str = "coilbox_lang";
 ///
 /// English is the widgets' own language, so it is never written. Nor is any
 /// language on a networked host: the engine sends the host's script to every
-/// player who joins, so the host's language would become theirs. Those
-/// players' widgets read the engine's `language` config key instead.
+/// player who joins, so the host's language would become theirs. Every
+/// player's widgets read their own from the launch's settings instead, see
+/// `launch_settings` (issue #5046).
 pub fn language_option(cfg: &BattleConfig) -> Option<&str> {
     let code = cfg.language.as_deref()?.trim();
     if code.is_empty() || code.eq_ignore_ascii_case("en") || cfg.host_port.is_some() {

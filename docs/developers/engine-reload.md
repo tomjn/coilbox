@@ -207,7 +207,7 @@ For the sandbox in #3341:
 
 For the reload button in #3346, which does this:
 
-- Commands go through the autohost interface, set up as described in "Sending a command to a running engine". The launch adds `<app data>/play/autohost/` to the end of `SPRING_DATADIR`, holding only a `springsettings.cfg` with the port.
+- Commands go through the autohost interface, set up as described in "Sending a command to a running engine". The launch adds `<app data>/play/launch/` to the end of `SPRING_DATADIR`, holding a `springsettings.cfg` with the port and the language the in-game widgets draw in.
 - A changed script: export, then send `/luarules coilbox_sandbox reload_scripts`. The sandbox gadget reloads the unit script framework alone, as in "Reloading the unit script framework alone", and answers `coilbox_sandbox:loaded` with `Spring.SendLuaRulesMsg`. A full `/luarules reload` is not used, because of "A full reload can end the game".
 - A changed definition, model or a new file: say a relaunch is needed, and offer it in the same place. Do not use `/editdefs` to fake a definition reload, because table values cannot be written, live units do not change, and the game's own processing of the file would have to be repeated.
 - A changed texture under a file name the game started with: send `/luarules coilbox_sandbox reload_textures`. The sandbox gadget hands it to its unsynced half, which calls `Spring.SendCommands("reloadtextures s3o")` and answers `coilbox_sandbox:textures`. A texture under a new file name, or one that changed with the model, needs a relaunch. Texture files are not in the export's digests, so the file names they were written under are compared with the ones the game was launched on.
