@@ -11,4 +11,7 @@ return {
 	["pt-BR"] = {
 		help = "Plantas do Coilbox: /%s mostra ou oculta o painel. Atribua teclas a %s, %s, %s, %s, %s e %s para girar, inverter e escolher layouts.",
 	},
+	nb = {
+		help = "Coilbox-blåkopier: /%s viser eller skjuler panelet. Tilordne taster til %s, %s, %s, %s, %s og %s for å dreie, vende og velge oppsett.",
+	},
 }

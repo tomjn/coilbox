@@ -26,4 +26,12 @@ return {
 		defeat = "Missão fracassada",
 		undecided = "Missão encerrada",
 	},
+	nb = {
+		objectives = "Mål",
+		secondary = "Sekundære",
+		holdHint = "Klikk for å fortsette",
+		victory = "Oppdrag fullført",
+		defeat = "Oppdrag mislyktes",
+		undecided = "Oppdrag avsluttet",
+	},
 }

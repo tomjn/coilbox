@@ -36901,7 +36901,7 @@ msgstr "Spill som"
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #, fuzzy
 msgid "Play in reverse"
-msgstr "Spill baklengs"
+msgstr "Spill av baklengs"
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -36931,12 +36931,12 @@ msgstr "Spill Open Annihilation"
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
 msgid "Play or pause"
-msgstr "Spill eller pause"
+msgstr "Spill av eller pause"
 
 #: src/content/replayMapView/timelineKeys.ts
 #, fuzzy
 msgid "Play the other way"
-msgstr "Spill den andre veien"
+msgstr "Spill av baklengs"
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy
