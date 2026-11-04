@@ -10554,7 +10554,7 @@ msgstr "Todas as campanhas carregadas"
 #: src/lego/pages/components/CategoryMenu.tsx
 #, fuzzy
 msgid "All categories"
-msgstr "Todas as categorias"
+msgstr "Todas"
 
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
@@ -10664,7 +10664,7 @@ msgstr "Todos os cenários carregados"
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "All servers"
-msgstr "Todos os servidores"
+msgstr "Qualquer servidor"
 
 #: src/general/index.ts
 #, fuzzy
@@ -11426,7 +11426,7 @@ msgstr "Qualquer pessoa que colar isto em Cenários → Importar recebe esta mis
 #: src/workshop/pages/components/ShareProjectForm.tsx
 #, fuzzy
 msgid "Anyone who pastes this into Unit tweaks → Import gets this project, opened against the game it names."
-msgstr "Qualquer pessoa que colar isto em Ajustes de unidades → Importar recebe este projeto, aberto com o jogo que ele indica."
+msgstr "Qualquer pessoa que colar isto em Ajustes de unidade → Importar recebe este projeto, aberto com o jogo que ele indica."
 
 #: src/content/pages/components/states.tsx
 #, fuzzy
@@ -11602,7 +11602,7 @@ msgstr "Arquivo compactado não instalado: <0>{missingName}</0>"
 #: src/content/pages/ArchivesPage.tsx
 #, fuzzy
 msgid "Archives"
-msgstr "Arquivos compactados"
+msgstr "Arquivos"
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -14497,7 +14497,7 @@ msgstr "Trocar explosão"
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
 msgid "Change in Unit tweaks"
-msgstr "Alterar em Ajustes de unidades"
+msgstr "Alterar em Ajustes de unidade"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -16307,7 +16307,7 @@ msgstr "Atualização do Coilbox"
 #: src/updater/index.ts
 #, fuzzy
 msgid "Coilbox updates"
-msgstr "Atualizações do Coilbox"
+msgstr "Atualizações"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -18547,7 +18547,7 @@ msgstr "Data"
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Date created"
-msgstr "Data de criação"
+msgstr "Criação"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/DaysField.tsx
@@ -20623,7 +20623,7 @@ msgstr "Editar diretamente"
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
 msgid "Edit in Unit tweaks"
-msgstr "Editar em Ajustes de unidades"
+msgstr "Editar em Ajustes de unidade"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -22100,7 +22100,7 @@ msgstr "Em destaque"
 #: src/content/libraryGames.ts
 #, fuzzy
 msgid "Featured first"
-msgstr "Destaques primeiro"
+msgstr "Destaques"
 
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
@@ -26615,7 +26615,7 @@ msgstr "Ele é removido de todos os jogos que o carregam: {0}"
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
-msgstr "Ele é salvo em Ajustes de unidades e aberto, o que exige o Modo avançado ativado em Configurações."
+msgstr "Ele é salvo em Ajustes de unidade e aberto, o que exige o Modo avançado ativado em Configurações."
 
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
@@ -26928,7 +26928,7 @@ msgstr "Falha ao entrar: {lastJoinError}"
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
-msgstr "Entrar em um canal ou criar um…"
+msgstr "Entrar ou criar canal…"
 
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
@@ -28624,7 +28624,7 @@ msgstr "longo"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Longest"
-msgstr "Mais longos"
+msgstr "Maior duração"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
@@ -31949,7 +31949,7 @@ msgstr "Nenhum jogo chamado"
 #: src/play/pages/components/GameSelectCard.tsx
 #, fuzzy
 msgid "No game selected"
-msgstr "Nenhum jogo selecionado"
+msgstr "Nenhum jogo escolhido"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -32176,7 +32176,7 @@ msgstr "Nenhum mapa registrado para este replay."
 #: src/play/pages/components/MapCard.tsx
 #, fuzzy
 msgid "No map selected"
-msgstr "Nenhum mapa selecionado"
+msgstr "Nenhum mapa escolhido"
 
 #: src/scenario/pages/components/ScenarioMapThumb.tsx
 #, fuzzy
@@ -38947,7 +38947,7 @@ msgstr "Velocidade de reciclagem"
 #: src/downloads/pages/components/EngineInstaller.tsx
 #, fuzzy
 msgid "Recoil (GitHub releases)"
-msgstr "Recoil (releases do GitHub)"
+msgstr "Recoil (GitHub)"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -42898,7 +42898,7 @@ msgstr "Definir tópico do canal"
 #: src/lego/pages/components/BuilderReport.tsx
 #, fuzzy
 msgid "Set it in Unit tweaks"
-msgstr "Defina em Ajustes de unidades"
+msgstr "Defina em Ajustes de unidade"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -43492,7 +43492,7 @@ msgstr "Replays curtos"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Shortest"
-msgstr "Mais curta"
+msgstr "Menor duração"
 
 #: src/lego/scriptMarks.ts
 #, fuzzy
@@ -45027,7 +45027,7 @@ msgstr "Criar um projeto a partir disto"
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Start a project under Unit tweaks to edit a game's units."
-msgstr "Crie um projeto em Ajustes de unidades para editar as unidades de um jogo."
+msgstr "Crie um projeto em Ajustes de unidade para editar as unidades de um jogo."
 
 #: src/home/groupDescription.ts
 #, fuzzy
@@ -46582,7 +46582,7 @@ msgstr "Essa predefinição não está mais aqui. Ela pode ter sido excluída."
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "That project is not on this machine. Pick one under Unit tweaks."
-msgstr "Esse projeto não está nesta máquina. Escolha um em Ajustes de unidades."
+msgstr "Esse projeto não está nesta máquina. Escolha um em Ajustes de unidade."
 
 #: src/direct/lan.ts
 #, fuzzy
@@ -50690,7 +50690,7 @@ msgstr "Este pacote tem {packSize}, acima dos {limit} que um código de comparti
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
 msgid "This page opens one model out of an archive, and it was not told which. Browse an archive under Library > Archives and open a model from its preview."
-msgstr "Esta página abre um modelo de dentro de um arquivo compactado, e não foi informado qual. Navegue por um arquivo compactado em Biblioteca > Arquivos compactados e abra um modelo pela prévia dele."
+msgstr "Esta página abre um modelo de dentro de um arquivo compactado, e não foi informado qual. Navegue por um arquivo compactado em Biblioteca > Arquivos e abra um modelo pela prévia dele."
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -52867,7 +52867,7 @@ msgstr "Projetos de ajustes de unidades"
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Unit tweaks"
-msgstr "Ajustes de unidades"
+msgstr "Ajustes de unidade"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -53056,7 +53056,7 @@ msgstr "Campo desconhecido \"{identifier}\". Tente hp, speed, cost, metal, energ
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Origem desconhecida"
+msgstr "Desconhecida"
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -54146,7 +54146,7 @@ msgstr "Não foi possível ler os registros da Trilha de guerra. A Trilha de gue
 #: src/home/continue.ts
 #, fuzzy
 msgid "Warpath run"
-msgstr "Expedição da Trilha de guerra"
+msgstr "Trilha de guerra"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
