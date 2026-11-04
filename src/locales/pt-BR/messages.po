@@ -10407,6 +10407,7 @@ msgid "Against AI"
 msgstr "Contra IA"
 
 #: src/content/commandRates.ts
+#: src/play/participantLabel.ts
 #, fuzzy
 msgid "AI"
 msgstr "IA"
@@ -55802,6 +55803,7 @@ msgstr "você"
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/multiplayer/NameMarkIcon.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
+#: src/play/participantLabel.ts
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "You"
