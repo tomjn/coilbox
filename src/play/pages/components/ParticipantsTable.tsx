@@ -48,6 +48,7 @@ import {
   rgbToHex,
   showsFactionColumn,
 } from "../../config";
+import { useParticipantLabel } from "../../participantLabel";
 import { DifficultyPips } from "./DifficultyPips";
 
 /** Ally-team letters (A, B, C…) mapped to indices, offered per row. */
@@ -165,6 +166,7 @@ export function ParticipantsTable({
   // `t` is the core macro: this component subscribes to language changes here,
   // and `t` reads the active locale as it renders.
   const { i18n } = useLingui();
+  const labelOf = useParticipantLabel();
   // Effective (compacted) team index per participant, plus each team's leader —
   // the row whose ally/colour/side the engine team takes when rows share a slot.
   const { teamIndexById, leaderIdByTeam } = effectiveTeams(participants);
@@ -312,8 +314,8 @@ export function ParticipantsTable({
             // An AI row is taller than its picker, which has the bonus under it.
             // Its other cells sit at the top so every picker shares one line.
             const top = p.kind === "ai" && "align-top";
-            const leaderName = leader.name;
-            const playerName = p.name;
+            const leaderName = labelOf(leader);
+            const playerName = labelOf(p);
             const aiShortName = p.ai?.shortName;
             const sharedTitle = sharer
               ? t`Shares a team with ${leaderName} — team settings come from the first member`
@@ -444,7 +446,7 @@ export function ParticipantsTable({
                               <Trans>Bonus</Trans>
                             </span>
                             <BonusButton
-                              name={p.name}
+                              name={playerName}
                               confirmed={p.handicap ?? 0}
                               onSend={(v) => onSetAiBonus(p.id, v)}
                               help={i18n._(BONUS_HELP)}

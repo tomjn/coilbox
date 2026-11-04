@@ -8387,6 +8387,7 @@ msgid "Against AI"
 msgstr ""
 
 #: src/content/commandRates.ts
+#: src/play/participantLabel.ts
 msgid "AI"
 msgstr ""
 
@@ -45101,6 +45102,7 @@ msgstr ""
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/multiplayer/NameMarkIcon.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
+#: src/play/participantLabel.ts
 #: src/runlite/galaxyAdapter.ts
 msgid "You"
 msgstr ""
