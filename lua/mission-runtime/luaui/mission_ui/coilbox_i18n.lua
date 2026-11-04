@@ -42,9 +42,13 @@ local function tidy(code)
 	return code
 end
 
---- The language part of a code: "pt" for "pt-BR".
+--- Languages written under another code: Norwegian "no" is Bokmål, `nb`.
+local SAME_LANGUAGE = { no = "nb" }
+
+--- The language part of a code: "pt" for "pt-BR", and "nb" for "no".
 local function language(code)
-	return (code:match("^([^-]+)") or code):lower()
+	local base = (code:match("^([^-]+)") or code):lower()
+	return SAME_LANGUAGE[base] or base
 end
 
 --- The codes of `tables`, in order, so a match never depends on `pairs`.
@@ -62,8 +66,8 @@ end
 --- The code in `tables` that `wanted` names, or nil.
 --
 -- The exact code first, then the same code in another case, then the first
--- table for the same language, so "fr-FR" finds `fr`, "zh" finds `zh-Hans`
--- and "pt" finds `pt-BR`.
+-- table for the same language, so "fr-FR" finds `fr`, "zh" finds `zh-Hans`,
+-- "pt" finds `pt-BR` and "no" finds `nb`.
 function M.match(tables, wanted)
 	wanted = tidy(wanted)
 	if not wanted then

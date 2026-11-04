@@ -61,19 +61,24 @@ check("a key the French table lacks is drawn in English", hasText(L, "Mission ac
 local T = tables()
 T["zh-Hans"] = { objectives = "目标" }
 T["pt-BR"] = { objectives = "Objetivos" }
+T.nb = { objectives = "Mål" }
 
 check("the mod option comes first", I18N.code(T, { coilbox_lang = "fr" }, "zh-Hans") == "fr")
 check("then the engine's language key", I18N.code(T, {}, "fr") == "fr")
 check("then English", I18N.code(T, {}, "") == "en")
 check("with no mod options at all", I18N.code(T, nil, nil) == "en")
 check("a mod option naming a language with no table is passed over",
-	I18N.code(T, { coilbox_lang = "nb" }, "fr") == "fr")
-check("and with nothing after it, English", I18N.code(T, { coilbox_lang = "nb" }, "") == "en")
+	I18N.code(T, { coilbox_lang = "nn" }, "fr") == "fr")
+check("and with nothing after it, English", I18N.code(T, { coilbox_lang = "nn" }, "") == "en")
 check("a region finds its language", I18N.code(T, {}, "fr-FR") == "fr")
 check("as does an underscore", I18N.code(T, {}, "fr_CA") == "fr")
 check("a case the table does not use still matches", I18N.code(T, { coilbox_lang = "ZH-hans" }, "") == "zh-Hans")
 check("a bare language finds its one table", I18N.code(T, {}, "zh") == "zh-Hans")
 check("and so does pt", I18N.code(T, {}, "pt") == "pt-BR")
+check("no is written nb", I18N.code(T, {}, "no") == "nb")
+check("as is a region of it", I18N.code(T, { coilbox_lang = "no-NO" }, "") == "nb")
+check("nb with a region finds nb", I18N.code(T, {}, "nb_NO") == "nb")
+check("Nynorsk has no table and is English", I18N.code(T, {}, "nn") == "en")
 check("a language coilbox does not draw in is English", I18N.code(T, {}, "xx") == "en")
 check("the pseudo-locale needs no table", I18N.code(T, { coilbox_lang = "en-XA" }, "") == "en-XA")
 
