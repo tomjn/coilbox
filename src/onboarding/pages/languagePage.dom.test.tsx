@@ -44,7 +44,9 @@ function show() {
 const stored = () => storage.get(LANGUAGE_KEY);
 const option = (code: string) =>
   screen.getByRole("button", {
-    name: new RegExp(`^${localeDisplayName(code)}`),
+    name: new RegExp(
+      `^${localeDisplayName(code).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+    ),
   });
 const click = (name: string) =>
   fireEvent.click(screen.getByRole("button", { name }));
