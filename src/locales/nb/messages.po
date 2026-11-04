@@ -36243,7 +36243,7 @@ msgstr "Lim inn en utfordringskode…"
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
 msgid "Paste a coilbox link, a code, or an exported file's contents…"
-msgstr "Lim inn en coilbox-lenke, en kode eller innholdet i en eksportert fil…"
+msgstr "Lim inn en coilbox-lenke, en kode eller en eksportert fil…"
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -53056,7 +53056,7 @@ msgstr "Ukjent felt «{identifier}». Prøv hp, speed, cost, metal, energy, buil
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Ukjent opprinnelse"
+msgstr "Ukjent opphav"
 
 #: src/deeplink/parse.ts
 #, fuzzy
