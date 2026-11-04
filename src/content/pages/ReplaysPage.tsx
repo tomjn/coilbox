@@ -594,7 +594,7 @@ export default function ReplaysPage() {
                   onValueChange={setMinLength}
                   options={MIN_LENGTH_OPTIONS}
                   size="sm"
-                  className="w-44"
+                  className="w-48"
                 />
                 <OptionSelect
                   value={originFilter}

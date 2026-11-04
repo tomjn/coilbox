@@ -13,7 +13,10 @@ describe("resolveLocaleTag", () => {
     ["fr-CA", "fr"],
     ["zh-CN", "zh-Hans"],
     ["zh-TW", "en"],
-    ["pt-BR", "en"],
+    ["pt-BR", "pt-BR"],
+    ["pt", "pt-BR"],
+    ["pt-PT", "pt-BR"],
+    ["pt_br", "pt-BR"],
     ["en-GB", "en"],
     ["zh", "zh-Hans"],
     ["zh-Hans-CN", "zh-Hans"],
@@ -50,6 +53,7 @@ describe("localeDisplayName", () => {
     expect(localeDisplayName("de")).toBe("Deutsch");
     expect(localeDisplayName("pl")).toBe("Polski");
     expect(localeDisplayName("uk")).toBe("Українська");
+    expect(localeDisplayName("pt-BR")).toBe("Português (Brasil)");
   });
 });
 
