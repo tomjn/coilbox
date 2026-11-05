@@ -19661,6 +19661,7 @@ msgstr "Χώρος στον δίσκο για ίχνη (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -39476,6 +39477,7 @@ msgstr "Ανάγλυφο"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -49218,6 +49220,10 @@ msgstr "Οι διακομιστές στους οποίους παίζετε κ�
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "Οι ρυθμίσεις άλλαξαν αφού τις διάβασε το coilbox, οπότε δεν αποθηκεύτηκε τίποτα. Κλείστε αυτό και ανοίξτε το ξανά."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49347,6 +49353,10 @@ msgstr "Το δοκιμαστικό mutator φέρνει {conditionCount} συν
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "Το παραπάνω κείμενο απορρίπτεται. Η αναίρεση το επαναφέρει αν ήταν λάθος, οπότε αντιγράψτε το πρώτα αν θέλετε να το κρατήσετε μετά από αυτή τη συνεδρία."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy

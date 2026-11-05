@@ -5927,6 +5927,7 @@ dependencies = [
  "coilbox-unitpatch",
  "flate2",
  "image 0.25.10",
+ "notify",
  "picoframe-core",
  "serde",
  "serde_json",

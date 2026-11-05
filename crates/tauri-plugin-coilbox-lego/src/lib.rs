@@ -29,6 +29,7 @@ mod reexport;
 mod sandbox;
 mod sheet;
 mod texture;
+mod texture_watch;
 
 use coilbox_3do_convert as atlas3do;
 use coilbox_portable::valid_id;
@@ -41,7 +42,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    AppHandle, Manager, Runtime,
+    AppHandle, Emitter, Manager, Runtime,
 };
 
 /// Generous for a bounded thumbnail and small enough that a mistake cannot fill
@@ -1880,6 +1881,56 @@ async fn lego_texture_import<R: Runtime>(app: AppHandle<R>, path: String) -> Cli
             "name": stored.name,
             "bytes": stored.bytes,
         })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// The event sent to every window once a watched texture file has been edited
+/// and has stopped changing. The payload is `{ "path": <the path as watched> }`.
+pub const TEXTURE_CHANGED_EVENT: &str = "coilbox-lego://texture-changed";
+
+/// The one running texture watch. The unit builder has one unit open at a time,
+/// so a new request replaces whatever was watched before.
+fn texture_watch_slot() -> &'static std::sync::Mutex<Option<texture_watch::TextureWatcher>> {
+    static SLOT: std::sync::OnceLock<std::sync::Mutex<Option<texture_watch::TextureWatcher>>> =
+        std::sync::OnceLock::new();
+    SLOT.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+/// `lego_texture_watch` watches the files an open unit's textures came from
+/// (issue #3225), and emits [`TEXTURE_CHANGED_EVENT`] once for each edit.
+///
+/// It replaces any earlier watch, and an empty list stops watching. The unit
+/// builder calls it with the source of each texture on the open unit, so a
+/// unit that is closed, or whose texture is swapped for another file, passes a
+/// list without the old path.
+#[tauri::command]
+async fn lego_texture_watch<R: Runtime>(app: AppHandle<R>, paths: Vec<String>) -> CliResult {
+    let previous = texture_watch_slot()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .take();
+    if let Some(previous) = previous {
+        previous.stop();
+    }
+    if paths.is_empty() {
+        return CliResult::ok(json!({ "watching": 0 }));
+    }
+    let watched = paths.len();
+    let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let started = texture_watch::spawn(&paths, texture_watch::SETTLE_MS, move |path| {
+        let _ = app.emit(
+            TEXTURE_CHANGED_EVENT,
+            json!({ "path": path.to_string_lossy() }),
+        );
+    });
+    match started {
+        Ok(watcher) => {
+            *texture_watch_slot()
+                .lock()
+                .unwrap_or_else(|p| p.into_inner()) = Some(watcher);
+            CliResult::ok(json!({ "watching": watched }))
+        }
         Err(e) => CliResult::err(e),
     }
 }
@@ -3803,6 +3854,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_read_dae,
             lego_import_dae,
             lego_texture_import,
+            lego_texture_watch,
             lego_texture_png,
             lego_atlas_png,
             lego_bitmap_png,

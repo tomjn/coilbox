@@ -19657,6 +19657,7 @@ msgstr "Espaço em disco para trilhas (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -39459,6 +39460,7 @@ msgstr "Relevo"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -49201,6 +49203,10 @@ msgstr "Os servidores em que você joga e de quem você recebe mensagens lá."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "As configurações mudaram depois de o coilbox lê-las, então nada foi salvo. Feche isto e abra de novo."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49330,6 +49336,10 @@ msgstr "O mutador de teste traz {conditionCount} condições e {actionCount} aç
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "O texto acima é descartado. Desfazer o traz de volta se foi um engano, então copie antes se quiser guardá-lo além desta sessão."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy

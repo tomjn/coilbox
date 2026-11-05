@@ -19661,6 +19661,7 @@ msgstr "Schijfruimte voor tracks (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -39476,6 +39477,7 @@ msgstr "Reliëf"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -49218,6 +49220,10 @@ msgstr "De servers waarop je speelt, en van wie je daar berichten ontvangt."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "De instellingen zijn veranderd nadat coilbox ze gelezen had, dus er is niets opgeslagen. Sluit dit en open het opnieuw."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49347,6 +49353,10 @@ msgstr "De testmutator brengt {conditionCount} voorwaarden en {actionCount} acti
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "De tekst hierboven wordt weggegooid. Ongedaan maken haalt hem terug als dat een vergissing was, dus kopieer hem eerst als je hem na deze sessie wilt bewaren."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
