@@ -102,6 +102,12 @@ export interface ResumeCandidate {
    * the card's title alone does not say whether it names a map (#5080).
    */
   mapName?: string;
+  /**
+   * The title is still being read, so `title` is empty and the card shows a
+   * placeholder in its place. Only a conquest sets it, while the galaxies a
+   * game carries are still being listed (#5080).
+   */
+  titlePending?: boolean;
 }
 
 /** What a card calls a kind of thing, and what its action offers to do. */
@@ -282,30 +288,45 @@ export function campaignCandidate(
 }
 
 /**
- * The conquest to offer: the most recently updated galaxy whose run is active.
+ * The conquest to offer: the most recently updated active conquest whose galaxy
+ * is listed.
  *
  * Only the galaxy's name is read, so this takes the two fields it needs and a
  * real `LoadedGalaxy[]` still satisfies it.
+ *
+ * `titlesPending` says the galaxy list is not complete yet. The maps a game
+ * carries in its archive are listed only once every installed game has been
+ * read, one unitsync run each, and that took long enough to hold the whole
+ * resume row back (#5080). Everything else this card says comes from the state
+ * file, so while the list is pending a conquest with no listed galaxy is still
+ * offered, with `titlePending` set for the card to show its title is coming.
+ * Once the list is complete, a conquest whose galaxy is not on it is skipped
+ * for the next one, as a galaxy that was removed always was.
  */
 export function conquestCandidate(
   galaxies: readonly { galaxy: Pick<GalaxyDoc, "id" | "title"> }[],
   file: ConquestStateFile,
+  titlesPending = false,
 ): ResumeCandidate | undefined {
+  const titles = new Map(galaxies.map((g) => [g.galaxy.id, g.galaxy.title]));
   const best = mostRecentOpen(
-    galaxies,
-    (g) => file.conquests[g.galaxy.id]?.status === "active",
-    (g) => Date.parse(file.conquests[g.galaxy.id]?.updatedAt ?? ""),
+    Object.entries(file.conquests),
+    ([id, state]) =>
+      state?.status === "active" && (titlesPending || titles.has(id)),
+    ([, state]) => Date.parse(state?.updatedAt ?? ""),
   );
   if (!best) return undefined;
-  const state = file.conquests[best.galaxy.id];
+  const [id, state] = best;
   if (!state) return undefined;
+  const title = titles.get(id);
   const turn = state.turn;
   return {
-    id: `conquest:${best.galaxy.id}`,
+    id: `conquest:${id}`,
     kind: "conquest",
-    title: best.galaxy.title,
+    title: title ?? "",
+    ...(title === undefined && { titlePending: true }),
     detail: t`Turn ${turn}`,
-    to: `/conquest/${encodeURIComponent(best.galaxy.id)}`,
+    to: `/conquest/${encodeURIComponent(id)}`,
     touchedAt: Date.parse(state.updatedAt),
   };
 }
@@ -616,6 +637,8 @@ export interface ResumeSources {
   progress: ProgressFile;
   galaxies: readonly { galaxy: Pick<GalaxyDoc, "id" | "title"> }[];
   conquests: ConquestStateFile;
+  /** Whether `galaxies` may still be missing some, see {@link conquestCandidate}. */
+  galaxiesPending?: boolean;
   lobby: LobbySnapshot | null;
   draft: StoredSkirmishDraft;
   presets: readonly SkirmishPreset[];
@@ -641,7 +664,11 @@ export function collectCandidates(
   return [
     battleCandidate(sources.lobby, now),
     warpathCandidate(sources.runs),
-    conquestCandidate(sources.galaxies, sources.conquests),
+    conquestCandidate(
+      sources.galaxies,
+      sources.conquests,
+      sources.galaxiesPending,
+    ),
     campaignCandidate(sources.campaigns, sources.progress),
     skirmishCandidate(sources.draft, sources.presets),
     // Last in the fixed order, so a tie on the timestamp goes to the thing you
@@ -661,9 +688,14 @@ export function collectCandidates(
  * `loading` is true until every source stored on disk has answered. A zone that
  * renders on the first frame would otherwise show an empty rail and then fill it.
  *
- * Two sources are deliberately not in that flag, which the audit in #1002 asked
- * about:
+ * Three sources are deliberately not in that flag, which the audit in #1002
+ * asked about:
  *
+ * - The hand-made maps games carry in their archives. They are listed only once
+ *   every installed game has been read, one unitsync run each, and waiting for
+ *   them held the whole row back on every launch (#5080). The flag waits for the
+ *   saved hand-made maps alone, which are a folder read, and a conquest on a
+ *   game's map shows with its title still loading (see {@link conquestCandidate}).
  * - The skirmish draft and the saved presets are settings, and `main.tsx` awaits
  *   the settings cache before it renders anything, so `useSetting` answers from
  *   the first frame and there is no half-read state to wait for.
@@ -706,6 +738,7 @@ export function useResume(): {
         progress: progress.progress,
         galaxies: [...galaxies.galaxies, ...listedHandmadeMaps(handmade.maps)],
         conquests: conquests.file,
+        galaxiesPending: handmade.loading,
         lobby: mirror.state,
         draft,
         presets,
@@ -735,7 +768,7 @@ export function useResume(): {
     campaigns.loading ||
     progress.loading ||
     galaxies.loading ||
-    handmade.loading ||
+    handmade.savedLoading ||
     conquests.loading ||
     startScenarios.loading;
 
