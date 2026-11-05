@@ -104,15 +104,26 @@ const ZONE_SPACING: Partial<Record<ZoneId, string>> = {
  * you could go back to.
  *
  * `flex-wrap`, so the rail drops under the hero when the line cannot hold both.
- * That is the two-row page this replaced, which is still the right answer on a
- * narrow window and with a rail three cards wide. The gap is the rail's own card
- * gap, so the space between the hero and the first rail card is the same as the
- * space between rail cards.
+ * The gap is the rail's own card gap, so the space between the hero and the
+ * first rail card is the same as the space between rail cards.
  *
- * A column below `sm`, because that is where the rail's own cards go full width
- * (`RAIL_CARD_CLASS`). A row there would size the rail to its text instead, and
- * the cards would come out narrower than the hero above them for no reason the
- * page could explain. The window can be dragged to 600px, so this is reachable.
+ * ## Where it wraps
+ *
+ * No viewport breakpoint. The sidebar beside the page can be dragged to any
+ * width, so the window says little about how wide this row is. Each side says
+ * how small it will go instead, and the row wraps when the two no longer fit:
+ *
+ * - The hero starts from 20rem and grows to its content (see
+ *   {@link HERO_WIDTH}).
+ * - The rail asks for its cards at their narrowest, side by side (see
+ *   `railWidths` in `./zones/ResumeRail`).
+ *
+ * The rail wraps as one item, never card by card beside the hero (#5080). A
+ * card that wrapped inside a rail squeezed in next to the hero started its
+ * second line under the rail, which left an empty block under the hero. Dropped
+ * whole, the rail starts its own line at the left edge and has the full width.
+ * At the default 1100px window both fit on one line with three rail cards, with
+ * the sidebar at its usual width.
  *
  * `empty:hidden` on the row, with each participant a direct child and no wrapper
  * each. That is what makes the block vanish on a fresh install: every one of
@@ -136,46 +147,41 @@ const ZONE_SPACING: Partial<Record<ZoneId, string>> = {
  * same line. Centring or aligning at the foot each cost that edge to buy the
  * other one, and left the rail floating against nothing.
  *
- * Only from `sm`, where the row is a row. Below that the main axis is vertical,
- * `items-start` would be a width, and the rail's full-width cards would come out
- * narrower than the hero above them.
- *
  * The rail's own cards still stretch to each other, because this aligns the two
- * zones and the rail is a flex container of its own. One rail card wrapping its
- * title still sets the height of its siblings, which is what keeps their actions
- * on one line.
+ * zones and the rail lays out its own cards. One rail card wrapping its title
+ * still sets the height of its siblings, which is what keeps their actions on
+ * one line.
  */
-const RESUME_ROW =
-  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-start";
+const RESUME_ROW = "mt-6 flex flex-wrap items-start gap-3 empty:hidden";
 
 /**
- * What the layout tells the hero about its width: as wide as its contents, and
- * never wider than 42rem.
+ * What the layout tells the hero about its width: as wide as its contents when
+ * the line has room, and down to 20rem before the rail has to wrap.
  *
  * It used to fill whatever the rail left, and that is what left the action a long
- * way from the text it belongs to (#1059). How far depended on how many rail
- * cards there happened to be, which is a thing the hero cannot see and should not
- * have to. A card sized to its contents has no spare room to spread, so the
- * question stops being asked.
+ * way from the text it belongs to (#1059). `max-w-max` keeps that fixed: the hero
+ * grows, but never past its own contents, so it has no spare room to spread.
  *
- * No flex utility at all, because `flex: 0 1 auto` is already the answer: size to
- * the content, do not grow into the rest of the line, and shrink only when the
- * hero alone is wider than the line it is on. It is the same nothing the rail is
- * handed, and for the same reason.
+ * `basis-80` is how narrow the hero will go to keep the rail beside it. Sized to
+ * its content alone, a hero with a long game line held its full width and pushed
+ * the rail onto a second line at the default window size (#5080). From 20rem it
+ * still fits its art, a short title, a game name and its action.
  *
- * 42rem is a title's limit, not a card's. Past it a run's name is a paragraph, and
- * the row would rather wrap the title than push the rail onto a second line: a
- * hero at the cap still leaves a two-card rail beside it on a 1256px page. The cap
- * is only from `sm`, since below that {@link RESUME_ROW} is a column and the card
- * is narrower than 42rem anyway.
+ * `grow-[4]` against the rail's `grow`, so spare room on the line goes to the
+ * hero first. The rail cards have the least to lose, and they give it up first.
+ *
+ * The 42rem cap is the title's own (`TEXT_MEASURE` in `./zones/Continue`), so the
+ * hero's contents can never ask for more than that.
  *
  * `min-w-0` so a long title shrinks and wraps rather than pushing the row wider
  * than the page.
  *
- * Used for a lone hero too, not just the row. A profile that separated the zones
- * asked for them apart, not for a card the width of the window.
+ * Used for a lone hero too, not just the row. Outside a flex row the basis and
+ * the grow do nothing, and `max-w-max` keeps the card to its contents. A profile
+ * that separated the zones asked for them apart, not for a card the width of the
+ * window.
  */
-const HERO_WIDTH = "min-w-0 sm:max-w-2xl";
+const HERO_WIDTH = "min-w-0 max-w-max grow-[4] basis-80";
 
 /**
  * The page's entries, with two pairs of zones composed into one.

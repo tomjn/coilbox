@@ -64,6 +64,7 @@ import ResumeRail, {
   RAIL_CARD_CLASS,
   RAIL_DIM_CLASS,
   railCards,
+  railWidths,
 } from "./zones/ResumeRail";
 
 function candidate(
@@ -473,6 +474,27 @@ function cardTokens(
     ? { card: hsl(hue, (sat * 5) / 100, 0.1), ink: hsl(0, 0, 0.95) }
     : { card: hsl(0, 0, 1), ink: hsl(hue, (satText * 10) / 100, 0.12) };
 }
+
+describe("railWidths", () => {
+  it("asks for its cards at their narrowest, side by side, with the gaps", () => {
+    // Three 9.5rem cards and two 0.75rem gaps. Less than this beside the hero
+    // and the rail drops to a line of its own rather than wrapping a card into
+    // the corner the hero leaves (#5080).
+    expect(railWidths(3)).toEqual({ min: 30, max: 49.5 });
+    expect(railWidths(2)).toEqual({ min: 19.75, max: 32.75 });
+    expect(railWidths(1)).toEqual({ min: 9.5, max: 16 });
+  });
+
+  it("puts the widths on the rail for its grid to read", () => {
+    resume.mockReturnValue({
+      candidates: [HERO, WARPATH, CONQUEST],
+      loading: false,
+    });
+    const html = render();
+    expect(html).toContain("--rail-min:19.75rem");
+    expect(html).toContain("--rail-max:32.75rem");
+  });
+});
 
 describe("secondary text on a rail card", () => {
   it("uses the shared muted token, not an ink of its own", () => {

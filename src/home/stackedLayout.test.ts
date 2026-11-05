@@ -58,8 +58,10 @@ type Rendered = {
 const COLUMN = "relative p-8";
 
 /** The class on the row the continue hero and the resume rail share. */
-const RESUME_ROW =
-  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-start";
+const RESUME_ROW = "mt-6 flex flex-wrap items-start gap-3 empty:hidden";
+
+/** The width the layout hands the hero, alone or in the row. */
+const HERO_WIDTH = "min-w-0 max-w-max grow-[4] basis-80";
 
 /** Walk an element tree and list the stubbed zones it reached, in order. */
 function collect(node: unknown, wrapper: string | null, out: Rendered[]): void {
@@ -347,19 +349,19 @@ describe("StackedLayout resume row", () => {
   it("lets the rail keep its own height next to a taller hero", () => {
     // A flex row stretches its items, so a hero whose title wrapped pulled the
     // rail's cards to its own depth and left 84px between each card's detail and
-    // the action pinned to its foot (#1074). Only from `sm`: below that the row
-    // is a column and this would be a width.
-    expect(RESUME_ROW).toContain("sm:items-start");
-    expect(RESUME_ROW).not.toContain(" items-start");
+    // the action pinned to its foot (#1074). The row is a row at every width
+    // now (#5080), so the alignment is too.
+    expect(RESUME_ROW).toContain(" items-start");
+    expect(RESUME_ROW).not.toContain("flex-col");
   });
 
   it("tells the hero how wide to be, and the rail nothing", () => {
-    // The width is the layout's decision. The rail's default as a flex item is
-    // already what it wants: size to the cards it has, do not grow.
+    // The hero's width is the layout's decision. The rail's comes from its own
+    // cards (`railWidths`), so the layout hands it nothing.
     const rendered = render(resolveHome(undefined).entries);
     const hero = rendered.find((r) => r.name === "continue");
     const rail = rendered.find((r) => r.name === "resume");
-    expect(hero?.props.className).toBe("min-w-0 sm:max-w-2xl");
+    expect(hero?.props.className).toBe(HERO_WIDTH);
     expect(rail?.props).toEqual({});
   });
 
@@ -370,7 +372,7 @@ describe("StackedLayout resume row", () => {
       resolveHome({ zones: [{ zone: "continue" }] }).entries,
     );
     expect(rendered.find((r) => r.name === "continue")?.props.className).toBe(
-      "min-w-0 sm:max-w-2xl",
+      HERO_WIDTH,
     );
   });
 
