@@ -15,7 +15,7 @@ import {
   type WeaponInput,
 } from "./derivedStats";
 import { libraryWeaponDef, type WeaponLibrary } from "./weaponLibrary";
-import { weaponSlots } from "./weaponSlots";
+import { type WeaponSlot, weaponSlots } from "./weaponSlots";
 
 /** A weapon slot's own `slaveTo` field, the unit's own weapon mount, which
  *  excludes a slaved weapon from the unit's summed DPS the same way
@@ -49,16 +49,26 @@ export function unitEffectiveWeapons(
 ): WeaponInput[] {
   const slots = weaponSlots(def, weaponDefs, owners);
   return slots.flatMap((slot): WeaponInput[] => {
-    const fires = unitEquipped?.[slot.step];
-    const equippedWeapon = fires ? library[fires] : undefined;
-    const weaponDef = equippedWeapon
-      ? libraryWeaponDef(equippedWeapon)
-      : slot.definition.kind === "missing"
-        ? undefined
-        : slot.definition.def;
-    if (!weaponDef) return [];
-    return [{ def: weaponDef, excludeFromSum: slavedExclude(slot.table) }];
+    const input = slotWeaponInput(slot, library, unitEquipped?.[slot.step]);
+    return input ? [input] : [];
   });
+}
+
+/** What one slot fires, or undefined when nothing defines its weapon. `fires`
+ *  is the library weapon the project equipped into the slot, if any. */
+export function slotWeaponInput(
+  slot: WeaponSlot,
+  library: WeaponLibrary,
+  fires: string | undefined,
+): WeaponInput | undefined {
+  const equippedWeapon = fires ? library[fires] : undefined;
+  const weaponDef = equippedWeapon
+    ? libraryWeaponDef(equippedWeapon)
+    : slot.definition.kind === "missing"
+      ? undefined
+      : slot.definition.def;
+  if (!weaponDef) return undefined;
+  return { def: weaponDef, excludeFromSum: slavedExclude(slot.table) };
 }
 
 /**

@@ -16421,6 +16421,7 @@ msgid "Colours compare places on this map with each other, not with another pict
 msgstr "Les couleurs comparent les endroits de cette carte entre eux, pas avec une autre image. {made} le {exported}."
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
 msgid "Colourway"
 msgstr "Coloris"
@@ -33161,6 +33162,7 @@ msgid "none"
 msgstr "aucun"
 
 #: src/animation/pages/Bos2LuaPage.tsx
+#: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx

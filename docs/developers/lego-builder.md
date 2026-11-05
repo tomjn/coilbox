@@ -145,7 +145,7 @@ A shape has no panel detail. It tiles a small swatch of plain surface from its c
 
 On the bundled atlas the team colour colourway is plain team colour, the same colour the team colour parts are drawn in. Tan is a grainy concrete, where the mirrored tiles show a repeating pattern. Grey is a flat light grey.
 
-A shape takes the colourway most of the unit's parts and shapes use when it is added, or the pack's first one when the unit has none. It keeps that colourway. The piece panel has no control to change it, and **Change part** is not offered for a shape.
+A shape takes the colourway most of the unit's parts and shapes use when it is added, or the pack's first one when the unit has none. Select the shape and choose another colourway under **Colourway** in the piece panel to change it. The choices are the swatches the base pack lists, drawn with the same colour chips as the parts browser's colourway switch, and the change is one undo step. **Change part** is not offered for a shape.
 
 A cylinder, a tube or a cone can show a wheel hub on its flat ends instead. Tick **Hub on ends** in the piece panel. The hub is the [round panel](../reference/lego-parts-pack.md#round-panels) the pack draws for the shape's colourway, fitted to each end, so it stretches with the radius. On the bundled pack it is drawn at the parts' own density at a radius of 1.6 units, and it starts to look soft past 3.2 units. A tube's end ring shows the outer part of the hub. The choice is off for a new shape, and the side keeps its swatch either way.
 

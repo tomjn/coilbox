@@ -16421,6 +16421,7 @@ msgid "Colours compare places on this map with each other, not with another pict
 msgstr "颜色比较的是此地图上各处之间的差异，而不是与其他图片比较。{made}，导出于 {exported}。"
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
 msgid "Colourway"
 msgstr "配色"
@@ -33161,6 +33162,7 @@ msgid "none"
 msgstr "无"
 
 #: src/animation/pages/Bos2LuaPage.tsx
+#: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx

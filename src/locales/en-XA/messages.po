@@ -13364,6 +13364,7 @@ msgid "Colours compare places on this map with each other, not with another pict
 msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ShapeFields.tsx
 msgid "Colourway"
 msgstr ""
 
@@ -26991,6 +26992,7 @@ msgid "none"
 msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
+#: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
