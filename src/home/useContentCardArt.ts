@@ -12,7 +12,7 @@
  * the property `art.ts` was built around.
  */
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import type { MinimapResult } from "../content/bindings";
 import {
@@ -214,4 +214,37 @@ export function useContentCardArt(claimed: readonly ContentPick[] = []): void {
       cancelled = true;
     };
   }, [key, enginePath, dataDir, headers]);
+}
+
+/**
+ * One map's minimap for the Continue hero's icon square (#5080), or `null` while
+ * it loads and when the map has none.
+ *
+ * Through {@link minimapUrl}, so it shares the maps grid's cache and size, and a
+ * map the scan does not list starts no worker. Read against the same target the
+ * card art reads, which is the one the setup screen scans.
+ */
+export function useMapMinimap(mapName: string | undefined): string | null {
+  const { selected } = useScanTargetSelection();
+  const enginePath = selected?.enginePath;
+  const dataDir = selected?.rootPath;
+  const key =
+    enginePath && dataDir && mapName
+      ? `${dataDir}::${enginePath}::${mapName}`
+      : undefined;
+  // The key each URL belongs to, so a changed map never shows the old one.
+  const [loaded, setLoaded] = useState<{ key: string; url: string | null }>();
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName || !key) return;
+    let cancelled = false;
+    minimapUrl(enginePath, dataDir, mapName).then((url) => {
+      if (!cancelled) setLoaded({ key, url });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, enginePath, dataDir, mapName]);
+
+  return loaded && loaded.key === key ? loaded.url : null;
 }
