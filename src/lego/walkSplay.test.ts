@@ -134,3 +134,46 @@ describe("a walk that swings its legs out (#4487)", () => {
     expect(fitWalk(BODY, { splay: 12 }).splay).toBe(12);
   });
 });
+
+describe("the outward swing at the top of its slider (#4487)", () => {
+  const top =
+    WALK_BIPED.params.find((param) => param.id === "splay")?.max ?? Number.NaN;
+  const straight = fitWalk(BODY, {});
+  const widest = fitWalk(BODY, { splay: top });
+
+  it("is where a straight leg swung out puts its foot level with the hip", () => {
+    // No leg lengths and no knee bend, so the leg is straight, and at the
+    // middle of its time in the air it hangs straight down before the swing.
+    const params = fitWalk(
+      { legLength: BODY.legLength, speed: BODY.speed },
+      { splay: top, knee: 0 },
+    );
+    const midAir = 0.75 * params.period;
+    const thigh = turn(WALK_BIPED.track(midAir, params, "leg.l1.thigh"));
+    const foot = new THREE.Vector3(0, -BODY.legLength, 0).applyMatrix4(thigh);
+    expect(foot.y).toBeCloseTo(0, 9);
+    expect(foot.x).toBeCloseTo(BODY.legLength, 9);
+  });
+
+  it("never lifts a foot above its hip", () => {
+    for (const t of frames(widest)) {
+      for (const side of ["l", "r"] as const) {
+        expect(leg(widest, side, t).ankle.y).toBeLessThan(1e-9);
+      }
+    }
+  });
+
+  it("still plants the feet and keeps them level", () => {
+    for (const t of frames(widest)) {
+      for (const side of ["l", "r"] as const) {
+        const swung = leg(widest, side, t);
+        const level = new THREE.Vector3(0, 1, 0).applyMatrix4(swung.foot);
+        expect(level.y).toBeCloseTo(1, 9);
+        if (swung.thighOut) continue;
+        expect(swung.ankle.toArray()).toEqual(
+          leg(straight, side, t).ankle.toArray(),
+        );
+      }
+    }
+  });
+});

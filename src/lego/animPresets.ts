@@ -1340,6 +1340,13 @@ const WALK_PARAMS: PresetParam[] = [
     fallback: 30,
   },
   dutyParam(80),
+  // How far a leg swings out while its foot is in the air (#4487). Swung out
+  // by an angle, a leg hanging from its hip puts the foot its length times the
+  // angle's cosine below the hip, so at a right angle the foot is level with
+  // the hip whatever the leg's length. Past that the leg no longer hangs below
+  // its hip, which the walk's solve takes it to do (`legLengths` in
+  // `walkFit.ts`). No game measured for #4487 swings its legs out, so the walk
+  // does not unless the game maker sets it.
   {
     id: "splay",
     get label() {
@@ -1347,7 +1354,7 @@ const WALK_PARAMS: PresetParam[] = [
     },
     unit: "deg",
     min: 0,
-    max: 30,
+    max: 90,
     step: 1,
     fallback: 0,
   },
