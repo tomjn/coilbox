@@ -19370,10 +19370,6 @@ msgstr "Generate a map"
 msgid "Generate seed SQL"
 msgstr "Generate seed SQL"
 
-#: src/lego/pages/components/ScriptTab.tsx
-msgid "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
-msgstr "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
-
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "Generated Lua"
 msgstr "Generated Lua"
@@ -19720,10 +19716,6 @@ msgstr "Gun height"
 #: src/lego/pages/components/ModuleLabelsFields.tsx
 msgid "gun, heavy"
 msgstr "gun, heavy"
-
-#: src/lego/pages/components/ScriptTab.tsx
-msgid "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
-msgstr "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
 
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "Hand them over"
@@ -27345,10 +27337,6 @@ msgstr "Not recorded for rewind."
 msgid "Not renamed: {error}"
 msgstr "Not renamed: {error}"
 
-#: src/lego/pages/components/ScriptTab.tsx
-msgid "Not saved yet."
-msgstr "Not saved yet."
-
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Not saved: {error}"
@@ -33627,10 +33615,6 @@ msgstr "Saved profile \"{trimmed}\"."
 msgid "Saved to Singleplayer presets"
 msgstr "Saved to Singleplayer presets"
 
-#: src/lego/pages/components/ScriptTab.tsx
-msgid "Saved to the unit."
-msgstr "Saved to the unit."
-
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Saved to your Singleplayer presets to replay later."
@@ -39908,10 +39892,6 @@ msgstr "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. I
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 
-#: src/lego/pages/components/ScriptTab.tsx
-msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
-msgstr "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
-
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "The texture file has changed."
 msgstr "The texture file has changed."
@@ -41459,8 +41439,8 @@ msgid "This script includes {includes}. A script pasted here cannot load its inc
 msgstr "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
 
 #: src/lego/pages/components/ScriptTab.tsx
-msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
-msgstr "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
+msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
+msgstr "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
 
 #: src/lego/aimResolver.ts
 msgid "This script names no {callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits."
@@ -41653,10 +41633,6 @@ msgstr "this unit's geometry file is missing (404). It was written when the mode
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "This unit's name"
 msgstr "This unit's name"
-
-#: src/lego/pages/components/ScriptTab.tsx
-msgid "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
-msgstr "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "This unit's script can keep shared COB unit values as rules params. For the game's synced gadgets to set them, and its gadgets and widgets to read them, put <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> on the first line of <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> and <3>luaui.lua</3> (or <4>LuaUI/main.lua</4>)."
@@ -42659,6 +42635,10 @@ msgstr "Undo ({mod} Z)"
 #: src/lego/pages/BuilderPage.tsx
 msgid "Undo ({undoShortcut})"
 msgstr "Undo ({undoShortcut})"
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Undo brings the text back."
+msgstr "Undo brings the text back."
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "Undo every change?"

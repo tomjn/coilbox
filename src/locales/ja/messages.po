@@ -23778,11 +23778,6 @@ msgstr "マップを生成"
 msgid "Generate seed SQL"
 msgstr "シード SQL を生成"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
-msgstr "このユニットに適用したアニメーションから生成しています。スクリプトのチェックボックスにチェックが入っていれば（デフォルトでオン）、エクスポートで <0>scripts/{unitName}.lua</0> にも書き出します。既存のスクリプトは上書きしないため、手で編集した内容は再エクスポートしても残ります。"
-
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -24211,11 +24206,6 @@ msgstr "砲の高さ"
 #, fuzzy
 msgid "gun, heavy"
 msgstr "砲 , 重"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
-msgstr "スクリプトを戻すと、引き継ぐ前と同じように、ユニットはアニメーションプリセットから再び生成されます。"
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -33595,11 +33585,6 @@ msgstr "巻き戻し用に記録されていません。"
 msgid "Not renamed: {error}"
 msgstr "名前を変更できませんでした：{error}"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Not saved yet."
-msgstr "まだ保存されていません。"
-
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
@@ -41284,11 +41269,6 @@ msgstr "プロファイル「{trimmed}」を保存しました。"
 #, fuzzy
 msgid "Saved to Singleplayer presets"
 msgstr "シングルプレイのプリセットに保存しました"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Saved to the unit."
-msgstr "ユニットに保存しました。"
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #, fuzzy
@@ -49009,11 +48989,6 @@ msgstr ""
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr "テスト用ミューテーターは {conditionCount} 個の条件と {actionCount} 個のアクションを提供します"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
-msgstr "上のテキストは破棄されます。間違いだった場合は元に戻すで戻せますが、このセッション後も残したい場合は先にコピーしてください。"
-
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "The texture file has changed."
 msgstr ""
@@ -50931,9 +50906,8 @@ msgid "This script includes {includes}. A script pasted here cannot load its inc
 msgstr "このスクリプトは {includes} をインクルードしています。ここに貼り付けたスクリプトはインクルードを読み込めないため、変換できません。代わりにフォルダーから .bos を読み込むか、ゲームからユニットを開いてください。"
 
 #: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
-msgstr "このスクリプトは空なので、ユニットにはアニメーションがまったくなく、プリセットも反映できません。スクリプトを戻すと、アニメーションパネルが再び機能します。"
+msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
+msgstr ""
 
 #: src/lego/aimResolver.ts
 #, fuzzy
@@ -51172,11 +51146,6 @@ msgstr "このユニットのジオメトリファイルがありません（404
 #, fuzzy
 msgid "This unit's name"
 msgstr "このユニットの名前"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
-msgstr "このユニット独自のスクリプト。スクリプトのチェックボックスがオンの場合、エクスポートで <0>scripts/{unitName}.lua</0> にこのまま書き出されます。ゲームのフォルダーにすでにあるスクリプトが上書きされることはありません。"
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52412,6 +52381,10 @@ msgstr "元に戻す（{mod} Z）"
 #, fuzzy
 msgid "Undo ({undoShortcut})"
 msgstr "元に戻す（{undoShortcut}）"
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Undo brings the text back."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
