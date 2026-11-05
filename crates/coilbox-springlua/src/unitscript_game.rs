@@ -278,12 +278,12 @@ fn glob(pattern: &str, name: &str) -> bool {
     let (mut pi, mut ni) = (0, 0);
     let mut star: Option<(usize, usize)> = None;
     while ni < n.len() {
-        if pi < p.len() && (p[pi] == '?' || p[pi] == n[ni]) {
-            pi += 1;
-            ni += 1;
-        } else if pi < p.len() && p[pi] == '*' {
+        if pi < p.len() && p[pi] == '*' {
             star = Some((pi, ni));
             pi += 1;
+        } else if pi < p.len() && (p[pi] == '?' || p[pi] == n[ni]) {
+            pi += 1;
+            ni += 1;
         } else if let Some((at, from)) = star {
             pi = at + 1;
             ni = from + 1;
@@ -370,6 +370,8 @@ mod tests {
         assert!(glob("v?ctor.lua", "vector.lua"));
         assert!(glob("*a*b", "xxaxxb"));
         assert!(!glob("*a*b", "xxaxx"));
+        // A `*` in the name is still matched by the pattern's `*` as a wildcard.
+        assert!(glob("*", "*x"));
         // Answers at once rather than trying every split of the name.
         assert!(!glob(&"*a".repeat(30), &"a".repeat(29)));
     }
