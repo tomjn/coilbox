@@ -63,7 +63,12 @@ import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
-import { pickerRoles, presetById, restAngleWarnings } from "../animPresets";
+import {
+  BREAK_APART,
+  pickerRoles,
+  presetById,
+  restAngleWarnings,
+} from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
@@ -86,6 +91,7 @@ import {
   pieceConnectors,
   pieceOwnBox,
   same,
+  setJoinBreak,
   setJoinPlace,
 } from "../connectors";
 import { planById } from "../describedPlan";
@@ -108,11 +114,12 @@ import { useInventoryView } from "../inventory";
 import { withLimits } from "../jointLimits";
 import { liftIntoUnit, pasteIntoUnit, saveModuleMeshes } from "../liftIntoUnit";
 import {
-  holdsLiftedPieces,
+  holdsMeshes,
   liftCredit,
   liftedModuleRefusal,
   openedFrom,
   withMeshBoxes,
+  withOwnTextures,
 } from "../liftPiece";
 import {
   adoptLoadoutFile,
@@ -822,9 +829,9 @@ function Builder({ id }: { id: string | undefined }) {
   function startPlacingModule(module: LegoProject, now: boolean) {
     if (refuseLifted(module)) return;
     setPlacingAnchor(false);
-    // A lifted piece's meshes go into the unit first, so it has faces to join
-    // by and a ghost to draw, like any module.
-    if (holdsLiftedPieces(module)) {
+    // A module's meshes go into the unit first, so it has faces to join by and
+    // a ghost to draw, like any module.
+    if (holdsMeshes(module)) {
       setPlacingPart(null);
       void takeInLifted(module, t`Add module`).then((placed) => {
         if (placed) beginPlacingModule(placed, now);
@@ -1093,13 +1100,22 @@ function Builder({ id }: { id: string | undefined }) {
     edit((project) => setJoinPlace(project, pack, pieceId, change));
   }
 
+  // Marking how a join breaks moves nothing, so there is nothing to resolve.
+  function breakJoin(
+    pieceId: string,
+    change: { unbreakable?: boolean; strength?: number | null },
+  ) {
+    edit((project) => setJoinBreak(project, pieceId, change));
+  }
+
   function liftSelection(): LegoProject | null {
     if (!draft) return null;
-    return selectionAsCompound(draft, selectedIds, {
+    const cut = selectionAsCompound(draft, selectedIds, {
       id: crypto.randomUUID(),
       now: new Date().toISOString(),
       newId: () => crypto.randomUUID(),
     });
+    return cut && withOwnTextures(cut, draft);
   }
 
   // What the save step offers as the mount: the connectors of the module the
@@ -1458,7 +1474,7 @@ function Builder({ id }: { id: string | undefined }) {
   ) {
     setSwappingModule(false);
     if (!draft || !pack || refuseLifted(module, title)) return;
-    if (holdsLiftedPieces(module)) {
+    if (holdsMeshes(module)) {
       void takeInLifted(module, title).then((placed) => {
         const now = docRef.current.project;
         if (placed && now) applyModuleSwap(now, pieceId, placed, title);
@@ -1563,11 +1579,11 @@ function Builder({ id }: { id: string | undefined }) {
 
   async function copySelection() {
     const lifted = doc.lift(selectedIds);
-    if (!lifted) return;
+    if (!lifted || !draft) return;
     try {
       await navigator.clipboard.writeText(
         serializeClipboardPiece(
-          lifted,
+          withOwnTextures(lifted, draft),
           draft?.id,
           draft ? openedFrom(draft) : null,
         ),
@@ -2428,25 +2444,25 @@ function Builder({ id }: { id: string | undefined }) {
                   onDuplicate: duplicateSelection,
                   canDuplicate: transformRoots(draft, selectedIds).length > 0,
                   onPaste: () => void pasteClipboard(),
-                  // Not for an imported unit: a compound is pieces made of
-                  // parts, and one saved out of raw geometry would name
-                  // meshes that only mean anything inside the unit they
-                  // came from. It can never have one, so the button goes.
-                  onSaveAsCompound: imported
-                    ? undefined
-                    : (mount, labels) =>
-                        void saveSelectionAsCompound(mount, labels),
+                  // Not for a unit opened from somebody else's model, whose
+                  // meshes record nowhere they came from. One imported from
+                  // the game maker's own file can (#4360).
+                  onSaveAsCompound:
+                    imported && !draft?.pieces.some((piece) => piece.ownMesh)
+                      ? undefined
+                      : (mount, labels) =>
+                          void saveSelectionAsCompound(mount, labels),
                   compoundMounts,
-                  // A selection holding lifted pieces saves with its meshes in
-                  // a file of its own. A mesh that records no game cannot,
-                  // since the module could not be held to one.
+                  // A selection holding meshes saves them in a file of its
+                  // own. A mesh must record a game or be the maker's own,
+                  // since otherwise the module could not be held to a rule.
                   canSaveAsCompound:
                     selectedIds.length > 0 &&
                     !selectedIds
                       .flatMap((pieceId) => descendantIds(draft, pieceId))
                       .some((pieceId) => {
                         const held = pieceById(draft, pieceId);
-                        return held?.meshId && !held.lifted;
+                        return held?.meshId && !held.lifted && !held.ownMesh;
                       }),
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,
@@ -3373,6 +3389,14 @@ function Builder({ id }: { id: string | undefined }) {
                               onDetach={() => detach(selected.id)}
                               onPlace={(change) =>
                                 placeJoin(selected.id, change)
+                              }
+                              onBreak={
+                                (draft.animations ?? []).some(
+                                  (applied) =>
+                                    applied.presetId === BREAK_APART.id,
+                                )
+                                  ? (change) => breakJoin(selected.id, change)
+                                  : undefined
                               }
                               notice={
                                 joinNotice?.pieceId === selected.id

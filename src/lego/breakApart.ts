@@ -43,14 +43,17 @@ export const EVERY_CUT = Number.POSITIVE_INFINITY;
 
 /**
  * The places a unit can break: its joined pieces, or every piece but the root
- * when none is joined. The root is never one, since it is what is left.
+ * when none is joined. The root is never one, since it is what is left, and
+ * nor is a join the game maker marked unbreakable (#4503).
  */
 function cutPieces(project: LegoProject): LegoPiece[] {
   const beneath = project.pieces.filter(
     (piece) => piece.id !== project.rootPieceId && piece.parentId !== null,
   );
   const joined = beneath.filter((piece) => piece.connection);
-  return joined.length > 0 ? joined : beneath;
+  return joined.length > 0
+    ? joined.filter((piece) => !piece.connection?.unbreakable)
+    : beneath;
 }
 
 /**
@@ -60,8 +63,9 @@ function cutPieces(project: LegoProject): LegoPiece[] {
  * Depth 1 cuts only where a branch leaves the unit's body, so every group is a
  * whole branch. A greater depth also cuts the branches themselves, so a group
  * is what is left of a branch once the deeper cuts are taken from it. The
- * weakest group is the smallest, then the one that comes first in the
- * document.
+ * weakest group is the one whose join has the lowest strength, where a join
+ * without one is as strong as its group has pieces (#4503). Between equals the
+ * smaller group is weaker, then the one that comes first in the document.
  */
 export function breakGroups(project: LegoProject, depth: number): BreakGroup[] {
   const cuts = cutPieces(project);
@@ -113,10 +117,17 @@ export function breakGroups(project: LegoProject, depth: number): BreakGroup[] {
         }
       };
       walk(top);
-      return { at: order.get(top.id) ?? 0, group: { pieces, whole } };
+      return {
+        at: order.get(top.id) ?? 0,
+        strength: top.connection?.strength ?? pieces.length,
+        group: { pieces, whole },
+      };
     })
     .sort(
-      (a, b) => a.group.pieces.length - b.group.pieces.length || a.at - b.at,
+      (a, b) =>
+        a.strength - b.strength ||
+        a.group.pieces.length - b.group.pieces.length ||
+        a.at - b.at,
     )
     .map(({ group }): BreakGroup => group);
 }

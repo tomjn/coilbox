@@ -20,6 +20,8 @@ const COMMANDS: &[&str] = &[
     "lego_read_dae",
     "lego_import_dae",
     "lego_texture_import",
+    "lego_texture_save",
+    "lego_texture_watch",
     "lego_texture_png",
     "lego_atlas_png",
     "lego_bitmap_png",

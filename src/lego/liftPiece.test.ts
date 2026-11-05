@@ -21,6 +21,7 @@ import {
   moduleForUnit,
   openedFrom,
   withMeshBoxes,
+  withOwnTextures,
 } from "./liftPiece";
 import {
   type LegoProject,
@@ -434,6 +435,18 @@ describe("a lifted piece in a unit for a different game", () => {
     expect(marked.pieces[1].lifted).toBeDefined();
   });
 
+  it("leaves a mesh recorded as the maker's own unmarked (#4360)", () => {
+    const [, mesh] = lifted().pieces;
+    const marked = markLifted(
+      {
+        ...lifted(),
+        pieces: [{ ...mesh, lifted: undefined, ownMesh: { file: "hull.s3o" } }],
+      },
+      mesh.lifted as NonNullable<typeof mesh.lifted>,
+    );
+    expect(marked.pieces[0].lifted).toBeUndefined();
+  });
+
   it("keeps the record on a duplicate, which stays in its own unit", () => {
     const module = lifted();
     const duplicated = duplicatePiece(module, module.rootPieceId, {
@@ -441,6 +454,38 @@ describe("a lifted piece in a unit for a different game", () => {
       newId: ids(),
     });
     expect(duplicated?.project.pieces.every((p) => p.lifted)).toBe(true);
+  });
+
+  it("records the unit's textures on an own mesh saved as a module (#5073)", () => {
+    const [root, mesh] = lifted().pieces;
+    const opened: LegoProject = {
+      ...lifted(),
+      imported: {
+        source: "/models/hull.s3o",
+        texture: { key: "aa11.png", name: "hull.png", source: "/m/hull.png" },
+        texture2: { key: "bb22.png", name: "hull_2.png" },
+      },
+      pieces: [
+        { ...root, lifted: undefined },
+        { ...mesh, lifted: undefined, ownMesh: { file: "hull.s3o" } },
+      ],
+    };
+    const saved = selectionAsCompound(opened, [opened.rootPieceId], {
+      id: "saved",
+      now: "2026-11-05T00:00:00Z",
+      newId: ids(),
+    }) as LegoProject;
+    const recorded = withOwnTextures(saved, opened);
+    const own = recorded.pieces.find((p) => p.ownMesh);
+    // No path to refresh from: the unit it came from keeps that.
+    expect(own?.ownMesh).toEqual({
+      file: "hull.s3o",
+      texture: { key: "aa11.png", name: "hull.png" },
+      texture2: { key: "bb22.png", name: "hull_2.png" },
+    });
+    expect(parseLegoProjectJson(JSON.stringify(recorded))).toEqual(recorded);
+    // A unit of parts has no one pair, so a piece keeps what it carries.
+    expect(withOwnTextures(recorded, unit({}))).toBe(recorded);
   });
 
   it("keeps the record when a selection is saved as a module", () => {

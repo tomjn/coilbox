@@ -267,6 +267,24 @@ describe("sheetSources", () => {
     ]);
   });
 
+  it("puts an own mesh on the texture it records, under its file (#5073)", () => {
+    const doc = project([
+      {
+        partId: null,
+        meshId: "mod/m0",
+        ownMesh: {
+          file: "hull.s3o",
+          texture: { key: "dddd.png", name: "hull.png" },
+        },
+      },
+    ]);
+    const found = sheetSources(doc, pack(), raw());
+    if (!found || "refused" in found) throw new Error("no sources");
+    expect(found.sources.map((s) => [s.id, s.label, s.pieceIds])).toEqual([
+      ["dddd.png\n", "hull.png (hull.s3o)", ["piece0"]],
+    ]);
+  });
+
   it("refuses a lifted piece that has no texture to put on the sheet", () => {
     const doc = project([
       {

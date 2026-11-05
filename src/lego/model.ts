@@ -77,6 +77,15 @@ export interface LegoConnection {
   /** Radians about the parent connector's facing, turning the piece on the
    *  face. Absent means none. */
   twist?: number;
+  /** A unit that breaks apart is never cut here (#4503), so the piece leaves
+   *  with its parent's group. Absent means it can be. */
+  unbreakable?: true;
+  /**
+   * How hard the join is to break, counted in pieces (#4503). A unit breaks
+   * apart weakest first, and a join without a strength is as strong as the
+   * group it throws off has pieces. Absent means that size.
+   */
+  strength?: number;
 }
 
 /**
@@ -266,6 +275,41 @@ export interface LegoLifted {
   texture?: LegoTexture;
   /** The model's second texture, whose alpha hides pixels. */
   texture2?: LegoTexture;
+}
+
+/**
+ * A mesh the game maker imported from a model file of their own (#4360).
+ *
+ * Set by the file dialog's import, and only for a file outside a game's folder,
+ * never by opening a game's unit or a model out of an archive. It is what lets
+ * a module holding the mesh be shared, so a mesh with no record, which includes
+ * every mesh imported before this existed, stays unshareable: nothing says it
+ * is not a game's.
+ */
+export interface LegoOwnMesh {
+  /** The model file's name, without the folder it was in. */
+  file: string;
+  /** The unit's colour texture, which the mesh's UVs point onto, recorded when
+   *  the mesh is saved as a module or copied, so it still draws with it there
+   *  and in a unit of parts (#5073). As `LegoLifted` keeps its pair. */
+  texture?: LegoTexture;
+  /** The unit's second texture, whose alpha hides pixels. */
+  texture2?: LegoTexture;
+}
+
+/**
+ * The textures a mesh piece records it was drawn with: a lifted piece's game
+ * textures or an own mesh's, or null for a piece that records neither.
+ */
+export function pieceTextures(
+  piece: Pick<LegoPiece, "lifted" | "ownMesh">,
+): Pick<LegoLifted, "texture" | "texture2"> | null {
+  const from = piece.lifted ?? piece.ownMesh;
+  if (!from?.texture && !from?.texture2) return null;
+  return {
+    ...(from.texture ? { texture: from.texture } : {}),
+    ...(from.texture2 ? { texture2: from.texture2 } : {}),
+  };
 }
 
 /**
@@ -478,6 +522,8 @@ export interface LegoPiece {
   customAnchors?: LegoAnchor[];
   /** Set on a piece lifted off a game's unit. See {@link LegoLifted}. */
   lifted?: LegoLifted;
+  /** Set on a piece whose mesh is the game maker's own. See {@link LegoOwnMesh}. */
+  ownMesh?: LegoOwnMesh;
   /**
    * Joined to the parent by a connector. Absent means a free piece, placed by
    * its own `position` and `rotation`, which is every piece made before #3273.
@@ -2050,6 +2096,10 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const lifted = parseLifted(p.lifted);
       return lifted ? { lifted } : {};
     })(),
+    ...(() => {
+      const ownMesh = parseOwnMesh(p.ownMesh);
+      return ownMesh ? { ownMesh } : {};
+    })(),
     ...(typeof p.twin === "string" && p.twin !== "" ? { twin: p.twin } : {}),
     ...(() => {
       const ring = parsePieceRing(p.ring);
@@ -2231,6 +2281,21 @@ export function parseLifted(value: unknown): LegoLifted | null {
     game,
     member: v.member,
     ...(typeof v.unit === "string" && v.unit !== "" ? { unit: v.unit } : {}),
+    ...(texture ? { texture } : {}),
+    ...(texture2 ? { texture2 } : {}),
+  };
+}
+
+/** A piece's own mesh record, or null unless it names a file. */
+function parseOwnMesh(value: unknown): LegoOwnMesh | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.file !== "string" || v.file === "") return null;
+  // A pointer into the store, never a path to refresh from: the unit keeps that.
+  const texture = parseTexture(v.texture, true);
+  const texture2 = parseTexture(v.texture2, true);
+  return {
+    file: v.file,
     ...(texture ? { texture } : {}),
     ...(texture2 ? { texture2 } : {}),
   };
@@ -2677,6 +2742,12 @@ function parseConnection(value: unknown): LegoConnection | null {
     ...(offset ? { offset } : {}),
     ...(typeof v.twist === "number" && Number.isFinite(v.twist)
       ? { twist: v.twist }
+      : {}),
+    ...(v.unbreakable === true ? { unbreakable: true as const } : {}),
+    ...(typeof v.strength === "number" &&
+    Number.isFinite(v.strength) &&
+    v.strength >= 0
+      ? { strength: v.strength }
       : {}),
   };
 }

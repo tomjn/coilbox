@@ -13847,6 +13847,10 @@ msgstr "按地图"
 msgid "By output"
 msgstr "按输出"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -19522,6 +19526,7 @@ msgstr "录制轨道的磁盘空间（MB）"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -33158,6 +33163,7 @@ msgid "none"
 msgstr "无"
 
 #: src/animation/pages/Bos2LuaPage.tsx
+#: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
@@ -38505,6 +38511,10 @@ msgstr "正在读取镜像站索引…"
 msgid "Reading the model."
 msgstr "正在读取模型。"
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -39205,6 +39215,7 @@ msgstr "地形起伏"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -45464,6 +45475,10 @@ msgstr "连续纪录"
 msgid "Stream messages"
 msgstr ""
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -48097,6 +48112,10 @@ msgstr "对阵"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "护盾能储存的最大电量，会因来袭武器的伤害而减少。"
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -48869,6 +48888,10 @@ msgstr "你游玩的服务器，以及你在那里能收到谁的消息。"
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -48994,6 +49017,10 @@ msgstr "测试变异器带来 {conditionCount} 个条件和 {actionCount} 个动
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "上面的文本会被丢弃。如果这是误操作，撤销可以恢复，所以如果想在本次会话之后保留，请先复制它。"
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -49476,6 +49503,10 @@ msgstr "这些对局的布局并不都相同，所以这里不按队伍划分位
 #, fuzzy
 msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr "这些总和与对局图表中的伤害数据不同。引擎自身的总计将每次命中计为目标原本已损失的生命值，最多不超过命中的伤害，所以对未受损单位的第一次命中不会增加总计。"
+
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -50385,9 +50416,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "此模型是从打包的归档中打开的，没有可写回的路径。请改为保存到所选路径。"
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "此模块包含来自游戏或模型的几何体，分享的模块无法携带这些内容。"
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy
@@ -52277,6 +52307,10 @@ msgstr "取消屏蔽域名"
 #, fuzzy
 msgid "Unblock…"
 msgstr "取消屏蔽…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

@@ -13932,6 +13932,10 @@ msgstr "Per karta"
 msgid "By output"
 msgstr "Efter utdata"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -19657,6 +19661,7 @@ msgstr "Diskutrymme för spår (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -33368,6 +33373,7 @@ msgid "none"
 msgstr "ingen"
 
 #: src/animation/pages/Bos2LuaPage.tsx
+#: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
@@ -38772,6 +38778,10 @@ msgstr "Läser speglarnas index…"
 msgid "Reading the model."
 msgstr "Läser modellen."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -39475,6 +39485,7 @@ msgstr "Relief"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -45775,6 +45786,10 @@ msgstr "Sviter"
 msgid "Stream messages"
 msgstr "Strömmeddelanden"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -48429,6 +48444,10 @@ msgstr "det inbördes mötet"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "Den största laddning skölden kan hålla, minskad av inkommande vapenskada."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -49213,6 +49232,10 @@ msgstr "Servrarna du spelar på, och vilka du hör från där."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "Inställningarna ändrades efter att coilbox läste dem, så inget sparades. Stäng det här och öppna det igen."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49342,6 +49365,10 @@ msgstr "Testmutatorn har med {conditionCount} villkor och {actionCount} åtgärd
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "Texten ovan kastas. Ångra tar tillbaka den om det var ett misstag, så kopiera den först om du vill behålla den efter den här sessionen."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -49826,6 +49853,10 @@ msgstr "De här matcherna har inte alla samma uppställning, så positioner dela
 #, fuzzy
 msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr "De här summorna skiljer sig från skadevärdena i matchdiagrammet. Motorns egen summa räknar varje träff som den hälsa målet redan saknade, upp till träffens storlek, så den första träffen på en oskadd enhet lägger inte till något."
+
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -50736,9 +50767,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Den här modellen öppnades inifrån ett packat arkiv, som inte har någon sökväg att skriva tillbaka till. Spara den till en vald sökväg i stället."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Den här modulen innehåller geometri från ett spel eller en modell, vilket en delad modul inte kan bära."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy
@@ -52638,6 +52668,10 @@ msgstr "Avblockera domän"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Avblockera…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

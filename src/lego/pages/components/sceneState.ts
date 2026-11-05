@@ -20,11 +20,12 @@ import { importedMaterial, partMaterial } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
 import type { GuideLine, GuidePlane } from "../../guides";
 import { JoinedGroup } from "../../joinedWorld";
-import type {
-  LegoCollisionVolume,
-  LegoPiece,
-  LegoPoseOffset,
-  LegoProject,
+import {
+  type LegoCollisionVolume,
+  type LegoPiece,
+  type LegoPoseOffset,
+  type LegoProject,
+  pieceTextures,
 } from "../../model";
 import type { StandardView } from "../../orthoViews";
 import { getPartGeometry, type LoadedPack } from "../../pack";
@@ -533,10 +534,10 @@ export function pieceMaterials(
 ): (piece: LegoPiece) => THREE.MeshStandardMaterial {
   const unit = unitMaterial(state, pack, project);
   const keyOf = (piece: LegoPiece) => {
-    const lifted = piece.lifted;
-    if (project.imported || !lifted || !piece.meshId) return null;
-    if (!lifted.texture && !lifted.texture2) return null;
-    return `${lifted.texture?.key ?? ""}|${lifted.texture2?.key ?? ""}`;
+    // An own mesh records its unit's textures the same way (#5073).
+    const textures = pieceTextures(piece);
+    if (project.imported || !textures || !piece.meshId) return null;
+    return `${textures.texture?.key ?? ""}|${textures.texture2?.key ?? ""}`;
   };
   const used = new Set<string>();
   for (const piece of project.pieces) {
@@ -544,7 +545,7 @@ export function pieceMaterials(
     if (!key || used.has(key)) continue;
     used.add(key);
     if (!state.lifted.has(key))
-      state.lifted.set(key, importedMaterial(piece.lifted ?? {}));
+      state.lifted.set(key, importedMaterial(pieceTextures(piece) ?? {}));
   }
   for (const [key, held] of state.lifted) {
     if (used.has(key)) continue;

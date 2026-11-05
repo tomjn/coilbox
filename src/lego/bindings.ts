@@ -766,6 +766,31 @@ export const legoTextureImport = defineCommand<
 >("coilbox-lego", "lego_texture_import");
 
 /**
+ * Put a texture a shared module code carried (#5073) in the store, under the
+ * key the sender's store gave it. Refused unless the key is the bytes' own
+ * content hash, so a code cannot name a file or replace one already held.
+ */
+export const legoTextureSave = defineCommand<
+  { key: string; bytes: number[] },
+  { key: string }
+>("coilbox-lego", "lego_texture_save");
+
+/**
+ * Watch the files an open unit's textures came from, replacing any earlier
+ * watch. An empty list stops watching. Each edit that has settled arrives once
+ * as {@link LEGO_TEXTURE_CHANGED_EVENT} (issue #3225).
+ */
+export const legoTextureWatch = defineCommand<
+  { paths: string[] },
+  { watching: number }
+>("coilbox-lego", "lego_texture_watch");
+
+/** Emitted when a watched texture file has been edited and has stopped
+ *  changing. The payload is `{ path }`, the path as it was handed to
+ *  {@link legoTextureWatch}. */
+export const LEGO_TEXTURE_CHANGED_EVENT = "coilbox-lego://texture-changed";
+
+/**
  * A stored texture as a PNG `data:` URL, decoded and scaled to fit inside 2048
  * if the game's own copy is larger.
  *

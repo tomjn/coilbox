@@ -136,6 +136,14 @@ export function holdsLiftedPieces(project: LegoProject): boolean {
 }
 
 /**
+ * Whether a document has any piece drawn from a geometry file of its own: one
+ * lifted from a game, or one imported from the game maker's own model (#4360).
+ */
+export function holdsMeshes(project: LegoProject): boolean {
+  return project.pieces.some((piece) => piece.meshId);
+}
+
+/**
  * The pieces with a mesh and no box, given the box of that mesh from `raw`
  * (#3269). A box a piece already has is kept, and a mesh `raw` does not hold
  * leaves its piece as it is. The same document comes back when nothing changed.
@@ -223,6 +231,7 @@ export function openedFrom(project: LegoProject): LegoLifted | null {
  * The pieces with a mesh and no record of where it came from, marked as lifted
  * from `source`. A copy of part of a unit opened from a game becomes game
  * geometry in the unit it is pasted into, and is held to the same game rule.
+ * A mesh recorded as the game maker's own (#4360) keeps that record.
  */
 export function markLifted(
   project: LegoProject,
@@ -231,7 +240,31 @@ export function markLifted(
   return {
     ...project,
     pieces: project.pieces.map((piece) =>
-      piece.meshId && !piece.lifted ? { ...piece, lifted: source } : piece,
+      piece.meshId && !piece.lifted && !piece.ownMesh
+        ? { ...piece, lifted: source }
+        : piece,
+    ),
+  };
+}
+
+/**
+ * A selection cut out of `unit`, with each own mesh recording the textures
+ * `unit` draws it with (#5073), so it draws with them as a module and in a unit
+ * of parts. Only a unit opened from a model has one pair for every mesh. In a
+ * unit of parts each piece already carries its own, which are kept.
+ */
+export function withOwnTextures(
+  selection: LegoProject,
+  unit: Pick<LegoProject, "imported">,
+): LegoProject {
+  if (!unit.imported) return selection;
+  const textures = liftedTextures(unit.imported);
+  return {
+    ...selection,
+    pieces: selection.pieces.map((piece) =>
+      piece.meshId && piece.ownMesh
+        ? { ...piece, ownMesh: { file: piece.ownMesh.file, ...textures } }
+        : piece,
     ),
   };
 }

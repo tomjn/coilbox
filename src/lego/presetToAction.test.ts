@@ -103,13 +103,27 @@ interface Body {
   loop: Op[];
 }
 
+// A fitted walk's speeds are written times `scale` and its sleeps as `wait`
+// frames, both from `walkPace` (#4486). This plays it at top speed, as the
+// preview does with nothing driving the unit, where `scale` is 1 and `wait` is
+// the step's own frames.
 const CALL =
-  /^\s*(Turn|Move|ActTurn|ActMove)\((\w+), ([xyz])_axis, (-?[\d.e-]+)(?:, (-?[\d.e-]+))?\)$/;
+  /^\s*(Turn|Move|ActTurn|ActMove)\((\w+), ([xyz])_axis, (-?[\d.e-]+)(?:, (-?[\d.e-]+)(?: \* scale)?)?\)$/;
 
 function parseBody(lines: string[]): Body {
   const body: Body = { lead: [], loop: [] };
   let into = body.lead;
+  let stepFrames = 0;
   for (const line of lines) {
+    const paced = /walkPace\((\d+), due\)$/.exec(line);
+    if (paced) {
+      stepFrames = Number(paced[1]);
+      continue;
+    }
+    if (/^\s*Sleep\(33 \* wait\)$/.test(line)) {
+      into.push({ op: "sleep", frames: stepFrames });
+      continue;
+    }
     if (line === "  while true do") {
       into = body.loop;
       continue;

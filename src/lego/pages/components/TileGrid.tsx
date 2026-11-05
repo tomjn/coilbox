@@ -45,8 +45,13 @@ import {
   partMaterial,
 } from "../../geometry";
 import { refKey } from "../../inventory";
-import { holdsLiftedPieces, liftCredits } from "../../liftPiece";
-import type { LegoLifted, LegoPiece, LegoProject } from "../../model";
+import { holdsLiftedPieces, holdsMeshes, liftCredits } from "../../liftPiece";
+import {
+  type LegoLifted,
+  type LegoPiece,
+  type LegoProject,
+  pieceTextures,
+} from "../../model";
 import {
   getPartGeometry,
   type LegoPartInfo,
@@ -272,12 +277,13 @@ export function TileGrid({
     ready,
   );
 
-  // A lifted module's meshes are in a file of its own, read once per module.
+  // A module's meshes, lifted or the maker's own, are in a file of its own,
+  // read once per module.
   useEffect(() => {
     for (const item of items) {
       if (item.kind !== "module") continue;
       const { module } = item;
-      if (!holdsLiftedPieces(module) || asked.current.has(module.id)) continue;
+      if (!holdsMeshes(module) || asked.current.has(module.id)) continue;
       asked.current.add(module.id);
       const { id } = module;
       void loadRawGeometry(id).then(
@@ -616,7 +622,7 @@ export function buildModule(
   material: THREE.Material,
   fit: number,
 ): Holder | null {
-  if (!holdsLiftedPieces(module)) {
+  if (!holdsMeshes(module)) {
     const group = buildCompoundHolder(
       module,
       (piece) =>
@@ -633,11 +639,12 @@ export function buildModule(
   if (!raw) return null;
   // A module lifted whole draws everything with its game's texture. One saved
   // out of a selection (#4344) has none of its own, so each lifted piece draws
-  // with the textures it records and a pack part with the pack's.
+  // with the textures it records and a pack part with the pack's. An own mesh
+  // records its unit's the same way (#5073).
   const own = new Map<string, ReturnType<typeof importedMaterial>>();
   const lifted = (piece: LegoPiece) => {
     const source: Pick<LegoLifted, "texture" | "texture2"> =
-      module.imported ?? piece.lifted ?? {};
+      module.imported ?? pieceTextures(piece) ?? {};
     const key = `${source.texture?.key ?? ""}|${source.texture2?.key ?? ""}`;
     let held = own.get(key);
     if (!held) {
@@ -681,7 +688,7 @@ function holderFor(
   module: LegoProject,
   material: THREE.Material,
 ): Holder | null {
-  const raw = holdsLiftedPieces(module) ? state.raws.get(module.id) : undefined;
+  const raw = holdsMeshes(module) ? state.raws.get(module.id) : undefined;
   let holder = state.holders.get(module.id);
   if (holder && (holder.module !== module || holder.raw !== raw)) {
     state.scene.remove(holder.group);
