@@ -13932,6 +13932,10 @@ msgstr "Per mappa"
 msgid "By output"
 msgstr "Per output"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -45770,6 +45774,10 @@ msgstr "Serie"
 msgid "Stream messages"
 msgstr "Messaggi in streaming"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -52633,6 +52641,10 @@ msgstr "Sblocca dominio"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Sblocca…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx
