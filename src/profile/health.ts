@@ -1,6 +1,7 @@
 import { plural, t } from "@lingui/core/macro";
 import type { BundleReport } from "../content/bindings";
 import { bundleProblemText } from "../content/bundle";
+import type { PackFailure } from "../i18n/packs";
 import type { OnlyOwnMapsResolution } from "./onlyOwnMaps";
 import type { GameFilter, ProfileSource } from "./profile";
 import { canonicalProfileId } from "./renamedIds";
@@ -135,6 +136,17 @@ export interface HealthInputs {
    * checked: no `start`, nothing it leads to, or no scan yet.
    */
   startMissing: string[] | null;
+  /**
+   * The language packs under `.coilbox/locales/`: the codes that loaded, the
+   * folders that did not and why, and the profile's `defaultLocale` with
+   * whether it names a language coilbox has.
+   */
+  languagePacks: {
+    loaded: string[];
+    failures: PackFailure[];
+    defaultLocale?: string;
+    defaultKnown: boolean;
+  };
 }
 
 /** Strip the trailing `.coilbox` segment to get the app dir the package sits in. */
@@ -286,6 +298,48 @@ export function checkAppIcon(
     status: "warn",
     label: t`The profile's \`icon\` was not applied`,
     hint: t`${iconError}. \`icon\` is a PNG file, by its path relative to the .coilbox folder.`,
+  };
+}
+
+/**
+ * Say which language packs loaded, and why any did not. A pack that fails is
+ * skipped, so its language is missing from the picker with no other sign. Also
+ * an error when `defaultLocale` names a language coilbox has no catalog or pack
+ * for, since the player then starts in the system language. `null` when the
+ * profile ships no packs and sets no `defaultLocale`.
+ */
+export function checkLanguagePacks(
+  packs: HealthInputs["languagePacks"],
+): HealthCheck | null {
+  const { loaded, failures, defaultLocale, defaultKnown } = packs;
+  if (loaded.length === 0 && failures.length === 0 && !defaultLocale) {
+    return null;
+  }
+  const loadedList = loaded.join(", ");
+  if (defaultLocale && !defaultKnown) {
+    return {
+      id: "languagePacks",
+      status: "error",
+      label: t`\`defaultLocale\` names a language coilbox does not have`,
+      hint: t`"${defaultLocale}" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language.`,
+    };
+  }
+  if (failures.length > 0) {
+    const failureCount = failures.length;
+    return {
+      id: "languagePacks",
+      status: "warn",
+      label: t`${failureCount} language pack(s) were not used`,
+      hint: t`Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes.`,
+      detail: failures.map((f) => `${f.dir}: ${f.error}`).join("\n"),
+    };
+  }
+  return {
+    id: "languagePacks",
+    status: "ok",
+    label: loaded.length
+      ? t`Language packs loaded: ${loadedList}`
+      : t`No language packs`,
   };
 }
 
@@ -821,6 +875,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checkHideSettingsIds(i.hideSettings, i.settingsIds),
     checkAppIcon(i.appIcon),
     checkLinkIcons(i.linkIcons, i.validIconNames),
+    checkLanguagePacks(i.languagePacks),
     checkHome(i.home),
     checkStart(i.start),
     checkOnlyOwnMaps(i.onlyOwnMaps),

@@ -14,6 +14,7 @@ import { loadHomeMarkup } from "./home/markup";
 import { i18n, loadLocale } from "./i18n";
 import { LocalisedAppFrame } from "./i18n/LocalisedAppFrame";
 import { bootLocale, LANGUAGE_KEY } from "./i18n/language";
+import { loadLocalePacks } from "./i18n/packs";
 import { applyUiZoom, DEFAULT_UI_ZOOM, UI_ZOOM_KEY } from "./lib/uiZoom";
 import { seedExistingInstall } from "./onboarding/settle";
 import { applyProfilePages } from "./profile/CustomPage";
@@ -62,8 +63,14 @@ if (import.meta.env.DEV) performance.mark("coilbox:boot:settings");
 const { profile } = await loadProfile();
 if (import.meta.env.DEV) performance.mark("coilbox:boot:profile");
 
+// Read the profile's language packs (.coilbox/locales/<code>/), so the catalog
+// below can merge one in and the picker can list the languages they add.
+await loadLocalePacks();
+if (import.meta.env.DEV) performance.mark("coilbox:boot:locale-packs");
+
 // Load the catalog before first render, so the first frame is already in the
-// player's language: the Language setting, or the system's when it is unset.
+// player's language: the Language setting, or the profile's `defaultLocale` or
+// the system's when it is unset.
 await loadLocale(bootLocale(settingsStorage.get(LANGUAGE_KEY)));
 if (import.meta.env.DEV) performance.mark("coilbox:boot:locale");
 if (settingsStorage.loadProblem) {

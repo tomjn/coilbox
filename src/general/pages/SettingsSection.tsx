@@ -6,11 +6,8 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useLanguageSetting } from "../../i18n/language";
-import {
-  localeDisplayName,
-  pickerLocales,
-  SYSTEM_LANGUAGE,
-} from "../../i18n/locales";
+import { pickerLocales, SYSTEM_LANGUAGE } from "../../i18n/locales";
+import { languageLabel, packOnlyLocales } from "../../i18n/packs";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
 import { requestOnboardingRerun } from "../../onboarding/rerun";
 import { useAdvancedModeSetting } from "../advanced";
@@ -90,9 +87,9 @@ export default function GeneralSettings() {
             size="sm"
             options={[
               { value: SYSTEM_LANGUAGE, label: t`System` },
-              ...pickerLocales().map((code) => ({
+              ...pickerLocales(packOnlyLocales()).map((code) => ({
                 value: code,
-                label: localeDisplayName(code),
+                label: languageLabel(code),
                 hint: code,
               })),
             ]}
