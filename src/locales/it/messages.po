@@ -10570,7 +10570,7 @@ msgstr "Tutte le campagne caricate"
 #: src/lego/pages/components/CategoryMenu.tsx
 #, fuzzy
 msgid "All categories"
-msgstr "Tutte le categorie"
+msgstr "Tutte"
 
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
@@ -14778,7 +14778,7 @@ msgstr "Chat"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Chat highlights"
-msgstr "Evidenziazioni della chat"
+msgstr "Evidenziazioni chat"
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -18579,7 +18579,7 @@ msgstr "Data"
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Date created"
-msgstr "Data di creazione"
+msgstr "Data creazione"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/DaysField.tsx
@@ -22157,7 +22157,7 @@ msgstr "In evidenza"
 #: src/content/libraryGames.ts
 #, fuzzy
 msgid "Featured first"
-msgstr "Prima quelli in evidenza"
+msgstr "In evidenza"
 
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
@@ -36341,7 +36341,7 @@ msgstr "Incolla un codice sfida…"
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
 msgid "Paste a coilbox link, a code, or an exported file's contents…"
-msgstr "Incolla un link coilbox, un codice, o il contenuto di un file esportato…"
+msgstr "Incolla un link coilbox, un codice o un file esportato…"
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -53190,7 +53190,7 @@ msgstr "Campo sconosciuto «{identifier}». Prova hp, speed, cost, metal, energy
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Origine sconosciuta"
+msgstr "Sconosciuta"
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -54280,7 +54280,7 @@ msgstr "Impossibile leggere i risultati del Sentiero di guerra. Il Sentiero di g
 #: src/home/continue.ts
 #, fuzzy
 msgid "Warpath run"
-msgstr "Spedizione del Sentiero di guerra"
+msgstr "Sentiero di guerra"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
