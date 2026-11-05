@@ -13929,6 +13929,10 @@ msgstr "Etter kart"
 msgid "By output"
 msgstr "Etter utdata"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -45753,6 +45757,10 @@ msgstr "Rekker"
 msgid "Stream messages"
 msgstr "Strømmeldinger"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -52616,6 +52624,10 @@ msgstr "Opphev blokkering av domene"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Opphev blokkering…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

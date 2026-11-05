@@ -13847,6 +13847,10 @@ msgstr "Par carte"
 msgid "By output"
 msgstr "Par sortie"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -45459,6 +45463,10 @@ msgstr "Séries"
 msgid "Stream messages"
 msgstr ""
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -52272,6 +52280,10 @@ msgstr "Débloquer le domaine"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Débloquer…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

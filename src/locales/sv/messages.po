@@ -13932,6 +13932,10 @@ msgstr "Per karta"
 msgid "By output"
 msgstr "Efter utdata"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -45770,6 +45774,10 @@ msgstr "Sviter"
 msgid "Stream messages"
 msgstr "Strömmeddelanden"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -52633,6 +52641,10 @@ msgstr "Avblockera domän"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Avblockera…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

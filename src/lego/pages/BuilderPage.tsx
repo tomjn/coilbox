@@ -63,7 +63,12 @@ import { addShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
-import { pickerRoles, presetById, restAngleWarnings } from "../animPresets";
+import {
+  BREAK_APART,
+  pickerRoles,
+  presetById,
+  restAngleWarnings,
+} from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { balanceProblem, checkBalance } from "../balance";
 import { legoTexturePrune } from "../bindings";
@@ -86,6 +91,7 @@ import {
   pieceConnectors,
   pieceOwnBox,
   same,
+  setJoinBreak,
   setJoinPlace,
 } from "../connectors";
 import { planById } from "../describedPlan";
@@ -1091,6 +1097,14 @@ function Builder({ id }: { id: string | undefined }) {
   ) {
     if (!pack) return;
     edit((project) => setJoinPlace(project, pack, pieceId, change));
+  }
+
+  // Marking how a join breaks moves nothing, so there is nothing to resolve.
+  function breakJoin(
+    pieceId: string,
+    change: { unbreakable?: boolean; strength?: number | null },
+  ) {
+    edit((project) => setJoinBreak(project, pieceId, change));
   }
 
   function liftSelection(): LegoProject | null {
@@ -3372,6 +3386,14 @@ function Builder({ id }: { id: string | undefined }) {
                               onDetach={() => detach(selected.id)}
                               onPlace={(change) =>
                                 placeJoin(selected.id, change)
+                              }
+                              onBreak={
+                                (draft.animations ?? []).some(
+                                  (applied) =>
+                                    applied.presetId === BREAK_APART.id,
+                                )
+                                  ? (change) => breakJoin(selected.id, change)
+                                  : undefined
                               }
                               notice={
                                 joinNotice?.pieceId === selected.id

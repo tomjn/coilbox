@@ -13847,6 +13847,10 @@ msgstr "按地图"
 msgid "By output"
 msgstr "按输出"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -45459,6 +45463,10 @@ msgstr "连续纪录"
 msgid "Stream messages"
 msgstr ""
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -52272,6 +52280,10 @@ msgstr "取消屏蔽域名"
 #, fuzzy
 msgid "Unblock…"
 msgstr "取消屏蔽…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx
