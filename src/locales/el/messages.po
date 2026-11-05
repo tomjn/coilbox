@@ -23936,11 +23936,6 @@ msgstr "Δημιουργία χάρτη"
 msgid "Generate seed SQL"
 msgstr "Δημιουργία seed SQL"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
-msgstr "Δημιουργήθηκε από τις κινήσεις που εφαρμόστηκαν σε αυτή τη μονάδα. Η εξαγωγή το γράφει και στο <0>scripts/{unitName}.lua</0>, αν είναι επιλεγμένο το πλαίσιο script (ενεργό από προεπιλογή). Ένα υπάρχον script δεν αντικαθίσταται ποτέ, οπότε οι χειροκίνητες αλλαγές επιβιώνουν από μια νέα εξαγωγή."
-
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -24371,11 +24366,6 @@ msgstr "Ύψος όπλου"
 #, fuzzy
 msgid "gun, heavy"
 msgstr "όπλο, βαρύ"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
-msgstr "Επιστρέψτε το script και η μονάδα δημιουργείται ξανά από τις προρρυθμίσεις κίνησης, όπως ήταν πριν το αναλάβετε."
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -33808,11 +33798,6 @@ msgstr "Δεν καταγράφηκε για γύρισμα πίσω."
 msgid "Not renamed: {error}"
 msgstr "Δεν μετονομάστηκε: {error}"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Not saved yet."
-msgstr "Δεν αποθηκεύτηκε ακόμη."
-
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
@@ -41575,11 +41560,6 @@ msgstr "Το προφίλ «{trimmed}» αποθηκεύτηκε."
 #, fuzzy
 msgid "Saved to Singleplayer presets"
 msgstr "Αποθηκεύτηκε στις προρρυθμίσεις Ένας παίκτης"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Saved to the unit."
-msgstr "Αποθηκεύτηκε στη μονάδα."
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #, fuzzy
@@ -49361,11 +49341,6 @@ msgstr "Η εικόνα περιβάλλοντος «{file}» είναι {wideWi
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr "Το δοκιμαστικό mutator φέρνει {conditionCount} συνθήκες και {actionCount} δράσεις"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
-msgstr "Το παραπάνω κείμενο απορρίπτεται. Η αναίρεση το επαναφέρει αν ήταν λάθος, οπότε αντιγράψτε το πρώτα αν θέλετε να το κρατήσετε μετά από αυτή τη συνεδρία."
-
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "The texture file has changed."
 msgstr ""
@@ -51291,9 +51266,8 @@ msgid "This script includes {includes}. A script pasted here cannot load its inc
 msgstr "Αυτό το script περιλαμβάνει {includes}. Ένα script που επικολλάται εδώ δεν μπορεί να φορτώσει τα αρχεία που περιλαμβάνει, οπότε δεν μπορεί να μετατραπεί. Φορτώστε το .bos από τον φάκελό του ή ανοίξτε τη μονάδα από το παιχνίδι της."
 
 #: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
-msgstr "Αυτό το script είναι κενό, οπότε η μονάδα δεν έχει καμία κίνηση και οι προρρυθμίσεις δεν μπορούν να τη φτάσουν. Επιστρέψτε το και το πλαίσιο Κίνηση λειτουργεί ξανά."
+msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
+msgstr ""
 
 #: src/lego/aimResolver.ts
 #, fuzzy
@@ -51533,11 +51507,6 @@ msgstr "λείπει το αρχείο γεωμετρίας αυτής της μ
 #, fuzzy
 msgid "This unit's name"
 msgstr "Το όνομα αυτής της μονάδας"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
-msgstr "Το script της ίδιας της μονάδας. Η εξαγωγή το γράφει στο <0>scripts/{unitName}.lua</0> ακριβώς όπως είναι εδώ, αν είναι επιλεγμένο το πλαίσιο script. Ένα script που υπάρχει ήδη στον φάκελο του παιχνιδιού δεν αντικαθίσταται ποτέ."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52777,6 +52746,10 @@ msgstr "Αναίρεση ({mod} Z)"
 #, fuzzy
 msgid "Undo ({undoShortcut})"
 msgstr "Αναίρεση ({undoShortcut})"
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Undo brings the text back."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy

@@ -23936,11 +23936,6 @@ msgstr "Een kaart genereren"
 msgid "Generate seed SQL"
 msgstr "Seed-SQL genereren"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
-msgstr "Gegenereerd uit de animaties die op deze eenheid zijn toegepast. Exporteren schrijft het ook naar <0>scripts/{unitName}.lua</0>, als het selectievakje voor het script is aangevinkt (standaard aan). Een bestaand script wordt nooit overschreven, dus wijzigingen met de hand blijven na opnieuw exporteren bewaard."
-
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -24371,11 +24366,6 @@ msgstr "Geschuthoogte"
 #, fuzzy
 msgid "gun, heavy"
 msgstr "geschut, zwaar"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
-msgstr "Geef het script terug en de eenheid wordt weer gegenereerd uit de animatievoorinstellingen, zoals voordat je het overnam."
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -33808,11 +33798,6 @@ msgstr "Niet opgenomen voor terugspoelen."
 msgid "Not renamed: {error}"
 msgstr "Naam niet gewijzigd: {error}"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Not saved yet."
-msgstr "Nog niet opgeslagen."
-
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
@@ -41575,11 +41560,6 @@ msgstr "Profiel \"{trimmed}\" opgeslagen."
 #, fuzzy
 msgid "Saved to Singleplayer presets"
 msgstr "Opgeslagen in de Singleplayer-voorinstellingen"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Saved to the unit."
-msgstr "Opgeslagen in de eenheid."
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #, fuzzy
@@ -49361,11 +49341,6 @@ msgstr "De randafbeelding \"{file}\" is {wideWidth} bij {wideHeight} pixels. Hij
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr "De testmutator brengt {conditionCount} voorwaarden en {actionCount} acties mee"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
-msgstr "De tekst hierboven wordt weggegooid. Ongedaan maken haalt hem terug als dat een vergissing was, dus kopieer hem eerst als je hem na deze sessie wilt bewaren."
-
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "The texture file has changed."
 msgstr ""
@@ -51291,9 +51266,8 @@ msgid "This script includes {includes}. A script pasted here cannot load its inc
 msgstr "Dit script bevat {includes}. Een script dat hier geplakt is, kan zijn includes niet laden, dus het kan niet omgezet worden. Laad in plaats daarvan de .bos uit zijn map, of open de eenheid uit haar spel."
 
 #: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
-msgstr "Dit script is leeg, dus de eenheid heeft helemaal geen animatie en de voorinstellingen kunnen er niet bij. Geef het terug en het paneel Animatie werkt weer."
+msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
+msgstr ""
 
 #: src/lego/aimResolver.ts
 #, fuzzy
@@ -51533,11 +51507,6 @@ msgstr "het geometriebestand van deze eenheid ontbreekt (404). Het is geschreven
 #, fuzzy
 msgid "This unit's name"
 msgstr "De naam van deze eenheid"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
-msgstr "Het eigen script van deze eenheid. De export schrijft het precies zoals het hier staat naar <0>scripts/{unitName}.lua</0>, als het vakje voor het script aangevinkt is. Een script dat al in de spelmap staat, wordt nooit overschreven."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52777,6 +52746,10 @@ msgstr "Ongedaan maken ({mod} Z)"
 #, fuzzy
 msgid "Undo ({undoShortcut})"
 msgstr "Ongedaan maken ({undoShortcut})"
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Undo brings the text back."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy

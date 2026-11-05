@@ -23936,11 +23936,6 @@ msgstr "Generera en karta"
 msgid "Generate seed SQL"
 msgstr "Generera SQL för startdata"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
-msgstr "Genererat från animationerna som används på den här enheten. Exporten skriver det också till <0>scripts/{unitName}.lua</0> om kryssrutan för skript är markerad (på som standard). Ett befintligt skript skrivs aldrig över, så handgjorda ändringar finns kvar efter en ny export."
-
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -24371,11 +24366,6 @@ msgstr "Kanonens höjd"
 #, fuzzy
 msgid "gun, heavy"
 msgstr "kanon, tung"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
-msgstr "Lämna tillbaka skriptet så genereras enheten från animationsförinställningarna igen, som den var innan du tog över det."
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -33808,11 +33798,6 @@ msgstr "Inte inspelad för tillbakaspolning."
 msgid "Not renamed: {error}"
 msgstr "Inte omdöpt: {error}"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Not saved yet."
-msgstr "Inte sparat än."
-
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
 #: src/blueprint/pages/components/ImportPackForm.tsx
 #, fuzzy
@@ -41575,11 +41560,6 @@ msgstr "Sparade profilen ”{trimmed}”."
 #, fuzzy
 msgid "Saved to Singleplayer presets"
 msgstr "Sparad i förinställningar för enspelarläget"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "Saved to the unit."
-msgstr "Sparat i enheten."
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #, fuzzy
@@ -49361,11 +49341,6 @@ msgstr "Omgivningsbilden ”{file}” är {wideWidth} gånger {wideHeight} pixla
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr "Testmutatorn har med {conditionCount} villkor och {actionCount} åtgärder"
 
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
-msgstr "Texten ovan kastas. Ångra tar tillbaka den om det var ett misstag, så kopiera den först om du vill behålla den efter den här sessionen."
-
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "The texture file has changed."
 msgstr ""
@@ -51291,9 +51266,8 @@ msgid "This script includes {includes}. A script pasted here cannot load its inc
 msgstr "Det här skriptet inkluderar {includes}. Ett skript som klistras in här kan inte läsa in sina inkluderingar, så det kan inte konverteras. Läs in .bos-filen från dess mapp i stället, eller öppna enheten från dess spel."
 
 #: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
-msgstr "Det här skriptet är tomt, så enheten har ingen animation alls och förinställningarna kan inte nå den. Lämna tillbaka det så fungerar panelen Animation igen."
+msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
+msgstr ""
 
 #: src/lego/aimResolver.ts
 #, fuzzy
@@ -51533,11 +51507,6 @@ msgstr "den här enhetens geometrifil saknas (404). Den skrevs när modellen imp
 #, fuzzy
 msgid "This unit's name"
 msgstr "Den här enhetens namn"
-
-#: src/lego/pages/components/ScriptTab.tsx
-#, fuzzy
-msgid "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
-msgstr "Den här enhetens eget skript. Exporten skriver det till <0>scripts/{unitName}.lua</0> precis som det är här, om kryssrutan för skript är markerad. Ett skript som redan finns i spelmappen skrivs aldrig över."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52777,6 +52746,10 @@ msgstr "Ångra ({mod} Z)"
 #, fuzzy
 msgid "Undo ({undoShortcut})"
 msgstr "Ångra ({undoShortcut})"
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Undo brings the text back."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
