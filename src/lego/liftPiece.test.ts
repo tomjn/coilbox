@@ -434,6 +434,18 @@ describe("a lifted piece in a unit for a different game", () => {
     expect(marked.pieces[1].lifted).toBeDefined();
   });
 
+  it("leaves a mesh recorded as the maker's own unmarked (#4360)", () => {
+    const [, mesh] = lifted().pieces;
+    const marked = markLifted(
+      {
+        ...lifted(),
+        pieces: [{ ...mesh, lifted: undefined, ownMesh: { file: "hull.s3o" } }],
+      },
+      mesh.lifted as NonNullable<typeof mesh.lifted>,
+    );
+    expect(marked.pieces[0].lifted).toBeUndefined();
+  });
+
   it("keeps the record on a duplicate, which stays in its own unit", () => {
     const module = lifted();
     const duplicated = duplicatePiece(module, module.rootPieceId, {

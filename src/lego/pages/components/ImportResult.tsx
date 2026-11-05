@@ -61,7 +61,14 @@ import {
   normalisePieceName,
 } from "../../model";
 import { loadPack } from "../../pack";
-import { projectFromImport, type RawImport } from "../../rawImport";
+import { ownMeshFor, projectFromImport, type RawImport } from "../../rawImport";
+
+/** The own mesh record an import writes, when the caller says the file is the
+ *  game maker's own. */
+function ownMeshOption(options: { path: string; own?: boolean }) {
+  const ownMesh = options.own ? ownMeshFor(options.path) : null;
+  return ownMesh ? { ownMesh } : {};
+}
 
 /** How far a read got, and what it turned into. */
 export type ImportStage =
@@ -133,6 +140,9 @@ export async function readModel(options: {
    *  file where it lives. The textures were unpacked beside it, so none of them
    *  is somewhere to refresh from either (#1903). */
   unpacked?: boolean;
+  /** Whether the game maker picked the file off disk as their own model, which
+   *  records its meshes as theirs unless it sits in a game's folder (#4360). */
+  own?: boolean;
   beforeImport?: (textures: string[]) => Promise<void>;
 }): Promise<ImportStage> {
   const { path } = options;
@@ -179,6 +189,7 @@ export async function readModel(options: {
       source: options.source ?? path,
       ...(options.game ? { game: options.game } : {}),
       ...(options.unpacked ? { unpacked: true } : {}),
+      ...ownMeshOption(options),
       name,
       unitName,
       packId: pack.manifest.id,
@@ -205,6 +216,7 @@ async function readThreeDo(options: {
   source?: string;
   game?: LegoImportedGame;
   unpacked?: boolean;
+  own?: boolean;
   beforeImport?: (textures: string[]) => Promise<void>;
 }): Promise<ImportStage> {
   const { path } = options;
@@ -228,6 +240,7 @@ async function readThreeDo(options: {
       source: options.source ?? path,
       ...(options.game ? { game: options.game } : {}),
       ...(options.unpacked ? { unpacked: true } : {}),
+      ...ownMeshOption(options),
       name,
       unitName,
       packId: pack.manifest.id,
@@ -257,6 +270,7 @@ async function readGlb(options: {
   source?: string;
   game?: LegoImportedGame;
   unpacked?: boolean;
+  own?: boolean;
 }): Promise<ImportStage> {
   const { path } = options;
   const pack = await loadPack();
@@ -276,6 +290,7 @@ async function readGlb(options: {
       source: options.source ?? path,
       ...(options.game ? { game: options.game } : {}),
       ...(options.unpacked ? { unpacked: true } : {}),
+      ...ownMeshOption(options),
       name,
       unitName,
       packId: pack.manifest.id,
@@ -303,6 +318,7 @@ async function readDae(options: {
   source?: string;
   game?: LegoImportedGame;
   unpacked?: boolean;
+  own?: boolean;
   beforeImport?: (textures: string[]) => Promise<void>;
 }): Promise<ImportStage> {
   const { path } = options;
@@ -326,6 +342,7 @@ async function readDae(options: {
       source: options.source ?? path,
       ...(options.game ? { game: options.game } : {}),
       ...(options.unpacked ? { unpacked: true } : {}),
+      ...ownMeshOption(options),
       name,
       unitName,
       packId: pack.manifest.id,
