@@ -34,6 +34,14 @@ return {
 		defeat = "Oppdrag mislyktes",
 		undecided = "Oppdrag avsluttet",
 	},
+	sv = {
+		objectives = "Mål",
+		secondary = "Sekundära",
+		holdHint = "Klicka för att fortsätta",
+		victory = "Uppdraget slutfört",
+		defeat = "Uppdraget misslyckades",
+		undecided = "Uppdraget avslutat",
+	},
 	fr = {
 		objectives = "Objectifs",
 		secondary = "Secondaires",
