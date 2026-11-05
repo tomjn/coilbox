@@ -73,7 +73,7 @@ fn does_nothing(lua: &Lua, sim: &Rc<RefCell<Sim>>, label: &str) -> mlua::Result<
     })
 }
 
-/// `Game`, `CMD` and `CMDTYPE`, with the engine's values.
+/// `Game`, `CMD`, `CMDTYPE` and `math.tau`, with the engine's values.
 ///
 /// `Game` holds only what is the same in every match, from
 /// `rts/Lua/LuaConstGame.cpp` and `rts/Sim/Misc/GlobalConstants.h`. Its map
@@ -142,6 +142,9 @@ fn install_engine_constants(lua: &Lua) -> mlua::Result<()> {
         })
 
         FeatureDefs, FeatureDefNames = {}, {}
+
+        -- Recoil's Lua adds a full turn to `math` (`rts/lib/lua/src/lmathlib.cpp`).
+        math.tau = 2 * math.pi
         "#,
     )
     .set_name("unitscript:constants")

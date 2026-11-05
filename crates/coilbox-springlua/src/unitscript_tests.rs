@@ -4283,6 +4283,7 @@ mod zero_k {
             local turret = piece("turret")
             function script.Create()
               assert(Game.gameSpeed == 30)
+              assert(math.tau == 2 * math.pi)
               assert(CMD.MANUALFIRE == 105 and CMD[105] == "MANUALFIRE")
               assert(CMD.OPT_SHIFT == 32)
               assert(CMDTYPE.ICON_UNIT_OR_AREA == 16)
