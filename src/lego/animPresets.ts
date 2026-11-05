@@ -1204,6 +1204,12 @@ function walkTrack(
       duty,
       fitted ? Math.round(period * ENGINE_FPS) : undefined,
     );
+  // An unfitted walk's foot is down from -90 to 90 degrees of its phase. A
+  // fitted one comes down at 0, so its poses fall on whole frames.
+  const share = strideShare(
+    (fitted ? phase : phase + Math.PI / 2) / TAU,
+    duty,
+  );
 
   let thigh: number;
   let shin: number;
@@ -1214,12 +1220,6 @@ function walkTrack(
     thigh = swing * Math.sin(phase);
     shin = knee * (1 - Math.cos(phase)) * 0.5;
   } else {
-    // An unfitted walk's foot is down from -90 to 90 degrees of its phase. A
-    // fitted one comes down at 0, so its poses fall on whole frames.
-    const share = strideShare(
-      (fitted ? phase : phase + Math.PI / 2) / TAU,
-      duty,
-    );
     if (!fitted) {
       const warped = share * TAU - Math.PI / 2;
       thigh = swing * Math.sin(warped);
@@ -1251,12 +1251,74 @@ function walkTrack(
     }
   }
 
-  const angle: Record<LegSegment, number> = {
-    thigh,
-    shin,
-    foot: -(thigh + shin),
-  };
-  return { rotation: [angle[leg.segment], 0, 0] };
+  // Out to the side while the foot is in the air (#4487), most at the middle
+  // of the swing and none as it lifts or lands, so a foot on the ground stays
+  // where the walk put it. The left leg is on +x, where a z turn takes a
+  // hanging foot.
+  const splay = deg(value(preset, params, "splay"));
+  const out =
+    splay > 0 && share > 0.5
+      ? (leg.side === "l" ? 1 : -1) * splay * Math.sin(Math.PI * (2 * share - 1))
+      : 0;
+  if (out === 0) {
+    const angle: Record<LegSegment, number> = {
+      thigh,
+      shin,
+      foot: -(thigh + shin),
+    };
+    return { rotation: [angle[leg.segment], 0, 0] };
+  }
+  if (leg.segment === "thigh") return { rotation: [thigh, 0, out] };
+  if (leg.segment === "shin") return { rotation: [shin, 0, 0] };
+  return { rotation: levelFoot(thigh, out, shin) };
+}
+
+/**
+ * The foot's turn that undoes the thigh's and the shin's, so it stays level
+ * while the leg is out to the side. The thigh's turn composes as x then z
+ * (`ENGINE_ROTATION_ORDER`), so the foot's is the inverse of
+ * `Rx(thigh) * Rz(out) * Rx(shin)`, put back into the engine's order.
+ */
+function levelFoot(
+  thigh: number,
+  out: number,
+  shin: number,
+): [number, number, number] {
+  const rx = (a: number) => [
+    [1, 0, 0],
+    [0, Math.cos(a), -Math.sin(a)],
+    [0, Math.sin(a), Math.cos(a)],
+  ];
+  const rz = (a: number) => [
+    [Math.cos(a), -Math.sin(a), 0],
+    [Math.sin(a), Math.cos(a), 0],
+    [0, 0, 1],
+  ];
+  const mul = (a: number[][], b: number[][]) =>
+    a.map((row) =>
+      b[0].map((_, col) => row.reduce((sum, n, k) => sum + n * b[k][col], 0)),
+    );
+  const m = mul(mul(rx(-shin), rz(-out)), rx(-thigh));
+  // Ry(y) * Rx(x) * Rz(z), as three.js reads a `YXZ` Euler out of a matrix.
+  // That reading keeps x within 90 degrees, and every turn has a second one
+  // past it. Of the two, the foot takes the one nearer its turn without the
+  // swing, so a leg folded past 90 degrees does not flip the foot round.
+  const x = Math.asin(Math.min(1, Math.max(-1, -m[1][2])));
+  const near: [number, number, number] = [
+    x,
+    Math.atan2(m[0][2], m[2][2]),
+    Math.atan2(m[1][0], m[1][1]),
+  ];
+  const far = near.map((a, axis) => wrap(axis === 0 ? Math.PI - a : a + Math.PI));
+  const flat = [-(thigh + shin), 0, 0];
+  const from = (angles: number[]) =>
+    angles.reduce((sum, a, axis) => sum + Math.abs(wrap(a - flat[axis])), 0);
+  return from(far) < from(near) ? (far as [number, number, number]) : near;
+}
+
+/** An angle put within half a turn either side of 0. */
+function wrap(angle: number): number {
+  return angle - TAU * Math.round(angle / TAU);
 }
 
 const WALK_PARAMS: PresetParam[] = [
@@ -1294,6 +1356,17 @@ const WALK_PARAMS: PresetParam[] = [
     fallback: 30,
   },
   dutyParam(80),
+  {
+    id: "splay",
+    get label() {
+      return t`Outward swing`;
+    },
+    unit: "deg",
+    min: 0,
+    max: 30,
+    step: 1,
+    fallback: 0,
+  },
 ];
 
 // A walk keeps each foot down for more than half the time and a run for less.
