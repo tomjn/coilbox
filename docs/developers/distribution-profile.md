@@ -114,6 +114,41 @@ Notes:
 - **Compose** pages with [`@` references](#file-references): include shared fragments (`@.coilbox/pages/_foo.md`), link to routes (`@route/singleplayer`), and embed live GUI (`@widget/onboarding`, `@widget/build-tree/<game>`).
 - Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS). Malformed or duplicate `path`s are skipped rather than breaking the app.
 
+## Language packs
+
+A distribution can change Coilbox's wording in a language it ships, or add a language it does not, with a folder per language under `.coilbox/locales/`. No `profile.json` entry is needed. To start players in a pack's language, set [`defaultLocale`](#defaultlocale-string).
+
+```
+<YourGameFolder>/
+  .coilbox/
+    profile.json
+    locales/
+      de/
+        pack.json
+        messages.json
+      eo/
+        pack.json
+        messages.json
+```
+
+`pack.json` names the language:
+
+```json
+{ "code": "eo", "name": "Esperanto", "direction": "ltr" }
+```
+
+| Key         | Meaning |
+| ----------- | ------- |
+| `code`      | The language code. It must match the folder's name. |
+| `name`      | The language's name in its own language, as the Language picker lists it. |
+| `direction` | `ltr` or `rtl`. Default `ltr`. Coilbox records it, but lays every language out left to right for now. |
+
+`messages.json` is the catalog `lingui compile --namespace json` writes for one locale. In a Coilbox checkout, edit the translations in `src/locales/<code>/messages.po` and run `bunx lingui compile --namespace json`, which writes `messages.json` beside it. For a language Coilbox does not ship, add its code to `LOCALES` in `src/i18n/locales.ts` and run `bun run i18n:extract` first, to get a `.po` file to fill in. A message is keyed by an id Lingui makes from the English text, so a pack works only against the Coilbox release whose catalog it was compiled from. A message whose English changes in a later release gets a new id and shows Coilbox's own text again.
+
+- **A pack for a language Coilbox ships** is laid over that language's catalog. Each message in the pack replaces Coilbox's, and every message the pack leaves out keeps Coilbox's translation. So a pack can hold only the lines you want to change.
+- **A pack for any other language** adds it to the Language picker. A message the pack leaves out shows in English.
+- **Packs are checked, never run.** Each file is read as JSON. A file over 4 MiB is not read at all, which is over three times the size of Coilbox's largest catalog. A pack whose files do not parse, or whose code does not match its folder, is skipped. The health panel names it and says why.
+
 ## File references (`@`)
 
 Profile content is composable through a single `@<namespace>/<rest>` token. The first segment after `@` is a namespace, so there's no ambiguity between (say) a file named `route` and the route namespace:
@@ -1113,6 +1148,16 @@ Keeps maps out of warpath and galactic conquest, the two modes that pick maps on
 `match` is tested against the installed map's spring name: `regex` is case-insensitive, `names` are case-insensitive exact matches and win over `regex` within a rule. Prefer `regex` when you mean a family of maps, since a map's version is part of its spring name. `reason` is shown to the player on the map's detail page.
 
 An excluded map stays visible in Content and stays playable in skirmish and multiplayer. A player can opt further maps out themselves on the map detail page, but cannot re-enable one your profile or the catalog excluded. Same shape as the branding catalog's `excludedMaps`, documented in [Branding catalog](branding-catalog.md#excluding-maps-from-warpath-and-conquest).
+
+### `defaultLocale` (string)
+
+The language a player starts in until they pick one. Unset follows the system language.
+
+```json
+{ "version": 1, "defaultLocale": "de" }
+```
+
+Use a language Coilbox ships, such as `de` or `ja`, or the code of a [language pack](#language-packs) under `.coilbox/locales/`. This sets the starting language and nothing more. Once the player picks a language in Settings > General or the first-run setup, their choice wins, including a pick of System. A code that is neither bundled nor a pack is ignored, and the health panel says so.
 
 ### `fullscreen` (boolean)
 
