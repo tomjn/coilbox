@@ -18465,6 +18465,7 @@ msgid "Damage comes from playing a match back, which is run from a replay's own 
 msgstr "O dano vem da reprodução de uma partida, que é feita na própria página de um replay. Ele é somado em cada célula e cada minuto e arredondado para um ponto inteiro. Não inclui o dano além da vida restante de uma unidade, paralisia nem cura. Onde caiu conta todos os acertos. De onde veio conta só o dano causado por um atacante."
 
 #: src/content/mapAggregate.ts
+#: src/content/metricLabels.ts
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "Damage dealt"
@@ -18509,6 +18510,10 @@ msgstr "Dano por metal é o dano que um tipo de unidade causou dividido pelo cus
 #, fuzzy
 msgid "Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this."
 msgstr "Dano por segundo contra a classe de blindagem padrão, somado entre todas as armas que disparam por conta própria. Uma arma que causa dano diferente a algumas classes de blindagem pode acertar mais forte ou mais fraco contra elas do que isto."
+
+#: src/content/metricLabels.ts
+msgid "Damage received"
+msgstr ""
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -20942,6 +20947,10 @@ msgstr "Custo de energia por disparo"
 msgid "Energy drained continuously by a repulsor while a projectile is nearby, or spent absorbing a hit."
 msgstr "Energia drenada continuamente por um repulsor enquanto um projétil está perto, ou gasta para absorver um acerto."
 
+#: src/content/metricLabels.ts
+msgid "Energy excess"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Energy made"
@@ -20951,6 +20960,18 @@ msgstr "Energia produzida"
 #, fuzzy
 msgid "energy per second"
 msgstr "energia por segundo"
+
+#: src/content/metricLabels.ts
+msgid "Energy produced"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Energy received"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Energy sent"
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -20971,6 +20992,10 @@ msgstr "Manutenção de energia"
 #, fuzzy
 msgid "Energy upkeep (old name)"
 msgstr "Manutenção de energia (nome antigo)"
+
+#: src/content/metricLabels.ts
+msgid "Energy used"
+msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -29695,6 +29720,10 @@ msgstr "Custo de metal perdido"
 msgid "Metal cost per shot"
 msgstr "Custo de metal por tiro"
 
+#: src/content/metricLabels.ts
+msgid "Metal excess"
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "Metal is the units ordered times the unit's metal cost, from the unit list of the build each game was played on. Other is builders, factories, sensors and transports. Unclassified is a unit whose definition does not say what it is for."
@@ -29725,6 +29754,18 @@ msgstr "Metal encomendado por tipo de unidade"
 msgid "metal per second"
 msgstr "metal por segundo"
 
+#: src/content/metricLabels.ts
+msgid "Metal produced"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Metal received"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Metal sent"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "metal storage"
@@ -29744,6 +29785,10 @@ msgstr "Manutenção de metal"
 #, fuzzy
 msgid "Metal upkeep (old name)"
 msgstr "Manutenção de metal (nome antigo)"
+
+#: src/content/metricLabels.ts
+msgid "Metal used"
+msgstr ""
 
 #: src/lego/pivot.ts
 #, fuzzy
@@ -52917,6 +52962,14 @@ msgstr "Unidades ({unitCount})"
 msgid "Units being carried by this transport keep firing."
 msgstr "As unidades carregadas por este transporte continuam disparando."
 
+#: src/content/metricLabels.ts
+msgid "Units built"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Units captured"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Units captured from the team, as the log counted them"
@@ -52933,6 +52986,10 @@ msgstr "Unidades que o comandante de cada facção pode construir, direta ou ind
 msgid "Units from the builder"
 msgstr "Unidades do construtor"
 
+#: src/content/metricLabels.ts
+msgid "Units given away"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Units given to the team, as the log counted them"
@@ -52943,11 +53000,24 @@ msgstr "Unidades dadas à equipe, segundo a contagem do log"
 msgid "Units in {activeName}"
 msgstr "Unidades em {activeName}"
 
+#: src/content/metricLabels.ts
+msgid "Units killed"
+msgstr ""
+
+#: src/content/metricLabels.ts
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Units lost"
 msgstr "Unidades perdidas"
+
+#: src/content/metricLabels.ts
+msgid "Units lost per unit killed"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Units lost to capture"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -52968,6 +53038,10 @@ msgstr "Unidades em {mapName} no momento escolhido"
 #, fuzzy
 msgid "Units ordered"
 msgstr "Unidades encomendadas"
+
+#: src/content/metricLabels.ts
+msgid "Units received"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy

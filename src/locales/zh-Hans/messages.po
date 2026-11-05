@@ -18339,6 +18339,7 @@ msgid "Damage comes from playing a match back, which is run from a replay's own 
 msgstr ""
 
 #: src/content/mapAggregate.ts
+#: src/content/metricLabels.ts
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "Damage dealt"
@@ -18381,6 +18382,10 @@ msgstr ""
 #, fuzzy
 msgid "Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this."
 msgstr "对默认护甲类型的每秒伤害，为所有独立开火武器的总和。对某些护甲类型造成不同伤害的武器，对它们的实际伤害可能高于或低于此值。"
+
+#: src/content/metricLabels.ts
+msgid "Damage received"
+msgstr ""
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -20809,6 +20814,10 @@ msgstr "每发能量消耗"
 msgid "Energy drained continuously by a repulsor while a projectile is nearby, or spent absorbing a hit."
 msgstr "斥力器在弹体靠近时持续消耗的能量，或吸收一次命中所消耗的能量。"
 
+#: src/content/metricLabels.ts
+msgid "Energy excess"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Energy made"
@@ -20818,6 +20827,18 @@ msgstr "能量产量"
 #, fuzzy
 msgid "energy per second"
 msgstr "每秒能量"
+
+#: src/content/metricLabels.ts
+msgid "Energy produced"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Energy received"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Energy sent"
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -20838,6 +20859,10 @@ msgstr "能量维持消耗"
 #, fuzzy
 msgid "Energy upkeep (old name)"
 msgstr "能量维持消耗（旧名称）"
+
+#: src/content/metricLabels.ts
+msgid "Energy used"
+msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -29517,6 +29542,10 @@ msgstr "损失的金属消耗"
 msgid "Metal cost per shot"
 msgstr "每发金属消耗"
 
+#: src/content/metricLabels.ts
+msgid "Metal excess"
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "Metal is the units ordered times the unit's metal cost, from the unit list of the build each game was played on. Other is builders, factories, sensors and transports. Unclassified is a unit whose definition does not say what it is for."
@@ -29547,6 +29576,18 @@ msgstr "按单位种类统计的下令金属"
 msgid "metal per second"
 msgstr "每秒金属"
 
+#: src/content/metricLabels.ts
+msgid "Metal produced"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Metal received"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Metal sent"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "metal storage"
@@ -29566,6 +29607,10 @@ msgstr "金属维持消耗"
 #, fuzzy
 msgid "Metal upkeep (old name)"
 msgstr "金属维持消耗（旧名称）"
+
+#: src/content/metricLabels.ts
+msgid "Metal used"
+msgstr ""
 
 #: src/lego/pivot.ts
 #, fuzzy
@@ -52572,6 +52617,14 @@ msgstr "单位（{unitCount}）"
 msgid "Units being carried by this transport keep firing."
 msgstr "此运输单位搭载的单位会继续开火。"
 
+#: src/content/metricLabels.ts
+msgid "Units built"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Units captured"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Units captured from the team, as the log counted them"
@@ -52588,6 +52641,10 @@ msgstr "每个阵营的指挥官能直接或间接建造的单位。"
 msgid "Units from the builder"
 msgstr "来自构建器的单位"
 
+#: src/content/metricLabels.ts
+msgid "Units given away"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Units given to the team, as the log counted them"
@@ -52598,11 +52655,24 @@ msgstr "赠送给该队伍的单位，按日志的计数"
 msgid "Units in {activeName}"
 msgstr "{activeName} 中的单位"
 
+#: src/content/metricLabels.ts
+msgid "Units killed"
+msgstr ""
+
+#: src/content/metricLabels.ts
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Units lost"
 msgstr "损失的单位"
+
+#: src/content/metricLabels.ts
+msgid "Units lost per unit killed"
+msgstr ""
+
+#: src/content/metricLabels.ts
+msgid "Units lost to capture"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -52623,6 +52693,10 @@ msgstr "所选时间 {mapName} 上的单位"
 #, fuzzy
 msgid "Units ordered"
 msgstr "下令建造的单位"
+
+#: src/content/metricLabels.ts
+msgid "Units received"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
