@@ -16533,6 +16533,7 @@ msgid "Colours compare places on this map with each other, not with another pict
 msgstr "I colori confrontano i punti di questa mappa tra loro, non con un’altra immagine. {made} il {exported}."
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
 msgid "Colourway"
 msgstr "Variante di colore"

@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BIPED, projectFromPlan } from "../bodyPlans";
 import { type LegoProject, newProject } from "../model";
 import type { RawGeometry } from "../rawGeometry";
-import type { ShapeKind } from "../shapes";
+import { type ShapeKind, type ShapeSwatch, setShapeSwatches } from "../shapes";
 import type { LegoDocumentSession } from "../useLegoDocument";
 
 const doc: { current: LegoDocumentSession } = { current: null as never };
@@ -197,7 +197,10 @@ function unit(over: Partial<LegoProject> = {}): LegoProject {
   return { ...base, ...over };
 }
 
-function session(project: LegoProject): LegoDocumentSession {
+function session(
+  project: LegoProject,
+  selectedId?: string,
+): LegoDocumentSession {
   return {
     loading: false,
     project,
@@ -205,8 +208,8 @@ function session(project: LegoProject): LegoDocumentSession {
     saving: false,
     canUndo: false,
     canRedo: false,
-    selectedIds: [],
-    selectedId: null,
+    selectedIds: selectedId ? [selectedId] : [],
+    selectedId: selectedId ?? null,
     select: vi.fn(),
     toggleSelect: vi.fn(),
     edit: vi.fn(),
@@ -223,8 +226,8 @@ function session(project: LegoProject): LegoDocumentSession {
   };
 }
 
-function show(project: LegoProject) {
-  doc.current = session(project);
+function show(project: LegoProject, selectedId?: string) {
+  doc.current = session(project, selectedId);
   return render(
     <MemoryRouter initialEntries={["/lego/p"]}>
       <Routes>
@@ -242,6 +245,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  setShapeSwatches([]);
 });
 
 describe("a unit built out of parts", () => {
@@ -278,6 +282,42 @@ describe("a shape chosen in the strip (#3337)", () => {
     expect(
       screen.queryByRole("button", { name: "Add the Cylinder shape" }),
     ).toBeNull();
+  });
+
+  it("changes colourway from the piece panel in one edit (#4423)", async () => {
+    // The mocked pack read does not register the swatches the real one does.
+    const swatches = ["grey", "green"].map((id) => ({
+      id,
+      uv: { min: [0, 0], max: [0.1, 0.1] },
+      tile: 1.56,
+    }));
+    packLoad = loadedPack([], swatches);
+    setShapeSwatches(swatches as ShapeSwatch[]);
+    const base = unit();
+    const withShape = {
+      ...base,
+      pieces: [
+        ...base.pieces,
+        {
+          id: "s",
+          name: "cylinder",
+          parentId: "base",
+          partId: null,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          shape: { kind: "cylinder", size: [1, 1, 1], swatch: "green" },
+        },
+      ],
+    } as LegoProject;
+    show(withShape, "s");
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    fireEvent.click(await screen.findByRole("button", { name: "grey" }));
+    expect(edit).toHaveBeenCalledTimes(1);
+    const next = edit.mock.calls[0][0](withShape);
+    expect(next.pieces.find((p: { id: string }) => p.id === "s").shape).toEqual(
+      { kind: "cylinder", size: [1, 1, 1], swatch: "grey" },
+    );
   });
 
   it("is not offered for a unit imported whole", async () => {

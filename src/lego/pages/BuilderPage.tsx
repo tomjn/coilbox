@@ -3151,6 +3151,7 @@ function Builder({ id }: { id: string | undefined }) {
                             <ShapeFields
                               key={selected.id}
                               shape={selected.shape}
+                              pack={pack}
                               onChange={reshapeSelected}
                             />
                           ) : null}

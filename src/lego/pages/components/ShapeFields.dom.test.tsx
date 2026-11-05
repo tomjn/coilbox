@@ -8,6 +8,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { LoadedPack } from "../../pack";
 import {
   type LegoShape,
   setShapeRoundPanels,
@@ -24,6 +25,17 @@ const tube: LegoShape = {
 
 const onChange = vi.fn();
 
+const pack = {
+  manifest: {
+    categories: [
+      { id: "grey", label: "Grey" },
+      { id: "green", label: "Team colour" },
+      { id: "tan", label: "Tan" },
+    ],
+  },
+  library: { atlases: [{ tex1: "atlas.png", folder: null }] },
+} as unknown as LoadedPack;
+
 beforeEach(() => onChange.mockReset());
 afterEach(cleanup);
 
@@ -35,7 +47,7 @@ function type(label: string, value: string) {
 
 describe("ShapeFields", () => {
   it("shows a tube's radius, length, wall and sides", () => {
-    render(<ShapeFields shape={tube} onChange={onChange} />);
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
     expect(screen.getByLabelText<HTMLInputElement>("Radius").value).toBe("1");
     expect(screen.getByLabelText<HTMLInputElement>("Length").value).toBe("3");
     expect(screen.getByLabelText<HTMLInputElement>("Wall").value).toBe("0.25");
@@ -44,25 +56,29 @@ describe("ShapeFields", () => {
 
   it("has no wall for a cylinder", () => {
     render(
-      <ShapeFields shape={{ ...tube, kind: "cylinder" }} onChange={onChange} />,
+      <ShapeFields
+        shape={{ ...tube, kind: "cylinder" }}
+        pack={pack}
+        onChange={onChange}
+      />,
     );
     expect(screen.queryByLabelText("Wall")).toBeNull();
   });
 
   it("sets the length", () => {
-    render(<ShapeFields shape={tube} onChange={onChange} />);
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
     type("Length", "5");
     expect(onChange.mock.calls[0][0].size).toEqual([2, 5, 2]);
   });
 
   it("turns it to lie along x", () => {
-    render(<ShapeFields shape={tube} onChange={onChange} />);
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: "X" }));
     expect(onChange.mock.calls[0][0].size).toEqual([3, 2, 2]);
   });
 
   it("refuses a wall as thick as the radius and says why", () => {
-    render(<ShapeFields shape={tube} onChange={onChange} />);
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
     type("Wall", "1");
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toBe(
@@ -80,7 +96,7 @@ describe("ShapeFields for a wedge (#3328)", () => {
   };
 
   it("shows width, depth, height and the low end", () => {
-    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    render(<ShapeFields shape={wedge} pack={pack} onChange={onChange} />);
     expect(screen.getByLabelText<HTMLInputElement>("Width").value).toBe("2");
     expect(screen.getByLabelText<HTMLInputElement>("Depth").value).toBe("3");
     expect(screen.getByLabelText<HTMLInputElement>("Height").value).toBe("4");
@@ -89,13 +105,13 @@ describe("ShapeFields for a wedge (#3328)", () => {
   });
 
   it("sets the low end", () => {
-    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    render(<ShapeFields shape={wedge} pack={pack} onChange={onChange} />);
     type("Low end", "2");
     expect(onChange.mock.calls[0][0].options.low).toBe(2);
   });
 
   it("flips the direction of the slope", () => {
-    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    render(<ShapeFields shape={wedge} pack={pack} onChange={onChange} />);
     expect(
       screen
         .getByRole("button", { name: "High at back" })
@@ -106,7 +122,7 @@ describe("ShapeFields for a wedge (#3328)", () => {
   });
 
   it("refuses a low end above the height and says why", () => {
-    render(<ShapeFields shape={wedge} onChange={onChange} />);
+    render(<ShapeFields shape={wedge} pack={pack} onChange={onChange} />);
     type("Low end", "9");
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toBe(
@@ -124,7 +140,7 @@ describe("ShapeFields for a cone (#3329)", () => {
   };
 
   it("shows the bottom radius, top radius, height and sides", () => {
-    render(<ShapeFields shape={cone} onChange={onChange} />);
+    render(<ShapeFields shape={cone} pack={pack} onChange={onChange} />);
     expect(screen.getByLabelText<HTMLInputElement>("Bottom radius").value).toBe(
       "1",
     );
@@ -137,13 +153,13 @@ describe("ShapeFields for a cone (#3329)", () => {
   });
 
   it("sets the top radius", () => {
-    render(<ShapeFields shape={cone} onChange={onChange} />);
+    render(<ShapeFields shape={cone} pack={pack} onChange={onChange} />);
     type("Top radius", "0");
     expect(onChange.mock.calls[0][0].options.top).toBe(0);
   });
 
   it("says to use a cylinder for a top as wide as the bottom", () => {
-    render(<ShapeFields shape={cone} onChange={onChange} />);
+    render(<ShapeFields shape={cone} pack={pack} onChange={onChange} />);
     type("Top radius", "1");
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toBe(
@@ -161,7 +177,7 @@ describe("ShapeFields for a sphere (#3330)", () => {
   };
 
   it("shows three radii, rings and sides", () => {
-    render(<ShapeFields shape={sphere} onChange={onChange} />);
+    render(<ShapeFields shape={sphere} pack={pack} onChange={onChange} />);
     expect(screen.getByLabelText<HTMLInputElement>("Radius X").value).toBe("1");
     expect(screen.getByLabelText<HTMLInputElement>("Radius Y").value).toBe("2");
     expect(screen.getByLabelText<HTMLInputElement>("Radius Z").value).toBe("3");
@@ -171,19 +187,19 @@ describe("ShapeFields for a sphere (#3330)", () => {
 
   it("makes it a dome, and calls the vertical radius a height", () => {
     const { rerender } = render(
-      <ShapeFields shape={sphere} onChange={onChange} />,
+      <ShapeFields shape={sphere} pack={pack} onChange={onChange} />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Dome" }));
     const dome = onChange.mock.calls[0][0] as LegoShape;
     expect(dome.options?.keep).toBe(1);
     expect(dome.size).toEqual([2, 2, 6]);
-    rerender(<ShapeFields shape={dome} onChange={onChange} />);
+    rerender(<ShapeFields shape={dome} pack={pack} onChange={onChange} />);
     expect(screen.getByLabelText<HTMLInputElement>("Height").value).toBe("2");
     expect(screen.queryByLabelText("Radius Y")).toBeNull();
   });
 
   it("refuses rings below 2 and keeps the shape", () => {
-    render(<ShapeFields shape={sphere} onChange={onChange} />);
+    render(<ShapeFields shape={sphere} pack={pack} onChange={onChange} />);
     type("Rings", "1");
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByRole("alert").textContent).toBe(
@@ -214,7 +230,7 @@ describe("ShapeFields round panel (#4398)", () => {
   const hub = () => screen.queryByRole("checkbox", { name: "Hub on ends" });
 
   it("is off by default on a tube, and turns on", () => {
-    render(<ShapeFields shape={tube} onChange={onChange} />);
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
     expect(hub()?.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(hub() as HTMLElement);
     expect(onChange.mock.calls[0][0].options).toEqual({
@@ -227,6 +243,7 @@ describe("ShapeFields round panel (#4398)", () => {
     render(
       <ShapeFields
         shape={{ ...tube, options: { ...tube.options, hub: 1 } }}
+        pack={pack}
         onChange={onChange}
       />,
     );
@@ -237,13 +254,18 @@ describe("ShapeFields round panel (#4398)", () => {
 
   it("is offered on a cylinder and a cone", () => {
     render(
-      <ShapeFields shape={{ ...tube, kind: "cylinder" }} onChange={onChange} />,
+      <ShapeFields
+        shape={{ ...tube, kind: "cylinder" }}
+        pack={pack}
+        onChange={onChange}
+      />,
     );
     expect(hub()).not.toBeNull();
     cleanup();
     render(
       <ShapeFields
         shape={{ ...tube, kind: "cone", options: { top: 0 } }}
+        pack={pack}
         onChange={onChange}
       />,
     );
@@ -252,20 +274,100 @@ describe("ShapeFields round panel (#4398)", () => {
 
   it("is not offered on a wedge or a sphere", () => {
     render(
-      <ShapeFields shape={{ ...tube, kind: "wedge" }} onChange={onChange} />,
+      <ShapeFields
+        shape={{ ...tube, kind: "wedge" }}
+        pack={pack}
+        onChange={onChange}
+      />,
     );
     expect(hub()).toBeNull();
     cleanup();
     render(
-      <ShapeFields shape={{ ...tube, kind: "sphere" }} onChange={onChange} />,
+      <ShapeFields
+        shape={{ ...tube, kind: "sphere" }}
+        pack={pack}
+        onChange={onChange}
+      />,
     );
     expect(hub()).toBeNull();
   });
 
   it("is not offered when the pack has no panel for the colourway", () => {
     render(
-      <ShapeFields shape={{ ...tube, swatch: "tan" }} onChange={onChange} />,
+      <ShapeFields
+        shape={{ ...tube, swatch: "tan" }}
+        pack={pack}
+        onChange={onChange}
+      />,
     );
     expect(hub()).toBeNull();
+  });
+});
+
+describe("ShapeFields colourway (#4423)", () => {
+  beforeEach(() => {
+    setShapeSwatches(
+      ["grey", "green", "tan"].map((id) => ({
+        id,
+        uv: { min: [0.1, 0.1], max: [0.2, 0.2] },
+        tile: 1.5,
+      })),
+    );
+  });
+  afterEach(() => setShapeSwatches([]));
+
+  const choice = (name: string) => screen.getByRole("button", { name });
+
+  it("lists the pack's swatches and marks the shape's own", () => {
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
+    expect(choice("Grey").getAttribute("aria-pressed")).toBe("true");
+    expect(choice("Team colour").getAttribute("aria-pressed")).toBe("false");
+    expect(choice("Tan").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("marks the first swatch for a shape whose swatch the pack lacks", () => {
+    render(
+      <ShapeFields
+        shape={{ ...tube, swatch: "gone" }}
+        pack={pack}
+        onChange={onChange}
+      />,
+    );
+    expect(choice("Grey").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("changes the swatch and keeps the rest of the shape", () => {
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
+    fireEvent.click(choice("Tan"));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toEqual({ ...tube, swatch: "tan" });
+  });
+
+  it("does nothing for the swatch it already has", () => {
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
+    fireEvent.click(choice("Grey"));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("is offered on a wedge and a sphere too", () => {
+    for (const kind of ["wedge", "sphere"]) {
+      render(
+        <ShapeFields
+          shape={{ ...tube, kind }}
+          pack={pack}
+          onChange={onChange}
+        />,
+      );
+      expect(screen.queryByRole("button", { name: "Tan" })).not.toBeNull();
+      cleanup();
+    }
+  });
+
+  it("is not offered when the pack lists one swatch", () => {
+    setShapeSwatches([
+      { id: "grey", uv: { min: [0.1, 0.1], max: [0.2, 0.2] }, tile: 1.5 },
+    ]);
+    render(<ShapeFields shape={tube} pack={pack} onChange={onChange} />);
+    expect(screen.queryByRole("button", { name: "Grey" })).toBeNull();
   });
 });
