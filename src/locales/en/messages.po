@@ -19068,6 +19068,7 @@ msgstr "game"
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/hub/pages/ItemPage.tsx
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/NewUnitPopover.tsx
 #: src/lego/pages/components/ReferencePicker.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx

@@ -61,12 +61,8 @@ vi.mock("../../../general/display", () => ({
 }));
 
 // Reads the test game and its unit definitions through unitsync, which a panel
-// rendered on its own has no app for. `MovementSection.dom.test.tsx` covers it.
-vi.mock("./MovementSection", () => ({ MovementSection: () => null }));
+// rendered on its own has no app for.
 vi.mock("./BuilderReport", () => ({ BuilderReport: () => null }));
-vi.mock("./GameFitSection", () => ({ GameFitSection: () => null }));
-vi.mock("./WorthSection", () => ({ WorthSection: () => null }));
-vi.mock("./StatsSection", () => ({ StatsSection: () => null }));
 vi.mock("./WorkshopChangeMarks", () => ({
   ProjectWorkshopMarks: () => null,
 }));
@@ -136,8 +132,6 @@ function show(
       onChange={vi.fn()}
       onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
-      onMovementChange={vi.fn()}
-      onWorthChange={vi.fn()}
       onScriptTimeline={vi.fn()}
       onScriptRun={vi.fn()}
       scriptPaused={false}
@@ -1076,8 +1070,6 @@ describe("a unit on the presets, edited while it plays", () => {
           onChange={vi.fn()}
           onShowScript={vi.fn()}
           onBuilderChange={vi.fn()}
-          onMovementChange={vi.fn()}
-          onWorthChange={vi.fn()}
           onScriptTimeline={vi.fn()}
           onScriptRun={vi.fn()}
           scriptPaused={false}
@@ -1135,8 +1127,6 @@ describe("a unit on the presets, edited while it plays", () => {
         onChange={vi.fn()}
         onShowScript={vi.fn()}
         onBuilderChange={vi.fn()}
-        onMovementChange={vi.fn()}
-        onWorthChange={vi.fn()}
         onScriptTimeline={vi.fn()}
         onScriptRun={vi.fn()}
         scriptPaused={false}
@@ -1257,8 +1247,6 @@ describe("playing one preset on its own", () => {
       onChange={vi.fn()}
       onShowScript={vi.fn()}
       onBuilderChange={vi.fn()}
-      onMovementChange={vi.fn()}
-      onWorthChange={vi.fn()}
       onScriptTimeline={vi.fn()}
       onScriptRun={vi.fn()}
       scriptPaused={false}
