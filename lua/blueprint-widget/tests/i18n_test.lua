@@ -352,7 +352,7 @@ check("the label check can see a cut label", #cutLabels({
 	rects = { { x = 0, y = 0, w = 10, h = 10, kind = "button" } },
 }) == 1)
 
-local LOCALES = { "fr", "de", "es", "ja", "zh-Hans", "pl", "uk", "pt-BR", "nb", "sv" }
+local LOCALES = { "fr", "de", "es", "ja", "zh-Hans", "pl", "uk", "pt-BR", "nb", "sv", "nl" }
 for _, code in ipairs(LOCALES) do
 	local own = TABLES[code] or {}
 	local missing, extra = {}, {}
