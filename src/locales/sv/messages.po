@@ -10170,7 +10170,7 @@ msgstr "Lägg till spawn"
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Add tag…"
-msgstr "Lägg till tagg…"
+msgstr "Ny tagg…"
 
 #. placeholder {0}: shown.length
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -11157,7 +11157,7 @@ msgstr "analyserade eller inte"
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Analysed or not"
-msgstr "Analyserade eller inte"
+msgstr "Analys: alla"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -41465,7 +41465,7 @@ msgstr "Sparad som förinställning"
 #: src/content/index.ts
 #, fuzzy
 msgid "Saved configs"
-msgstr "Sparade konfigurationer"
+msgstr "Sparade"
 
 #: src/blueprint/library.ts
 #, fuzzy
