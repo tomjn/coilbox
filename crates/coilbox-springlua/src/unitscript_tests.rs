@@ -4232,3 +4232,197 @@ fn the_sfx_table_holds_the_engines_values() {
     }
     assert_eq!(sfx.pairs::<String, Value>().count(), engine.len());
 }
+
+/// Zero-K's units read its gadgets' tables, the engine's constants and the
+/// game's own utility library (issue #2791).
+mod zero_k {
+    use super::*;
+
+    fn with_files(script: &str, files: &[(&str, &str)]) -> Timeline {
+        let sources: HashMap<String, String> = files
+            .iter()
+            .map(|(name, text)| ((*name).to_string(), (*text).to_string()))
+            .collect();
+        let pieces = pieces();
+        let unit = Unit {
+            includes: &sources,
+            ..Unit::new(&pieces)
+        };
+        run(script, "test.lua", &unit, &create(), 3, &HashMap::new())
+    }
+
+    /// `GG.att_MoveChange[unitID] or 1` is a unit nothing has slowed, and the
+    /// attribute calls change stats rather than pieces, so they are noted.
+    #[test]
+    fn a_unit_nothing_has_slowed_walks_at_its_own_speed() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+              GG.Attributes.SetRangeUpdater(unitID, function() end)
+              GG.PokeDecloakUnit(unitID)
+              local speed = GG.att_MoveChange[unitID] or 1
+              local mapped = GG.Upgrades_WeaponNumMap(unitID, 1)
+              if mapped == false then Turn(turret, y_axis, speed) end
+            end
+            "#,
+            2,
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("GG.Attributes.SetRangeUpdater does nothing")));
+    }
+
+    #[test]
+    fn the_engine_constants_have_the_engines_numbers() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+              assert(Game.gameSpeed == 30)
+              assert(math.tau == 2 * math.pi)
+              assert(CMD.MANUALFIRE == 105 and CMD[105] == "MANUALFIRE")
+              assert(CMD.OPT_SHIFT == 32)
+              assert(CMDTYPE.ICON_UNIT_OR_AREA == 16)
+              assert(FeatureDefs[nil] == nil)
+              assert(UnitDef == UnitDefs[unitDefID])
+              assert(Spring.GetModOptions().anything == nil)
+              assert(Spring.GetUnitIsStunned(unitID) == false)
+              assert(Spring.FindUnitCmdDesc(unitID, CMD.MANUALFIRE) == nil)
+              Turn(turret, y_axis, 1)
+            end
+            "#,
+            2,
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// Zero-K's `Utilities.lua` lists its folder and includes each file, and one
+    /// of those includes the command list by path. A file that throws is noted
+    /// and the rest still load.
+    #[test]
+    fn the_games_utility_library_loads_before_the_script() {
+        let timeline = with_files(
+            r#"
+            local turret = piece("turret")
+            local CMD_JUMP = Spring.Utilities.CMD.JUMP
+            function script.Create()
+              Turn(turret, y_axis, Spring.Utilities.Half(CMD_JUMP))
+            end
+            "#,
+            &[
+                (
+                    "LuaRules/Utilities.lua",
+                    r#"
+                    Spring.Utilities = Spring.Utilities or {}
+                    local files = VFS.DirList(Script.GetName() .. '/Utilities/', "*.lua")
+                    for i = 1, #files do VFS.Include(files[i]) end
+                    "#,
+                ),
+                (
+                    "LuaRules/Utilities/globals.lua",
+                    r#"Spring.Utilities.CMD = VFS.Include("LuaRules/Configs/customcmds.lua", nil, VFS.GAME)"#,
+                ),
+                ("LuaRules/Utilities/drawing.lua", "gl.Utilities = {}"),
+                (
+                    "LuaRules/Utilities/numbers.lua",
+                    "function Spring.Utilities.Half(x) return x / 2 end",
+                ),
+                (
+                    "LuaRules/Configs/customcmds.lua",
+                    "return { JUMP = 2, kind = CMDTYPE.ICON_MAP }",
+                ),
+            ],
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("VFS.Include(\"LuaRules/Utilities/drawing.lua\") stopped")));
+    }
+
+    /// The commanders walk the model's tree from its root to find each bone.
+    #[test]
+    fn piece_info_describes_where_a_piece_hangs() {
+        let pieces = pieces();
+        let rest = [
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 5.0, 0.0],
+            },
+            Rest {
+                parent: Some(1),
+                position: [0.0, 0.0, 3.0],
+            },
+            Rest {
+                parent: Some(2),
+                position: [0.0, 0.0, 1.0],
+            },
+        ];
+        let unit = Unit {
+            rest: &rest,
+            ..Unit::new(&pieces)
+        };
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+              local info = Spring.GetUnitPieceInfo(unitID, turret)
+              assert(info.name == "turret" and info.parent == "base")
+              assert(info.children[1] == "barrel" and #info.children == 1)
+              Turn(turret, y_axis, info.offset[2])
+            end
+            "#,
+            "test.lua",
+            &unit,
+            &create(),
+            2,
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 5.0);
+    }
+}
+
+/// The smaller calls Zero-K's units make while they animate (issue #2791).
+mod zero_k_calls {
+    use super::*;
+
+    #[test]
+    fn reads_back_a_turn_and_answers_a_still_unit() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+              Turn(turret, x_axis, 0.5)
+              local x = Spring.UnitScript.GetPieceRotation(turret)
+              assert(Spring.GetUnitHeading(unitID) == 0)
+              assert(Spring.GetGroundHeight(10, 10) == 0)
+              assert(#Spring.GetUnitCommands(unitID, 1) == 0)
+              assert(Spring.GetUnitCurrentCommand(unitID) == nil)
+              Spring.SetUnitCOBValue(unitID, COB.INBUILDSTANCE, 1)
+              assert(GetUnitValue(COB.INBUILDSTANCE) == 1)
+              Spring.MoveCtrl.Enable(unitID, true)
+              Spring.SetUnitVelocity(unitID, 0, 0, 0)
+              Turn(turret, y_axis, x * 2)
+            end
+            "#,
+            2,
+        );
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("Spring.MoveCtrl.Enable does nothing")));
+    }
+}

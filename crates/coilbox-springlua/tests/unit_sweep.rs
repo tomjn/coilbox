@@ -3,13 +3,14 @@
 //! Set `COILBOX_UNIT_SWEEP` to a folder of JSON files, one per unit, each
 //! holding what the unitsync worker read for it: `script`, `includes` and
 //! `unitDef` from `--unit-script`, and `pieces`, the model's piece names from
-//! `--unit-model`. Each script is asked for its pieces the way importing a unit
+//! `--unit-model`, with `rest`, each piece's parent and offset, where the file
+//! has it. `scripts/unit-script-sweep.ts` gathers such a folder from a game. Each script is asked for its pieces the way importing a unit
 //! asks, then played through the call-ins the animation presets send. Any
 //! script that stops fails the test, by unit.
 //!
 //! Skipped when the variable is unset, because no game ships in this repo.
 
-use coilbox_springlua::unitscript::{probe, run, ScriptEvent, Unit};
+use coilbox_springlua::unitscript::{probe, run, Rest, ScriptEvent, Unit};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -92,9 +93,22 @@ fn every_unit_script_in_the_folder_runs() {
             })
             .unwrap_or_default();
         let def = gathered.get("unitDef").filter(|def| def.is_object());
+        // Where each piece hangs, as the app passes it. A file without it runs
+        // as a unit nobody told the preview about.
+        let rest: Vec<Rest> = match gathered.get("rest") {
+            None => Vec::new(),
+            Some(rest) => match serde_json::from_value(rest.clone()) {
+                Ok(rest) => rest,
+                Err(error) => {
+                    failures.push(format!("{unit}: its rest would not read: {error}"));
+                    continue;
+                }
+            },
+        };
         let target = Unit {
             def,
             includes: &includes,
+            rest: &rest,
             ..Unit::new(&pieces)
         };
         let name = format!("{unit}.lua");

@@ -458,6 +458,13 @@ impl Run {
             .get("script")
             .map_err(|e| format!("could not read the script table: {e}"))?;
 
+        // The game's libraries load before any unit exists, so they get a
+        // frame's instructions of their own rather than the script's.
+        game::load_libraries(&lua, &sim)
+            .map_err(|e| format!("could not load the game's libraries: {e}"))?;
+        budget.set(FRAME_INSTRUCTIONS);
+        fatal.set(false);
+
         lua.load(script)
             .set_name(name)
             .exec()
@@ -1462,6 +1469,7 @@ fn sandbox(
     // Last, because it hands a script the `UnitScript` table the line above
     // builds and the `unitDefID` the one before it sets.
     install_spring(&lua, sim, unit_def)?;
+    game::install(&lua, sim, includes)?;
     Ok(lua)
 }
 
@@ -1504,6 +1512,7 @@ fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
         "AttachUnit",
         "DropUnit",
         "ShowFlare",
+        "GetPieceRotation",
     ] {
         let held: Value = globals.get(name)?;
         table.set(name, held)?;
@@ -1783,6 +1792,10 @@ fn install_unit_def(
         UnitDefs = { insensitive(__rawdef, missing) }
         UnitDefNames = elsewhere('the unit')
         if unitName then rawset(UnitDefNames, string.lower(unitName), UnitDefs[1]) end
+        -- Zero-K puts `local UnitDef = UnitDefs[unitDefID]` at the top of every
+        -- unit script, from its `gamedata/unit_script_header.lua`, and its
+        -- scripts read `UnitDef` without declaring it.
+        UnitDef = UnitDefs[1]
         __rawdef, __hasdef, __nodef, __note = nil, nil, nil, nil
         "#,
     )
@@ -1931,6 +1944,24 @@ fn install_spring(
         // script waiting to be finished is a script waiting forever otherwise.
         lua.create_function(|_, _: MultiValue| Ok((false, 1.0)))?,
     )?;
+    spring.set(
+        "GetUnitIsStunned",
+        // stunnedOrBeingBuilt, stunned, beingBuilt, for a finished unit nothing
+        // has paralysed. Zero-K's turrets wait on the first before they aim.
+        lua.create_function(|_, _: MultiValue| Ok((false, false, false)))?,
+    )?;
+
+    // The unit's command buttons, which a preview has none of. Zero-K's
+    // commanders look up their manual fire button when they are created and
+    // carry on without it when there is none.
+    spring.set(
+        "FindUnitCmdDesc",
+        lua.create_function(|_, _: MultiValue| Ok(Value::Nil))?,
+    )?;
+    spring.set(
+        "GetUnitCmdDescs",
+        lua.create_function(|lua, _: MultiValue| lua.create_table())?,
+    )?;
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitVelocity",
@@ -2074,6 +2105,55 @@ fn install_spring(
         })?,
     )?;
 
+    // One piece's place in the model, in the engine's shape
+    // (`GetSolidObjectPieceInfoHelper` in `rts/Lua/LuaSyncedRead.cpp`). Zero-K's
+    // commanders walk the tree with it to find where each bone sits. The
+    // preview knows each piece's parent and offset, and not its bounds or
+    // whether it has any faces, so those read as a point and as not empty.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPieceInfo",
+        lua.create_function(move |lua, (_unit, piece): (Value, Option<i64>)| {
+            let mut sim = state.borrow_mut();
+            let Some(index) = piece
+                .and_then(|number| usize::try_from(number - 1).ok())
+                .filter(|index| *index < sim.model.pieces.len())
+            else {
+                return Ok(Value::Nil);
+            };
+            if sim.model.piece_position(index).is_none() {
+                sim.model.note(
+                    "This script asks how its pieces hang together, and the preview was not told, so every piece reads as a root at the origin.".to_string(),
+                );
+            }
+            let pieces = &sim.model.pieces;
+            let this = &pieces[index];
+            let info = lua.create_table()?;
+            info.set("name", this.name.as_str())?;
+            info.set(
+                "parent",
+                this.rest
+                    .parent
+                    .and_then(|parent| pieces.get(parent))
+                    .map_or("[null]", |parent| parent.name.as_str()),
+            )?;
+            info.set(
+                "children",
+                lua.create_sequence_from(
+                    pieces
+                        .iter()
+                        .filter(|other| other.rest.parent == Some(index))
+                        .map(|other| other.name.as_str()),
+                )?,
+            )?;
+            info.set("isEmpty", false)?;
+            info.set("min", lua.create_sequence_from([0.0; 3])?)?;
+            info.set("max", lua.create_sequence_from([0.0; 3])?)?;
+            info.set("offset", lua.create_sequence_from(this.rest.position)?)?;
+            Ok(Value::Table(info))
+        })?,
+    )?;
+
     // Every piece by name, numbered as `piece()` numbers them. The engine's own
     // map is where those numbers come from: the unit script framework builds its
     // piece table out of this callout and `piece(name)` reads it, so the two
@@ -2154,6 +2234,10 @@ fn install_spring(
         "CreateUnit",
         "SetUnitCollisionVolumeData",
         "SetUnitPieceCollisionVolumeData",
+        "InsertUnitCmdDesc",
+        "RemoveUnitCmdDesc",
+        "EditUnitCmdDesc",
+        "SetUnitVelocity",
     ] {
         let state = Rc::clone(sim);
         let label = name.to_string();
@@ -2299,6 +2383,74 @@ fn install_spring(
                 None => Ok(MultiValue::new()),
             }
         })?,
+    )?;
+
+    // The ground the viewport draws, flat at 0 when the scene has none, as the
+    // compiled runtime answers `GROUND_HEIGHT`.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetGroundHeight",
+        lua.create_function(move |_, (x, z): (f64, f64)| {
+            let ground = state.borrow().world.as_ref().and_then(|world| world.ground);
+            Ok(ground.map_or(0.0, |ground| ground.height(x, z)))
+        })?,
+    )?;
+
+    // The engine's heading, 65536 to a circle: where a drive has turned the
+    // unit, and straight ahead otherwise.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitHeading",
+        lua.create_function(move |_, _: MultiValue| {
+            Ok(unitvalue::heading(state.borrow().world.as_ref()))
+        })?,
+    )?;
+
+    // A unit with no orders.
+    spring.set(
+        "GetUnitCommands",
+        lua.create_function(|lua, _: MultiValue| lua.create_table())?,
+    )?;
+    spring.set(
+        "GetUnitCurrentCommand",
+        lua.create_function(|_, _: MultiValue| Ok(Value::Nil))?,
+    )?;
+
+    // The same store `SetUnitValue` writes, under the name Zero-K's builders
+    // use for `COB.INBUILDSTANCE`.
+    let set_value: Function = lua.globals().get("SetUnitValue")?;
+    spring.set(
+        "SetUnitCOBValue",
+        lua.create_function(move |_, (_unit, id, value): (Value, Value, Value)| {
+            set_value.call::<()>((id, value))
+        })?,
+    )?;
+
+    // Moving the unit itself, which only a drive does in the preview. Each
+    // `MoveCtrl` call is noted and answers nothing.
+    let state = Rc::clone(sim);
+    let move_ctrl = lua.create_table()?;
+    let meta = lua.create_table()?;
+    meta.set(
+        "__index",
+        lua.create_function(move |lua, (_, name): (Value, String)| {
+            let state = Rc::clone(&state);
+            lua.create_function(move |_, _: MultiValue| {
+                state.borrow_mut().model.note(format!(
+                    "Spring.MoveCtrl.{name} does nothing in the preview."
+                ));
+                Ok(())
+            })
+        })?,
+    )?;
+    move_ctrl.set_metatable(Some(meta))?;
+    spring.set("MoveCtrl", move_ctrl)?;
+
+    // A match with no options changed. The engine hands back only the options
+    // the lobby set, so this is the game played as it ships.
+    spring.set(
+        "GetModOptions",
+        lua.create_function(|lua, _: MultiValue| lua.create_table())?,
     )?;
 
     install_echo(lua, sim, &spring)
@@ -2501,6 +2653,18 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 Ok(())
             },
         )?,
+    )?;
+
+    // GetPieceRotation(piece), where the piece has turned to so far, in the
+    // same radians Turn takes. Zero-K's walkers read their thighs back.
+    let state = Rc::clone(sim);
+    globals.set(
+        "GetPieceRotation",
+        lua.create_function(move |_, piece: i64| {
+            let sim = state.borrow();
+            let [x, y, z] = sim.model.pieces[piece_index(&sim, piece)?].rot;
+            Ok((x, y, z))
+        })?,
     )?;
 
     // Scale(piece, scale, speed), which Recoil added. The preview draws no
@@ -3100,6 +3264,9 @@ fn bootstrap(lua: &Lua) -> mlua::Result<()> {
     .set_name("unitscript:bootstrap")
     .exec()
 }
+
+#[path = "unitscript_game.rs"]
+mod game;
 
 #[cfg(test)]
 #[path = "unitscript_tests.rs"]

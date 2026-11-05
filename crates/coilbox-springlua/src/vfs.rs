@@ -21,7 +21,7 @@ use mlua::{Lua, Value, Variadic};
 /// VFS mode constants, as the engine pushes them (string values from
 /// `LuaVFS.cpp`). Inert in the loose-file backend — present only so config that
 /// passes `VFS.MAP` / `VFS.ZIP_FIRST` / ... doesn't get nil.
-const MODES: &[(&str, &str)] = &[
+pub(crate) const MODES: &[(&str, &str)] = &[
     ("RAW", "r"),
     ("MOD", "M"),
     ("GAME", "M"),
