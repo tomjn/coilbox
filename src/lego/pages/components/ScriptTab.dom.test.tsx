@@ -151,7 +151,12 @@ describe("a unit still on the generated script", () => {
   it("shows it to read rather than to edit", () => {
     show(unit());
     expect(screen.getByRole("textbox")).toHaveProperty("readOnly", true);
-    expect(screen.getByText(/Generated from the animations/)).toBeTruthy();
+  });
+
+  it("has no help paragraph above the script", () => {
+    show(unit());
+    expect(screen.queryByText(/Generated from the animations/)).toBeNull();
+    expect(screen.queryByText(/Export writes it/)).toBeNull();
   });
 
   it("offers to take it over, and says the presets stop generating it", () => {
@@ -218,10 +223,38 @@ describe("a unit that owns its script", () => {
     expect(onScriptRelease).toHaveBeenCalledTimes(1);
   });
 
-  it("says the text goes and that undo brings it back", () => {
+  it("renders no help paragraph, so the script box takes the drawer's height", () => {
+    const { container } = show(unit({ script: "-- mine\n" }));
+
+    expect(container.querySelector("p")).toBeNull();
+    expect(screen.queryByText(/Export writes it/)).toBeNull();
+    expect(screen.queryByText(/never overwritten/)).toBeNull();
+    expect(screen.queryByText(/Hand the script back/)).toBeNull();
+    expect(screen.queryByText(/The text above is discarded/)).toBeNull();
+
+    // The box's wrapper grows to fill the drawer, and the header is the only
+    // other child, so nothing sits between them or under the box.
+    const root = container.firstElementChild;
+    expect(root?.children).toHaveLength(2);
+    expect(root?.lastElementChild?.className).toContain("flex-1");
+    expect(root?.lastElementChild?.className).toContain("min-h-0");
+    expect(root?.lastElementChild?.contains(screen.getByRole("textbox"))).toBe(
+      true,
+    );
+  });
+
+  it("says on the Discard button's tooltip that undo brings the text back", async () => {
     show(unit({ script: "-- mine\n" }));
-    expect(screen.getByText(/The text above is discarded/)).toBeTruthy();
-    expect(screen.getByText(/Undo brings it back/)).toBeTruthy();
+
+    fireEvent.focus(
+      screen.getByRole("button", {
+        name: "Discard this script and use the presets",
+      }),
+    );
+
+    expect(
+      (await screen.findAllByText("Undo brings the text back.")).length,
+    ).toBeGreaterThan(0);
   });
 
   it("says so plainly when the owned script is empty", () => {

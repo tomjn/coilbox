@@ -397,11 +397,9 @@ export function ScriptTab({
     }
   }
 
-  const unitName = project.unitName;
   const checkCount = diagnostics.length;
   const unmatchedNames = unmatched.join(", ");
   const severity = worstSeverity(diagnostics.map((d) => d.severity));
-  const unsaved = owned && draft !== project.script;
   const empty = owned && shown.trim() === "";
 
   return (
@@ -533,41 +531,21 @@ export function ScriptTab({
             {copied ? t`Copied` : t`Copy`}
           </Button>
           {owned && (
-            <Button variant="outline" size="sm" onClick={onScriptRelease}>
-              <Trans>Discard this script and use the presets</Trans>
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={onScriptRelease}>
+                    <Trans>Discard this script and use the presets</Trans>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <Trans>Undo brings the text back.</Trans>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>
-
-      {/* Nothing for a compiled script. The file name above already says what
-        it is, and the editor being read-only says the rest. */}
-      {compiled ? null : (
-        <p className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          {owned ? (
-            <>
-              <Trans>
-                This unit's own script. Export writes it to{" "}
-                <code>scripts/{unitName}.lua</code> exactly as it is here, if
-                the script checkbox is ticked. A script already in the game
-                folder is never overwritten.
-              </Trans>{" "}
-              {unsaved ? (
-                <Trans>Not saved yet.</Trans>
-              ) : (
-                <Trans>Saved to the unit.</Trans>
-              )}
-            </>
-          ) : (
-            <Trans>
-              Generated from the animations applied to this unit. Export writes
-              it to <code>scripts/{unitName}.lua</code> too, if the script
-              checkbox is ticked (on by default). An existing script is never
-              overwritten, so hand edits survive a re-export.
-            </Trans>
-          )}
-        </p>
-      )}
 
       {outdated && (
         <p className="border-b border-border/60 px-3 py-2 text-xs text-amber-500">
@@ -655,24 +633,12 @@ export function ScriptTab({
         </div>
       )}
 
-      {owned && (
+      {empty && (
         <p className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          {empty ? (
-            <Trans>
-              This script is empty, so the unit has no animation at all and the
-              presets cannot reach it. Hand it back and the Animation panel
-              works again.
-            </Trans>
-          ) : (
-            <Trans>
-              Hand the script back and the unit is generated from the animation
-              presets again, as it was before you took it over.
-            </Trans>
-          )}{" "}
           <Trans>
-            The text above is discarded. Undo brings it back if that was a
-            mistake, so copy it first if you want to keep it beyond this
-            session.
+            This script is empty, so the unit has no animation at all and the
+            presets cannot reach it. Discard it and the Animation panel works
+            again.
           </Trans>
         </p>
       )}
