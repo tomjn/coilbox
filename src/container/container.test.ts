@@ -433,8 +433,43 @@ describe("module containers (#3272)", () => {
 
   it("refuses a mesh with no record of where it came from", () => {
     const mesh = module([piece("root"), piece("hull", { meshId: "m0" })]);
+    expect(moduleGeometryRefusal({ ...mesh, geometry: "AAAA" })).toBe(
+      "This module holds meshes with no record of where they came from: hull. Only meshes imported from your own model file can be shared.",
+    );
+  });
+
+  // #4360
+  const own = { meshId: "m0", ownMesh: { file: "hull.s3o" } };
+
+  it("accepts the maker's own mesh when the payload carries the meshes", () => {
+    const mesh = module([piece("root"), piece("hull", own)]);
+    expect(moduleGeometryRefusal({ ...mesh, geometry: "AAAA" })).toBeNull();
+  });
+
+  it("refuses the maker's own mesh when the payload does not carry it", () => {
+    const mesh = module([piece("root"), piece("hull", own)]);
     expect(moduleGeometryRefusal(mesh)).toBe(
-      "This module holds imported meshes: hull. The hub carries modules built from parts and empty pieces only.",
+      "This module names meshes it does not carry: hull.",
+    );
+  });
+
+  it("refuses an own mesh record that names no file", () => {
+    const mesh = module([
+      piece("root"),
+      piece("hull", { meshId: "m0", ownMesh: { file: "" } }),
+    ]);
+    expect(moduleGeometryRefusal({ ...mesh, geometry: "AAAA" })).toContain(
+      "no record of where they came from",
+    );
+  });
+
+  it("refuses a lifted piece even beside the maker's own meshes", () => {
+    const mixed = module([
+      piece("root", own),
+      piece("barrel", { ...own, ...lifted() }),
+    ]);
+    expect(moduleGeometryRefusal({ ...mixed, geometry: "AAAA" })).toContain(
+      "cannot be uploaded to the hub",
     );
   });
 

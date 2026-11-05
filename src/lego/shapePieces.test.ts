@@ -354,7 +354,7 @@ describe("copies of a shape keep it", () => {
   });
 
   it("survives a shared module code", () => {
-    const made = moduleShareCode(unit);
+    const made = moduleShareCode(unit, null);
     if (!made.ok) throw new Error(made.reason);
     const read = readSharedModule(made.code, new Set());
     expect(read.ok && shapesIn(read.project)).toEqual([shape]);

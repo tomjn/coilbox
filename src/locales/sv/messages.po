@@ -38774,6 +38774,10 @@ msgstr "Läser speglarnas index…"
 msgid "Reading the model."
 msgstr "Läser modellen."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -48436,6 +48440,10 @@ msgstr "det inbördes mötet"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "Den största laddning skölden kan hålla, minskad av inkommande vapenskada."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -50751,9 +50759,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Den här modellen öppnades inifrån ett packat arkiv, som inte har någon sökväg att skriva tillbaka till. Spara den till en vald sökväg i stället."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Den här modulen innehåller geometri från ett spel eller en modell, vilket en delad modul inte kan bära."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy

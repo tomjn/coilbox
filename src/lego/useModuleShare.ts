@@ -5,16 +5,19 @@
 
 import { t } from "@lingui/core/macro";
 import { useDrawer } from "@picoframe/frame";
+import { gzipSync } from "fflate";
 import { createElement, useCallback, useEffect, useRef } from "react";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
 import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
+import { legoGeometrySave } from "./bindings";
 import type { LegoProject } from "./model";
 import { sharedModuleToSave } from "./moduleShare";
 import type { LoadedPack } from "./pack";
 import { saveCompound, useLegoCompounds } from "./projects";
+import { encodeRawGeometry } from "./rawGeometry";
 
 /** Open the share drawer for a module. */
 export function useShareModule(): (module: LegoProject) => void {
@@ -68,28 +71,38 @@ export function useSharedModuleImport(
       });
       return;
     }
-    void saveCompound(read.project).then(
-      (saved) => {
-        recordHubImport(hubItemId, [saved.id], "/lego/parts");
-        const savedName = saved.name;
-        const parts = read.missingParts.join(", ");
-        notify(
-          read.missingParts.length > 0
-            ? {
-                title: t`Added ${savedName}, with parts missing`,
-                body: t`No installed pack has the parts for: ${parts}.`,
-                level: "warning",
-              }
-            : { title: t`Added ${savedName}`, level: "success" },
-        );
-      },
-      (error: unknown) =>
-        notify({
-          title: t`Could not add the module`,
-          body: describeError(error),
-          level: "error",
-        }),
-    );
+    // The meshes go first, so no module names meshes it lacks.
+    const { geometry } = read;
+    const meshes = geometry
+      ? legoGeometrySave({
+          id: read.project.id,
+          bytes: Array.from(gzipSync(encodeRawGeometry(geometry))),
+        })
+      : Promise.resolve();
+    void meshes
+      .then(() => saveCompound(read.project))
+      .then(
+        (saved) => {
+          recordHubImport(hubItemId, [saved.id], "/lego/parts");
+          const savedName = saved.name;
+          const parts = read.missingParts.join(", ");
+          notify(
+            read.missingParts.length > 0
+              ? {
+                  title: t`Added ${savedName}, with parts missing`,
+                  body: t`No installed pack has the parts for: ${parts}.`,
+                  level: "warning",
+                }
+              : { title: t`Added ${savedName}`, level: "success" },
+          );
+        },
+        (error: unknown) =>
+          notify({
+            title: t`Could not add the module`,
+            body: describeError(error),
+            level: "error",
+          }),
+      );
   };
 
   const ready = packSettled && !loading;

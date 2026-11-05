@@ -38507,6 +38507,10 @@ msgstr "ミラーのインデックスを読み込み中…"
 msgid "Reading the model."
 msgstr "モデルを読み込んでいます。"
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -48104,6 +48108,10 @@ msgstr "対戦カード"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "シールドが保持できる最大充電量。飛来する武器のダメージで減ります。"
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -50400,9 +50408,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "このモデルはパックされたアーカイブの中から開いたもので、書き戻すパスがありません。代わりに、選択したパスに保存してください。"
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "このモジュールにはゲームやモデルのジオメトリが含まれており、共有するモジュールには含められません。"
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy

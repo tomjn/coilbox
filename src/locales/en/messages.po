@@ -31357,6 +31357,10 @@ msgstr "Reading the mirror indexes…"
 msgid "Reading the model."
 msgstr "Reading the model."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr "Reading the module's meshes."
+
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "Reading the rapid index…"
 msgstr "Reading the rapid index…"
@@ -39167,6 +39171,10 @@ msgstr "the matchup"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "The maximum charge the shield can hold, reduced by incoming weapon damage."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr "The meshes in this module could not be read."
+
 #: src/lego/liftIntoUnit.ts
 msgid "The meshes of {moduleName} could not be read: {reason}"
 msgstr "The meshes of {moduleName} could not be read: {reason}"
@@ -41025,8 +41033,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 
 #: src/lego/moduleShare.ts
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "This module holds geometry from a game or a model, which a shared module cannot carry."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
 
 #: src/lego/moduleShare.ts
 msgid "This module is {size} KB, over the {limit} KB a code can carry."

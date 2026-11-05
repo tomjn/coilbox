@@ -416,27 +416,30 @@ function joinNames(names: string[]): string {
 /**
  * Why a module payload cannot go on the hub, or null when it can (#3272).
  *
- * The hub carries modules made of parts and empty pieces. A piece lifted from
- * a game records the game in `lifted`, and the owner has ruled that such
- * geometry never goes on the hub, whatever game the upload is tagged to. A
- * mesh with no such record is refused too, because its geometry lives in a
- * file beside the module that a container does not carry, and because a mesh
- * whose record was lost could still be a game's.
+ * A piece lifted from a game records the game in `lifted`, and the owner has
+ * ruled that such geometry never goes on the hub, whatever game the upload is
+ * tagged to. A mesh the game maker imported from their own model file records
+ * that in `ownMesh` (#4360), and can be shared, as long as the payload carries
+ * the meshes in `geometry`: the vertices otherwise live in a file beside the
+ * module that a container does not hold. A mesh with neither record is
+ * refused, because a mesh whose record was lost could still be a game's.
  *
  * Here rather than in the unit builder so the hub, which vendors this file,
  * refuses with the same rule and the same words. A skeleton kind, when there
  * is one, holds the same pieces and takes the same check.
  */
 export function moduleGeometryRefusal(payload: unknown): string | null {
-  const pieces =
+  const doc =
     typeof payload === "object" && payload !== null
-      ? (payload as Record<string, unknown>).pieces
+      ? (payload as Record<string, unknown>)
       : undefined;
+  const pieces = doc?.pieces;
   if (!Array.isArray(pieces)) return "That module could not be read.";
 
   const liftedNames: string[] = [];
   const games: string[] = [];
   const meshNames: string[] = [];
+  const ownNames: string[] = [];
   for (const piece of pieces) {
     if (typeof piece !== "object" || piece === null) continue;
     const p = piece as Record<string, unknown>;
@@ -451,7 +454,8 @@ export function moduleGeometryRefusal(payload: unknown): string | null {
       const label = typeof gameName === "string" ? gameName : "a game";
       if (!games.includes(label)) games.push(label);
     } else if (typeof p.meshId === "string") {
-      meshNames.push(name);
+      if (isOwnMesh(p.ownMesh)) ownNames.push(name);
+      else meshNames.push(name);
     }
   }
 
@@ -460,9 +464,19 @@ export function moduleGeometryRefusal(payload: unknown): string | null {
     return `This module holds ${what} from ${joinNames(games)}: ${liftedNames.join(", ")}. Geometry lifted from a game cannot be uploaded to the hub.`;
   }
   if (meshNames.length > 0) {
-    return `This module holds imported meshes: ${meshNames.join(", ")}. The hub carries modules built from parts and empty pieces only.`;
+    return `This module holds meshes with no record of where they came from: ${meshNames.join(", ")}. Only meshes imported from your own model file can be shared.`;
+  }
+  if (ownNames.length > 0 && typeof doc?.geometry !== "string") {
+    return `This module names meshes it does not carry: ${ownNames.join(", ")}.`;
   }
   return null;
+}
+
+/** Whether a piece's `ownMesh` is a record of the file it came from. */
+function isOwnMesh(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const file = (value as Record<string, unknown>).file;
+  return typeof file === "string" && file !== "";
 }
 
 /** Map a recognised kind + schema version to a compatibility verdict. */
