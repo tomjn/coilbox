@@ -19,6 +19,7 @@ import type {
   ProgressFile,
 } from "../campaign/model";
 import { resumeMissionId } from "../campaign/progress";
+import { stripVersion } from "../career/games";
 import { useConquestState, useGalaxies } from "../conquest/conquests";
 import { listedHandmadeMaps } from "../conquest/handmade/conquest";
 import { useHandmadeMaps } from "../conquest/handmade/useHandmadeMaps";
@@ -96,6 +97,11 @@ export interface ResumeCandidate {
    * whether its game and map are installed.
    */
   startScenario?: Scenario;
+  /**
+   * The map a `skirmish` candidate plays on. The hero draws its minimap, since
+   * the card's title alone does not say whether it names a map (#5080).
+   */
+  mapName?: string;
 }
 
 /** What a card calls a kind of thing, and what its action offers to do. */
@@ -374,6 +380,10 @@ export function battleCandidate(
  * back to the presets keeps the old answer for one visit, until the setup screen
  * next writes. A draft naming no game or map is unoffered for the same reason:
  * those two words are the whole card.
+ *
+ * The game is named without its version (#5080). The draft holds the archive's
+ * whole name, which for a test build of Beyond All Reason is a hash longer than
+ * the game's own name, and it took most of the hero's width.
  */
 export function skirmishCandidate(
   draft: StoredSkirmishDraft,
@@ -390,9 +400,10 @@ export function skirmishCandidate(
       id: "skirmish:draft",
       kind: "skirmish",
       title: mapName,
-      detail: gameName,
+      detail: stripVersion(gameName),
       to: "/play/skirmish",
       touchedAt,
+      mapName,
     };
   const best = mostRecentOpen(
     presets,
@@ -400,7 +411,8 @@ export function skirmishCandidate(
     (p) => Date.parse(p.lastUsedAt),
   );
   if (!best) return undefined;
-  const { gameName: presetGame, mapName: presetMap } = best;
+  const { mapName: presetMap } = best;
+  const presetGame = stripVersion(best.gameName);
   return {
     id: `skirmish:${best.id}`,
     kind: "skirmish",
@@ -408,6 +420,7 @@ export function skirmishCandidate(
     detail: t`${presetGame} on ${presetMap}`,
     to: "/play/skirmish",
     touchedAt: Date.parse(best.lastUsedAt),
+    mapName: presetMap || undefined,
   };
 }
 

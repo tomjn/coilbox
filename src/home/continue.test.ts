@@ -493,6 +493,32 @@ describe("skirmishCandidate", () => {
     expect(skirmishCandidate(empty, [preset({})])?.title).toBe("Duel");
   });
 
+  it("names the game without its version (#5080)", () => {
+    // The archive's name, version and all, is what the draft holds. A pull
+    // request build's hash was longer than the game's own name.
+    const c = skirmishCandidate(
+      draft({
+        gameName: "Beyond All Reason pr-8942-30929-09be885",
+        touchedAt: NOW - 1000,
+      }),
+      [],
+    );
+    expect(c?.detail).toBe("Beyond All Reason");
+    const p = skirmishCandidate(unstamped, [
+      preset({ gameName: "Beyond All Reason test-30018-d71d659" }),
+    ]);
+    expect(p?.detail).toBe("Beyond All Reason on Comet Catcher");
+  });
+
+  it("carries the map, for the hero to draw its minimap", () => {
+    expect(
+      skirmishCandidate(draft({ touchedAt: NOW - 1000 }), [])?.mapName,
+    ).toBe("Supreme Isthmus");
+    expect(skirmishCandidate(unstamped, [preset({})])?.mapName).toBe(
+      "Comet Catcher",
+    );
+  });
+
   it("skips a preset whose timestamp did not parse", () => {
     expect(
       skirmishCandidate(unstamped, [preset({ lastUsedAt: "" })]),

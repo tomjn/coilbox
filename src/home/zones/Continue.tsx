@@ -1,8 +1,8 @@
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
-import { Play } from "lucide-react";
-import type { ReactNode } from "react";
+import { Map as MapIcon, Play } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import { type MissionNeed, missionNeeds } from "../../campaign/missionNeeds";
 import { useCampaignImage } from "../../campaign/panorama";
@@ -18,6 +18,7 @@ import {
   startCopy,
   useResume,
 } from "../continue";
+import { useMapMinimap } from "../useContentCardArt";
 
 /**
  * One large card for the single most relevant thing to pick up again, with the
@@ -143,7 +144,12 @@ export default function Continue({ className }: { className?: string }) {
     label: i18n._(copy.label),
     action: i18n._(copy.action),
     detail: top.detail,
-    art: <KindIcon kind={top.kind} />,
+    art:
+      top.kind === "skirmish" && top.mapName ? (
+        <MapArt mapName={top.mapName} />
+      ) : (
+        <KindIcon kind={top.kind} />
+      ),
     className,
   });
 }
@@ -154,6 +160,56 @@ function KindIcon({ kind }: { kind: ResumeCandidate["kind"] }) {
   return (
     <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
       <Icon className="size-6" aria-hidden />
+    </span>
+  );
+}
+
+/**
+ * A skirmish's map, in the square the kind's icon would fill (#5080).
+ *
+ * The card's title is the map's name, and a name like "BarR 1.1" does not say
+ * it is a map. Its minimap does. A map with no minimap, or one still loading,
+ * gets a map icon in the kind's tinted square rather than the skirmish's
+ * crossed swords, so the square says "map" either way.
+ *
+ * The square is always drawn, icon and all, and the minimap fades in over it
+ * once it has decoded. The minimap usually arrives a moment after the card, and
+ * swapping one element for another made the square jump from icon to picture.
+ * Drawn over the square, the icon is what shows until the picture is ready, and
+ * also what stays when there is none.
+ *
+ * A border once the picture is in, the same `border-border` the battle list
+ * draws round its minimaps. Most maps are dark, and without an edge a dark one
+ * dissolved into the card.
+ *
+ * The image is decorative, `alt=""`: the title beside it already names the map.
+ * `object-cover`, because a square crop of a long map still reads as that map,
+ * and letterboxing it would leave a 48px box mostly empty.
+ */
+function MapArt({ mapName }: { mapName: string }) {
+  const url = useMapMinimap(mapName);
+  // The URL that finished decoding, so a new map starts transparent again.
+  const [shown, setShown] = useState<string | null>(null);
+  const ready = url !== null && shown === url;
+  return (
+    <span
+      className={cn(
+        "relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary/10 text-primary",
+        ready && "border border-border",
+      )}
+    >
+      <MapIcon data-testid="continue-map-icon" className="size-6" aria-hidden />
+      {url && (
+        <img
+          src={url}
+          alt=""
+          onLoad={() => setShown(url)}
+          className={cn(
+            "absolute inset-0 size-full object-cover motion-safe:transition-opacity motion-safe:duration-300",
+            ready ? "opacity-100" : "opacity-0",
+          )}
+        />
+      )}
     </span>
   );
 }
@@ -267,6 +323,15 @@ function StartScenarioHero({
   });
 }
 
+/**
+ * The widest the card's text runs: 32rem, which with the art, the action and the
+ * padding puts the whole card just under 42rem. Past that a run's name is a
+ * paragraph, and the row would rather wrap the title than push the rail onto a
+ * second line. The layout sizes the card to its contents, so this is the card's
+ * cap as well (`HERO_WIDTH` in `../StackedLayout`).
+ */
+const TEXT_MEASURE = "max-w-lg";
+
 /** The card itself, shared by a thing to resume and a mission to start. */
 function heroCard({
   top,
@@ -308,20 +373,26 @@ function heroCard({
         to={top.to}
         aria-label={ariaLabel}
         className={cn(
-          "flex flex-wrap items-center gap-4 rounded-lg p-4 transition-colors hover:bg-accent/50",
+          // One line, never wrapped. The card shrinks before the rail beside it
+          // has to wrap, so the text gives way and the action stays beside it.
+          "flex items-center gap-4 rounded-lg p-4 transition-colors hover:bg-accent/50",
           CARD_FOCUS_CLASS,
         )}
       >
         {art}
-        <div className="min-w-0 flex-1">
+        <div className={cn("min-w-0 flex-1", TEXT_MEASURE)}>
           {/* The heading is the kind, not the run's name. See above. A heading
               inside a link is valid, and the link's own label is what gets read
               as its name, so both lists the page is navigated by still work. */}
           <h2 id="home-continue-heading" className={GROUP_HEADING_CLASS}>
             {label}
           </h2>
-          <p className="text-xl font-semibold">{top.title}</p>
-          <p className="text-sm text-muted-foreground">{detail}</p>
+          <p className="break-words text-xl font-semibold">{top.title}</p>
+          {/* Cut short rather than wrapped, so a long game line can never set
+              the card's width (#5080). */}
+          <p className="truncate text-sm text-muted-foreground" title={detail}>
+            {detail}
+          </p>
         </div>
         {/* Inert. The card around it is the link. `title` so a pointer user who
             wants the words can still get them. */}

@@ -118,8 +118,7 @@ const WARPATH = candidate("warpath", "Kestrel");
 const CONQUEST = candidate("conquest", "Orion Reach");
 
 /** The row's class, repeated here so a change to it has to be deliberate. */
-const ROW =
-  'class="mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-start"';
+const ROW = 'class="mt-6 flex flex-wrap items-start gap-3 empty:hidden"';
 
 /**
  * The two zones on a page of their own, as the markup a browser would get.
@@ -199,7 +198,7 @@ describe("the resume row", () => {
 
   it("gives the hero the width the layout chose", () => {
     resume.mockReturnValue({ candidates: [HERO], loading: false });
-    expect(page()).toContain("min-w-0 sm:max-w-2xl");
+    expect(page()).toContain("min-w-0 max-w-max grow-[4] basis-80");
   });
 
   it("takes the accent off the hero when the map card is promoted", () => {

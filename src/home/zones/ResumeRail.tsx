@@ -3,6 +3,7 @@ import { plural, t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight, LogIn } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import {
   allServers,
@@ -280,10 +281,8 @@ export const RAIL_DIM_CLASS = "text-muted-foreground";
  * rail is the quiet half of the hero above it and a tint would compete with the
  * hero's own accent border for the same "look here" job.
  *
- * Width adjusts from `sm`: a 10rem base so three cards fit beside the hero on
- * lines a fixed 16rem card pushed onto a second row, growing back to the tool
- * cards' 16rem cap whenever the line has the room, so a wide page looks as it
- * did before.
+ * No width of its own. The rail's grid sets it, between {@link RAIL_CARD_MIN_REM}
+ * and {@link RAIL_CARD_MAX_REM} (see {@link railWidths}).
  *
  * ## The padding is paired with the hero's
  *
@@ -299,8 +298,62 @@ export const RAIL_DIM_CLASS = "text-muted-foreground";
  * gains or loses a line.
  */
 export const RAIL_CARD_CLASS =
-  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-2.5 text-left text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:max-w-64 sm:grow sm:basis-40 " +
+  "group flex min-w-0 flex-col gap-0.5 rounded-lg border border-border bg-card p-2.5 text-left text-card-foreground transition-colors hover:border-ring hover:shadow-sm " +
   CARD_FOCUS_CLASS;
+
+/**
+ * How narrow a rail card goes, in rem.
+ *
+ * The narrowest width that still fits the longest action on one line: "Resume
+ * conquest" and its arrow measured 119px in issue #5080's screenshot, and 9.5rem leaves
+ * 130px inside the padding and the border. The title wraps to two lines and the
+ * detail truncates, so neither sets a minimum.
+ */
+export const RAIL_CARD_MIN_REM = 9.5;
+
+/** How wide a rail card goes, in rem: the tool cards' 16rem. */
+export const RAIL_CARD_MAX_REM = 16;
+
+/** The gap between rail cards, in rem. `gap-3`, as the row uses. */
+const RAIL_GAP_REM = 0.75;
+
+/**
+ * The rail's narrowest and widest, in rem, for `count` cards side by side.
+ *
+ * The narrowest is what the rail asks for beside the hero. When the line cannot
+ * give it that much, the rail drops under the hero as one item, rather than
+ * wrapping its own cards in the corner the hero leaves (#5080). On a line of its
+ * own narrower than this, the rail takes the whole line and its grid wraps the
+ * cards into even columns.
+ *
+ * The widest stops the rail taking room on the line that its cards could not
+ * fill, which leaves that room to the hero.
+ *
+ * Pure, so the widths for one, two and three cards are unit tests.
+ */
+export function railWidths(count: number): { min: number; max: number } {
+  const gaps = Math.max(0, count - 1) * RAIL_GAP_REM;
+  return {
+    min: count * RAIL_CARD_MIN_REM + gaps,
+    max: count * RAIL_CARD_MAX_REM + gaps,
+  };
+}
+
+/**
+ * The rail as a flex item and as a grid.
+ *
+ * As a flex item, it starts from its narrowest width and grows to its widest.
+ * Its minimum is the lesser of that width and the whole line, so a line of its
+ * own narrower than three cards still holds it.
+ *
+ * As a grid, `auto-fit` columns of at least a card's narrowest, sharing the
+ * rail's width. Three cards that fit sit in one row. Three that do not wrap into
+ * columns of one width, so a card on a second row lines up with the one above it.
+ * The grid stretches the cards in a row to one height, which keeps their actions
+ * on one line.
+ */
+const RAIL_CLASS =
+  "grid min-w-[min(100%,var(--rail-min))] max-w-(--rail-max) grow basis-(--rail-min) grid-cols-[repeat(auto-fit,minmax(min(100%,var(--rail-card-min)),1fr))] gap-3";
 
 /**
  * The runners-up the Continue hero did not take, as small cards.
@@ -311,10 +364,9 @@ export const RAIL_CARD_CLASS =
  *
  * Layout-agnostic: no page-level spacing of its own, because the `stacked`
  * layout is a compatibility contract and a later layout has to be able to put
- * the rail somewhere else. Beside the hero (#1041) it is `flex-1 min-w-0`, so
- * it takes the rest of the hero's line and wraps its own cards inside that
- * space, rather than sizing to three full cards and dropping whole onto a
- * second row whenever they did not fit.
+ * the rail somewhere else. How wide it goes is a fact about its cards, so it is
+ * the rail's own (see {@link railWidths}), and beside the hero (#1041) the row
+ * reads it from there.
  *
  * ## The log-in card
  *
@@ -359,6 +411,7 @@ export default function ResumeRail() {
   );
   const cards = railCards(candidates, logins, reconnectAll);
   if (loading || cards.length === 0) return null;
+  const widths = railWidths(cards.length);
 
   return (
     // Labelled rather than headed: the rail is the small half of the hero it
@@ -367,7 +420,14 @@ export default function ResumeRail() {
     // from the layout.
     <section
       aria-label={t`More to pick up`}
-      className="flex min-w-0 flex-1 flex-wrap gap-3"
+      className={RAIL_CLASS}
+      style={
+        {
+          "--rail-min": `${widths.min}rem`,
+          "--rail-max": `${widths.max}rem`,
+          "--rail-card-min": `${RAIL_CARD_MIN_REM}rem`,
+        } as CSSProperties
+      }
     >
       {cards.map((card) => {
         const { key, icon: Icon, label, title, detail, action } = card;

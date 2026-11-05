@@ -118,6 +118,9 @@ describe("createGameResolver", () => {
     expect(stripVersion("Beyond All Reason test-30018-d71d659")).toBe(
       "Beyond All Reason",
     );
+    expect(stripVersion("Beyond All Reason pr-8942-30929-09be885")).toBe(
+      "Beyond All Reason",
+    );
   });
 
   it("keeps a game apart from another that shares its shortname", () => {

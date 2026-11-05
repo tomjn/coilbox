@@ -195,7 +195,7 @@ describe("Continue zone", () => {
     );
     expect(
       all.find((n) => n.props.children === "Kestrel")?.props.className,
-    ).toBe("text-xl font-semibold");
+    ).toBe("break-words text-xl font-semibold");
   });
 
   it("names its section by that heading", () => {
