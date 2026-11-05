@@ -12,14 +12,25 @@
  * A walk thread starts on `StartMoving` and is told to stop on `StopMoving`.
  * Its first lap comes in from rest rather than from the cycle's first pose,
  * so it is not marked.
+ *
+ * During a drive the walk goes at the share of top speed the unit is moving at
+ * (#4486), so the marks follow the thread's own steps, each as long as
+ * `walkPaceStep` says it sleeps for the drive's speed on the frame it starts.
  */
 
 import {
+  type AnimPreset,
+  COBSCALE,
+  cycleSteps,
   type Gait,
   legPhase,
+  legRoleIds,
   parseLegRole,
   presetById,
+  WALK_DROP,
+  WALK_PAIRS,
   WALK_THIGH,
+  walkPaceStep,
   walkSweep,
 } from "./animPresets";
 import { presetRoles, roleInstanceGroups } from "./luaScript";
@@ -49,16 +60,77 @@ function movingSpans(events: ScriptEvent[]): [number, number][] {
   return spans;
 }
 
+/** What a drive tells the script about the unit's speed, in elmos a frame,
+ *  as `scriptDrive` in `drive.ts` takes it. */
+export interface PlantedDrive {
+  frames: { speed: number }[];
+  maxSpeed: number;
+}
+
+/**
+ * Where a walk thread started on `start` is in its cycle on each frame up to
+ * `end`, in frames of the cycle at top speed, as `cycleThread` writes it: each
+ * step of `steps` frames sleeps what `walkPaceStep` says for the speed the
+ * drive reads on the frame it starts, and the pieces move evenly through it.
+ * With no drive the unit reads its top speed and the clock is the frames since
+ * `start`.
+ */
+function walkClock(
+  steps: number[],
+  start: number,
+  end: number,
+  drive: PlantedDrive | undefined,
+): Map<number, number> {
+  const clock = new Map<number, number>();
+  const top = drive ? Math.trunc(drive.maxSpeed * COBSCALE) : 1;
+  let at = start;
+  let cycle = 0;
+  let due = 0;
+  for (let step = 0; at < end; step = (step + 1) % steps.length) {
+    const frames = steps[step];
+    const speed = drive?.frames[at]?.speed ?? drive?.maxSpeed ?? 0;
+    const current = drive ? Math.trunc(speed * COBSCALE) : 1;
+    const paced = walkPaceStep(frames, due, current, top);
+    due = paced.due;
+    for (let frame = 0; frame < paced.wait && at + frame < end; frame++) {
+      clock.set(at + frame, cycle + (frames * frame) / paced.wait);
+    }
+    at += paced.wait;
+    cycle += frames;
+  }
+  return clock;
+}
+
+/** The frames each step of a walk's thread takes at top speed, as
+ *  `walkEmit` writes it for one set of legs. */
+function stepFrames(
+  preset: AnimPreset,
+  params: Record<string, number>,
+): number[] {
+  const roles =
+    preset.id === "walk.legs"
+      ? legRoleIds(Math.round(params[WALK_PAIRS] ?? 1))
+      : preset.animates;
+  const bounds = cycleSteps(
+    preset,
+    params,
+    Math.max(params.period, 0.05),
+    roles,
+  );
+  return bounds.slice(1).map((frame, index) => frame - bounds[index]);
+}
+
 /**
  * The marks for `frames` frames of a run fired by `events`, or null when no
  * walk the unit plays is solved or the unit never moves. Only the generated
  * script plays the presets, so a unit with a script of its own, or a game's
- * compiled one, gets none.
+ * compiled one, gets none. `drive` is the drive the run plays, if any.
  */
 export function plantedFeet(
   project: LegoProject,
   events: ScriptEvent[],
   frames: number,
+  drive?: PlantedDrive,
 ): PlantedFeet | null {
   if (project.script !== undefined || project.compiledScript) return null;
   const spans = movingSpans(events);
@@ -79,11 +151,20 @@ export function plantedFeet(
       project.pieces,
       presetRoles(preset, project.pieces),
     )) {
-      const params = shownParams(project, entry, group.id || null);
+      // Every set of legs is solved to the ground the shared walk lowers the
+      // body to, as `walkDrop` writes it.
+      const params: Record<string, number> = {
+        ...shownParams(project, entry, group.id || null),
+        [WALK_DROP]: shownParams(project, entry, null)[WALK_DROP],
+      };
       if (!(params[WALK_THIGH] > 0)) continue;
       const lap = Math.round(params.period * ENGINE_FPS);
       const down = Math.round((params.duty / 100) * lap);
       const half = walkSweep(params) / 2;
+      const steps = stepFrames(preset, params);
+      const clocks = spans.map(([start, end]) =>
+        walkClock(steps, start, Math.min(end, frames), drive),
+      );
       for (const piece of group.pieces) {
         const leg = parseLegRole(piece.role ?? "");
         if (leg?.segment !== "thigh") continue;
@@ -95,13 +176,10 @@ export function plantedFeet(
         const offset = Math.round((1 - phase / (2 * Math.PI)) * lap) % lap;
         const [x, , z] = jointOf(project, piece);
         any = true;
-        for (const [start, end] of spans) {
-          for (
-            let frame = start + lap;
-            frame < Math.min(end, frames);
-            frame++
-          ) {
-            const turn = (((frame - start - offset) % lap) + lap) % lap;
+        for (const clock of clocks) {
+          for (const [frame, cycle] of clock) {
+            if (cycle < lap) continue;
+            const turn = (((cycle - offset) % lap) + lap) % lap;
             if (turn > down) continue;
             marks[frame].set(piece.id, [x, z + half * (1 - (2 * turn) / down)]);
           }

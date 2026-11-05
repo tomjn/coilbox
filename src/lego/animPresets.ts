@@ -1571,6 +1571,26 @@ const WALK_PACE = [
 ];
 
 /**
+ * `walkPace` in `WALK_PACE`, for code that works out where a fitted walk's
+ * thread is without running it (`plantedFeet.ts`): the frames a step of
+ * `frames` sleeps with the unit reading `current` against a top speed of
+ * `top`, both in the engine's 65536ths of an elmo a frame, and the `due` it
+ * carries to the next step.
+ */
+export function walkPaceStep(
+  frames: number,
+  due: number,
+  current: number,
+  top: number,
+): { wait: number; due: number } {
+  const pace =
+    top > 0 ? Math.min(Math.max(current / top, WALK_PACE_FLOOR), 1) : 1;
+  const owed = due + frames / pace;
+  const wait = Math.floor(owed + 0.5);
+  return { wait, due: owed - wait };
+}
+
+/**
  * Walking starts and stops with the unit, so it hangs off the move callins.
  * Each module instance of legs walks in a thread of its own, all started by
  * the same `StartMoving`, so a leg's phase still comes from its role alone.
@@ -1860,7 +1880,7 @@ const WHEEL_POLL_FRAMES = 3;
 
 /** `COBSCALE`: `CURRENT_SPEED` is elmos a frame times this
  *  (`UnitScript.cpp:1118`). */
-const COBSCALE = 65536;
+export const COBSCALE = 65536;
 
 /**
  * The speed the preview answers `CURRENT_SPEED` with when nothing drives the
