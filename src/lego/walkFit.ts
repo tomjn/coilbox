@@ -24,10 +24,10 @@
  * walkers keep one set of poses and divide every sleep by the unit's speed
  * (`armpw.bos` in BA 15.9.8, `xhammer.bos` in Splinter Faction), so the poses,
  * and with them the stride, stay the same and the period goes as one over the
- * speed. Those scripts read `CURRENT_SPEED` while walking. This bakes the
- * unit's `speed` in when the script is written instead, because the presets
- * are a function of time alone, which is what the preview plays and the
- * parity fixture checks.
+ * speed. This fits the poses to the unit's top `speed` when the script is
+ * written, and the script then goes at the share of it the unit is moving at,
+ * as those scripts do (`WALK_PACE` in `animPresets.ts`, #4486). At top speed
+ * it plays the preset's `track`, which is what the parity fixture checks.
  *
  * The game maker's numbers stay as overrides. A period set by hand keeps that
  * period and fits the swing angle to it, and a swing set by hand keeps that

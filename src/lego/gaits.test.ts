@@ -117,7 +117,9 @@ function run(
   const harness = `
 x_axis, y_axis, z_axis = 1, 2, 3
 SFX = { SHATTER = 1 }
-COB = {}
+-- At top speed, as the preview answers with nothing driving the unit (#4486).
+COB = { CURRENT_SPEED = 29, MAX_SPEED = 75 }
+function GetUnitValue() return 65536 end
 local frame = 0
 local anims = {}
 local threads = {}

@@ -105,7 +105,11 @@ import {
 import { movesInGame } from "../../movement";
 import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
-import { type PlantedFeet, plantedFeet } from "../../plantedFeet";
+import {
+  type PlantedDrive,
+  type PlantedFeet,
+  plantedFeet,
+} from "../../plantedFeet";
 import {
   conversionProblem,
   convertedActionId,
@@ -597,7 +601,7 @@ export function AnimationPanel({
   /** Where the walk the run plays holds each foot, from the same project the
    *  run's script is written from. */
   const plantedNow = useCallback(
-    (events: ScriptEvent[]) =>
+    (events: ScriptEvent[], drive?: PlantedDrive) =>
       plantedFeet(
         soloActionRef.current
           ? soloActionProject(project, soloActionRef.current)
@@ -606,6 +610,7 @@ export function AnimationPanel({
             : project,
         events,
         PREVIEW_FRAMES,
+        drive,
       ),
     [project],
   );
@@ -810,7 +815,10 @@ export function AnimationPanel({
             // own rather than being carried back past it.
             motion: null,
             drive: placement,
-            planted: plantedNow(events),
+            planted: plantedNow(events, {
+              frames: run.frames,
+              maxSpeed: source.motion.speed,
+            }),
           });
           const scene = withWorld(events, null, {
             radius: 0,
@@ -947,7 +955,15 @@ export function AnimationPanel({
         aims: aimsOf(events, driven?.run.frames),
         // A drive really moves the unit, so what it leaves behind stays put.
         motion: driven ? null : motionOf(events, withValues),
-        planted: plantedNow(events),
+        planted: plantedNow(
+          events,
+          driven
+            ? {
+                frames: driven.run.frames,
+                maxSpeed: driven.source.motion.speed,
+              }
+            : undefined,
+        ),
         ...(driven ? { drive: driven.placement } : {}),
         ...(scenario.movingTarget
           ? {
