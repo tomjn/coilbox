@@ -98,4 +98,12 @@ return {
 		defeat = "Місію провалено",
 		undecided = "Місію завершено",
 	},
+	nl = {
+		objectives = "Doelen",
+		secondary = "Secundair",
+		holdHint = "Klik om verder te gaan",
+		victory = "Missie voltooid",
+		defeat = "Missie mislukt",
+		undecided = "Missie beëindigd",
+	},
 }

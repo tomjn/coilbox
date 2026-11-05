@@ -16,6 +16,7 @@ export const LOCALES = [
   "pt-BR",
   "nb",
   "sv",
+  "nl",
   "ja",
   "zh-Hans",
 ] as const;
