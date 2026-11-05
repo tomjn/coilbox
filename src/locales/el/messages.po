@@ -3561,12 +3561,12 @@ msgstr "{keys}: χωρίς αντιστοίχιση"
 #: src/container/names.ts
 #, fuzzy
 msgid "{kind, select, campaign {a campaign for {game}} coilbox_campaign {a coilbox campaign for {game}} preset {a singleplayer preset for {game}} challenge {a challenge for {game}} conquest_challenge {a conquest challenge for {game}} warpath_challenge {a warpath challenge for {game}} setup_pack {a setup pack for {game}} scenario {a scenario for {game}} keymap {a keymap for {game}} blueprint {a base blueprint for {game}} mod_project {a unit tweak project for {game}} module {a unit builder module for {game}} other {an import for {game}}}"
-msgstr "{kind, select, campaign {μια εκστρατεία για το {game}} coilbox_campaign {μια εκστρατεία coilbox για το {game}} preset {μια προρρύθμιση ενός παίκτη για το {game}} challenge {μια πρόκληση για το {game}} conquest_challenge {μια πρόκληση Κατάκτησης για το {game}} warpath_challenge {μια πρόκληση Μονοπατιού του Πολέμου για το {game}} setup_pack {ένα πακέτο ρύθμισης για το {game}} scenario {ένα σενάριο για το {game}} keymap {μια διάταξη πλήκτρων για το {game}} blueprint {ένα σχέδιο βάσης για το {game}} mod_project {ένα έργο τροποποίησης μονάδων για το {game}} module {μια λειτουργική μονάδα συναρμολογητή για το {game}} other {μια εισαγωγή για το {game}}}"
+msgstr "{kind, select, campaign {μια εκστρατεία για το {game}} coilbox_campaign {μια εκστρατεία coilbox για το {game}} preset {μια προρρύθμιση ενός παίκτη για το {game}} challenge {μια πρόκληση για το {game}} conquest_challenge {μια πρόκληση Κατάκτησης για το {game}} warpath_challenge {μια πρόκληση Μονοπατιού Μάχης για το {game}} setup_pack {ένα πακέτο ρύθμισης για το {game}} scenario {ένα σενάριο για το {game}} keymap {μια διάταξη πλήκτρων για το {game}} blueprint {ένα σχέδιο βάσης για το {game}} mod_project {ένα έργο τροποποίησης μονάδων για το {game}} module {μια λειτουργική μονάδα συναρμολογητή για το {game}} other {μια εισαγωγή για το {game}}}"
 
 #: src/container/names.ts
 #, fuzzy
 msgid "{kind, select, campaign {a campaign} coilbox_campaign {a coilbox campaign} preset {a singleplayer preset} challenge {a challenge} conquest_challenge {a conquest challenge} warpath_challenge {a warpath challenge} setup_pack {a setup pack} scenario {a scenario} keymap {a keymap} blueprint {a base blueprint} mod_project {a unit tweak project} module {a unit builder module} other {an import}}"
-msgstr "{kind, select, campaign {μια εκστρατεία} coilbox_campaign {μια εκστρατεία coilbox} preset {μια προρρύθμιση ενός παίκτη} challenge {μια πρόκληση} conquest_challenge {μια πρόκληση Κατάκτησης} warpath_challenge {μια πρόκληση Μονοπατιού του Πολέμου} setup_pack {ένα πακέτο ρύθμισης} scenario {ένα σενάριο} keymap {μια διάταξη πλήκτρων} blueprint {ένα σχέδιο βάσης} mod_project {ένα έργο τροποποίησης μονάδων} module {μια λειτουργική μονάδα συναρμολογητή} other {μια εισαγωγή}}"
+msgstr "{kind, select, campaign {μια εκστρατεία} coilbox_campaign {μια εκστρατεία coilbox} preset {μια προρρύθμιση ενός παίκτη} challenge {μια πρόκληση} conquest_challenge {μια πρόκληση Κατάκτησης} warpath_challenge {μια πρόκληση Μονοπατιού Μάχης} setup_pack {ένα πακέτο ρύθμισης} scenario {ένα σενάριο} keymap {μια διάταξη πλήκτρων} blueprint {ένα σχέδιο βάσης} mod_project {ένα έργο τροποποίησης μονάδων} module {μια λειτουργική μονάδα συναρμολογητή} other {μια εισαγωγή}}"
 
 #: src/hub/publish.ts
 #, fuzzy
@@ -3919,12 +3919,12 @@ msgstr "{MANIFEST_FILE}: τα «{firstName}» και «{secondName}» έχουν
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: \"{locationName}\" is the Warpath goal, so it cannot also have the kind \"{kind}\". Remove the kind, or move the goal."
-msgstr "{MANIFEST_FILE}: το «{locationName}» είναι ο στόχος του Μονοπατιού του Πολέμου, οπότε δεν μπορεί να έχει και το είδος «{kind}». Αφαιρέστε το είδος ή μετακινήστε τον στόχο."
+msgstr "{MANIFEST_FILE}: το «{locationName}» είναι ο στόχος του Μονοπατιού Μάχης, οπότε δεν μπορεί να έχει και το είδος «{kind}». Αφαιρέστε το είδος ή μετακινήστε τον στόχο."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: \"{locationName}\" is the Warpath start, so it cannot also have the kind \"{kind}\". Remove the kind, or move the start."
-msgstr "{MANIFEST_FILE}: το «{locationName}» είναι η αφετηρία του Μονοπατιού του Πολέμου, οπότε δεν μπορεί να έχει και το είδος «{kind}». Αφαιρέστε το είδος ή μετακινήστε την αφετηρία."
+msgstr "{MANIFEST_FILE}: το «{locationName}» είναι η αφετηρία του Μονοπατιού Μάχης, οπότε δεν μπορεί να έχει και το είδος «{kind}». Αφαιρέστε το είδος ή μετακινήστε την αφετηρία."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
@@ -3934,7 +3934,7 @@ msgstr "{MANIFEST_FILE}: το «{name}» έχει σενάριο και μάχη
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: \"{name}\" has the Warpath kind \"{kind}\", which Warpath does not know. Use one of: {kinds}."
-msgstr "{MANIFEST_FILE}: το «{name}» έχει το είδος Μονοπατιού του Πολέμου «{kind}», που το Μονοπάτι του Πολέμου δεν γνωρίζει. Χρησιμοποιήστε ένα από: {kinds}."
+msgstr "{MANIFEST_FILE}: το «{name}» έχει το είδος Μονοπατιού Μάχης «{kind}», που το Μονοπάτι Μάχης δεν γνωρίζει. Χρησιμοποιήστε ένα από: {kinds}."
 
 #: src/conquest/handmade/read.ts
 #, fuzzy
@@ -4239,17 +4239,17 @@ msgstr "{MANIFEST_FILE}: το id «{mapId}» δεν ταιριάζει με το
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: the Warpath start and goal are both \"{sameName}\". They must be different locations."
-msgstr "{MANIFEST_FILE}: η αφετηρία και ο στόχος του Μονοπατιού του Πολέμου είναι και τα δύο «{sameName}». Πρέπει να είναι διαφορετικές τοποθεσίες."
+msgstr "{MANIFEST_FILE}: η αφετηρία και ο στόχος του Μονοπατιού Μάχης είναι και τα δύο «{sameName}». Πρέπει να είναι διαφορετικές τοποθεσίες."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: warpath has a goal and no start. Warpath needs both. Add warpath.start, or remove warpath.goal to offer the map in Conquest only."
-msgstr "{MANIFEST_FILE}: το warpath έχει στόχο αλλά όχι αφετηρία. Το Μονοπάτι του Πολέμου χρειάζεται και τα δύο. Προσθέστε warpath.start ή αφαιρέστε το warpath.goal για να προσφέρεται ο χάρτης μόνο στην Κατάκτηση."
+msgstr "{MANIFEST_FILE}: το warpath έχει στόχο αλλά όχι αφετηρία. Το Μονοπάτι Μάχης χρειάζεται και τα δύο. Προσθέστε warpath.start ή αφαιρέστε το warpath.goal για να προσφέρεται ο χάρτης μόνο στην Κατάκτηση."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: warpath has a start and no goal. Warpath needs both. Add warpath.goal, or remove warpath.start to offer the map in Conquest only."
-msgstr "{MANIFEST_FILE}: το warpath έχει αφετηρία αλλά όχι στόχο. Το Μονοπάτι του Πολέμου χρειάζεται και τα δύο. Προσθέστε warpath.goal ή αφαιρέστε το warpath.start για να προσφέρεται ο χάρτης μόνο στην Κατάκτηση."
+msgstr "{MANIFEST_FILE}: το warpath έχει αφετηρία αλλά όχι στόχο. Το Μονοπάτι Μάχης χρειάζεται και τα δύο. Προσθέστε warpath.goal ή αφαιρέστε το warpath.start για να προσφέρεται ο χάρτης μόνο στην Κατάκτηση."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
@@ -4629,7 +4629,7 @@ msgstr "{missions, plural, one {Ολοκληρώθηκε, # αποστολή} ot
 #: src/hub/api.ts
 #, fuzzy
 msgid "{mode, select, conquest {Conquest challenge} warpath {Warpath challenge} other {{label} challenge}}"
-msgstr "{mode, select, conquest {Πρόκληση Κατάκτησης} warpath {Πρόκληση Μονοπατιού του Πολέμου} other {Πρόκληση {label}}}"
+msgstr "{mode, select, conquest {Πρόκληση Κατάκτησης} warpath {Πρόκληση Μονοπατιού Μάχης} other {Πρόκληση {label}}}"
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -4837,7 +4837,7 @@ msgstr "{n, plural, one {# σενάριο} other {# σενάρια}}"
 #: src/hub/removePlan.ts
 #, fuzzy
 msgid "{n, plural, one {# warpath run} other {# warpath runs}}"
-msgstr "{n, plural, one {# πορεία Μονοπατιού του Πολέμου} other {# πορείες Μονοπατιού του Πολέμου}}"
+msgstr "{n, plural, one {# πορεία Μονοπατιού Μάχης} other {# πορείες Μονοπατιού Μάχης}}"
 
 #: src/content/pages/components/GatherReplaysButton.tsx
 #, fuzzy
@@ -6056,12 +6056,12 @@ msgstr "{scenarioName} ως mission.lua"
 #: src/campaign/units.ts
 #, fuzzy
 msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {Λείπει το αντίγραφο του {unitLabel} αυτής της εκστρατείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} conquest {Λείπει το αντίγραφο του {unitLabel} αυτής της Κατάκτησης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} warpath {Λείπει το αντίγραφο του {unitLabel} αυτού του Μονοπατιού του Πολέμου. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} other {Λείπει το αντίγραφο του {unitLabel} αυτής της πορείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.}}"
+msgstr "{scope, select, campaign {Λείπει το αντίγραφο του {unitLabel} αυτής της εκστρατείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} conquest {Λείπει το αντίγραφο του {unitLabel} αυτής της Κατάκτησης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} warpath {Λείπει το αντίγραφο του {unitLabel} αυτού του Μονοπατιού Μάχης. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.} other {Λείπει το αντίγραφο του {unitLabel} αυτής της πορείας. Συνδέστε το ξανά από τον συναρμολογητή μονάδων.}}"
 
 #: src/campaign/units.ts
 #, fuzzy
 msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {Το id αυτής της εκστρατείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} conquest {Το id αυτής της Κατάκτησης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} warpath {Το id αυτού του Μονοπατιού του Πολέμου, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες του δεν μπορούν να φορτωθούν.} other {Το id αυτής της πορείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.}}"
+msgstr "{scope, select, campaign {Το id αυτής της εκστρατείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} conquest {Το id αυτής της Κατάκτησης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.} warpath {Το id αυτού του Μονοπατιού Μάχης, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες του δεν μπορούν να φορτωθούν.} other {Το id αυτής της πορείας, {ownerId}, δεν μπορεί να είναι όνομα φακέλου παιχνιδιού, οπότε οι μονάδες της δεν μπορούν να φορτωθούν.}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -6441,7 +6441,7 @@ msgstr "{starts, plural, one {# παίκτης} other {# παίκτες}}"
 #: src/content/libraryMaps.ts
 #, fuzzy
 msgid "{starts, plural, one {# start} other {# starts}}"
-msgstr "{starts, plural, one {# εκκίνηση} other {# εκκινήσεις}}"
+msgstr "{starts, plural, one {# θέση} other {# θέσεις}}"
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -7410,7 +7410,7 @@ msgstr "{unreadableCount, plural, one {Σε αυτό το αρχείο υπάρ�
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "{unreadableCount, plural, one {# warpath run could not be read. It is kept in the file and has not been changed.} other {# warpath runs could not be read. They are kept in the file and have not been changed.}}"
-msgstr "{unreadableCount, plural, one {# πορεία Μονοπατιού του Πολέμου δεν ήταν δυνατό να διαβαστεί. Διατηρείται στο αρχείο και δεν έχει αλλάξει.} other {# πορείες Μονοπατιού του Πολέμου δεν ήταν δυνατό να διαβαστούν. Διατηρούνται στο αρχείο και δεν έχουν αλλάξει.}}"
+msgstr "{unreadableCount, plural, one {# πορεία Μονοπατιού Μάχης δεν ήταν δυνατό να διαβαστεί. Διατηρείται στο αρχείο και δεν έχει αλλάξει.} other {# πορείες Μονοπατιού Μάχης δεν ήταν δυνατό να διαβαστούν. Διατηρούνται στο αρχείο και δεν έχουν αλλάξει.}}"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -8753,7 +8753,7 @@ msgstr "Μια δική της συνάρτηση"
 #: src/content/pages/components/AiRecordSection.tsx
 #, fuzzy
 msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
-msgstr "Ένα παιχνίδι εναντίον πολλών διαφορετικών AI εμφανίζεται στη γραμμή του καθενός. Τα παιχνίδια από εκστρατεία, Κατάκτηση και Μονοπάτι του Πολέμου δεν μετράνε."
+msgstr "Ένα παιχνίδι εναντίον πολλών διαφορετικών AI εμφανίζεται στη γραμμή του καθενός. Τα παιχνίδια από εκστρατεία, Κατάκτηση και Μονοπάτι Μάχης δεν μετράνε."
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -9490,12 +9490,12 @@ msgstr "Μια ψηφοφορία σας αναφέρει"
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "a Warpath run"
-msgstr "μια πορεία Μονοπατιού του Πολέμου"
+msgstr "μια πορεία Μονοπατιού Μάχης"
 
 #: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "A Warpath run cannot get from the start {start} to the goal {goal}. Join them with a crossing or a road in {MANIFEST_FILE}, or paint the land between them so it touches."
-msgstr "Μια πορεία Μονοπατιού του Πολέμου δεν μπορεί να φτάσει από την αφετηρία {start} στον στόχο {goal}. Ενώστε τα με πέρασμα ή δρόμο στο {MANIFEST_FILE}, ή βάψτε την ξηρά ανάμεσά τους ώστε να εφάπτεται."
+msgstr "Μια πορεία Μονοπατιού Μάχης δεν μπορεί να φτάσει από την αφετηρία {start} στον στόχο {goal}. Ενώστε τα με πέρασμα ή δρόμο στο {MANIFEST_FILE}, ή βάψτε την ξηρά ανάμεσά τους ώστε να εφάπτεται."
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -9586,7 +9586,7 @@ msgstr "Εγκατάλειψη αυτής της εκστρατείας"
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Abandon warpath"
-msgstr "Εγκατάλειψη Μονοπατιού του Πολέμου"
+msgstr "Εγκατάλειψη Μονοπατιού Μάχης"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
@@ -10570,7 +10570,7 @@ msgstr "Όλες οι εκστρατείες φορτώθηκαν"
 #: src/lego/pages/components/CategoryMenu.tsx
 #, fuzzy
 msgid "All categories"
-msgstr "Όλες οι κατηγορίες"
+msgstr "Κατηγορία: όλες"
 
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
@@ -10644,7 +10644,7 @@ msgstr "Όλες οι εντολές"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "All origins"
-msgstr "Όλες οι προελεύσεις"
+msgstr "Κάθε προέλευση"
 
 #: src/lego/pages/components/PartFilters.tsx
 #, fuzzy
@@ -10680,7 +10680,7 @@ msgstr "Όλα τα σενάρια φορτώθηκαν"
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "All servers"
-msgstr "Όλοι οι διακομιστές"
+msgstr "Κάθε διακομιστής"
 
 #: src/general/index.ts
 #, fuzzy
@@ -11362,7 +11362,7 @@ msgstr "Κάθε δική σας εκκίνηση: μια αψιμαχία, μι
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Any length"
-msgstr "Οποιαδήποτε διάρκεια"
+msgstr "Κάθε διάρκεια"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -11417,7 +11417,7 @@ msgstr "Όποιος επικολλήσει αυτόν τον κωδικό στ�
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
-msgstr "Όποιος επικολλήσει αυτόν τον κωδικό στην Εισαγωγή πρόκλησης (χρειάζεται το ίδιο παιχνίδι εγκατεστημένο) παίζει το ίδιο ακριβώς Μονοπάτι του Πολέμου, οπότε τα αποτελέσματα είναι άμεσα συγκρίσιμα."
+msgstr "Όποιος επικολλήσει αυτόν τον κωδικό στην Εισαγωγή πρόκλησης (χρειάζεται το ίδιο παιχνίδι εγκατεστημένο) παίζει το ίδιο ακριβώς Μονοπάτι Μάχης, οπότε τα αποτελέσματα είναι άμεσα συγκρίσιμα."
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -12278,18 +12278,18 @@ msgstr "Πίσω στο πλέγμα μονάδων"
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Back to warpath"
-msgstr "Πίσω στο Μονοπάτι του Πολέμου"
+msgstr "Πίσω στο Μονοπάτι Μάχης"
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Back to warpath hub"
-msgstr "Πίσω στο κέντρο του Μονοπατιού του Πολέμου"
+msgstr "Πίσω στο κέντρο του Μονοπατιού Μάχης"
 
 #: src/content/replayProvenanceLink.ts
 #, fuzzy
 msgid "Back to warpath run"
-msgstr "Πίσω στην πορεία Μονοπατιού του Πολέμου"
+msgstr "Πίσω στην πορεία Μονοπατιού Μάχης"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -12834,7 +12834,7 @@ msgstr "Έναρξη Κατάκτησης"
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "Begin warpath"
-msgstr "Έναρξη Μονοπατιού του Πολέμου"
+msgstr "Έναρξη Μονοπατιού Μάχης"
 
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
@@ -14778,7 +14778,7 @@ msgstr "Συνομιλία"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Chat highlights"
-msgstr "Επισημάνσεις συνομιλίας"
+msgstr "Επισημάνσεις"
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -14790,7 +14790,7 @@ msgstr "Αρχείο συνομιλίας"
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "Chat logs"
-msgstr "Ιστορικό συνομιλιών"
+msgstr "Συνομιλίες"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -15205,7 +15205,7 @@ msgstr "Επιλογή εικόνας ή βίντεο"
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Choose in-game (start boxes)"
-msgstr "Επιλογή μέσα στο παιχνίδι (περιοχές εκκίνησης)"
+msgstr "Στο παιχνίδι (περιοχές εκκίνησης)"
 
 #: src/play/presetParts.ts
 #, fuzzy
@@ -18344,7 +18344,7 @@ msgstr "Αθροιστικό"
 #: src/home/zones/SuggestedMap.tsx
 #, fuzzy
 msgid "Curated map"
-msgstr "Επιλεγμένος χάρτης"
+msgstr "Επιλεγμένος"
 
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
@@ -18579,7 +18579,7 @@ msgstr "Ημερομηνία"
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Date created"
-msgstr "Ημερομηνία δημιουργίας"
+msgstr "Δημιουργία"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/DaysField.tsx
@@ -18858,7 +18858,7 @@ msgstr "Ήττα"
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "Defeat costs health, not the warpath — you retreat and press on."
-msgstr "Η ήττα κοστίζει πόντους ζωής, όχι το Μονοπάτι του Πολέμου — υποχωρείτε και συνεχίζετε."
+msgstr "Η ήττα κοστίζει πόντους ζωής, όχι το Μονοπάτι Μάχης — υποχωρείτε και συνεχίζετε."
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
@@ -20582,7 +20582,7 @@ msgstr "Κάθε ομάδα εμφανίζεται στην αριθμημένη
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Earlier Warpath runs"
-msgstr "Προηγούμενες πορείες Μονοπατιού του Πολέμου"
+msgstr "Προηγούμενες πορείες Μονοπατιού Μάχης"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -21155,7 +21155,7 @@ msgstr "κλειδί μηχανής"
 #: src/play/index.ts
 #, fuzzy
 msgid "Engine log"
-msgstr "Αρχείο καταγραφής μηχανής"
+msgstr "Καταγραφή μηχανής"
 
 #: src/multiplayer/battle/contentBlock.ts
 #, fuzzy
@@ -22157,7 +22157,7 @@ msgstr "Προτεινόμενα"
 #: src/content/libraryGames.ts
 #, fuzzy
 msgid "Featured first"
-msgstr "Πρώτα τα προτεινόμενα"
+msgstr "Προτεινόμενα"
 
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
@@ -25299,7 +25299,7 @@ msgstr "Πόσο μακριά φτάνει. Η μηχανή περιορίζει
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath."
-msgstr "Πόσο έχετε διασχίσει τον χάρτη. Φτάστε και νικήστε τον πολέμαρχο στην άλλη άκρη για να κερδίσετε το Μονοπάτι του Πολέμου."
+msgstr "Πόσο έχετε διασχίσει τον χάρτη. Φτάστε και νικήστε τον πολέμαρχο στην άλλη άκρη για να κερδίσετε το Μονοπάτι Μάχης."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27198,7 +27198,7 @@ msgstr "Κρατήστε αυτή τη διάταξη πλήκτρων με έν
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer."
-msgstr "Να μη χρησιμοποιείται αυτός ο χάρτης σε παραγόμενα Μονοπάτια του Πολέμου και Κατακτήσεις. Παραμένει διαθέσιμος σε αψιμαχίες και παιχνίδια πολλών παικτών."
+msgstr "Να μη χρησιμοποιείται αυτός ο χάρτης σε παραγόμενα Μονοπάτια Μάχης και Κατακτήσεις. Παραμένει διαθέσιμος σε αψιμαχίες και παιχνίδια πολλών παικτών."
 
 #: src/lego/pages/components/WorthSection.tsx
 #, fuzzy
@@ -27720,7 +27720,7 @@ msgstr "Λιγότερο"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Least {metricName}"
-msgstr "Λιγότερο {metricName}"
+msgstr "Λιγότερο: {metricName}"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/BattleRow.tsx
@@ -29800,7 +29800,7 @@ msgstr "μέταλλο ανά δευτερόλεπτο"
 #: src/content/metricLabels.ts
 #, fuzzy
 msgid "Metal produced"
-msgstr "Μέταλλο που παρήχθη"
+msgstr "Μέταλλο που παράχθηκε"
 
 #: src/content/metricLabels.ts
 #, fuzzy
@@ -31361,7 +31361,7 @@ msgstr "Νέα μεταβλητή"
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "New warpath"
-msgstr "Νέο Μονοπάτι του Πολέμου"
+msgstr "Νέο Μονοπάτι Μάχης"
 
 #: src/content/pages/EnginesSection.tsx
 #, fuzzy
@@ -31378,7 +31378,7 @@ msgstr "Νεότερα"
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Newest first"
-msgstr "Νεότερα πρώτα"
+msgstr "Νεότερα"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -31456,7 +31456,7 @@ msgstr "Δεν έχουν εμφανιστεί λογαριασμοί σε αυ�
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "No active warpath."
-msgstr "Κανένα ενεργό Μονοπάτι του Πολέμου."
+msgstr "Κανένα ενεργό Μονοπάτι Μάχης."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -32983,7 +32983,7 @@ msgstr "Καμία προρρύθμιση αψιμαχίας ακόμη. Ρυθ�
 #: src/content/pages/components/AiRecordSection.tsx
 #, fuzzy
 msgid "No skirmishes against AI yet. Games from campaign, Conquest and Warpath are not counted here."
-msgstr "Καμία αψιμαχία εναντίον AI ακόμη. Τα παιχνίδια από εκστρατεία, Κατάκτηση και Μονοπάτι του Πολέμου δεν μετρούν εδώ."
+msgstr "Καμία αψιμαχία εναντίον AI ακόμη. Τα παιχνίδια από εκστρατεία, Κατάκτηση και Μονοπάτι Μάχης δεν μετρούν εδώ."
 
 #: src/content/pages/components/GameSourcesTab.tsx
 #, fuzzy
@@ -33258,7 +33258,7 @@ msgstr "Κανένα αρχείο βίντεο δεν ταίριαξε στην 
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "No warpath in progress. Start a new warpath to begin."
-msgstr "Κανένα Μονοπάτι του Πολέμου σε εξέλιξη. Ξεκινήστε ένα νέο για να αρχίσετε."
+msgstr "Κανένα Μονοπάτι Μάχης σε εξέλιξη. Ξεκινήστε ένα νέο για να αρχίσετε."
 
 #: src/content/pages/MapsPage.tsx
 #, fuzzy
@@ -34747,27 +34747,27 @@ msgstr "ok · {when} · {took}"
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than 3 months"
-msgstr "Παλαιότερα από 3 μήνες"
+msgstr "Άνω των 3 μηνών"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than 6 months"
-msgstr "Παλαιότερα από 6 μήνες"
+msgstr "Άνω των 6 μηνών"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than a month"
-msgstr "Παλαιότερα από έναν μήνα"
+msgstr "Άνω του μήνα"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than a week"
-msgstr "Παλαιότερα από μία εβδομάδα"
+msgstr "Άνω της εβδομάδας"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than a year"
-msgstr "Παλαιότερα από έναν χρόνο"
+msgstr "Άνω του έτους"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -35494,12 +35494,12 @@ msgstr "Άνοιγμα της καρτέλας Script"
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Open Warpath"
-msgstr "Άνοιγμα Μονοπατιού του Πολέμου"
+msgstr "Άνοιγμα Μονοπατιού Μάχης"
 
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open Warpath."
-msgstr "Άνοιγμα Μονοπατιού του Πολέμου."
+msgstr "Άνοιγμα Μονοπατιού Μάχης."
 
 #: src/multiplayer/battle/RoomWidgetsWarning.tsx
 #, fuzzy
@@ -36331,7 +36331,7 @@ msgstr "Επικολλήστε έναν κωδικό πρόκλησης που �
 #: src/runlite/pages/components/ImportChallengeForm.tsx
 #, fuzzy
 msgid "Paste a challenge code shared by another player to generate the identical warpath on your own install."
-msgstr "Επικολλήστε έναν κωδικό πρόκλησης που κοινοποίησε άλλος παίκτης για να δημιουργηθεί το ίδιο ακριβώς Μονοπάτι του Πολέμου στη δική σας εγκατάσταση."
+msgstr "Επικολλήστε έναν κωδικό πρόκλησης που κοινοποίησε άλλος παίκτης για να δημιουργηθεί το ίδιο ακριβώς Μονοπάτι Μάχης στη δική σας εγκατάσταση."
 
 #: src/challenge/ChallengeCodeInput.tsx
 #, fuzzy
@@ -36341,7 +36341,7 @@ msgstr "Επικολλήστε κωδικό πρόκλησης…"
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
 msgid "Paste a coilbox link, a code, or an exported file's contents…"
-msgstr "Επικολλήστε σύνδεσμο coilbox, κωδικό ή τα περιεχόμενα ενός εξαγόμενου αρχείου…"
+msgstr "Επικολλήστε σύνδεσμο coilbox, κωδικό ή περιεχόμενα αρχείου…"
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -41327,7 +41327,7 @@ msgstr "Αποθήκευση αρχείου από την αρχειοθήκη"
 #: src/play/pages/SavegamesPage.tsx
 #, fuzzy
 msgid "Save games"
-msgstr "Αποθηκευμένα παιχνίδια"
+msgstr "Αποθηκεύσεις"
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -45130,17 +45130,17 @@ msgstr "Ξεκινήστε ένα έργο στις Τροποποιήσεις �
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Start a skirmish, run a campaign, or pick up a Warpath run."
-msgstr "Ξεκινήστε μια αψιμαχία, παίξτε μια εκστρατεία ή συνεχίστε μια πορεία στο Μονοπάτι του Πολέμου."
+msgstr "Ξεκινήστε μια αψιμαχία, παίξτε μια εκστρατεία ή συνεχίστε μια πορεία στο Μονοπάτι Μάχης."
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Start a warpath"
-msgstr "Έναρξη Μονοπατιού του Πολέμου"
+msgstr "Έναρξη Μονοπατιού Μάχης"
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
 msgid "Start a warpath run"
-msgstr "Έναρξη πορείας στο Μονοπάτι του Πολέμου"
+msgstr "Έναρξη πορείας στο Μονοπάτι Μάχης"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -47207,7 +47207,7 @@ msgstr "Η μηχανή δεν μπορεί να τα επαναφορτώσει
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "The engine could not read your games, so this warpath cannot check for <0>{name}</0>. Open <1>Content > Games</1> to see what it did find, or pick another engine in Settings."
-msgstr "Η μηχανή δεν μπόρεσε να διαβάσει τα παιχνίδια σας, οπότε αυτό το Μονοπάτι του Πολέμου δεν μπορεί να ελέγξει για το <0>{name}</0>. Ανοίξτε <1>Περιεχόμενο > Παιχνίδια</1> για να δείτε τι βρήκε ή επιλέξτε άλλη μηχανή στις Ρυθμίσεις."
+msgstr "Η μηχανή δεν μπόρεσε να διαβάσει τα παιχνίδια σας, οπότε αυτό το Μονοπάτι Μάχης δεν μπορεί να ελέγξει για το <0>{name}</0>. Ανοίξτε <1>Περιεχόμενο > Παιχνίδια</1> για να δείτε τι βρήκε ή επιλέξτε άλλη μηχανή στις Ρυθμίσεις."
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -47836,12 +47836,12 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση του χειροποί
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "The hand-made map \"{mapTitle}\" has changed since this warpath began, and the run no longer fits it."
-msgstr "Ο χειροποίητος χάρτης «{mapTitle}» έχει αλλάξει από τότε που ξεκίνησε αυτό το Μονοπάτι του Πολέμου, και η πορεία δεν ταιριάζει πλέον σε αυτόν."
+msgstr "Ο χειροποίητος χάρτης «{mapTitle}» έχει αλλάξει από τότε που ξεκίνησε αυτό το Μονοπάτι Μάχης, και η πορεία δεν ταιριάζει πλέον σε αυτόν."
 
 #: src/runlite/handmadeMap.ts
 #, fuzzy
 msgid "The hand-made map \"{mapTitle}\" has no Warpath start and goal, so it can only be played in Conquest."
-msgstr "Ο χειροποίητος χάρτης «{mapTitle}» δεν έχει αφετηρία και προορισμό για το Μονοπάτι του Πολέμου, οπότε μπορεί να παιχτεί μόνο στην Κατάκτηση."
+msgstr "Ο χειροποίητος χάρτης «{mapTitle}» δεν έχει αφετηρία και προορισμό για το Μονοπάτι Μάχης, οπότε μπορεί να παιχτεί μόνο στην Κατάκτηση."
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -48327,7 +48327,7 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση του χάρτη, οπ
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
-msgstr "Ο χάρτης καθορίζει τη διάρκεια αυτού του Μονοπατιού του Πολέμου. Αυτό το μήκος διασχίζει χάρτη με {landLocationCount} {landLocationNoun}."
+msgstr "Ο χάρτης καθορίζει τη διάρκεια αυτού του Μονοπατιού Μάχης. Αυτό το μήκος διασχίζει χάρτη με {landLocationCount} {landLocationNoun}."
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -48337,7 +48337,7 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση των φακέλων �
 #: src/runlite/mapRun.ts
 #, fuzzy
 msgid "The map for this warpath could not be generated."
-msgstr "Δεν ήταν δυνατή η δημιουργία του χάρτη για αυτό το Μονοπάτι του Πολέμου."
+msgstr "Δεν ήταν δυνατή η δημιουργία του χάρτη για αυτό το Μονοπάτι Μάχης."
 
 #: src/scenario/pages/components/ShortcutsList.tsx
 #, fuzzy
@@ -49076,7 +49076,7 @@ msgstr "Το δεύτερο λεπτό πρέπει να είναι μετά τ�
 #: src/runlite/pages/components/RunEndScreen.tsx
 #, fuzzy
 msgid "The sector warlord is broken. The warpath is yours."
-msgstr "Ο πολέμαρχος του τομέα συντρίφτηκε. Το Μονοπάτι του Πολέμου είναι δικό σας."
+msgstr "Ο πολέμαρχος του τομέα συντρίφτηκε. Το Μονοπάτι Μάχης είναι δικό σας."
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -49596,12 +49596,12 @@ msgstr "Η αναμονή πριν μπορέσει η μονάδα να ρίξ�
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "The warpath was not abandoned. {reason}"
-msgstr "Το Μονοπάτι του Πολέμου δεν εγκαταλείφθηκε. {reason}"
+msgstr "Το Μονοπάτι Μάχης δεν εγκαταλείφθηκε. {reason}"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The warpath was not started. {reason}"
-msgstr "Το Μονοπάτι του Πολέμου δεν ξεκίνησε. {reason}"
+msgstr "Το Μονοπάτι Μάχης δεν ξεκίνησε. {reason}"
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -50078,7 +50078,7 @@ msgstr "Αυτός ο κωδικός πρόκλησης δημιουργήθηκ
 #: src/runlite/handmadeMap.ts
 #, fuzzy
 msgid "This challenge is a Warpath run on the hand-made map \"{mapTitle}\", and the copy installed here has no Warpath start and goal, so the challenge was not started."
-msgstr "Αυτή η πρόκληση είναι πορεία στο Μονοπάτι του Πολέμου στον χειροποίητο χάρτη «{mapTitle}», και το αντίγραφο που είναι εγκατεστημένο εδώ δεν έχει αφετηρία και προορισμό για το Μονοπάτι του Πολέμου, οπότε η πρόκληση δεν ξεκίνησε."
+msgstr "Αυτή η πρόκληση είναι πορεία στο Μονοπάτι Μάχης στον χειροποίητο χάρτη «{mapTitle}», και το αντίγραφο που είναι εγκατεστημένο εδώ δεν έχει αφετηρία και προορισμό για το Μονοπάτι Μάχης, οπότε η πρόκληση δεν ξεκίνησε."
 
 #: src/runlite/challenge.ts
 #, fuzzy
@@ -50193,7 +50193,7 @@ msgstr "Αυτό διαγράφει τον χάρτη από τον υπολογ
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
-msgstr "Αυτό διαγράφει οριστικά το Μονοπάτι του Πολέμου, μαζί με την πρόοδό του ({progressText}). Δεν αναιρείται."
+msgstr "Αυτό διαγράφει οριστικά το Μονοπάτι Μάχης, μαζί με την πρόοδό του ({progressText}). Δεν αναιρείται."
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -51534,27 +51534,27 @@ msgstr "Αυτή η τιμή έχει αλλάξει από την προεπι�
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "this warpath"
-msgstr "αυτό το Μονοπάτι του Πολέμου"
+msgstr "αυτό το Μονοπάτι Μάχης"
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "This warpath is drawn in columns until the map is back as it was, and it can still be played."
-msgstr "Αυτό το Μονοπάτι του Πολέμου σχεδιάζεται σε στήλες μέχρι ο χάρτης να επανέλθει όπως ήταν, και μπορεί ακόμη να παιχτεί."
+msgstr "Αυτό το Μονοπάτι Μάχης σχεδιάζεται σε στήλες μέχρι ο χάρτης να επανέλθει όπως ήταν, και μπορεί ακόμη να παιχτεί."
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "This warpath needs the game <0>{name}</0>, which is not installed and has no download coilbox knows about. Add it in <1>Content > Games</1>."
-msgstr "Αυτό το Μονοπάτι του Πολέμου χρειάζεται το παιχνίδι <0>{name}</0>, που δεν είναι εγκατεστημένο και δεν έχει λήψη που να γνωρίζει το coilbox. Προσθέστε το στο <1>Περιεχόμενο > Παιχνίδια</1>."
+msgstr "Αυτό το Μονοπάτι Μάχης χρειάζεται το παιχνίδι <0>{name}</0>, που δεν είναι εγκατεστημένο και δεν έχει λήψη που να γνωρίζει το coilbox. Προσθέστε το στο <1>Περιεχόμενο > Παιχνίδια</1>."
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
-msgstr "Αυτό το Μονοπάτι του Πολέμου χρειάζεται το παιχνίδι <0>{name}</0>, που δεν είναι εγκατεστημένο."
+msgstr "Αυτό το Μονοπάτι Μάχης χρειάζεται το παιχνίδι <0>{name}</0>, που δεν είναι εγκατεστημένο."
 
 #: src/lego/playerLimit.ts
 #, fuzzy
 msgid "This warpath's units belong to {side}, so you can build little or nothing on another faction."
-msgstr "Οι μονάδες αυτού του Μονοπατιού του Πολέμου ανήκουν στη φατρία {side}, οπότε μπορείτε να κατασκευάσετε λίγα ή τίποτα σε άλλη φατρία."
+msgstr "Οι μονάδες αυτού του Μονοπατιού Μάχης ανήκουν στη φατρία {side}, οπότε μπορείτε να κατασκευάσετε λίγα ή τίποτα σε άλλη φατρία."
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -52965,7 +52965,7 @@ msgstr "Έργα τροποποιήσεων μονάδων"
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Unit tweaks"
-msgstr "Τροποποιήσεις μονάδων"
+msgstr "Τροποποιήσεις"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -53190,7 +53190,7 @@ msgstr "Άγνωστο πεδίο «{identifier}». Δοκιμάστε hp, speed
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Άγνωστη προέλευση"
+msgstr "Άγνωστη"
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -54224,7 +54224,7 @@ msgstr "Προειδοποιήσεις"
 #: src/play/pages/components/GameChoiceOffer.tsx
 #, fuzzy
 msgid "warpath"
-msgstr "Μονοπάτι του Πολέμου"
+msgstr "Μονοπάτι Μάχης"
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -54233,54 +54233,54 @@ msgstr "Μονοπάτι του Πολέμου"
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath"
-msgstr "Μονοπάτι του Πολέμου"
+msgstr "Μονοπάτι Μάχης"
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Warpath and Galactic Conquest"
-msgstr "Μονοπάτι του Πολέμου και Γαλαξιακή Κατάκτηση"
+msgstr "Μονοπάτι Μάχης και Γαλαξιακή Κατάκτηση"
 
 #: src/play/PlayProvider.tsx
 #, fuzzy
 msgid "Warpath battle"
-msgstr "Μάχη Μονοπατιού του Πολέμου"
+msgstr "Μάχη Μονοπατιού Μάχης"
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath complete"
-msgstr "Το Μονοπάτι του Πολέμου ολοκληρώθηκε"
+msgstr "Το Μονοπάτι Μάχης ολοκληρώθηκε"
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath ended"
-msgstr "Το Μονοπάτι του Πολέμου τελείωσε"
+msgstr "Το Μονοπάτι Μάχης τελείωσε"
 
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath in progress"
-msgstr "Μονοπάτι του Πολέμου σε εξέλιξη"
+msgstr "Μονοπάτι Μάχης σε εξέλιξη"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "warpath records"
-msgstr "καταγραφές Μονοπατιού του Πολέμου"
+msgstr "καταγραφές Μονοπατιού Μάχης"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "Warpath records could not be read. Only the standard options are offered. The file has not been changed. {metaError}"
-msgstr "Δεν ήταν δυνατή η ανάγνωση των καταγραφών Μονοπατιού του Πολέμου. Προσφέρονται μόνο οι τυπικές επιλογές. Το αρχείο δεν άλλαξε. {metaError}"
+msgstr "Δεν ήταν δυνατή η ανάγνωση των καταγραφών Μονοπατιού Μάχης. Προσφέρονται μόνο οι τυπικές επιλογές. Το αρχείο δεν άλλαξε. {metaError}"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Warpath records could not be read. Warpath is not shown. {error}"
-msgstr "Δεν ήταν δυνατή η ανάγνωση των καταγραφών Μονοπατιού του Πολέμου. Το Μονοπάτι του Πολέμου δεν εμφανίζεται. {error}"
+msgstr "Δεν ήταν δυνατή η ανάγνωση των καταγραφών Μονοπατιού Μάχης. Το Μονοπάτι Μάχης δεν εμφανίζεται. {error}"
 
 #: src/home/continue.ts
 #, fuzzy
 msgid "Warpath run"
-msgstr "Πορεία στο Μονοπάτι του Πολέμου"
+msgstr "Πορεία στο Μονοπάτι Μάχης"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -56135,7 +56135,7 @@ msgstr "Έχετε την τελευταία έκδοση του παιχνιδ�
 #: src/challenge/SubstitutedMapNote.tsx
 #, fuzzy
 msgid "You have this map, but it is hidden from warpath and galactic conquest."
-msgstr "Έχετε αυτόν τον χάρτη, αλλά είναι κρυμμένος από το Μονοπάτι του Πολέμου και τη Γαλαξιακή Κατάκτηση."
+msgstr "Έχετε αυτόν τον χάρτη, αλλά είναι κρυμμένος από το Μονοπάτι Μάχης και τη Γαλαξιακή Κατάκτηση."
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy
@@ -56429,7 +56429,7 @@ msgstr "Τα στατιστικά σας"
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Your progress in each game. It is read from your campaigns, Conquests, Warpath runs and replays, and nothing here can be changed."
-msgstr "Η πρόοδός σας σε κάθε παιχνίδι. Διαβάζεται από τις εκστρατείες, τις Κατακτήσεις, τις πορείες στο Μονοπάτι του Πολέμου και τις επαναλήψεις σας, και τίποτα εδώ δεν μπορεί να αλλάξει."
+msgstr "Η πρόοδός σας σε κάθε παιχνίδι. Διαβάζεται από τις εκστρατείες, τις Κατακτήσεις, τις πορείες στο Μονοπάτι Μάχης και τις επαναλήψεις σας, και τίποτα εδώ δεν μπορεί να αλλάξει."
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -56500,7 +56500,7 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση των ρυθμίσεώ
 #: src/runlite/pages/components/RunEndScreen.tsx
 #, fuzzy
 msgid "Your ship gave out. The warpath is over."
-msgstr "Το σκάφος σας κατέρρευσε. Το Μονοπάτι του Πολέμου τελείωσε."
+msgstr "Το σκάφος σας κατέρρευσε. Το Μονοπάτι Μάχης τελείωσε."
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
@@ -56515,17 +56515,17 @@ msgstr "Η μονάδα σας"
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Your warpath ends when this reaches zero. Losing a battle costs hull — you retreat and press on — while events and depots can restore it."
-msgstr "Το Μονοπάτι του Πολέμου τελειώνει όταν αυτό φτάσει στο μηδέν. Μια χαμένη μάχη κοστίζει θωράκιση σκάφους — υποχωρείτε και συνεχίζετε — ενώ συμβάντα και αποθήκες μπορούν να την αποκαταστήσουν."
+msgstr "Το Μονοπάτι Μάχης τελειώνει όταν αυτό φτάσει στο μηδέν. Μια χαμένη μάχη κοστίζει θωράκιση σκάφους — υποχωρείτε και συνεχίζετε — ενώ συμβάντα και αποθήκες μπορούν να την αποκαταστήσουν."
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Your warpath runs could not be read. Nothing has been changed. {loadError}"
-msgstr "Δεν ήταν δυνατή η ανάγνωση των πορειών σας στο Μονοπάτι του Πολέμου. Δεν άλλαξε τίποτα. {loadError}"
+msgstr "Δεν ήταν δυνατή η ανάγνωση των πορειών σας στο Μονοπάτι Μάχης. Δεν άλλαξε τίποτα. {loadError}"
 
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Your warpath runs could not be read. Nothing has been changed. {runsError}"
-msgstr "Δεν ήταν δυνατή η ανάγνωση των πορειών σας στο Μονοπάτι του Πολέμου. Δεν άλλαξε τίποτα. {runsError}"
+msgstr "Δεν ήταν δυνατή η ανάγνωση των πορειών σας στο Μονοπάτι Μάχης. Δεν άλλαξε τίποτα. {runsError}"
 
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
