@@ -35931,6 +35931,10 @@ msgstr "Φάκελος εξόδου"
 msgid "Output name (-o)"
 msgstr "Όνομα εξόδου (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

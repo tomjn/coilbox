@@ -29055,6 +29055,10 @@ msgstr "Output folder"
 msgid "Output name (-o)"
 msgstr "Output name (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr "Outward swing"
+
 #: src/content/replayMatchFigures.ts
 msgid "Over {length}"
 msgstr "Over {length}"

@@ -733,6 +733,10 @@ function paramSets(
             params: fitWalk(FITTED_BODY, { duty: 35 }),
           },
           {
+            label: "fitted, swinging out",
+            params: fitWalk(FITTED_BODY, { splay: 20 }),
+          },
+          {
             label: "fitted, no leg lengths",
             params: fitWalk(
               { legLength: FITTED_BODY.legLength, speed: FITTED_BODY.speed },

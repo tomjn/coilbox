@@ -35688,6 +35688,10 @@ msgstr "Папка виводу"
 msgid "Output name (-o)"
 msgstr "Вихідна назва (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

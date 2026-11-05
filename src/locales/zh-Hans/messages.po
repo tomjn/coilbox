@@ -35688,6 +35688,10 @@ msgstr "输出文件夹"
 msgid "Output name (-o)"
 msgstr "输出名称 (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"
