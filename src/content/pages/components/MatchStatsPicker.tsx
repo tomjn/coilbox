@@ -7,6 +7,7 @@ import {
   type SparkLine,
   TILE_BOX,
 } from "../../matchStats";
+import { labelOfMetric } from "../../metricLabels";
 
 /**
  * Which metric the chart draws, picked by looking at all of them (#1141).
@@ -125,7 +126,7 @@ export function MatchStatsPicker({
                * the span inherits it, so dropping `truncate` alone would spill
                * the label out of the tile instead of wrapping it. */}
               <span className="w-full text-left text-xs whitespace-normal">
-                {t.metric.label}
+                {labelOfMetric(t.metric)}
               </span>
               <Spark lines={t.lines} />
             </ToggleGroupItem>

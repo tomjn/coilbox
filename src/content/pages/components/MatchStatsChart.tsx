@@ -62,6 +62,7 @@ import {
   tooltipRows,
   valueTable,
 } from "../../matchStats";
+import { labelOfMetric } from "../../metricLabels";
 import { chartAxis, plotInsets } from "../../replayTimeline";
 import { useSetChartAxis } from "../../useChartAxis";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
@@ -137,7 +138,7 @@ function MetricSelect({
             <SelectLabel>{g.label}</SelectLabel>
             {g.metrics.map((m) => (
               <SelectItem key={m.key} value={m.key}>
-                {m.label}
+                {labelOfMetric(m)}
               </SelectItem>
             ))}
           </SelectGroup>

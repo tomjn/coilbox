@@ -24,10 +24,14 @@ const METRICS_RS = join(
 );
 const BINDINGS = join(SRC, "content/bindings.ts");
 
-/** Files allowed to name a metric: the published bindings, and this test. */
+/**
+ * Files allowed to name a metric: the published bindings, this test, and the
+ * table of translated labels, which is keyed by metric.
+ */
 const MAY_NAME_METRICS = [
   "src/content/bindings.ts",
   "src/content/metricRegistry.test.ts",
+  "src/content/metricLabels.ts",
 ];
 
 /** The x axis, which is a sample field but not a metric. */

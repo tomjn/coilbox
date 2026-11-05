@@ -44,6 +44,7 @@ import {
   useScanTargetSelection,
   useUnitsyncThumbnails,
 } from "../config";
+import { labelOfMetric } from "../metricLabels";
 import {
   computeReplayFilterVisibility,
   isShortReplay,
@@ -292,7 +293,7 @@ export default function ReplaysPage() {
     () => [
       ...SORT_OPTIONS.map((o) => ({ value: o.value, label: i18n._(o.label) })),
       ...metrics.flatMap((m) => {
-        const metricName = lowerFirst(m.label);
+        const metricName = lowerFirst(labelOfMetric(m));
         return [
           {
             value: metricSortValue(m.key, "desc"),
@@ -747,7 +748,7 @@ export default function ReplaysPage() {
                               className={`${sorted ? "" : "hidden lg:block"} text-right text-xs text-muted-foreground`}
                             >
                               <div className="text-[10px] uppercase tracking-wide">
-                                {m.label}
+                                {labelOfMetric(m)}
                               </div>
                               <div className="font-mono text-sm text-foreground">
                                 {formatFigure(
@@ -757,7 +758,7 @@ export default function ReplaysPage() {
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {m.label}, {figureBasis(m, basisPlayer)}
+                            {labelOfMetric(m)}, {figureBasis(m, basisPlayer)}
                           </TooltipContent>
                         </Tooltip>
                       );

@@ -46,6 +46,7 @@ import {
   type StoredReplayTrack,
 } from "../../bindings";
 import { FRAMES_PER_SECOND } from "../../chatClock";
+import { labelOfMetric } from "../../metricLabels";
 import {
   ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
@@ -1083,7 +1084,9 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
   // A team statistic is named the way the rest of the page names it.
   const { t } = useLingui();
   const registry = useMetricRegistry();
-  const labels = new Map(registry.map((m) => [m.key as string, m.label]));
+  const labels = new Map(
+    registry.map((m) => [m.key as string, labelOfMetric(m)]),
+  );
   const figures = stored.disagreements.map((d) =>
     disagreementInWords(d, labels),
   );
