@@ -6,6 +6,7 @@ import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import { type MissionNeed, missionNeeds } from "../../campaign/missionNeeds";
 import { useCampaignImage } from "../../campaign/panorama";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useUnitsyncScan } from "../../content/config";
 import { mediaKind } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
@@ -349,7 +350,9 @@ function heroCard({
   className?: string;
 }) {
   const runTitle = top.title;
-  const ariaLabel = t`${action}: ${runTitle}`;
+  // A title still loading leaves the action's own words, rather than a label
+  // ending in a colon and nothing.
+  const ariaLabel = top.titlePending ? action : t`${action}: ${runTitle}`;
   return (
     // The accent border and the filled action mark this as the card to look at.
     // A tinted fill would say the same thing three times. The tint was also
@@ -387,7 +390,18 @@ function heroCard({
           <h2 id="home-continue-heading" className={GROUP_HEADING_CLASS}>
             {label}
           </h2>
-          <p className="break-words text-xl font-semibold">{top.title}</p>
+          {top.titlePending ? (
+            // One title line high, so a title that fits on one line arrives
+            // without the card changing size. A longer one still grows it,
+            // since its length is not known until it arrives.
+            <Skeleton
+              aria-hidden
+              data-testid="title-pending"
+              className="my-1 h-5 w-40 motion-reduce:animate-none"
+            />
+          ) : (
+            <p className="break-words text-xl font-semibold">{top.title}</p>
+          )}
           {/* Cut short rather than wrapped, so a long game line can never set
               the card's width (#5080). */}
           <p className="truncate text-sm text-muted-foreground" title={detail}>

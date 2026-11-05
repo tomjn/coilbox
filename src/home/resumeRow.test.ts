@@ -237,6 +237,32 @@ describe("the resume row", () => {
   });
 });
 
+describe("a card whose title is still loading", () => {
+  const PENDING: ResumeCandidate = {
+    ...candidate("conquest", "two-shores"),
+    title: "",
+    titlePending: true,
+    detail: "Turn 14",
+  };
+
+  it("draws a placeholder for the hero's title, and the rest of the card", () => {
+    // The row no longer waits for the maps games carry (#5080), so a conquest
+    // on one shows before its title is known.
+    resume.mockReturnValue({ candidates: [PENDING], loading: false });
+    const html = page();
+    expect(html).toContain('data-testid="title-pending"');
+    expect(html).toContain('aria-label="Resume conquest"');
+    expect(text()).toBe("Conquest Turn 14");
+  });
+
+  it("draws a placeholder for a rail card's title", () => {
+    resume.mockReturnValue({ candidates: [HERO, PENDING], loading: false });
+    const rail = page().split('aria-label="More to pick up"')[1];
+    expect(rail).toContain('data-testid="title-pending"');
+    expect(rail).toContain("Turn 14");
+  });
+});
+
 describe("the resume row with one half missing", () => {
   it("holds the hero alone when there is only one thing to resume", () => {
     resume.mockReturnValue({ candidates: [HERO], loading: false });

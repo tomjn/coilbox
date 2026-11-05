@@ -357,6 +357,44 @@ describe("conquestCandidate", () => {
     const file = conquestFile("two-shores", minutesAgo(2));
     expect(conquestCandidate(listedHandmadeMaps([]), file)).toBeUndefined();
   });
+
+  it("offers the conquest with its title pending while the galaxies are listed (#5080)", () => {
+    // A game's own maps are listed only after every game has been read, one
+    // unitsync run each. The rank and the turn are in the state file already.
+    const file = conquestFile("two-shores", minutesAgo(2));
+    const c = conquestCandidate([], file, true);
+    expect(c?.titlePending).toBe(true);
+    expect(c?.title).toBe("");
+    expect(c?.detail).toBe("Turn 7");
+    expect(c?.to).toBe("/conquest/two-shores");
+    expect(c?.touchedAt).toBe(Date.parse(minutesAgo(2)));
+  });
+
+  it("titles a conquest whose galaxy is already listed, even while pending", () => {
+    const galaxies = [{ galaxy: { id: "g1", title: "The Rim" } }];
+    const c = conquestCandidate(
+      galaxies,
+      conquestFile("g1", minutesAgo(2)),
+      true,
+    );
+    expect(c?.title).toBe("The Rim");
+    expect(c?.titlePending).toBeUndefined();
+  });
+
+  it("skips a missing galaxy for the next conquest once the list is complete", () => {
+    // Most recent first: the newer conquest's galaxy is gone, so the older one
+    // with a listed galaxy is offered, as before the list could be pending.
+    const file: ConquestStateFile = {
+      schemaVersion: 1,
+      conquests: {
+        ...conquestFile("gone", minutesAgo(1)).conquests,
+        ...conquestFile("g1", minutesAgo(5)).conquests,
+      },
+    };
+    const galaxies = [{ galaxy: { id: "g1", title: "The Rim" } }];
+    expect(conquestCandidate(galaxies, file)?.title).toBe("The Rim");
+    expect(conquestCandidate(galaxies, file, true)?.titlePending).toBe(true);
+  });
 });
 
 function lobby(over: Partial<LobbySnapshot> = {}): LobbySnapshot {

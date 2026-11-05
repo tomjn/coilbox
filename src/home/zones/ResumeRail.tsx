@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowRight, LogIn } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router";
+import { Skeleton } from "../../components/ui/skeleton";
 import {
   allServers,
   type LastLogin,
@@ -42,6 +43,8 @@ interface RailCardBase {
   /** The line above the title, saying what sort of thing this is. */
   label: string;
   title: string;
+  /** The title is still loading, so the card draws a placeholder for it. */
+  titlePending?: boolean;
   detail: string;
   /** The action's own words, in the card's foot. */
   action: string;
@@ -152,6 +155,7 @@ function candidateCard(c: ResumeCandidate): RailCard {
     icon: RESUME_KIND_ICON[c.kind],
     label: i18n._(label),
     title: c.title,
+    ...(c.titlePending && { titlePending: true }),
     detail: c.detail,
     action: i18n._(action),
     to: c.to,
@@ -442,7 +446,18 @@ export default function ResumeRail() {
             {/* Wraps to two lines rather than truncating: a run's name is the
                 one line worth the room, and it reads better broken than
                 clipped. */}
-            <span className="line-clamp-2 text-sm font-medium">{title}</span>
+            {card.titlePending ? (
+              // One title line high, the usual case. A title that wraps to two
+              // still grows the card when it arrives, but reserving two lines
+              // would shrink every card whose title fits on one.
+              <Skeleton
+                aria-hidden
+                data-testid="title-pending"
+                className="my-0.5 h-4 w-24 motion-reduce:animate-none"
+              />
+            ) : (
+              <span className="line-clamp-2 text-sm font-medium">{title}</span>
+            )}
             <span className={`truncate text-xs ${RAIL_DIM_CLASS}`}>
               {detail}
             </span>
