@@ -188,6 +188,34 @@ export interface WeaponStats {
   range: number;
 }
 
+/**
+ * The weapon definition fields {@link weaponStats} reads for a weapon's range,
+ * lowercased. A workshop edit to one of these can move a unit's range.
+ */
+export const RANGE_FIELDS = ["weapontype", "range"] as const;
+
+/**
+ * The weapon definition fields {@link weaponStats} reads for a weapon's damage
+ * per second, lowercased. Keep this in step with the function below.
+ */
+export const DPS_FIELDS = [
+  "weapontype",
+  "damage.default",
+  "reloadtime",
+  "reload",
+  "projectiles",
+  "projectilespershot",
+  "burst",
+  "salvosize",
+  "burstrate",
+  "salvodelay",
+  "beamburst",
+  "paralyzer",
+  "stockpile",
+  "manualfire",
+  "commandfire",
+] as const;
+
 /** One weapon's derived numbers, read off its resolved definition. */
 export function weaponStats(input: WeaponInput): WeaponStats {
   const { def } = input;
