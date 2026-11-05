@@ -15,6 +15,8 @@ import { useEffect, useId, useState } from "react";
 
 import { CheckField } from "@/components/Field";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { useColourwayColours } from "../../colourwayColours";
+import { colourwayLabel, type LoadedPack } from "../../pack";
 import {
   type RoundNumbers,
   roundNumbers,
@@ -26,6 +28,8 @@ import {
   SPHERE_BOWL,
   SPHERE_DOME,
   SPHERE_WHOLE,
+  shapeSwatches,
+  swatchOf,
 } from "../../shapes";
 import {
   type SphereNumbers,
@@ -37,6 +41,7 @@ import {
   wedgeNumbers,
   withWedgeNumber,
 } from "../../wedgeShape";
+import { ColourwayChip } from "./ColourwayChip";
 import { AXES } from "./TransformFields";
 
 interface Props {
@@ -44,14 +49,65 @@ interface Props {
   onChange: (shape: LegoShape) => void;
 }
 
-export function ShapeFields({ shape, onChange }: Props) {
-  if (shape.kind === "wedge") {
-    return <WedgeFields shape={shape} onChange={onChange} />;
-  }
-  if (shape.kind === "sphere") {
-    return <SphereFields shape={shape} onChange={onChange} />;
-  }
-  return <RoundFields shape={shape} onChange={onChange} />;
+export function ShapeFields({
+  shape,
+  pack,
+  onChange,
+}: Props & { pack: LoadedPack }) {
+  return (
+    <>
+      <ShapeColourway shape={shape} pack={pack} onChange={onChange} />
+      {shape.kind === "wedge" ? (
+        <WedgeFields shape={shape} onChange={onChange} />
+      ) : shape.kind === "sphere" ? (
+        <SphereFields shape={shape} onChange={onChange} />
+      ) : (
+        <RoundFields shape={shape} onChange={onChange} />
+      )}
+    </>
+  );
+}
+
+/**
+ * The swatches the base pack lists, as the part detail panel's colourway
+ * switch draws them (#4423). Nothing is shown when the pack lists fewer than
+ * two, as there is nothing to choose between.
+ */
+function ShapeColourway({
+  shape,
+  pack,
+  onChange,
+}: Props & { pack: LoadedPack }) {
+  const { t } = useLingui();
+  const colours = useColourwayColours(pack);
+  const swatches = shapeSwatches();
+  if (swatches.length < 2) return null;
+  const current = swatchOf(shape)?.id;
+  return (
+    <div className="mt-2">
+      <span className="text-xs text-muted-foreground">
+        <Trans>Colourway</Trans>
+      </span>
+      <ButtonGroup className="mt-1 flex w-full" aria-label={t`Colourway`}>
+        {swatches.map((swatch) => (
+          <Button
+            key={swatch.id}
+            size="sm"
+            variant={swatch.id === current ? "default" : "outline"}
+            className="h-7 flex-1 px-2.5 text-xs"
+            aria-pressed={swatch.id === current}
+            onClick={() => {
+              if (swatch.id !== current)
+                onChange({ ...shape, swatch: swatch.id });
+            }}
+          >
+            <ColourwayChip colourway={swatch.id} colours={colours} />
+            {colourwayLabel(pack, swatch.id)}
+          </Button>
+        ))}
+      </ButtonGroup>
+    </div>
+  );
 }
 
 function SphereFields({ shape, onChange }: Props) {
