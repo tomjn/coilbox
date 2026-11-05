@@ -12,7 +12,7 @@ import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
 import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
-import { legoGeometrySave } from "./bindings";
+import { legoGeometrySave, legoTextureSave } from "./bindings";
 import type { LegoProject } from "./model";
 import { sharedModuleToSave } from "./moduleShare";
 import type { LoadedPack } from "./pack";
@@ -71,14 +71,20 @@ export function useSharedModuleImport(
       });
       return;
     }
-    // The meshes go first, so no module names meshes it lacks.
-    const { geometry } = read;
-    const meshes = geometry
-      ? legoGeometrySave({
-          id: read.project.id,
-          bytes: Array.from(gzipSync(encodeRawGeometry(geometry))),
-        })
-      : Promise.resolve();
+    // The textures and meshes go first, so no module names what it lacks.
+    const { geometry, textures } = read;
+    const meshes = Promise.all(
+      textures.map(({ key, bytes }) =>
+        legoTextureSave({ key, bytes: Array.from(bytes) }),
+      ),
+    ).then(() =>
+      geometry
+        ? legoGeometrySave({
+            id: read.project.id,
+            bytes: Array.from(gzipSync(encodeRawGeometry(geometry))),
+          })
+        : undefined,
+    );
     void meshes
       .then(() => saveCompound(read.project))
       .then(

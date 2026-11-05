@@ -49500,6 +49500,10 @@ msgstr "Ці матчі мають різні розстановки, тож п�
 msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr "Ці суми відрізняються від даних про шкоду на графіку матчу. Власний підсумок рушія рахує кожне влучання як здоров’я, якого цілі вже бракувало, але не більше за силу влучання, тож перше влучання в непошкоджений юніт нічого до нього не додає."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "They are no longer one of your friends."

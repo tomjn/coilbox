@@ -49850,6 +49850,10 @@ msgstr "Queste partite non hanno tutte la stessa disposizione, quindi qui le pos
 msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr "Queste somme sono diverse dai dati sui danni nel grafico della partita. Il totale del motore conta ogni colpo come la salute che al bersaglio già mancava, fino all’entità del colpo, quindi il primo colpo su un’unità intatta non aggiunge nulla."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "They are no longer one of your friends."

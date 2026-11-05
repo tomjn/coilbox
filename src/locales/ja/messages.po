@@ -49500,6 +49500,10 @@ msgstr "これらの試合はすべて同じ配置ではないため、ここで
 msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr "これらの合計は、試合グラフのダメージの値とは異なります。エンジン自体の合計では、各命中を、命中の大きさを上限に、目標がすでに失っていた HP として数えるため、無傷のユニットへの最初の命中は何も加算しません。"
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "They are no longer one of your friends."

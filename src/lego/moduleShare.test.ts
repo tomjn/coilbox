@@ -5,7 +5,12 @@ import {
   encodeContainerCode,
   identify,
 } from "@/container/container";
-import { type LegoPiece, type LegoProject, newProject } from "./model";
+import {
+  type LegoPiece,
+  type LegoProject,
+  newProject,
+  pieceTextures,
+} from "./model";
 import {
   moduleShareCode,
   moduleSharePayload,
@@ -201,6 +206,90 @@ describe("sharing the maker's own meshes (#4360)", () => {
   });
 });
 
+describe("sharing the textures own meshes record (#5073)", () => {
+  const hull = { key: "aa11.png", name: "hull.png" };
+  const glow = { key: "bb22.png", name: "hull_2.png" };
+  const textured = module({
+    ...own,
+    ownMesh: { file: "hull.s3o", texture: hull, texture2: glow },
+  });
+  /** Bytes that deflate as badly as a real compressed texture does. */
+  function noise(length: number): Uint8Array {
+    let seed = 7;
+    return Uint8Array.from({ length }, () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed >> 16;
+    });
+  }
+
+  it("carries a texture that fits, and the far end draws with it", () => {
+    const bytes = noise(2048);
+    const made = moduleShareCode(
+      textured,
+      geometry(),
+      new Map([
+        [hull.key, bytes],
+        [glow.key, Uint8Array.of(1, 2, 3)],
+      ]),
+    );
+    if (!made.ok) throw new Error(made.reason);
+    expect(made.leftOut).toEqual([]);
+    const read = readSharedModule(made.code, new Set());
+    if (!read.ok) throw new Error(read.reason);
+    expect(read.textures).toEqual([
+      { key: hull.key, bytes },
+      { key: glow.key, bytes: Uint8Array.of(1, 2, 3) },
+    ]);
+    expect(pieceTextures(read.project.pieces[1])).toEqual({
+      texture: hull,
+      texture2: glow,
+    });
+  });
+
+  it("leaves out a texture over the ceiling, and the far end draws without it", () => {
+    // 400,000 bytes is 533,334 as base64, over the 524,288 a code inflates to.
+    const made = moduleShareCode(
+      textured,
+      geometry(),
+      new Map([
+        [hull.key, noise(400_000)],
+        [glow.key, Uint8Array.of(1, 2, 3)],
+      ]),
+    );
+    if (!made.ok) throw new Error(made.reason);
+    expect(made.leftOut).toEqual(["hull.png"]);
+    const read = readSharedModule(made.code, new Set());
+    if (!read.ok) throw new Error(read.reason);
+    expect(read.textures.map((texture) => texture.key)).toEqual([glow.key]);
+    expect(read.project.pieces[1].ownMesh).toEqual({
+      file: "hull.s3o",
+      texture2: glow,
+    });
+  });
+
+  it("leaves out a texture the store no longer holds", () => {
+    const made = moduleShareCode(textured, geometry(), new Map());
+    if (!made.ok) throw new Error(made.reason);
+    expect(made.leftOut).toEqual(["hull.png", "hull_2.png"]);
+    const read = readSharedModule(made.code, new Set());
+    expect(read.ok && pieceTextures(read.project.pieces[1])).toBe(null);
+  });
+
+  it("takes only the textures the pieces name off a hand made code", () => {
+    const code = handMade({
+      ...textured,
+      geometry: bytesToBase64Url(encodeRawGeometry(geometry())),
+      textures: {
+        [hull.key]: bytesToBase64Url(Uint8Array.of(9)),
+        "cc33.png": bytesToBase64Url(Uint8Array.of(8)),
+      },
+    });
+    const read = readSharedModule(code, new Set());
+    if (!read.ok) throw new Error(read.reason);
+    expect(read.textures).toEqual([{ key: hull.key, bytes: Uint8Array.of(9) }]);
+  });
+});
+
 describe("readSharedModule", () => {
   it("round trips a module of parts", () => {
     const source = module();
@@ -212,6 +301,7 @@ describe("readSharedModule", () => {
       project: source,
       missingParts: [],
       geometry: null,
+      textures: [],
     });
   });
 
