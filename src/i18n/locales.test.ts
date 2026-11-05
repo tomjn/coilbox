@@ -27,6 +27,10 @@ describe("resolveLocaleTag", () => {
     ["nl_be", "nl"],
     ["nn", "en"],
     ["nn-NO", "en"],
+    ["sv", "sv"],
+    ["sv-SE", "sv"],
+    ["sv-FI", "sv"],
+    ["sv_se", "sv"],
     ["en-GB", "en"],
     ["zh", "zh-Hans"],
     ["zh-Hans-CN", "zh-Hans"],
@@ -65,6 +69,7 @@ describe("localeDisplayName", () => {
     expect(localeDisplayName("uk")).toBe("Українська");
     expect(localeDisplayName("pt-BR")).toBe("Português (Brasil)");
     expect(localeDisplayName("nb")).toBe("Norsk bokmål");
+    expect(localeDisplayName("sv")).toBe("Svenska");
     expect(localeDisplayName("nl")).toBe("Nederlands");
   });
 });

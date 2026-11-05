@@ -165,6 +165,7 @@ describe("Language picker", () => {
       "Українська",
       "Português (Brasil)",
       "Norsk bokmål",
+      "Svenska",
       "Nederlands",
       "日本語",
       expect.stringContaining("中文"),
@@ -188,6 +189,7 @@ describe("Language picker", () => {
     expect(hints).toContainEqual(["zh-Hans", "zh-Hans"]);
     expect(hints).toContainEqual(["pt-BR", "pt-BR"]);
     expect(hints).toContainEqual(["nb", "nb"]);
+    expect(hints).toContainEqual(["sv", "sv"]);
     expect(hints).toContainEqual(["nl", "nl"]);
     expect(hints).toContainEqual([SYSTEM_LANGUAGE, null]);
   });
