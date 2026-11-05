@@ -231,6 +231,7 @@ import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { FitPlanDrawer } from "./components/FitPlanDrawer";
+import { GamePanel } from "./components/GamePanel";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
@@ -432,7 +433,13 @@ function Builder({ id }: { id: string | undefined }) {
   const liftedRef = useRef<LegoProject | null>(null);
   const [asideOpen, setAsideOpen] = usePanelOpen("aside");
   const [aside, setAside] = useState<
-    "pieces" | "animation" | "collision" | "aim" | "texture" | "skeleton"
+    | "pieces"
+    | "animation"
+    | "game"
+    | "collision"
+    | "aim"
+    | "texture"
+    | "skeleton"
   >("pieces");
   /** The game unit standing beside the build, which the stats compare with. */
   const [referenceUnit, setReferenceUnit] = useState<ReferenceUnit | null>(
@@ -2787,6 +2794,14 @@ function Builder({ id }: { id: string | undefined }) {
                 </Button>
                 <Button
                   size="sm"
+                  variant={aside === "game" ? "default" : "outline"}
+                  onClick={() => setAside("game")}
+                  aria-pressed={aside === "game"}
+                >
+                  <Trans>Game</Trans>
+                </Button>
+                <Button
+                  size="sm"
                   variant={aside === "collision" ? "default" : "outline"}
                   onClick={() => setAside("collision")}
                   aria-pressed={aside === "collision"}
@@ -2842,6 +2857,39 @@ function Builder({ id }: { id: string | undefined }) {
                   onReset={resetSkeleton}
                   onPreview={setProportionPreview}
                   preview={proportionPreview}
+                />
+              ) : aside === "game" ? (
+                <GamePanel
+                  project={draft}
+                  pack={loaded}
+                  raw={raw}
+                  referenceUnit={referenceUnit}
+                  onMovementChange={(movement) =>
+                    edit(({ movement: _old, ...project }) =>
+                      movement ? { ...project, movement } : project,
+                    )
+                  }
+                  onBuiltByChange={(builtBy) =>
+                    edit(({ builtBy: _old, ...project }) =>
+                      builtBy.length > 0 ? { ...project, builtBy } : project,
+                    )
+                  }
+                  onWorthChange={(worth) =>
+                    edit((project) => ({ ...project, worth }))
+                  }
+                  onBudgetChange={(budget) =>
+                    edit(({ budget: _old, ...project }) =>
+                      budget === undefined ? project : { ...project, budget },
+                    )
+                  }
+                  onWeaponChange={(pieceId, weapon) =>
+                    edit((project) => ({
+                      ...project,
+                      pieces: project.pieces.map((piece) =>
+                        piece.id === pieceId ? { ...piece, weapon } : piece,
+                      ),
+                    }))
+                  }
                 />
               ) : aside === "aim" ? (
                 <AimPointPanel
@@ -2901,7 +2949,6 @@ function Builder({ id }: { id: string | undefined }) {
               ) : aside === "animation" ? (
                 <AnimationPanel
                   project={draft}
-                  referenceUnit={referenceUnit}
                   playing={playing}
                   onPlayingChange={setPlaying}
                   onChange={(animations) =>
@@ -2924,32 +2971,6 @@ function Builder({ id }: { id: string | undefined }) {
                   }}
                   onBuilderChange={(builder) =>
                     edit((project) => ({ ...project, builder }))
-                  }
-                  onMovementChange={(movement) =>
-                    edit(({ movement: _old, ...project }) =>
-                      movement ? { ...project, movement } : project,
-                    )
-                  }
-                  onBuiltByChange={(builtBy) =>
-                    edit(({ builtBy: _old, ...project }) =>
-                      builtBy.length > 0 ? { ...project, builtBy } : project,
-                    )
-                  }
-                  onWorthChange={(worth) =>
-                    edit((project) => ({ ...project, worth }))
-                  }
-                  onBudgetChange={(budget) =>
-                    edit(({ budget: _old, ...project }) =>
-                      budget === undefined ? project : { ...project, budget },
-                    )
-                  }
-                  onWeaponChange={(pieceId, weapon) =>
-                    edit((project) => ({
-                      ...project,
-                      pieces: project.pieces.map((piece) =>
-                        piece.id === pieceId ? { ...piece, weapon } : piece,
-                      ),
-                    }))
                   }
                   effectsNote={effectBitmaps.note}
                 />

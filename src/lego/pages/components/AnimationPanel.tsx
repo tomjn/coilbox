@@ -100,8 +100,6 @@ import { presetCopies, presetInstanceIds, unitScript } from "../../luaScript";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
-  type LegoMovement,
-  type LegoPieceWeapon,
   type LegoProject,
 } from "../../model";
 import { movesInGame } from "../../movement";
@@ -155,19 +153,12 @@ import { controlFor } from "../../unitValueControls";
 import { overridesFit, shownParams, withoutFitOverrides } from "../../walkFit";
 import { pickedWeapon } from "../../weaponModule";
 import { unitReaches } from "../../weaponReach";
-import type { LegoWorth } from "../../worth";
 import { ActionsDrawer } from "./ActionsDrawer";
 import { BuilderReport } from "./BuilderReport";
-import { BuiltBySection } from "./BuiltBySection";
-import { GameFitSection } from "./GameFitSection";
-import { MovementSection } from "./MovementSection";
-import type { ReferenceUnit } from "./ReferencePicker";
 import { ScrubberMarks } from "./ScrubberMarks";
-import { StatsSection } from "./StatsSection";
 import type { DrivePlacement } from "./standInPlayback";
-import { useWeaponSource, WeaponsSection } from "./WeaponsSection";
+import { useWeaponSource } from "./WeaponsSection";
 import { ProjectWorkshopMarks } from "./WorkshopChangeMarks";
-import { WorthSection } from "./WorthSection";
 
 /** The scenario Select's own entry for firing an arbitrary function by name,
  *  rather than one of the canned scenarios above it. Not a real scenario id:
@@ -383,21 +374,6 @@ interface Props {
   /** What the unit builds with, written into its definition. Only asked for
    *  when the unit has a build arm on it. */
   onBuilderChange: (builder: LegoBuilder) => void;
-  /** The movement class, speed and turn rate, or nothing for a unit that
-   *  does not move (issue #3255). */
-  onMovementChange: (movement: LegoMovement | undefined) => void;
-  /** The table that sets the unit's health, cost and mass (issue #3280). */
-  onWorthChange: (worth: LegoWorth) => void;
-  /** Sets or clears the chassis budget (issue #3284). */
-  onBudgetChange?: (budget: number | undefined) => void;
-  /** What a turret or aim point fires, and over what arc (issue #3274). The
-   *  Weapons section is shown only when this is given. */
-  onWeaponChange?: (pieceId: string, weapon: LegoPieceWeapon) => void;
-  /** Which base game units build this one (issue #4515). The Built by
-   *  section is shown only when this is given. */
-  onBuiltByChange?: (builtBy: string[]) => void;
-  /** The game unit picked beside the build, for the stats to compare with. */
-  referenceUnit?: ReferenceUnit | null;
   /**
    * The poses a run of the unit's own script produced, for the viewport to
    * play. Null whenever the presets are what is playing, or nothing is.
@@ -462,12 +438,6 @@ export function AnimationPanel({
   onActionsEdit,
   onShowScript,
   onBuilderChange,
-  onMovementChange,
-  onWorthChange,
-  onBudgetChange,
-  onWeaponChange,
-  onBuiltByChange,
-  referenceUnit,
   onScriptTimeline,
   onScriptRun,
   scriptPaused,
@@ -1925,39 +1895,6 @@ export function AnimationPanel({
               </div>
             </div>
           ) : null}
-
-          <MovementSection
-            project={project}
-            bounds={bounds}
-            onMovementChange={onMovementChange}
-          />
-
-          {onBuiltByChange ? (
-            <BuiltBySection
-              project={project}
-              onBuiltByChange={onBuiltByChange}
-            />
-          ) : null}
-
-          <WorthSection
-            project={project}
-            pack={pack}
-            onWorthChange={onWorthChange}
-          />
-
-          {onWeaponChange ? (
-            <WeaponsSection project={project} onWeaponChange={onWeaponChange} />
-          ) : null}
-
-          <StatsSection
-            project={project}
-            pack={pack}
-            bounds={bounds}
-            reference={referenceUnit ?? null}
-            onBudgetChange={onBudgetChange}
-          />
-
-          <GameFitSection project={project} bounds={bounds} />
 
           {onActionsEdit ? (
             <div className="border-b border-border/60 px-3 py-2">
