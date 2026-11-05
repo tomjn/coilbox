@@ -42,6 +42,14 @@ return {
 		defeat = "Uppdraget misslyckades",
 		undecided = "Uppdraget avslutat",
 	},
+	el = {
+		objectives = "Στόχοι",
+		secondary = "Δευτερεύοντες",
+		holdHint = "Κάντε κλικ για συνέχεια",
+		victory = "Η αποστολή ολοκληρώθηκε",
+		defeat = "Η αποστολή απέτυχε",
+		undecided = "Η αποστολή έληξε",
+	},
 	fr = {
 		objectives = "Objectifs",
 		secondary = "Secondaires",
