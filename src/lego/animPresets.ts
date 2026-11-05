@@ -677,7 +677,13 @@ function cycleThread(
   preset: AnimPreset,
   params: Record<string, number>,
   instance: EmitInstance,
-  options: { name: string; period: number; roles?: string[] },
+  options: {
+    name: string;
+    period: number;
+    roles?: string[];
+    /** Whether the cycle goes at the unit's speed (`WALK_PACE`). */
+    paced?: boolean;
+  },
 ): string[] | null {
   const sampled = cycleSamples(preset, params, instance, options);
   if (!sampled) return null;
@@ -690,10 +696,14 @@ function cycleThread(
 
   // Step k heads for pose k, from pose k - 1, and the last heads back round to
   // the first, which is what the loop then starts from again.
+  const scale = options.paced ? " * scale" : "";
   for (let step = 1; step <= count; step++) {
     const frames = bounds[step] - bounds[step - 1];
     const stepSeconds = frames / ENGINE_FPS;
     const before = poses[step - 1];
+    if (options.paced) {
+      body.push(`    scale, wait, due = walkPace(${frames}, due)`);
+    }
     for (const [piece, pose] of poses[step % count]) {
       const was = before.get(piece);
       if (pose.rotation) {
@@ -703,7 +713,7 @@ function cycleThread(
           const speed =
             Math.abs(pose.rotation[axis] - from[axis]) / stepSeconds;
           body.push(
-            `    Turn(${piece}, ${AXES[axis]}, ${lua(pose.rotation[axis])}, ${lua(speed)})`,
+            `    Turn(${piece}, ${AXES[axis]}, ${lua(pose.rotation[axis])}, ${lua(speed)}${scale})`,
           );
           movedRotation.set(
             piece,
@@ -718,7 +728,7 @@ function cycleThread(
           const speed =
             Math.abs(pose.position[axis] - from[axis]) / stepSeconds;
           body.push(
-            `    Move(${piece}, ${AXES[axis]}, ${lua(pose.position[axis])}, ${lua(speed)})`,
+            `    Move(${piece}, ${AXES[axis]}, ${lua(pose.position[axis])}, ${lua(speed)}${scale})`,
           );
           movedPosition.set(
             piece,
@@ -727,7 +737,11 @@ function cycleThread(
         }
       }
     }
-    body.push(`    Sleep(${frames * SLEEP_FRAME_MS})`);
+    body.push(
+      options.paced
+        ? `    Sleep(${SLEEP_FRAME_MS} * wait)`
+        : `    Sleep(${frames * SLEEP_FRAME_MS})`,
+    );
   }
 
   // Back to rest on stop, or the unit keeps whatever pose it stopped in. Only
@@ -745,6 +759,7 @@ function cycleThread(
   return [
     `local function ${options.name}()`,
     `  SetSignalMask(${instance.signal})`,
+    ...(options.paced ? ["  local scale, wait, due = 1, 0, 0"] : []),
     "  while true do",
     ...body,
     "  end",
@@ -820,6 +835,8 @@ function cycleThreads(
     roles?: string[];
     /** The params one instance is written with, when not its own. */
     params?: (instance: EmitInstance) => Record<string, number>;
+    /** Whether the cycle goes at the unit's speed (`WALK_PACE`). */
+    paced?: boolean;
   },
 ): EmitResult | null {
   const functions: string[] = [];
@@ -833,6 +850,7 @@ function cycleThreads(
       name,
       period,
       ...(options.roles ? { roles: options.roles } : {}),
+      ...(options.paced ? { paced: true } : {}),
     });
     if (!thread) continue;
     if (functions.length > 0) functions.push("");
@@ -842,7 +860,7 @@ function cycleThreads(
   }
   if (functions.length === 0) return null;
   return {
-    functions,
+    functions: options.paced ? [...WALK_PACE, "", ...functions] : functions,
     hooks: {
       [options.start]: started,
       ...Object.fromEntries(
@@ -1502,6 +1520,57 @@ export const WALK_LEGS: AnimPreset = {
 };
 
 /**
+ * The least share of its top speed a fitted walk's pace drops to (#4486).
+ *
+ * Balanced Annihilation 15.9.8's `armpw.bos` floors its pace at 20 percent of
+ * `MAX_SPEED` (`if (currentSpeed<20) currentSpeed=20;` in `UnitSpeed`), and
+ * Splinter Faction's `scripts/faction/xhammer.bos` at 40 of a percentage it
+ * has doubled (`currentSpeed = 2 * (get CURRENT_SPEED)*100/moveSpeed;`), which
+ * is 20 percent of top speed too. Without a floor a unit setting off from a
+ * standstill reads a speed of 0 and its first step never ends.
+ */
+const WALK_PACE_FLOOR = 0.2;
+
+/**
+ * Lua for the share of top speed a fitted walk goes at, and how many frames a
+ * step of the cycle takes at it (#4486).
+ *
+ * The walk is fitted to the unit's top speed (`walkFit.ts`), so at a share of
+ * it the same poses take that much longer: every sleep is divided by the pace
+ * and every Turn and Move slowed to match, as Balanced Annihilation's and
+ * Splinter Faction's hand written walkers do. The pace is read again at each
+ * step, so the walk follows the unit as it speeds up, slows down or is held
+ * back, and is held between `WALK_PACE_FLOOR` and 1. Above 1 a step of one
+ * frame would sleep for none.
+ *
+ * `Sleep` waits whole frames, so a step's frames over the pace is rounded and
+ * what rounding left over is carried to the next step in `due`. The cycle
+ * then takes as long as the pace says, where rounding each sleep on its own
+ * would make every lap short. Each step's speeds are scaled by its frames
+ * over the frames it sleeps, so its pose is reached as the sleep ends, within
+ * half a frame of when it is due. Scaling them by the pace instead leaves a
+ * piece short of a pose after a short sleep and waiting at it after a long
+ * one. Measured for #4486 on a 12 elmo leg at 40 elmos a second, at 0.6 of
+ * top speed, that slid a planted foot 1.59 elmos where this slides it 0.53.
+ *
+ * `CURRENT_SPEED` over `MAX_SPEED` is 1 in a preview with nothing driving
+ * the unit (`known` in `crates/coilbox-unitpose/src/unitvalue.rs`), so there
+ * the walk plays its `track`, which is what the parity fixture checks.
+ */
+const WALK_PACE = [
+  "local function walkPace(frames, due)",
+  "  local top = GetUnitValue(COB.MAX_SPEED)",
+  "  local pace = 1",
+  "  if top > 0 then",
+  `    pace = math.min(math.max(GetUnitValue(COB.CURRENT_SPEED) / top, ${WALK_PACE_FLOOR}), 1)`,
+  "  end",
+  "  due = due + frames / pace",
+  "  local wait = math.floor(due + 0.5)",
+  "  return frames / wait, wait, due - wait",
+  "end",
+];
+
+/**
  * Walking starts and stops with the unit, so it hangs off the move callins.
  * Each module instance of legs walks in a thread of its own, all started by
  * the same `StartMoving`, so a leg's phase still comes from its role alone.
@@ -1521,6 +1590,7 @@ function walkEmit(
     stop: "StopMoving",
     ...(roles ? { roles } : {}),
     ...params,
+    ...(fitted ? { paced: true } : {}),
   });
   if (!result || !fitted) return result;
   const period = Math.max(value(preset, ctx.params, "period"), 0.05);
@@ -1544,7 +1614,8 @@ function walkEmit(
     : {};
   return {
     functions: [
-      `-- Fitted to the unit's legs and speed: a stride every ${frames} frames, each foot down for ${down} of them.`,
+      `-- Fitted to the unit's legs and speed: at top speed a stride every ${frames} frames, each foot down for ${down} of them.`,
+      `-- Slower, the stride takes as much longer, down to ${lua(WALK_PACE_FLOOR * 100)} percent of top speed.`,
       ...(body
         ? [
             `-- Each foot stays put while it is down, with the body ${lua(drop)} elmos lower so it reaches the ground.`,
@@ -1803,12 +1874,10 @@ const UNDRIVEN_SPEED = 1;
  *
  * A wheel rolling without slipping turns at the unit's speed over its radius,
  * so a script that reads `CURRENT_SPEED` while it runs gets the right rate at
- * every speed, speeding up, slowing down and backing up. The walks bake the
- * speed in when the script is written (`walkFit.ts`), which suits a walker
- * that moves at the one speed it was fitted for. A wheel has no cycle to fit,
- * and a unit that brakes to a stop would spin its wheels at full speed all the
- * way down if the rate were fixed. So the wheels read it. The preview answers
- * `CURRENT_SPEED` on every frame of a drive.
+ * every speed, speeding up, slowing down and backing up. A unit that brakes
+ * to a stop would spin its wheels at full speed all the way down if the rate
+ * were fixed. So the wheels read it, as a fitted walk does (`WALK_PACE`). The
+ * preview answers `CURRENT_SPEED` on every frame of a drive.
  *
  * The engine calls `StopMoving` when the unit is told to stop, not when it has
  * stopped: a unit rolls on at its brake rate (`GroundMoveType.cpp:2455` and
