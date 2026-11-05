@@ -14,6 +14,8 @@
  * controls, then a ground flash toggle and a `useDefaultExplosions` toggle
  * below them.
  */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -64,9 +66,13 @@ const colorToHex = (color: { r: number; g: number; b: number } | undefined) => {
     : "#ffffff";
 };
 
-/** "a" or "an", for a field label that starts a sentence lowercase, e.g.
- *  "impact effect" against "bounce effect". */
-const articleFor = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
+/** The create button's label, one whole message per field (issue #5059), so
+ *  each language picks its own article, case and gender for the noun. */
+const CREATE_LABEL: Record<CegWeaponField, MessageDescriptor> = {
+  explosionGenerator: msg`Create an impact effect`,
+  bounceExplosionGenerator: msg`Create a bounce effect`,
+  cegTag: msg`Create a trail effect`,
+};
 
 /** One class specific field's control, by {@link CegFieldSpec.key}, shared by
  *  a spawn and the ground flash: both are plain objects with the same
@@ -345,10 +351,8 @@ export function ExplosionGeneratorEditor({
 
   const check = checkExplosionGeneratorName(draftName, generators);
 
-  const article = articleFor(label);
-  const lowerLabel = label.toLowerCase();
   const ownedKey = owned?.key;
-  const createLabel = t`Create ${article} ${lowerLabel}`;
+  const createLabel = t(CREATE_LABEL[field]);
 
   const create = () => {
     if (!check.ok) return;
