@@ -391,8 +391,9 @@ function heroCard({
             {label}
           </h2>
           {top.titlePending ? (
-            // The height of the title's line, so the card does not change
-            // size when the title arrives.
+            // One title line high, so a title that fits on one line arrives
+            // without the card changing size. A longer one still grows it,
+            // since its length is not known until it arrives.
             <Skeleton
               aria-hidden
               data-testid="title-pending"

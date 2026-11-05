@@ -447,8 +447,9 @@ export default function ResumeRail() {
                 one line worth the room, and it reads better broken than
                 clipped. */}
             {card.titlePending ? (
-              // The height of one title line, so the card keeps its size
-              // when the title arrives.
+              // One title line high, the usual case. A title that wraps to two
+              // still grows the card when it arrives, but reserving two lines
+              // would shrink every card whose title fits on one.
               <Skeleton
                 aria-hidden
                 data-testid="title-pending"
