@@ -18019,15 +18019,15 @@ msgstr "Множник сили кратера"
 msgid "Create"
 msgstr "Створити"
 
-#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
-#, fuzzy
-msgid "Create {article} {lowerLabel}"
-msgstr "Створити {article} {lowerLabel}"
-
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "Create a bot account"
 msgstr "Створити обліковий запис бота"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a bounce effect"
+msgstr "Створити ефект відскоку"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
@@ -18039,6 +18039,11 @@ msgstr "Створити лобі"
 msgid "Create a new account"
 msgstr "Створити новий обліковий запис"
 
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a trail effect"
+msgstr "Створити ефект сліду"
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Create an account"
@@ -18048,6 +18053,11 @@ msgstr "Створити обліковий запис"
 #, fuzzy
 msgid "Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
 msgstr "Створіть обліковий запис для бота. uberserver не має команди, щоб перелічити облікові записи ботів. Щоб задати або зняти прапорець бота для наявного облікового запису, знайдіть його в розділі «Гравці»."
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create an impact effect"
+msgstr "Створити ефект влучання"
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy

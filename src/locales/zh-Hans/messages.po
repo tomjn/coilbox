@@ -18019,15 +18019,15 @@ msgstr "弹坑强度倍率"
 msgid "Create"
 msgstr "创建"
 
-#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
-#, fuzzy
-msgid "Create {article} {lowerLabel}"
-msgstr "创建 {article} {lowerLabel}"
-
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "Create a bot account"
 msgstr "创建机器人账号"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a bounce effect"
+msgstr "创建弹跳效果"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
@@ -18039,6 +18039,11 @@ msgstr "创建大厅"
 msgid "Create a new account"
 msgstr "创建新账号"
 
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a trail effect"
+msgstr "创建拖尾效果"
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Create an account"
@@ -18048,6 +18053,11 @@ msgstr "创建账号"
 #, fuzzy
 msgid "Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
 msgstr "为机器人创建账号。uberserver 没有列出机器人账号的命令。要为已有账号设置或清除机器人标志，请在“玩家”中查询它。"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create an impact effect"
+msgstr "创建命中效果"
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy

@@ -14669,12 +14669,12 @@ msgstr ""
 msgid "Create"
 msgstr ""
 
-#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
-msgid "Create {article} {lowerLabel}"
-msgstr ""
-
 #: src/multiplayer/admin/BotAccountsSection.tsx
 msgid "Create a bot account"
+msgstr ""
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+msgid "Create a bounce effect"
 msgstr ""
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -14685,12 +14685,20 @@ msgstr ""
 msgid "Create a new account"
 msgstr ""
 
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+msgid "Create a trail effect"
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Create an account"
 msgstr ""
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 msgid "Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
+msgstr ""
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+msgid "Create an impact effect"
 msgstr ""
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
