@@ -33350,6 +33350,7 @@ msgid "none"
 msgstr "nenhum"
 
 #: src/animation/pages/Bos2LuaPage.tsx
+#: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
