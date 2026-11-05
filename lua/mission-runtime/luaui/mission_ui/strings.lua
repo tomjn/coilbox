@@ -106,4 +106,12 @@ return {
 		defeat = "Missie mislukt",
 		undecided = "Missie beëindigd",
 	},
+	it = {
+		objectives = "Obiettivi",
+		secondary = "Secondari",
+		holdHint = "Fai clic per continuare",
+		victory = "Missione compiuta",
+		defeat = "Missione fallita",
+		undecided = "Missione terminata",
+	},
 }
