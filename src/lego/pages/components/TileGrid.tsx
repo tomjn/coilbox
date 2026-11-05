@@ -45,7 +45,7 @@ import {
   partMaterial,
 } from "../../geometry";
 import { refKey } from "../../inventory";
-import { holdsLiftedPieces, liftCredits } from "../../liftPiece";
+import { holdsLiftedPieces, holdsMeshes, liftCredits } from "../../liftPiece";
 import type { LegoLifted, LegoPiece, LegoProject } from "../../model";
 import {
   getPartGeometry,
@@ -272,12 +272,13 @@ export function TileGrid({
     ready,
   );
 
-  // A lifted module's meshes are in a file of its own, read once per module.
+  // A module's meshes, lifted or the maker's own, are in a file of its own,
+  // read once per module.
   useEffect(() => {
     for (const item of items) {
       if (item.kind !== "module") continue;
       const { module } = item;
-      if (!holdsLiftedPieces(module) || asked.current.has(module.id)) continue;
+      if (!holdsMeshes(module) || asked.current.has(module.id)) continue;
       asked.current.add(module.id);
       const { id } = module;
       void loadRawGeometry(id).then(
@@ -616,7 +617,7 @@ export function buildModule(
   material: THREE.Material,
   fit: number,
 ): Holder | null {
-  if (!holdsLiftedPieces(module)) {
+  if (!holdsMeshes(module)) {
     const group = buildCompoundHolder(
       module,
       (piece) =>
@@ -681,7 +682,7 @@ function holderFor(
   module: LegoProject,
   material: THREE.Material,
 ): Holder | null {
-  const raw = holdsLiftedPieces(module) ? state.raws.get(module.id) : undefined;
+  const raw = holdsMeshes(module) ? state.raws.get(module.id) : undefined;
   let holder = state.holders.get(module.id);
   if (holder && (holder.module !== module || holder.raw !== raw)) {
     state.scene.remove(holder.group);

@@ -38,7 +38,7 @@ import { useColourwayColours } from "../../colourwayColours";
 import { validateCompoundName } from "../../compounds";
 import { addStandardLights, partMaterial } from "../../geometry";
 import type { InventoryRef } from "../../inventory";
-import { holdsLiftedPieces, liftCredits } from "../../liftPiece";
+import { holdsLiftedPieces, holdsMeshes, liftCredits } from "../../liftPiece";
 import type { LegoProject } from "../../model";
 import {
   canonicalCategory,
@@ -471,8 +471,9 @@ function labelsDraft(module: LegoProject): ModuleLabelsDraft {
 /**
  * A built in module shows what it is and offers a copy. The game maker's own
  * module has its name, category and tags as fields that save as they go, and
- * Save to file, Share and Delete. One lifted from a game cannot leave the
- * machine as a file, so it has Share and Delete.
+ * Save to file, Share and Delete. One holding meshes, lifted from a game or
+ * the maker's own, has Share and Delete: a module file does not carry the
+ * meshes.
  */
 function ModuleBody({
   frame,
@@ -551,9 +552,9 @@ function ModuleBody({
     onLabels(base, next);
   }
 
-  // Hold the raw geometry of a module lifted from a game, freed with the panel.
+  // Hold the raw geometry of a module with meshes, freed with the panel.
   const [raw, setRaw] = useState<RawGeometry | null | undefined>(undefined);
-  const lifted = holdsLiftedPieces(module);
+  const lifted = holdsMeshes(module);
   const moduleId = module.id;
   useEffect(() => {
     if (!lifted) return;
@@ -727,7 +728,7 @@ function ModuleBody({
             <Copy size={14} /> <Trans>Make my own copy</Trans>
           </Button>
         ) : null}
-        {actions.onSaveFile && !liftedFrom ? (
+        {actions.onSaveFile && !liftedFrom && !holdsMeshes(module) ? (
           <Button
             size="sm"
             variant="outline"
