@@ -18019,15 +18019,15 @@ msgstr "Mnożnik siły krateru"
 msgid "Create"
 msgstr "Utwórz"
 
-#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
-#, fuzzy
-msgid "Create {article} {lowerLabel}"
-msgstr "Utwórz {article} {lowerLabel}"
-
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "Create a bot account"
 msgstr "Utwórz konto bota"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a bounce effect"
+msgstr "Utwórz efekt odbicia"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
@@ -18039,6 +18039,11 @@ msgstr "Utwórz lobby"
 msgid "Create a new account"
 msgstr "Utwórz nowe konto"
 
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a trail effect"
+msgstr "Utwórz efekt smugi"
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Create an account"
@@ -18048,6 +18053,11 @@ msgstr "Utwórz konto"
 #, fuzzy
 msgid "Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
 msgstr "Utwórz konto dla bota. uberserver nie ma polecenia do wyświetlania kont botów. Aby ustawić lub wyczyścić flagę bota na istniejącym koncie, wyszukaj je w sekcji Gracze."
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create an impact effect"
+msgstr "Utwórz efekt trafienia"
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy

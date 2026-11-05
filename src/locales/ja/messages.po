@@ -18019,15 +18019,15 @@ msgstr "クレーター強度の倍率"
 msgid "Create"
 msgstr "作成"
 
-#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
-#, fuzzy
-msgid "Create {article} {lowerLabel}"
-msgstr "{article} {lowerLabel} を作成"
-
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "Create a bot account"
 msgstr "ボットアカウントを作成"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a bounce effect"
+msgstr "跳ね返りのエフェクトを作成"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
@@ -18039,6 +18039,11 @@ msgstr "ロビーを作成"
 msgid "Create a new account"
 msgstr "新しいアカウントを作成"
 
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a trail effect"
+msgstr "軌跡エフェクトを作成"
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Create an account"
@@ -18048,6 +18053,11 @@ msgstr "アカウントを作成"
 #, fuzzy
 msgid "Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
 msgstr "ボット用のアカウントを作成します。uberserver にはボットアカウントを一覧表示するコマンドがありません。既存のアカウントのボットフラグを設定または解除するには、プレイヤーで検索してください。"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create an impact effect"
+msgstr "着弾エフェクトを作成"
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
