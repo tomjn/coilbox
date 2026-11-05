@@ -175,6 +175,12 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
     // whatever it needed already inside it.
     if let Some(text) = out.text.clone() {
         out.includes = read_includes(&us, handle, &list, &text, unit_def.as_deref());
+        let uses_utilities = std::iter::once(text.as_str())
+            .chain(out.includes.iter().map(|file| file.text.as_str()))
+            .any(|source| source.contains("Spring.Utilities"));
+        if uses_utilities {
+            out.includes.extend(read_game_libraries(&us, handle, &list));
+        }
     }
 
     // Only for a `.cob`. A game shipping Lua has nothing to convert, and the
@@ -496,6 +502,91 @@ fn read_includes(
     found
 }
 
+/// The library a game following Zero-K's layout loads into its LuaRules state
+/// before any unit script runs, for a script that reads `Spring.Utilities`
+/// (issue #2791).
+///
+/// That is `LuaRules/Utilities.lua`, which includes every file in
+/// `LuaRules/Utilities/`, and whatever those name with a literal `VFS.Include`
+/// or `VFS.DirList`, such as Zero-K's command list. Each comes back under its
+/// path in the archive, which is the name the preview's `VFS` answers to, and
+/// none of it is the script's to export. A game without the file gets nothing.
+fn read_game_libraries(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+) -> Vec<ScriptInclude> {
+    let Some(root) = exact(list, "luarules/utilities.lua") else {
+        return Vec::new();
+    };
+    let mut queue: VecDeque<(String, u32)> = std::iter::once(root)
+        .chain(lua_files_in(list, "luarules/utilities"))
+        .map(|member| (member, 1))
+        .collect();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut found = Vec::new();
+    while let Some((member, depth)) = queue.pop_front() {
+        if !seen.insert(member.to_lowercase()) {
+            continue;
+        }
+        let Some((_, bytes)) = us.read_archive_member(handle, &member, SCRIPT_CAP) else {
+            continue;
+        };
+        let source = String::from_utf8_lossy(&bytes).into_owned();
+        if depth < INCLUDE_DEPTH {
+            let (files, dirs) = vfs_names(&source);
+            let named = files
+                .into_iter()
+                .filter_map(|name| exact(list, &name.replace('\\', "/").to_lowercase()))
+                .chain(dirs.iter().flat_map(|dir| lua_files_in(list, dir)));
+            queue.extend(named.map(|member| (member, depth + 1)));
+        }
+        found.push(ScriptInclude {
+            name: member.clone(),
+            member,
+            text: source,
+        });
+    }
+    found
+}
+
+/// The `.lua` files directly inside `dir`, by their archive spelling.
+fn lua_files_in(list: &[(String, String)], dir: &str) -> Vec<String> {
+    let prefix = format!(
+        "{}/",
+        dir.replace('\\', "/").trim_end_matches('/').to_lowercase()
+    );
+    let mut files: Vec<String> = list
+        .iter()
+        .filter(|(lower, _)| {
+            lower
+                .strip_prefix(&prefix)
+                .is_some_and(|rest| !rest.contains('/') && rest.ends_with(".lua"))
+        })
+        .map(|(_, real)| real.clone())
+        .collect();
+    files.sort();
+    files
+}
+
+/// The files one library names with a literal `VFS.Include`, and the folders
+/// it names with a literal `VFS.DirList`, in that order.
+fn vfs_names(text: &str) -> (Vec<String>, Vec<String>) {
+    let grab = |call: &str| -> Vec<String> {
+        let Ok(pattern) = regex::Regex::new(&format!(
+            r#"VFS\.{call}\s*\(\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')"#
+        )) else {
+            return Vec::new();
+        };
+        pattern
+            .captures_iter(text)
+            .filter_map(|hit| hit.get(1).or_else(|| hit.get(2)))
+            .map(|name| name.as_str().to_string())
+            .collect()
+    };
+    (grab("Include"), grab("DirList"))
+}
+
 /// The files a `.bos` pulls in with `#include`, and the files those pull in.
 ///
 /// Found by the converter's own `find_includes`, the same search the converter
@@ -792,6 +883,40 @@ mod tests {
     #[test]
     fn does_not_match_a_word_that_merely_ends_in_include() {
         assert_eq!(include_names(r#"reinclude("a.lua")"#), Vec::<String>::new());
+    }
+
+    /// Zero-K's utility library names its command list and that list's folder
+    /// of extra commands this way (`globals.lua`, `customcmds.lua`).
+    #[test]
+    fn finds_the_files_and_folders_a_library_names_through_vfs() {
+        let text = "Spring.Utilities.CMD = VFS.Include(\"LuaRules/Configs/customcmds.lua\", nil, VFS.GAME)\nlocal files = VFS.DirList('LuaRules/Configs/ModCommands')\nVFS.Include(name)";
+        assert_eq!(
+            vfs_names(text),
+            (
+                vec!["LuaRules/Configs/customcmds.lua".to_string()],
+                vec!["LuaRules/Configs/ModCommands".to_string()]
+            )
+        );
+    }
+
+    /// Only the folder's own files, which is what `VFS.DirList` lists, in the
+    /// archive's spelling.
+    #[test]
+    fn lists_the_lua_files_directly_in_a_folder() {
+        let list = listing(&[
+            "LuaRules/Utilities/vector.lua",
+            "LuaRules/Utilities/json.lua",
+            "LuaRules/Utilities/readme.txt",
+            "LuaRules/Utilities/old/vector.lua",
+            "LuaRules/Utilities.lua",
+        ]);
+        assert_eq!(
+            lua_files_in(&list, "luarules/utilities"),
+            vec![
+                "LuaRules/Utilities/json.lua",
+                "LuaRules/Utilities/vector.lua"
+            ]
+        );
     }
 
     /// Run [`declared_script_lua`] against a stand-in for a game's definitions
