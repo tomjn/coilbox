@@ -25650,7 +25650,7 @@ msgstr "Een bestand genegeerd"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Ignored users"
-msgstr "Genegeerde gebruikers"
+msgstr "Negeerlijst"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
@@ -29799,7 +29799,7 @@ msgstr "metaal per seconde"
 #: src/content/metricLabels.ts
 #, fuzzy
 msgid "Metal produced"
-msgstr "Metaal geproduceerd"
+msgstr "Geproduceerd metaal"
 
 #: src/content/metricLabels.ts
 #, fuzzy
@@ -31377,7 +31377,7 @@ msgstr "Nieuwste"
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Newest first"
-msgstr "Nieuwste eerst"
+msgstr "Nieuwste"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -36340,7 +36340,7 @@ msgstr "Plak een uitdagingscode…"
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
 msgid "Paste a coilbox link, a code, or an exported file's contents…"
-msgstr "Plak een coilbox-link, een code of de inhoud van een geëxporteerd bestand…"
+msgstr "Plak een coilbox-link, code of geëxporteerd bestand…"
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -52964,7 +52964,7 @@ msgstr "Aanpassingsprojecten voor eenheden"
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Unit tweaks"
-msgstr "Eenheidsaanpassingen"
+msgstr "Eenheidstweaks"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -53189,7 +53189,7 @@ msgstr "Onbekend veld \"{identifier}\". Probeer hp, speed, cost, metal, energy, 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Onbekende herkomst"
+msgstr "Onbekend"
 
 #: src/deeplink/parse.ts
 #, fuzzy
