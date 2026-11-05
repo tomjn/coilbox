@@ -33,5 +33,7 @@ export function useBuiltUnitDef(project: LegoProject | null | undefined) {
     key && defs && defsFor === game?.primaryArchive.name
       ? (defs.units[key] as Record<string, unknown> | undefined)
       : undefined;
-  return { game, key, def };
+  const weaponDefs =
+    defs && defsFor === game?.primaryArchive.name ? defs.weaponDefs : undefined;
+  return { game, key, def, weaponDefs };
 }

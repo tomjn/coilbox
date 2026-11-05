@@ -15,7 +15,12 @@ import {
 import { luaLiteral } from "@/lib/lua";
 import { useModProjects } from "@/workshop/project";
 import { projectPath } from "@/workshop/routes";
-import { type WorkshopChange, workshopChanges } from "../../builderFields";
+import {
+  type WeaponStatId,
+  type WorkshopChange,
+  workshopChanges,
+  workshopWeaponChanges,
+} from "../../builderFields";
 import type { LegoProject } from "../../model";
 import { useBuiltUnitDef } from "./useBuiltUnitDef";
 
@@ -32,7 +37,7 @@ function shown(value: unknown): string {
  */
 export function useWorkshopChanges(project: LegoProject) {
   const { projects } = useModProjects();
-  const { game, key, def } = useBuiltUnitDef(project);
+  const { game, key, def, weaponDefs } = useBuiltUnitDef(project);
   return useMemo(
     () => ({
       key,
@@ -40,8 +45,20 @@ export function useWorkshopChanges(project: LegoProject) {
         game && key
           ? workshopChanges(projects, game.name, key, def, paths)
           : [],
+      /** The changes to the range or damage per second the weapons give. */
+      weaponChangesFor: (stat: WeaponStatId): WorkshopChange[] =>
+        game && key
+          ? workshopWeaponChanges(
+              projects,
+              game.name,
+              key,
+              def,
+              weaponDefs,
+              stat,
+            )
+          : [],
     }),
-    [projects, game, key, def],
+    [projects, game, key, def, weaponDefs],
   );
 }
 

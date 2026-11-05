@@ -60,9 +60,10 @@ interface Props {
 
 /**
  * The unit fields each stat is read from, for marking a workshop change to
- * one. Range and damage come from the weapons, which the marks do not follow.
+ * one. Range and damage come from the weapons, so `workshopWeaponChanges`
+ * marks those.
  */
-const STAT_FIELDS: Partial<Record<StatId, string[]>> = {
+const STAT_FIELDS: Record<"cost" | "health" | "speed", string[]> = {
   cost: ["metalCost", "buildCostMetal"],
   health: ["health", "maxDamage"],
   speed: ["speed"],
@@ -228,7 +229,11 @@ export function StatsSection({
                 <output aria-label={label}>{cell(id)}</output>
                 <WorkshopChangeMarks
                   unitKey={workshop.key}
-                  changes={workshop.changesFor(STAT_FIELDS[id] ?? [])}
+                  changes={
+                    id === "range" || id === "dps"
+                      ? workshop.weaponChangesFor(id)
+                      : workshop.changesFor(STAT_FIELDS[id])
+                  }
                 />
               </span>
             }
