@@ -11237,6 +11237,10 @@ msgstr "By map"
 msgid "By output"
 msgstr "By output"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr "By size"
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "By unit"
 msgstr "By unit"
@@ -15896,6 +15900,7 @@ msgstr "Disk space for tracks (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -31928,6 +31933,7 @@ msgstr "Relief"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reload"
@@ -37023,6 +37029,10 @@ msgstr "Streaks"
 msgid "Stream messages"
 msgstr "Stream messages"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr "Strength"
+
 #: src/lego/animPresets.ts
 msgid "Stride time"
 msgstr "Stride time"
@@ -39794,6 +39804,10 @@ msgstr "The servers you play on, and who you hear from there."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr "The shading map file has changed."
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
 msgstr "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -39897,6 +39911,10 @@ msgstr "The test mutator brings {conditionCount} conditions and {actionCount} ac
 #: src/lego/pages/components/ScriptTab.tsx
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr "The texture file has changed."
 
 #: src/lego/sandboxReload.ts
 msgid "The texture is in a file the game did not start with, so relaunch to see it."
@@ -42546,6 +42564,10 @@ msgstr "Unblock domain"
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 msgid "Unblock…"
 msgstr "Unblock…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr "Unbreakable"
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

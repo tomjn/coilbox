@@ -23,8 +23,11 @@
  * back, so there is nothing to re-read and Refresh is off until a file is
  * chosen (#1903).
  *
- * A watcher would notice the edit on its own and is more machinery than this
- * needs. A button is honest and cheap, and can grow into a watcher later.
+ * While the unit is open, the files its textures came from are watched
+ * (`lego_texture_watch`, #3225). When one is edited and the editor has finished
+ * writing it, an offer to reload appears. Nothing reloads without being asked:
+ * accepting the offer does what Refresh does, and Refresh stays for anyone who
+ * dismissed it. A texture with no source file has nothing to watch.
  *
  * Refresh is also the fix for a unit imported before issue #1909, whose stored
  * texture had its team-colour mask cut out of it on the way in. Nothing here
@@ -36,6 +39,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, RefreshCw, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -54,7 +58,11 @@ import {
   hexToRgb,
   mixTeamColourInto,
 } from "@/lib/textureTeamColour";
-import { legoTextureImport } from "../../bindings";
+import {
+  LEGO_TEXTURE_CHANGED_EVENT,
+  legoTextureImport,
+  legoTextureWatch,
+} from "../../bindings";
 import type { LegoImported, LegoTexture } from "../../model";
 import { maskLoss, maskLossNote } from "../../textureMask";
 
@@ -71,6 +79,10 @@ export function TexturePicker({ imported, onChange }: Props) {
   const { t } = useLingui();
   const [busy, setBusy] = useState<Slot | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const { changed, forget } = useChangedSources(
+    imported.texture?.source,
+    imported.texture2?.source,
+  );
 
   const label =
     imported.texture?.name ?? imported.missingTexture ?? t`no texture`;
@@ -92,6 +104,7 @@ export function TexturePicker({ imported, onChange }: Props) {
           ? { texture, missingTexture: undefined }
           : { texture2: texture, missingTexture2: undefined },
       );
+      forget(path);
     } catch (error) {
       setProblem(describeError(error));
     } finally {
@@ -126,80 +139,176 @@ export function TexturePicker({ imported, onChange }: Props) {
     await take(slot, source);
   }
 
+  const offers: { slot: Slot; title: string }[] = [];
+  if (imported.texture?.source && changed.includes(imported.texture.source))
+    offers.push({ slot: "texture", title: t`The texture file has changed.` });
+  if (imported.texture2?.source && changed.includes(imported.texture2.source))
+    offers.push({
+      slot: "texture2",
+      title: t`The shading map file has changed.`,
+    });
+
   return (
-    <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-      <span>
-        <Trans>texture</Trans>
-      </span>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 max-w-40 justify-start gap-1 px-1 text-xs font-normal"
-            // The unit is visibly missing its markings and nothing else on this
-            // screen says why, so the warning rides on the control that opens
-            // the sentence explaining it.
-            {...(note ? { title: note } : {})}
+    <>
+      <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+        <span>
+          <Trans>texture</Trans>
+        </span>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 max-w-40 justify-start gap-1 px-1 text-xs font-normal"
+              // The unit is visibly missing its markings and nothing else on this
+              // screen says why, so the warning rides on the control that opens
+              // the sentence explaining it.
+              {...(note ? { title: note } : {})}
+            >
+              <Image size={12} className="shrink-0" />
+              <span className="truncate">{label}</span>
+              {note ? (
+                <>
+                  <TriangleAlert
+                    size={12}
+                    aria-hidden
+                    className="shrink-0 text-amber-500"
+                  />
+                  <span className="sr-only">
+                    <Trans>This unit's team-colour mask is missing</Trans>
+                  </span>
+                </>
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80">
+            <div className="flex flex-col gap-4">
+              <TextureSlot
+                title={t`Texture`}
+                hint={t`What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap.`}
+                texture={imported.texture}
+                missing={imported.missingTexture}
+                note={note}
+                busy={busy === "texture"}
+                previewTeamColour
+                onChoose={() => void choose("texture")}
+                onRefresh={() => void refresh("texture")}
+              />
+              <TextureSlot
+                title={t`Shading map`}
+                hint={t`The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it.`}
+                texture={imported.texture2}
+                missing={imported.missingTexture2}
+                busy={busy === "texture2"}
+                previewTeamColour={false}
+                onChoose={() => void choose("texture2")}
+                onRefresh={() => void refresh("texture2")}
+              />
+              {problem ? (
+                <p className="text-xs text-destructive">{problem}</p>
+              ) : null}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-5"
+          aria-label={t`Refresh the texture`}
+          title={t`Re-read the texture file, to pick up an edit made elsewhere`}
+          disabled={busy !== null || !imported.texture?.source}
+          onClick={() => void refresh("texture")}
+        >
+          <RefreshCw size={12} />
+        </Button>
+      </div>
+      {offers.map(({ slot, title }) => {
+        const source = (
+          slot === "texture" ? imported.texture : imported.texture2
+        )?.source;
+        return (
+          <div
+            key={slot}
+            role="status"
+            className="mt-1 flex items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-background/90 px-2 py-1 text-xs"
           >
-            <Image size={12} className="shrink-0" />
-            <span className="truncate">{label}</span>
-            {note ? (
-              <>
-                <TriangleAlert
-                  size={12}
-                  aria-hidden
-                  className="shrink-0 text-amber-500"
-                />
-                <span className="sr-only">
-                  <Trans>This unit's team-colour mask is missing</Trans>
-                </span>
-              </>
-            ) : null}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-80">
-          <div className="flex flex-col gap-4">
-            <TextureSlot
-              title={t`Texture`}
-              hint={t`What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap.`}
-              texture={imported.texture}
-              missing={imported.missingTexture}
-              note={note}
-              busy={busy === "texture"}
-              previewTeamColour
-              onChoose={() => void choose("texture")}
-              onRefresh={() => void refresh("texture")}
-            />
-            <TextureSlot
-              title={t`Shading map`}
-              hint={t`The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it.`}
-              texture={imported.texture2}
-              missing={imported.missingTexture2}
-              busy={busy === "texture2"}
-              previewTeamColour={false}
-              onChoose={() => void choose("texture2")}
-              onRefresh={() => void refresh("texture2")}
-            />
-            {problem ? (
-              <p className="text-xs text-destructive">{problem}</p>
-            ) : null}
+            <span>{title}</span>
+            <span className="flex shrink-0 gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy !== null}
+                onClick={() => void refresh(slot)}
+              >
+                <Trans>Reload</Trans>
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  if (source) forget(source);
+                }}
+              >
+                <Trans>Dismiss</Trans>
+              </Button>
+            </span>
           </div>
-        </PopoverContent>
-      </Popover>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-5"
-        aria-label={t`Refresh the texture`}
-        title={t`Re-read the texture file, to pick up an edit made elsewhere`}
-        disabled={busy !== null || !imported.texture?.source}
-        onClick={() => void refresh("texture")}
-      >
-        <RefreshCw size={12} />
-      </Button>
-    </div>
+        );
+      })}
+    </>
   );
+}
+
+/**
+ * Which of the unit's texture files have been edited since the user last
+ * reloaded or dismissed them, as the paths the backend was told to watch.
+ *
+ * Watches exactly the sources it is given, so a unit with none watches nothing,
+ * and a texture changed to another file stops watching the old one. The watch
+ * ends with the component.
+ */
+function useChangedSources(...sources: (string | undefined)[]): {
+  changed: string[];
+  forget: (path: string) => void;
+} {
+  const [changed, setChanged] = useState<string[]>([]);
+  const paths = sources.filter((p): p is string => !!p);
+  const key = paths.join("\n");
+
+  useEffect(() => {
+    const watching = key === "" ? [] : key.split("\n");
+    // An offer for a file the unit no longer uses is not an offer.
+    setChanged((prev) => prev.filter((p) => watching.includes(p)));
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    // A watch that cannot start leaves Refresh, which does not depend on it.
+    listen<{ path: string }>(LEGO_TEXTURE_CHANGED_EVENT, (event) => {
+      const { path } = event.payload;
+      setChanged((prev) => (prev.includes(path) ? prev : [...prev, path]));
+    })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
+    legoTextureWatch({ paths: watching }).catch(() => {});
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [key]);
+
+  useEffect(
+    () => () => {
+      legoTextureWatch({ paths: [] }).catch(() => {});
+    },
+    [],
+  );
+
+  return {
+    changed,
+    forget: (path) => setChanged((prev) => prev.filter((p) => p !== path)),
+  };
 }
 
 /**

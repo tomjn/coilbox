@@ -17,6 +17,8 @@ const JOIN: JoinSummary = {
   offset: [0.5, 0.25],
   twist: Math.PI / 2,
   broken: false,
+  unbreakable: false,
+  strength: null,
 };
 
 const noop = {
@@ -82,6 +84,64 @@ describe("JoinedTo", () => {
     expect((screen.getByLabelText("Twist") as HTMLInputElement).value).toBe(
       "90",
     );
+  });
+
+  it("offers no break marks unless the unit breaks apart", () => {
+    render(<JoinedTo join={JOIN} {...noop} />);
+    expect(screen.queryByRole("checkbox", { name: "Unbreakable" })).toBeNull();
+    expect(screen.queryByLabelText("Strength")).toBeNull();
+  });
+
+  it("marks the join unbreakable, which hides its strength", () => {
+    const onBreak = vi.fn();
+    const { rerender } = render(
+      <JoinedTo join={JOIN} {...noop} onBreak={onBreak} />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Unbreakable" }));
+    expect(onBreak).toHaveBeenCalledWith({ unbreakable: true });
+    rerender(
+      <JoinedTo
+        join={{ ...JOIN, unbreakable: true }}
+        {...noop}
+        onBreak={onBreak}
+      />,
+    );
+    expect(screen.queryByLabelText("Strength")).toBeNull();
+  });
+
+  it("types a strength in, and clearing it goes back to the size", () => {
+    const onBreak = vi.fn();
+    const { rerender } = render(
+      <JoinedTo join={JOIN} {...noop} onBreak={onBreak} />,
+    );
+    const strength = screen.getByLabelText("Strength") as HTMLInputElement;
+    expect(strength.value).toBe("");
+    fireEvent.change(strength, { target: { value: "0.5" } });
+    fireEvent.blur(strength);
+    expect(onBreak).toHaveBeenLastCalledWith({ strength: 0.5 });
+
+    rerender(
+      <JoinedTo
+        join={{ ...JOIN, strength: 0.5 }}
+        {...noop}
+        onBreak={onBreak}
+      />,
+    );
+    const shown = screen.getByLabelText("Strength") as HTMLInputElement;
+    expect(shown.value).toBe("0.5");
+    fireEvent.change(shown, { target: { value: "" } });
+    fireEvent.blur(shown);
+    expect(onBreak).toHaveBeenLastCalledWith({ strength: null });
+  });
+
+  it("refuses a negative strength", () => {
+    const onBreak = vi.fn();
+    render(<JoinedTo join={JOIN} {...noop} onBreak={onBreak} />);
+    const strength = screen.getByLabelText("Strength") as HTMLInputElement;
+    fireEvent.change(strength, { target: { value: "-1" } });
+    fireEvent.blur(strength);
+    expect(onBreak).not.toHaveBeenCalled();
+    expect(strength.value).toBe("");
   });
 
   it("toggles the free faces", () => {

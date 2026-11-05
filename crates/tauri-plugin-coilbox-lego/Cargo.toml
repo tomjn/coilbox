@@ -72,5 +72,9 @@ coilbox-unitpatch = { path = "../coilbox-unitpatch" }
 # The workshop's in place backup markers, which hold a re-export back.
 coilbox-gamebackup = { path = "../coilbox-gamebackup" }
 
+# Watches the folder a texture was read from, to offer a reload when it is edited
+# (issue #3225). The version the replay folder watcher already uses.
+notify = "8"
+
 [dev-dependencies]
 tempfile = { workspace = true }

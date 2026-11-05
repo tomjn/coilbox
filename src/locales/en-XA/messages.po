@@ -11236,6 +11236,10 @@ msgstr ""
 msgid "By output"
 msgstr ""
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "By unit"
 msgstr ""
@@ -15895,6 +15899,7 @@ msgstr ""
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -31927,6 +31932,7 @@ msgstr ""
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reload"
@@ -37022,6 +37028,10 @@ msgstr ""
 msgid "Stream messages"
 msgstr ""
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 msgid "Stride time"
 msgstr ""
@@ -39793,6 +39803,10 @@ msgstr ""
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
 msgstr ""
@@ -39895,6 +39909,10 @@ msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
 msgstr ""
 
 #: src/lego/sandboxReload.ts
@@ -42544,6 +42562,10 @@ msgstr ""
 
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 msgid "Unblock…"
+msgstr ""
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
 msgstr ""
 
 #: src/lego/inventoryCategory.ts

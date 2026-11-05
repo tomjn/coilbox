@@ -13932,6 +13932,10 @@ msgstr "Per mappa"
 msgid "By output"
 msgstr "Per output"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -19657,6 +19661,7 @@ msgstr "Spazio su disco per le tracce (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -39476,6 +39481,7 @@ msgstr "Rilievo"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -45776,6 +45782,10 @@ msgstr "Serie"
 msgid "Stream messages"
 msgstr "Messaggi in streaming"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -49218,6 +49228,10 @@ msgstr "I server su cui giochi, e chi senti lì."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "Le impostazioni sono cambiate dopo che coilbox le ha lette, quindi non è stato salvato nulla. Chiudi e riapri."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49347,6 +49361,10 @@ msgstr "Il mutatore di prova porta {conditionCount} condizioni e {actionCount} a
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "Il testo qui sopra viene scartato. Annulla lo riporta se era un errore, quindi copialo prima se vuoi tenerlo oltre questa sessione."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -52642,6 +52660,10 @@ msgstr "Sblocca dominio"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Sblocca…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

@@ -77,6 +77,15 @@ export interface LegoConnection {
   /** Radians about the parent connector's facing, turning the piece on the
    *  face. Absent means none. */
   twist?: number;
+  /** A unit that breaks apart is never cut here (#4503), so the piece leaves
+   *  with its parent's group. Absent means it can be. */
+  unbreakable?: true;
+  /**
+   * How hard the join is to break, counted in pieces (#4503). A unit breaks
+   * apart weakest first, and a join without a strength is as strong as the
+   * group it throws off has pieces. Absent means that size.
+   */
+  strength?: number;
 }
 
 /**
@@ -2705,6 +2714,12 @@ function parseConnection(value: unknown): LegoConnection | null {
     ...(offset ? { offset } : {}),
     ...(typeof v.twist === "number" && Number.isFinite(v.twist)
       ? { twist: v.twist }
+      : {}),
+    ...(v.unbreakable === true ? { unbreakable: true as const } : {}),
+    ...(typeof v.strength === "number" &&
+    Number.isFinite(v.strength) &&
+    v.strength >= 0
+      ? { strength: v.strength }
       : {}),
   };
 }

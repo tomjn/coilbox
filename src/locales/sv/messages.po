@@ -13932,6 +13932,10 @@ msgstr "Per karta"
 msgid "By output"
 msgstr "Efter utdata"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "By unit"
@@ -19657,6 +19661,7 @@ msgstr "Diskutrymme för spår (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -39476,6 +39481,7 @@ msgstr "Relief"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -45776,6 +45782,10 @@ msgstr "Sviter"
 msgid "Stream messages"
 msgstr "Strömmeddelanden"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Stride time"
@@ -49218,6 +49228,10 @@ msgstr "Servrarna du spelar på, och vilka du hör från där."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "Inställningarna ändrades efter att coilbox läste dem, så inget sparades. Stäng det här och öppna det igen."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49347,6 +49361,10 @@ msgstr "Testmutatorn har med {conditionCount} villkor och {actionCount} åtgärd
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "Texten ovan kastas. Ångra tar tillbaka den om det var ett misstag, så kopiera den först om du vill behålla den efter den här sessionen."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -52642,6 +52660,10 @@ msgstr "Avblockera domän"
 #, fuzzy
 msgid "Unblock…"
 msgstr "Avblockera…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr ""
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

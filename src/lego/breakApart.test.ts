@@ -9,6 +9,7 @@ import {
   type LegoPiece,
   type LegoProject,
   newProject,
+  parseLegoProjectJson,
 } from "./model";
 
 /** The flag values `LuaConstCOB.cpp` gives `SFX`, as the engine reads them. */
@@ -27,6 +28,8 @@ interface Spec {
   name: string;
   parent?: string;
   joined?: boolean;
+  /** Extra fields on the join, such as `unbreakable` or `strength`. */
+  join?: Partial<LegoConnection>;
 }
 
 /** A unit whose root is `base`, with pieces in the order given. */
@@ -51,7 +54,7 @@ function unit(
     position: [0, 0, 0],
     rotation: [0, 0, 0],
     scale: [1, 1, 1],
-    ...(spec.joined === false ? {} : { connection: JOIN }),
+    ...(spec.joined === false ? {} : { connection: { ...JOIN, ...spec.join } }),
   }));
   return {
     ...base,
@@ -184,6 +187,179 @@ describe("breakGroups", () => {
     expect(breakGroups(unit([]), Number.POSITIVE_INFINITY)).toEqual([]);
   });
 });
+
+describe("Joins the game maker marks (#4503)", () => {
+  it("never cuts a join marked unbreakable, at any depth", () => {
+    const marked = unit(
+      ROBOT.map((spec) =>
+        spec.name === "hand" ? { ...spec, join: { unbreakable: true } } : spec,
+      ),
+    );
+
+    for (const depth of [1, 2, Number.POSITIVE_INFINITY]) {
+      const groups = breakGroups(marked, depth);
+      expect(groups.some((group) => group.pieces[0] === "hand")).toBe(false);
+      expect(groups).toContainEqual({ pieces: ["arm", "hand"], whole: true });
+    }
+  });
+
+  it("keeps an unbreakable branch on the body while the joins beneath it still break", () => {
+    const marked = unit(
+      ROBOT.map((spec) =>
+        spec.name === "turret"
+          ? { ...spec, join: { unbreakable: true } }
+          : spec,
+      ),
+    );
+
+    const groups = breakGroups(marked, Number.POSITIVE_INFINITY);
+    const thrown = groups.flatMap((group) => group.pieces);
+    expect(thrown).not.toContain("turret");
+    expect(thrown).not.toContain("dish");
+    expect(thrown).toContain("barrel");
+  });
+
+  it("breaks nothing when every join is unbreakable, rather than falling back to the piece tree", () => {
+    const sealed = unit(
+      ROBOT.map((spec) =>
+        spec.joined === false ? spec : { ...spec, join: { unbreakable: true } },
+      ),
+    );
+
+    expect(breakGroups(sealed, Number.POSITIVE_INFINITY)).toEqual([]);
+    expect(die(sealed, 150)).toEqual({
+      calls: ["Explode base 1"],
+      returned: 1,
+    });
+  });
+
+  it("breaks a weak join first and a strong one last", () => {
+    const marked = unit(
+      ROBOT.map((spec) => {
+        if (spec.name === "turret") return { ...spec, join: { strength: 0.5 } };
+        if (spec.name === "antenna") return { ...spec, join: { strength: 9 } };
+        return spec;
+      }),
+    );
+
+    expect(breakGroups(marked, 1)).toEqual([
+      { pieces: ["turret", "dish", "barrel"], whole: true },
+      { pieces: ["lamp"], whole: true },
+      { pieces: ["arm", "hand"], whole: true },
+      { pieces: ["antenna"], whole: true },
+    ]);
+    // A light hit throws the weakest, so the turret goes first now.
+    expect(die(marked, 20).calls).toEqual([
+      explode("turret", SFX.RECURSIVE + SMOKE),
+      hide("turret"),
+      hide("dish"),
+      hide("barrel"),
+      explode("lamp", SMOKE),
+      hide("lamp"),
+      explode("base", SFX.NONE),
+    ]);
+  });
+
+  it("puts a join without a strength where its size puts it", () => {
+    // A strength of 2 sits with the two piece arm, and loses to it on size.
+    const marked = unit(
+      ROBOT.map((spec) =>
+        spec.name === "lamp" ? { ...spec, join: { strength: 2 } } : spec,
+      ),
+    );
+
+    expect(breakGroups(marked, 1).map((group) => group.pieces[0])).toEqual([
+      "antenna",
+      "lamp",
+      "arm",
+      "turret",
+    ]);
+  });
+
+  it("writes the same Killed as before for a unit that sets neither", () => {
+    const lua = buildLuaScript(unit(ROBOT));
+
+    expect(lua.slice(lua.indexOf("function script.Killed"))).toBe(
+      KILLED_BEFORE,
+    );
+  });
+
+  it("saves both marks with the piece and reads them back", () => {
+    const marked = unit(
+      ROBOT.map((spec) => {
+        if (spec.name === "hand")
+          return { ...spec, join: { unbreakable: true } };
+        if (spec.name === "lamp") return { ...spec, join: { strength: 0.25 } };
+        return spec;
+      }),
+    );
+
+    const back = parseLegoProjectJson(JSON.stringify(marked));
+    const join = (name: string) =>
+      back?.pieces.find((piece) => piece.name === name)?.connection;
+    expect(join("hand")).toEqual({ ...JOIN, unbreakable: true });
+    expect(join("lamp")).toEqual({ ...JOIN, strength: 0.25 });
+    expect(join("arm")).toEqual(JOIN);
+  });
+
+  it("drops a strength that is not a number of zero or more", () => {
+    const raw = JSON.parse(JSON.stringify(unit(ROBOT)));
+    for (const piece of raw.pieces) {
+      if (piece.name === "lamp") piece.connection.strength = -1;
+      if (piece.name === "arm") piece.connection.strength = "weak";
+      if (piece.name === "hand") piece.connection.unbreakable = "yes";
+    }
+
+    const back = parseLegoProjectJson(JSON.stringify(raw));
+    for (const name of ["lamp", "arm", "hand"]) {
+      expect(
+        back?.pieces.find((piece) => piece.name === name)?.connection,
+      ).toEqual(JOIN);
+    }
+  });
+});
+
+/** `Killed` for `ROBOT` as the export wrote it before joins had marks. */
+const KILLED_BEFORE = `function script.Killed(recentDamage, maxHealth)
+  local severity = recentDamage / maxHealth
+  if severity <= 0.25 then
+    Explode(antenna, SFX.SMOKE)
+    Hide(antenna)
+    Explode(lamp, SFX.SMOKE)
+    Hide(lamp)
+    Explode(base, SFX.NONE)
+    return 1
+  end
+  if severity <= 0.5 then
+    Explode(barrel, SFX.SMOKE + SFX.FIRE)
+    Hide(barrel)
+    Explode(arm, SFX.SMOKE + SFX.FIRE)
+    Hide(arm)
+    Explode(hand, SFX.SMOKE + SFX.FIRE)
+    Hide(hand)
+    Explode(antenna, SFX.SMOKE + SFX.FIRE)
+    Hide(antenna)
+    Explode(base, SFX.NONE)
+    return 1
+  end
+  Explode(barrel, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Hide(barrel)
+  Explode(arm, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Hide(arm)
+  Explode(hand, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Hide(hand)
+  Explode(antenna, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Hide(antenna)
+  Explode(lamp, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Hide(lamp)
+  Explode(turret, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Explode(dish, SFX.SMOKE + SFX.FIRE + SFX.EXPLODE_ON_HIT)
+  Hide(turret)
+  Hide(dish)
+  Explode(base, SFX.SHATTER)
+  return 1
+end
+`;
 
 describe("Killed with Break apart", () => {
   it("throws the weakest few whole, with smoke, on a light hit", () => {
