@@ -124,6 +124,11 @@ msgstr "”{baseId}” anger en enhet på {baseUnit}, vilket inte är ett positi
 msgid "\"{copyName}\" is yours to change."
 msgstr "”{copyName}” är din att ändra."
 
+#: src/profile/health.ts
+#, fuzzy
+msgid "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+msgstr "”{defaultLocale}” är varken ett medföljande språk eller ett paket under .coilbox/locales/, så spelarna börjar på systemspråket."
+
 #: src/conquest/handmade/library.ts
 #, fuzzy
 msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
@@ -2726,6 +2731,11 @@ msgstr "{failedGames} utelämnade: reprisen kunde inte läsas."
 #, fuzzy
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, one {# analys misslyckades} other {# analyser misslyckades}}"
+
+#: src/profile/health.ts
+#, fuzzy
+msgid "{failureCount} language pack(s) were not used"
+msgstr "Språkpaket som inte användes: {failureCount}"
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -7917,6 +7927,11 @@ msgstr "#{channel} är inte längre registrerad."
 #, fuzzy
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} är registrerad på {founder}."
+
+#: src/profile/health.ts
+#, fuzzy
+msgid "`defaultLocale` names a language coilbox does not have"
+msgstr "`defaultLocale` anger ett språk som coilbox inte har"
 
 #: src/profile/onlyOwnMaps.ts
 #, fuzzy
@@ -22608,6 +22623,11 @@ msgstr "Fixa färger"
 
 #: src/profile/health.ts
 #, fuzzy
+msgid "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+msgstr "Rätta filerna i .coilbox/locales/<code>/. Ett paket är pack.json och den messages.json som lingui compile --namespace json skriver."
+
+#: src/profile/health.ts
+#, fuzzy
 msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 msgstr "Rätta JSON-koden i .coilbox/campaigns/ (medföljande) eller kampanjmappen i appdata (lokala):"
 
@@ -27418,6 +27438,11 @@ msgstr "Utan kust"
 msgid "Language"
 msgstr "Språk"
 
+#: src/profile/health.ts
+#, fuzzy
+msgid "Language packs loaded: {loadedList}"
+msgstr "Inlästa språkpaket: {loadedList}"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -32149,6 +32174,11 @@ msgstr "Inget installerat paket har den texturen, så bekräfta vilken atlas den
 #, fuzzy
 msgid "No invite link for this battle. {inviteProblem}"
 msgstr "Ingen inbjudningslänk för den här striden. {inviteProblem}"
+
+#: src/profile/health.ts
+#, fuzzy
+msgid "No language packs"
+msgstr "Inga språkpaket"
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy
