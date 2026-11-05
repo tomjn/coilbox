@@ -63,6 +63,7 @@ T["zh-Hans"] = { objectives = "目标" }
 T["pt-BR"] = { objectives = "Objetivos" }
 T.nb = { objectives = "Mål" }
 T.el = { objectives = "Στόχοι" }
+T.nl = { objectives = "Doelen" }
 
 check("the mod option comes first", I18N.code(T, { coilbox_lang = "fr" }, "zh-Hans") == "fr")
 check("then the engine's language key", I18N.code(T, {}, "fr") == "fr")
@@ -107,6 +108,9 @@ check("Nynorsk has no table and is English", I18N.code(T, {}, "nn") == "en")
 check("el finds el", I18N.code(T, { coilbox_lang = "el" }, "") == "el")
 check("Cypriot Greek finds el", I18N.code(T, {}, "el-CY") == "el")
 check("as does el_GR", I18N.code(T, {}, "el_GR") == "el")
+check("nl finds nl", I18N.code(T, { coilbox_lang = "nl" }, "") == "nl")
+check("Flemish finds nl", I18N.code(T, {}, "nl-BE") == "nl")
+check("as does nl_NL", I18N.code(T, {}, "nl_NL") == "nl")
 check("a language coilbox does not draw in is English", I18N.code(T, {}, "xx") == "en")
 check("the pseudo-locale needs no table", I18N.code(T, { coilbox_lang = "en-XA" }, "") == "en-XA")
 

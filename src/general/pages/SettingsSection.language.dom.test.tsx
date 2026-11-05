@@ -167,6 +167,7 @@ describe("Language picker", () => {
       "Norsk bokmål",
       "Svenska",
       "Ελληνικά",
+      "Nederlands",
       "日本語",
       expect.stringContaining("中文"),
       // The pseudo-locale (#4593), listed because tests run as a dev build.
@@ -191,6 +192,7 @@ describe("Language picker", () => {
     expect(hints).toContainEqual(["nb", "nb"]);
     expect(hints).toContainEqual(["sv", "sv"]);
     expect(hints).toContainEqual(["el", "el"]);
+    expect(hints).toContainEqual(["nl", "nl"]);
     expect(hints).toContainEqual([SYSTEM_LANGUAGE, null]);
   });
 
