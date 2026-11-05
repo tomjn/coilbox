@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { getMeshGeometry, type RawGeometry } from "./rawGeometry";
 import {
   hideChrome,
   readyToCapture,
@@ -203,6 +204,78 @@ describe("thumbnailCamera", () => {
         }
       }
     }
+  });
+
+  /**
+   * A unit read out of a game keeps every piece's vertices in one shared buffer
+   * and gives each piece its own slice through an index buffer (issue #1892).
+   * Measured from the whole buffer, each piece would be as big as the whole
+   * model, and the thumbnail would sit in a wide band of empty space.
+   */
+  it("frames a unit whose pieces share one vertex buffer by what each piece draws", () => {
+    // Two unit cubes' corners 100 apart in the buffer, laid back on top of each
+    // other by moving the second piece 100 the other way.
+    const quad = (x: number) =>
+      [
+        [x, 0, 0],
+        [x + 1, 1, 0],
+        [x, 1, 1],
+        [x + 1, 0, 1],
+      ].flatMap(([px, py, pz]) => [px, py, pz, 0, 1, 0, 0, 0]);
+    const raw: RawGeometry = {
+      vertices: new Float32Array([...quad(0), ...quad(100)]),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3]),
+      byId: new Map([
+        [
+          "a",
+          {
+            id: "a",
+            vFirst: 0,
+            vCount: 4,
+            iFirst: 0,
+            iCount: 6,
+            bbox: { min: [0, 0, 0], max: [1, 1, 1] },
+          },
+        ],
+        [
+          "b",
+          {
+            id: "b",
+            vFirst: 4,
+            vCount: 4,
+            iFirst: 6,
+            iCount: 6,
+            bbox: { min: [100, 0, 0], max: [101, 1, 1] },
+          },
+        ],
+      ]),
+    };
+    const unit = new THREE.Group();
+    for (const [id, x] of [
+      ["a", 0],
+      ["b", -100],
+    ] as const) {
+      const geometry = getMeshGeometry(raw, id);
+      if (!geometry) throw new Error(`no geometry for ${id}`);
+      const piece = new THREE.Group();
+      piece.position.x = x;
+      piece.add(new THREE.Mesh(geometry));
+      unit.add(piece);
+    }
+    unit.updateMatrixWorld(true);
+
+    // What the pieces really cover: one box, one across.
+    const whole = new THREE.Group();
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+    box.position.set(0.5, 0.5, 0.5);
+    whole.add(box);
+    whole.updateMatrixWorld(true);
+
+    const camera = thumbnailCamera(unit);
+    const expected = thumbnailCamera(whole);
+    expect(camera.position.x).toBeCloseTo(expected.position.x);
+    expect(camera.position.y).toBeCloseTo(expected.position.y);
+    expect(camera.position.z).toBeCloseTo(expected.position.z);
   });
 
   it("still points somewhere for a unit with nothing in it", () => {
