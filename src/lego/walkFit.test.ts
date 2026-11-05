@@ -328,8 +328,9 @@ interface LegFrame {
  * speed / 30 a frame and stop there (`CUnitScript::TickTurnAnim` and
  * `TurnToward`), and `Sleep(ms)` wakes the thread `floor(ms / 33)` frames
  * later, as the unit script gadget's `Sleep` does. `StartMoving` fires on
- * frame 0. Returns the left thigh's and shin's x angles and the body's y
- * offset on every frame.
+ * frame 0. `CURRENT_SPEED` reads `pace` of `MAX_SPEED` on every frame, in the
+ * engine's 65536ths of an elmo a frame (#4486). Returns the left thigh's and
+ * shin's x angles and the body's y offset on every frame.
  */
 function walkLeg(
   lua: string,
@@ -337,11 +338,12 @@ function walkLeg(
   shin: string,
   body: string,
   frames: number,
+  pace = 1,
 ): LegFrame[] {
   const harness = `
 x_axis, y_axis, z_axis = 1, 2, 3
 SFX = { SHATTER = 1 }
-COB = {}
+${speedValues(pace)}
 local frame = 0
 local anims = {}
 local threads = {}
@@ -419,6 +421,22 @@ end
     });
 }
 
+/**
+ * `COB.CURRENT_SPEED` and `COB.MAX_SPEED` with the engine's ids
+ * (`crates/coilbox-unitpose/src/unitvalue.rs`), and a `GetUnitValue` that
+ * answers the current speed as `pace` of a top speed of 1.5 elmos a frame,
+ * floored to a whole number as the engine's integer answer is.
+ */
+function speedValues(pace: number): string {
+  const top = 1.5 * 65536;
+  return `COB = { CURRENT_SPEED = 29, MAX_SPEED = 75 }
+function GetUnitValue(id)
+  if id == 29 then return ${Math.floor(top * pace)} end
+  if id == 75 then return ${top} end
+  return 0
+end`;
+}
+
 /** A biped whose thigh is `share` of its `legLength`, at `speed`. */
 function walker(legLength: number, share: number, speed: number): LegoProject {
   const unit = fromPlan(BIPED, { legLength }, speed);
@@ -466,24 +484,35 @@ function stancesOf(
   unit: LegoProject,
   speed: number,
   params: Record<string, number>,
+  pace = 1,
 ): Stance[] {
-  const lap = Math.round(params.period * FPS);
-  const down = Math.round((params.duty / 100) * lap);
+  // At a share of top speed a lap and a time on the ground take that much
+  // longer (#4486), which need not be a whole number of frames. A foot is then
+  // counted as down on the frames inside its time on the ground, and the lap's
+  // start is the frame next to where it is due whose thigh is nearest the
+  // first pose.
+  const lap = Math.round(params.period * FPS) / pace;
+  const down = Math.round((params.duty / 100) * params.period * FPS) / pace;
   const lengths = legLengths(unit);
   if (!lengths) throw new Error("the walker has no leg lengths");
   const { thighLength: a, shinLength: b } = lengths;
   const first = WALK_BIPED.track(0, params, "leg.l1.thigh")?.rotation?.[0];
-  const start = [lap, lap + 1, lap - 1].find(
-    (frame) => Math.abs(legs[frame].thigh - (first ?? 0)) < 1e-3,
-  );
+  const near = Math.round(lap);
+  const gap = (frame: number) => Math.abs(legs[frame].thigh - (first ?? 0));
+  const start =
+    pace === 1
+      ? [near, near + 1, near - 1].find((frame) => gap(frame) < 1e-3)
+      : [near, near + 1, near - 1].reduce((best, frame) =>
+          gap(frame) < gap(best) ? frame : best,
+        );
   if (start === undefined) throw new Error("no lap starts on the first pose");
   const stances: Stance[] = [];
-  for (let from = start; from + down < legs.length; from += lap) {
-    const run = legs.slice(from, from + down + 1);
+  for (let from = start; Math.floor(from + down) < legs.length; from += lap) {
+    const run = legs.slice(Math.ceil(from), Math.floor(from + down) + 1);
     stances.push({
       along: run.map(
         (leg) =>
-          (speed * leg.frame) / FPS -
+          (speed * pace * leg.frame) / FPS -
           a * Math.sin(leg.thigh) -
           b * Math.sin(leg.thigh + leg.shin),
       ),
@@ -632,4 +661,181 @@ describe("a fitted walk under luajit (#3350)", () => {
       'The legs do not hang down from their joints, so "Walk, two legs" cannot keep the feet planted.',
     ]);
   });
+});
+
+/** One step of a walk thread: each `Turn` speed it sets, keyed by piece and
+ *  axis, and the frames it then sleeps. */
+interface WalkStep {
+  turns: Map<string, number>;
+  sleep: number;
+}
+
+/**
+ * The first `steps` steps a unit's walk thread takes, with the unit moving at
+ * `pace` of its top speed.
+ */
+function walkSteps(lua: string, pace: number, steps: number): WalkStep[] {
+  const harness = `
+x_axis, y_axis, z_axis = 1, 2, 3
+SFX = { SHATTER = 1 }
+${speedValues(pace)}
+local walking = false
+function piece(name) return name end
+function Turn(p, axis, dest, speed)
+  if walking then io.write("turn ", p, ":", axis, " ", speed, "\\n") end
+end
+function Move() end
+function Spin() end
+function StopSpin() end
+function Explode() end
+function SetUnitValue() end
+function SetSignalMask() end
+function Signal() end
+function Sleep(ms) io.write("sleep ", math.floor(ms / 33), "\\n") coroutine.yield() end
+local threads = {}
+function StartThread(fn) threads[#threads + 1] = coroutine.create(fn) end
+script = {}
+assert(loadstring(io.read("*a")))()
+script.Create()
+threads = {}
+script.StartMoving()
+walking = true
+for _ = 1, ${steps} do
+  for _, co in ipairs(threads) do assert(coroutine.resume(co)) end
+end
+`;
+  const result = spawnSync("luajit", ["-e", harness], { input: lua });
+  if (result.status !== 0) {
+    throw new Error(`luajit failed: ${result.stderr.toString()}`);
+  }
+  const out: WalkStep[] = [];
+  let turns = new Map<string, number>();
+  for (const line of result.stdout.toString().split("\n").filter(Boolean)) {
+    const [kind, key, value] = line.split(" ");
+    if (kind === "turn") {
+      turns.set(key, Number(value));
+      continue;
+    }
+    out.push({ turns, sleep: Number(key) });
+    turns = new Map();
+  }
+  return out;
+}
+
+const frameCount = (steps: WalkStep[]) =>
+  steps.reduce((sum, step) => sum + step.sleep, 0);
+
+describe("a fitted walk at the unit's speed (#4486)", () => {
+  const speed = 40;
+  const unit = walker(12, 0.395, speed);
+  const lua = buildLuaScript(unit);
+  const fitted = fittedParams(unit, "walk.biped", {});
+  const lap = Math.round(fitted.period * FPS);
+  // Three laps' steps at top speed, the thread's first step being the first.
+  const top = walkSteps(lua, 1, 400);
+  const steps =
+    top.findIndex(
+      (_, index) => frameCount(top.slice(0, index + 1)) === 3 * lap,
+    ) + 1;
+
+  it("sleeps each step's own frames at top speed, as it always did", () => {
+    const written = [...lua.matchAll(/walkPace\((\d+), due\)/g)].map((match) =>
+      Number(match[1]),
+    );
+    expect(written.length).toBeGreaterThan(0);
+    expect(steps).toBe(3 * written.length);
+    expect(top.slice(0, steps).map((step) => step.sleep)).toEqual([
+      ...written,
+      ...written,
+      ...written,
+    ]);
+  });
+
+  it("takes twice as long at half top speed, with every turn half as fast", () => {
+    const half = walkSteps(lua, 0.5, steps);
+    half.forEach((step, index) => {
+      expect(step.sleep).toBe(2 * top[index].sleep);
+      for (const [key, rate] of step.turns) {
+        expect(rate).toBeCloseTo((top[index].turns.get(key) ?? 0) / 2, 9);
+      }
+    });
+  });
+
+  for (const pace of [0.5, 0.6, 0.35]) {
+    it(`divides the sleeps by the pace and slows every turn to match at ${pace} of top speed`, () => {
+      const paced = walkSteps(lua, pace, steps);
+      // Each sleep is whole frames, and what rounding leaves over is carried,
+      // so three laps take three laps' frames over the pace to within half a
+      // frame.
+      for (const step of paced) {
+        expect(Number.isInteger(step.sleep) && step.sleep >= 1).toBe(true);
+      }
+      expect(
+        Math.abs(frameCount(paced) - (3 * lap) / pace),
+      ).toBeLessThanOrEqual(0.5);
+      // Each step turns the same pieces as at top speed and covers the same
+      // ground in the frames it sleeps, so each pose is reached as the sleep
+      // ends.
+      paced.forEach((step, index) => {
+        const was = top[index];
+        expect([...step.turns.keys()]).toEqual([...was.turns.keys()]);
+        for (const [key, rate] of step.turns) {
+          expect(rate * step.sleep).toBeCloseTo(
+            (was.turns.get(key) ?? 0) * was.sleep,
+            9,
+          );
+        }
+      });
+    });
+  }
+
+  it("goes no slower than a fifth of top speed, even standing still", () => {
+    const floor = walkSteps(lua, 0.2, steps);
+    expect(frameCount(floor)).toBe(5 * 3 * lap);
+    for (const pace of [0.1, 0]) {
+      expect(walkSteps(lua, pace, steps)).toEqual(floor);
+    }
+  });
+
+  it("goes no faster than top speed", () => {
+    expect(walkSteps(lua, 1.2, steps)).toEqual(top.slice(0, steps));
+  });
+
+  it("leaves a walk that is not fitted to the unit's speed alone", () => {
+    const unfitted = fromPlan(BIPED, { legLength: 12 });
+    const script = buildLuaScript({
+      ...unfitted,
+      animations: [{ presetId: "walk.biped", params: {} }],
+    });
+    expect(script).not.toContain("CURRENT_SPEED");
+    expect(lua).toContain("CURRENT_SPEED");
+  });
+
+  /**
+   * At a share of top speed the poses are the same and take longer, so a
+   * planted foot stays planted. A step's sleep is rounded to whole frames, so
+   * a pose can be reached up to half a frame early or late, which moves the
+   * foot by up to half a frame of the unit's travel each way. Poses more than a
+   * frame apart also let the foot dip between them, as `walkPoses` says. The
+   * allowance is one frame of the unit's travel, which is what the parity
+   * fixture gives a script, on top of what rounding the poses allows.
+   */
+  for (const pace of [0.5, 0.6, 0.35]) {
+    it(`plants the feet at ${pace} of top speed`, () => {
+      const frames = Math.ceil((lap * 6) / pace);
+      const legs = walkLeg(lua, "lthigh", "lshin", "hip", frames, pace);
+      const stances = stancesOf(legs, unit, speed, fitted, pace);
+      expect(stances.length).toBeGreaterThanOrEqual(3);
+      const allowance =
+        roundingAllowance(fitted[WALK_THIGH], fitted[WALK_SHIN]) +
+        (speed * pace) / FPS;
+      for (const { along, height } of stances) {
+        expect(spread(along)).toBeLessThan(allowance);
+        for (const h of height) expect(Math.abs(h)).toBeLessThan(allowance);
+      }
+      console.log(
+        `#4486 ${pace} of top speed: along ${Math.max(...stances.map((run) => spread(run.along))).toFixed(5)}, height ${Math.max(...stances.flatMap((run) => run.height.map(Math.abs))).toFixed(5)}, allowance ${allowance.toFixed(5)}`,
+      );
+    });
+  }
 });

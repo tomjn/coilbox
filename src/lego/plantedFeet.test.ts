@@ -98,6 +98,37 @@ describe("the planted foot markers (#3350)", () => {
     }
   });
 
+  /** A drive that holds the unit at `share` of its top speed from the start. */
+  const drive = (share: number) => ({
+    maxSpeed: 40 / FPS,
+    frames: Array.from({ length: FRAMES * 2 }, () => ({
+      speed: (share * 40) / FPS,
+    })),
+  });
+
+  it("follows a drive below top speed, where the walk takes as much longer (#4486)", () => {
+    const top = plantedFeet(unit, WALKING, FRAMES);
+    const half = plantedFeet(unit, WALKING, FRAMES * 2, drive(0.5));
+    // Every step of the thread sleeps twice its frames at half speed, so the
+    // walk is on the frame of its cycle half as far from its start.
+    let marked = 0;
+    for (let frame = START; frame < FRAMES; frame++) {
+      const slow = START + 2 * (frame - START);
+      expect(half?.[slow]).toEqual(top?.[frame]);
+      marked += top?.[frame].size ?? 0;
+    }
+    expect(marked).toBeGreaterThan(0);
+  });
+
+  it("follows the walk's floor of a fifth of top speed while the unit is barely moving (#4486)", () => {
+    expect(plantedFeet(unit, WALKING, FRAMES, drive(0))).toEqual(
+      plantedFeet(unit, WALKING, FRAMES, drive(0.2)),
+    );
+    expect(plantedFeet(unit, WALKING, FRAMES, drive(1))).toEqual(
+      plantedFeet(unit, WALKING, FRAMES),
+    );
+  });
+
   it("marks nothing for a walk the solve does not apply to", () => {
     // No speed, so the walk is not fitted.
     expect(plantedFeet(walker(), WALKING, FRAMES)).toBeNull();
