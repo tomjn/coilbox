@@ -2,7 +2,7 @@ import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Map as MapIcon, Play } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import { type MissionNeed, missionNeeds } from "../../campaign/missionNeeds";
 import { useCampaignImage } from "../../campaign/panorama";
@@ -172,27 +172,45 @@ function KindIcon({ kind }: { kind: ResumeCandidate["kind"] }) {
  * gets a map icon in the kind's tinted square rather than the skirmish's
  * crossed swords, so the square says "map" either way.
  *
+ * The square is always drawn, icon and all, and the minimap fades in over it
+ * once it has decoded. The minimap usually arrives a moment after the card, and
+ * swapping one element for another made the square jump from icon to picture.
+ * Drawn over the square, the icon is what shows until the picture is ready, and
+ * also what stays when there is none.
+ *
+ * A border once the picture is in, the same `border-border` the battle list
+ * draws round its minimaps. Most maps are dark, and without an edge a dark one
+ * dissolved into the card.
+ *
  * The image is decorative, `alt=""`: the title beside it already names the map.
  * `object-cover`, because a square crop of a long map still reads as that map,
  * and letterboxing it would leave a 48px box mostly empty.
  */
 function MapArt({ mapName }: { mapName: string }) {
   const url = useMapMinimap(mapName);
-  if (!url)
-    return (
-      <span
-        data-testid="continue-map-icon"
-        className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
-      >
-        <MapIcon className="size-6" aria-hidden />
-      </span>
-    );
+  // The URL that finished decoding, so a new map starts transparent again.
+  const [shown, setShown] = useState<string | null>(null);
+  const ready = url !== null && shown === url;
   return (
-    <img
-      src={url}
-      alt=""
-      className="size-12 shrink-0 rounded-md bg-muted object-cover"
-    />
+    <span
+      className={cn(
+        "relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary/10 text-primary",
+        ready && "border border-border",
+      )}
+    >
+      <MapIcon data-testid="continue-map-icon" className="size-6" aria-hidden />
+      {url && (
+        <img
+          src={url}
+          alt=""
+          onLoad={() => setShown(url)}
+          className={cn(
+            "absolute inset-0 size-full object-cover motion-safe:transition-opacity motion-safe:duration-300",
+            ready ? "opacity-100" : "opacity-0",
+          )}
+        />
+      )}
+    </span>
   );
 }
 

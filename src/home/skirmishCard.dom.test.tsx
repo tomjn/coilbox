@@ -9,7 +9,13 @@
  * calls are the stubs here and the hook between them runs for real.
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinimapResult } from "../content/bindings";
@@ -91,7 +97,18 @@ describe("the skirmish card's icon square", () => {
       );
     });
     expect(minimap).toHaveBeenCalledWith("/engine", "/data", "BarR 1.1");
-    expect(screen.queryByTestId("continue-map-icon")).toBeNull();
+  });
+
+  it("fades the minimap in over the map icon once it has decoded", async () => {
+    // The icon holds the square until the picture is ready, so the square
+    // never jumps from one to the other.
+    const { container } = renderZone();
+    await waitFor(() => expect(container.querySelector("img")).not.toBeNull());
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(screen.getByTestId("continue-map-icon")).toBeTruthy();
+    fireEvent.load(img);
+    expect(img.className).toContain("opacity-100");
+    expect(img.parentElement?.className).toContain("border-border");
   });
 
   it("shows a map icon when the map has no minimap", async () => {
