@@ -38769,6 +38769,10 @@ msgstr "Ανάγνωση των ευρετηρίων καθρεφτών…"
 msgid "Reading the model."
 msgstr "Ανάγνωση του μοντέλου."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -48426,6 +48430,10 @@ msgstr "η αναμέτρηση"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "Η μέγιστη φόρτιση που μπορεί να κρατήσει η ασπίδα, η οποία μειώνεται από τη ζημιά των εισερχόμενων όπλων."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -50733,9 +50741,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Αυτό το μοντέλο ανοίχτηκε μέσα από συμπιεσμένη αρχειοθήκη, που δεν έχει διαδρομή για εγγραφή. Αποθηκεύστε το σε διαδρομή της επιλογής σας."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Αυτή η λειτουργική μονάδα περιέχει γεωμετρία από παιχνίδι ή μοντέλο, την οποία δεν μπορεί να μεταφέρει μια κοινοποιημένη λειτουργική μονάδα."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy

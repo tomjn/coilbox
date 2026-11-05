@@ -38502,6 +38502,10 @@ msgstr "Читання індексів дзеркал…"
 msgid "Reading the model."
 msgstr "Читання моделі."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -48094,6 +48098,10 @@ msgstr "протистояння"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "Максимальний заряд, який може мати щит, що зменшується від шкоди вхідної зброї."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -50382,9 +50390,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Цю модель відкрито із запакованого архіву, який не містить шляху для запису назад. Натомість збережіть її за вибраним шляхом."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Цей модуль містить геометрію з гри чи моделі, яку модуль для поширення не може передати."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy
