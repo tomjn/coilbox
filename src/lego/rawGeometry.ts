@@ -115,6 +115,33 @@ export function parseRawGeometry(blob: Uint8Array): RawGeometry {
 }
 
 /**
+ * Whether a mesh's directory entry stays inside the blob's arrays, its indices
+ * stay inside its own vertices, and its box is six numbers. A blob coilbox
+ * wrote always passes. One that arrived in a shared code (#4360) is checked
+ * with this before anything draws it.
+ */
+export function rawMeshFits(raw: RawGeometry, mesh: RawMesh): boolean {
+  const { vFirst, vCount, iFirst, iCount, bbox } = mesh;
+  const counts = [vFirst, vCount, iFirst, iCount];
+  if (!counts.every((n) => Number.isInteger(n) && n >= 0)) return false;
+  if ((vFirst + vCount) * FLOATS_PER_VERTEX > raw.vertices.length) return false;
+  if (iFirst + iCount > raw.indices.length) return false;
+  for (let i = iFirst; i < iFirst + iCount; i++) {
+    if (raw.indices[i] >= vCount) return false;
+  }
+  const corner = (v: unknown) =>
+    Array.isArray(v) &&
+    v.length === 3 &&
+    v.every((n) => typeof n === "number" && Number.isFinite(n));
+  return (
+    typeof bbox === "object" &&
+    bbox !== null &&
+    corner(bbox.min) &&
+    corner(bbox.max)
+  );
+}
+
+/**
  * The inflated blob for some meshes, in the layout `parseRawGeometry` reads and
  * `import.rs` writes.
  */
