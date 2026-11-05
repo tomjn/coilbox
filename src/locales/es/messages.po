@@ -123,6 +123,10 @@ msgstr "\"{baseId}\" indica un paso de {baseUnit}, que no es un número positivo
 msgid "\"{copyName}\" is yours to change."
 msgstr "Puedes cambiar “{copyName}” a tu gusto."
 
+#: src/profile/health.ts
+msgid "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+msgstr ""
+
 #: src/conquest/handmade/library.ts
 #, fuzzy
 msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
@@ -2698,6 +2702,10 @@ msgstr "Omitidas: {failedGames}. No se pudo leer la repetición."
 #, fuzzy
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, one {# análisis falló} other {# análisis fallaron}}"
+
+#: src/profile/health.ts
+msgid "{failureCount} language pack(s) were not used"
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -7863,6 +7871,10 @@ msgstr "#{channel} ya no está registrado."
 #, fuzzy
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} está registrado a nombre de {founder}."
+
+#: src/profile/health.ts
+msgid "`defaultLocale` names a language coilbox does not have"
+msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
 #, fuzzy
@@ -22458,6 +22470,10 @@ msgid "Fix colours"
 msgstr "Corregir colores"
 
 #: src/profile/health.ts
+msgid "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+msgstr ""
+
+#: src/profile/health.ts
 #, fuzzy
 msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 msgstr "Corrige el JSON en .coilbox/campaigns/ (incluidas) o en la carpeta de campañas de los datos de la aplicación (locales):"
@@ -27248,6 +27264,10 @@ msgstr "Sin salida al mar"
 msgid "Language"
 msgstr "Idioma"
 
+#: src/profile/health.ts
+msgid "Language packs loaded: {loadedList}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -31948,6 +31968,10 @@ msgstr "Ningún paquete instalado incluye esa textura, así que confirma qué at
 #, fuzzy
 msgid "No invite link for this battle. {inviteProblem}"
 msgstr "No hay enlace de invitación para esta partida. {inviteProblem}"
+
+#: src/profile/health.ts
+msgid "No language packs"
+msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy

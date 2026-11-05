@@ -1,5 +1,6 @@
 import { i18n, type Messages } from "@lingui/core";
-import { PSEUDO_LOCALE, SOURCE_LOCALE } from "./locales";
+import { isLocale, PSEUDO_LOCALE, SOURCE_LOCALE } from "./locales";
+import { getLocalePack } from "./packs";
 
 /**
  * The one translation runtime. It is Lingui's global instance, so the `t`
@@ -45,11 +46,18 @@ let requested: string | undefined;
  * `.po` file when it is imported, so each locale is its own chunk, fetched only
  * when chosen. If another locale is requested while this one loads, this one is
  * dropped.
+ *
+ * A profile's language pack for `code` is merged over the catalog key by key.
+ * A pack for a code coilbox does not bundle is merged over the English catalog,
+ * so a message the pack leaves out shows in English rather than as its id.
  */
 export async function loadLocale(code: string): Promise<void> {
   requested = code;
-  const { messages } = await importCatalog(code);
+  const pack = getLocalePack(code);
+  const base = pack && !isLocale(code) ? SOURCE_LOCALE : code;
+  const { messages: bundled } = await importCatalog(base);
   if (requested !== code) return;
+  const messages = pack ? { ...bundled, ...pack.messages } : bundled;
   i18n.loadAndActivate({ locale: code, messages });
   document.documentElement.lang = code;
 }

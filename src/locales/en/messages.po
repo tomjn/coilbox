@@ -101,6 +101,10 @@ msgstr "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number
 msgid "\"{copyName}\" is yours to change."
 msgstr "\"{copyName}\" is yours to change."
 
+#: src/profile/health.ts
+msgid "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+msgstr "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+
 #: src/conquest/handmade/library.ts
 msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
 msgstr "\"{file}\" could not be opened as an image. Save it again as a PNG."
@@ -2222,6 +2226,10 @@ msgstr "{failedGames} left out: the replay could not be read."
 #: src/content/AnalysisQueueBadge.tsx
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
+
+#: src/profile/health.ts
+msgid "{failureCount} language pack(s) were not used"
+msgstr "{failureCount} language pack(s) were not used"
 
 #: src/placement/preview.ts
 msgid "{far, plural, one {# square {way}} other {# squares {way}}}"
@@ -6384,6 +6392,10 @@ msgstr "#{channel} is no longer registered."
 #: src/multiplayer/admin/ChannelsSection.tsx
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} is registered to {founder}."
+
+#: src/profile/health.ts
+msgid "`defaultLocale` names a language coilbox does not have"
+msgstr "`defaultLocale` names a language coilbox does not have"
 
 #: src/profile/onlyOwnMaps.ts
 msgid "`onlyOwnMaps` is a {kind}, and it must be true or false"
@@ -18291,6 +18303,10 @@ msgid "Fix colours"
 msgstr "Fix colours"
 
 #: src/profile/health.ts
+msgid "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+msgstr "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+
+#: src/profile/health.ts
 msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 msgstr "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 
@@ -22180,6 +22196,10 @@ msgstr "Landlocked"
 msgid "Language"
 msgstr "Language"
 
+#: src/profile/health.ts
+msgid "Language packs loaded: {loadedList}"
+msgstr "Language packs loaded: {loadedList}"
+
 #: src/content/unitFieldNotes.ts
 msgid "Large beam laser texturing"
 msgstr "Large beam laser texturing"
@@ -26008,6 +26028,10 @@ msgstr "No installed pack ships that texture, so confirm which atlas this model 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 msgid "No invite link for this battle. {inviteProblem}"
 msgstr "No invite link for this battle. {inviteProblem}"
+
+#: src/profile/health.ts
+msgid "No language packs"
+msgstr "No language packs"
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."

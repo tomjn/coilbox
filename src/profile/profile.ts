@@ -297,6 +297,12 @@ export interface Profile {
   lobby?: ProfileLobby;
   /** Brand splash shown over the whole window at startup. */
   splash?: SplashConfig;
+  /**
+   * The language a player who has never picked one starts in: a bundled locale
+   * code, or the code of a pack under `.coilbox/locales/`. A seed, not a lock,
+   * so the Language picker still changes it. Unset follows the system language.
+   */
+  defaultLocale?: string;
   /** Background music, off unless a distribution ships tracks to play. */
   sound?: SoundConfig;
   /**

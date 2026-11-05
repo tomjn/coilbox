@@ -287,6 +287,94 @@ async fn profile_pages() -> CliResult {
     CliResult::ok(json!({ "pages": pages }))
 }
 
+/// The largest `pack.json` or `messages.json` [`profile_locales`] reads. The
+/// largest bundled catalog `lingui compile --namespace json` wrote was `uk`, at
+/// 1,211,773 bytes, and a 4,890,466-byte catalog parsed in 13 ms, so this leaves a
+/// full catalog room to grow while a stray huge file in the folder is never read.
+const PACK_FILE_CAP: u64 = 4 * 1024 * 1024;
+
+/// One language pack folder as [`read_locales_from`] found it. `pack` and
+/// `catalog` are the raw text of `pack.json` and `messages.json`, and `error`
+/// says why either could not be read, with the text left empty.
+#[derive(Debug, PartialEq)]
+struct LocaleDir {
+    dir: String,
+    pack: String,
+    catalog: String,
+    error: String,
+}
+
+/// Pure core of [`profile_locales`]: list `<root>/locales/*/` and read each
+/// folder's `pack.json` and `messages.json`, sorted by folder name. `list` yields
+/// the folder's entry paths, `size` a file's length in bytes, and `read` reads one
+/// file. A file over [`PACK_FILE_CAP`] is not read. Empty when there is no portable
+/// root or no `locales` folder.
+fn read_locales_from(
+    root: Option<PathBuf>,
+    list: impl Fn(&Path) -> std::io::Result<Vec<PathBuf>>,
+    size: impl Fn(&Path) -> std::io::Result<u64>,
+    read: impl Fn(&Path) -> std::io::Result<String>,
+) -> Vec<LocaleDir> {
+    let Some(root) = root else {
+        return Vec::new();
+    };
+    let Ok(mut entries) = list(&root.join("locales")) else {
+        return Vec::new();
+    };
+    entries.sort();
+    let read_capped = |path: &Path, name: &str| -> Result<String, String> {
+        let len = size(path).map_err(|e| format!("could not read {name}: {e}"))?;
+        if len > PACK_FILE_CAP {
+            return Err(format!(
+                "{name} is {len} bytes, over the {PACK_FILE_CAP} byte limit"
+            ));
+        }
+        read(path).map_err(|e| format!("could not read {name}: {e}"))
+    };
+    let mut out = Vec::new();
+    for entry in entries {
+        let Some(dir) = entry.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        // A file beside the folders, such as a README or `.DS_Store`, is no pack.
+        if dir.starts_with('.') || size(&entry.join("pack.json")).is_err() {
+            continue;
+        }
+        let read_both = read_capped(&entry.join("pack.json"), "pack.json").and_then(|pack| {
+            read_capped(&entry.join("messages.json"), "messages.json").map(|c| (pack, c))
+        });
+        let (pack, catalog, error) = match read_both {
+            Ok((pack, catalog)) => (pack, catalog, String::new()),
+            Err(e) => (String::new(), String::new(), e),
+        };
+        out.push(LocaleDir {
+            dir: dir.to_string(),
+            pack,
+            catalog,
+            error,
+        });
+    }
+    out
+}
+
+/// `profile_locales` reads the language packs under the portable
+/// `.coilbox/locales/<code>/` folders. Returns `{ packs: [{ dir, pack, catalog,
+/// error }] }` with each file's raw text. The frontend validates both files and
+/// merges the catalog. Empty when not portable or the folder is absent.
+#[tauri::command]
+async fn profile_locales() -> CliResult {
+    let packs: Vec<_> = read_locales_from(
+        coilbox_portable::portable_root(),
+        list_dir,
+        |p| std::fs::metadata(p).map(|m| m.len()),
+        |p| std::fs::read_to_string(p),
+    )
+    .into_iter()
+    .map(|l| json!({ "dir": l.dir, "pack": l.pack, "catalog": l.catalog, "error": l.error }))
+    .collect();
+    CliResult::ok(json!({ "packs": packs }))
+}
+
 /// Pure core of [`profile_scaffold`]: write `<app_dir>/.coilbox/profile.json`, but
 /// only when nothing is there yet. Returns the target path and whether it was written.
 /// An existing file is left alone (`false`) and never overwritten, because it is the
@@ -431,6 +519,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             profile_asset,
             profile_file,
             profile_pages,
+            profile_locales,
             profile_scaffold,
             profile_open
         ])
@@ -677,6 +766,102 @@ mod tests {
             |_| panic!("reader must not run without a portable root"),
         );
         assert!(out.is_empty());
+    }
+
+    /// A `.coilbox/locales` holding `files`, each `(path, text)`, read through
+    /// [`read_locales_from`].
+    fn locales_with(files: &[(&str, &str)]) -> Vec<LocaleDir> {
+        let file = |p: &Path| files.iter().find(|(f, _)| Path::new(f) == p).map(|f| f.1);
+        let missing = || std::io::Error::from(std::io::ErrorKind::NotFound);
+        read_locales_from(
+            Some(PathBuf::from(ROOT)),
+            |dir| {
+                assert_eq!(dir, Path::new("/pkg/.coilbox/locales"));
+                let mut dirs: Vec<PathBuf> = files
+                    .iter()
+                    .filter_map(|(f, _)| Path::new(f).parent().map(Path::to_path_buf))
+                    .collect();
+                dirs.dedup();
+                dirs.push(PathBuf::from("/pkg/.coilbox/locales/.DS_Store"));
+                Ok(dirs)
+            },
+            |p| file(p).map(|t| t.len() as u64).ok_or_else(missing),
+            |p| file(p).map(str::to_string).ok_or_else(missing),
+        )
+    }
+
+    #[test]
+    fn locales_reads_each_pack_folder_sorted() {
+        let out = locales_with(&[
+            ("/pkg/.coilbox/locales/eo/pack.json", "eo pack"),
+            ("/pkg/.coilbox/locales/eo/messages.json", "eo catalog"),
+            ("/pkg/.coilbox/locales/de/pack.json", "de pack"),
+            ("/pkg/.coilbox/locales/de/messages.json", "de catalog"),
+        ]);
+        let dir = |d: &str, pack: &str, catalog: &str| LocaleDir {
+            dir: d.to_string(),
+            pack: pack.to_string(),
+            catalog: catalog.to_string(),
+            error: String::new(),
+        };
+        assert_eq!(
+            out,
+            vec![
+                dir("de", "de pack", "de catalog"),
+                dir("eo", "eo pack", "eo catalog")
+            ]
+        );
+    }
+
+    #[test]
+    fn locales_reports_a_missing_catalog() {
+        let out = locales_with(&[("/pkg/.coilbox/locales/de/pack.json", "de pack")]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].pack, "");
+        assert!(
+            out[0].error.starts_with("could not read messages.json"),
+            "{}",
+            out[0].error
+        );
+    }
+
+    #[test]
+    fn locales_never_reads_a_file_over_the_cap() {
+        let out = read_locales_from(
+            Some(PathBuf::from(ROOT)),
+            |_| Ok(vec![PathBuf::from("/pkg/.coilbox/locales/de")]),
+            |p| {
+                Ok(if p.ends_with("messages.json") {
+                    PACK_FILE_CAP + 1
+                } else {
+                    9
+                })
+            },
+            |p| {
+                assert!(p.ends_with("pack.json"), "read {}", p.display());
+                Ok("{}".to_string())
+            },
+        );
+        assert_eq!(out[0].catalog, "");
+        assert!(
+            out[0].error.contains("over the 4194304 byte limit"),
+            "{}",
+            out[0].error
+        );
+    }
+
+    #[test]
+    fn locales_empty_when_not_portable_or_absent() {
+        let never = |_: &Path| -> std::io::Result<String> { panic!("must not read") };
+        let never_size = |_: &Path| -> std::io::Result<u64> { panic!("must not stat") };
+        assert!(read_locales_from(None, |_| panic!("must not list"), never_size, never).is_empty());
+        assert!(read_locales_from(
+            Some(PathBuf::from(ROOT)),
+            |_| Err(std::io::Error::from(std::io::ErrorKind::NotFound)),
+            never_size,
+            never
+        )
+        .is_empty());
     }
 
     #[test]

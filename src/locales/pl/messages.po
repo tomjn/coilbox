@@ -123,6 +123,10 @@ msgstr "\"{baseId}\" podaje krok {baseUnit}, który nie jest liczbą dodatnią. 
 msgid "\"{copyName}\" is yours to change."
 msgstr "„{copyName}” to twoja kopia, możesz ją zmieniać."
 
+#: src/profile/health.ts
+msgid "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+msgstr ""
+
 #: src/conquest/handmade/library.ts
 #, fuzzy
 msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
@@ -2698,6 +2702,10 @@ msgstr "Pominięte: {failedGames} – nie udało się odczytać powtórki."
 #, fuzzy
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, one {# analiza nie powiodła się} few {# analizy nie powiodły się} many {# analiz nie powiodło się} other {# analizy nie powiodło się}}"
+
+#: src/profile/health.ts
+msgid "{failureCount} language pack(s) were not used"
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -7863,6 +7871,10 @@ msgstr "#{channel} nie jest już zarejestrowany."
 #, fuzzy
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} jest zarejestrowany na {founder}."
+
+#: src/profile/health.ts
+msgid "`defaultLocale` names a language coilbox does not have"
+msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
 #, fuzzy
@@ -22458,6 +22470,10 @@ msgid "Fix colours"
 msgstr "Popraw kolory"
 
 #: src/profile/health.ts
+msgid "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+msgstr ""
+
+#: src/profile/health.ts
 #, fuzzy
 msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 msgstr "Popraw JSON w .coilbox/campaigns/ (dołączone) lub w folderze kampanii w danych aplikacji (lokalne):"
@@ -27248,6 +27264,10 @@ msgstr "Bez dostępu do morza"
 msgid "Language"
 msgstr "Język"
 
+#: src/profile/health.ts
+msgid "Language packs loaded: {loadedList}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -31948,6 +31968,10 @@ msgstr "Żadna zainstalowana paczka nie zawiera tej tekstury, więc potwierdź, 
 #, fuzzy
 msgid "No invite link for this battle. {inviteProblem}"
 msgstr "Brak linku z zaproszeniem do tego meczu. {inviteProblem}"
+
+#: src/profile/health.ts
+msgid "No language packs"
+msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy

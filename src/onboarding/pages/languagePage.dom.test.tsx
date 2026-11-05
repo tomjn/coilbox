@@ -20,6 +20,7 @@ import {
   PSEUDO_LOCALE,
   pickerLocales,
 } from "@/i18n/locales";
+import { applyLocalePacks } from "@/i18n/packs";
 import { Wizard } from "../Wizard";
 
 let storage = memoryStorage();
@@ -119,4 +120,22 @@ it("leaves general.language unset on Skip", () => {
   show();
   click("Skip");
   expect(stored()).toBeNull();
+});
+
+it("offers a language a profile's pack adds, under the pack's name", () => {
+  applyLocalePacks([
+    {
+      dir: "eo",
+      pack: JSON.stringify({ code: "eo", name: "Esperanto", direction: "ltr" }),
+      catalog: JSON.stringify({ messages: {} }),
+      error: "",
+    },
+  ]);
+  try {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: /^Esperanto/ }));
+    expect(stored()).toBe(JSON.stringify("eo"));
+  } finally {
+    applyLocalePacks([]);
+  }
 });

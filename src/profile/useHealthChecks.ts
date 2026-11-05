@@ -17,6 +17,9 @@ import { resolveHomeBackground } from "../home/background";
 import { describeHome, resolveHome } from "../home/config";
 import { homeMarkupIssues } from "../home/markup";
 import { resolveCardArtOverrides } from "../home/profileArt";
+import { defaultLanguage } from "../i18n/language";
+import { SYSTEM_LANGUAGE } from "../i18n/locales";
+import { getLocalePackCodes, getLocalePackFailures } from "../i18n/packs";
 import { usePreferredTarget } from "../play/config";
 import { missingLaunchContent } from "../play/launchContent";
 import { scenarioList } from "../scenario/bindings";
@@ -284,6 +287,12 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         onlyOwnMaps: resolveOnlyOwnMaps(profile.onlyOwnMaps),
         bundle,
         startMissing: startMissing(start, scannedGames, scannedMaps),
+        languagePacks: {
+          loaded: getLocalePackCodes(),
+          failures: getLocalePackFailures(),
+          defaultLocale: profile.defaultLocale,
+          defaultKnown: defaultLanguage() !== SYSTEM_LANGUAGE,
+        },
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);

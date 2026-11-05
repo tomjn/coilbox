@@ -2,16 +2,19 @@ import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { useEffect } from "react";
 import { useLanguageSetting, useResolvedLocale } from "@/i18n/language";
-import { LOCALES, localeDisplayName, resolveLocaleTag } from "@/i18n/locales";
+import { LOCALES, resolveLocaleTag } from "@/i18n/locales";
+import { languageLabel, packOnlyLocales } from "@/i18n/packs";
 import type { WizardPageProps } from "./registry";
 
 /**
- * One button per locale with a catalog. The pseudo-locale is a developer's
+ * One button per locale with a catalog, then one per language a profile's
+ * language pack adds. The pseudo-locale is a developer's
  * check, so it stays in the Settings picker and never shows here. A pick is
  * written straight away, so the app, and the wizard's title with it, switches
  * language at once. Until then the selection is the locale the app already
  * runs in, which is the system's, and Continue writes "system", so the app
  * keeps following the system language as the Settings picker's option does.
+ * A profile's `defaultLocale` replaces "system" there, and Continue writes it.
  */
 export default function LanguagePage({ beforeContinue }: WizardPageProps) {
   const { t } = useLingui();
@@ -30,7 +33,7 @@ export default function LanguagePage({ beforeContinue }: WizardPageProps) {
 
   return (
     <div className="grid grid-cols-4 gap-2.5">
-      {LOCALES.map((code) => (
+      {[...LOCALES, ...packOnlyLocales()].map((code) => (
         <Button
           key={code}
           variant="outline"
@@ -42,7 +45,7 @@ export default function LanguagePage({ beforeContinue }: WizardPageProps) {
               "border-primary ring-1 ring-primary ring-inset",
           )}
         >
-          <span lang={code}>{localeDisplayName(code)}</span>
+          <span lang={code}>{languageLabel(code)}</span>
           {code === system && (
             <span className="text-xs font-normal text-muted-foreground">
               {t`Matches your system`}

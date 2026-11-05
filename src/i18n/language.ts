@@ -1,13 +1,32 @@
 import { useSetting } from "@picoframe/frame";
 import { useEffect } from "react";
+import { getProfile } from "../profile/profile";
 import { loadLocale } from ".";
-import { type AppLocale, resolveLanguage, SYSTEM_LANGUAGE } from "./locales";
+import {
+  type AppLocale,
+  isLocale,
+  resolveLanguage,
+  SYSTEM_LANGUAGE,
+} from "./locales";
+import { getLocalePack, packOnlyLocales } from "./packs";
 
 export const LANGUAGE_KEY = "general.language";
 
+/**
+ * The language a player who has never chosen one gets: the profile's
+ * `defaultLocale` when it names a bundled locale or a loaded pack, and "system"
+ * otherwise.
+ */
+export function defaultLanguage(): string {
+  const code = getProfile().defaultLocale;
+  return typeof code === "string" && (isLocale(code) || getLocalePack(code))
+    ? code
+    : SYSTEM_LANGUAGE;
+}
+
 /** `[language, setLanguage]` for the stored choice: a locale code or "system". */
 export function useLanguageSetting() {
-  return useSetting<string>(LANGUAGE_KEY, SYSTEM_LANGUAGE);
+  return useSetting<string>(LANGUAGE_KEY, defaultLanguage());
 }
 
 /**
@@ -17,15 +36,16 @@ export function useLanguageSetting() {
  */
 export function useResolvedLocale(): AppLocale {
   const [language] = useLanguageSetting();
-  return resolveLanguage(language, navigator.language);
+  return resolveLanguage(language, navigator.language, packOnlyLocales());
 }
 
 /**
  * The locale to load before first render, from the raw stored value (settings
  * are kept as JSON, so a stored choice reads back as `"fr"` with its quotes).
+ * Nothing stored means the player never chose, so the profile's default applies.
  */
 export function bootLocale(raw: string | null): AppLocale {
-  let stored: unknown = SYSTEM_LANGUAGE;
+  let stored: unknown = defaultLanguage();
   try {
     if (raw !== null) stored = JSON.parse(raw);
   } catch {
@@ -34,6 +54,7 @@ export function bootLocale(raw: string | null): AppLocale {
   return resolveLanguage(
     typeof stored === "string" ? stored : SYSTEM_LANGUAGE,
     navigator.language,
+    packOnlyLocales(),
   );
 }
 

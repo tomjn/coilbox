@@ -93,7 +93,10 @@ vi.mock("@tauri-apps/api/app", () => ({ getVersion: async () => "1.2.2" }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: async () => {} }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: async () => null }));
 vi.mock("../../notify/notify", () => ({ notify: async () => {} }));
-vi.mock("../../profile/profile", () => ({ isUpdaterEnabled: () => true }));
+vi.mock("../../profile/profile", () => ({
+  isUpdaterEnabled: () => true,
+  getProfile: () => ({ version: 1 }),
+}));
 
 import.meta.env.DEV = false;
 
