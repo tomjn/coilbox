@@ -42,6 +42,14 @@ return {
 		defeat = "Uppdraget misslyckades",
 		undecided = "Uppdraget avslutat",
 	},
+	el = {
+		objectives = "Στόχοι",
+		secondary = "Δευτερεύοντες",
+		holdHint = "Κάντε κλικ για συνέχεια",
+		victory = "Η αποστολή ολοκληρώθηκε",
+		defeat = "Η αποστολή απέτυχε",
+		undecided = "Η αποστολή έληξε",
+	},
 	fr = {
 		objectives = "Objectifs",
 		secondary = "Secondaires",
@@ -105,5 +113,13 @@ return {
 		victory = "Missie voltooid",
 		defeat = "Missie mislukt",
 		undecided = "Missie beëindigd",
+	},
+	it = {
+		objectives = "Obiettivi",
+		secondary = "Secondari",
+		holdHint = "Fai clic per continuare",
+		victory = "Missione compiuta",
+		defeat = "Missione fallita",
+		undecided = "Missione terminata",
 	},
 }
