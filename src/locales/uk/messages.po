@@ -123,6 +123,10 @@ msgstr "\"{baseId}\" задає крок {baseUnit}, що не є додатни
 msgid "\"{copyName}\" is yours to change."
 msgstr "«{copyName}» – ваша копія, її можна змінювати."
 
+#: src/profile/health.ts
+msgid "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+msgstr ""
+
 #: src/conquest/handmade/library.ts
 #, fuzzy
 msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
@@ -2698,6 +2702,10 @@ msgstr "Пропущено {failedGames}: повтор не вдалося пр�
 #, fuzzy
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, one {Не вдалося виконати # аналіз} few {Не вдалося виконати # аналізи} many {Не вдалося виконати # аналізів} other {Не вдалося виконати # аналізу}}"
+
+#: src/profile/health.ts
+msgid "{failureCount} language pack(s) were not used"
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -7863,6 +7871,10 @@ msgstr "#{channel} більше не зареєстровано."
 #, fuzzy
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} зареєстровано на {founder}."
+
+#: src/profile/health.ts
+msgid "`defaultLocale` names a language coilbox does not have"
+msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
 #, fuzzy
@@ -22458,6 +22470,10 @@ msgid "Fix colours"
 msgstr "Виправити кольори"
 
 #: src/profile/health.ts
+msgid "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+msgstr ""
+
+#: src/profile/health.ts
 #, fuzzy
 msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 msgstr "Виправте JSON у .coilbox/campaigns/ (вбудовані) або в папці campaigns даних застосунку (локальні):"
@@ -27248,6 +27264,10 @@ msgstr "Без виходу до моря"
 msgid "Language"
 msgstr "Мова"
 
+#: src/profile/health.ts
+msgid "Language packs loaded: {loadedList}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -31948,6 +31968,10 @@ msgstr "Жоден установлений пакет не постачає ц�
 #, fuzzy
 msgid "No invite link for this battle. {inviteProblem}"
 msgstr "Для цього матчу немає посилання-запрошення. {inviteProblem}"
+
+#: src/profile/health.ts
+msgid "No language packs"
+msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy

@@ -38,8 +38,11 @@ export const PSEUDO_LOCALE = "en-XA";
  */
 const PSEUDO_ENABLED = import.meta.env?.DEV === true;
 
-/** A locale coilbox can run in: one with a catalog, or the pseudo-locale. */
-export type AppLocale = LocaleCode | typeof PSEUDO_LOCALE;
+/**
+ * A locale coilbox can run in: one with a catalog, the pseudo-locale, or a code
+ * a profile's language pack adds (see `./packs`).
+ */
+export type AppLocale = LocaleCode | typeof PSEUDO_LOCALE | (string & {});
 
 /** The settings value that means "follow the system language". */
 export const SYSTEM_LANGUAGE = "system";
@@ -76,16 +79,24 @@ export function resolveLocaleTag(tag: string): LocaleCode {
 /**
  * The locale to run in for a stored `general.language` value. "system" (and
  * anything unrecognised, such as a code from a newer build) follows
- * `systemTag`.
+ * `systemTag`. `extra` are the codes a profile's language packs add.
  */
-export function resolveLanguage(stored: string, systemTag: string): AppLocale {
+export function resolveLanguage(
+  stored: string,
+  systemTag: string,
+  extra: readonly string[] = [],
+): AppLocale {
   if (PSEUDO_ENABLED && stored === PSEUDO_LOCALE) return PSEUDO_LOCALE;
-  return isLocale(stored) ? stored : resolveLocaleTag(systemTag);
+  if (isLocale(stored) || extra.includes(stored)) return stored;
+  return resolveLocaleTag(systemTag);
 }
 
-/** The locales the Language picker offers, with the pseudo-locale in dev. */
-export function pickerLocales(): string[] {
-  return PSEUDO_ENABLED ? [...LOCALES, PSEUDO_LOCALE] : [...LOCALES];
+/**
+ * The locales the Language picker offers: the bundled ones, then the codes in
+ * `extra`, then the pseudo-locale in dev.
+ */
+export function pickerLocales(extra: readonly string[] = []): string[] {
+  return [...LOCALES, ...extra, ...(PSEUDO_ENABLED ? [PSEUDO_LOCALE] : [])];
 }
 
 /** A locale's name in its own language, which is how the picker lists it. */

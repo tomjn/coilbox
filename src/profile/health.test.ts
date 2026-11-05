@@ -31,6 +31,7 @@ function base(): HealthInputs {
     onlyOwnMaps: { status: "none" },
     bundle: null,
     startMissing: null,
+    languagePacks: { loaded: [], failures: [], defaultKnown: false },
   };
 }
 
@@ -665,5 +666,44 @@ describe("deriveHealthChecks", () => {
       expect(c.status).toBe("warn");
       expect(c.hint).toContain("is a string");
     });
+  });
+});
+
+describe("checkLanguagePacks", () => {
+  const packs = (over: Partial<HealthInputs["languagePacks"]>) => ({
+    ...base(),
+    languagePacks: { loaded: [], failures: [], defaultKnown: false, ...over },
+  });
+
+  it("adds no row when the profile ships no packs and sets no defaultLocale", () => {
+    expect(maybeById(base(), "languagePacks")).toBeUndefined();
+  });
+
+  it("lists the packs that loaded", () => {
+    const c = byId(packs({ loaded: ["de", "eo"] }), "languagePacks");
+    expect(c.status).toBe("ok");
+    expect(c.label).toContain("de, eo");
+  });
+
+  it("names each pack that was not used, and why", () => {
+    const c = byId(
+      packs({
+        failures: [{ dir: "eo", error: "pack.json is not a JSON object" }],
+      }),
+      "languagePacks",
+    );
+    expect(c.status).toBe("warn");
+    expect(c.detail).toBe("eo: pack.json is not a JSON object");
+  });
+
+  it("is an error when defaultLocale names a language coilbox does not have", () => {
+    const c = byId(packs({ defaultLocale: "eo" }), "languagePacks");
+    expect(c.status).toBe("error");
+    expect(c.hint).toContain('"eo"');
+    const known = byId(
+      packs({ defaultLocale: "de", defaultKnown: true }),
+      "languagePacks",
+    );
+    expect(known.status).toBe("ok");
   });
 });

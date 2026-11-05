@@ -123,6 +123,10 @@ msgstr "\"{baseId}\" 声明的步长单位为 {baseUnit}，不是正数。改用
 msgid "\"{copyName}\" is yours to change."
 msgstr "“{copyName}”可由你自由修改。"
 
+#: src/profile/health.ts
+msgid "\"{defaultLocale}\" is neither a bundled language nor a pack under .coilbox/locales/, so players start in the system language."
+msgstr ""
+
 #: src/conquest/handmade/library.ts
 #, fuzzy
 msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
@@ -2698,6 +2702,10 @@ msgstr "已排除 {failedGames}：无法读取回放。"
 #, fuzzy
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, other {# 次分析失败}}"
+
+#: src/profile/health.ts
+msgid "{failureCount} language pack(s) were not used"
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -7863,6 +7871,10 @@ msgstr "#{channel} 已不再注册。"
 #, fuzzy
 msgid "#{channel} is registered to {founder}."
 msgstr "#{channel} 已注册给 {founder}。"
+
+#: src/profile/health.ts
+msgid "`defaultLocale` names a language coilbox does not have"
+msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
 #, fuzzy
@@ -22458,6 +22470,10 @@ msgid "Fix colours"
 msgstr "修复颜色"
 
 #: src/profile/health.ts
+msgid "Fix the files in .coilbox/locales/<code>/. A pack is pack.json and the messages.json that lingui compile --namespace json writes."
+msgstr ""
+
+#: src/profile/health.ts
 #, fuzzy
 msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
 msgstr "请修复 .coilbox/campaigns/（内置）或应用数据 campaigns 文件夹（本地）中的 JSON："
@@ -27248,6 +27264,10 @@ msgstr "内陆"
 msgid "Language"
 msgstr "语言"
 
+#: src/profile/health.ts
+msgid "Language packs loaded: {loadedList}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -31948,6 +31968,10 @@ msgstr "没有已安装的包附带该纹理，请确认此模型采样的是哪
 #, fuzzy
 msgid "No invite link for this battle. {inviteProblem}"
 msgstr "此房间没有邀请链接。{inviteProblem}"
+
+#: src/profile/health.ts
+msgid "No language packs"
+msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #, fuzzy
