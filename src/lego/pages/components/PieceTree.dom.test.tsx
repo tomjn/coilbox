@@ -430,6 +430,8 @@ const JOIN = {
   toName: "bottom",
   offset: [0, 0] as [number, number],
   twist: 0,
+  unbreakable: false,
+  strength: null,
 };
 
 describe("PieceTree joins", () => {

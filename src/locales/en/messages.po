@@ -11237,6 +11237,10 @@ msgstr "By map"
 msgid "By output"
 msgstr "By output"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "By size"
+msgstr "By size"
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "By unit"
 msgstr "By unit"
@@ -37019,6 +37023,10 @@ msgstr "Streaks"
 msgid "Stream messages"
 msgstr "Stream messages"
 
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Strength"
+msgstr "Strength"
+
 #: src/lego/animPresets.ts
 msgid "Stride time"
 msgstr "Stride time"
@@ -42538,6 +42546,10 @@ msgstr "Unblock domain"
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 msgid "Unblock…"
 msgstr "Unblock…"
+
+#: src/lego/pages/components/JoinedTo.tsx
+msgid "Unbreakable"
+msgstr "Unbreakable"
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx

@@ -13,6 +13,7 @@ import {
   pieceConnectors,
   readPartConnectors,
   resolveConnections,
+  setJoinBreak,
   setJoinPlace,
   slideFrame,
   slideJoin,
@@ -443,6 +444,8 @@ describe("describeJoin", () => {
       offset: [0, 0],
       twist: 0,
       broken: false,
+      unbreakable: false,
+      strength: null,
     });
   });
 
@@ -586,6 +589,67 @@ describe("setJoinPlace", () => {
   it("leaves a free piece alone", () => {
     const doc = hullAndLeg({});
     expect(setJoinPlace(doc, pack(), "leg", { offset: [1, 0] })).toBe(doc);
+  });
+});
+
+describe("setJoinBreak", () => {
+  const joined = () =>
+    connectPiece(hullAndLeg({}), pack(), "leg", { connector: "+y", to: "-y" });
+
+  it("marks the join and leaves the piece where it is", () => {
+    const out = setJoinBreak(joined(), "leg", {
+      unbreakable: true,
+      strength: 0.5,
+    });
+    expect(pieceOf(out, "leg").connection).toEqual({
+      connector: "+y",
+      to: "-y",
+      unbreakable: true,
+      strength: 0.5,
+    });
+    expect(pieceOf(out, "leg").position).toEqual(
+      pieceOf(joined(), "leg").position,
+    );
+  });
+
+  it("keeps the offset and twist, and the mark a change does not name", () => {
+    const placed = setJoinPlace(joined(), pack(), "leg", { twist: 1 });
+    const out = setJoinBreak(
+      setJoinBreak(placed, "leg", { strength: 3 }),
+      "leg",
+      { unbreakable: true },
+    );
+    expect(pieceOf(out, "leg").connection).toMatchObject({
+      twist: 1,
+      strength: 3,
+      unbreakable: true,
+    });
+    // Placing it again keeps the marks too.
+    const moved = setJoinPlace(out, pack(), "leg", { offset: [0.5, 0] });
+    expect(pieceOf(moved, "leg").connection).toMatchObject({
+      strength: 3,
+      unbreakable: true,
+    });
+  });
+
+  it("stores nothing once both marks are taken away", () => {
+    const marked = setJoinBreak(joined(), "leg", {
+      unbreakable: true,
+      strength: 2,
+    });
+    const out = setJoinBreak(marked, "leg", {
+      unbreakable: false,
+      strength: null,
+    });
+    expect(pieceOf(out, "leg").connection).toEqual({
+      connector: "+y",
+      to: "-y",
+    });
+  });
+
+  it("leaves a free piece alone", () => {
+    const doc = hullAndLeg({});
+    expect(setJoinBreak(doc, "leg", { unbreakable: true })).toBe(doc);
   });
 });
 

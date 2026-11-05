@@ -770,6 +770,10 @@ export interface JoinSummary {
   twist: number;
   /** The join cannot be made, so the piece is where it last was. */
   broken: boolean;
+  /** Breaking the unit apart never cuts here (#4503). */
+  unbreakable: boolean;
+  /** How hard the join is to break, or null to go by its group's size. */
+  strength: number | null;
 }
 
 /** The unit faces +z and its right is -x, so +x is its left. */
@@ -829,6 +833,8 @@ export function describeJoin(
     toName: faceName(pack, parent, connection.to),
     offset: connection.offset ?? [0, 0],
     twist: connection.twist ?? 0,
+    unbreakable: connection.unbreakable === true,
+    strength: connection.strength ?? null,
     broken:
       !parent ||
       !placeJoin(
@@ -953,6 +959,39 @@ export function setJoinPlace(
     ...(offset && (offset[0] !== 0 || offset[1] !== 0) ? { offset } : {}),
     ...(twist ? { twist } : {}),
   });
+}
+
+/**
+ * Mark how a join breaks when the unit breaks apart (#4503). A strength of null
+ * takes it away, so the join goes by its group's size again. Neither mark moves
+ * the piece, so nothing is resolved.
+ */
+export function setJoinBreak(
+  project: LegoProject,
+  pieceId: string,
+  change: { unbreakable?: boolean; strength?: number | null },
+): LegoProject {
+  const connection = project.pieces.find((p) => p.id === pieceId)?.connection;
+  if (!connection) return project;
+  const {
+    unbreakable: _unbreakable,
+    strength: _strength,
+    ...base
+  } = connection;
+  const unbreakable = change.unbreakable ?? connection.unbreakable === true;
+  const strength =
+    change.strength === undefined ? connection.strength : change.strength;
+  const next: LegoConnection = {
+    ...base,
+    ...(unbreakable ? { unbreakable: true as const } : {}),
+    ...(strength !== null && strength !== undefined ? { strength } : {}),
+  };
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) =>
+      piece.id === pieceId ? { ...piece, connection: next } : piece,
+    ),
+  };
 }
 
 /**
