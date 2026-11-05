@@ -15900,6 +15900,7 @@ msgstr "Disk space for tracks (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -31356,6 +31357,10 @@ msgstr "Reading the mirror indexes…"
 msgid "Reading the model."
 msgstr "Reading the model."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr "Reading the module's meshes."
+
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "Reading the rapid index…"
 msgstr "Reading the rapid index…"
@@ -31928,6 +31933,7 @@ msgstr "Relief"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reload"
@@ -39165,6 +39171,10 @@ msgstr "the matchup"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "The maximum charge the shield can hold, reduced by incoming weapon damage."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr "The meshes in this module could not be read."
+
 #: src/lego/liftIntoUnit.ts
 msgid "The meshes of {moduleName} could not be read: {reason}"
 msgstr "The meshes of {moduleName} could not be read: {reason}"
@@ -39794,6 +39804,10 @@ msgstr "The servers you play on, and who you hear from there."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr "The shading map file has changed."
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
 msgstr "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -39897,6 +39911,10 @@ msgstr "The test mutator brings {conditionCount} conditions and {actionCount} ac
 #: src/lego/pages/components/ScriptTab.tsx
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr "The texture file has changed."
 
 #: src/lego/sandboxReload.ts
 msgid "The texture is in a file the game did not start with, so relaunch to see it."
@@ -41015,8 +41033,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 
 #: src/lego/moduleShare.ts
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "This module holds geometry from a game or a model, which a shared module cannot carry."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
 
 #: src/lego/moduleShare.ts
 msgid "This module is {size} KB, over the {limit} KB a code can carry."

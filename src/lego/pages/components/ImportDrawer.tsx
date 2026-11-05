@@ -79,7 +79,7 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
 
       setStage({ state: "reading" });
       try {
-        const read = await readModel({ path: picked });
+        const read = await readModel({ path: picked, own: true });
         if (live) setStage(read);
       } catch (error) {
         if (!live) return;

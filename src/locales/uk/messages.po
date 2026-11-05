@@ -19526,6 +19526,7 @@ msgstr "Місце на диску для доріжок (МБ)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -38506,6 +38507,10 @@ msgstr "Читання індексів дзеркал…"
 msgid "Reading the model."
 msgstr "Читання моделі."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -39206,6 +39211,7 @@ msgstr "Рельєф"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -48102,6 +48108,10 @@ msgstr "протистояння"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "Максимальний заряд, який може мати щит, що зменшується від шкоди вхідної зброї."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -48874,6 +48884,10 @@ msgstr "Сервери, на яких ви граєте, і від кого ви
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -48999,6 +49013,10 @@ msgstr "Тестовий мутатор додає умови ({conditionCount})
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "Текст вище буде відкинуто. Якщо це помилка, «Скасувати» поверне його, тож скопіюйте його, якщо хочете зберегти довше, ніж на цей сеанс."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -50390,9 +50408,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Цю модель відкрито із запакованого архіву, який не містить шляху для запису назад. Натомість збережіть її за вибраним шляхом."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Цей модуль містить геометрію з гри чи моделі, яку модуль для поширення не може передати."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy

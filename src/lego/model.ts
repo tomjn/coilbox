@@ -278,6 +278,20 @@ export interface LegoLifted {
 }
 
 /**
+ * A mesh the game maker imported from a model file of their own (#4360).
+ *
+ * Set by the file dialog's import, and only for a file outside a game's folder,
+ * never by opening a game's unit or a model out of an archive. It is what lets
+ * a module holding the mesh be shared, so a mesh with no record, which includes
+ * every mesh imported before this existed, stays unshareable: nothing says it
+ * is not a game's.
+ */
+export interface LegoOwnMesh {
+  /** The model file's name, without the folder it was in. */
+  file: string;
+}
+
+/**
  * What a unit that builds is worth, as three unit definition keys.
  *
  * All three go in together, and that is not tidiness. `UnitDef::IsBuilderUnit`
@@ -487,6 +501,8 @@ export interface LegoPiece {
   customAnchors?: LegoAnchor[];
   /** Set on a piece lifted off a game's unit. See {@link LegoLifted}. */
   lifted?: LegoLifted;
+  /** Set on a piece whose mesh is the game maker's own. See {@link LegoOwnMesh}. */
+  ownMesh?: LegoOwnMesh;
   /**
    * Joined to the parent by a connector. Absent means a free piece, placed by
    * its own `position` and `rotation`, which is every piece made before #3273.
@@ -2059,6 +2075,10 @@ function parsePiece(raw: unknown): LegoPiece | null {
       const lifted = parseLifted(p.lifted);
       return lifted ? { lifted } : {};
     })(),
+    ...(() => {
+      const ownMesh = parseOwnMesh(p.ownMesh);
+      return ownMesh ? { ownMesh } : {};
+    })(),
     ...(typeof p.twin === "string" && p.twin !== "" ? { twin: p.twin } : {}),
     ...(() => {
       const ring = parsePieceRing(p.ring);
@@ -2243,6 +2263,14 @@ export function parseLifted(value: unknown): LegoLifted | null {
     ...(texture ? { texture } : {}),
     ...(texture2 ? { texture2 } : {}),
   };
+}
+
+/** A piece's own mesh record, or null unless it names a file. */
+function parseOwnMesh(value: unknown): LegoOwnMesh | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { file } = value as Record<string, unknown>;
+  if (typeof file !== "string" || file === "") return null;
+  return { file };
 }
 
 /** A piece's ring, or null unless it names a next piece and a usable count. */

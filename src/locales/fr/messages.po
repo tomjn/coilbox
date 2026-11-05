@@ -19526,6 +19526,7 @@ msgstr "Espace disque pour les pistes (Mo)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -38506,6 +38507,10 @@ msgstr "Lecture des index des miroirs…"
 msgid "Reading the model."
 msgstr "Lecture du modèle."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -39206,6 +39211,7 @@ msgstr "Relief"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -48102,6 +48108,10 @@ msgstr "la confrontation"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "La charge maximale du bouclier, réduite par les dégâts des armes entrantes."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -48874,6 +48884,10 @@ msgstr "Les serveurs sur lesquels vous jouez, et qui vous y entendez."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -48999,6 +49013,10 @@ msgstr "Le mutateur de test apporte {conditionCount} conditions et {actionCount}
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "Le texte ci-dessus est abandonné. Annuler le restaure en cas d’erreur, copiez-le donc d’abord si vous voulez le garder au-delà de cette session."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -50390,9 +50408,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Ce modèle a été ouvert depuis une archive empaquetée, qui ne fournit pas de chemin où réécrire. Enregistrez-le plutôt dans un chemin choisi."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Ce module contient de la géométrie issue d’un jeu ou d’un modèle, qu’un module partagé ne peut pas contenir."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy

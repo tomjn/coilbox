@@ -27,6 +27,7 @@ import {
   LEGO_SCHEMA_VERSION,
   type LegoImported,
   type LegoImportedGame,
+  type LegoOwnMesh,
   type LegoPiece,
   type LegoProject,
   type LegoTexture,
@@ -82,6 +83,9 @@ export function projectFromImport(
      *  with the folder when the operating system reclaims it, so none is
      *  recorded: see {@link LegoTexture} (#1903). */
     unpacked?: boolean;
+    /** Recorded on every piece with a mesh when the model is the game maker's
+     *  own file (#4360). See {@link LegoOwnMesh}. */
+    ownMesh?: LegoOwnMesh;
     name: string;
     unitName: string;
     packId: string;
@@ -110,6 +114,7 @@ export function projectFromImport(
       // and letting the two share a field would let one resolve as the other.
       partId: null,
       ...(piece.meshId ? { meshId: piece.meshId } : {}),
+      ...(piece.meshId && options.ownMesh ? { ownMesh: options.ownMesh } : {}),
       // The format stores a translation per piece and nothing else, which is
       // exactly what the document's own rotation and scale start at.
       position: piece.offset,
@@ -160,6 +165,18 @@ export function projectFromImport(
     converted: result.converted,
     bytes: result.bytes,
   };
+}
+
+/**
+ * The own mesh record for a model file the game maker picked off disk, or null
+ * for one inside a game's folder (#4360). A `.sdd` is a game archive kept as a
+ * folder, so a model anywhere under one is the game's.
+ */
+export function ownMeshFor(path: string): LegoOwnMesh | null {
+  const segments = path.split(/[\\/]/).filter((segment) => segment !== "");
+  const file = segments.pop();
+  if (!file || segments.some(isLooseArchive)) return null;
+  return { file };
 }
 
 /**

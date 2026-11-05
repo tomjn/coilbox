@@ -114,7 +114,7 @@ import { useInventoryView } from "../inventory";
 import { withLimits } from "../jointLimits";
 import { liftIntoUnit, pasteIntoUnit, saveModuleMeshes } from "../liftIntoUnit";
 import {
-  holdsLiftedPieces,
+  holdsMeshes,
   liftCredit,
   liftedModuleRefusal,
   openedFrom,
@@ -828,9 +828,9 @@ function Builder({ id }: { id: string | undefined }) {
   function startPlacingModule(module: LegoProject, now: boolean) {
     if (refuseLifted(module)) return;
     setPlacingAnchor(false);
-    // A lifted piece's meshes go into the unit first, so it has faces to join
-    // by and a ghost to draw, like any module.
-    if (holdsLiftedPieces(module)) {
+    // A module's meshes go into the unit first, so it has faces to join by and
+    // a ghost to draw, like any module.
+    if (holdsMeshes(module)) {
       setPlacingPart(null);
       void takeInLifted(module, t`Add module`).then((placed) => {
         if (placed) beginPlacingModule(placed, now);
@@ -1472,7 +1472,7 @@ function Builder({ id }: { id: string | undefined }) {
   ) {
     setSwappingModule(false);
     if (!draft || !pack || refuseLifted(module, title)) return;
-    if (holdsLiftedPieces(module)) {
+    if (holdsMeshes(module)) {
       void takeInLifted(module, title).then((placed) => {
         const now = docRef.current.project;
         if (placed && now) applyModuleSwap(now, pieceId, placed, title);
@@ -2442,25 +2442,25 @@ function Builder({ id }: { id: string | undefined }) {
                   onDuplicate: duplicateSelection,
                   canDuplicate: transformRoots(draft, selectedIds).length > 0,
                   onPaste: () => void pasteClipboard(),
-                  // Not for an imported unit: a compound is pieces made of
-                  // parts, and one saved out of raw geometry would name
-                  // meshes that only mean anything inside the unit they
-                  // came from. It can never have one, so the button goes.
-                  onSaveAsCompound: imported
-                    ? undefined
-                    : (mount, labels) =>
-                        void saveSelectionAsCompound(mount, labels),
+                  // Not for a unit opened from somebody else's model, whose
+                  // meshes record nowhere they came from. One imported from
+                  // the game maker's own file can (#4360).
+                  onSaveAsCompound:
+                    imported && !draft?.pieces.some((piece) => piece.ownMesh)
+                      ? undefined
+                      : (mount, labels) =>
+                          void saveSelectionAsCompound(mount, labels),
                   compoundMounts,
-                  // A selection holding lifted pieces saves with its meshes in
-                  // a file of its own. A mesh that records no game cannot,
-                  // since the module could not be held to one.
+                  // A selection holding meshes saves them in a file of its
+                  // own. A mesh must record a game or be the maker's own,
+                  // since otherwise the module could not be held to a rule.
                   canSaveAsCompound:
                     selectedIds.length > 0 &&
                     !selectedIds
                       .flatMap((pieceId) => descendantIds(draft, pieceId))
                       .some((pieceId) => {
                         const held = pieceById(draft, pieceId);
-                        return held?.meshId && !held.lifted;
+                        return held?.meshId && !held.lifted && !held.ownMesh;
                       }),
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,

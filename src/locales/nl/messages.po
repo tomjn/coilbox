@@ -19661,6 +19661,7 @@ msgstr "Schijfruimte voor tracks (MB)"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -38773,6 +38774,10 @@ msgstr "De mirror-indexen lezen…"
 msgid "Reading the model."
 msgstr "Het model lezen."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Reading the module's meshes."
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "Reading the rapid index…"
@@ -39476,6 +39481,7 @@ msgstr "Reliëf"
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
@@ -48434,6 +48440,10 @@ msgstr "de confrontatie"
 msgid "The maximum charge the shield can hold, reduced by incoming weapon damage."
 msgstr "De maximale lading die het schild kan bevatten, verminderd door inkomende wapenschade."
 
+#: src/lego/moduleShare.ts
+msgid "The meshes in this module could not be read."
+msgstr ""
+
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
 msgid "The meshes of {moduleName} could not be read: {reason}"
@@ -49218,6 +49228,10 @@ msgstr "De servers waarop je speelt, en van wie je daar berichten ontvangt."
 msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
 msgstr "De instellingen zijn veranderd nadat coilbox ze gelezen had, dus er is niets opgeslagen. Sluit dit en open het opnieuw."
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The shading map file has changed."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -49347,6 +49361,10 @@ msgstr "De testmutator brengt {conditionCount} voorwaarden en {actionCount} acti
 #, fuzzy
 msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr "De tekst hierboven wordt weggegooid. Ongedaan maken haalt hem terug als dat een vergissing was, dus kopieer hem eerst als je hem na deze sessie wilt bewaren."
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The texture file has changed."
+msgstr ""
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -50741,9 +50759,8 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Dit model is geopend uit een ingepakt archief, dat geen pad bevat om naar terug te schrijven. Sla het in plaats daarvan op in een gekozen pad."
 
 #: src/lego/moduleShare.ts
-#, fuzzy
-msgid "This module holds geometry from a game or a model, which a shared module cannot carry."
-msgstr "Deze module bevat geometrie uit een spel of een model, en die kan een gedeelde module niet meenemen."
+msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy

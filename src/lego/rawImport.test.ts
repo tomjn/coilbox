@@ -5,6 +5,7 @@ import type { LegoProject } from "./model";
 import {
   blenderTextures,
   importedTextures,
+  ownMeshFor,
   pngName,
   projectFromImport,
   texturesInUse,
@@ -235,6 +236,46 @@ describe("projectFromImport", () => {
     expect(imported.converted).toBe(27);
     expect(imported.vertices).toBe(4657);
     expect(imported.triangles).toBe(3044);
+  });
+});
+
+describe("ownMeshFor (#4360)", () => {
+  it("records the file name of a model picked off disk", () => {
+    expect(ownMeshFor("/Users/me/models/hull.s3o")).toEqual({
+      file: "hull.s3o",
+    });
+    expect(ownMeshFor("C:\\models\\hull.obj")).toEqual({ file: "hull.obj" });
+  });
+
+  it("records nothing for a model inside a game kept as a folder", () => {
+    expect(ownMeshFor("/spring/games/bar.sdd/objects3d/armcom.s3o")).toBe(null);
+    expect(ownMeshFor("C:\\games\\XTA.SDD\\objects3d\\a.3do")).toBe(null);
+  });
+});
+
+describe("own meshes on import (#4360)", () => {
+  it("records the file on every piece with a mesh, and only those", () => {
+    let n = 0;
+    const { project } = projectFromImport(result(), {
+      id: "unit-1",
+      source: "/me/Beacon.s3o",
+      ownMesh: { file: "Beacon.s3o" },
+      name: "Beacon",
+      unitName: "Beacon",
+      packId: "coilbox-lego",
+      packVersion: "1",
+      now: "2026-07-31T00:00:00.000Z",
+      newId: () => `p${n++}`,
+    });
+    expect(project.pieces.map((p) => p.ownMesh?.file ?? null)).toEqual([
+      null,
+      "Beacon.s3o",
+      "Beacon.s3o",
+    ]);
+  });
+
+  it("records nothing when the import is not the maker's own", () => {
+    expect(build().project.pieces.some((p) => p.ownMesh)).toBe(false);
   });
 });
 
