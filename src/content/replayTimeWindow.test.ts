@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { i18n } from "@/i18n";
 import type {
   DemoInfo,
   DemoTrailer,
@@ -6,6 +7,7 @@ import type {
   MetricKey,
   TeamStatSample,
 } from "./bindings";
+import { METRIC_LABEL } from "./metricLabels";
 import {
   activityPath,
   activitySeries,
@@ -304,7 +306,7 @@ describe("activitySeries", () => {
       metric(OTHER, false),
       metric(KEY, true),
     ]);
-    expect(series?.label).toBe(`Label of ${KEY} per minute`);
+    expect(series?.label).toBe(`${i18n._(METRIC_LABEL[KEY])} per minute`);
     // Team 0 rises 100 then 200 in a quarter minute each: 400 then 800 a
     // minute. Team 1 rises 50 then 0: 200 then 0. The first row takes the
     // second's rate, as the chart draws it.
@@ -320,7 +322,7 @@ describe("activitySeries", () => {
       metric(OTHER, true),
       metric(KEY, false),
     ]);
-    expect(series?.label).toBe(`Label of ${OTHER} per minute`);
+    expect(series?.label).toBe(`${i18n._(METRIC_LABEL[OTHER])} per minute`);
     expect(series?.points.every((p) => p.value === 0)).toBe(true);
   });
 

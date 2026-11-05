@@ -17,6 +17,7 @@ import type {
   MetricKey,
   TeamStatSample,
 } from "./bindings";
+import { labelOfMetric } from "./metricLabels";
 import { teamLabel } from "./replaySideLabel";
 
 /**
@@ -1034,7 +1035,7 @@ export function valueTable(
   shown: { metric: Metric; mode: ChartMode; view: ChartView },
 ): ValueTable {
   const { metric, mode, view } = shown;
-  const metricLabel = metric.label;
+  const metricLabel = labelOfMetric(metric);
   const byTeam = view === "teams";
   const caption =
     mode === "perMinute"
