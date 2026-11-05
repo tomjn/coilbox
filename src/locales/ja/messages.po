@@ -35697,6 +35697,10 @@ msgstr "出力フォルダー"
 msgid "Output name (-o)"
 msgstr "出力名 (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

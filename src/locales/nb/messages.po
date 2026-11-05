@@ -35923,6 +35923,10 @@ msgstr "Utdatamappe"
 msgid "Output name (-o)"
 msgstr "Utdatanavn (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

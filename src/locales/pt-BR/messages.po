@@ -35923,6 +35923,10 @@ msgstr "Pasta de saída"
 msgid "Output name (-o)"
 msgstr "Nome de saída (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

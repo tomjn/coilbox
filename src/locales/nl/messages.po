@@ -35940,6 +35940,10 @@ msgstr "Uitvoermap"
 msgid "Output name (-o)"
 msgstr "Uitvoernaam (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

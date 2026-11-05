@@ -29060,6 +29060,10 @@ msgstr ""
 msgid "Output name (-o)"
 msgstr ""
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 msgid "Over {length}"
 msgstr ""
