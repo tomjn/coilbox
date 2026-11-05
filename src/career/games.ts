@@ -43,11 +43,12 @@ const RANK_SHORTNAME = 1;
 
 /**
  * A word that is a version: `v2.58`, `0.1.78`, `V15.9.8-coilbox3do`,
- * `test-30018-d71d659`, or the unexpanded `$VERSION` a game in development
+ * `test-30018-d71d659`, the `pr-8942-30929-09be885` a pull request build of
+ * Beyond All Reason carries, or the unexpanded `$VERSION` a game in development
  * leaves in its name. A bare whole number is not one, so `Spring 1944` keeps
  * its year.
  */
-const VERSION_WORD = /^(v\d|\d+\.\d|test-\d|\$version$)/i;
+const VERSION_WORD = /^(v\d|\d+\.\d|(test|pr)-\d|\$version$)/i;
 
 /**
  * The game's name without its version. Everything from the first word that
