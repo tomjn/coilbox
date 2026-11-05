@@ -18144,15 +18144,15 @@ msgstr "Multiplikator for kraterstyrke"
 msgid "Create"
 msgstr "Opprett"
 
-#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
-#, fuzzy
-msgid "Create {article} {lowerLabel}"
-msgstr "Opprett {article} {lowerLabel}"
-
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
 msgid "Create a bot account"
 msgstr "Opprett en botkonto"
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a bounce effect"
+msgstr "Opprett en spretteffekt"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
@@ -18164,6 +18164,11 @@ msgstr "Opprett en lobby"
 msgid "Create a new account"
 msgstr "Opprett en ny konto"
 
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create a trail effect"
+msgstr "Opprett en sporeffekt"
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Create an account"
@@ -18173,6 +18178,11 @@ msgstr "Opprett en konto"
 #, fuzzy
 msgid "Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
 msgstr "Opprett en konto for en bot. uberserver har ingen kommando for å liste opp botkontoer. For å sette eller fjerne botflagget på en konto som finnes, slå den opp under Spillere."
+
+#: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
+#, fuzzy
+msgid "Create an impact effect"
+msgstr "Opprett en treffeffekt"
 
 #: src/multiplayer/admin/BotAccountsSection.tsx
 #, fuzzy
