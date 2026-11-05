@@ -68,7 +68,9 @@ describe("a walk that swings its legs out (#4487)", () => {
     const midAir = 0.75 * out.period;
     expect(leg(out, "l", midAir).ankle.x).toBeGreaterThan(1);
     expect(leg(out, "r", midAir - out.period / 2).ankle.x).toBeLessThan(-1);
-    expect(leg(out, "l", midAir).thighOut).toBeCloseTo(20 * (Math.PI / 180));
+    // Seen from in front, the leg leans out from upright by the whole swing.
+    const { ankle } = leg(out, "l", midAir);
+    expect(Math.atan2(ankle.x, -ankle.y)).toBeCloseTo(20 * (Math.PI / 180));
   });
 
   it("does not move a foot on the ground at all", () => {
