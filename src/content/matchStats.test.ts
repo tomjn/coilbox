@@ -46,6 +46,7 @@ import {
   tooltipRows,
   valueTable,
 } from "./matchStats";
+import { METRIC_LABEL } from "./metricLabels";
 
 /**
  * No metric is named here either. `metricRegistry.test.ts` forbids it, and the
@@ -1112,6 +1113,8 @@ describe("formatTableValue", () => {
 });
 
 describe("valueTable", () => {
+  // The name comes from the label table, whatever label the registry sent.
+  const NAME_A = i18n._(METRIC_LABEL[KEY_A]);
   const shown = { metric: metric(KEY_A, "Damage dealt", true) } as const;
   const players = { ...shown, mode: "cumulative", view: "players" } as const;
 
@@ -1135,19 +1138,19 @@ describe("valueTable", () => {
   describe("its caption, which is the name it is announced under", () => {
     it("names the metric, the question and the lines", () => {
       expect(table(oneTeam).caption).toBe(
-        "Damage dealt in total, by player, over match time",
+        `${NAME_A} in total, by player, over match time`,
       );
     });
 
     it("says per minute when that is what the figures are", () => {
       expect(table(oneTeam, { mode: "perMinute" }).caption).toBe(
-        "Damage dealt per minute, by player, over match time",
+        `${NAME_A} per minute, by player, over match time`,
       );
     });
 
     it("says by team when the sides are what is listed", () => {
       expect(table(oneTeam, { view: "teams" }).caption).toBe(
-        "Damage dealt in total, by team, over match time",
+        `${NAME_A} in total, by team, over match time`,
       );
     });
   });

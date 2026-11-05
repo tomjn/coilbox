@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { i18n } from "@/i18n";
 import type {
   DemoInfo,
   DemoTrailer,
@@ -9,6 +10,7 @@ import type {
   TeamStatSample,
 } from "../../bindings";
 import { modeRows, teamSeries, valueTable } from "../../matchStats";
+import { METRIC_LABEL } from "../../metricLabels";
 import { MatchStatsTable } from "./MatchStatsTable";
 
 /**
@@ -132,7 +134,9 @@ describe("the value table's markup", () => {
   it("is named by a caption that says what is in it", () => {
     const html = markup();
     expect(html).toMatch(
-      /<caption[^>]*>Damage dealt in total, by player, over match time<\/caption>/,
+      new RegExp(
+        `<caption[^>]*>${i18n._(METRIC_LABEL[KEY])} in total, by player, over match time</caption>`,
+      ),
     );
   });
 

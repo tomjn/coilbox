@@ -16,6 +16,7 @@ import type {
   MetricGroup,
 } from "../../bindings";
 import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
+import { labelOfMetric } from "../../metricLabels";
 import { teamResultLabel } from "../../replaySideLabel";
 import { useMatchStats } from "../../useMatchStats";
 import { MatchStatsChart } from "./MatchStatsChart";
@@ -92,7 +93,7 @@ function Headlines({
         <StatCard
           key={h.metric.key}
           icon={groupIcon[h.metric.group]}
-          label={h.metric.label}
+          label={labelOfMetric(h.metric)}
           value={h.text}
           sub={measured === 1 ? t`one team` : t`across ${measured} teams`}
         />

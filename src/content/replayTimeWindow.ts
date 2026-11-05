@@ -21,6 +21,7 @@ import {
   secondsPerFrame,
   teamSeries,
 } from "./matchStats";
+import { labelOfMetric } from "./metricLabels";
 
 /** A stretch of match time in whole seconds from the start of the game. */
 export interface TimeWindow {
@@ -264,7 +265,7 @@ export function activitySeries(
     "perMinute",
   );
   const points = sumRows(rows, series);
-  const metricLabel = metric.label;
+  const metricLabel = labelOfMetric(metric);
   return points.length > 0
     ? { label: t`${metricLabel} per minute`, points }
     : null;

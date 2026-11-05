@@ -15,6 +15,7 @@ import {
   spreadLabels,
 } from "./matchStats";
 import { slug, startedAt } from "./matchStatsCsv";
+import { labelOfMetric } from "./metricLabels";
 
 /**
  * The match statistics chart as a picture that says what it is of (#3836).
@@ -148,7 +149,10 @@ export function matchStatsCaption(
     },
     { label: t`Game id`, value: info.gameId ?? "" },
   ];
-  return { title: metric.label, facts: all.filter((f) => f.value !== "") };
+  return {
+    title: labelOfMetric(metric),
+    facts: all.filter((f) => f.value !== ""),
+  };
 }
 
 /** A default file name from the map, the date, the metric, the view and the mode. */

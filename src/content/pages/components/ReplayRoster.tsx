@@ -26,6 +26,7 @@ import { RatingBadge } from "@/multiplayer/UserBadges";
 import { isProfileHidden } from "../../../profile/hidden";
 import type { DemoInfo, ReplayAi, ReplayPlayer } from "../../bindings";
 import { hasStatistics } from "../../matchStats";
+import { labelOfMetric } from "../../metricLabels";
 import { formatFigure } from "../../replayMatchFigures";
 import {
   ariaSort,
@@ -293,7 +294,10 @@ export function ReplayRoster({
     });
   if (measured)
     for (const m of rosterMetrics(measured.metrics))
-      figures.push({ column: { kind: "metric", key: m.key }, label: m.label });
+      figures.push({
+        column: { kind: "metric", key: m.key },
+        label: labelOfMetric(m),
+      });
 
   const hasRating = roster.rows.some((r) =>
     r.seats.some(

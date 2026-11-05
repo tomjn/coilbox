@@ -14,6 +14,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { formatDate } from "@/lib/format";
 import type { Metric, MetricRatio, StatRecord } from "../../bindings";
 import { formatRate } from "../../matchStats";
+import { labelOfMetric, labelOfRatio } from "../../metricLabels";
 import {
   formatRateValue,
   leftOutNote,
@@ -216,7 +217,9 @@ export function PlayerMatchFigures({
     [ratios, metrics],
   );
   const labelOf = (key: string) =>
-    metrics.find((m) => m.key === key)?.label.toLowerCase() ?? "";
+    labelOfMetric(
+      metrics.find((m) => m.key === key) ?? { key, label: "" },
+    ).toLowerCase();
   const data = useMemo(
     () =>
       playerRateGames(
@@ -242,9 +245,14 @@ export function PlayerMatchFigures({
     metrics.find((m) => m.headline) ??
     metrics[0];
   const trendIsRatio = shownRatios.some((r) => r.key === trendMetric?.key);
+  const trendName = !trendMetric
+    ? ""
+    : trendIsRatio
+      ? labelOfRatio(trendMetric)
+      : labelOfMetric(trendMetric);
   const describeTrend = (value: number) =>
     trendIsRatio
-      ? `${formatRate(value)} ${trendMetric?.label.toLowerCase()}`
+      ? `${formatRate(value)} ${trendName.toLowerCase()}`
       : t`${formatRate(value)} per minute`;
   const points = useMemo(
     () => (trendMetric ? trendSeries(data.list, trendMetric.key) : []),
@@ -354,7 +362,7 @@ export function PlayerMatchFigures({
                       scope="row"
                       className="px-2 py-1.5 text-left align-top font-normal"
                     >
-                      {r.metric.label}
+                      {labelOfMetric(r.metric)}
                     </th>
                     <Cell s={r.all} />
                     <Cell s={r.wins} />
@@ -383,7 +391,7 @@ export function PlayerMatchFigures({
                           scope="row"
                           className="px-2 py-1.5 text-left align-top font-normal"
                         >
-                          {r.ratio.label}
+                          {labelOfRatio(r.ratio)}
                         </th>
                         <RatioCell s={r.all} lowerFigure={lower} />
                         <RatioCell s={r.wins} lowerFigure={lower} />
@@ -414,10 +422,13 @@ export function PlayerMatchFigures({
                   value={trendMetric.key}
                   onValueChange={setPicked}
                   options={[
-                    ...metrics.map((m) => ({ value: m.key, label: m.label })),
+                    ...metrics.map((m) => ({
+                      value: m.key,
+                      label: labelOfMetric(m),
+                    })),
                     ...shownRatios.map((r) => ({
                       value: r.key,
-                      label: r.label,
+                      label: labelOfRatio(r),
                     })),
                   ]}
                 />
@@ -427,7 +438,7 @@ export function PlayerMatchFigures({
               </div>
               <Trend
                 points={points}
-                label={trendMetric.label}
+                label={trendName}
                 describe={describeTrend}
               />
             </div>

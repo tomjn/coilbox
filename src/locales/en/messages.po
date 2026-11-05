@@ -14927,6 +14927,7 @@ msgid "Damage comes from playing a match back, which is run from a replay's own 
 msgstr "Damage comes from playing a match back, which is run from a replay's own page. It is added up in each cell and each minute and rounded to a whole point. Damage past a unit's last health, paralysis and healing are not in it. Where it landed counts every hit. Where it came from counts only damage an attacker dealt."
 
 #: src/content/mapAggregate.ts
+#: src/content/metricLabels.ts
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Damage dealt"
 msgstr "Damage dealt"
@@ -14962,6 +14963,10 @@ msgstr "Damage per metal is the damage a kind of unit dealt divided by what the 
 #: src/workshop/derivedStats.ts
 msgid "Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this."
 msgstr "Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this."
+
+#: src/content/metricLabels.ts
+msgid "Damage received"
+msgstr "Damage received"
 
 #: src/i18n/frameStrings.ts
 msgid "Dark"
@@ -16945,6 +16950,10 @@ msgstr "Energy cost per shot"
 msgid "Energy drained continuously by a repulsor while a projectile is nearby, or spent absorbing a hit."
 msgstr "Energy drained continuously by a repulsor while a projectile is nearby, or spent absorbing a hit."
 
+#: src/content/metricLabels.ts
+msgid "Energy excess"
+msgstr "Energy excess"
+
 #: src/content/unitFieldNotes.ts
 msgid "Energy made"
 msgstr "Energy made"
@@ -16952,6 +16961,18 @@ msgstr "Energy made"
 #: src/scenario/triggerTypes.ts
 msgid "energy per second"
 msgstr "energy per second"
+
+#: src/content/metricLabels.ts
+msgid "Energy produced"
+msgstr "Energy produced"
+
+#: src/content/metricLabels.ts
+msgid "Energy received"
+msgstr "Energy received"
+
+#: src/content/metricLabels.ts
+msgid "Energy sent"
+msgstr "Energy sent"
 
 #: src/scenario/triggerTypes.ts
 msgid "energy storage"
@@ -16968,6 +16989,10 @@ msgstr "Energy upkeep"
 #: src/content/unitFieldNotes.ts
 msgid "Energy upkeep (old name)"
 msgstr "Energy upkeep (old name)"
+
+#: src/content/metricLabels.ts
+msgid "Energy used"
+msgstr "Energy used"
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -24024,6 +24049,10 @@ msgstr "Metal cost lost"
 msgid "Metal cost per shot"
 msgstr "Metal cost per shot"
 
+#: src/content/metricLabels.ts
+msgid "Metal excess"
+msgstr "Metal excess"
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "Metal is the units ordered times the unit's metal cost, from the unit list of the build each game was played on. Other is builders, factories, sensors and transports. Unclassified is a unit whose definition does not say what it is for."
 msgstr "Metal is the units ordered times the unit's metal cost, from the unit list of the build each game was played on. Other is builders, factories, sensors and transports. Unclassified is a unit whose definition does not say what it is for."
@@ -24048,6 +24077,18 @@ msgstr "Metal ordered by kind of unit"
 msgid "metal per second"
 msgstr "metal per second"
 
+#: src/content/metricLabels.ts
+msgid "Metal produced"
+msgstr "Metal produced"
+
+#: src/content/metricLabels.ts
+msgid "Metal received"
+msgstr "Metal received"
+
+#: src/content/metricLabels.ts
+msgid "Metal sent"
+msgstr "Metal sent"
+
 #: src/scenario/triggerTypes.ts
 msgid "metal storage"
 msgstr "metal storage"
@@ -24063,6 +24104,10 @@ msgstr "Metal upkeep"
 #: src/content/unitFieldNotes.ts
 msgid "Metal upkeep (old name)"
 msgstr "Metal upkeep (old name)"
+
+#: src/content/metricLabels.ts
+msgid "Metal used"
+msgstr "Metal used"
 
 #: src/lego/pivot.ts
 msgid "Middle"
@@ -42772,6 +42817,14 @@ msgstr "Units ({unitCount})"
 msgid "Units being carried by this transport keep firing."
 msgstr "Units being carried by this transport keep firing."
 
+#: src/content/metricLabels.ts
+msgid "Units built"
+msgstr "Units built"
+
+#: src/content/metricLabels.ts
+msgid "Units captured"
+msgstr "Units captured"
+
 #: src/content/replayAnalysis.ts
 msgid "Units captured from the team, as the log counted them"
 msgstr "Units captured from the team, as the log counted them"
@@ -42785,6 +42838,10 @@ msgstr "Units each faction's commander can build, directly or indirectly."
 msgid "Units from the builder"
 msgstr "Units from the builder"
 
+#: src/content/metricLabels.ts
+msgid "Units given away"
+msgstr "Units given away"
+
 #: src/content/replayAnalysis.ts
 msgid "Units given to the team, as the log counted them"
 msgstr "Units given to the team, as the log counted them"
@@ -42793,10 +42850,23 @@ msgstr "Units given to the team, as the log counted them"
 msgid "Units in {activeName}"
 msgstr "Units in {activeName}"
 
+#: src/content/metricLabels.ts
+msgid "Units killed"
+msgstr "Units killed"
+
+#: src/content/metricLabels.ts
 #: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/replayAnalysis.ts
 msgid "Units lost"
 msgstr "Units lost"
+
+#: src/content/metricLabels.ts
+msgid "Units lost per unit killed"
+msgstr "Units lost per unit killed"
+
+#: src/content/metricLabels.ts
+msgid "Units lost to capture"
+msgstr "Units lost to capture"
 
 #: src/content/replayAnalysis.ts
 msgid "Units made"
@@ -42813,6 +42883,10 @@ msgstr "Units on {mapName} at the chosen time"
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "Units ordered"
 msgstr "Units ordered"
+
+#: src/content/metricLabels.ts
+msgid "Units received"
+msgstr "Units received"
 
 #: src/content/replayAnalysis.ts
 msgid "Units the team captured, as the log counted them"

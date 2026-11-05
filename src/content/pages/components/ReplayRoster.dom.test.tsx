@@ -17,6 +17,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n";
 import type {
   DemoInfo,
   DemoTrailer,
@@ -24,6 +25,7 @@ import type {
   MetricKey,
   TeamStatSample,
 } from "../../bindings";
+import { METRIC_LABEL } from "../../metricLabels";
 
 let HIDE: string[] = [];
 const trailerRead = vi.fn();
@@ -121,9 +123,9 @@ function metric(key: MetricKey, over: Partial<Metric> = {}): Metric {
     ...over,
   };
 }
-const LABEL_A = `Metric ${KEYS.indexOf(ROSTER_A)}`;
-const LABEL_B = `Metric ${KEYS.indexOf(ROSTER_B)}`;
-const LABEL_NOT_ROSTER = `Metric ${KEYS.indexOf(NOT_ROSTER)}`;
+const LABEL_A = i18n._(METRIC_LABEL[ROSTER_A]);
+const LABEL_B = i18n._(METRIC_LABEL[ROSTER_B]);
+const LABEL_NOT_ROSTER = i18n._(METRIC_LABEL[NOT_ROSTER]);
 
 /** Team figures at the end of the match, for the first roster metric. */
 function trailerWith(finals: number[], samples = true): DemoTrailer {
