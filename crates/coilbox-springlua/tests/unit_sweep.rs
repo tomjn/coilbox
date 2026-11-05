@@ -95,10 +95,16 @@ fn every_unit_script_in_the_folder_runs() {
         let def = gathered.get("unitDef").filter(|def| def.is_object());
         // Where each piece hangs, as the app passes it. A file without it runs
         // as a unit nobody told the preview about.
-        let rest: Vec<Rest> = gathered
-            .get("rest")
-            .and_then(|rest| serde_json::from_value(rest.clone()).ok())
-            .unwrap_or_default();
+        let rest: Vec<Rest> = match gathered.get("rest") {
+            None => Vec::new(),
+            Some(rest) => match serde_json::from_value(rest.clone()) {
+                Ok(rest) => rest,
+                Err(error) => {
+                    failures.push(format!("{unit}: its rest would not read: {error}"));
+                    continue;
+                }
+            },
+        };
         let target = Unit {
             def,
             includes: &includes,

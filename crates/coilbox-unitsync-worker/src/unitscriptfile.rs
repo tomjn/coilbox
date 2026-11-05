@@ -91,7 +91,9 @@ pub struct UnitScriptOutput {
 #[serde(rename_all = "camelCase")]
 pub struct ScriptInclude {
     /// The name the script asked for, exactly as written. That is the key the
-    /// preview matches on, because it is all the script ever says.
+    /// preview matches on, because it is all the script ever says. A file of
+    /// the game's own library, which the script never names, is keyed by its
+    /// archive path instead, which is what the preview's `VFS` asks for.
     pub name: String,
     /// The archive member it resolved to, so the caller can say where from.
     pub member: String,

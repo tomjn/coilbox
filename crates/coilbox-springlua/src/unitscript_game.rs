@@ -269,18 +269,30 @@ fn install_vfs(
 
 /// Whether `name` matches a VFS pattern, where `*` is any run of characters and
 /// `?` is one.
+///
+/// Greedy, going back only to the latest `*`, so it takes time in proportion
+/// to the two lengths multiplied, whatever pattern the game's Lua passes.
 fn glob(pattern: &str, name: &str) -> bool {
-    fn go(p: &[char], n: &[char]) -> bool {
-        match p.split_first() {
-            None => n.is_empty(),
-            Some(('*', rest)) => (0..=n.len()).any(|skip| go(rest, &n[skip..])),
-            Some(('?', rest)) => !n.is_empty() && go(rest, &n[1..]),
-            Some((c, rest)) => n.first() == Some(c) && go(rest, &n[1..]),
-        }
-    }
     let p: Vec<char> = pattern.chars().collect();
     let n: Vec<char> = name.chars().collect();
-    go(&p, &n)
+    let (mut pi, mut ni) = (0, 0);
+    let mut star: Option<(usize, usize)> = None;
+    while ni < n.len() {
+        if pi < p.len() && (p[pi] == '?' || p[pi] == n[ni]) {
+            pi += 1;
+            ni += 1;
+        } else if pi < p.len() && p[pi] == '*' {
+            star = Some((pi, ni));
+            pi += 1;
+        } else if let Some((at, from)) = star {
+            pi = at + 1;
+            ni = from + 1;
+            star = Some((at, from + 1));
+        } else {
+            return false;
+        }
+    }
+    p[pi..].iter().all(|c| *c == '*')
 }
 
 /// What Zero-K's gadgets put in `GG` for a unit script to use, answered as for
@@ -356,5 +368,9 @@ mod tests {
         assert!(!glob("*.lua", "vector.lua.bak"));
         assert!(glob("*", "anything"));
         assert!(glob("v?ctor.lua", "vector.lua"));
+        assert!(glob("*a*b", "xxaxxb"));
+        assert!(!glob("*a*b", "xxaxx"));
+        // Answers at once rather than trying every split of the name.
+        assert!(!glob(&"*a".repeat(30), &"a".repeat(29)));
     }
 }

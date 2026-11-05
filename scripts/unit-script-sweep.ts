@@ -95,6 +95,10 @@ mkdirSync(out, { recursive: true });
 const counts = { lua: 0, cob: 0, none: 0, failed: 0 };
 async function gather(unit: string) {
   const script = await ask(["--unit-script", "--game", game, "--unit", unit]);
+  const errors = (script.errors ?? []) as string[];
+  if (!script.kind && errors.length > 0) {
+    throw new Error(`worker could not read the script: ${errors.join("; ")}`);
+  }
   if (script.kind !== "lua") {
     counts[script.kind === "cob" ? "cob" : "none"]++;
     return;
