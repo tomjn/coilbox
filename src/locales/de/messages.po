@@ -35703,6 +35703,10 @@ msgstr "Ausgabeordner"
 msgid "Output name (-o)"
 msgstr "Ausgabename (-o)"
 
+#: src/lego/animPresets.ts
+msgid "Outward swing"
+msgstr ""
+
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Over {length}"

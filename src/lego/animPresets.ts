@@ -1222,6 +1222,9 @@ function walkTrack(
       duty,
       fitted ? Math.round(period * ENGINE_FPS) : undefined,
     );
+  // An unfitted walk's foot is down from -90 to 90 degrees of its phase. A
+  // fitted one comes down at 0, so its poses fall on whole frames.
+  const share = strideShare((fitted ? phase : phase + Math.PI / 2) / TAU, duty);
 
   let thigh: number;
   let shin: number;
@@ -1232,12 +1235,6 @@ function walkTrack(
     thigh = swing * Math.sin(phase);
     shin = knee * (1 - Math.cos(phase)) * 0.5;
   } else {
-    // An unfitted walk's foot is down from -90 to 90 degrees of its phase. A
-    // fitted one comes down at 0, so its poses fall on whole frames.
-    const share = strideShare(
-      (fitted ? phase : phase + Math.PI / 2) / TAU,
-      duty,
-    );
     if (!fitted) {
       const warped = share * TAU - Math.PI / 2;
       thigh = swing * Math.sin(warped);
@@ -1269,12 +1266,43 @@ function walkTrack(
     }
   }
 
-  const angle: Record<LegSegment, number> = {
-    thigh,
-    shin,
-    foot: -(thigh + shin),
-  };
-  return { rotation: [angle[leg.segment], 0, 0] };
+  // Out to the side while the foot is in the air (#4487), most at the middle
+  // of the swing and none as it lifts or lands, so a foot on the ground stays
+  // where the walk put it. The left leg is on +x, where a z turn takes a
+  // hanging foot.
+  const splay = deg(value(preset, params, "splay"));
+  const out =
+    splay > 0 && share > 0.5
+      ? (leg.side === "l" ? 1 : -1) *
+        splay *
+        Math.sin(Math.PI * (2 * share - 1))
+      : 0;
+  if (out === 0) {
+    const angle: Record<LegSegment, number> = {
+      thigh,
+      shin,
+      foot: -(thigh + shin),
+    };
+    return { rotation: [angle[leg.segment], 0, 0] };
+  }
+  // The thigh turns out about the body's z and then forward about x, so the
+  // leg goes out to the side whatever its pitch. The foot undoes both in the
+  // other order, which is the engine's own order, so it stays level.
+  if (leg.segment === "thigh") return { rotation: outThenPitch(out, thigh) };
+  if (leg.segment === "shin") return { rotation: [shin, 0, 0] };
+  return { rotation: [-(thigh + shin), 0, -out] };
+}
+
+/**
+ * `Rz(out) * Rx(pitch)` as a turn in the engine's `YXZ` order
+ * (`ENGINE_ROTATION_ORDER`), read out of that matrix as three.js reads a
+ * `YXZ` Euler. It holds for a pitch within 90 degrees either way, which every
+ * thigh the walks swing is.
+ */
+function outThenPitch(out: number, pitch: number): [number, number, number] {
+  const [so, co] = [Math.sin(out), Math.cos(out)];
+  const [sp, cp] = [Math.sin(pitch), Math.cos(pitch)];
+  return [Math.asin(co * sp), Math.atan2(so * sp, cp), Math.atan2(so, co * cp)];
 }
 
 const WALK_PARAMS: PresetParam[] = [
@@ -1312,6 +1340,24 @@ const WALK_PARAMS: PresetParam[] = [
     fallback: 30,
   },
   dutyParam(80),
+  // How far a leg swings out while its foot is in the air (#4487). Swung out
+  // by an angle, a leg hanging from its hip puts the foot its length times the
+  // angle's cosine below the hip, so at a right angle the foot is level with
+  // the hip whatever the leg's length. Past that the leg no longer hangs below
+  // its hip, which the walk's solve takes it to do (`legLengths` in
+  // `walkFit.ts`). No game measured for #4487 swings its legs out, so the walk
+  // does not unless the game maker sets it.
+  {
+    id: "splay",
+    get label() {
+      return t`Outward swing`;
+    },
+    unit: "deg",
+    min: 0,
+    max: 90,
+    step: 1,
+    fallback: 0,
+  },
 ];
 
 // A walk keeps each foot down for more than half the time and a run for less.

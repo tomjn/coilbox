@@ -320,6 +320,8 @@ interface LegFrame {
   shin: number;
   /** The body piece's y offset, from the walk lowering it. */
   body: number;
+  /** The thigh's z angle, the leg's outward swing (#4487). */
+  out: number;
 }
 
 /**
@@ -330,7 +332,7 @@ interface LegFrame {
  * later, as the unit script gadget's `Sleep` does. `StartMoving` fires on
  * frame 0. `CURRENT_SPEED` reads `pace` of `MAX_SPEED` on every frame, in the
  * engine's 65536ths of an elmo a frame (#4486). Returns the left thigh's and
- * shin's x angles and the body's y offset on every frame.
+ * shin's x angles, the thigh's z angle and the body's y offset on every frame.
  */
 function walkLeg(
   lua: string,
@@ -404,7 +406,7 @@ for f = 0, ${frames - 1} do
       else a.at = a.at - step end
     end
   end
-  io.write(f, " ", anim("turn", "${thigh}", x_axis).at, " ", anim("turn", "${shin}", x_axis).at, " ", anim("move", "${body}", y_axis).at, "\\n")
+  io.write(f, " ", anim("turn", "${thigh}", x_axis).at, " ", anim("turn", "${shin}", x_axis).at, " ", anim("move", "${body}", y_axis).at, " ", anim("turn", "${thigh}", z_axis).at, "\\n")
 end
 `;
   const result = spawnSync("luajit", ["-e", harness], { input: lua });
@@ -416,8 +418,10 @@ end
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const [frame, thighAngle, shinAngle, bodyY] = line.split(" ").map(Number);
-      return { frame, thigh: thighAngle, shin: shinAngle, body: bodyY };
+      const [frame, thighAngle, shinAngle, bodyY, out] = line
+        .split(" ")
+        .map(Number);
+      return { frame, thigh: thighAngle, shin: shinAngle, body: bodyY, out };
     });
 }
 
@@ -464,6 +468,8 @@ interface Stance {
   along: number[];
   /** The ankle's height above the ground, the body's drop counted. */
   height: number[];
+  /** The thigh's z angle, which swings the leg out (#4487). */
+  out: number[];
 }
 
 /**
@@ -524,6 +530,7 @@ function stancesOf(
           a * Math.cos(leg.thigh) -
           b * Math.cos(leg.thigh + leg.shin),
       ),
+      out: run.map((leg) => leg.out),
     });
   }
   return stances;
@@ -835,6 +842,42 @@ describe("a fitted walk at the unit's speed (#4486)", () => {
       }
       console.log(
         `#4486 ${pace} of top speed: along ${Math.max(...stances.map((run) => spread(run.along))).toFixed(5)}, height ${Math.max(...stances.flatMap((run) => run.height.map(Math.abs))).toFixed(5)}, allowance ${allowance.toFixed(5)}`,
+      );
+    });
+  }
+});
+
+describe("a walk swinging its legs out at the unit's speed (#4487)", () => {
+  const speed = 40;
+  const base = walker(12, 0.395, speed);
+  const unit: LegoProject = {
+    ...base,
+    animations: [{ presetId: "walk.biped", params: { splay: 40 } }],
+  };
+  const lua = buildLuaScript(unit);
+  const fitted = fittedParams(unit, "walk.biped", { splay: 40 });
+  const lap = Math.round(fitted.period * FPS);
+
+  // The paces are the ones #4486 tests, its floor and top speed.
+  for (const pace of [1, 0.6, 0.35, 0.2]) {
+    it(`swings a leg out only while its foot is in the air at ${pace} of top speed`, () => {
+      const frames = Math.ceil((lap * 6) / pace);
+      const legs = walkLeg(lua, "lthigh", "lshin", "hip", frames, pace);
+      const stances = stancesOf(legs, unit, speed, fitted, pace);
+      expect(stances.length).toBeGreaterThanOrEqual(3);
+      // A foot down is held as #4486 holds it, to rounding and a frame of
+      // the unit's travel, so the swing may move it sideways by no more.
+      const allowance =
+        roundingAllowance(fitted[WALK_THIGH], fitted[WALK_SHIN]) +
+        (speed * pace) / FPS;
+      for (const { out } of stances) {
+        for (const angle of out) {
+          expect(Math.abs(12 * Math.sin(angle))).toBeLessThan(allowance);
+        }
+      }
+      // And it does swing out in between, to the left for the left leg.
+      expect(Math.max(...legs.map((leg) => leg.out))).toBeGreaterThan(
+        0.9 * 40 * (Math.PI / 180),
       );
     });
   }
