@@ -1885,6 +1885,25 @@ async fn lego_texture_import<R: Runtime>(app: AppHandle<R>, path: String) -> Cli
     }
 }
 
+/// `lego_texture_save` puts a texture that arrived inside a shared module code
+/// (#5073) into the store, under the key the sender's store gave it. See
+/// [`texture::store_shared`] for why the key is checked against the bytes.
+#[tauri::command]
+async fn lego_texture_save<R: Runtime>(
+    app: AppHandle<R>,
+    key: String,
+    bytes: Vec<u8>,
+) -> CliResult {
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    match texture::store_shared(&dir, &key, &bytes) {
+        Ok(()) => CliResult::ok(json!({ "key": key })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// The event sent to every window once a watched texture file has been edited
 /// and has stopped changing. The payload is `{ "path": <the path as watched> }`.
 pub const TEXTURE_CHANGED_EVENT: &str = "coilbox-lego://texture-changed";
@@ -3854,6 +3873,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_read_dae,
             lego_import_dae,
             lego_texture_import,
+            lego_texture_save,
             lego_texture_watch,
             lego_texture_png,
             lego_atlas_png,

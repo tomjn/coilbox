@@ -32,6 +32,7 @@ import {
   type LegoProject,
   type LegoTexture,
   normalisePieceName,
+  pieceTextures,
   uniquePieceName,
 } from "./model";
 
@@ -367,10 +368,11 @@ export function texturesInUse(projects: LegoProject[]): string[] {
     for (const texture of [
       project.imported?.texture,
       project.imported?.texture2,
-      // A piece lifted from a game draws with its game's texture (#3259).
+      // A piece lifted from a game draws with its game's texture (#3259), and
+      // an own mesh with the one its unit had (#5073).
       ...project.pieces.flatMap((piece) => [
-        piece.lifted?.texture,
-        piece.lifted?.texture2,
+        pieceTextures(piece)?.texture,
+        pieceTextures(piece)?.texture2,
       ]),
     ]) {
       if (texture?.key) keys.add(texture.key);

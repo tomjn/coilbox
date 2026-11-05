@@ -46,7 +46,12 @@ import {
 } from "../../geometry";
 import { refKey } from "../../inventory";
 import { holdsLiftedPieces, holdsMeshes, liftCredits } from "../../liftPiece";
-import type { LegoLifted, LegoPiece, LegoProject } from "../../model";
+import {
+  type LegoLifted,
+  type LegoPiece,
+  type LegoProject,
+  pieceTextures,
+} from "../../model";
 import {
   getPartGeometry,
   type LegoPartInfo,
@@ -634,11 +639,12 @@ export function buildModule(
   if (!raw) return null;
   // A module lifted whole draws everything with its game's texture. One saved
   // out of a selection (#4344) has none of its own, so each lifted piece draws
-  // with the textures it records and a pack part with the pack's.
+  // with the textures it records and a pack part with the pack's. An own mesh
+  // records its unit's the same way (#5073).
   const own = new Map<string, ReturnType<typeof importedMaterial>>();
   const lifted = (piece: LegoPiece) => {
     const source: Pick<LegoLifted, "texture" | "texture2"> =
-      module.imported ?? piece.lifted ?? {};
+      module.imported ?? pieceTextures(piece) ?? {};
     const key = `${source.texture?.key ?? ""}|${source.texture2?.key ?? ""}`;
     let held = own.get(key);
     if (!held) {

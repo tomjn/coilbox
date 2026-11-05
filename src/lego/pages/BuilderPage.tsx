@@ -119,6 +119,7 @@ import {
   liftedModuleRefusal,
   openedFrom,
   withMeshBoxes,
+  withOwnTextures,
 } from "../liftPiece";
 import {
   adoptLoadoutFile,
@@ -1109,11 +1110,12 @@ function Builder({ id }: { id: string | undefined }) {
 
   function liftSelection(): LegoProject | null {
     if (!draft) return null;
-    return selectionAsCompound(draft, selectedIds, {
+    const cut = selectionAsCompound(draft, selectedIds, {
       id: crypto.randomUUID(),
       now: new Date().toISOString(),
       newId: () => crypto.randomUUID(),
     });
+    return cut && withOwnTextures(cut, draft);
   }
 
   // What the save step offers as the mount: the connectors of the module the
@@ -1577,11 +1579,11 @@ function Builder({ id }: { id: string | undefined }) {
 
   async function copySelection() {
     const lifted = doc.lift(selectedIds);
-    if (!lifted) return;
+    if (!lifted || !draft) return;
     try {
       await navigator.clipboard.writeText(
         serializeClipboardPiece(
-          lifted,
+          withOwnTextures(lifted, draft),
           draft?.id,
           draft ? openedFrom(draft) : null,
         ),

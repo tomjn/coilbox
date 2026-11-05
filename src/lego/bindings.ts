@@ -766,6 +766,16 @@ export const legoTextureImport = defineCommand<
 >("coilbox-lego", "lego_texture_import");
 
 /**
+ * Put a texture a shared module code carried (#5073) in the store, under the
+ * key the sender's store gave it. Refused unless the key is the bytes' own
+ * content hash, so a code cannot name a file or replace one already held.
+ */
+export const legoTextureSave = defineCommand<
+  { key: string; bytes: number[] },
+  { key: string }
+>("coilbox-lego", "lego_texture_save");
+
+/**
  * Watch the files an open unit's textures came from, replacing any earlier
  * watch. An empty list stops watching. Each edit that has settled arrives once
  * as {@link LEGO_TEXTURE_CHANGED_EVENT} (issue #3225).

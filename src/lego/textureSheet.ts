@@ -42,7 +42,7 @@ import { t } from "@lingui/core/macro";
 import { vZeroAtTop } from "@/lib/springTexture";
 import { exportTextureName, unitAtlas } from "./atlas";
 import { liftCredit } from "./liftPiece";
-import type { LegoProject } from "./model";
+import { type LegoProject, pieceTextures } from "./model";
 import type { LoadedPack } from "./pack";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
 import { type BakedPiece, engineUv } from "./s3oBuild";
@@ -160,14 +160,19 @@ export function sheetSources(
   const sources = new Map<string, SheetSource>();
   for (const piece of project.pieces) {
     if (pieceMesh(raw, piece) !== null) {
-      const texture = piece.lifted?.texture;
-      if (!piece.lifted || !texture) {
+      // An own mesh records its unit's textures as a lifted one does (#5073).
+      const recorded = pieceTextures(piece);
+      const texture = recorded?.texture;
+      if (!recorded || !texture) {
         const pieceName = piece.name;
         return {
           refused: t`${pieceName} has no texture recorded from the model it came from, so it cannot go on this unit's texture sheet.`,
         };
       }
-      const texture2 = piece.lifted.texture2;
+      const texture2 = recorded.texture2;
+      const from = piece.lifted
+        ? liftCredit(piece.lifted)
+        : (piece.ownMesh?.file ?? "");
       const id = `${texture.key}\n${texture2?.key ?? ""}`;
       const found = sources.get(id);
       if (found) {
@@ -176,7 +181,7 @@ export function sheetSources(
       }
       sources.set(id, {
         id,
-        label: `${texture.name} (${liftCredit(piece.lifted)})`,
+        label: `${texture.name} (${from})`,
         part: false,
         colour: { key: texture.key, flipY: !vZeroAtTop(texture.key) },
         shading: texture2

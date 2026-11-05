@@ -289,6 +289,27 @@ export interface LegoLifted {
 export interface LegoOwnMesh {
   /** The model file's name, without the folder it was in. */
   file: string;
+  /** The unit's colour texture, which the mesh's UVs point onto, recorded when
+   *  the mesh is saved as a module or copied, so it still draws with it there
+   *  and in a unit of parts (#5073). As `LegoLifted` keeps its pair. */
+  texture?: LegoTexture;
+  /** The unit's second texture, whose alpha hides pixels. */
+  texture2?: LegoTexture;
+}
+
+/**
+ * The textures a mesh piece records it was drawn with: a lifted piece's game
+ * textures or an own mesh's, or null for a piece that records neither.
+ */
+export function pieceTextures(
+  piece: Pick<LegoPiece, "lifted" | "ownMesh">,
+): Pick<LegoLifted, "texture" | "texture2"> | null {
+  const from = piece.lifted ?? piece.ownMesh;
+  if (!from?.texture && !from?.texture2) return null;
+  return {
+    ...(from.texture ? { texture: from.texture } : {}),
+    ...(from.texture2 ? { texture2: from.texture2 } : {}),
+  };
 }
 
 /**
@@ -2268,9 +2289,16 @@ export function parseLifted(value: unknown): LegoLifted | null {
 /** A piece's own mesh record, or null unless it names a file. */
 function parseOwnMesh(value: unknown): LegoOwnMesh | null {
   if (typeof value !== "object" || value === null) return null;
-  const { file } = value as Record<string, unknown>;
-  if (typeof file !== "string" || file === "") return null;
-  return { file };
+  const v = value as Record<string, unknown>;
+  if (typeof v.file !== "string" || v.file === "") return null;
+  // A pointer into the store, never a path to refresh from: the unit keeps that.
+  const texture = parseTexture(v.texture, true);
+  const texture2 = parseTexture(v.texture2, true);
+  return {
+    file: v.file,
+    ...(texture ? { texture } : {}),
+    ...(texture2 ? { texture2 } : {}),
+  };
 }
 
 /** A piece's ring, or null unless it names a next piece and a usable count. */

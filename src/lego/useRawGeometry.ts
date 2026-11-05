@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { describeError } from "@/i18n/uiError";
 
 import { legoTextureUrl } from "../lib/assetUrl";
-import type { LegoProject } from "./model";
+import { type LegoProject, pieceTextures } from "./model";
 import {
   disposeRawGeometry,
   loadRawGeometry,
@@ -65,8 +65,8 @@ function namedTextures(project: LegoProject | null): string {
     project?.imported?.texture,
     project?.imported?.texture2,
     ...(project?.pieces ?? []).flatMap((piece) => [
-      piece.lifted?.texture,
-      piece.lifted?.texture2,
+      pieceTextures(piece)?.texture,
+      pieceTextures(piece)?.texture2,
     ]),
   ]) {
     if (texture?.key) named.set(texture.key, texture.name);

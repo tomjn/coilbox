@@ -91,6 +91,43 @@ pub fn store(dir: &Path, source: &Path) -> Result<Stored, String> {
     })
 }
 
+/// The extensions a texture that arrives as bytes may be stored under: the ones
+/// the store itself keeps after an import, since anything else was re-encoded
+/// to PNG on the way in.
+const SHARED_EXTS: &[&str] = &["dds", "png", "jpg", "jpeg"];
+
+/// Put bytes that arrived in a shared module code (#5073) in the store under
+/// the key the sender's store gave them.
+///
+/// The bytes came from outside the app, so the key has to be exactly what this
+/// store would have called them: their own SHA-256 and one of the extensions
+/// the store keeps. That leaves a sender no way to choose a file name or to
+/// replace a texture already held.
+pub fn store_shared(dir: &Path, key: &str, bytes: &[u8]) -> Result<(), String> {
+    let (hash, ext) = key
+        .split_once('.')
+        .ok_or_else(|| format!("{key} is not a texture key"))?;
+    if !SHARED_EXTS.contains(&ext) {
+        return Err(format!("{key} is not a kind of texture the store holds"));
+    }
+    if bytes.len() as u64 > MAX_TEXTURE_BYTES {
+        return Err(format!(
+            "{key} is {} bytes, which is far larger than any unit texture",
+            bytes.len()
+        ));
+    }
+    if hex(&Sha256::digest(bytes)) != hash {
+        return Err(format!("the bytes sent as {key} are not that texture"));
+    }
+    let target = dir.join(key);
+    if target.is_file() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dir)
+        .map_err(|e| format!("could not create the texture folder: {e}"))?;
+    std::fs::write(&target, bytes).map_err(|e| format!("could not store the texture: {e}"))
+}
+
 /// Lowercase hex, two digits a byte.
 ///
 /// Spelled out because sha2 0.11's output type does not format itself. Its
@@ -1057,5 +1094,41 @@ mod tests {
 
         assert!(stored.key.ends_with(".bin"), "got: {}", stored.key);
         assert!(!stored.key.contains(':'), "got: {}", stored.key);
+    }
+
+    /// A texture shared in a module code lands under the key the sender's
+    /// store gave it, which is the key an import of the same file gives here.
+    #[test]
+    fn a_shared_texture_lands_under_the_key_an_import_gives_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("hull.png");
+        std::fs::write(&source, b"pretend png bytes").expect("write");
+        let imported = store(&dir.path().join("a"), &source).expect("store");
+
+        let shared = dir.path().join("b");
+        store_shared(&shared, &imported.key, b"pretend png bytes").expect("shared");
+
+        assert_eq!(
+            std::fs::read(shared.join(&imported.key)).expect("read"),
+            b"pretend png bytes"
+        );
+    }
+
+    /// A key that is not the bytes' own hash, or names a path or a kind the
+    /// store never holds, is refused and nothing is written.
+    #[test]
+    fn a_shared_texture_under_any_other_key_is_refused() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bytes = b"pretend png bytes";
+        let hash = hex(&Sha256::digest(bytes));
+        for key in [
+            format!("{}.png", "0".repeat(64)),
+            format!("{hash}.exe"),
+            format!("../{hash}.png"),
+            hash.clone(),
+        ] {
+            assert!(store_shared(dir.path(), &key, bytes).is_err(), "{key}");
+        }
+        assert_eq!(std::fs::read_dir(dir.path()).expect("dir").count(), 0);
     }
 }

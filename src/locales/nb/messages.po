@@ -49833,6 +49833,10 @@ msgstr "Disse kampene har ikke alle samme oppstilling, så posisjoner deles ikke
 msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr "Disse summene er forskjellige fra skadetallene i kampdiagrammet. Motorens egen total teller hvert treff som den helsen målet allerede manglet, opptil størrelsen på treffet, så det første treffet på en uskadd enhet legger ikke til noe."
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "They are no longer one of your friends."

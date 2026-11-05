@@ -247,6 +247,28 @@ export function markLifted(
   };
 }
 
+/**
+ * A selection cut out of `unit`, with each own mesh recording the textures
+ * `unit` draws it with (#5073), so it draws with them as a module and in a unit
+ * of parts. Only a unit opened from a model has one pair for every mesh. In a
+ * unit of parts each piece already carries its own, which are kept.
+ */
+export function withOwnTextures(
+  selection: LegoProject,
+  unit: Pick<LegoProject, "imported">,
+): LegoProject {
+  if (!unit.imported) return selection;
+  const textures = liftedTextures(unit.imported);
+  return {
+    ...selection,
+    pieces: selection.pieces.map((piece) =>
+      piece.meshId && piece.ownMesh
+        ? { ...piece, ownMesh: { file: piece.ownMesh.file, ...textures } }
+        : piece,
+    ),
+  };
+}
+
 /** The two textures a lifted piece records, without a path to refresh from. */
 function liftedTextures(
   imported: Pick<LegoImported, "texture" | "texture2"> | undefined,
