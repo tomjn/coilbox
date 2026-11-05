@@ -296,10 +296,7 @@ mod tests {
         rx.recv_timeout(within).ok()
     }
 
-    fn watch(
-        file: &Path,
-        settle_ms: u64,
-    ) -> (TextureWatcher, mpsc::Receiver<PathBuf>) {
+    fn watch(file: &Path, settle_ms: u64) -> (TextureWatcher, mpsc::Receiver<PathBuf>) {
         let (tx, rx) = mpsc::channel();
         let watcher = spawn(&[file.to_path_buf()], settle_ms, move |p| {
             let _ = tx.send(p.to_path_buf());
