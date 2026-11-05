@@ -25,6 +25,10 @@ describe("resolveLocaleTag", () => {
     ["nl-NL", "nl"],
     ["nl-BE", "nl"],
     ["nl_be", "nl"],
+    ["it", "it"],
+    ["it-IT", "it"],
+    ["it-CH", "it"],
+    ["it_it", "it"],
     ["nn", "en"],
     ["nn-NO", "en"],
     ["sv", "sv"],
@@ -71,6 +75,7 @@ describe("localeDisplayName", () => {
     expect(localeDisplayName("nb")).toBe("Norsk bokmål");
     expect(localeDisplayName("sv")).toBe("Svenska");
     expect(localeDisplayName("nl")).toBe("Nederlands");
+    expect(localeDisplayName("it")).toBe("Italiano");
   });
 });
 
