@@ -78,10 +78,10 @@ export default function MapinfoOptions({
       disabled={disabled}
     />
   );
-  const starts = value.startPositions ?? [];
+  const starts = value.startRows ?? [];
   const setStart = (i: number, p: Partial<{ x: string; z: string }>) =>
     set({
-      startPositions: starts.map((s, j) => (j === i ? { ...s, ...p } : s)),
+      startRows: starts.map((s, j) => (j === i ? { ...s, ...p } : s)),
     });
 
   return (
@@ -221,7 +221,7 @@ export default function MapinfoOptions({
                 aria-label={t`Remove team ${team}`}
                 onClick={() =>
                   set({
-                    startPositions: starts.filter((_, j) => j !== i),
+                    startRows: starts.filter((_, j) => j !== i),
                   })
                 }
                 disabled={disabled}
@@ -234,7 +234,7 @@ export default function MapinfoOptions({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => set({ startPositions: [...starts, { x: "", z: "" }] })}
+          onClick={() => set({ startRows: [...starts, { x: "", z: "" }] })}
           disabled={disabled}
         >
           <Plus /> <Trans>Add start position</Trans>

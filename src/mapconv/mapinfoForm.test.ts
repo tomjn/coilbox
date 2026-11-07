@@ -44,7 +44,7 @@ describe("toMapinfoForm", () => {
   it("keeps a slot for a start position with a missing or invalid coordinate", () => {
     const draft = {
       ...defaultMapinfoDraft,
-      startPositions: [
+      startRows: [
         { x: "512", z: "" },
         { x: "abc", z: "5" },
         { x: "512", z: "1024" },
@@ -59,19 +59,27 @@ describe("toMapinfoForm", () => {
   });
 
   it("tells no start positions from leaving them alone", () => {
-    const form = (startPositions: { x: string; z: string }[] | null) =>
-      toMapinfoForm({ ...defaultMapinfoDraft, startPositions });
+    const form = (startRows: { x: string; z: string }[] | null) =>
+      toMapinfoForm({ ...defaultMapinfoDraft, startRows });
     expect(form(null).startPositions).toBeUndefined();
     expect(form([]).startPositions).toEqual([]);
     expect(form([{ x: "1", z: "2" }]).startPositions).toEqual([{ x: 1, z: 2 }]);
   });
 
-  it("reads an empty saved list as leaving the start positions alone", () => {
-    expect(readSavedMapinfo(undefined).startPositions).toBeNull();
-    expect(readSavedMapinfo({ startPositions: [] }).startPositions).toBeNull();
-    expect(
-      readSavedMapinfo({ name: "a", startPositions: [{ x: "1", z: "2" }] }),
-    ).toMatchObject({ name: "a", startPositions: [{ x: "1", z: "2" }] });
+  it("keeps an emptied list of start rows as it was saved", () => {
+    expect(readSavedMapinfo(undefined).startRows).toBeNull();
+    expect(readSavedMapinfo({ startRows: [] }).startRows).toEqual([]);
+    expect(readSavedMapinfo({ startRows: null }).startRows).toBeNull();
+  });
+
+  it("reads a draft saved before startRows existed", () => {
+    expect(readSavedMapinfo({ startPositions: [] }).startRows).toBeNull();
+    const old = readSavedMapinfo({
+      name: "a",
+      startPositions: [{ x: "1", z: "2" }],
+    });
+    expect(old).toMatchObject({ name: "a", startRows: [{ x: "1", z: "2" }] });
+    expect(old).not.toHaveProperty("startPositions");
   });
 
   it("leaves out a water opacity outside 0 to 1", () => {

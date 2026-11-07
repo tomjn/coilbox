@@ -26,7 +26,7 @@ export interface MapinfoDraft {
    * stay. A list, even an empty one, is the page's say: rows taken out are taken
    * out of the file, and an empty list removes the start positions.
    */
-  startPositions: { x: string; z: string }[] | null;
+  startRows: { x: string; z: string }[] | null;
 }
 
 export const defaultMapinfoDraft: MapinfoDraft = {
@@ -43,7 +43,7 @@ export const defaultMapinfoDraft: MapinfoDraft = {
   sunDir: ["", "", ""],
   waterSurfaceAlpha: "",
   terrainHardness: "",
-  startPositions: null,
+  startRows: null,
 };
 
 export type ColourKey =
@@ -127,7 +127,7 @@ export function toMapinfoForm(d: MapinfoDraft): MapinfoForm {
     terrainHardness: finite(d.terrainHardness),
     // One slot per row. A row with a missing coordinate is null, not dropped,
     // because the slot's position is the team number the writer uses.
-    startPositions: d.startPositions?.map((p) => {
+    startPositions: d.startRows?.map((p) => {
       const x = finite(p.x);
       const z = finite(p.z);
       return x === undefined || z === undefined ? null : { x, z };
@@ -136,17 +136,27 @@ export function toMapinfoForm(d: MapinfoDraft): MapinfoForm {
 }
 
 /**
- * A draft saved before the page could tell "no start positions" from "leave
- * them alone" holds an empty list for both. Read it as the second, so an old
- * draft never removes the teams of a file it never looked at.
+ * The saved draft as the page state. Drafts saved before the page could tell
+ * "no start positions" from "leave them alone" kept their rows in
+ * `startPositions`, with an empty list for both. Their rows are used and an
+ * empty list is read as leaving the file's teams alone, so an old draft never
+ * removes the teams of a file it never looked at.
  */
 export function readSavedMapinfo(
-  saved: Partial<MapinfoDraft> | undefined,
+  saved:
+    | (Partial<MapinfoDraft> & {
+        startPositions?: { x: string; z: string }[];
+      })
+    | undefined,
 ): MapinfoDraft {
-  const startPositions = saved?.startPositions?.length
-    ? saved.startPositions
-    : null;
-  return { ...defaultMapinfoDraft, ...saved, startPositions };
+  const { startPositions: legacy, ...current } = saved ?? {};
+  const startRows =
+    current.startRows !== undefined
+      ? current.startRows
+      : legacy?.length
+        ? legacy
+        : null;
+  return { ...defaultMapinfoDraft, ...current, startRows };
 }
 
 /** How many fields the user has set, for the section's badge. */
