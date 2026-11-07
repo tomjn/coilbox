@@ -3,7 +3,22 @@
 //! archive holds `maps/<name>.smf` plus the matching `.smt`, which mapdecompile
 //! needs side-by-side; we extract the whole tree and locate the inner `.smf`.
 
+//!
+//! [`pack_map`] goes the other way and writes a compiled map's `.sdz`.
+
+use std::io::Write;
 use std::path::{Path, PathBuf};
+
+use crate::luapatch::{apply, Key, Mode, Val};
+use crate::mapinfo;
+
+/// What [`pack_map`] wrote.
+#[derive(Debug)]
+pub struct Packed {
+    pub path: PathBuf,
+    /// Every entry in the archive, by its path inside it.
+    pub files: Vec<String>,
+}
 
 /// Extract `archive` into `dest`, dispatching on the file extension.
 pub fn extract_archive(archive: &Path, dest: &Path) -> Result<(), String> {
@@ -28,6 +43,168 @@ pub fn extract_archive(archive: &Path, dest: &Path) -> Result<(), String> {
             .map_err(|e| format!("failed to extract sd7: {e}")),
         other => Err(format!("unsupported archive type: .{other}")),
     }
+}
+
+/// The string literals in a `mapinfo.lua` that name a file in `dir`, as the
+/// forward slash paths the archive will use for them. A map's textures
+/// (`skyBox`, splat textures) are referenced this way and the engine reads them
+/// from the archive by the same path, so a file at `dir/<ref>` goes in at
+/// `<ref>`. The map's own `.smf`, `.smt` and `mapinfo.lua` are not listed,
+/// because [`pack_map`] places those itself.
+fn referenced_files(dir: &Path, src: &str, name: &str) -> Vec<String> {
+    let own = [
+        "mapinfo.lua".to_string(),
+        format!("{name}.smf"),
+        format!("{name}.smt"),
+    ];
+    let mut out: Vec<String> = Vec::new();
+    for literal in string_literals(&mapinfo::strip_comments(src)) {
+        let Some(rel) = crate::sanitize_rel(&literal) else {
+            continue;
+        };
+        let archive_path = rel
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("/");
+        if own.iter().any(|o| o.eq_ignore_ascii_case(&archive_path)) || out.contains(&archive_path)
+        {
+            continue;
+        }
+        if dir.join(&rel).is_file() {
+            out.push(archive_path);
+        }
+    }
+    out
+}
+
+/// The contents of every `"..."` and `'...'` literal in `src`. A long bracket
+/// string is not read, since a file reference is never written as one.
+fn string_literals(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut chars = src.chars();
+    while let Some(c) = chars.next() {
+        if c != '"' && c != '\'' {
+            continue;
+        }
+        let mut lit = String::new();
+        while let Some(d) = chars.next() {
+            match d {
+                '\\' => {
+                    if let Some(e) = chars.next() {
+                        lit.push(e);
+                    }
+                }
+                '\n' => break,
+                d if d == c => break,
+                d => lit.push(d),
+            }
+        }
+        out.push(lit);
+    }
+    out
+}
+
+/// Write `<dir>/<name>.sdz` from the files a compile left in `dir`.
+///
+/// The archive holds `mapinfo.lua` at the root, the `.smf` and `.smt` under
+/// `maps/`, and any file the `mapinfo.lua` refers to at the path it names. The
+/// `.smt` is stored, since the compiler already compressed it. In the archive's
+/// copy of `mapinfo.lua`, `mapfile` is `maps/<name>.smf`, because the engine
+/// reads that key as a path inside the archive. The loose file beside the
+/// compile is not touched. `smtFileName0` needs no change, because the engine
+/// looks for the tile file in the folder of the `.smf`.
+pub fn pack_map(dir: &Path, name: &str) -> Result<Packed, String> {
+    let name = name.trim();
+    if name.is_empty() || name.contains(['/', '\\']) || name == "." || name == ".." {
+        return Err(format!("\"{name}\" is not a usable map name"));
+    }
+    let mapinfo_path = dir.join("mapinfo.lua");
+    let src = std::fs::read_to_string(&mapinfo_path).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => format!(
+            "{} is not there. Write mapinfo.lua first, because an archive without it cannot be loaded.",
+            mapinfo_path.display()
+        ),
+        _ => format!("could not read {}: {e}", mapinfo_path.display()),
+    })?;
+    let smf = dir.join(format!("{name}.smf"));
+    let smt = dir.join(format!("{name}.smt"));
+    for f in [&smf, &smt] {
+        if !f.is_file() {
+            return Err(format!(
+                "{} is not there. Compile the map first.",
+                f.display()
+            ));
+        }
+    }
+
+    let archive_info = apply(
+        &src,
+        &[Key::Name("mapfile".into())],
+        &Val::Str(format!("maps/{name}.smf")),
+        Mode::Set,
+    )?;
+    let refs = referenced_files(dir, &archive_info, name);
+
+    let sdz = dir.join(format!("{name}.sdz"));
+    let tmp = dir.join(format!("{name}.sdz.tmp"));
+    let mut files = Vec::new();
+    let built = write_zip(&tmp, &mut files, &archive_info, dir, name, &refs);
+    if let Err(e) = built {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    std::fs::rename(&tmp, &sdz).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("could not replace {}: {e}", sdz.display())
+    })?;
+    Ok(Packed { path: sdz, files })
+}
+
+fn write_zip(
+    tmp: &Path,
+    files: &mut Vec<String>,
+    mapinfo_text: &str,
+    dir: &Path,
+    name: &str,
+    refs: &[String],
+) -> Result<(), String> {
+    use zip::write::SimpleFileOptions;
+    let file = std::fs::File::create(tmp)
+        .map_err(|e| format!("could not create {}: {e}", tmp.display()))?;
+    let mut zip = zip::ZipWriter::new(file);
+    let deflated =
+        SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+    let mut add = |entry: String, bytes: &[u8], opts: SimpleFileOptions| -> Result<(), String> {
+        zip.start_file(entry.as_str(), opts)
+            .map_err(|e| format!("could not add {entry}: {e}"))?;
+        zip.write_all(bytes)
+            .map_err(|e| format!("could not add {entry}: {e}"))?;
+        files.push(entry);
+        Ok(())
+    };
+    let read =
+        |p: &Path| std::fs::read(p).map_err(|e| format!("could not read {}: {e}", p.display()));
+
+    add("mapinfo.lua".into(), mapinfo_text.as_bytes(), deflated)?;
+    add(
+        format!("maps/{name}.smf"),
+        &read(&dir.join(format!("{name}.smf")))?,
+        deflated,
+    )?;
+    add(
+        format!("maps/{name}.smt"),
+        &read(&dir.join(format!("{name}.smt")))?,
+        stored,
+    )?;
+    for r in refs {
+        add(r.clone(), &read(&dir.join(r))?, deflated)?;
+    }
+    zip.finish()
+        .map_err(|e| format!("could not finish {}: {e}", tmp.display()))?;
+    Ok(())
 }
 
 /// Find the map `.smf` within an extracted tree. Prefers one under a `maps/`
@@ -96,6 +273,84 @@ mod tests {
             dest.join("maps/MyMap.smt").exists(),
             "the .smt should extract too"
         );
+    }
+
+    const LOOSE_INFO: &str = "-- a mapper's file\nlocal mapinfo = {\n  name = \"MyMap\",\n  mapfile = \"MyMap.smf\",\n  smf = { smtFileName0 = \"MyMap.smt\" },\n  atmosphere = { skyBox = \"maps/sky.dds\" },\n  note = \"nothing.png\",\n}\nreturn mapinfo\n";
+
+    fn compiled_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("mapconv_pack_{}_{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("maps")).unwrap();
+        std::fs::write(dir.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
+        std::fs::write(dir.join("MyMap.smt"), b"spring tilefile\0".repeat(64)).unwrap();
+        std::fs::write(dir.join("maps/sky.dds"), b"DDS sky").unwrap();
+        std::fs::write(dir.join("heightmap.png"), b"not in the archive").unwrap();
+        std::fs::write(dir.join("mapinfo.lua"), LOOSE_INFO).unwrap();
+        dir
+    }
+
+    /// The archive the engine loads: mapinfo.lua at the root pointing at the
+    /// .smf inside it, the .smf and .smt under maps/, the .smt stored, and the
+    /// file mapinfo.lua names. A file it does not name stays out, and the
+    /// mapper's loose mapinfo.lua is as they left it.
+    #[test]
+    fn packs_a_compiled_map_the_engine_can_load() {
+        let dir = compiled_dir("ok");
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(packed.path, dir.join("MyMap.sdz"));
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "maps/sky.dds"
+            ]
+        );
+
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(&packed.path).unwrap()).unwrap();
+        let mut info = String::new();
+        std::io::Read::read_to_string(&mut zip.by_name("mapinfo.lua").unwrap(), &mut info).unwrap();
+        assert!(info.contains("mapfile = \"maps/MyMap.smf\""), "{info}");
+        assert!(info.contains("-- a mapper's file"), "comments survive");
+        assert!(info.contains("smtFileName0 = \"MyMap.smt\""), "{info}");
+        assert_eq!(
+            zip.by_name("maps/MyMap.smt").unwrap().compression(),
+            zip::CompressionMethod::Stored
+        );
+        assert!(zip.by_name("heightmap.png").is_err());
+        assert!(!dir.join("MyMap.sdz.tmp").exists());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap(),
+            LOOSE_INFO,
+            "the loose file keeps its own mapfile"
+        );
+
+        // And it reads back the way the decompiler reads archives.
+        let out = dir.join("out");
+        extract_archive(&packed.path, &out).unwrap();
+        assert!(find_smf(&out).unwrap().ends_with("maps/MyMap.smf"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn packing_without_a_mapinfo_names_what_to_do() {
+        let dir = compiled_dir("nomi");
+        std::fs::remove_file(dir.join("mapinfo.lua")).unwrap();
+        let err = pack_map(&dir, "MyMap").unwrap_err();
+        assert!(err.contains("Write mapinfo.lua first"), "{err}");
+        assert!(!dir.join("MyMap.sdz").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn packing_before_a_compile_or_with_a_path_for_a_name_is_refused() {
+        let dir = compiled_dir("nocompile");
+        std::fs::remove_file(dir.join("MyMap.smt")).unwrap();
+        assert!(pack_map(&dir, "MyMap").unwrap_err().contains("Compile"));
+        assert!(pack_map(&dir, "../MyMap").is_err());
+        assert!(pack_map(&dir, " ").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Round-trip a real .sd7 (7-zip): compress a maps/ tree, extract it, and

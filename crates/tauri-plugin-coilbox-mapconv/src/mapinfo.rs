@@ -83,7 +83,7 @@ fn is_ident(b: u8) -> bool {
 /// Drop `--`-to-end-of-line comments. Best-effort: ignores Lua block comments
 /// and `--` inside string literals (neither appears in the value lines we read,
 /// bar the rare description containing `--`).
-fn strip_comments(src: &str) -> String {
+pub(crate) fn strip_comments(src: &str) -> String {
     src.lines()
         .map(|line| match line.find("--") {
             Some(i) => &line[..i],

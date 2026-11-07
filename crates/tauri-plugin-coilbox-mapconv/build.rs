@@ -11,6 +11,8 @@ const COMMANDS: &[&str] = &[
     "mc_height_field",
     "mc_compile",
     "mc_write_mapinfo",
+    "mc_package_map",
+    "mc_install_map",
     "mc_decompile",
     "mc_cancel",
     "mc_open_path",
