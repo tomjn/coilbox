@@ -87,6 +87,8 @@ struct Tok {
 
 struct Field {
     key: Option<Key>,
+    /// The key is the position the value has in the table, not one written out.
+    positional: bool,
     /// First byte of the field (its key, or its value when it has none).
     start: usize,
     v_start: usize,
@@ -436,6 +438,8 @@ impl Ctx<'_> {
         let base = self.lv[t] + 1;
         let mut j = t + 1;
         let mut fields = Vec::new();
+        // A value with no key takes the next integer from 1, as Lua numbers it.
+        let mut positional = 0i64;
         loop {
             let tok = *self
                 .toks
@@ -453,7 +457,12 @@ impl Ctx<'_> {
                 j += 1;
                 continue;
             }
-            let (key, vi) = self.key_at(j)?;
+            let (mut key, vi) = self.key_at(j)?;
+            let is_positional = vi == j;
+            if is_positional {
+                positional += 1;
+                key = Some(Key::Index(positional));
+            }
             let ve = self.expr_end(vi, base)?;
             if ve == vi {
                 return Err("a field in mapinfo.lua has no value".into());
@@ -473,6 +482,7 @@ impl Ctx<'_> {
             };
             fields.push(Field {
                 key,
+                positional: is_positional,
                 start: tok.start,
                 v_start,
                 v_end,
@@ -683,21 +693,47 @@ fn only_a_comment_follows(src: &str, pos: usize) -> bool {
         && !(b.get(at + 2) == Some(&b'[') && long_bracket_level(b, at + 2).is_some())
 }
 
-/// Delete `table.fields[i]`, and the line it sits on when it has the line to
-/// itself.
+/// Where a field's trailing `--` comment ends, when nothing but that comment
+/// follows the field on its line.
+fn trailing_comment_end(src: &str, pos: usize) -> Option<usize> {
+    if !only_a_comment_follows(src, pos) {
+        return None;
+    }
+    let eol = src[pos..].find('\n').map_or(src.len(), |p| pos + p);
+    Some(if src[..eol].ends_with('\r') {
+        eol - 1
+    } else {
+        eol
+    })
+}
+
+/// Delete `table.fields[i]`. A field with its line to itself goes with the line.
+/// Otherwise the field goes with its own trailing comment, and a comment on a
+/// line of its own between it and the next field stays.
 fn delete_field(src: &str, table: &Table, i: usize) -> String {
     let f = &table.fields[i];
     let ls = line_start(src, f.start);
-    let alone =
-        src[ls..f.start].trim_matches([' ', '\t']).is_empty() && only_a_comment_follows(src, f.end);
-    if alone {
+    let before = src[ls..f.start].trim_matches([' ', '\t']).is_empty();
+    let comment_end = trailing_comment_end(src, f.end);
+    if before && comment_end.is_some() {
         let eol = src[f.end..].find('\n').map_or(src.len(), |p| f.end + p + 1);
         return splice(src, ls, eol - ls, "");
     }
     let prev = i.checked_sub(1).map(|p| &table.fields[p]);
     match (prev, table.fields.get(i + 1)) {
-        // Something follows on the line: take the field up to the next one.
-        (_, Some(next)) => splice(src, f.start, next.start - f.start, ""),
+        (_, Some(_)) => match comment_end {
+            // Last on its line: take the spaces before it and its comment.
+            Some(end) => {
+                let from = f.start
+                    - (src[..f.start].len() - src[..f.start].trim_end_matches([' ', '\t']).len());
+                splice(src, from, end - from, "")
+            }
+            // Something follows on the line: take the field and the spaces after it.
+            None => {
+                let after = src[f.end..].len() - src[f.end..].trim_start_matches([' ', '\t']).len();
+                splice(src, f.start, f.end + after - f.start, "")
+            }
+        },
         // The last field: take the separator that joined it to the one before.
         (Some(prev), None) => {
             let from = if f.end > f.v_end {
@@ -705,7 +741,7 @@ fn delete_field(src: &str, table: &Table, i: usize) -> String {
             } else {
                 prev.v_end
             };
-            splice(src, from, f.end - from, "")
+            splice(src, from, comment_end.unwrap_or(f.end) - from, "")
         }
         (None, None) => splice(src, table.open + 1, table.close - table.open - 1, ""),
     }
@@ -719,7 +755,9 @@ fn delete_field(src: &str, table: &Table, i: usize) -> String {
 /// error.
 pub fn remove(src: &str, path: &[Key]) -> Result<String, String> {
     let mut text = src.to_string();
-    // A key written twice is read as its last value, so every copy goes.
+    // A key written twice is read as its last value, so every copy goes. A
+    // value with no key is not a copy: the ones after it renumber as it goes.
+    let mut first = true;
     loop {
         let toks = lex(&text)?;
         let lv = levels(&text, &toks);
@@ -733,11 +771,9 @@ pub fn remove(src: &str, path: &[Key]) -> Result<String, String> {
         let mut found = None;
         for (depth, key) in path.iter().enumerate() {
             let last = depth + 1 == path.len();
-            let Some(i) = table
-                .fields
-                .iter()
-                .rposition(|f| f.key.as_ref().is_some_and(|k| k.matches(key)))
-            else {
+            let Some(i) = table.fields.iter().rposition(|f| {
+                (first || !f.positional) && f.key.as_ref().is_some_and(|k| k.matches(key))
+            }) else {
                 break;
             };
             if last {
@@ -756,11 +792,14 @@ pub fn remove(src: &str, path: &[Key]) -> Result<String, String> {
             Some(i) => text = delete_field(&text, table, i),
             None => return Ok(text),
         }
+        first = false;
     }
 }
 
-/// The integer keys written in the table at `path`, in file order. Empty when
-/// the table is missing or is not written out in the file.
+/// The integer keys of the table at `path`, in file order, counting a value
+/// with no key as the next integer from 1. Empty when the table is missing. A
+/// table along the path that is not a table constructor cannot be read, which
+/// is an error.
 pub fn index_keys(src: &str, path: &[Key]) -> Result<Vec<i64>, String> {
     let toks = lex(src)?;
     let lv = levels(src, &toks);
@@ -768,9 +807,17 @@ pub fn index_keys(src: &str, path: &[Key]) -> Result<Vec<i64>, String> {
     let root = cx.root()?;
     let mut table = &root;
     for key in path {
-        match find_field(table, key).and_then(|f| f.table.as_ref()) {
-            Some(inner) => table = inner,
+        match find_field(table, key) {
             None => return Ok(Vec::new()),
+            Some(f) => match &f.table {
+                Some(inner) => table = inner,
+                None => {
+                    return Err(format!(
+                        "`{}` in mapinfo.lua is not a table written out in the file, so its entries cannot be listed",
+                        key.describe()
+                    ))
+                }
+            },
         }
     }
     Ok(table
@@ -1061,7 +1108,29 @@ mod tests {
         );
         assert_eq!(
             remove(src, &[n("b")]).unwrap(),
-            "return {\r\n    a = 1,\r\n    c = 3,\r\n    d = 4,\r\n}\r\n"
+            "return {\r\n    a = 1,\r\n    --[[ x ]] c = 3,\r\n    d = 4,\r\n}\r\n"
+        );
+    }
+
+    #[test]
+    fn a_field_that_shares_its_line_takes_its_trailing_comment_but_not_the_next_ones() {
+        let src =
+            "return {\n    x = 0, a = 1, -- about a\n    -- about b\n    b = 2, -- also b\n}\n";
+        assert_eq!(
+            remove(src, &[n("a")]).unwrap(),
+            "return {\n    x = 0,\n    -- about b\n    b = 2, -- also b\n}\n"
+        );
+        let last = "return {\n    x = 0, a = 1 -- about a\n}\n";
+        assert_eq!(remove(last, &[n("a")]).unwrap(), "return {\n    x = 0\n}\n");
+    }
+
+    #[test]
+    fn a_list_written_without_keys_is_numbered_from_one() {
+        let src = "return { teams = { { x = 1 }, { x = 2 }, { x = 3 } } }";
+        assert_eq!(index_keys(src, &[n("teams")]).unwrap(), vec![1, 2, 3]);
+        assert_eq!(
+            remove(src, &team(2)).unwrap(),
+            "return { teams = { { x = 1 }, { x = 3 } } }"
         );
     }
 
@@ -1069,9 +1138,7 @@ mod tests {
     fn lists_the_integer_keys_of_a_table() {
         assert_eq!(index_keys(TEAMS, &[n("teams")]).unwrap(), vec![0, 1, 2]);
         assert!(index_keys(TEAMS, &[n("water")]).unwrap().is_empty());
-        assert!(index_keys("return { teams = load() }", &[n("teams")])
-            .unwrap()
-            .is_empty());
+        assert!(index_keys("return { teams = load() }", &[n("teams")]).is_err());
     }
 
     #[test]
