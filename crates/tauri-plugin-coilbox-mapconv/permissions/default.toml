@@ -10,6 +10,7 @@ permissions = [
   "allow-mc-image-info",
   "allow-mc-height-field",
   "allow-mc-compile",
+  "allow-mc-write-mapinfo",
   "allow-mc-decompile",
   "allow-mc-cancel",
   "allow-mc-open-path",

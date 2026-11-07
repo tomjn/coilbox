@@ -7,6 +7,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  FileText,
   FolderOpen,
   Hammer,
   Loader2,
@@ -36,9 +37,16 @@ import {
   mcReadMapinfo,
   mcReadSkybox,
   mcSuggestSources,
+  mcWriteMapinfo,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
+import {
+  countMapinfo,
+  defaultMapinfoDraft,
+  type MapinfoDraft,
+  toMapinfoForm,
+} from "../mapinfoForm";
 import { mapNameFromDir } from "../mapName";
 import { useMapProjects } from "../projects";
 import AdvancedOptions, {
@@ -46,6 +54,7 @@ import AdvancedOptions, {
   defaultAdvanced,
 } from "./components/AdvancedOptions";
 import { HelpTip, LearnMore, WIKI } from "./components/Help";
+import MapinfoOptions from "./components/MapinfoOptions";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
 
@@ -116,6 +125,11 @@ export default function CompilePage() {
     ...draft.advanced,
   }));
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [mapinfo, setMapinfo] = useState<MapinfoDraft>(() => ({
+    ...defaultMapinfoDraft,
+    ...draft.mapinfo,
+  }));
+  const [showMapinfo, setShowMapinfo] = useState(false);
   const [textureInfo, setTextureInfo] = useState<{
     width: number;
     height: number;
@@ -136,8 +150,21 @@ export default function CompilePage() {
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
-  const [result, setResult] = useState<{ smfPath: string } | null>(null);
+  // The folder and name the compile used, kept apart from the form, which stays
+  // editable. The mapinfo.lua written afterwards describes this compile.
+  const [result, setResult] = useState<{
+    smfPath: string;
+    outDir: string;
+    outSuffix: string;
+  } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const [writingMapinfo, setWritingMapinfo] = useState(false);
+  const [mapinfoResult, setMapinfoResult] = useState<{
+    path: string;
+    created: boolean;
+    changed: boolean;
+  } | null>(null);
+  const [mapinfoError, setMapinfoError] = useState<string | null>(null);
   const [probe, setProbe] = useState<{
     available: boolean;
     compile: boolean;
@@ -163,13 +190,17 @@ export default function CompilePage() {
   // not persisted.
   useEffect(() => {
     const id = setTimeout(() => {
-      setDraft({ maintexture, outDir, outSuffix, ct, advanced });
+      setDraft({ maintexture, outDir, outSuffix, ct, advanced, mapinfo });
     }, 400);
     return () => clearTimeout(id);
-  }, [maintexture, outDir, outSuffix, ct, advanced, setDraft]);
+  }, [maintexture, outDir, outSuffix, ct, advanced, mapinfo, setDraft]);
 
   const canRun =
-    !running && maintexture !== "" && outDir !== "" && outSuffix.trim() !== "";
+    !running &&
+    !writingMapinfo &&
+    maintexture !== "" &&
+    outDir !== "" &&
+    outSuffix.trim() !== "";
 
   function buildOpts(): CompileOpts {
     const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
@@ -197,6 +228,8 @@ export default function CompilePage() {
     setRunning(true);
     setResult(null);
     setRunError(null);
+    setMapinfoResult(null);
+    setMapinfoError(null);
     setLogLines([]);
     const runId = crypto.randomUUID();
     runIdRef.current = runId;
@@ -205,7 +238,7 @@ export default function CompilePage() {
     try {
       const opts = buildOpts();
       const res = await mcCompile({ opts, outDir, runId, onLog });
-      setResult({ smfPath: res.smfPath });
+      setResult({ smfPath: res.smfPath, outDir, outSuffix: res.outSuffix });
       // Record (or refresh) this map as a project, remembering its compile
       // options. The source texture is a reliable preview for compile projects.
       upsertProject({
@@ -226,6 +259,29 @@ export default function CompilePage() {
     } finally {
       setRunning(false);
       runIdRef.current = null;
+    }
+  }
+
+  async function writeMapinfo() {
+    if (!result) return;
+    setWritingMapinfo(true);
+    setMapinfoResult(null);
+    setMapinfoError(null);
+    try {
+      // No heights: the writer reads them from the .smf the compile wrote.
+      setMapinfoResult(
+        await mcWriteMapinfo({
+          opts: {
+            outDir: result.outDir,
+            outSuffix: result.outSuffix,
+            info: toMapinfoForm(mapinfo),
+          },
+        }),
+      );
+    } catch (e) {
+      setMapinfoError(errorText(e));
+    } finally {
+      setWritingMapinfo(false);
     }
   }
 
@@ -348,6 +404,7 @@ export default function CompilePage() {
   }, []);
 
   const advancedCount = countAdvanced(advanced);
+  const mapinfoCount = countMapinfo(mapinfo);
   const textureWidth = textureInfo?.width ?? 0;
   const textureHeight = textureInfo?.height ?? 0;
   const smfPath = result?.smfPath ?? "";
@@ -506,6 +563,26 @@ export default function CompilePage() {
             </CollapsibleContent>
           </Collapsible>
 
+          <Collapsible open={showMapinfo} onOpenChange={setShowMapinfo}>
+            <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight
+                size={15}
+                className="transition-transform group-data-[state=open]:rotate-90"
+              />{" "}
+              {mapinfoCount > 0 ? t`Map info (${mapinfoCount})` : t`Map info`}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-4">
+                <MapinfoOptions
+                  value={mapinfo}
+                  onChange={setMapinfo}
+                  outSuffix={outSuffix}
+                  disabled={running}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
           {heightRangeBad && (
             <Alert variant="warning" className="p-2.5">
               <AlertCircle size={14} />
@@ -570,14 +647,61 @@ export default function CompilePage() {
                   </Trans>
                 </span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => mcOpenPath({ path: outDir }).catch(() => {})}
-              >
-                <FolderOpen /> <Trans>Show in folder</Trans>
-              </Button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    mcOpenPath({ path: result.outDir }).catch(() => {})
+                  }
+                >
+                  <FolderOpen /> <Trans>Show in folder</Trans>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={writeMapinfo}
+                  disabled={writingMapinfo}
+                >
+                  {writingMapinfo ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <FileText />
+                  )}{" "}
+                  <Trans>Write mapinfo.lua</Trans>
+                </Button>
+              </div>
+              {mapinfoResult && (
+                <p className="mt-2 break-all text-sm">
+                  {mapinfoResult.created ? (
+                    <Trans>
+                      Created{" "}
+                      <span className="font-mono text-xs">
+                        {mapinfoResult.path}
+                      </span>
+                    </Trans>
+                  ) : mapinfoResult.changed ? (
+                    <Trans>
+                      Updated{" "}
+                      <span className="font-mono text-xs">
+                        {mapinfoResult.path}
+                      </span>
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      Already up to date{" "}
+                      <span className="font-mono text-xs">
+                        {mapinfoResult.path}
+                      </span>
+                    </Trans>
+                  )}
+                </p>
+              )}
+              {mapinfoError && (
+                <p className="mt-2 break-words text-sm text-destructive">
+                  {mapinfoError}
+                </p>
+              )}
             </div>
           )}
           {runError && (

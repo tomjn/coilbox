@@ -5,7 +5,9 @@
 //! matching every other picoframe plugin.
 
 mod archive;
+mod luapatch;
 mod mapinfo;
+mod mapinfo_write;
 mod sidecar;
 mod smf;
 
@@ -631,6 +633,25 @@ async fn mc_compile<R: Runtime>(
     })
 }
 
+/// `mc_write_mapinfo` — write `<outDir>/mapinfo.lua` for a map `mc_compile` just
+/// built. Creates the file, or patches the one already there so every field the
+/// page does not own survives. Returns `{ path, created, changed }`.
+#[tauri::command]
+async fn mc_write_mapinfo(opts: mapinfo_write::WriteOpts) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&opts.out_dir)) {
+        return CliResult::err(e);
+    }
+    match tauri::async_runtime::spawn_blocking(move || mapinfo_write::write(&opts)).await {
+        Ok(Ok(w)) => CliResult::ok(json!({
+            "path": w.path.to_string_lossy(),
+            "created": w.created,
+            "changed": w.changed,
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("mapinfo task failed: {e}")),
+    }
+}
+
 /// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
 /// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
@@ -828,6 +849,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_image_info,
             mc_height_field,
             mc_compile,
+            mc_write_mapinfo,
             mc_decompile,
             mc_cancel,
             mc_open_path,

@@ -1,5 +1,6 @@
 import { useSetting } from "@picoframe/frame";
 import type { MapAppearance, MapInfo } from "./bindings";
+import { defaultMapinfoDraft, type MapinfoDraft } from "./mapinfoForm";
 import {
   type AdvancedCompileOpts,
   defaultAdvanced,
@@ -20,6 +21,8 @@ export interface CompileDraft {
   /** Compression type as a string; falls back to the config default when unset. */
   ct?: string;
   advanced: AdvancedCompileOpts;
+  /** Absent in drafts saved before the `mapinfo.lua` fields existed. */
+  mapinfo?: MapinfoDraft;
 }
 
 export const defaultCompileDraft: CompileDraft = {
@@ -27,6 +30,7 @@ export const defaultCompileDraft: CompileDraft = {
   outDir: "",
   outSuffix: "",
   advanced: defaultAdvanced,
+  mapinfo: defaultMapinfoDraft,
 };
 
 export function useCompileDraft() {
