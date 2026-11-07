@@ -15,6 +15,7 @@ import {
   type MarginSurface,
   marginGeometry,
   type TerrainSurface,
+  terrainCavityPixels,
   terrainNormalPixels,
   terrainTriangles,
 } from "./terrain";
@@ -279,13 +280,14 @@ export function buildTerrainMesh(
 
   let normals: THREE.DataTexture | null = null;
   const grid = wide && surface.maxHeight > 0 ? wide.heights : heights;
+  // World units the grid covers, when it reaches past the sheet.
+  const span = margin
+    ? {
+        width: surface.worldWidth + 2 * margin.reachX,
+        depth: surface.worldDepth + 2 * margin.reachZ,
+      }
+    : undefined;
   if (grid && surface.maxHeight > 0) {
-    const span = margin
-      ? {
-          width: surface.worldWidth + 2 * margin.reachX,
-          depth: surface.worldDepth + 2 * margin.reachZ,
-        }
-      : undefined;
     normals = new THREE.DataTexture(
       terrainNormalPixels(surface, grid, span, ext?.relief),
       grid.width,
@@ -334,6 +336,22 @@ export function buildTerrainMesh(
     };
   }
 
+  // The cavity fields the bake reads, from the same heights as the normals.
+  let cavity: THREE.Texture | null = null;
+  if (normals && biomeTextures && grid) {
+    cavity = new THREE.DataTexture(
+      terrainCavityPixels(surface, grid, span, ext?.relief),
+      grid.width,
+      grid.height,
+      THREE.RGBAFormat,
+    );
+    cavity.flipY = false;
+    cavity.magFilter = THREE.LinearFilter;
+    cavity.minFilter = THREE.LinearMipmapLinearFilter;
+    cavity.generateMipmaps = true;
+    cavity.needsUpdate = true;
+  }
+
   let frame: TerrainFrame | undefined;
   // The haze's colour, and the background's. An apron round a picture still
   // loading takes the placeholder's until the picture arrives.
@@ -365,6 +383,7 @@ export function buildTerrainMesh(
     : undefined;
   const shading: TerrainShading = {
     normals,
+    cavity,
     biomes: biomeTextures,
     detail: detail && isColorPixels(color),
     frame,
@@ -420,6 +439,7 @@ export function buildTerrainMesh(
     bake = createTerrainBake(draw, rect, passes, ready, [
       biomeTextures.a,
       biomeTextures.b,
+      ...(cavity ? [cavity] : []),
     ]);
     disposables.push(bake);
   } else {
