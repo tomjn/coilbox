@@ -432,28 +432,28 @@ const FACE_FROM = 0.08;
 const FACE_TO = 0.22;
 
 /**
- * `src` smoothed by `passes` box blurs of the given radius in pixels, along
- * both axes. Edge pixels repeat outward. Two passes are close to a gaussian
- * and show none of a single box's square corners.
+ * `src` smoothed by two box blurs, with radii in pixels along x and y. Edge
+ * pixels repeat outward. Two passes are close to a gaussian and show none of
+ * a single box's square corners. Both radii are at least 1.
  */
 function boxBlur(
   src: Float32Array,
   width: number,
   height: number,
-  radius: number,
-  passes = 2,
+  radiusX: number,
+  radiusY: number,
 ): Float32Array {
-  if (radius < 1) return src;
   const rows = new Float32Array(src.length);
   const out = new Float32Array(src.length);
-  const scale = 1 / (2 * radius + 1);
   const line = (
     from: Float32Array,
     to: Float32Array,
     offset: number,
     stride: number,
     n: number,
+    radius: number,
   ) => {
+    const scale = 1 / (2 * radius + 1);
     const at = (i: number) =>
       from[offset + Math.min(n - 1, Math.max(0, i)) * stride];
     let sum = 0;
@@ -464,9 +464,10 @@ function boxBlur(
     }
   };
   let from = src;
-  for (let pass = 0; pass < passes; pass++) {
-    for (let y = 0; y < height; y++) line(from, rows, y * width, 1, width);
-    for (let x = 0; x < width; x++) line(rows, out, x, width, height);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 0; y < height; y++)
+      line(from, rows, y * width, 1, width, radiusX);
+    for (let x = 0; x < width; x++) line(rows, out, x, width, height, radiusY);
     from = out;
   }
   return out;
@@ -506,7 +507,17 @@ export function terrainCavityPixels(
   const toWorld = surface.heightScale * surface.scale;
   const stepX = span.width / Math.max(1, width - 1);
   const stepZ = span.depth / Math.max(1, height - 1);
-  const pixels = (reach: number) => Math.round(reach / Math.min(stepX, stepZ));
+  // A reach in world units is a different number of pixels along each axis
+  // when the grid's pixels are not square. Never under one, which would leave
+  // the field flat.
+  const blur = (field: Float32Array, reach: number) =>
+    boxBlur(
+      field,
+      width,
+      height,
+      Math.max(1, Math.round(reach / stepX)),
+      Math.max(1, Math.round(reach / stepZ)),
+    );
 
   const face = new Float32Array(count);
   const sea = new Float32Array(count);
@@ -533,10 +544,10 @@ export function terrainCavityPixels(
     }
   }
 
-  const fine = boxBlur(data, width, height, pixels(CAVITY_FINE_REACH));
-  const coarse = boxBlur(data, width, height, pixels(CAVITY_COARSE_REACH));
-  const faces = boxBlur(face, width, height, pixels(CAVITY_STEEP_REACH), 1);
-  const wet = boxBlur(sea, width, height, pixels(CAVITY_WET_REACH), 1);
+  const fine = blur(data, CAVITY_FINE_REACH);
+  const coarse = blur(data, CAVITY_COARSE_REACH);
+  const faces = blur(face, CAVITY_STEEP_REACH);
+  const wet = blur(sea, CAVITY_WET_REACH);
 
   const signed = (v: number, range: number) =>
     Math.round((Math.min(1, Math.max(-1, v / range)) * 0.5 + 0.5) * 255);

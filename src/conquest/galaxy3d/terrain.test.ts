@@ -294,6 +294,18 @@ describe("terrainCavityPixels", () => {
     expect(inGully[0]).toBeLessThan(128);
   });
 
+  it("keeps the fine field when a pixel is wider than the fine reach", () => {
+    const ridge = gridOf((x) => (x === 20 ? 0.6 : 0.5));
+    const wide = createTerrainSurface(
+      { width: 160, height: 160, heightScale: 40 },
+      160,
+      ridge,
+    );
+    expect(at(terrainCavityPixels(wide, ridge), 20, 20)[0]).toBeGreaterThan(
+      128,
+    );
+  });
+
   it("is positive on a dome and negative in a basin at the wide reach", () => {
     const dome = gridOf(
       (x, y) => 0.5 + 0.2 * Math.exp(-((x - 20) ** 2 + (y - 20) ** 2) / 20),
