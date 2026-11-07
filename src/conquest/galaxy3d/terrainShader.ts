@@ -34,6 +34,10 @@ import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
  *   never shimmers from far away.
  * - Patterns are drawn from above, which would smear down a cliff, so rock
  *   and any steep slope draw from the point in space instead.
+ * - Cavity fields read from the heightmap (`terrainCavityPixels`) shade the
+ *   land by its shape: pale rims and dark crevices on rock, scree below steep
+ *   faces, strata on them, bare rock through snow on ridges, blue hollows in
+ *   snow and ice, and a wet band at the water line. Only the bake reads them.
  *
  * Display only. Nothing here feeds play or the generator.
  */
@@ -42,6 +46,11 @@ import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
 export interface TerrainShading {
   /** {@link terrainNormalPixels} as a texture, or null for a flat sheet. */
   normals: THREE.Texture | null;
+  /**
+   * {@link terrainCavityPixels} as a texture. Read only by the bake, which
+   * draws the detail, so it costs a frame nothing once the bake is done.
+   */
+  cavity?: THREE.Texture | null;
   /** The generator's weights and its planet. Null for a hand-made map, which gets no detail. */
   biomes: { a: THREE.Texture; b: THREE.Texture; planet: PlanetId } | null;
   /** Draw the detail. Off in performance mode. */
@@ -111,6 +120,7 @@ vTerrainPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
 
 const FRAGMENT_HEAD = /* glsl */ `
 uniform sampler2D uTerrainNormals;
+uniform sampler2D uTerrainCavity;
 uniform float uTerrainRelief;
 uniform float uTerrainDetail;
 uniform sampler2D uBiomeA;
@@ -501,6 +511,16 @@ const DETAIL = /* glsl */ `
     // Steep ground shows bare rock, whatever grows on the level.
     float steep = smoothstep(0.08, 0.22, 1.0 - n.y) * land;
 
+    // The ground's shape from the heightmap: -1 to 1 for how far it stands
+    // proud of its surroundings close in (edges and ridges up, gullies down)
+    // and wide out (domes up, basins down), then how much steep face and how
+    // much sea lie within reach, 0 to 1.
+    vec4 cav = tSmooth(uTerrainCavity, vTerrainUv);
+    float cavFine = cav.r * 2.0 - 1.0;
+    float cavCoarse = cav.g * 2.0 - 1.0;
+    float faceNear = cav.b;
+    float seaNear = cav.a;
+
     float shadeMul = 1.0;
     // The slope each pattern adds, seen from above, and for rock in space.
     vec2 bump = vec2(0.0);
@@ -739,6 +759,12 @@ const DETAIL = /* glsl */ `
     // Rock, scree and mesa, and any steep slope: creased stone in layers. It
     // is drawn from the point in space, not from above, so it does not smear
     // down a cliff.
+    // Scree gathers on ground level enough to hold it, low against its
+    // surroundings, with a steep face close above.
+    float level = 1.0 - smoothstep(0.1, 0.24, 1.0 - n.y);
+    float talus = level * smoothstep(0.08, 0.45, faceNear) * smoothstep(0.05, -0.3, cavCoarse) * land * (1.0 - steep);
+    talus *= 1.0 - pw[${P.snow}];
+    pw[${P.scree}] += talus;
     float crag = max(pw[${P.rock}] + pw[${P.scree}] + pw[${P.mesa}] * 0.5, steep);
     if (crag > 0.02) {
       vec3 squash = vec3(1.0, 1.3, 1.0);
@@ -758,19 +784,54 @@ const DETAIL = /* glsl */ `
       shadeMul += crag * (stone.x * 0.45 + broad.x * 0.12);
       bump3 += crag * stone.yzw * 0.16;
       albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.5 + broad.x * 0.5), steep * (1.0 - pw[${P.snow}]) * 0.85);
-      // Layers by height, which show on a slope and not on the level.
-      float layer = vTerrainPos.y * 16.0;
-      float keepLayer = 1.0 - smoothstep(0.8, 2.0, fwidth(layer));
-      float band = sin(layer + stone.x * 1.5 + broad.x * 2.0) * keepLayer;
+      // Strata: beds of sediment that follow height, each its own tone, with
+      // a dark seam where one meets the next. They show on a slope and not on
+      // the level. The noise bends the beds and varies their thickness, so
+      // they read as layers and not as contour lines.
       float tilt = smoothstep(0.03, 0.15, 1.0 - n.y);
-      shadeMul += (steep * 0.1 + pw[${P.mesa}] * tilt * 0.25) * band;
+      float strata = (steep + pw[${P.mesa}] * tilt) * (1.0 - pw[${P.snow}]);
+      float warp = broad.x * 1.1 + stone.x * 0.45 + fine.x * 0.1;
+      for (int k = 0; k < 2; k++) {
+        float rate = k == 0 ? 3.0 : 10.0;
+        float depth = vTerrainPos.y * rate + warp * (k == 0 ? 1.0 : 0.6) + float(k) * 5.3;
+        float keepBed = 1.0 - smoothstep(0.5, 1.4, fwidth(depth));
+        if (keepBed <= 0.0) break;
+        float bed = floor(depth);
+        vec3 pick = tHash3(vec3(bed, float(k) * 9.7, 3.3));
+        // Hard beds stand out as ledges: a bright lip on top of each.
+        float within = fract(depth);
+        float seam = 1.0 - smoothstep(0.0, 0.09 + fwidth(depth), within);
+        float lip = smoothstep(0.82, 1.0, within) * (1.0 - seam);
+        float weight = strata * keepBed * (k == 0 ? 1.0 : 0.45);
+        shadeMul += weight * ((pick.x - 0.5) * 0.7 - seam * 0.3 + lip * 0.14);
+        vec3 tint = mix(vec3(1.12, 1.0, 0.8), vec3(0.84, 0.88, 1.0), pick.y);
+        albedo = mix(albedo, albedo * tint, weight * 0.75);
+      }
       shadeMul += pw[${P.mesa}] * fine.x * 0.12;
+      // Edges and ridges weather pale, and the crevices between fill dark.
+      float rock = min(crag, 1.0);
+      float rim = smoothstep(0.12, 0.7, cavFine);
+      float crevice = smoothstep(-0.08, -0.6, cavFine);
+      albedo = mix(albedo, albedo * 1.35 + vec3(0.05, 0.045, 0.035), rock * rim * 0.7);
+      shadeMul -= rock * (1.0 - min(talus, 1.0)) * (crevice * 0.4 + smoothstep(0.0, -0.5, cavCoarse) * 0.1);
+      // Talus is loose stone, greyer than the face it broke from.
+      albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.35 + broad.x * 0.4), min(talus, 1.0) * 0.6);
+      shadeMul += min(talus, 1.0) * 0.15;
       // Scree is the same stone broken small.
       float keep = tShow(0.04, footprint);
       if (pw[${P.scree}] > 0.02 && keep > 0.0) {
         vec4 cell = tCell(p / 0.11 + 6.1);
         shadeMul += pw[${P.scree}] * keep * (cell.w - 0.5) * 0.45 * (1.0 - smoothstep(0.15, 0.45, cell.x));
       }
+    }
+    // Snow and ice lie in the hollows, bluer there, and give way to bare rock
+    // on the edges and ridges.
+    float cold = min(pw[${P.snow}] + pw[${P.ice}], 1.0);
+    if (cold > 0.02) {
+      float hollow = smoothstep(0.05, -0.45, cavFine * 0.5 + cavCoarse);
+      albedo = mix(albedo, albedo * vec3(0.74, 0.86, 1.0), cold * hollow * 0.8);
+      float bare = smoothstep(0.3, 0.7, cavFine);
+      albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.5 + broad.x * 0.5), cold * bare * 0.85);
     }
     // Lava: plates of dark crust adrift on the melt, which glows in the gaps
     // between them. Rafts of crust in places, open melt in others.
@@ -841,6 +902,8 @@ const DETAIL = /* glsl */ `
     foam *= smoothstep(-0.3, 0.4, fine.x);
     // Only a liquid sea ripples, foams and glints.
     foam *= uSeaLiquid;
+    // Foam breaks where the shore has a slope to break on.
+    foam *= smoothstep(0.02, 0.3, faceNear);
     // Coasts past the edge are drawn at half the map's resolution, and foam
     // traces their steps, so it thins out there.
     foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
@@ -849,6 +912,10 @@ const DETAIL = /* glsl */ `
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
 
     albedo *= max(shadeMul, 0.2);
+    // Wet ground at the water line: darker and a little bluer, with a ragged
+    // upper edge.
+    float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
+    albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), wet * 0.85);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
     n = normalize(n + vec3(-bump.x, 0.0, -bump.y) - (bump3 - n * dot(bump3, n)));
 
@@ -948,6 +1015,14 @@ export function applyTerrainShader(
   );
   placeholder.needsUpdate = true;
   disposables.push(placeholder);
+  // No cavity: level ground with no steep face and no sea within reach.
+  const flatCavity = new THREE.DataTexture(
+    new Uint8Array([128, 128, 0, 0]),
+    1,
+    1,
+  );
+  flatCavity.needsUpdate = true;
+  disposables.push(flatCavity);
   // Detail tells sea from land by the height the normals carry, so without
   // them it would read every pixel as sea. It reads the biome weights too.
   const detail =
@@ -972,6 +1047,9 @@ export function applyTerrainShader(
     shader.uniforms.uTerrainRelief = { value: shading.normals ? 1 : 0 };
     shader.uniforms.uTerrainDetail = { value: detail ? 1 : 0 };
     // Weights are bound only when the detail will read them.
+    shader.uniforms.uTerrainCavity = {
+      value: weighs ? (shading.cavity ?? flatCavity) : flatCavity,
+    };
     shader.uniforms.uBiomeA = {
       value: weighs && shading.biomes ? shading.biomes.a : placeholder,
     };
