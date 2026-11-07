@@ -181,6 +181,47 @@ export const mcCompile = defineCommand<
   { smfPath: string; outSuffix: string }
 >("coilbox-mapconv", "mc_compile");
 
+/**
+ * The `mapinfo.lua` fields the Compile page sends. A field left out is not the
+ * page's to set: an existing file keeps its value and a new file gets the
+ * writer's default. Colours are RGB triples in 0 to 1, start positions are in
+ * elmos.
+ */
+export interface MapinfoForm {
+  name?: string;
+  shortname?: string;
+  description?: string;
+  author?: string;
+  skyColor?: [number, number, number];
+  fogColor?: [number, number, number];
+  sunColor?: [number, number, number];
+  sunDir?: [number, number, number];
+  groundAmbientColor?: [number, number, number];
+  groundDiffuseColor?: [number, number, number];
+  waterSurfaceColor?: [number, number, number];
+  waterSurfaceAlpha?: number;
+  terrainHardness?: number;
+  startPositions: { x: number; z: number }[];
+}
+
+/**
+ * Write `<outDir>/mapinfo.lua` for a map just compiled as `<outSuffix>.smf`, or
+ * patch the one already there so every field the page does not own survives.
+ * Heights default to the `.smf` header when the form has none.
+ */
+export const mcWriteMapinfo = defineCommand<
+  {
+    opts: {
+      outDir: string;
+      outSuffix: string;
+      minHeight?: number;
+      maxHeight?: number;
+      info: MapinfoForm;
+    };
+  },
+  { path: string; created: boolean; changed: boolean }
+>("coilbox-mapconv", "mc_write_mapinfo");
+
 export const mcDecompile = defineCommand<
   { inputPath: string; runId: string; onLog: Channel<LogLine> },
   {
