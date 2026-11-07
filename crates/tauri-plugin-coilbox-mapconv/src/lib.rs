@@ -682,6 +682,27 @@ async fn mc_compile<R: Runtime>(
     })
 }
 
+/// `mc_read_teams` — the start positions in `<outDir>/mapinfo.lua`, one slot per
+/// team in team order (`null` for a team with none). Empty when there is no file
+/// or it has no teams. Returns `{ teams }`.
+#[tauri::command]
+async fn mc_read_teams(out_dir: String) -> CliResult {
+    match tauri::async_runtime::spawn_blocking(move || {
+        mapinfo_write::read_teams(Path::new(&out_dir))
+    })
+    .await
+    {
+        Ok(Ok(teams)) => CliResult::ok(json!({
+            "teams": teams
+                .iter()
+                .map(|t| t.map(|p| json!({ "x": p.x, "z": p.z })))
+                .collect::<Vec<_>>(),
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("mapinfo task failed: {e}")),
+    }
+}
+
 /// `mc_write_mapinfo` — write `<outDir>/mapinfo.lua` for a map `mc_compile` just
 /// built. Creates the file, or patches the one already there so every field the
 /// page does not own survives. Returns `{ path, created, changed }`.
@@ -949,6 +970,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_height_field,
             mc_smf_heights,
             mc_compile,
+            mc_read_teams,
             mc_write_mapinfo,
             mc_package_map,
             mc_install_map,

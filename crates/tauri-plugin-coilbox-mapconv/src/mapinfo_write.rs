@@ -10,7 +10,8 @@
 //!   `mapfile`, `smf.minheight`, `smf.maxheight`, `smf.smtFileName0`.
 //! - Rewritten when the page sends a value: `name`, `shortname`, `description`,
 //!   `author`, the shading colours, the terrain hardness and the start
-//!   positions. `name` and `shortname` fall back to the output name when the
+//!   positions (an empty list removes `teams`; a shorter one removes the teams
+//!   past its end). `name` and `shortname` fall back to the output name when the
 //!   file has none.
 //! - Written only when the file is new: the atmosphere, lighting, water and
 //!   terrain type defaults, plus the engine's global defaults.
@@ -18,9 +19,10 @@
 
 use std::path::{Path, PathBuf};
 
+use coilbox_springlua::SpringLua;
 use serde::Deserialize;
 
-use crate::luapatch::{apply, Key, Mode, Val};
+use crate::luapatch::{apply, index_keys, remove, Key, Mode, Val};
 use crate::{mapinfo, smf};
 
 /// A team's start position, in elmos.
@@ -47,8 +49,10 @@ pub struct MapinfoForm {
     pub water_surface_color: Option<[f64; 3]>,
     pub water_surface_alpha: Option<f64>,
     pub terrain_hardness: Option<f64>,
-    /// One slot per team, in team order. `None` is a row the page left unfilled.
-    pub start_positions: Vec<Option<StartPos>>,
+    /// One slot per team, in team order. A slot that is `None` is a row the page
+    /// left unfilled. The whole list absent means the page has no opinion, and
+    /// an empty list means the map has no start positions.
+    pub start_positions: Option<Vec<Option<StartPos>>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -74,10 +78,17 @@ pub struct Written {
 }
 
 /// One change to the file.
-pub struct Edit {
-    pub path: Vec<Key>,
-    pub val: Val,
-    pub mode: Mode,
+pub enum Edit {
+    Put {
+        path: Vec<Key>,
+        val: Val,
+        mode: Mode,
+    },
+    /// Delete the field. A field the file does not have is left alone.
+    Remove { path: Vec<Key> },
+    /// Delete the integer keyed fields of the table at `path` numbered `keep`
+    /// or higher.
+    Trim { path: Vec<Key>, keep: usize },
 }
 
 const SKELETON: &str = "local mapinfo = {\n}\n\nreturn mapinfo\n";
@@ -86,19 +97,20 @@ fn n(s: &str) -> Key {
     Key::Name(s.into())
 }
 
-fn set(path: &[&str], val: Val) -> Edit {
-    Edit {
+fn put(path: &[&str], val: Val, mode: Mode) -> Edit {
+    Edit::Put {
         path: path.iter().map(|s| n(s)).collect(),
         val,
-        mode: Mode::Set,
+        mode,
     }
 }
 
+fn set(path: &[&str], val: Val) -> Edit {
+    put(path, val, Mode::Set)
+}
+
 fn default(path: &[&str], val: Val) -> Edit {
-    Edit {
-        mode: Mode::Default,
-        ..set(path, val)
-    }
+    put(path, val, Mode::Default)
 }
 
 fn table(entries: Vec<(&str, Val)>) -> Val {
@@ -171,7 +183,7 @@ fn new_file_defaults() -> Vec<Edit> {
                 ("surfaceAlpha", Val::Num(0.55)),
             ]),
         ),
-        Edit {
+        Edit::Put {
             path: vec![n("terrainTypes")],
             val: Val::Table(vec![(
                 Key::Index(0),
@@ -244,22 +256,37 @@ pub fn edits(opts: &WriteOpts, min_height: f64, max_height: f64, new_file: bool)
         out.push(set(&["water", "surfaceAlpha"], Val::Num(a)));
     }
     if let Some(h) = form.terrain_hardness {
-        out.push(Edit {
+        out.push(Edit::Put {
             path: vec![n("terrainTypes"), Key::Index(0), n("hardness")],
             val: Val::Num(h),
             mode: Mode::Set,
         });
     }
 
-    // A row the page left incomplete is `None` and keeps its team number, so the
-    // rows after it do not move down a slot.
-    for (team, pos) in form.start_positions.iter().enumerate() {
-        let Some(pos) = pos else { continue };
-        for (axis, v) in [("x", pos.x), ("z", pos.z)] {
-            out.push(Edit {
-                path: vec![n("teams"), Key::Index(team as i64), n("startPos"), n(axis)],
-                val: Val::Num(v),
-                mode: Mode::Set,
+    // Row `i` is team `i`, so the rows after a removed one move down a slot and
+    // the file's teams from the end of the list on are deleted. The engine stops
+    // reading start positions at the first team that has none, so leaving a gap
+    // would hide every team after it. A row the page left incomplete is `None`
+    // and keeps its team number: it is left as the file has it.
+    match &form.start_positions {
+        None => {}
+        Some(rows) if rows.is_empty() => out.push(Edit::Remove {
+            path: vec![n("teams")],
+        }),
+        Some(rows) => {
+            for (team, pos) in rows.iter().enumerate() {
+                let Some(pos) = pos else { continue };
+                for (axis, v) in [("x", pos.x), ("z", pos.z)] {
+                    out.push(Edit::Put {
+                        path: vec![n("teams"), Key::Index(team as i64), n("startPos"), n(axis)],
+                        val: Val::Num(v),
+                        mode: Mode::Set,
+                    });
+                }
+            }
+            out.push(Edit::Trim {
+                path: vec![n("teams")],
+                keep: rows.len(),
             });
         }
     }
@@ -268,8 +295,20 @@ pub fn edits(opts: &WriteOpts, min_height: f64, max_height: f64, new_file: bool)
 
 /// Apply `edits` to `src`.
 pub fn patch(src: &str, edits: &[Edit]) -> Result<String, String> {
-    edits.iter().try_fold(src.to_string(), |text, e| {
-        apply(&text, &e.path, &e.val, e.mode)
+    edits.iter().try_fold(src.to_string(), |text, e| match e {
+        Edit::Put { path, val, mode } => apply(&text, path, val, *mode),
+        Edit::Remove { path } => remove(&text, path),
+        Edit::Trim { path, keep } => {
+            let mut text = text;
+            for i in index_keys(&text, path)? {
+                if usize::try_from(i).map_or(true, |i| i >= *keep) {
+                    let mut at = path.clone();
+                    at.push(Key::Index(i));
+                    text = remove(&text, &at)?;
+                }
+            }
+            Ok(text)
+        }
     })
 }
 
@@ -291,6 +330,62 @@ fn heights(opts: &WriteOpts, dir: &Path) -> Result<(f64, f64), String> {
         opts.min_height.unwrap_or(f64::from(header.min_height)),
         opts.max_height.unwrap_or(f64::from(header.max_height)),
     ))
+}
+
+/// The engine's `MAX_TEAMS` (`rts/Sim/Misc/GlobalConstants.h`). A team number
+/// past it is never read, so it is not loaded into the page.
+const MAX_TEAMS: usize = 255;
+
+/// The start positions `<dir>/mapinfo.lua` holds, one slot per team up to the
+/// highest team that has an entry. A team with no readable `startPos` is `None`.
+/// Empty when there is no file or it has no teams. The file is evaluated, so
+/// teams a mapper computed are read too.
+pub fn read_teams(dir: &Path) -> Result<Vec<Option<StartPos>>, String> {
+    let path = dir.join("mapinfo.lua");
+    let src = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("could not read {}: {e}", path.display())),
+    };
+    let value = SpringLua::new(dir)
+        .and_then(|lua| {
+            lua.eval_expr_value(&format!("(function()\n{src}\nend)()"), "mapinfo.lua")
+        })
+        .map_err(|e| format!("could not evaluate {}: {e}", path.display()))?;
+    let field = |v: &serde_json::Value, name: &str| {
+        v.as_object()?
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.clone())
+    };
+    let start = |team: &serde_json::Value| {
+        let pos = field(team, "startPos")?;
+        Some(StartPos {
+            x: field(&pos, "x")?.as_f64()?,
+            z: field(&pos, "z")?.as_f64()?,
+        })
+    };
+    // A table written as a list has Lua keys from 1, so its first entry is team 1.
+    let entries: Vec<(usize, serde_json::Value)> = match field(&value, "teams") {
+        Some(serde_json::Value::Object(map)) => map
+            .into_iter()
+            .filter_map(|(k, v)| Some((k.parse().ok()?, v)))
+            .collect(),
+        Some(serde_json::Value::Array(list)) => list
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (i + 1, v))
+            .collect(),
+        _ => Vec::new(),
+    };
+    let mut teams = Vec::new();
+    for (team, entry) in entries.into_iter().filter(|(t, _)| *t < MAX_TEAMS) {
+        if teams.len() <= team {
+            teams.resize(team + 1, None);
+        }
+        teams[team] = start(&entry);
+    }
+    Ok(teams)
 }
 
 /// Write `<out_dir>/mapinfo.lua`, creating it or patching the one there.
@@ -344,7 +439,6 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use coilbox_springlua::SpringLua;
 
     /// Options for `mymap`, with a stand-in `.smf` in `dir` unless one is there.
     fn opts(dir: &Path) -> WriteOpts {
@@ -387,7 +481,7 @@ mod tests {
         let mut o = opts(&dir);
         o.info.description = Some("A test map".into());
         o.info.author = Some("Tom".into());
-        o.info.start_positions = vec![
+        o.info.start_positions = Some(vec![
             Some(StartPos {
                 x: 512.0,
                 z: 1024.0,
@@ -396,7 +490,7 @@ mod tests {
                 x: 3000.0,
                 z: 2000.0,
             }),
-        ];
+        ]);
         let w = write(&o).unwrap();
         assert!(w.created && w.changed);
         let v = eval(&dir);
@@ -428,7 +522,7 @@ mod tests {
         std::fs::write(&path, format!("-- my map\n{hand}")).unwrap();
 
         o.max_height = Some(500.0);
-        o.info.start_positions = vec![Some(StartPos { x: 1.0, z: 2.0 })];
+        o.info.start_positions = Some(vec![Some(StartPos { x: 1.0, z: 2.0 })]);
         let w = write(&o).unwrap();
         assert!(!w.created && w.changed);
 
@@ -445,11 +539,100 @@ mod tests {
     fn an_unfilled_start_position_keeps_the_team_numbers_after_it() {
         let dir = temp_dir("gap");
         let mut o = opts(&dir);
-        o.info.start_positions = vec![None, None, Some(StartPos { x: 7.0, z: 8.0 })];
+        o.info.start_positions = Some(vec![None, None, Some(StartPos { x: 7.0, z: 8.0 })]);
         write(&o).unwrap();
         let v = eval(&dir);
         assert_eq!(v["teams"]["2"]["startPos"]["x"], 7);
         assert!(v["teams"].get("0").is_none());
+    }
+
+    const THREE_TEAMS: &str = "-- my map\nlocal mapinfo = {\n    name = \"Mine\",\n    gravity = 130, -- floaty\n    teams = {\n        [0] = { startPos = { x = 1, z = 2 } },\n        [1] = { startPos = { x = 3, z = 4 } }, -- the middle one\n        [2] = { startPos = { x = 5, z = 6 } },\n    },\n}\nreturn mapinfo\n";
+
+    fn pos(x: f64, z: f64) -> Option<StartPos> {
+        Some(StartPos { x, z })
+    }
+
+    #[test]
+    fn a_team_removed_on_the_page_leaves_the_file_with_the_rest_renumbered() {
+        let dir = temp_dir("remove-middle");
+        std::fs::write(dir.join("mapinfo.lua"), THREE_TEAMS).unwrap();
+        let mut o = opts(&dir);
+        o.info.start_positions = Some(vec![pos(1.0, 2.0), pos(5.0, 6.0)]);
+        write(&o).unwrap();
+
+        let v = eval(&dir);
+        assert_eq!(v["teams"]["0"]["startPos"]["x"], 1);
+        assert_eq!(v["teams"]["1"]["startPos"]["x"], 5);
+        assert_eq!(v["teams"]["1"]["startPos"]["z"], 6);
+        assert!(v["teams"].get("2").is_none());
+        let text = std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap();
+        assert!(text.starts_with("-- my map\n"));
+        assert!(text.contains("gravity = 130, -- floaty"));
+    }
+
+    #[test]
+    fn no_start_positions_removes_the_teams_block_and_nothing_else() {
+        let dir = temp_dir("remove-all");
+        std::fs::write(dir.join("mapinfo.lua"), THREE_TEAMS).unwrap();
+        let mut o = opts(&dir);
+        o.info.start_positions = Some(Vec::new());
+        write(&o).unwrap();
+
+        let v = eval(&dir);
+        assert!(v.get("teams").is_none());
+        assert_eq!(v["name"], "Mine");
+        let text = std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap();
+        assert!(text.contains("gravity = 130, -- floaty"));
+        assert!(!text.contains("startPos"));
+    }
+
+    #[test]
+    fn a_page_with_no_opinion_leaves_the_teams_alone() {
+        let dir = temp_dir("no-opinion");
+        std::fs::write(dir.join("mapinfo.lua"), THREE_TEAMS).unwrap();
+        write(&opts(&dir)).unwrap();
+        let v = eval(&dir);
+        assert_eq!(v["teams"]["2"]["startPos"]["x"], 5);
+    }
+
+    #[test]
+    fn an_unfilled_row_is_left_as_the_file_has_it_and_later_teams_stay() {
+        let dir = temp_dir("unfilled");
+        std::fs::write(dir.join("mapinfo.lua"), THREE_TEAMS).unwrap();
+        let mut o = opts(&dir);
+        o.info.start_positions = Some(vec![pos(1.0, 2.0), None, pos(7.0, 8.0)]);
+        write(&o).unwrap();
+        let v = eval(&dir);
+        assert_eq!(v["teams"]["1"]["startPos"]["x"], 3);
+        assert_eq!(v["teams"]["2"]["startPos"]["x"], 7);
+    }
+
+    #[test]
+    fn the_teams_of_a_file_are_read_back_by_team_number() {
+        let dir = temp_dir("read-teams");
+        assert!(read_teams(&dir).unwrap().is_empty());
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { Teams = { [0] = { StartPos = { x = 1, z = 2 } }, [2] = { startpos = { x = 5.5, z = 6 } }, [1] = {} } }",
+        )
+        .unwrap();
+        assert_eq!(
+            read_teams(&dir).unwrap(),
+            vec![pos(1.0, 2.0), None, pos(5.5, 6.0)]
+        );
+        std::fs::write(dir.join("mapinfo.lua"), "return { name = \"x\" }").unwrap();
+        assert!(read_teams(&dir).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_team_number_past_the_engine_limit_is_not_read() {
+        let dir = temp_dir("read-teams-limit");
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { teams = { [0] = { startPos = { x = 1, z = 2 } }, [4000000000] = { startPos = { x = 3, z = 4 } } } }",
+        )
+        .unwrap();
+        assert_eq!(read_teams(&dir).unwrap(), vec![pos(1.0, 2.0)]);
     }
 
     #[test]
