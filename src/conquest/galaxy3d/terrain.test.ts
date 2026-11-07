@@ -15,6 +15,7 @@ import {
   sampleHeightGrid,
   TERRAIN_SUN,
   terrainCameraLimits,
+  terrainCavityPixels,
   terrainMarginPixels,
   terrainNormalPixels,
   terrainSpecOf,
@@ -258,6 +259,86 @@ describe("terrainNormalPixels", () => {
     // North and west of the peak face the sun, south and east face away.
     expect(facing(1)).toBeGreaterThan(facing(7));
     expect(facing(3)).toBeGreaterThan(facing(5));
+  });
+});
+
+describe("terrainCavityPixels", () => {
+  // 41 pixels across 40 world units, so a pixel is one world unit and the
+  // blurs reach 1, 3, 1 and 2 pixels.
+  const SIZE = 41;
+  const surfaceFor = (grid: HeightGrid) =>
+    createTerrainSurface({ width: 40, height: 40, heightScale: 40 }, 40, grid);
+  const gridOf = (value: (x: number, y: number) => number): HeightGrid => {
+    const data = new Float32Array(SIZE * SIZE);
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++) data[y * SIZE + x] = value(x, y);
+    return { data, width: SIZE, height: SIZE };
+  };
+  const at = (bytes: Uint8Array, x: number, y: number) =>
+    Array.from(bytes.slice((y * SIZE + x) * 4, (y * SIZE + x) * 4 + 4));
+
+  it("leaves level land at the middle of both fields with no face or sea", () => {
+    const grid = gridOf(() => 0.5);
+    const bytes = terrainCavityPixels(surfaceFor(grid), grid);
+    expect(bytes.length).toBe(SIZE * SIZE * 4);
+    expect(at(bytes, 20, 20)).toEqual([128, 128, 0, 0]);
+    expect(at(bytes, 0, 0)).toEqual([128, 128, 0, 0]);
+  });
+
+  it("is positive on a ridge and negative in a gully", () => {
+    const ridge = gridOf((x) => (x === 20 ? 0.6 : 0.5));
+    const gully = gridOf((x) => (x === 20 ? 0.4 : 0.5));
+    const onRidge = at(terrainCavityPixels(surfaceFor(ridge), ridge), 20, 20);
+    const inGully = at(terrainCavityPixels(surfaceFor(gully), gully), 20, 20);
+    expect(onRidge[0]).toBeGreaterThan(128);
+    expect(inGully[0]).toBeLessThan(128);
+  });
+
+  it("is positive on a dome and negative in a basin at the wide reach", () => {
+    const dome = gridOf(
+      (x, y) => 0.5 + 0.2 * Math.exp(-((x - 20) ** 2 + (y - 20) ** 2) / 20),
+    );
+    const basin = gridOf(
+      (x, y) => 0.7 - 0.2 * Math.exp(-((x - 20) ** 2 + (y - 20) ** 2) / 20),
+    );
+    expect(
+      at(terrainCavityPixels(surfaceFor(dome), dome), 20, 20)[1],
+    ).toBeGreaterThan(128);
+    expect(
+      at(terrainCavityPixels(surfaceFor(basin), basin), 20, 20)[1],
+    ).toBeLessThan(128);
+  });
+
+  it("clamps a difference larger than its range", () => {
+    const spike = gridOf((x, y) => (x === 20 && y === 20 ? 1 : 0.1));
+    const bytes = terrainCavityPixels(surfaceFor(spike), spike);
+    expect(at(bytes, 20, 20)[0]).toBe(255);
+  });
+
+  it("wets land next to the sea and not land far from it", () => {
+    const shore = gridOf((x) => (x < 20 ? 0 : 0.5));
+    const bytes = terrainCavityPixels(surfaceFor(shore), shore);
+    expect(at(bytes, 20, 20)[3]).toBeGreaterThan(0);
+    expect(at(bytes, 40, 20)[3]).toBe(0);
+    // The sea itself reads as mostly sea.
+    expect(at(bytes, 5, 20)[3]).toBe(255);
+  });
+
+  it("marks ground near a steep face and not ground far from one", () => {
+    const step = gridOf((x) => (x < 20 ? 0.2 : 1));
+    const bytes = terrainCavityPixels(surfaceFor(step), step);
+    expect(at(bytes, 19, 20)[2]).toBeGreaterThan(0);
+    expect(at(bytes, 2, 20)[2]).toBe(0);
+    expect(at(bytes, 38, 20)[2]).toBe(0);
+  });
+
+  it("takes the fields from the heights it is given and the sea from the grid", () => {
+    const grid = gridOf(() => 0.5);
+    const gully = gridOf((x) => (x === 20 ? 0.4 : 0.5));
+    const surface = surfaceFor(grid);
+    const bytes = terrainCavityPixels(surface, grid, undefined, gully);
+    expect(at(bytes, 20, 20)[0]).toBeLessThan(128);
+    expect(at(bytes, 20, 20)[3]).toBe(0);
   });
 });
 

@@ -404,6 +404,152 @@ export function terrainNormalPixels(
   return out;
 }
 
+/**
+ * Reach of the blurs behind {@link terrainCavityPixels}, in world units, so the
+ * look does not change with the heightmap's resolution. The fine blur is a
+ * couple of heightmap pixels, which picks out edges, ridges and gullies. The
+ * coarse one is wide enough to tell a dome from a basin.
+ */
+export const CAVITY_FINE_REACH = 0.5;
+export const CAVITY_COARSE_REACH = 3;
+/** Reach of the blur that spreads steepness down a slope, for scree. */
+export const CAVITY_STEEP_REACH = 1.2;
+/** Reach of the blur that spreads the sea onto the shore, for the wet band. */
+export const CAVITY_WET_REACH = 2;
+
+/**
+ * A height difference, as a share of a white pixel's height, that fills a
+ * channel of the cavity texture. Larger differences clamp. On the generated
+ * land of temperate, ice, desert and the Moon, 3 to 7 percent of land clamps
+ * the fine field and under 1 percent the coarse one, and the middle half of
+ * land sits within a quarter of the range either side of level.
+ */
+export const CAVITY_FINE_RANGE = 0.04;
+export const CAVITY_COARSE_RANGE = 0.25;
+
+/** How steep a slope must be, as 1 minus its normal's y, to count as a face. */
+const FACE_FROM = 0.08;
+const FACE_TO = 0.22;
+
+/**
+ * `src` smoothed by `passes` box blurs of the given radius in pixels, along
+ * both axes. Edge pixels repeat outward. Two passes are close to a gaussian
+ * and show none of a single box's square corners.
+ */
+function boxBlur(
+  src: Float32Array,
+  width: number,
+  height: number,
+  radius: number,
+  passes = 2,
+): Float32Array {
+  if (radius < 1) return src;
+  const rows = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  const scale = 1 / (2 * radius + 1);
+  const line = (
+    from: Float32Array,
+    to: Float32Array,
+    offset: number,
+    stride: number,
+    n: number,
+  ) => {
+    const at = (i: number) =>
+      from[offset + Math.min(n - 1, Math.max(0, i)) * stride];
+    let sum = 0;
+    for (let k = -radius; k <= radius; k++) sum += at(k);
+    for (let i = 0; i < n; i++) {
+      to[offset + i * stride] = sum * scale;
+      sum += at(i + radius + 1) - at(i - radius);
+    }
+  };
+  let from = src;
+  for (let pass = 0; pass < passes; pass++) {
+    for (let y = 0; y < height; y++) line(from, rows, y * width, 1, width);
+    for (let x = 0; x < width; x++) line(rows, out, x, width, height);
+    from = out;
+  }
+  return out;
+}
+
+/**
+ * Cavity fields from the heights, packed as RGBA bytes for a texture laid over
+ * the sheet like {@link terrainNormalPixels}', top row first. Each is a blur
+ * taken from the heights, so what the shader reads is smooth, and none of it
+ * changes the heightmap.
+ *
+ * - Red: fine cavity, the height minus a small blur. Positive on edges and
+ *   ridges, negative in gullies. 128 is level, and the field spans
+ *   {@link CAVITY_FINE_RANGE} of the tallest ground either way.
+ * - Green: coarse occlusion, the height minus a wide blur. Positive on domes,
+ *   negative in basins. Spans {@link CAVITY_COARSE_RANGE}.
+ * - Blue: how much of the ground within reach is a steep face, 0 to 255. Scree
+ *   gathers where this is high, on ground that is lower than its surroundings.
+ * - Alpha: how much of the ground within reach is sea, 0 to 255, so a shore
+ *   can be wet. Sea is where `grid` is 0.
+ *
+ * `slopes` are the heights the fields are taken from, `grid` when left out.
+ * They must be the grid's size. `span` is as for {@link terrainNormalPixels}.
+ */
+export function terrainCavityPixels(
+  surface: TerrainSurface,
+  grid: HeightGrid,
+  span: { width: number; depth: number } = {
+    width: surface.worldWidth,
+    depth: surface.worldDepth,
+  },
+  slopes: HeightGrid = grid,
+): Uint8Array {
+  const { width, height } = grid;
+  const count = width * height;
+  const data = slopes.data;
+  const toWorld = surface.heightScale * surface.scale;
+  const stepX = span.width / Math.max(1, width - 1);
+  const stepZ = span.depth / Math.max(1, height - 1);
+  const pixels = (reach: number) => Math.round(reach / Math.min(stepX, stepZ));
+
+  const face = new Float32Array(count);
+  const sea = new Float32Array(count);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const x0 = Math.max(0, x - 1);
+      const x1 = Math.min(width - 1, x + 1);
+      const y0 = Math.max(0, y - 1);
+      const y1 = Math.min(height - 1, y + 1);
+      const i = y * width + x;
+      const slopeX =
+        x1 === x0
+          ? 0
+          : ((data[y * width + x1] - data[y * width + x0]) * toWorld) /
+            ((x1 - x0) * stepX);
+      const slopeZ =
+        y1 === y0
+          ? 0
+          : ((data[y1 * width + x] - data[y0 * width + x]) * toWorld) /
+            ((y1 - y0) * stepZ);
+      const steep = 1 - 1 / Math.hypot(slopeX, 1, slopeZ);
+      face[i] = clamp01((steep - FACE_FROM) / (FACE_TO - FACE_FROM));
+      sea[i] = grid.data[i] * 255 < 0.5 ? 1 : 0;
+    }
+  }
+
+  const fine = boxBlur(data, width, height, pixels(CAVITY_FINE_REACH));
+  const coarse = boxBlur(data, width, height, pixels(CAVITY_COARSE_REACH));
+  const faces = boxBlur(face, width, height, pixels(CAVITY_STEEP_REACH), 1);
+  const wet = boxBlur(sea, width, height, pixels(CAVITY_WET_REACH), 1);
+
+  const signed = (v: number, range: number) =>
+    Math.round((Math.min(1, Math.max(-1, v / range)) * 0.5 + 0.5) * 255);
+  const out = new Uint8Array(count * 4);
+  for (let i = 0; i < count; i++) {
+    out[i * 4] = signed(data[i] - fine[i], CAVITY_FINE_RANGE);
+    out[i * 4 + 1] = signed(data[i] - coarse[i], CAVITY_COARSE_RANGE);
+    out[i * 4 + 2] = Math.round(clamp01(faces[i]) * 255);
+    out[i * 4 + 3] = Math.round(clamp01(wet[i]) * 255);
+  }
+  return out;
+}
+
 /** The strategic view's vertical field of view, in degrees. */
 export const VIEW_FOV_DEGREES = 50;
 
