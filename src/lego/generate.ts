@@ -339,8 +339,10 @@ function scaleInstance(
 export function describeInputs(inputs: GeneratorInputs): string {
   const seed = inputs.seed;
   const plan = inputs.plan.label;
-  const job = GENERATOR_JOBS.find((j) => j.id === inputs.job)?.label;
-  const size = GENERATOR_SIZES.find((s) => s.id === inputs.size)?.label;
+  const job =
+    GENERATOR_JOBS.find((j) => j.id === inputs.job)?.label ?? inputs.job;
+  const size =
+    GENERATOR_SIZES.find((s) => s.id === inputs.size)?.label ?? inputs.size;
   return t`Generated from seed ${seed}, body plan ${plan}, job ${job}, size ${size}.`;
 }
 
