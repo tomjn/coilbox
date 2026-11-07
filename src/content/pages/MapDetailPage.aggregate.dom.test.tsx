@@ -56,8 +56,12 @@ vi.mock("../config", () => ({
   useUnitsyncMapMeta: () => ({ meta: new Map() }),
   useUnitsyncMinimap: () => ({ startPositions: STARTS }),
   useUnitsyncHeightmap: () => ({}),
+  useUnitsyncHeightField: () => ({}),
   useUnitsyncMapInfo: () => ({}),
   useUnitsyncMapSkybox: () => ({}),
+}));
+vi.mock("../../mapconv/pages/components/PlayabilityPanel", () => ({
+  PlayabilityPanel: () => null,
 }));
 vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => null,

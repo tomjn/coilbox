@@ -1,0 +1,338 @@
+import { useLingui } from "@lingui/react/macro";
+import { useEffect, useMemo, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  useScanTargetSelection,
+  useUnitsyncGameHeaders,
+  useUnitsyncScan,
+} from "@/content/config";
+import { mapconvThumbUrl } from "@/lib/assetUrl";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
+import { errorText } from "@/lib/helpers";
+import { readHeightGrid } from "@/placement/terrain";
+import { useSkirmishDraft } from "@/play/drafts";
+import { GamePickerField } from "@/play/pages/components/GamePickerButton";
+import { useUnitDefs } from "@/workshop/config";
+import { mcSmfHeights } from "../../bindings";
+import {
+  buildingSpecs,
+  type Heights,
+  heightsOf,
+  moveClassSpecs,
+  type Playability,
+  type Way,
+  type WayEnd,
+} from "../../playability";
+import { measureOffThread } from "../../playabilityJobs";
+
+/**
+ * Whether a map is playable, as numbers and no verdict (issue #2169): for each
+ * of the chosen game's movement classes how much of the map it can stand on,
+ * how that ground splits into areas and the narrowest point on the widest way
+ * between start positions, and how much of the map takes the game's buildings.
+ *
+ * The classes and buildings are a game's, because the engine has none of its
+ * own worth measuring: a class with no `maxSlope` climbs anything short of a
+ * wall. The game defaults to the one last set up for a skirmish.
+ */
+export function PlayabilityPanel({
+  heights,
+  heightsError,
+  starts,
+}: {
+  /** The map's corner heights, or null while they are read. */
+  heights: Heights | null;
+  /** Why the heights could not be read. */
+  heightsError?: string | null;
+  /** Start positions, in elmos. */
+  starts: { x: number; z: number }[];
+}) {
+  const { t } = useLingui();
+  const { selected } = useScanTargetSelection();
+  const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
+  const games = useMemo(
+    () => withoutGeneratedGames(scan.data?.games ?? []),
+    [scan.data],
+  );
+  const { headers } = useUnitsyncGameHeaders(
+    selected?.enginePath,
+    selected?.rootPath,
+  );
+  const [draft] = useSkirmishDraft();
+  const [gameName, setGameName] = useState("");
+  useEffect(() => {
+    if (games.length === 0) return;
+    const known = games.find((g) => g.name === draft.gameName);
+    setGameName((prev) =>
+      games.some((g) => g.name === prev)
+        ? prev
+        : ((known ?? games[0])?.name ?? ""),
+    );
+  }, [games, draft.gameName]);
+  const game = games.find((g) => g.name === gameName);
+  const defs = useUnitDefs(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+  );
+
+  const specs = useMemo(() => {
+    if (!defs.defs || defs.defsFor !== game?.primaryArchive.name) return null;
+    return {
+      classes: moveClassSpecs(defs.defs.moveDefs),
+      buildings: buildingSpecs(defs.defs.units),
+    };
+  }, [defs.defs, defs.defsFor, game]);
+
+  // By value, because a caller's list can be a fresh array each render and
+  // the measuring should not start over for it.
+  const startsKey = JSON.stringify(starts.map((s) => [s.x, s.z]));
+  const startList = useMemo(
+    () =>
+      (JSON.parse(startsKey) as [number, number][]).map(([x, z]) => ({ x, z })),
+    [startsKey],
+  );
+
+  const [result, setResult] = useState<Playability | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [measuring, setMeasuring] = useState(false);
+  useEffect(() => {
+    setResult(null);
+    setError(null);
+    if (!heights || !specs) return;
+    const abort = new AbortController();
+    setMeasuring(true);
+    // A fresh object, because a caller's grid keeps `words` out of key
+    // enumeration and a worker message copies enumerable keys only.
+    const job = {
+      heights: {
+        words: heights.words,
+        width: heights.width,
+        height: heights.height,
+        minHeight: heights.minHeight,
+        maxHeight: heights.maxHeight,
+      },
+      ...specs,
+      starts: startList,
+    };
+    measureOffThread(job, abort.signal)
+      .then(setResult)
+      .catch((e: unknown) => {
+        if (!abort.signal.aborted) setError(errorText(e));
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setMeasuring(false);
+      });
+    return () => abort.abort();
+  }, [heights, specs, startList]);
+
+  const percent = (share: number) =>
+    `${(share * 100).toFixed(share > 0 && share < 0.01 ? 2 : 1)}%`;
+  const endName = (end: WayEnd) => {
+    if (end.kind === "start") {
+      const number = end.index + 1;
+      return t`start ${number}`;
+    }
+    return {
+      west: t`west edge`,
+      east: t`east edge`,
+      north: t`north edge`,
+      south: t`south edge`,
+    }[end.edge];
+  };
+  const narrowest = (ways: Way[]) => {
+    const joined = ways.filter((w) => w.width !== null);
+    const apart = ways.length - joined.length;
+    const parts: string[] = [];
+    if (joined.length > 0) {
+      const w = joined.reduce((a, b) =>
+        (b.width ?? 0) < (a.width ?? 0) ? b : a,
+      );
+      const width = Math.round(w.width ?? 0);
+      const from = endName(w.from);
+      const to = endName(w.to);
+      const x = Math.round(w.x);
+      const z = Math.round(w.z);
+      parts.push(t`${width} elmos, ${from} to ${to}, at ${x}, ${z}`);
+    }
+    if (apart > 0) {
+      const w = ways.find((x) => x.width === null);
+      if (ways.length === 1 && w) {
+        const from = endName(w.from);
+        const to = endName(w.to);
+        parts.push(t`${from} and ${to} not connected`);
+      } else {
+        const pairs = ways.length;
+        parts.push(t`${apart} of ${pairs} pairs not connected`);
+      }
+    }
+    return parts.join("; ");
+  };
+  const kindName = {
+    tank: t`tank`,
+    kbot: t`kbot`,
+    hover: t`hover`,
+    ship: t`ship`,
+  };
+
+  return (
+    <section className="flex flex-col gap-2" aria-label={t`Playability`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">{t`Playability`}</h2>
+        <div className="w-72">
+          <GamePickerField
+            value={gameName}
+            onValueChange={setGameName}
+            games={games}
+            headers={headers}
+            placeholder={scan.loading ? t`Reading games...` : t`No game`}
+            ariaLabel={t`Game whose units to measure with`}
+            disabled={games.length === 0}
+            gamesLoading={scan.loading}
+            scanError={scan.error}
+          />
+        </div>
+      </div>
+      {heightsError ? (
+        <p className="text-sm text-destructive">
+          {t`Could not read the map's heights: ${heightsError}`}
+        </p>
+      ) : defs.status === "error" ? (
+        <p className="text-sm text-destructive">
+          {t`Could not read the game's units: ${defs.error}`}
+        </p>
+      ) : error ? (
+        <p className="text-sm text-destructive">
+          {t`Could not measure the map: ${error}`}
+        </p>
+      ) : !game && !scan.loading ? (
+        <p className="text-sm text-muted-foreground">{t`No game installed.`}</p>
+      ) : !result || measuring ? (
+        <Skeleton className="h-24 rounded bg-muted" />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {result.classes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t`The game declares no movement classes.`}
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border/50 bg-card">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="p-2 font-medium">{t`Movement class`}</th>
+                    <th className="p-2 font-medium">{t`Kind`}</th>
+                    <th className="p-2 text-right font-medium">{t`Max slope`}</th>
+                    <th className="p-2 text-right font-medium">{t`Passable`}</th>
+                    <th className="p-2 text-right font-medium">{t`Largest area`}</th>
+                    <th className="p-2 text-right font-medium">{t`Areas`}</th>
+                    <th className="p-2 font-medium">{t`Narrowest point on the widest way`}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.classes.map((c) => (
+                    <tr key={c.name} className="border-t border-border/50">
+                      <td className="p-2 font-mono text-xs">{c.name}</td>
+                      <td className="p-2">{kindName[c.kind]}</td>
+                      <td className="p-2 text-right tabular-nums">
+                        {c.maxSlope === null ? "—" : `${c.maxSlope}°`}
+                      </td>
+                      <td className="p-2 text-right tabular-nums">
+                        {percent(c.passable)}
+                      </td>
+                      <td className="p-2 text-right tabular-nums">
+                        {percent(c.largest)}
+                      </td>
+                      <td className="p-2 text-right tabular-nums">{c.areas}</td>
+                      <td className="p-2">{narrowest(c.ways)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {result.buildings.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-border/50 bg-card">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="p-2 font-medium">{t`Building`}</th>
+                    <th className="p-2 text-right font-medium">{t`Defs this shape`}</th>
+                    <th className="p-2 text-right font-medium">{t`Footprint`}</th>
+                    <th className="p-2 text-right font-medium">{t`Max slope`}</th>
+                    <th className="p-2 text-right font-medium">{t`Buildable`}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.buildings.map((b) => {
+                    const share = percent(b.buildable);
+                    const spots = b.positions;
+                    return (
+                      <tr key={b.name} className="border-t border-border/50">
+                        <td className="p-2 font-mono text-xs">{b.name}</td>
+                        <td className="p-2 text-right tabular-nums">
+                          {b.defs}
+                        </td>
+                        <td className="p-2 text-right tabular-nums">
+                          {b.footprintX} × {b.footprintZ}
+                        </td>
+                        <td className="p-2 text-right tabular-nums">
+                          {b.maxSlope}°
+                        </td>
+                        <td className="p-2 text-right tabular-nums">
+                          {t`${share} of ${spots} spots`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * {@link PlayabilityPanel} for a map the Compile page has just written, read
+ * from the `.smf` itself so the numbers are the compiled map's.
+ */
+export function CompiledPlayability({
+  smfPath,
+  starts,
+}: {
+  smfPath: string;
+  starts: { x: number; z: number }[];
+}) {
+  const [heights, setHeights] = useState<Heights | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setHeights(null);
+    setError(null);
+    let cancelled = false;
+    (async () => {
+      const smf = await mcSmfHeights({ path: smfPath });
+      const grid = await readHeightGrid(
+        mapconvThumbUrl(smf.file),
+        smf.width,
+        smf.height,
+      );
+      if (!grid) throw new Error("the heights file is the wrong size");
+      return heightsOf(grid, smf.minHeight, smf.maxHeight);
+    })()
+      .then((h) => {
+        if (!cancelled) setHeights(h);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(errorText(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [smfPath]);
+  return (
+    <PlayabilityPanel heights={heights} heightsError={error} starts={starts} />
+  );
+}

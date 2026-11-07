@@ -67,6 +67,7 @@ import { HelpTip, LearnMore, WIKI } from "./components/Help";
 import MapinfoOptions from "./components/MapinfoOptions";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
+import { CompiledPlayability } from "./components/PlayabilityPanel";
 
 const CT_OPTIONS = [
   { value: "1", label: msg`1 — No compression` },
@@ -917,6 +918,17 @@ export default function CompilePage() {
                   {mapinfoError}
                 </p>
               )}
+            </div>
+          )}
+          {result && (
+            <div className="border-b border-border bg-card/50 px-4 py-3">
+              <CompiledPlayability
+                smfPath={result.smfPath}
+                starts={mapinfo.startPositions
+                  .filter((p) => p.x.trim() !== "" && p.z.trim() !== "")
+                  .map((p) => ({ x: Number(p.x), z: Number(p.z) }))
+                  .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z))}
+              />
             </div>
           )}
           {runError && (

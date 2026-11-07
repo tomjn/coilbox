@@ -16,7 +16,7 @@ import { usePreferredTarget } from "../../../play/config";
  * displaces and the ground a building's verdict is worked out on (issue #1730).
  * Tens of megabytes on a large map, so a second fetch is not a rounding error.
  */
-function useHeightGrid(
+export function useHeightGrid(
   src?: string,
   width?: number,
   height?: number,

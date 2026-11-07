@@ -21,7 +21,10 @@ import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
+import { useHeightGrid } from "../../campaign/pages/components/useMissionMapAssets";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
+import { PlayabilityPanel } from "../../mapconv/pages/components/PlayabilityPanel";
+import { heightsOf } from "../../mapconv/playability";
 import {
   MapLayerToggle,
   MapOverlayImage,
@@ -34,6 +37,7 @@ import {
   useReplayStats,
   useScanTargetSelection,
   useUnitsyncArchiveTree,
+  useUnitsyncHeightField,
   useUnitsyncHeightmap,
   useUnitsyncMapInfo,
   useUnitsyncMapMeta,
@@ -100,6 +104,27 @@ export default function MapDetailPage() {
     selected?.enginePath,
     selected?.rootPath,
     decoded,
+  );
+  // The raw heights, for the playability panel to measure at the depth the
+  // engine holds them (issue #2169).
+  const heightField = useUnitsyncHeightField(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const { grid: heightGrid } = useHeightGrid(
+    heightField.url ?? undefined,
+    heightField.data?.width,
+    heightField.data?.height,
+  );
+  const fieldMin = heightField.data?.minHeight;
+  const fieldMax = heightField.data?.maxHeight;
+  const playHeights = useMemo(
+    () =>
+      heightGrid && fieldMin != null && fieldMax != null
+        ? heightsOf(heightGrid, fieldMin, fieldMax)
+        : null,
+    [heightGrid, fieldMin, fieldMax],
   );
   const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
@@ -495,6 +520,13 @@ export default function MapDetailPage() {
           )}
         </div>
       </section>
+
+      <PlayabilityPanel
+        key={`playability-${map.name}`}
+        heights={playHeights}
+        heightsError={heightField.error}
+        starts={minimap.startPositions}
+      />
 
       {insightShown && (
         <MapAggregate
