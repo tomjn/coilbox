@@ -1567,6 +1567,10 @@ msgstr "{analysedUnnamedGames} 是在录制器保存引擎单位列表之前分�
 msgid "{angle} render of this unit"
 msgstr "此单位的 {angle} 渲染图"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr ""
+
 #: src/onboarding/pages/GamesPage.tsx
 msgid "{app} runs other games too. Find them in Games after setup."
 msgstr "{app} 也能运行其他游戏。设置完成后可在“游戏”中找到它们。"
@@ -2836,6 +2840,10 @@ msgstr "找到 {found} 个"
 #, fuzzy
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "找到了 {tiles} 个中的 {found} 个。游戏中没有与 {missing} 匹配的内容，因此使用它们的面以纯色绘制。"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -6140,6 +6148,10 @@ msgstr "{mapName} 上的 {shape}"
 msgid "{shape} on any map"
 msgstr "任意地图上的 {shape}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{share} of {spots} spots"
+msgstr ""
+
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy
 msgid "{shared, plural, one {# game with this player} other {# games with this player}}"
@@ -7738,6 +7750,10 @@ msgstr "{wholeTableFiles, plural, other {# 个文件读取了整个 customParams
 #, fuzzy
 msgid "{width} by {height} elmos"
 msgstr "{width} × {height} elmo"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -11567,6 +11583,10 @@ msgstr "归档（{archiveCount}）"
 msgid "Area"
 msgstr ""
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13540,6 +13560,10 @@ msgstr "已导出建造树。"
 msgid "Build your own campaigns and scenarios."
 msgstr "创建你自己的战役和场景。"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "builder"
@@ -13561,6 +13585,7 @@ msgstr "建造单位、工厂、传感器和运输单位"
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -17598,6 +17623,10 @@ msgstr "无法加载模块"
 msgid "Could not look for extension packs: {reason}"
 msgstr "无法查找扩展包：{reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 #, fuzzy
 msgid "Could not open that file"
@@ -17760,6 +17789,15 @@ msgstr "无法读取游戏的位图，因此效果以普通圆形精灵绘制：
 #, fuzzy
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "无法读取游戏的位图，因此效果以普通圆形精灵绘制：{reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18787,6 +18825,10 @@ msgstr "防守 {nodeName}"
 #, fuzzy
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "定义地形高度。灰度图，<0>白色为最高点，黑色为最低点</0>。灰色为中间高度。每边应为 <1>（纹理 ÷ 8）+ 1</1> 像素（例如 8192px 的纹理需要 1025px 的高度图）。"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -20484,6 +20526,10 @@ msgstr "已获得"
 #, fuzzy
 msgid "east"
 msgstr "东"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr ""
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -22852,6 +22898,7 @@ msgstr "食物"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Footprint"
 msgstr "占地"
@@ -23649,6 +23696,10 @@ msgstr "游戏版本"
 #, fuzzy
 msgid "Game whose bindings to show"
 msgstr "要显示其绑定的游戏"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -25062,6 +25113,7 @@ msgid "Hosting…"
 msgstr "创建中…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "hover"
 msgstr "气垫"
@@ -26977,6 +27029,10 @@ msgstr "自杀攻击需要视线"
 msgid "Kamikaze trigger distance"
 msgstr "自杀攻击触发距离"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Keep"
@@ -27270,6 +27326,7 @@ msgstr "击杀"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
 msgid "Kind"
@@ -27330,6 +27387,10 @@ msgstr "最大优先"
 #, fuzzy
 msgid "Largest angle"
 msgstr "最大角度"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29436,6 +29497,10 @@ msgstr "最大玩家数"
 msgid "Max rudder"
 msgstr "最大方向舵"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Maximum in play"
@@ -30310,6 +30375,7 @@ msgstr "移动与传感器"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Movement class"
 msgstr "移动类型"
@@ -30811,6 +30877,10 @@ msgstr "来自 {piece} 的纳米喷流"
 #, fuzzy
 msgid "Nano spray from no piece"
 msgstr "无部件的纳米喷流"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -31842,6 +31912,7 @@ msgstr "无游戏"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -31861,6 +31932,10 @@ msgstr "未设置游戏筛选"
 #, fuzzy
 msgid "No game installed"
 msgstr "未安装游戏"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33338,6 +33413,10 @@ msgstr "普通"
 #, fuzzy
 msgid "north"
 msgstr "北"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36016,6 +36095,10 @@ msgstr "零件包使用架构 {schema}，此版本支持 {supported}"
 msgid "Party"
 msgstr "小队"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Passed"
@@ -36873,6 +36956,10 @@ msgstr "在你自己的机器上游玩此项目"
 #, fuzzy
 msgid "Play your first recorded game."
 msgstr "游玩你的第一场有记录的游戏。"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38444,6 +38531,7 @@ msgid "Reading games"
 msgstr "正在读取游戏"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Reading games..."
 msgstr "正在读取游戏…"
@@ -43338,6 +43426,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "按住 Shift 点击一行可将其一并选中，而不是替换选择。"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "ship"
 msgstr "舰船"
@@ -44556,6 +44645,10 @@ msgstr "来源"
 msgid "south"
 msgstr "南"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Space separated category names this unit refuses to pursue."
@@ -44877,6 +44970,10 @@ msgstr "星光闪烁、星云等装饰效果。关闭可获得更简洁的界面
 #, fuzzy
 msgid "Start"
 msgstr "开始"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr ""
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -45960,6 +46057,10 @@ msgstr "正在取出"
 #, fuzzy
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "在 {0} 中讨论，它在你的聊天列表中。"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47365,6 +47466,10 @@ msgstr "游戏加载时会更改此字段。其文件中为 {fileValue}，加载
 #: src/multiplayer/battle/CompatHostExport.tsx
 #: src/multiplayer/battles/useHostCompat.ts
 msgid "The game could not be read"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -54269,6 +54374,10 @@ msgstr "见多识广"
 #, fuzzy
 msgid "west"
 msgstr "西"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy

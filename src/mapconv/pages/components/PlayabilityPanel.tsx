@@ -2,6 +2,14 @@ import { useLingui } from "@lingui/react/macro";
 import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   useScanTargetSelection,
   useUnitsyncGameHeaders,
   useUnitsyncScan,
@@ -216,77 +224,83 @@ export function PlayabilityPanel({
               {t`The game declares no movement classes.`}
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border/50 bg-card">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="p-2 font-medium">{t`Movement class`}</th>
-                    <th className="p-2 font-medium">{t`Kind`}</th>
-                    <th className="p-2 text-right font-medium">{t`Max slope`}</th>
-                    <th className="p-2 text-right font-medium">{t`Passable`}</th>
-                    <th className="p-2 text-right font-medium">{t`Largest area`}</th>
-                    <th className="p-2 text-right font-medium">{t`Areas`}</th>
-                    <th className="p-2 font-medium">{t`Narrowest point on the widest way`}</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div className="rounded-lg border border-border/50 bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t`Movement class`}</TableHead>
+                    <TableHead>{t`Kind`}</TableHead>
+                    <TableHead className="text-right">{t`Max slope`}</TableHead>
+                    <TableHead className="text-right">{t`Passable`}</TableHead>
+                    <TableHead className="text-right">{t`Largest area`}</TableHead>
+                    <TableHead className="text-right">{t`Areas`}</TableHead>
+                    <TableHead>{t`Narrowest point on the widest way`}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {result.classes.map((c) => (
-                    <tr key={c.name} className="border-t border-border/50">
-                      <td className="p-2 font-mono text-xs">{c.name}</td>
-                      <td className="p-2">{kindName[c.kind]}</td>
-                      <td className="p-2 text-right tabular-nums">
+                    <TableRow key={c.name}>
+                      <TableCell className="font-mono text-xs">
+                        {c.name}
+                      </TableCell>
+                      <TableCell>{kindName[c.kind]}</TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {c.maxSlope === null ? "—" : `${c.maxSlope}°`}
-                      </td>
-                      <td className="p-2 text-right tabular-nums">
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {percent(c.passable)}
-                      </td>
-                      <td className="p-2 text-right tabular-nums">
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {percent(c.largest)}
-                      </td>
-                      <td className="p-2 text-right tabular-nums">{c.areas}</td>
-                      <td className="p-2">{narrowest(c.ways)}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {c.areas}
+                      </TableCell>
+                      <TableCell>{narrowest(c.ways)}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
           {result.buildings.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border border-border/50 bg-card">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="p-2 font-medium">{t`Building`}</th>
-                    <th className="p-2 text-right font-medium">{t`Defs this shape`}</th>
-                    <th className="p-2 text-right font-medium">{t`Footprint`}</th>
-                    <th className="p-2 text-right font-medium">{t`Max slope`}</th>
-                    <th className="p-2 text-right font-medium">{t`Buildable`}</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div className="rounded-lg border border-border/50 bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t`Building`}</TableHead>
+                    <TableHead className="text-right">{t`Defs this shape`}</TableHead>
+                    <TableHead className="text-right">{t`Footprint`}</TableHead>
+                    <TableHead className="text-right">{t`Max slope`}</TableHead>
+                    <TableHead className="text-right">{t`Buildable`}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {result.buildings.map((b) => {
                     const share = percent(b.buildable);
                     const spots = b.positions;
                     return (
-                      <tr key={b.name} className="border-t border-border/50">
-                        <td className="p-2 font-mono text-xs">{b.name}</td>
-                        <td className="p-2 text-right tabular-nums">
+                      <TableRow key={b.name}>
+                        <TableCell className="font-mono text-xs">
+                          {b.name}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
                           {b.defs}
-                        </td>
-                        <td className="p-2 text-right tabular-nums">
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
                           {b.footprintX} × {b.footprintZ}
-                        </td>
-                        <td className="p-2 text-right tabular-nums">
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
                           {b.maxSlope}°
-                        </td>
-                        <td className="p-2 text-right tabular-nums">
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
                           {t`${share} of ${spots} spots`}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>

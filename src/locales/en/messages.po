@@ -1308,6 +1308,10 @@ msgstr "{analysedUnnamedGames} analysed before the recorder kept the engine's un
 msgid "{angle} render of this unit"
 msgstr "{angle} render of this unit"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr "{apart} of {pairs} pairs not connected"
+
 #: src/onboarding/pages/GamesPage.tsx
 msgid "{app} runs other games too. Find them in Games after setup."
 msgstr "{app} runs other games too. Find them in Games after setup."
@@ -2334,6 +2338,10 @@ msgstr "{found} found"
 #: src/lego/pages/components/ImportResult.tsx
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr "{from} and {to} not connected"
 
 #: src/blueprint/library.ts
 msgid "{from} It was called \"{wasCalled}\" in there."
@@ -4999,6 +5007,10 @@ msgstr "{shape} on {mapName}"
 msgid "{shape} on any map"
 msgstr "{shape} on any map"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{share} of {spots} spots"
+msgstr "{share} of {spots} spots"
+
 #: src/multiplayer/statsRelationSummary.ts
 msgid "{shared, plural, one {# game with this player} other {# games with this player}}"
 msgstr "{shared, plural, one {# game with this player} other {# games with this player}}"
@@ -6285,6 +6297,10 @@ msgstr "{wholeTableFiles, plural, one {# file reads the whole customParams table
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{width} by {height} elmos"
 msgstr "{width} by {height} elmos"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr "{width} elmos, {from} to {to}, at {x}, {z}"
 
 #: src/career/pages/CareerPage.tsx
 msgid "{wins, plural, one {# win} other {# wins}}"
@@ -9388,6 +9404,10 @@ msgstr "Archives ({archiveCount})"
 msgid "Area"
 msgstr "Area"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr "Areas"
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Arguments"
 msgstr "Arguments"
@@ -10990,6 +11010,10 @@ msgstr "Build tree exported."
 msgid "Build your own campaigns and scenarios."
 msgstr "Build your own campaigns and scenarios."
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr "Buildable"
+
 #: src/scenario/triggerTypes.ts
 msgid "builder"
 msgstr "builder"
@@ -11008,6 +11032,7 @@ msgstr "Builders, factories, sensors and transports"
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -14328,6 +14353,10 @@ msgstr "Could not load the module"
 msgid "Could not look for extension packs: {reason}"
 msgstr "Could not look for extension packs: {reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr "Could not measure the map: {error}"
+
 #: src/profile/openBundledFile.ts
 msgid "Could not open that file"
 msgstr "Could not open that file"
@@ -14460,6 +14489,15 @@ msgstr "Could not read the game's bitmaps, so effects are drawn as a plain round
 #: src/lego/effectBitmaps.ts
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr "Could not read the game's units: {0}"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr "Could not read the map's heights: {heightsError}"
 
 #: src/lego/pack.ts
 msgid "could not read the parts pack: {status}"
@@ -15300,6 +15338,10 @@ msgstr "Defend {nodeName}"
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr "Defs this shape"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "degrees, for the next recalculation"
@@ -16687,6 +16729,10 @@ msgstr "Earned"
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "east"
 msgstr "east"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr "east edge"
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -18618,6 +18664,7 @@ msgstr "Food"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Footprint"
 msgstr "Footprint"
 
@@ -19266,6 +19313,10 @@ msgstr "Game version"
 #: src/content/pages/KeybindsSection.tsx
 msgid "Game whose bindings to show"
 msgstr "Game whose bindings to show"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr "Game whose units to measure with"
 
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "Game, map and engine not installed"
@@ -20416,6 +20467,7 @@ msgid "Hosting…"
 msgstr "Hosting…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "hover"
 msgstr "hover"
 
@@ -21972,6 +22024,10 @@ msgstr "Kamikaze needs line of sight"
 msgid "Kamikaze trigger distance"
 msgstr "Kamikaze trigger distance"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr "kbot"
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "Keep"
 msgstr "Keep"
@@ -22210,6 +22266,7 @@ msgstr "Kills"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 msgid "Kind"
 msgstr "Kind"
@@ -22259,6 +22316,10 @@ msgstr "Largest"
 #: src/lego/animPresets.ts
 msgid "Largest angle"
 msgstr "Largest angle"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr "Largest area"
 
 #: src/lego/animPresets.ts
 msgid "Largest lean"
@@ -23977,6 +24038,10 @@ msgstr "Max players"
 msgid "Max rudder"
 msgstr "Max rudder"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr "Max slope"
+
 #: src/content/unitFieldNotes.ts
 msgid "Maximum in play"
 msgstr "Maximum in play"
@@ -24691,6 +24756,7 @@ msgstr "Movement and sensors"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Movement class"
 msgstr "Movement class"
 
@@ -25101,6 +25167,10 @@ msgstr "Nano spray from {piece}"
 #: src/lego/scriptMarks.ts
 msgid "Nano spray from no piece"
 msgstr "Nano spray from no piece"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr "Narrowest point on the widest way"
 
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "NAT port"
@@ -25935,6 +26005,7 @@ msgstr "no game"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "No game"
@@ -25951,6 +26022,10 @@ msgstr "No game filter set"
 #: src/lego/pages/components/TestDrawer.tsx
 msgid "No game installed"
 msgstr "No game installed"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr "No game installed."
 
 #: src/lego/pages/components/TestDrawer.tsx
 msgid "No game is installed. A unit needs one to be built on top of."
@@ -27146,6 +27221,10 @@ msgstr "Normal"
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "north"
 msgstr "north"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr "north edge"
 
 #: src/content/unitFieldNotes.ts
 msgid "Nose and velocity alignment"
@@ -29332,6 +29411,10 @@ msgstr "parts pack uses schema {schema}, this build understands {supported}"
 msgid "Party"
 msgstr "Party"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr "Passable"
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "Passed"
 msgstr "Passed"
@@ -30028,6 +30111,10 @@ msgstr "Play this project on your own machine"
 #: src/content/achievements.ts
 msgid "Play your first recorded game."
 msgstr "Play your first recorded game."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr "Playability"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "Playable even if the previous mission is incomplete."
@@ -31317,6 +31404,7 @@ msgid "Reading games"
 msgstr "Reading games"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Reading games..."
 msgstr "Reading games..."
 
@@ -35311,6 +35399,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "Shift-click a row to select it as well, rather than instead."
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "ship"
 msgstr "ship"
 
@@ -36305,6 +36394,10 @@ msgstr "Sources"
 msgid "south"
 msgstr "south"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr "south edge"
+
 #: src/content/unitFieldNotes.ts
 msgid "Space separated category names this unit refuses to pursue."
 msgstr "Space separated category names this unit refuses to pursue."
@@ -36565,6 +36658,10 @@ msgstr "Star twinkle, nebulae and other decorative touches. Turn off for a plain
 #: src/multiplayer/battle/startButtonLabel.ts
 msgid "Start"
 msgstr "Start"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr "start {number}"
 
 #: src/content/pages/components/StartModeActions.tsx
 msgid "Start a conquest"
@@ -37446,6 +37543,10 @@ msgstr "Taking it out"
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Talk it over in {0}, which is in your chat list."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr "tank"
 
 #: src/uberstress/pages/RunPage.tsx
 msgid "Target server"
@@ -38598,6 +38699,10 @@ msgstr "The game changes this field as it loads. Its files say {fileValue} and i
 #: src/multiplayer/battles/useHostCompat.ts
 msgid "The game could not be read"
 msgstr "The game could not be read"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
+msgstr "The game declares no movement classes."
 
 #: src/i18n/uiError.ts
 msgid "The game did not answer within {seconds} seconds. Its infolog says why."
@@ -44205,6 +44310,10 @@ msgstr "Well travelled"
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "west"
 msgstr "west"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr "west edge"
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "What {builderName} offers, in the order the buttons appear. Drag a row by its handle to move it, or focus the handle and use the arrow keys. The picker covers the whole game, so another side's units go in here the same way this side's do. Taking a unit out of this menu does not remove it from the game. A unit switched off on its own page keeps its place here and is marked disabled instead of disappearing."

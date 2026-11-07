@@ -103,6 +103,7 @@ vi.mock("../config", () => {
     useUnitsyncMapMeta: () => ({ meta: new Map() }),
     useUnitsyncMinimap: () => ({ startPositions: [] }),
     useUnitsyncHeightmap: none,
+    useUnitsyncHeightField: none,
     useUnitsyncMapInfo: none,
     useUnitsyncMapSkybox: none,
   };
@@ -136,6 +137,9 @@ vi.mock("./components/Convert3doDrawer", () => ({
 }));
 vi.mock("./components/LuaConsoleDrawer", () => ({
   LuaConsoleDrawer: () => null,
+}));
+vi.mock("../../mapconv/pages/components/PlayabilityPanel", () => ({
+  PlayabilityPanel: () => null,
 }));
 vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => null,

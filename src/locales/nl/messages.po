@@ -1587,6 +1587,10 @@ msgstr "{analysedUnnamedGames} geanalyseerd voordat de recorder de eenhedenlijst
 msgid "{angle} render of this unit"
 msgstr "Weergave van deze eenheid vanuit {angle}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr ""
+
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
 msgid "{app} runs other games too. Find them in Games after setup."
@@ -2866,6 +2870,10 @@ msgstr "{found} gevonden"
 #, fuzzy
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "{found} van {tiles} zijn gevonden. Niets in het spel kwam overeen met {missing}, dus de vlakken die ze gebruiken worden effen getekend."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -6189,6 +6197,10 @@ msgstr "{shape} op {mapName}"
 msgid "{shape} on any map"
 msgstr "{shape} op een willekeurige kaart"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{share} of {spots} spots"
+msgstr ""
+
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy
 msgid "{shared, plural, one {# game with this player} other {# games with this player}}"
@@ -7794,6 +7806,10 @@ msgstr "{wholeTableFiles, plural, one {# bestand leest de hele customParams-tabe
 #, fuzzy
 msgid "{width} by {height} elmos"
 msgstr "{width} bij {height} elmo"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -11644,6 +11660,10 @@ msgstr "Archieven ({archiveCount})"
 msgid "Area"
 msgstr "Gebied"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13624,6 +13644,10 @@ msgstr "Bouwboom geëxporteerd."
 msgid "Build your own campaigns and scenarios."
 msgstr "Bouw je eigen campagnes en scenario’s."
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "builder"
@@ -13645,6 +13669,7 @@ msgstr "Bouwers, fabrieken, sensoren en transporten"
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -17721,6 +17746,10 @@ msgstr "Kan de module niet laden"
 msgid "Could not look for extension packs: {reason}"
 msgstr "Kan niet zoeken naar uitbreidingspakketten: {reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 #, fuzzy
 msgid "Could not open that file"
@@ -17884,6 +17913,15 @@ msgstr "Kan de bitmaps van het spel niet lezen, dus effecten worden als een eenv
 #, fuzzy
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "Kan de bitmaps van het spel niet lezen, dus effecten worden als een eenvoudige ronde sprite getekend: {reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18921,6 +18959,10 @@ msgstr "{nodeName} verdedigen"
 #, fuzzy
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "Bepaalt de hoogte van het terrein. Een grijswaardenafbeelding waarin <0>wit het hoogste punt is en zwart het laagste</0>. Grijstinten zijn hoogten daartussen. Hij moet aan elke kant <1>(textuur ÷ 8) + 1</1> pixels zijn (een textuur van 8192 px heeft bijvoorbeeld een hoogtekaart van 1025 px nodig)."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -20621,6 +20663,10 @@ msgstr "Behaald"
 #, fuzzy
 msgid "east"
 msgstr "oost"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr ""
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -23007,6 +23053,7 @@ msgstr "Eten"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Footprint"
 msgstr "Voetafdruk"
@@ -23806,6 +23853,10 @@ msgstr "Spelversie"
 #, fuzzy
 msgid "Game whose bindings to show"
 msgstr "Spel waarvan de toewijzingen worden getoond"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -25226,6 +25277,7 @@ msgid "Hosting…"
 msgstr "Bezig met hosten…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "hover"
 msgstr "zweven"
@@ -27149,6 +27201,10 @@ msgstr "Kamikaze heeft zichtlijn nodig"
 msgid "Kamikaze trigger distance"
 msgstr "Activeringsafstand van kamikaze"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Keep"
@@ -27444,6 +27500,7 @@ msgstr "Vernietigingen"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
 msgid "Kind"
@@ -27505,6 +27562,10 @@ msgstr "Grootste"
 #, fuzzy
 msgid "Largest angle"
 msgstr "Grootste hoek"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29625,6 +29686,10 @@ msgstr "Max. spelers"
 msgid "Max rudder"
 msgstr "Max. richtingsroer"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Maximum in play"
@@ -30506,6 +30571,7 @@ msgstr "Beweging en sensoren"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Movement class"
 msgstr "Bewegingsklasse"
@@ -31011,6 +31077,10 @@ msgstr "Nanostraal vanuit {piece}"
 #, fuzzy
 msgid "Nano spray from no piece"
 msgstr "Nanostraal vanuit geen enkel deel"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -32045,6 +32115,7 @@ msgstr "geen spel"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -32065,6 +32136,10 @@ msgstr "Geen spelfilter ingesteld"
 #, fuzzy
 msgid "No game installed"
 msgstr "Geen spel geïnstalleerd"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33548,6 +33623,10 @@ msgstr "Normaal"
 #, fuzzy
 msgid "north"
 msgstr "noord"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36260,6 +36339,10 @@ msgstr "onderdelenpakket gebruikt schema {schema}, deze build begrijpt {supporte
 msgid "Party"
 msgstr "Groep"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Passed"
@@ -37120,6 +37203,10 @@ msgstr "Dit project op je eigen computer spelen"
 #, fuzzy
 msgid "Play your first recorded game."
 msgstr "Speel je eerste opgenomen spel."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38709,6 +38796,7 @@ msgid "Reading games"
 msgstr "Spellen lezen"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Reading games..."
 msgstr "Spellen lezen..."
@@ -43633,6 +43721,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "Shift-klik op een regel om hem ook te selecteren, in plaats van in de plaats van de rest."
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "ship"
 msgstr "schip"
@@ -44862,6 +44951,10 @@ msgstr "Bronnen"
 msgid "south"
 msgstr "zuid"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Space separated category names this unit refuses to pursue."
@@ -45183,6 +45276,10 @@ msgstr "Twinkelende sterren, nevels en andere decoratieve details. Zet uit voor 
 #, fuzzy
 msgid "Start"
 msgstr "Starten"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr ""
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -46273,6 +46370,10 @@ msgstr "Wordt eruit gehaald"
 #, fuzzy
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Bespreek het in {0}, dat in je chatlijst staat."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47696,6 +47797,10 @@ msgstr "Het spel wijzigt dit veld tijdens het laden. De bestanden zeggen {fileVa
 #, fuzzy
 msgid "The game could not be read"
 msgstr "Het spel kon niet gelezen worden"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
+msgstr ""
 
 #: src/i18n/uiError.ts
 #, fuzzy
@@ -54643,6 +54748,10 @@ msgstr "Bereisd"
 #, fuzzy
 msgid "west"
 msgstr "west"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy

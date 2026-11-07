@@ -1586,6 +1586,10 @@ msgstr "{analysedUnnamedGames} ble analysert før opptakeren lagret motorens enh
 msgid "{angle} render of this unit"
 msgstr "{angle}-gjengivelse av denne enheten"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr ""
+
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
 msgid "{app} runs other games too. Find them in Games after setup."
@@ -2864,6 +2868,10 @@ msgstr "{found} funnet"
 #, fuzzy
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "{found} av {tiles} ble funnet. Ingenting i spillet passet til {missing}, så flatene som bruker dem, tegnes uten tekstur."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -6187,6 +6195,10 @@ msgstr "{shape} på {mapName}"
 msgid "{shape} on any map"
 msgstr "{shape} på et hvilket som helst kart"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{share} of {spots} spots"
+msgstr ""
+
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy
 msgid "{shared, plural, one {# game with this player} other {# games with this player}}"
@@ -7792,6 +7804,10 @@ msgstr "{wholeTableFiles, plural, one {# fil leser hele customParams-tabellen, s
 #, fuzzy
 msgid "{width} by {height} elmos"
 msgstr "{width} ganger {height} elmo"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -11641,6 +11657,10 @@ msgstr "Arkiver ({archiveCount})"
 msgid "Area"
 msgstr "Område"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13621,6 +13641,10 @@ msgstr "Byggetre eksportert."
 msgid "Build your own campaigns and scenarios."
 msgstr "Lag dine egne kampanjer og scenarioer."
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "builder"
@@ -13642,6 +13666,7 @@ msgstr "Byggere, fabrikker, sensorer og transporter"
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -17718,6 +17743,10 @@ msgstr "Kunne ikke laste modulen"
 msgid "Could not look for extension packs: {reason}"
 msgstr "Kunne ikke se etter utvidelsespakker: {reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 #, fuzzy
 msgid "Could not open that file"
@@ -17881,6 +17910,15 @@ msgstr "Kunne ikke lese spillets bitmaps, så effekter tegnes som en enkel rund 
 #, fuzzy
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "Kunne ikke lese spillets bitmaps, så effekter tegnes som en enkel rund sprite: {reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18917,6 +18955,10 @@ msgstr "Forsvar {nodeName}"
 #, fuzzy
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "Definerer terrenghøyden. Et gråtonebilde der <0>hvitt er det høyeste punktet og svart det laveste</0>. Grått er høyder imellom. Det bør være <1>(tekstur ÷ 8) + 1</1> piksler på hver side (f.eks. trenger en tekstur på 8192 px et høydekart på 1025 px)."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -20617,6 +20659,10 @@ msgstr "Oppnådd"
 #, fuzzy
 msgid "east"
 msgstr "øst"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr ""
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -22997,6 +23043,7 @@ msgstr "Mat"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Footprint"
 msgstr "Fotavtrykk"
@@ -23796,6 +23843,10 @@ msgstr "Spillversjon"
 #, fuzzy
 msgid "Game whose bindings to show"
 msgstr "Spill med tilordningene som skal vises"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -25216,6 +25267,7 @@ msgid "Hosting…"
 msgstr "Er vert…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "hover"
 msgstr "sveving"
@@ -27139,6 +27191,10 @@ msgstr "Kamikaze trenger siktlinje"
 msgid "Kamikaze trigger distance"
 msgstr "Utløseravstand for kamikaze"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Keep"
@@ -27434,6 +27490,7 @@ msgstr "Drap"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
 msgid "Kind"
@@ -27494,6 +27551,10 @@ msgstr "Største"
 #, fuzzy
 msgid "Largest angle"
 msgstr "Største vinkel"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29614,6 +29675,10 @@ msgstr "Maks spillere"
 msgid "Max rudder"
 msgstr "Maks sideror"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Maximum in play"
@@ -30490,6 +30555,7 @@ msgstr "Bevegelse og sensorer"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Movement class"
 msgstr "Bevegelsesklasse"
@@ -30995,6 +31061,10 @@ msgstr "Nanostråle fra {piece}"
 #, fuzzy
 msgid "Nano spray from no piece"
 msgstr "Nanostråle fra ingen del"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -32029,6 +32099,7 @@ msgstr "ingen spill"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -32049,6 +32120,10 @@ msgstr "Ingen spillfilter satt"
 #, fuzzy
 msgid "No game installed"
 msgstr "Ingen spill installert"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33531,6 +33606,10 @@ msgstr "Normal"
 #, fuzzy
 msgid "north"
 msgstr "nord"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36243,6 +36322,10 @@ msgstr "komponentpakken bruker skjema {schema}, denne versjonen forstår {suppor
 msgid "Party"
 msgstr "Gruppe"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Passed"
@@ -37103,6 +37186,10 @@ msgstr "Spill dette prosjektet på din egen maskin"
 #, fuzzy
 msgid "Play your first recorded game."
 msgstr "Spill ditt første registrerte spill."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38692,6 +38779,7 @@ msgid "Reading games"
 msgstr "Leser spill"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Reading games..."
 msgstr "Leser spill..."
@@ -43616,6 +43704,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "Shift-klikk på en rad for å legge den til i utvalget i stedet for å erstatte det."
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "ship"
 msgstr "skip"
@@ -44845,6 +44934,10 @@ msgstr "Kilder"
 msgid "south"
 msgstr "sør"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Space separated category names this unit refuses to pursue."
@@ -45166,6 +45259,10 @@ msgstr "Stjerneblink, stjernetåker og andre dekorative detaljer. Slå av for et
 #, fuzzy
 msgid "Start"
 msgstr "Start"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr ""
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -46256,6 +46353,10 @@ msgstr "Tar det ut"
 #, fuzzy
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Snakk om det i {0}, som er i chatlisten din."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47679,6 +47780,10 @@ msgstr "Spillet endrer dette feltet når det lastes. Filene sier {fileValue}, og
 #, fuzzy
 msgid "The game could not be read"
 msgstr "Spillet kunne ikke leses"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
+msgstr ""
 
 #: src/i18n/uiError.ts
 #, fuzzy
@@ -54619,6 +54724,10 @@ msgstr "Bereist"
 #, fuzzy
 msgid "west"
 msgstr "vest"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
