@@ -373,18 +373,31 @@ export function widestWays(
   const order = widestFirst(pass, dist2);
   if (starts.length >= 2) {
     const ends: WayEnd[] = starts.map((_, index) => ({ kind: "start", index }));
-    const at = new Map<number, number[]>();
-    starts.forEach((s, e) => {
-      const cx = Math.floor(s.x / CELL);
-      const cz = Math.floor(s.z / CELL);
-      if (cx < 0 || cz < 0 || cx >= cellsX || cz >= cellsZ) return;
-      const i = cz * cellsX + cx;
-      at.set(i, [...(at.get(i) ?? []), e]);
+    // A way reaches a start at the first cell whose clear circle holds it,
+    // so a start beside a cliff or the map's edge is not itself the narrow
+    // point. A start on ground the class cannot stand on is never reached.
+    const spots = starts.map((s) => {
+      const x = Math.floor(s.x / CELL);
+      const z = Math.floor(s.z / CELL);
+      const inside = x >= 0 && z >= 0 && x < cellsX && z < cellsZ;
+      return inside && pass[z * cellsX + x] ? { x, z } : null;
     });
+    const reached = new Uint8Array(starts.length);
     const pairs: [number, number][] = [];
     for (let a = 0; a < ends.length; a++)
       for (let b = a + 1; b < ends.length; b++) pairs.push([a, b]);
-    return sweep(order, dist2, cellsX, cellsZ, ends, pairs, (i) => at.get(i));
+    return sweep(order, dist2, cellsX, cellsZ, ends, pairs, (i, x, z) => {
+      let out: number[] | undefined;
+      for (let e = 0; e < spots.length; e++) {
+        const spot = spots[e];
+        if (!spot || reached[e]) continue;
+        if ((spot.x - x) ** 2 + (spot.z - z) ** 2 < dist2[i]) {
+          reached[e] = 1;
+          (out ??= []).push(e);
+        }
+      }
+      return out;
+    });
   }
   // A way reaches an edge at a cell whose nearest wall is that edge, so the
   // edge's own wall does not count as a narrow point. Each pair of edges is

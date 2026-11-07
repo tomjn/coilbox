@@ -24,6 +24,7 @@ import { useUnitDefs } from "@/workshop/config";
 import { mcSmfHeights } from "../../bindings";
 import {
   buildingSpecs,
+  type ClassResult,
   type Heights,
   heightsOf,
   moveClassSpecs,
@@ -134,6 +135,7 @@ export function PlayabilityPanel({
     return () => abort.abort();
   }, [heights, specs, startList]);
 
+  const degrees = (value: number) => `${Number(value.toFixed(1))}°`;
   const percent = (share: number) =>
     `${(share * 100).toFixed(share > 0 && share < 0.01 ? 2 : 1)}%`;
   const endName = (end: WayEnd) => {
@@ -176,6 +178,22 @@ export function PlayabilityPanel({
     }
     return parts.join("; ");
   };
+  // Classes whose every number is the same share a row, because a game
+  // declares dozens and most differ only by name.
+  const rows: { names: string[]; c: ClassResult }[] = [];
+  for (const c of result?.classes ?? []) {
+    const same = rows.find(
+      (r) =>
+        r.c.kind === c.kind &&
+        r.c.maxSlope === c.maxSlope &&
+        r.c.passable === c.passable &&
+        r.c.largest === c.largest &&
+        r.c.areas === c.areas &&
+        narrowest(r.c.ways) === narrowest(c.ways),
+    );
+    if (same) same.names.push(c.name);
+    else rows.push({ names: [c.name], c });
+  }
   const kindName = {
     tank: t`tank`,
     kbot: t`kbot`,
@@ -238,14 +256,14 @@ export function PlayabilityPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {result.classes.map((c) => (
-                    <TableRow key={c.name}>
-                      <TableCell className="font-mono text-xs">
-                        {c.name}
+                  {rows.map(({ names, c }) => (
+                    <TableRow key={names.join(" ")}>
+                      <TableCell className="whitespace-normal font-mono text-xs">
+                        {names.join(", ")}
                       </TableCell>
                       <TableCell>{kindName[c.kind]}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {c.maxSlope === null ? "—" : `${c.maxSlope}°`}
+                        {c.maxSlope === null ? "—" : degrees(c.maxSlope)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {percent(c.passable)}
@@ -256,7 +274,9 @@ export function PlayabilityPanel({
                       <TableCell className="text-right tabular-nums">
                         {c.areas}
                       </TableCell>
-                      <TableCell>{narrowest(c.ways)}</TableCell>
+                      <TableCell className="whitespace-normal">
+                        {narrowest(c.ways)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -291,7 +311,7 @@ export function PlayabilityPanel({
                           {b.footprintX} × {b.footprintZ}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {b.maxSlope}°
+                          {degrees(b.maxSlope)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {t`${share} of ${spots} spots`}

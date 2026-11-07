@@ -137,6 +137,23 @@ describe("passability", () => {
     expect(shut.classes[0].ways[0].width).toBeNull();
   });
 
+  it("does not count the ground beside a start as the narrow point", () => {
+    // Open flat ground, with both starts one cell in from the middle of the
+    // west and east edges.
+    const r = measurePlayability({
+      heights: heights(64, () => 0),
+      classes: [kbot(30)],
+      buildings: [],
+      starts: [
+        { x: 8, z: 256 },
+        { x: 500, z: 256 },
+      ],
+    });
+    // The widest way runs through the middle of the 32 cell map, 31 cells
+    // wide by the odd gap rule.
+    expect(r.classes[0].ways[0].width).toBeGreaterThanOrEqual(30 * 16);
+  });
+
   it("lets a class with a steep enough maxSlope over the cliff", () => {
     const r = measurePlayability({
       heights: ridge(),
