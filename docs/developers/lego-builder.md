@@ -657,6 +657,12 @@ A piece with no `bone` is free, and changing a proportion never moves it. A copy
 
 A skeleton is for a whole unit, and a [module](#modules) is for a part of one, so they are kept separate. A module never carries a `bone`.
 
+### Generated units
+
+`generateUnit` in `src/lego/generate.ts` makes a unit from a seed, a body plan, a job (assault, artillery, scout, builder or anti-air) and a size (small, medium or large). It has no screen yet. It starts from the plan's skeleton with each length rolled within 15% of the plan's default times the size, 0.75 for small, 1 for medium and 1.5 for large, and each count, such as axles, anywhere in its range. Then it hangs modules from the library on it: a chassis section on the torso, deck or body bone, scaled to a share of the unit's width that depends on the job, and the job's turret or build arm on the chassis's top face. A scout's turret is a coin toss. These numbers are choices, not measurements.
+
+The same seed, plan, job, size and module library always give the same unit. Every choice rolls from its own random stream, seeded from the inputs and the name of the choice, so adding a choice later changes no other. The unit's notes say which inputs made it, and `generated` on the unit holds them with the module instance each slot produced, such as `weapon.1`.
+
 ## Health, cost and stats
 
 A built unit's health, metal cost, energy cost, build time and mass come from the **Worth** table in the Animation panel. There is no field for one unit's health or cost. The table works them out from what the unit is made of, so a bigger unit is worth more.
