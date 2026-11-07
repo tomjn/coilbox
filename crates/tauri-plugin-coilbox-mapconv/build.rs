@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "mc_image_info",
     "mc_height_field",
     "mc_compile",
+    "mc_write_mapinfo",
     "mc_decompile",
     "mc_cancel",
     "mc_open_path",
