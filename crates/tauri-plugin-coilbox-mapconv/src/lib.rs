@@ -549,6 +549,54 @@ async fn mc_height_field<R: Runtime>(app: AppHandle<R>, path: String, max: u32) 
     }
 }
 
+/// A compiled map's height words, written to the cache under `<key>-smf.bin`
+/// and reported by file name with the grid and range they are on. Keyed by the
+/// file's size and modification time, so a new compile is read afresh.
+fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json::Value, String> {
+    // The header first, so a missing or broken map says so rather than
+    // anything about the cache.
+    let at = smf::locate_smf_heights(Path::new(path))?;
+    let (dir, key) = cache_dir
+        .zip(thumb_cache_key(path, 0))
+        .ok_or_else(|| "no cache directory to write the heights to".to_string())?;
+    let name = format!("{key}-smf.bin");
+    let grid = dir.join(&name);
+    // A cache file of the wrong length is a write that did not finish.
+    let cached = std::fs::metadata(&grid).is_ok_and(|m| m.len() == at.len as u64);
+    if cached {
+        coilbox_thumb_cache::touch(&grid);
+    } else {
+        let bytes = smf::read_smf_heights(Path::new(path), &at)?;
+        let _ = std::fs::create_dir_all(dir);
+        std::fs::write(&grid, &bytes).map_err(|e| format!("could not write the heights: {e}"))?;
+    }
+    let info = at.info;
+    Ok(json!({
+        "file": name,
+        "width": info.mapx + 1,
+        "height": info.mapy + 1,
+        "minHeight": info.min_height,
+        "maxHeight": info.max_height,
+    }))
+}
+
+/// `mc_smf_heights` reads the heights out of a compiled `.smf`, for the
+/// playability panel to measure the map the compile actually wrote (issue
+/// #2169).
+#[tauri::command]
+async fn mc_smf_heights<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
+    let cache_dir = thumb_cache_dir(&app);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        smf_heights_cached(&path, cache_dir.as_deref())
+    })
+    .await;
+    match result {
+        Ok(Ok(v)) => CliResult::ok(v),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("height task failed: {e}")),
+    }
+}
+
 /// `mc_image_info` decodes the image at `path` and returns its true pixel
 /// dimensions plus a small downscaled PNG thumbnail. Lets the UI preview chosen
 /// source assets and validate texture sizing (multiple of 1024) up front,
@@ -899,6 +947,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_read_skybox,
             mc_image_info,
             mc_height_field,
+            mc_smf_heights,
             mc_compile,
             mc_write_mapinfo,
             mc_package_map,

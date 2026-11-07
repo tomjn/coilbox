@@ -25,6 +25,9 @@ const OFF_SQUARE: usize = 32;
 const OFF_MINH: usize = 44;
 const OFF_MAXH: usize = 48;
 const HEADER_MIN: usize = 52;
+const OFF_HEIGHTMAP_PTR: usize = 52;
+/// The header up to and including `heightmapPtr`.
+const HEIGHTS_HEADER: usize = 56;
 
 /// Parse the leading SMF header fields. Returns an error if the bytes are too
 /// short or the magic doesn't match.
@@ -49,6 +52,64 @@ pub fn parse_smf_header(bytes: &[u8]) -> Result<SmfInfo, String> {
         world_width: mapx.saturating_mul(square_size),
         world_height: mapy.saturating_mul(square_size),
     })
+}
+
+/// Where a compiled map's heights are: the header, and the byte offset and
+/// length of the `(mapx + 1) * (mapy + 1)` little endian 16 bit words at
+/// `heightmapPtr`, as the engine reads them in `CSMFMapFile::ReadHeightmap`.
+/// The words must lie inside the file, so a corrupt header cannot ask for more
+/// memory than the file holds.
+pub struct SmfHeights {
+    pub info: SmfInfo,
+    offset: u64,
+    pub len: usize,
+}
+
+pub fn locate_smf_heights(path: &std::path::Path) -> Result<SmfHeights, String> {
+    use std::io::Read;
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("could not open {}: {e}", path.display()))?;
+    let size = file
+        .metadata()
+        .map_err(|e| format!("could not read {}: {e}", path.display()))?
+        .len();
+    let mut head = [0u8; HEIGHTS_HEADER];
+    file.read_exact(&mut head)
+        .map_err(|_| "file too small to be an SMF".to_string())?;
+    let info = parse_smf_header(&head)?;
+    if info.mapx <= 0 || info.mapy <= 0 {
+        return Err(format!(
+            "the SMF says it is {} by {} squares",
+            info.mapx, info.mapy
+        ));
+    }
+    let offset = u64::from(u32::from_le_bytes([
+        head[OFF_HEIGHTMAP_PTR],
+        head[OFF_HEIGHTMAP_PTR + 1],
+        head[OFF_HEIGHTMAP_PTR + 2],
+        head[OFF_HEIGHTMAP_PTR + 3],
+    ]));
+    let len = (info.mapx as u64 + 1) * (info.mapy as u64 + 1) * 2;
+    if offset + len > size {
+        return Err("the SMF ends before its heightmap does".to_string());
+    }
+    Ok(SmfHeights {
+        info,
+        offset,
+        len: len as usize,
+    })
+}
+
+/// The heightmap words `locate_smf_heights` found.
+pub fn read_smf_heights(path: &std::path::Path, at: &SmfHeights) -> Result<Vec<u8>, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("could not open {}: {e}", path.display()))?;
+    let mut words = vec![0u8; at.len];
+    file.seek(SeekFrom::Start(at.offset))
+        .and_then(|_| file.read_exact(&mut words))
+        .map_err(|_| "the SMF ends before its heightmap does".to_string())?;
+    Ok(words)
 }
 
 #[cfg(test)]
@@ -88,5 +149,35 @@ mod tests {
     #[test]
     fn rejects_short_input() {
         assert!(parse_smf_header(b"spring map file\0").is_err());
+    }
+
+    #[test]
+    fn reads_the_heightmap_words_at_the_pointer() {
+        let mut b = header(2, 1, 8, -10.0, 200.0);
+        b.resize(80, 0);
+        b[OFF_HEIGHTMAP_PTR..OFF_HEIGHTMAP_PTR + 4].copy_from_slice(&80u32.to_le_bytes());
+        let words: Vec<u16> = (0..6).map(|i| i * 1000).collect();
+        for w in &words {
+            b.extend_from_slice(&w.to_le_bytes());
+        }
+        let path =
+            std::env::temp_dir().join(format!("coilbox-smf-heights-{}.smf", std::process::id()));
+        std::fs::write(&path, &b).unwrap();
+        let at = locate_smf_heights(&path).unwrap();
+        let bytes = read_smf_heights(&path, &at).unwrap();
+        assert_eq!((at.info.mapx, at.info.mapy), (2, 1));
+        assert_eq!(bytes.len(), 12);
+        assert_eq!(u16::from_le_bytes([bytes[10], bytes[11]]), 5000);
+
+        // Cut short inside the heightmap.
+        std::fs::write(&path, &b[..b.len() - 1]).unwrap();
+        assert!(locate_smf_heights(&path).is_err());
+
+        // A header claiming a huge map is refused before anything is read.
+        let mut huge = b.clone();
+        huge[OFF_MAPX..OFF_MAPX + 4].copy_from_slice(&i32::MAX.to_le_bytes());
+        std::fs::write(&path, &huge).unwrap();
+        assert!(locate_smf_heights(&path).is_err());
+        let _ = std::fs::remove_file(&path);
     }
 }

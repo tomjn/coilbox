@@ -544,6 +544,11 @@ msgstr "{0, plural, one {Tabela obrażeń ({holder}) wymienia # klasę pancerza,
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece jest na tym obrazku.} few {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece są na tym obrazku.} many {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece jest na tym obrazku.} other {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece jest na tym obrazku.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -1566,6 +1571,10 @@ msgstr "Gry przeanalizowane, zanim rejestrator zaczął zapisywać listę jednos
 #, fuzzy
 msgid "{angle} render of this unit"
 msgstr "Render tej jednostki ({angle})"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr ""
 
 #: src/onboarding/pages/GamesPage.tsx
 msgid "{app} runs other games too. Find them in Games after setup."
@@ -2836,6 +2845,10 @@ msgstr "znaleziono: {found}"
 #, fuzzy
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "Znaleziono {found} z {tiles}. Nic w grze nie pasowało do: {missing}, więc ściany, które ich używają, są rysowane bez tekstury."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -7739,6 +7752,10 @@ msgstr "{wholeTableFiles, plural, one {# plik czyta całą tabelę customParams,
 msgid "{width} by {height} elmos"
 msgstr "{width} × {height} elmo"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "{wins, plural, one {# win} other {# wins}}"
@@ -11567,6 +11584,10 @@ msgstr "Archiwa ({archiveCount})"
 msgid "Area"
 msgstr ""
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13540,6 +13561,10 @@ msgstr "Wyeksportowano drzewo budowy."
 msgid "Build your own campaigns and scenarios."
 msgstr "Twórz własne kampanie i scenariusze."
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "builder"
@@ -13561,6 +13586,7 @@ msgstr "Jednostki budujące, fabryki, czujniki i transportery"
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -17598,6 +17624,10 @@ msgstr "Nie udało się wczytać modułu"
 msgid "Could not look for extension packs: {reason}"
 msgstr "Nie udało się wyszukać paczek rozszerzeń: {reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 #, fuzzy
 msgid "Could not open that file"
@@ -17760,6 +17790,15 @@ msgstr "Nie udało się odczytać bitmap gry, więc efekty są rysowane jako zwy
 #, fuzzy
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "Nie udało się odczytać bitmap gry, więc efekty są rysowane jako zwykły okrągły sprite: {reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18787,6 +18826,10 @@ msgstr "Obroń: {nodeName}"
 #, fuzzy
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "Określa wysokość terenu. Obraz w skali szarości, w którym <0>biały to najwyższy punkt, a czarny najniższy</0>. Odcienie szarości to wysokości pośrednie. Powinien mieć <1>(tekstura ÷ 8) + 1</1> pikseli na każdym boku (np. tekstura 8192 px wymaga mapy wysokości 1025 px)."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -20484,6 +20527,10 @@ msgstr "Zdobyte"
 #, fuzzy
 msgid "east"
 msgstr "wschód"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr ""
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -22852,6 +22899,7 @@ msgstr "Jedzenie"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Footprint"
 msgstr "Obrys"
@@ -23649,6 +23697,10 @@ msgstr "Wersja gry"
 #, fuzzy
 msgid "Game whose bindings to show"
 msgstr "Gra, której przypisania pokazać"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -25062,6 +25114,7 @@ msgid "Hosting…"
 msgstr "Hostowanie…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "hover"
 msgstr "zawis"
@@ -26977,6 +27030,10 @@ msgstr "Kamikaze wymaga pola widzenia"
 msgid "Kamikaze trigger distance"
 msgstr "Odległość wyzwolenia kamikaze"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Keep"
@@ -27270,6 +27327,7 @@ msgstr "Zabójstwa"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
 msgid "Kind"
@@ -27330,6 +27388,10 @@ msgstr "Największe"
 #, fuzzy
 msgid "Largest angle"
 msgstr "Największy kąt"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29436,6 +29498,10 @@ msgstr "Maks. liczba graczy"
 msgid "Max rudder"
 msgstr "Maks. ster kierunku"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Maximum in play"
@@ -30310,6 +30376,7 @@ msgstr "Ruch i czujniki"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Movement class"
 msgstr "Klasa ruchu"
@@ -30811,6 +30878,10 @@ msgstr "Strumień nano z: {piece}"
 #, fuzzy
 msgid "Nano spray from no piece"
 msgstr "Strumień nano bez elementu"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -31842,6 +31913,7 @@ msgstr "brak gry"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -31861,6 +31933,10 @@ msgstr "Nie ustawiono filtra gier"
 #, fuzzy
 msgid "No game installed"
 msgstr "Nie zainstalowano gry"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33338,6 +33414,10 @@ msgstr "Normalny"
 #, fuzzy
 msgid "north"
 msgstr "północ"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36016,6 +36096,10 @@ msgstr "paczka części używa schematu {schema}, ta wersja rozumie {supported}"
 msgid "Party"
 msgstr "Grupa"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Passed"
@@ -36873,6 +36957,10 @@ msgstr "Zagraj w ten projekt na własnym komputerze"
 #, fuzzy
 msgid "Play your first recorded game."
 msgstr "Rozegraj pierwszą nagraną grę."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38444,6 +38532,7 @@ msgid "Reading games"
 msgstr "Odczytywanie gier"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Reading games..."
 msgstr "Odczytywanie gier..."
@@ -43338,6 +43427,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "Kliknij wiersz z klawiszem Shift, aby zaznaczyć go dodatkowo, a nie zamiast."
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "ship"
 msgstr "okręt"
@@ -44556,6 +44646,10 @@ msgstr "Źródła"
 msgid "south"
 msgstr "południe"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Space separated category names this unit refuses to pursue."
@@ -44877,6 +44971,10 @@ msgstr "Migotanie gwiazd, mgławice i inne ozdobniki. Wyłącz, aby uzyskać pro
 #, fuzzy
 msgid "Start"
 msgstr "Rozpocznij"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr ""
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -45960,6 +46058,10 @@ msgstr "Wyjmowanie"
 #, fuzzy
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Omów to na kanale {0}, który jest na liście czatów."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47365,6 +47467,10 @@ msgstr "Gra zmienia to pole podczas wczytywania. Jej pliki podają {fileValue}, 
 #: src/multiplayer/battle/CompatHostExport.tsx
 #: src/multiplayer/battles/useHostCompat.ts
 msgid "The game could not be read"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -54269,6 +54375,10 @@ msgstr "Dalekie podróże"
 #, fuzzy
 msgid "west"
 msgstr "zachód"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy

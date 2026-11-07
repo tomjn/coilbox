@@ -85,7 +85,9 @@ export async function readHeightGrid(
   width: number,
   height: number,
 ): Promise<HeightGrid | null> {
-  return heightGrid(await (await fetch(src)).arrayBuffer(), width, height);
+  const res = await fetch(src);
+  if (!res.ok) throw new Error(`could not read the heights (${res.status})`);
+  return heightGrid(await res.arrayBuffer(), width, height);
 }
 
 /**

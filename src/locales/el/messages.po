@@ -548,6 +548,11 @@ msgstr "{0, plural, one {Ο πίνακας ζημιάς του {holder} αναφ
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} από τα {libraryTotal} σε αυτόν τον χάρτη στη βιβλιοθήκη σας βρίσκεται σε αυτή την εικόνα.} other {{inPicture} από τα {libraryTotal} σε αυτόν τον χάρτη στη βιβλιοθήκη σας βρίσκονται σε αυτή την εικόνα.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -1586,6 +1591,10 @@ msgstr "{analysedUnnamedGames} αναλύθηκαν πριν η καταγραφ
 #, fuzzy
 msgid "{angle} render of this unit"
 msgstr "Απεικόνιση {angle} αυτής της μονάδας"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr ""
 
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
@@ -2866,6 +2875,10 @@ msgstr "Βρέθηκαν: {found}"
 #, fuzzy
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "Βρέθηκαν {found} από {tiles}. Τίποτα στο παιχνίδι δεν ταίριαξε με {missing}, οπότε οι όψεις που τα χρησιμοποιούν σχεδιάζονται απλές."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -7795,6 +7808,10 @@ msgstr "{wholeTableFiles, plural, one {# αρχείο διαβάζει ολόκ�
 msgid "{width} by {height} elmos"
 msgstr "{width} επί {height} elmos"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "{wins, plural, one {# win} other {# wins}}"
@@ -11644,6 +11661,10 @@ msgstr "Αρχειοθήκες ({archiveCount})"
 msgid "Area"
 msgstr "Περιοχή"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13624,6 +13645,10 @@ msgstr "Το δέντρο κατασκευής εξήχθη."
 msgid "Build your own campaigns and scenarios."
 msgstr "Φτιάξτε τις δικές σας εκστρατείες και σενάρια."
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "builder"
@@ -13645,6 +13670,7 @@ msgstr "Κατασκευαστές, εργοστάσια, αισθητήρες �
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -17721,6 +17747,10 @@ msgstr "Δεν ήταν δυνατή η φόρτωση της λειτουργι
 msgid "Could not look for extension packs: {reason}"
 msgstr "Δεν ήταν δυνατή η αναζήτηση πακέτων επέκτασης: {reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 #, fuzzy
 msgid "Could not open that file"
@@ -17884,6 +17914,15 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση των bitmaps του �
 #, fuzzy
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "Δεν ήταν δυνατή η ανάγνωση των bitmaps του παιχνιδιού, οπότε τα εφέ σχεδιάζονται ως απλό στρογγυλό sprite: {reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18921,6 +18960,10 @@ msgstr "Υπεράσπιση του {nodeName}"
 #, fuzzy
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "Ορίζει το υψόμετρο του εδάφους. Μια εικόνα σε κλίμακα του γκρι όπου <0>το λευκό είναι το υψηλότερο σημείο και το μαύρο το χαμηλότερο</0>. Τα γκρι είναι ενδιάμεσα ύψη. Πρέπει να έχει <1>(υφή ÷ 8) + 1</1> pixel σε κάθε πλευρά (π.χ. μια υφή 8192px χρειάζεται χάρτη ύψους 1025px)."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -20621,6 +20664,10 @@ msgstr "Κερδήθηκαν"
 #, fuzzy
 msgid "east"
 msgstr "ανατολικά"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr ""
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -23007,6 +23054,7 @@ msgstr "Φαγητό"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Footprint"
 msgstr "Αποτύπωμα"
@@ -23806,6 +23854,10 @@ msgstr "Έκδοση παιχνιδιού"
 #, fuzzy
 msgid "Game whose bindings to show"
 msgstr "Παιχνίδι του οποίου οι αντιστοιχίσεις θα εμφανιστούν"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -25226,6 +25278,7 @@ msgid "Hosting…"
 msgstr "Φιλοξενία…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "hover"
 msgstr "αιώρηση"
@@ -27149,6 +27202,10 @@ msgstr "Το καμικάζι χρειάζεται οπτική επαφή"
 msgid "Kamikaze trigger distance"
 msgstr "Απόσταση ενεργοποίησης καμικάζι"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Keep"
@@ -27444,6 +27501,7 @@ msgstr "Εξοντώσεις"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
 msgid "Kind"
@@ -27505,6 +27563,10 @@ msgstr "Μεγαλύτεροι"
 #, fuzzy
 msgid "Largest angle"
 msgstr "Μέγιστη γωνία"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29625,6 +29687,10 @@ msgstr "Μέγ. παίκτες"
 msgid "Max rudder"
 msgstr "Μέγ. πηδάλιο διεύθυνσης"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Maximum in play"
@@ -30506,6 +30572,7 @@ msgstr "Κίνηση και αισθητήρες"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Movement class"
 msgstr "Κατηγορία κίνησης"
@@ -31011,6 +31078,10 @@ msgstr "Νανοψεκασμός από {piece}"
 #, fuzzy
 msgid "Nano spray from no piece"
 msgstr "Νανοψεκασμός από κανένα τμήμα"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -32045,6 +32116,7 @@ msgstr "χωρίς παιχνίδι"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -32065,6 +32137,10 @@ msgstr "Δεν έχει οριστεί φίλτρο παιχνιδιού"
 #, fuzzy
 msgid "No game installed"
 msgstr "Δεν είναι εγκατεστημένο κανένα παιχνίδι"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33548,6 +33624,10 @@ msgstr "Κανονική"
 #, fuzzy
 msgid "north"
 msgstr "βόρεια"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36260,6 +36340,10 @@ msgstr "το πακέτο εξαρτημάτων χρησιμοποιεί σχή
 msgid "Party"
 msgstr "Ομάδα φίλων"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Passed"
@@ -37120,6 +37204,10 @@ msgstr "Παίξτε αυτό το έργο στον δικό σας υπολο�
 #, fuzzy
 msgid "Play your first recorded game."
 msgstr "Παίξτε το πρώτο σας καταγεγραμμένο παιχνίδι."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38709,6 +38797,7 @@ msgid "Reading games"
 msgstr "Ανάγνωση παιχνιδιών"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Reading games..."
 msgstr "Ανάγνωση παιχνιδιών..."
@@ -43633,6 +43722,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "Shift-κλικ σε μια γραμμή για να επιλεγεί επιπλέον, αντί για αντικατάσταση."
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "ship"
 msgstr "πλοίο"
@@ -44862,6 +44952,10 @@ msgstr "Πηγές"
 msgid "south"
 msgstr "νότια"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Space separated category names this unit refuses to pursue."
@@ -45183,6 +45277,10 @@ msgstr "Τρεμόπαιγμα αστεριών, νεφελώματα και ά�
 #, fuzzy
 msgid "Start"
 msgstr "Έναρξη"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr ""
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -46273,6 +46371,10 @@ msgstr "Αφαίρεση σε εξέλιξη"
 #, fuzzy
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Συζητήστε το στο {0}, που υπάρχει στη λίστα συνομιλιών σας."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47696,6 +47798,10 @@ msgstr "Το παιχνίδι αλλάζει αυτό το πεδίο κατά �
 #, fuzzy
 msgid "The game could not be read"
 msgstr "Δεν ήταν δυνατή η ανάγνωση του παιχνιδιού"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
+msgstr ""
 
 #: src/i18n/uiError.ts
 #, fuzzy
@@ -54643,6 +54749,10 @@ msgstr "Πολυταξιδεμένος"
 #, fuzzy
 msgid "west"
 msgstr "δυτικά"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy

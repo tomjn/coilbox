@@ -544,6 +544,11 @@ msgstr "{0, plural, one {Таблиця шкоди ({holder}) називає # �
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.} few {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.} many {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.} other {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -1566,6 +1571,10 @@ msgstr "{analysedUnnamedGames} проаналізовано до того, як 
 #, fuzzy
 msgid "{angle} render of this unit"
 msgstr "Рендер цього юніта: {angle}"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{apart} of {pairs} pairs not connected"
+msgstr ""
 
 #: src/onboarding/pages/GamesPage.tsx
 msgid "{app} runs other games too. Find them in Games after setup."
@@ -2836,6 +2845,10 @@ msgstr "Знайдено: {found}"
 #, fuzzy
 msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so the faces using them are drawn plain."
 msgstr "Знайдено {found} з {tiles}. У грі ніщо не відповідало цьому: {missing}, тому грані, що їх використовують, намальовано без текстури."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{from} and {to} not connected"
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -7739,6 +7752,10 @@ msgstr "{wholeTableFiles, plural, one {# файл читає всю таблиц
 msgid "{width} by {height} elmos"
 msgstr "{width} × {height} ельмо"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{width} elmos, {from} to {to}, at {x}, {z}"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "{wins, plural, one {# win} other {# wins}}"
@@ -11567,6 +11584,10 @@ msgstr "Архіви ({archiveCount})"
 msgid "Area"
 msgstr ""
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Areas"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13540,6 +13561,10 @@ msgstr "Дерево будівництва експортовано."
 msgid "Build your own campaigns and scenarios."
 msgstr "Створюйте власні кампанії й сценарії."
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildable"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "builder"
@@ -13561,6 +13586,7 @@ msgstr "Будівельники, заводи, сенсори й транспо
 #: src/content/pages/components/CompatMode.tsx
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -17598,6 +17624,10 @@ msgstr "Не вдалося завантажити модуль"
 msgid "Could not look for extension packs: {reason}"
 msgstr "Не вдалося знайти пакети розширень: {reason}"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not measure the map: {error}"
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 #, fuzzy
 msgid "Could not open that file"
@@ -17760,6 +17790,15 @@ msgstr "Не вдалося прочитати зображення гри, то
 #, fuzzy
 msgid "Could not read the game's bitmaps, so effects are drawn as a plain round sprite: {reason}"
 msgstr "Не вдалося прочитати зображення гри, тому ефекти малюються простим круглим спрайтом: {reason}"
+
+#. placeholder {0}: defs.error
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the game's units: {0}"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Could not read the map's heights: {heightsError}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18787,6 +18826,10 @@ msgstr "Захистити {nodeName}"
 #, fuzzy
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
 msgstr "Задає висоту рельєфу. Зображення у відтінках сірого, де <0>білий – найвища точка, а чорний – найнижча</0>. Сірі – проміжні висоти. Розмір має бути <1>(текстура ÷ 8) + 1</1> пікселів з кожного боку (напр. текстурі 8192 пікс. потрібна карта висот 1025 пікс.)."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Defs this shape"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -20484,6 +20527,10 @@ msgstr "Здобуто"
 #, fuzzy
 msgid "east"
 msgstr "схід"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "east edge"
+msgstr ""
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -22852,6 +22899,7 @@ msgstr "Їжа"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/problems.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Footprint"
 msgstr "Контур"
@@ -23649,6 +23697,10 @@ msgstr "Версія гри"
 #, fuzzy
 msgid "Game whose bindings to show"
 msgstr "Гра, сполучення клавіш якої показати"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Game whose units to measure with"
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -25062,6 +25114,7 @@ msgid "Hosting…"
 msgstr "Створення кімнати…"
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "hover"
 msgstr "зависання"
@@ -26977,6 +27030,10 @@ msgstr "Камікадзе потребує прямої видимості"
 msgid "Kamikaze trigger distance"
 msgstr "Відстань спрацювання камікадзе"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "kbot"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Keep"
@@ -27270,6 +27327,7 @@ msgstr "Знищення"
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
 msgid "Kind"
@@ -27330,6 +27388,10 @@ msgstr "Найбільші"
 #, fuzzy
 msgid "Largest angle"
 msgstr "Найбільший кут"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Largest area"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29436,6 +29498,10 @@ msgstr "Макс. гравців"
 msgid "Max rudder"
 msgstr "Макс. руль напрямку"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Max slope"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Maximum in play"
@@ -30310,6 +30376,7 @@ msgstr "Рух і сенсори"
 
 #: src/content/unitFieldNotes.ts
 #: src/lego/pages/components/MovementSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Movement class"
 msgstr "Клас руху"
@@ -30811,6 +30878,10 @@ msgstr "Нанопромінь з {piece}"
 #, fuzzy
 msgid "Nano spray from no piece"
 msgstr "Нанопромінь без елемента"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Narrowest point on the widest way"
+msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -31842,6 +31913,7 @@ msgstr "немає гри"
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -31861,6 +31933,10 @@ msgstr "Фільтр ігор не задано"
 #, fuzzy
 msgid "No game installed"
 msgstr "Гру не встановлено"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "No game installed."
+msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33338,6 +33414,10 @@ msgstr "Звичайна"
 #, fuzzy
 msgid "north"
 msgstr "північ"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "north edge"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -36016,6 +36096,10 @@ msgstr "пакет деталей використовує схему {schema}, 
 msgid "Party"
 msgstr "Група"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passable"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Passed"
@@ -36873,6 +36957,10 @@ msgstr "Грати в цей проєкт на власному комп’ют�
 #, fuzzy
 msgid "Play your first recorded game."
 msgstr "Зіграйте свою першу записану гру."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Playability"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38444,6 +38532,7 @@ msgid "Reading games"
 msgstr "Читання ігор"
 
 #: src/content/pages/KeybindsSection.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "Reading games..."
 msgstr "Читання ігор..."
@@ -43338,6 +43427,7 @@ msgid "Shift-click a row to select it as well, rather than instead."
 msgstr "Клацніть рядок із Shift, щоб додати його до виділення, а не замінити."
 
 #: src/lego/movement.ts
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
 msgid "ship"
 msgstr "корабель"
@@ -44556,6 +44646,10 @@ msgstr "Джерела"
 msgid "south"
 msgstr "південь"
 
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "south edge"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Space separated category names this unit refuses to pursue."
@@ -44877,6 +44971,10 @@ msgstr "Мерехтіння зір, туманності та інші деко
 #, fuzzy
 msgid "Start"
 msgstr "Почати"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "start {number}"
+msgstr ""
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -45960,6 +46058,10 @@ msgstr "Вилучення"
 #, fuzzy
 msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Обговоріть це в {0} – він є у вашому списку чатів."
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "tank"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47365,6 +47467,10 @@ msgstr "Гра змінює це поле під час завантаження
 #: src/multiplayer/battle/CompatHostExport.tsx
 #: src/multiplayer/battles/useHostCompat.ts
 msgid "The game could not be read"
+msgstr ""
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "The game declares no movement classes."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -54269,6 +54375,10 @@ msgstr "Досвід мандрів"
 #, fuzzy
 msgid "west"
 msgstr "захід"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "west edge"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
