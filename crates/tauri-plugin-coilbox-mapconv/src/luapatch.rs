@@ -756,7 +756,8 @@ fn delete_field(src: &str, table: &Table, i: usize) -> String {
 pub fn remove(src: &str, path: &[Key]) -> Result<String, String> {
     let mut text = src.to_string();
     // A key written twice is read as its last value, so every copy goes. A
-    // value with no key is not a copy: the ones after it renumber as it goes.
+    // value with no key is not a copy: the ones after it renumber as it goes,
+    // so only the first pass removes one.
     let mut first = true;
     loop {
         let toks = lex(&text)?;
@@ -772,7 +773,7 @@ pub fn remove(src: &str, path: &[Key]) -> Result<String, String> {
         for (depth, key) in path.iter().enumerate() {
             let last = depth + 1 == path.len();
             let Some(i) = table.fields.iter().rposition(|f| {
-                (first || !f.positional) && f.key.as_ref().is_some_and(|k| k.matches(key))
+                (first || !last || !f.positional) && f.key.as_ref().is_some_and(|k| k.matches(key))
             }) else {
                 break;
             };
@@ -1131,6 +1132,16 @@ mod tests {
         assert_eq!(
             remove(src, &team(2)).unwrap(),
             "return { teams = { { x = 1 }, { x = 3 } } }"
+        );
+    }
+
+    #[test]
+    fn removes_every_copy_of_a_key_inside_an_unkeyed_list_entry() {
+        let src = "return { teams = { { a = 1, b = 2, a = 3 } } }";
+        let path = [n("teams"), Key::Index(1), n("a")];
+        assert_eq!(
+            remove(src, &path).unwrap(),
+            "return { teams = { { b = 2 } } }"
         );
     }
 

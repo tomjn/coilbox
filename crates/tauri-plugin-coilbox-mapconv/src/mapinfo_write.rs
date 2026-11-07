@@ -368,9 +368,15 @@ pub fn read_teams(dir: &Path) -> Result<Vec<Option<StartPos>>, String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(format!("could not read {}: {e}", path.display())),
     };
+    teams_in(dir, &src).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// The start positions `src`, a `mapinfo.lua` in `dir`, evaluates to. See
+/// [`read_teams`].
+fn teams_in(dir: &Path, src: &str) -> Result<Vec<Option<StartPos>>, String> {
     let value = SpringLua::new(dir)
         .and_then(|lua| lua.eval_expr_value(&format!("(function()\n{src}\nend)()"), "mapinfo.lua"))
-        .map_err(|e| format!("could not evaluate {}: {e}", path.display()))?;
+        .map_err(|e| format!("could not evaluate it: {e}"))?;
     let field = |v: &serde_json::Value, name: &str| {
         v.as_object()?
             .iter()
@@ -429,8 +435,9 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     }
     let (min_height, max_height) = heights(opts, &dir)?;
     let before = existing.as_deref().unwrap_or(SKELETON);
-    let teams = match existing {
-        Some(_) => read_teams(&dir).ok(),
+    // From the text the patch starts from, so the two cannot disagree.
+    let teams = match existing.as_deref() {
+        Some(src) => teams_in(&dir, src).ok(),
         None => Some(Vec::new()),
     };
     let after = patch(
