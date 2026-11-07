@@ -125,7 +125,10 @@ describe("erodeRelief", () => {
         h[y * side + x] = 0.01 + (x - 4) * 0.003;
       }
     }
+    const before = h.slice();
     runDrops(h, side, side, mulberry32(9));
+    // The drops did run: some land moved.
+    expect(same(h, before)).toBe(false);
     for (let y = 0; y < side; y++) {
       for (let x = 0; x < 4; x++) expect(h[y * side + x]).toBe(0);
     }
