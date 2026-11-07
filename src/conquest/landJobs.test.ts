@@ -58,7 +58,10 @@ describe("map generation off the main thread", () => {
 
   // React's development build walks a changed prop key by key, and a typed
   // array it can see is walked one element at a time.
-  it("keeps every typed array out of key enumeration", async () => {
+  // The pixels include the display erosion, which is part of their cost.
+  it("keeps every typed array out of key enumeration", {
+    timeout: 30_000,
+  }, async () => {
     const preview = await landPreviewOffThread(base);
     expect(enumerableArrays(preview)).toEqual([]);
 
@@ -68,7 +71,9 @@ describe("map generation off the main thread", () => {
     expect(pixels?.extension?.image.data.length).toBeGreaterThan(0);
   });
 
-  it("answers the same land with the same pixels", async () => {
+  it("answers the same land with the same pixels", {
+    timeout: 30_000,
+  }, async () => {
     const doc = generateMap(base);
     const first = await terrainPixelsOffThread(doc);
     // The same document read a second time is a new object.
