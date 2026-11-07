@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 1,
+  "id": "unit",
+  "name": "Anti-air Ship 3",
+  "unitName": "anti_air_ship_3",
+  "packId": "splinterfaction-legosv2",
+  "packVersion": "2026.07.28",
+  "createdAt": "2026-11-07T00:00:00.000Z",
+  "updatedAt": "2026-11-07T00:00:00.000Z",
+  "rootPieceId": "root",
+  "pieces": [
+    {
+      "id": "root",
+      "name": "hull",
+      "parentId": null,
+      "partId": null,
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "base",
+      "bone": "hull"
+    },
+    {
+      "id": "unit.1",
+      "name": "turret",
+      "parentId": "root",
+      "partId": null,
+      "position": [
+        0,
+        13.41881486540311,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "turret",
+      "bone": "turret"
+    },
+    {
+      "id": "unit.2",
+      "name": "barrel",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        0,
+        9.289544109874402,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "barrel",
+      "bone": "barrel"
+    },
+    {
+      "id": "unit.3",
+      "name": "flare",
+      "parentId": "unit.2",
+      "partId": null,
+      "position": [
+        0,
+        0,
+        20.909390959736196
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "flare",
+      "bone": "flare"
+    },
+    {
+      "id": "unit.4",
+      "name": "wake",
+      "parentId": "root",
+      "partId": null,
+      "position": [
+        0,
+        0,
+        -60.22544346779818
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wake",
+      "bone": "wake"
+    },
+    {
+      "id": "unit.5",
+      "name": "rudder",
+      "parentId": "root",
+      "partId": null,
+      "position": [
+        0,
+        0,
+        -60.22544346779818
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "rudder",
+      "bone": "rudder"
+    },
+    {
+      "id": "unit.6",
+      "name": "deck",
+      "parentId": "root",
+      "partId": "588fc761d4df",
+      "position": [
+        0,
+        9.23417026206851,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        36.93668104827404,
+        36.93668104827404,
+        36.93668104827404
+      ],
+      "module": {
+        "id": "builtin.deck",
+        "instance": "unit.7",
+        "rev": "03f11b2fc8e623",
+        "fp": "033db76510f272"
+      }
+    },
+    {
+      "id": "unit.8",
+      "name": "turret2",
+      "parentId": "unit.6",
+      "partId": "17ddbb403e05",
+      "position": [
+        0,
+        0.5625,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        36.93668104827404,
+        36.93668104827404,
+        36.93668104827404
+      ],
+      "role": "turret",
+      "weapon": {},
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.11",
+        "rev": "0402a3ff06943b",
+        "fp": "0b82cb74f76563"
+      },
+      "connection": {
+        "connector": "-y",
+        "to": "+y"
+      }
+    },
+    {
+      "id": "unit.9",
+      "name": "barrel2",
+      "parentId": "unit.8",
+      "partId": "1fdca59c9339",
+      "position": [
+        0,
+        0,
+        0.375
+      ],
+      "rotation": [
+        1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "barrel",
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.11",
+        "rev": "0402a3ff06943b",
+        "fp": "1cda6b88b16ea0"
+      }
+    },
+    {
+      "id": "unit.10",
+      "name": "flare2",
+      "parentId": "unit.9",
+      "partId": null,
+      "position": [
+        0,
+        0.25,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "flare",
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.11",
+        "rev": "0402a3ff06943b",
+        "fp": "0e85b23aad74ae"
+      }
+    }
+  ],
+  "animations": [
+    {
+      "presetId": "turret.track",
+      "params": {}
+    },
+    {
+      "presetId": "recoil",
+      "params": {}
+    },
+    {
+      "presetId": "rudder.follow",
+      "params": {}
+    },
+    {
+      "presetId": "wake.moving",
+      "params": {}
+    }
+  ],
+  "skeleton": {
+    "plan": "ship",
+    "proportions": {
+      "hullLength": 120.45088693559636,
+      "deckHeight": 13.41881486540311,
+      "turretHeight": 9.289544109874402,
+      "barrelLength": 20.909390959736196
+    }
+  },
+  "notes": "Generated from seed 3, body plan Ship, job Anti-air, size Large.",
+  "generated": {
+    "seed": 3,
+    "plan": "ship",
+    "job": "antiair",
+    "size": "large",
+    "modules": [
+      {
+        "slot": "chassis.1",
+        "module": "builtin.deck",
+        "instance": "unit.7"
+      },
+      {
+        "slot": "weapon.1",
+        "module": "builtin.turret",
+        "instance": "unit.11"
+      }
+    ]
+  }
+}

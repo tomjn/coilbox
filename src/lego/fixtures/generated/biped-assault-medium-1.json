@@ -1,0 +1,381 @@
+{
+  "schemaVersion": 1,
+  "id": "unit",
+  "name": "Assault Two legs 1",
+  "unitName": "assault_two_legs_1",
+  "packId": "splinterfaction-legosv2",
+  "packVersion": "2026.07.28",
+  "createdAt": "2026-11-07T00:00:00.000Z",
+  "updatedAt": "2026-11-07T00:00:00.000Z",
+  "rootPieceId": "root",
+  "pieces": [
+    {
+      "id": "root",
+      "name": "base",
+      "parentId": null,
+      "partId": null,
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "bone": "base"
+    },
+    {
+      "id": "unit.1",
+      "name": "hip",
+      "parentId": "root",
+      "partId": null,
+      "position": [
+        0,
+        16.68853710401803,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "base",
+      "bone": "hip"
+    },
+    {
+      "id": "unit.2",
+      "name": "torso",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        0,
+        5.236475220099091,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "bone": "torso"
+    },
+    {
+      "id": "unit.3",
+      "name": "lthigh",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        13.616368575855159,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.l1.thigh",
+      "twin": "unit.6",
+      "bone": "thigh.l1"
+    },
+    {
+      "id": "unit.4",
+      "name": "lshin",
+      "parentId": "unit.3",
+      "partId": null,
+      "position": [
+        0,
+        -6.591972156087123,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.l1.shin",
+      "twin": "unit.7",
+      "bone": "shin.l1"
+    },
+    {
+      "id": "unit.5",
+      "name": "lfoot",
+      "parentId": "unit.4",
+      "partId": null,
+      "position": [
+        0,
+        -10.096564947930908,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.l1.foot",
+      "twin": "unit.8",
+      "bone": "foot.l1"
+    },
+    {
+      "id": "unit.6",
+      "name": "rthigh",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        -13.616368575855159,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.r1.thigh",
+      "twin": "unit.3",
+      "bone": "thigh.r1"
+    },
+    {
+      "id": "unit.7",
+      "name": "rshin",
+      "parentId": "unit.6",
+      "partId": null,
+      "position": [
+        0,
+        -6.591972156087123,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.r1.shin",
+      "twin": "unit.4",
+      "bone": "shin.r1"
+    },
+    {
+      "id": "unit.8",
+      "name": "rfoot",
+      "parentId": "unit.7",
+      "partId": null,
+      "position": [
+        0,
+        -10.096564947930908,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.r1.foot",
+      "twin": "unit.5",
+      "bone": "foot.r1"
+    },
+    {
+      "id": "unit.9",
+      "name": "hull",
+      "parentId": "unit.2",
+      "partId": "d2c111537495",
+      "position": [
+        0,
+        4.956616822768659,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        9.91323364553732,
+        9.91323364553732,
+        9.91323364553732
+      ],
+      "module": {
+        "id": "builtin.hull",
+        "instance": "unit.10",
+        "rev": "136160dce45c06",
+        "fp": "0f93623723cd16"
+      }
+    },
+    {
+      "id": "unit.11",
+      "name": "turret",
+      "parentId": "unit.9",
+      "partId": "17ddbb403e05",
+      "position": [
+        0,
+        0.8125,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        9.91323364553732,
+        9.91323364553732,
+        9.91323364553732
+      ],
+      "role": "turret",
+      "weapon": {},
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.14",
+        "rev": "0402a3ff06943b",
+        "fp": "12075dc5e6c72d"
+      },
+      "connection": {
+        "connector": "-y",
+        "to": "+y"
+      }
+    },
+    {
+      "id": "unit.12",
+      "name": "barrel",
+      "parentId": "unit.11",
+      "partId": "1fdca59c9339",
+      "position": [
+        0,
+        0,
+        0.375
+      ],
+      "rotation": [
+        1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "barrel",
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.14",
+        "rev": "0402a3ff06943b",
+        "fp": "0a07abff47a0d1"
+      }
+    },
+    {
+      "id": "unit.13",
+      "name": "flare",
+      "parentId": "unit.12",
+      "partId": null,
+      "position": [
+        0,
+        0.25,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "flare",
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.14",
+        "rev": "0402a3ff06943b",
+        "fp": "0abf90a24e2154"
+      }
+    }
+  ],
+  "animations": [
+    {
+      "presetId": "walk.biped",
+      "params": {}
+    },
+    {
+      "presetId": "turret.track",
+      "params": {}
+    },
+    {
+      "presetId": "recoil",
+      "params": {}
+    }
+  ],
+  "skeleton": {
+    "plan": "biped",
+    "proportions": {
+      "legLength": 16.68853710401803,
+      "stance": 27.232737151710317,
+      "bodyHeight": 5.236475220099091
+    }
+  },
+  "notes": "Generated from seed 1, body plan Two legs, job Assault, size Medium.",
+  "generated": {
+    "seed": 1,
+    "plan": "biped",
+    "job": "assault",
+    "size": "medium",
+    "modules": [
+      {
+        "slot": "chassis.1",
+        "module": "builtin.hull",
+        "instance": "unit.10"
+      },
+      {
+        "slot": "weapon.1",
+        "module": "builtin.turret",
+        "instance": "unit.14"
+      }
+    ]
+  }
+}

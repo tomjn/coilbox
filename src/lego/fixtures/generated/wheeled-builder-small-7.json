@@ -1,0 +1,466 @@
+{
+  "schemaVersion": 1,
+  "id": "unit",
+  "name": "Builder Wheels 7",
+  "unitName": "builder_wheels_7",
+  "packId": "splinterfaction-legosv2",
+  "packVersion": "2026.07.28",
+  "createdAt": "2026-11-07T00:00:00.000Z",
+  "updatedAt": "2026-11-07T00:00:00.000Z",
+  "rootPieceId": "root",
+  "pieces": [
+    {
+      "id": "root",
+      "name": "base",
+      "parentId": null,
+      "partId": null,
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "bone": "base"
+    },
+    {
+      "id": "unit.1",
+      "name": "body",
+      "parentId": "root",
+      "partId": null,
+      "position": [
+        0,
+        3.930852816329571,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "base",
+      "bone": "body"
+    },
+    {
+      "id": "unit.2",
+      "name": "lwheel1",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        11.188712358148768,
+        0,
+        22.340131347002462
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.3",
+      "bone": "wheel.l1"
+    },
+    {
+      "id": "unit.3",
+      "name": "rwheel1",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        -11.188712358148768,
+        0,
+        22.340131347002462
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.2",
+      "bone": "wheel.r1"
+    },
+    {
+      "id": "unit.4",
+      "name": "lwheel2",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        11.188712358148768,
+        0,
+        7.44671044900082
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.5",
+      "bone": "wheel.l2"
+    },
+    {
+      "id": "unit.5",
+      "name": "rwheel2",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        -11.188712358148768,
+        0,
+        7.44671044900082
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.4",
+      "bone": "wheel.r2"
+    },
+    {
+      "id": "unit.6",
+      "name": "lwheel3",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        11.188712358148768,
+        0,
+        -7.44671044900082
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.7",
+      "bone": "wheel.l3"
+    },
+    {
+      "id": "unit.7",
+      "name": "rwheel3",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        -11.188712358148768,
+        0,
+        -7.44671044900082
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.6",
+      "bone": "wheel.r3"
+    },
+    {
+      "id": "unit.8",
+      "name": "lwheel4",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        11.188712358148768,
+        0,
+        -22.340131347002462
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.9",
+      "bone": "wheel.l4"
+    },
+    {
+      "id": "unit.9",
+      "name": "rwheel4",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        -11.188712358148768,
+        0,
+        -22.340131347002462
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "wheel",
+      "twin": "unit.8",
+      "bone": "wheel.r4"
+    },
+    {
+      "id": "unit.10",
+      "name": "hull",
+      "parentId": "unit.1",
+      "partId": "d2c111537495",
+      "position": [
+        0,
+        3.683738454762961,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        7.367476909525922,
+        7.367476909525922,
+        7.367476909525922
+      ],
+      "module": {
+        "id": "builtin.hull-long",
+        "instance": "unit.12",
+        "rev": "1260d1beaa4a66",
+        "fp": "0f93623723cd16"
+      }
+    },
+    {
+      "id": "unit.11",
+      "name": "hullfront",
+      "parentId": "unit.10",
+      "partId": "d2c111537495",
+      "position": [
+        0,
+        0,
+        3
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        7.367476909525922,
+        7.367476909525922,
+        7.367476909525922
+      ],
+      "connection": {
+        "connector": "-z",
+        "to": "+z"
+      },
+      "module": {
+        "id": "builtin.hull-long",
+        "instance": "unit.12",
+        "rev": "1260d1beaa4a66",
+        "fp": "084bb5519eb84e"
+      }
+    },
+    {
+      "id": "unit.13",
+      "name": "buildbase",
+      "parentId": "unit.10",
+      "partId": "17ddbb403e05",
+      "position": [
+        0,
+        0.8125,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        7.367476909525922,
+        7.367476909525922,
+        7.367476909525922
+      ],
+      "role": "buildarm.base",
+      "module": {
+        "id": "builtin.buildarm",
+        "instance": "unit.17",
+        "rev": "199e56fc605b19",
+        "fp": "035186b079359e"
+      },
+      "connection": {
+        "connector": "-y",
+        "to": "+y"
+      }
+    },
+    {
+      "id": "unit.14",
+      "name": "buildarm",
+      "parentId": "unit.13",
+      "partId": "1fdca59c9339",
+      "position": [
+        0,
+        0.5625,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "buildarm.arm",
+      "module": {
+        "id": "builtin.buildarm",
+        "instance": "unit.17",
+        "rev": "199e56fc605b19",
+        "fp": "167fec9a1bf4b3"
+      }
+    },
+    {
+      "id": "unit.15",
+      "name": "nozzle",
+      "parentId": "unit.14",
+      "partId": "6e310414fda4",
+      "position": [
+        0,
+        0.3366,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "buildarm.nozzle",
+      "module": {
+        "id": "builtin.buildarm",
+        "instance": "unit.17",
+        "rev": "199e56fc605b19",
+        "fp": "0f859623b3ef9e"
+      }
+    },
+    {
+      "id": "unit.16",
+      "name": "nano1",
+      "parentId": "unit.15",
+      "partId": null,
+      "position": [
+        0,
+        0.0866,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "buildarm.nano",
+      "module": {
+        "id": "builtin.buildarm",
+        "instance": "unit.17",
+        "rev": "199e56fc605b19",
+        "fp": "110aa111fa7439"
+      }
+    }
+  ],
+  "animations": [
+    {
+      "presetId": "wheels.roll",
+      "params": {}
+    },
+    {
+      "presetId": "build.aim",
+      "params": {}
+    },
+    {
+      "presetId": "build.nano",
+      "params": {}
+    }
+  ],
+  "skeleton": {
+    "plan": "wheeled",
+    "proportions": {
+      "axles": 4,
+      "axleSpacing": 14.89342089800164,
+      "trackWidth": 22.377424716297536,
+      "wheelHeight": 3.930852816329571
+    }
+  },
+  "notes": "Generated from seed 7, body plan Wheels, job Builder, size Small.",
+  "generated": {
+    "seed": 7,
+    "plan": "wheeled",
+    "job": "builder",
+    "size": "small",
+    "modules": [
+      {
+        "slot": "chassis.1",
+        "module": "builtin.hull-long",
+        "instance": "unit.12"
+      },
+      {
+        "slot": "buildarm.1",
+        "module": "builtin.buildarm",
+        "instance": "unit.17"
+      }
+    ]
+  }
+}

@@ -3466,6 +3466,10 @@ msgstr "{ip} is geen adres van één machine, dus de engine kan er geen verbindi
 msgid "{itemName} ({itemModule}). Added before changes were tracked."
 msgstr "{itemName} ({itemModule}). Toegevoegd voordat wijzigingen werden bijgehouden."
 
+#: src/lego/generate.ts
+msgid "{jobLabel} {planLabel} {seed}"
+msgstr ""
+
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
 msgid "{jobs, plural, one {Analysing # replay} other {Analysing # replays}}"
@@ -11339,6 +11343,10 @@ msgstr "Een andere eenheid heeft deze naam al"
 msgid "Answered the question at {spot}."
 msgstr "De vraag bij {spot} beantwoord."
 
+#: src/lego/generate.ts
+msgid "Anti-air"
+msgstr ""
+
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
 msgid "Antispam"
@@ -11752,6 +11760,10 @@ msgstr "Geluid bij aankomst"
 msgid "Arsenal"
 msgstr "Arsenaal"
 
+#: src/lego/generate.ts
+msgid "Artillery"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "As {account} on {serverName}. You join the battles they join and leave when they leave."
@@ -11869,6 +11881,10 @@ msgstr "Vraagt het eenheidsscript vóór elke controle op eigen vuur vanaf welk 
 #, fuzzy
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "Vraagt je router de poort van de ruimte en de poort van het spel {hostPort} door te sturen, zodat mensen buiten dit netwerk kunnen meedoen. Allebei, want als alleen die van de ruimte open is, komt iedereen binnen en mislukt het daarna bij het starten."
+
+#: src/lego/generate.ts
+msgid "Assault"
+msgstr ""
 
 #: src/home/groupDescription.ts
 #, fuzzy
@@ -13656,6 +13672,7 @@ msgstr "bouwer"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/lego/generate.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -24013,6 +24030,10 @@ msgstr "Een kaart genereren"
 msgid "Generate seed SQL"
 msgstr "Seed-SQL genereren"
 
+#: src/lego/generate.ts
+msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
+msgstr ""
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -27548,6 +27569,10 @@ msgstr "Taal"
 msgid "Language packs loaded: {loadedList}"
 msgstr "Geladen taalpakketten: {loadedList}"
 
+#: src/lego/generate.ts
+msgid "Large"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -29756,6 +29781,10 @@ msgstr "Mediaan"
 #, fuzzy
 msgid "median {median}"
 msgstr "mediaan {median}"
+
+#: src/lego/generate.ts
+msgid "Medium"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -42055,6 +42084,10 @@ msgstr "Beperken tot een set"
 msgid "Scope: {scopeText}."
 msgstr "Bereik: {scopeText}."
 
+#: src/lego/generate.ts
+msgid "Scout"
+msgstr ""
+
 #: src/content/pages/components/BrandingScreenshots.tsx
 #, fuzzy
 msgid "Screenshot"
@@ -44675,6 +44708,10 @@ msgstr "Remt een eenheid af terwijl die slipt."
 #, fuzzy
 msgid "SM3 map, not supported since Spring 95.0"
 msgstr "SM3-kaart, niet ondersteund sinds Spring 95.0"
+
+#: src/lego/generate.ts
+msgid "Small"
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
