@@ -81,13 +81,15 @@ function blur(
 }
 
 /** Drops run over `h` in place. `h` is `width` by `height`, heights 0 to 1. */
-function runDrops(
+export function runDrops(
   h: Float32Array,
   width: number,
   height: number,
   rng: () => number,
 ): void {
   const total = Math.floor(width * height * DROPS_PER_CELL);
+  const sea = new Uint8Array(h.length);
+  for (let i = 0; i < h.length; i++) sea[i] = h[i] <= 0 ? 1 : 0;
   const px = new Float64Array(BATCH);
   const py = new Float64Array(BATCH);
   const dx = new Float64Array(BATCH);
@@ -168,28 +170,37 @@ function runDrops(
           Math.max(-delta, MIN_SLOPE) * speed[d] * water[d] * CAPACITY;
 
         // Four corners of the cell the drop is leaving take the change.
-        const w00 = (1 - fx) * (1 - fy);
-        const w10 = fx * (1 - fy);
-        const w01 = (1 - fx) * fy;
-        const w11 = fx * fy;
+        // Sea corners take no part, so the shore stays where it is and a drop
+        // that runs into the sea builds nothing up under it.
+        const w00 = sea[i] ? 0 : (1 - fx) * (1 - fy);
+        const w10 = sea[i + 1] ? 0 : fx * (1 - fy);
+        const w01 = sea[i + width] ? 0 : (1 - fx) * fy;
+        const w11 = sea[i + width + 1] ? 0 : fx * fy;
+        const landShare = w00 + w10 + w01 + w11;
+        if (landShare === 0) {
+          alive[d] = 0;
+          continue;
+        }
         if (sediment[d] > capacity || delta > 0) {
           const dropped =
             delta > 0
               ? Math.min(delta, sediment[d])
               : (sediment[d] - capacity) * DEPOSIT_RATE;
           sediment[d] -= dropped;
-          h[i] += dropped * w00;
-          h[i + 1] += dropped * w10;
-          h[i + width] += dropped * w01;
-          h[i + width + 1] += dropped * w11;
+          h[i] += (dropped * w00) / landShare;
+          h[i + 1] += (dropped * w10) / landShare;
+          h[i + width] += (dropped * w01) / landShare;
+          h[i + width + 1] += (dropped * w11) / landShare;
         } else {
           const taken = Math.min((capacity - sediment[d]) * ERODE_RATE, -delta);
           sediment[d] += taken;
-          // Never cut into the sea or below it. The shore stays where it is.
-          h[i] = Math.max(0, h[i] - taken * w00);
-          h[i + 1] = Math.max(0, h[i + 1] - taken * w10);
-          h[i + width] = Math.max(0, h[i + width] - taken * w01);
-          h[i + width + 1] = Math.max(0, h[i + width + 1] - taken * w11);
+          h[i] = Math.max(0, h[i] - (taken * w00) / landShare);
+          h[i + 1] = Math.max(0, h[i + 1] - (taken * w10) / landShare);
+          h[i + width] = Math.max(0, h[i + width] - (taken * w01) / landShare);
+          h[i + width + 1] = Math.max(
+            0,
+            h[i + width + 1] - (taken * w11) / landShare,
+          );
         }
         speed[d] = Math.sqrt(
           Math.max(0, speed[d] * speed[d] - delta * GRAVITY),

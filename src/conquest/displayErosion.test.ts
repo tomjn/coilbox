@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { erodeRelief } from "./displayErosion";
+import { erodeRelief, runDrops } from "./displayErosion";
 import { mulberry32 } from "./rng";
 
 const SIDE = 192;
@@ -114,6 +114,21 @@ describe("erodeRelief", () => {
       }
     }
     expect(across).toBeGreaterThan(down * 1.5);
+  });
+
+  it("never builds land up in the sea from drops that run into it", () => {
+    // Land rising from the sea at the left edge, so every drop ends there.
+    const side = 96;
+    const h = new Float32Array(side * side);
+    for (let y = 0; y < side; y++) {
+      for (let x = 4; x < side; x++) {
+        h[y * side + x] = 0.01 + (x - 4) * 0.003;
+      }
+    }
+    runDrops(h, side, side, mulberry32(9));
+    for (let y = 0; y < side; y++) {
+      for (let x = 0; x < 4; x++) expect(h[y * side + x]).toBe(0);
+    }
   });
 
   it("leaves flat land flat", () => {
