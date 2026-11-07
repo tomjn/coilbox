@@ -40,16 +40,31 @@ describe("toMapinfoForm", () => {
     expect(form.terrainHardness).toBe(2);
   });
 
-  it("drops a start position with a missing or invalid coordinate", () => {
-    const form = toMapinfoForm({
+  it("keeps a slot for a start position with a missing or invalid coordinate", () => {
+    const draft = {
       ...defaultMapinfoDraft,
       startPositions: [
-        { x: "512", z: "1024" },
         { x: "512", z: "" },
         { x: "abc", z: "5" },
+        { x: "512", z: "1024" },
       ],
-    });
-    expect(form.startPositions).toEqual([{ x: 512, z: 1024 }]);
+    };
+    expect(toMapinfoForm(draft).startPositions).toEqual([
+      null,
+      null,
+      { x: 512, z: 1024 },
+    ]);
+    expect(countMapinfo(draft)).toBe(1);
+  });
+
+  it("leaves out a water opacity outside 0 to 1", () => {
+    const alpha = (waterSurfaceAlpha: string) =>
+      toMapinfoForm({ ...defaultMapinfoDraft, waterSurfaceAlpha })
+        .waterSurfaceAlpha;
+    expect(alpha("-1")).toBeUndefined();
+    expect(alpha("2")).toBeUndefined();
+    expect(alpha("0")).toBe(0);
+    expect(alpha("1")).toBe(1);
   });
 
   it("sends a sun direction only when all three parts are numbers and not all zero", () => {

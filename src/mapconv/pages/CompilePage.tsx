@@ -150,7 +150,13 @@ export default function CompilePage() {
 
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
-  const [result, setResult] = useState<{ smfPath: string } | null>(null);
+  // The folder and name the compile used, kept apart from the form, which stays
+  // editable. The mapinfo.lua written afterwards describes this compile.
+  const [result, setResult] = useState<{
+    smfPath: string;
+    outDir: string;
+    outSuffix: string;
+  } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [writingMapinfo, setWritingMapinfo] = useState(false);
   const [mapinfoResult, setMapinfoResult] = useState<{
@@ -190,7 +196,11 @@ export default function CompilePage() {
   }, [maintexture, outDir, outSuffix, ct, advanced, mapinfo, setDraft]);
 
   const canRun =
-    !running && maintexture !== "" && outDir !== "" && outSuffix.trim() !== "";
+    !running &&
+    !writingMapinfo &&
+    maintexture !== "" &&
+    outDir !== "" &&
+    outSuffix.trim() !== "";
 
   function buildOpts(): CompileOpts {
     const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
@@ -228,7 +238,7 @@ export default function CompilePage() {
     try {
       const opts = buildOpts();
       const res = await mcCompile({ opts, outDir, runId, onLog });
-      setResult({ smfPath: res.smfPath });
+      setResult({ smfPath: res.smfPath, outDir, outSuffix: res.outSuffix });
       // Record (or refresh) this map as a project, remembering its compile
       // options. The source texture is a reliable preview for compile projects.
       upsertProject({
@@ -253,18 +263,17 @@ export default function CompilePage() {
   }
 
   async function writeMapinfo() {
+    if (!result) return;
     setWritingMapinfo(true);
     setMapinfoResult(null);
     setMapinfoError(null);
     try {
-      const height = (s: string) => (s.trim() === "" ? undefined : Number(s));
+      // No heights: the writer reads them from the .smf the compile wrote.
       setMapinfoResult(
         await mcWriteMapinfo({
           opts: {
-            outDir,
-            outSuffix: outSuffix.trim(),
-            minHeight: height(advanced.minh),
-            maxHeight: height(advanced.maxh),
+            outDir: result.outDir,
+            outSuffix: result.outSuffix,
             info: toMapinfoForm(mapinfo),
           },
         }),
@@ -642,7 +651,9 @@ export default function CompilePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => mcOpenPath({ path: outDir }).catch(() => {})}
+                  onClick={() =>
+                    mcOpenPath({ path: result.outDir }).catch(() => {})
+                  }
                 >
                   <FolderOpen /> <Trans>Show in folder</Trans>
                 </Button>

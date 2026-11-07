@@ -47,7 +47,8 @@ pub struct MapinfoForm {
     pub water_surface_color: Option<[f64; 3]>,
     pub water_surface_alpha: Option<f64>,
     pub terrain_hardness: Option<f64>,
-    pub start_positions: Vec<StartPos>,
+    /// One slot per team, in team order. `None` is a row the page left unfilled.
+    pub start_positions: Vec<Option<StartPos>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -63,6 +64,7 @@ pub struct WriteOpts {
     pub info: MapinfoForm,
 }
 
+#[derive(Debug)]
 pub struct Written {
     pub path: PathBuf,
     /// The file did not exist before.
@@ -249,7 +251,10 @@ pub fn edits(opts: &WriteOpts, min_height: f64, max_height: f64, new_file: bool)
         });
     }
 
+    // A row the page left incomplete is `None` and keeps its team number, so the
+    // rows after it do not move down a slot.
     for (team, pos) in form.start_positions.iter().enumerate() {
+        let Some(pos) = pos else { continue };
         for (axis, v) in [("x", pos.x), ("z", pos.z)] {
             out.push(Edit {
                 path: vec![n("teams"), Key::Index(team as i64), n("startPos"), n(axis)],
@@ -301,6 +306,13 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => return Err(format!("could not read {}: {e}", path.display())),
     };
+    let smf_path = dir.join(format!("{suffix}.smf"));
+    if !smf_path.is_file() {
+        return Err(format!(
+            "{} is not there. Compile the map first.",
+            smf_path.display()
+        ));
+    }
     let (min_height, max_height) = heights(opts, &dir)?;
     let before = existing.as_deref().unwrap_or(SKELETON);
     let after = patch(
@@ -334,7 +346,12 @@ mod tests {
     use super::*;
     use coilbox_springlua::SpringLua;
 
+    /// Options for `mymap`, with a stand-in `.smf` in `dir` unless one is there.
     fn opts(dir: &Path) -> WriteOpts {
+        let smf = dir.join("mymap.smf");
+        if !smf.exists() {
+            std::fs::write(smf, b"stand-in").unwrap();
+        }
         WriteOpts {
             out_dir: dir.to_string_lossy().into(),
             out_suffix: "mymap".into(),
@@ -371,14 +388,14 @@ mod tests {
         o.info.description = Some("A test map".into());
         o.info.author = Some("Tom".into());
         o.info.start_positions = vec![
-            StartPos {
+            Some(StartPos {
                 x: 512.0,
                 z: 1024.0,
-            },
-            StartPos {
+            }),
+            Some(StartPos {
                 x: 3000.0,
                 z: 2000.0,
-            },
+            }),
         ];
         let w = write(&o).unwrap();
         assert!(w.created && w.changed);
@@ -411,7 +428,7 @@ mod tests {
         std::fs::write(&path, format!("-- my map\n{hand}")).unwrap();
 
         o.max_height = Some(500.0);
-        o.info.start_positions = vec![StartPos { x: 1.0, z: 2.0 }];
+        o.info.start_positions = vec![Some(StartPos { x: 1.0, z: 2.0 })];
         let w = write(&o).unwrap();
         assert!(!w.created && w.changed);
 
@@ -422,6 +439,29 @@ mod tests {
         assert_eq!(v["maxMetal"], 1.5);
         assert_eq!(v["smf"]["maxheight"], 500);
         assert_eq!(v["teams"]["0"]["startPos"]["x"], 1);
+    }
+
+    #[test]
+    fn an_unfilled_start_position_keeps_the_team_numbers_after_it() {
+        let dir = temp_dir("gap");
+        let mut o = opts(&dir);
+        o.info.start_positions = vec![None, None, Some(StartPos { x: 7.0, z: 8.0 })];
+        write(&o).unwrap();
+        let v = eval(&dir);
+        assert_eq!(v["teams"]["2"]["startPos"]["x"], 7);
+        assert!(v["teams"].get("0").is_none());
+    }
+
+    #[test]
+    fn a_map_that_was_not_compiled_is_an_error() {
+        let dir = temp_dir("no-smf");
+        let mut o = opts(&dir);
+        std::fs::remove_file(dir.join("mymap.smf")).unwrap();
+        o.min_height = Some(0.0);
+        o.max_height = Some(1.0);
+        let err = write(&o).unwrap_err();
+        assert!(err.contains("mymap.smf"), "{err}");
+        assert!(!dir.join("mapinfo.lua").exists());
     }
 
     #[test]

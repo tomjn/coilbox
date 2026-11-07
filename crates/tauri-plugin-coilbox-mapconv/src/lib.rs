@@ -633,8 +633,6 @@ async fn mc_compile<R: Runtime>(
     })
 }
 
-/// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
-/// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 /// `mc_write_mapinfo` — write `<outDir>/mapinfo.lua` for a map `mc_compile` just
 /// built. Creates the file, or patches the one already there so every field the
 /// page does not own survives. Returns `{ path, created, changed }`.
@@ -654,6 +652,8 @@ async fn mc_write_mapinfo(opts: mapinfo_write::WriteOpts) -> CliResult {
     }
 }
 
+/// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
+/// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
     // A directory input (e.g. a `.sdd` directory archive, or any extracted map
     // tree) is used in place — no extraction, just locate the inner `.smf`.

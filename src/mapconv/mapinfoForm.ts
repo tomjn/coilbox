@@ -93,6 +93,12 @@ function finite(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** A number from 0 to 1, as the water opacity field allows. */
+function opacity(s: string): number | undefined {
+  const n = finite(s);
+  return n !== undefined && n >= 0 && n <= 1 ? n : undefined;
+}
+
 /** The request body for `mc_write_mapinfo`. Empty and unreadable fields are left out. */
 export function toMapinfoForm(d: MapinfoDraft): MapinfoForm {
   const sun = d.sunDir.map(finite);
@@ -112,12 +118,14 @@ export function toMapinfoForm(d: MapinfoDraft): MapinfoForm {
     groundAmbientColor: hexToRgb(d.groundAmbientColor),
     groundDiffuseColor: hexToRgb(d.groundDiffuseColor),
     waterSurfaceColor: hexToRgb(d.waterSurfaceColor),
-    waterSurfaceAlpha: finite(d.waterSurfaceAlpha),
+    waterSurfaceAlpha: opacity(d.waterSurfaceAlpha),
     terrainHardness: finite(d.terrainHardness),
-    startPositions: d.startPositions.flatMap((p) => {
+    // One slot per row. A row with a missing coordinate is null, not dropped,
+    // because the slot's position is the team number the writer uses.
+    startPositions: d.startPositions.map((p) => {
       const x = finite(p.x);
       const z = finite(p.z);
-      return x === undefined || z === undefined ? [] : [{ x, z }];
+      return x === undefined || z === undefined ? null : { x, z };
     }),
   };
 }
@@ -128,6 +136,6 @@ export function countMapinfo(d: MapinfoDraft): number {
   const { startPositions, ...rest } = form;
   return (
     Object.values(rest).filter((v) => v !== undefined).length +
-    startPositions.length
+    startPositions.filter((p) => p !== null).length
   );
 }

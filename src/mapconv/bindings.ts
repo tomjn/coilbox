@@ -195,13 +195,15 @@ export interface MapinfoForm {
   skyColor?: [number, number, number];
   fogColor?: [number, number, number];
   sunColor?: [number, number, number];
+  /** A direction vector, not a colour: its parts are not limited to 0 to 1. */
   sunDir?: [number, number, number];
   groundAmbientColor?: [number, number, number];
   groundDiffuseColor?: [number, number, number];
   waterSurfaceColor?: [number, number, number];
   waterSurfaceAlpha?: number;
   terrainHardness?: number;
-  startPositions: { x: number; z: number }[];
+  /** One slot per team, in team order. `null` is a row left unfilled. */
+  startPositions: ({ x: number; z: number } | null)[];
 }
 
 /**
