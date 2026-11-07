@@ -547,6 +547,11 @@ msgstr "{0, plural, one {Skadetabellen til {holder} nevner # panserklasse dette 
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} av de {libraryTotal} på dette kartet i biblioteket ditt er med i dette bildet.} other {{inPicture} av de {libraryTotal} på dette kartet i biblioteket ditt er med i dette bildet.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -6194,10 +6199,6 @@ msgstr "{shape} på {mapName}"
 #, fuzzy
 msgid "{shape} on any map"
 msgstr "{shape} på et hvilket som helst kart"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr ""
 
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy

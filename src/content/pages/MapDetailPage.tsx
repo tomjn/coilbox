@@ -21,10 +21,10 @@ import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
-import { useHeightGrid } from "../../campaign/pages/components/useMissionMapAssets";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { PlayabilityPanel } from "../../mapconv/pages/components/PlayabilityPanel";
 import { heightsOf } from "../../mapconv/playability";
+import { useHeightGrid } from "../../placement/useHeightGrid";
 import {
   MapLayerToggle,
   MapOverlayImage,
@@ -112,7 +112,7 @@ export default function MapDetailPage() {
     selected?.rootPath,
     decoded,
   );
-  const { grid: heightGrid } = useHeightGrid(
+  const { grid: heightGrid, error: heightGridError } = useHeightGrid(
     heightField.url ?? undefined,
     heightField.data?.width,
     heightField.data?.height,
@@ -524,7 +524,7 @@ export default function MapDetailPage() {
       <PlayabilityPanel
         key={`playability-${map.name}`}
         heights={playHeights}
-        heightsError={heightField.error}
+        heightsError={heightField.error ?? heightGridError}
         starts={minimap.startPositions}
       />
 

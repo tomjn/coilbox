@@ -443,6 +443,11 @@ msgstr "{0, plural, one {{holder}'s damage table names # armour class this game 
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 msgid "{0, plural, one {{shown} of # unit} other {{shown} of # units}}"
@@ -5006,10 +5011,6 @@ msgstr "{shape} on {mapName}"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 msgid "{shape} on any map"
 msgstr "{shape} on any map"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr "{share} of {spots} spots"
 
 #: src/multiplayer/statsRelationSummary.ts
 msgid "{shared, plural, one {# game with this player} other {# games with this player}}"

@@ -1,3 +1,4 @@
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -298,7 +299,6 @@ export function PlayabilityPanel({
                 <TableBody>
                   {result.buildings.map((b) => {
                     const share = percent(b.buildable);
-                    const spots = b.positions;
                     return (
                       <TableRow key={b.name}>
                         <TableCell className="font-mono text-xs">
@@ -314,7 +314,10 @@ export function PlayabilityPanel({
                           {degrees(b.maxSlope)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {t`${share} of ${spots} spots`}
+                          {plural(b.positions, {
+                            one: `${share} of # spot`,
+                            other: `${share} of # spots`,
+                          })}
                         </TableCell>
                       </TableRow>
                     );
@@ -353,7 +356,7 @@ export function CompiledPlayability({
         smf.width,
         smf.height,
       );
-      if (!grid) throw new Error("the heights file is the wrong size");
+      if (!grid) throw new Error("the heights file is not this map's size");
       return heightsOf(grid, smf.minHeight, smf.maxHeight);
     })()
       .then((h) => {

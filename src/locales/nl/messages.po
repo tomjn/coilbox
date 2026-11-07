@@ -548,6 +548,11 @@ msgstr "{0, plural, one {De schadetabel van {holder} noemt # pantserklasse die d
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} van de {libraryTotal} op deze kaart in je bibliotheek staat in deze afbeelding.} other {{inPicture} van de {libraryTotal} op deze kaart in je bibliotheek staan in deze afbeelding.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -6196,10 +6201,6 @@ msgstr "{shape} op {mapName}"
 #, fuzzy
 msgid "{shape} on any map"
 msgstr "{shape} op een willekeurige kaart"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr ""
 
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy

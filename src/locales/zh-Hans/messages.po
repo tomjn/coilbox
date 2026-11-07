@@ -544,6 +544,11 @@ msgstr "{0, plural, other {{holder} 的伤害表引用了此游戏没有的 # �
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, other {你库中此地图的 {libraryTotal} 个回放中有 {inPicture} 个在此图中。}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -6147,10 +6152,6 @@ msgstr "{mapName} 上的 {shape}"
 #, fuzzy
 msgid "{shape} on any map"
 msgstr "任意地图上的 {shape}"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr ""
 
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy

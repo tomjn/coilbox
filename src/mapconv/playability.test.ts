@@ -351,11 +351,16 @@ describe("game specs", () => {
       tank: { footprintx: 3, footprintz: 3, movementclass: "TANK3" },
       plane: { footprintx: 3, footprintz: 3, canfly: true },
       buoy: { footprintx: 5, footprintz: 5, floater: true },
+      yard: { footprintx: 9, footprintz: 9, waterline: 3 },
+      dock: { footprintx: 6, footprintz: 6, waterline: 3, floater: false },
     });
     expect(specs.map((s) => [s.name, s.defs])).toEqual([
       ["mex", 3],
       ["factory", 1],
     ]);
     expect(specs[1].maxSlope).toBe(15);
+    // A waterline makes a floater unless `floater` says otherwise, so the
+    // yard is left out and the dock, at 36 squares, is not the largest.
+    expect(specs.map((s) => s.name)).not.toContain("yard");
   });
 });

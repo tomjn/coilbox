@@ -547,6 +547,11 @@ msgstr "{0, plural, one {A tabela de dano de {holder} cita # classe de blindagem
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} dos {libraryTotal} deste mapa na sua biblioteca está nesta imagem.} other {{inPicture} dos {libraryTotal} deste mapa na sua biblioteca estão nesta imagem.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -6194,10 +6199,6 @@ msgstr "{shape} em {mapName}"
 #, fuzzy
 msgid "{shape} on any map"
 msgstr "{shape} em qualquer mapa"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr ""
 
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy

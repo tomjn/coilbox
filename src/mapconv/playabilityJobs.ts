@@ -14,6 +14,9 @@ export function measureOffThread(
   job: PlayabilityJob,
   signal?: AbortSignal,
 ): Promise<Playability> {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException("measuring stopped", "AbortError"));
+  }
   if (typeof Worker === "undefined") {
     return Promise.resolve().then(() => measurePlayability(job));
   }

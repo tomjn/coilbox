@@ -544,6 +544,11 @@ msgstr "{0, plural, one {Tabela obrażeń ({holder}) wymienia # klasę pancerza,
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece jest na tym obrazku.} few {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece są na tym obrazku.} many {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece jest na tym obrazku.} other {{inPicture} z {libraryTotal} powtórek z tej mapy w twojej bibliotece jest na tym obrazku.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -6147,10 +6152,6 @@ msgstr "{shape} na mapie {mapName}"
 #, fuzzy
 msgid "{shape} on any map"
 msgstr "{shape} na dowolnej mapie"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr ""
 
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy

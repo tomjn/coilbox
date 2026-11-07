@@ -553,18 +553,24 @@ async fn mc_height_field<R: Runtime>(app: AppHandle<R>, path: String, max: u32) 
 /// and reported by file name with the grid and range they are on. Keyed by the
 /// file's size and modification time, so a new compile is read afresh.
 fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json::Value, String> {
+    // The header first, so a missing or broken map says so rather than
+    // anything about the cache.
+    let at = smf::locate_smf_heights(Path::new(path))?;
     let (dir, key) = cache_dir
         .zip(thumb_cache_key(path, 0))
         .ok_or_else(|| "no cache directory to write the heights to".to_string())?;
-    let (info, bytes) = smf::read_smf_heights(Path::new(path))?;
     let name = format!("{key}-smf.bin");
     let grid = dir.join(&name);
-    if !grid.is_file() {
+    // A cache file of the wrong length is a write that did not finish.
+    let cached = std::fs::metadata(&grid).is_ok_and(|m| m.len() == at.len as u64);
+    if cached {
+        coilbox_thumb_cache::touch(&grid);
+    } else {
+        let bytes = smf::read_smf_heights(Path::new(path), &at)?;
         let _ = std::fs::create_dir_all(dir);
         std::fs::write(&grid, &bytes).map_err(|e| format!("could not write the heights: {e}"))?;
-    } else {
-        coilbox_thumb_cache::touch(&grid);
     }
+    let info = at.info;
     Ok(json!({
         "file": name,
         "width": info.mapx + 1,

@@ -544,6 +544,11 @@ msgstr "{0, plural, one {Таблиця шкоди ({holder}) називає # �
 msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr "{0, plural, one {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.} few {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.} many {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.} other {На цьому зображенні: {inPicture} з {libraryTotal} повторів цієї мапи з вашої бібліотеки.}}"
 
+#. placeholder {0}: b.positions
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
+msgstr ""
+
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
 #, fuzzy
@@ -6147,10 +6152,6 @@ msgstr "{shape} на мапі {mapName}"
 #, fuzzy
 msgid "{shape} on any map"
 msgstr "{shape} на будь-якій мапі"
-
-#: src/mapconv/pages/components/PlayabilityPanel.tsx
-msgid "{share} of {spots} spots"
-msgstr ""
 
 #: src/multiplayer/statsRelationSummary.ts
 #, fuzzy

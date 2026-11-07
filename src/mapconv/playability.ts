@@ -708,7 +708,9 @@ export function moveClassSpecs(moveDefs: unknown[]): MoveClassSpec[] {
 /**
  * Two building shapes from the game: the shape most of its buildings share,
  * and its largest. A building is a def with a footprint and no movement class
- * that neither flies nor floats. A floater stands on the water rather than on
+ * that neither flies nor floats. "This shape" means the footprint and the
+ * terrain limits together, since two defs of one footprint with different
+ * limits stand on different ground. A floater stands on the water rather than on
  * the ground, so the ground decides nothing for it.
  */
 export function buildingSpecs(
@@ -718,7 +720,14 @@ export function buildingSpecs(
   for (const key of Object.keys(units).sort()) {
     const def = units[key];
     if (field(def, "movementclass") !== undefined) continue;
-    if (flag(field(def, "canfly")) || flag(field(def, "floater"))) continue;
+    // `UnitDef.cpp` reads `floater` with a default of whether `waterline`
+    // is declared at all.
+    const floater = field(def, "floater");
+    const floats =
+      floater !== undefined
+        ? flag(floater)
+        : field(def, "waterline") !== undefined;
+    if (flag(field(def, "canfly")) || floats) continue;
     const fx = num(field(def, "footprintx"), 0);
     const fz = num(field(def, "footprintz"), 0);
     if (fx <= 0 || fz <= 0) continue;

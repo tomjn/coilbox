@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import type { StageState } from "@/placement/mapLoad";
-import { type HeightGrid, readHeightGrid } from "@/placement/terrain";
+import { useHeightGrid } from "@/placement/useHeightGrid";
 import {
   useUnitsyncHeightField,
   useUnitsyncHeightmap,
@@ -8,46 +7,6 @@ import {
   useUnitsyncMinimap,
 } from "../../../content/config";
 import { usePreferredTarget } from "../../../play/config";
-
-/**
- * The worker's raw height grid, fetched once for everything that wants it.
- *
- * One read because there is one grid and two readers: the terrain the preview
- * displaces and the ground a building's verdict is worked out on (issue #1730).
- * Tens of megabytes on a large map, so a second fetch is not a rounding error.
- */
-export function useHeightGrid(
-  src?: string,
-  width?: number,
-  height?: number,
-): { grid: HeightGrid | null; read: boolean } {
-  const [grid, setGrid] = useState<HeightGrid | null>(null);
-  const [read, setRead] = useState(true);
-  useEffect(() => {
-    if (!src || !width || !height) {
-      setGrid(null);
-      setRead(true);
-      return;
-    }
-    setRead(false);
-    let cancelled = false;
-    readHeightGrid(src, width, height)
-      .then((got) => {
-        if (cancelled) return;
-        setGrid(got);
-        setRead(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setGrid(null);
-        setRead(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [src, width, height]);
-  return { grid, read };
-}
 
 /**
  * Resolve every {@link MapPreview3D} input for a mission's map by name, reusing the
