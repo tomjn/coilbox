@@ -25,6 +25,9 @@ const OFF_SQUARE: usize = 32;
 const OFF_MINH: usize = 44;
 const OFF_MAXH: usize = 48;
 const HEADER_MIN: usize = 52;
+const OFF_HEIGHTMAP_PTR: usize = 52;
+/// The header up to and including `heightmapPtr`.
+const HEIGHTS_HEADER: usize = 56;
 
 /// Parse the leading SMF header fields. Returns an error if the bytes are too
 /// short or the magic doesn't match.
@@ -49,6 +52,37 @@ pub fn parse_smf_header(bytes: &[u8]) -> Result<SmfInfo, String> {
         world_width: mapx.saturating_mul(square_size),
         world_height: mapy.saturating_mul(square_size),
     })
+}
+
+/// A compiled map's heights: the header, and the `(mapx + 1) * (mapy + 1)`
+/// little endian 16 bit words at `heightmapPtr`, as the engine reads them in
+/// `CSMFMapFile::ReadHeightmap`.
+pub fn read_smf_heights(path: &std::path::Path) -> Result<(SmfInfo, Vec<u8>), String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("could not open {}: {e}", path.display()))?;
+    let mut head = [0u8; HEIGHTS_HEADER];
+    file.read_exact(&mut head)
+        .map_err(|_| "file too small to be an SMF".to_string())?;
+    let info = parse_smf_header(&head)?;
+    if info.mapx <= 0 || info.mapy <= 0 {
+        return Err(format!(
+            "the SMF says it is {} by {} squares",
+            info.mapx, info.mapy
+        ));
+    }
+    let ptr = u32::from_le_bytes([
+        head[OFF_HEIGHTMAP_PTR],
+        head[OFF_HEIGHTMAP_PTR + 1],
+        head[OFF_HEIGHTMAP_PTR + 2],
+        head[OFF_HEIGHTMAP_PTR + 3],
+    ]);
+    let len = (info.mapx as usize + 1) * (info.mapy as usize + 1) * 2;
+    let mut words = vec![0u8; len];
+    file.seek(SeekFrom::Start(u64::from(ptr)))
+        .and_then(|_| file.read_exact(&mut words))
+        .map_err(|_| "the SMF ends before its heightmap does".to_string())?;
+    Ok((info, words))
 }
 
 #[cfg(test)]
@@ -88,5 +122,28 @@ mod tests {
     #[test]
     fn rejects_short_input() {
         assert!(parse_smf_header(b"spring map file\0").is_err());
+    }
+
+    #[test]
+    fn reads_the_heightmap_words_at_the_pointer() {
+        let mut b = header(2, 1, 8, -10.0, 200.0);
+        b.resize(80, 0);
+        b[OFF_HEIGHTMAP_PTR..OFF_HEIGHTMAP_PTR + 4].copy_from_slice(&80u32.to_le_bytes());
+        let words: Vec<u16> = (0..6).map(|i| i * 1000).collect();
+        for w in &words {
+            b.extend_from_slice(&w.to_le_bytes());
+        }
+        let path =
+            std::env::temp_dir().join(format!("coilbox-smf-heights-{}.smf", std::process::id()));
+        std::fs::write(&path, &b).unwrap();
+        let (info, bytes) = read_smf_heights(&path).unwrap();
+        assert_eq!((info.mapx, info.mapy), (2, 1));
+        assert_eq!(bytes.len(), 12);
+        assert_eq!(u16::from_le_bytes([bytes[10], bytes[11]]), 5000);
+
+        // Cut short inside the heightmap.
+        std::fs::write(&path, &b[..b.len() - 1]).unwrap();
+        assert!(read_smf_heights(&path).is_err());
+        let _ = std::fs::remove_file(&path);
     }
 }

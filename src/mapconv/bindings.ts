@@ -176,6 +176,22 @@ export const mcHeightField = defineCommand<
   { width: number; height: number; file: string }
 >("coilbox-mapconv", "mc_height_field");
 
+/**
+ * A compiled `.smf`'s heights as the engine reads them, written to a cache file
+ * under `coilbox://mapconvthumb/` with the corner grid and height range they
+ * are on (issue #2169).
+ */
+export const mcSmfHeights = defineCommand<
+  { path: string },
+  {
+    file: string;
+    width: number;
+    height: number;
+    minHeight: number;
+    maxHeight: number;
+  }
+>("coilbox-mapconv", "mc_smf_heights");
+
 export const mcCompile = defineCommand<
   { opts: CompileOpts; outDir: string; runId: string; onLog: Channel<LogLine> },
   { smfPath: string; outSuffix: string }
