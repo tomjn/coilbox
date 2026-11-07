@@ -35,16 +35,6 @@ pub fn install_map(sdz: &Path, root: &Path, replace: bool) -> Result<Outcome, St
         .map_err(|e| format!("could not create {}: {e}", maps.display()))?;
     let dest = maps.join(file_name);
 
-    // The mapper's output folder can be the maps folder itself.
-    if let (Ok(a), Ok(b)) = (sdz.canonicalize(), dest.canonicalize()) {
-        if a == b {
-            return Ok(Outcome::Installed {
-                path: dest,
-                replaced: false,
-            });
-        }
-    }
-
     // The engine reads three kinds of map archive, and any of them under this
     // name is the same archive to its cache.
     for other in [format!("{stem}.sd7"), format!("{stem}.sdd")] {
@@ -56,13 +46,26 @@ pub fn install_map(sdz: &Path, root: &Path, replace: bool) -> Result<Outcome, St
             ));
         }
     }
+
+    // The mapper's output folder can be the maps folder itself.
+    if let (Ok(a), Ok(b)) = (sdz.canonicalize(), dest.canonicalize()) {
+        if a == b {
+            return Ok(Outcome::Installed {
+                path: dest,
+                replaced: false,
+            });
+        }
+    }
     let exists = dest.exists();
     if exists && !replace {
         return Ok(Outcome::Exists { path: dest });
     }
 
     let tmp = maps.join(format!("{file_name}.tmp"));
-    std::fs::copy(sdz, &tmp).map_err(|e| format!("could not copy to {}: {e}", tmp.display()))?;
+    std::fs::copy(sdz, &tmp).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("could not copy to {}: {e}", tmp.display())
+    })?;
     std::fs::rename(&tmp, &dest).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         format!("could not install {}: {e}", dest.display())
@@ -165,6 +168,16 @@ mod tests {
             }
         ));
         assert_eq!(std::fs::read(&src).unwrap(), b"one");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_archive_in_maps_beside_another_kind_of_the_same_name_is_refused() {
+        let dir = temp_dir("selfkind");
+        let root = dir.join("root");
+        std::fs::create_dir_all(root.join("maps/mymap.sdd")).unwrap();
+        let src = sdz(&root.join("maps"), b"one");
+        assert!(install_map(&src, &root, false).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

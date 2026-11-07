@@ -223,6 +223,8 @@ export default function CompilePage() {
   const canRun =
     !running &&
     !writingMapinfo &&
+    !packaging &&
+    !installing &&
     maintexture !== "" &&
     outDir !== "" &&
     outSuffix.trim() !== "";
@@ -291,6 +293,8 @@ export default function CompilePage() {
   /** Writes mapinfo.lua. Resolves to whether it was written. */
   async function writeMapinfo(): Promise<boolean> {
     if (!result) return false;
+    // The archive on disk holds the old mapinfo.lua, so it is packaged again.
+    clearPackage();
     setWritingMapinfo(true);
     setMapinfoResult(null);
     setMapinfoError(null);
@@ -753,7 +757,7 @@ export default function CompilePage() {
                   variant="outline"
                   size="sm"
                   onClick={packageMap}
-                  disabled={packaging || writingMapinfo}
+                  disabled={packaging || writingMapinfo || installing}
                 >
                   {packaging ? (
                     <Loader2 className="animate-spin" />

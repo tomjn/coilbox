@@ -234,9 +234,10 @@ export const mcPackMap = defineCommand<
 >("coilbox-mapconv", "mc_package_map");
 
 /**
- * Copy a packed `.sdz` into `<rootPath>/maps/`. When an archive with that name
+ * Copy a packed `.sdz` into `<rootPath>/maps/`. When an `.sdz` with that name
  * is already there and `replace` is false, nothing is copied and `installed` is
- * false.
+ * false. `replaced` is true when the copy took the place of one. A `.sd7` or
+ * `.sdd` with the same name is an error whatever `replace` says.
  */
 export const mcInstallMap = defineCommand<
   { sdzPath: string; rootPath: string; replace: boolean },

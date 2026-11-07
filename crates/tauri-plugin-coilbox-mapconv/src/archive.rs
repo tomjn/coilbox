@@ -6,11 +6,9 @@
 //!
 //! [`pack_map`] goes the other way and writes a compiled map's `.sdz`.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::luapatch::{apply, Key, Mode, Val};
-use crate::mapinfo;
+use crate::luapatch::{apply, string_literals, Key, Mode, Val};
 
 /// What [`pack_map`] wrote.
 #[derive(Debug)]
@@ -51,14 +49,14 @@ pub fn extract_archive(archive: &Path, dest: &Path) -> Result<(), String> {
 /// from the archive by the same path, so a file at `dir/<ref>` goes in at
 /// `<ref>`. The map's own `.smf`, `.smt` and `mapinfo.lua` are not listed,
 /// because [`pack_map`] places those itself.
-fn referenced_files(dir: &Path, src: &str, name: &str) -> Vec<String> {
+fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<String>, String> {
     let own = [
         "mapinfo.lua".to_string(),
         format!("{name}.smf"),
         format!("{name}.smt"),
     ];
     let mut out: Vec<String> = Vec::new();
-    for literal in string_literals(&mapinfo::strip_comments(src)) {
+    for literal in string_literals(src)? {
         let Some(rel) = crate::sanitize_rel(&literal) else {
             continue;
         };
@@ -75,34 +73,7 @@ fn referenced_files(dir: &Path, src: &str, name: &str) -> Vec<String> {
             out.push(archive_path);
         }
     }
-    out
-}
-
-/// The contents of every `"..."` and `'...'` literal in `src`. A long bracket
-/// string is not read, since a file reference is never written as one.
-fn string_literals(src: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut chars = src.chars();
-    while let Some(c) = chars.next() {
-        if c != '"' && c != '\'' {
-            continue;
-        }
-        let mut lit = String::new();
-        while let Some(d) = chars.next() {
-            match d {
-                '\\' => {
-                    if let Some(e) = chars.next() {
-                        lit.push(e);
-                    }
-                }
-                '\n' => break,
-                d if d == c => break,
-                d => lit.push(d),
-            }
-        }
-        out.push(lit);
-    }
-    out
+    Ok(out)
 }
 
 /// Write `<dir>/<name>.sdz` from the files a compile left in `dir`.
@@ -144,7 +115,7 @@ pub fn pack_map(dir: &Path, name: &str) -> Result<Packed, String> {
         &Val::Str(format!("maps/{name}.smf")),
         Mode::Set,
     )?;
-    let refs = referenced_files(dir, &archive_info, name);
+    let refs = referenced_files(dir, &archive_info, name)?;
 
     let sdz = dir.join(format!("{name}.sdz"));
     let tmp = dir.join(format!("{name}.sdz.tmp"));
@@ -177,30 +148,35 @@ fn write_zip(
         SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
-    let mut add = |entry: String, bytes: &[u8], opts: SimpleFileOptions| -> Result<(), String> {
+    // Files are copied through rather than read whole: a large map's `.smt` is
+    // hundreds of megabytes.
+    let mut add = |entry: String,
+                   mut from: &mut dyn std::io::Read,
+                   opts: SimpleFileOptions|
+     -> Result<(), String> {
         zip.start_file(entry.as_str(), opts)
             .map_err(|e| format!("could not add {entry}: {e}"))?;
-        zip.write_all(bytes)
-            .map_err(|e| format!("could not add {entry}: {e}"))?;
+        std::io::copy(&mut from, &mut zip).map_err(|e| format!("could not add {entry}: {e}"))?;
         files.push(entry);
         Ok(())
     };
-    let read =
-        |p: &Path| std::fs::read(p).map_err(|e| format!("could not read {}: {e}", p.display()));
+    let open = |p: &Path| {
+        std::fs::File::open(p).map_err(|e| format!("could not read {}: {e}", p.display()))
+    };
 
-    add("mapinfo.lua".into(), mapinfo_text.as_bytes(), deflated)?;
+    add("mapinfo.lua".into(), &mut mapinfo_text.as_bytes(), deflated)?;
     add(
         format!("maps/{name}.smf"),
-        &read(&dir.join(format!("{name}.smf")))?,
+        &mut open(&dir.join(format!("{name}.smf")))?,
         deflated,
     )?;
     add(
         format!("maps/{name}.smt"),
-        &read(&dir.join(format!("{name}.smt")))?,
+        &mut open(&dir.join(format!("{name}.smt")))?,
         stored,
     )?;
     for r in refs {
-        add(r.clone(), &read(&dir.join(r))?, deflated)?;
+        add(r.clone(), &mut open(&dir.join(r))?, deflated)?;
     }
     zip.finish()
         .map_err(|e| format!("could not finish {}: {e}", tmp.display()))?;
@@ -330,6 +306,33 @@ mod tests {
         let out = dir.join("out");
         extract_archive(&packed.path, &out).unwrap();
         assert!(find_smf(&out).unwrap().ends_with("maps/MyMap.smf"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A reference is found however it is written: a name with `--` in it, a long
+    /// bracket string, and not one that only a comment mentions.
+    #[test]
+    fn finds_references_written_with_dashes_or_long_brackets() {
+        let dir = compiled_dir("refs");
+        std::fs::write(dir.join("maps/my--sky.dds"), b"a").unwrap();
+        std::fs::write(dir.join("maps/long.dds"), b"b").unwrap();
+        std::fs::write(dir.join("maps/commented.dds"), b"c").unwrap();
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return {\n  mapfile = \"MyMap.smf\", a = \"maps/my--sky.dds\", b = [[maps/long.dds]],\n  -- c = \"maps/commented.dds\"\n}\n",
+        )
+        .unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "maps/my--sky.dds",
+                "maps/long.dds"
+            ]
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
