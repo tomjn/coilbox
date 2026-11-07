@@ -393,7 +393,7 @@ export function widestWays(
         if (!spot || reached[e]) continue;
         if ((spot.x - x) ** 2 + (spot.z - z) ** 2 < dist2[i]) {
           reached[e] = 1;
-          (out ??= []).push(e);
+          out = out ? [...out, e] : [e];
         }
       }
       return out;
