@@ -236,7 +236,8 @@ export const mcPackMap = defineCommand<
 /**
  * Copy a packed `.sdz` into `<rootPath>/maps/`. When an `.sdz` with that name
  * is already there and `replace` is false, nothing is copied and `installed` is
- * false. `replaced` is true when the copy took the place of one. A `.sd7` or
+ * false. When `sdzPath` is already the archive in `maps/`, nothing is copied
+ * and `installed` is true with `replaced` false. `replaced` is true when the copy took the place of one. A `.sd7` or
  * `.sdd` with the same name is an error whatever `replace` says.
  */
 export const mcInstallMap = defineCommand<

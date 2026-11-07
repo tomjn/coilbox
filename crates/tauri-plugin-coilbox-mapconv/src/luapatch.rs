@@ -201,6 +201,7 @@ pub fn string_literals(src: &str) -> Result<Vec<String>, String> {
             if let Some(after) = raw.strip_prefix('[') {
                 let level = after.bytes().take_while(|&c| c == b'=').count();
                 let body = &raw[level + 2..raw.len() - level - 2];
+                let body = body.strip_prefix("\r\n").unwrap_or(body);
                 body.strip_prefix('\n').unwrap_or(body).to_string()
             } else {
                 let mut out = String::new();

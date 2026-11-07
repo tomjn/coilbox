@@ -337,6 +337,19 @@ mod tests {
     }
 
     #[test]
+    fn a_long_bracket_reference_on_its_own_line_may_end_in_crlf() {
+        let dir = compiled_dir("crlf");
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return {\r\n  mapfile = \"MyMap.smf\",\r\n  a = [[\r\nmaps/sky.dds]],\r\n}\r\n",
+        )
+        .unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert!(packed.files.contains(&"maps/sky.dds".to_string()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn packing_without_a_mapinfo_names_what_to_do() {
         let dir = compiled_dir("nomi");
         std::fs::remove_file(dir.join("mapinfo.lua")).unwrap();
