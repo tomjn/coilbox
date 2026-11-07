@@ -46,6 +46,7 @@ import {
   mcProbe,
   mcReadMapinfo,
   mcReadSkybox,
+  mcReadTeams,
   mcSuggestSources,
   mcWriteMapinfo,
 } from "../bindings";
@@ -53,8 +54,8 @@ import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
 import {
   countMapinfo,
-  defaultMapinfoDraft,
   type MapinfoDraft,
+  readSavedMapinfo,
   toMapinfoForm,
 } from "../mapinfoForm";
 import { mapNameFromDir } from "../mapName";
@@ -136,10 +137,9 @@ export default function CompilePage() {
     ...draft.advanced,
   }));
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [mapinfo, setMapinfo] = useState<MapinfoDraft>(() => ({
-    ...defaultMapinfoDraft,
-    ...draft.mapinfo,
-  }));
+  const [mapinfo, setMapinfo] = useState<MapinfoDraft>(() =>
+    readSavedMapinfo(draft.mapinfo),
+  );
   const [showMapinfo, setShowMapinfo] = useState(false);
   const [textureInfo, setTextureInfo] = useState<{
     width: number;
@@ -268,6 +268,7 @@ export default function CompilePage() {
       const opts = buildOpts();
       const res = await mcCompile({ opts, outDir, runId, onLog });
       setResult({ smfPath: res.smfPath, outDir, outSuffix: res.outSuffix });
+      loadTeams(outDir);
       // Record (or refresh) this map as a project, remembering its compile
       // options. The source texture is a reliable preview for compile projects.
       upsertProject({
@@ -289,6 +290,30 @@ export default function CompilePage() {
       setRunning(false);
       runIdRef.current = null;
     }
+  }
+
+  /**
+   * Fills the start position rows from the mapinfo.lua already in the folder, so
+   * a team the mapper then removes is told apart from a list never filled in.
+   * Rows the user already has are kept.
+   */
+  function loadTeams(dir: string) {
+    mcReadTeams({ outDir: dir })
+      .then(({ teams }) => {
+        if (teams.length === 0) return;
+        setMapinfo((m) =>
+          m.startPositions !== null
+            ? m
+            : {
+                ...m,
+                startPositions: teams.map((t) => ({
+                  x: t ? String(t.x) : "",
+                  z: t ? String(t.z) : "",
+                })),
+              },
+        );
+      })
+      .catch(() => {});
   }
 
   /** Writes mapinfo.lua. Resolves to whether it was written. */
@@ -924,7 +949,7 @@ export default function CompilePage() {
             <div className="border-b border-border bg-card/50 px-4 py-3">
               <CompiledPlayability
                 smfPath={result.smfPath}
-                starts={mapinfo.startPositions
+                starts={(mapinfo.startPositions ?? [])
                   .filter((p) => p.x.trim() !== "" && p.z.trim() !== "")
                   .map((p) => ({ x: Number(p.x), z: Number(p.z) }))
                   .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z))}

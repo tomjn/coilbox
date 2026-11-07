@@ -3,6 +3,7 @@ import {
   countMapinfo,
   defaultMapinfoDraft,
   hexToRgb,
+  readSavedMapinfo,
   rgbToHex,
   toMapinfoForm,
 } from "./mapinfoForm";
@@ -23,7 +24,7 @@ describe("toMapinfoForm", () => {
       waterSurfaceColor: undefined,
       waterSurfaceAlpha: undefined,
       terrainHardness: undefined,
-      startPositions: [],
+      startPositions: undefined,
     });
     expect(countMapinfo(defaultMapinfoDraft)).toBe(0);
   });
@@ -55,6 +56,22 @@ describe("toMapinfoForm", () => {
       { x: 512, z: 1024 },
     ]);
     expect(countMapinfo(draft)).toBe(1);
+  });
+
+  it("tells no start positions from leaving them alone", () => {
+    const form = (startPositions: { x: string; z: string }[] | null) =>
+      toMapinfoForm({ ...defaultMapinfoDraft, startPositions });
+    expect(form(null).startPositions).toBeUndefined();
+    expect(form([]).startPositions).toEqual([]);
+    expect(form([{ x: "1", z: "2" }]).startPositions).toEqual([{ x: 1, z: 2 }]);
+  });
+
+  it("reads an empty saved list as leaving the start positions alone", () => {
+    expect(readSavedMapinfo(undefined).startPositions).toBeNull();
+    expect(readSavedMapinfo({ startPositions: [] }).startPositions).toBeNull();
+    expect(
+      readSavedMapinfo({ name: "a", startPositions: [{ x: "1", z: "2" }] }),
+    ).toMatchObject({ name: "a", startPositions: [{ x: "1", z: "2" }] });
   });
 
   it("leaves out a water opacity outside 0 to 1", () => {

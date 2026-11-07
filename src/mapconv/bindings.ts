@@ -218,9 +218,24 @@ export interface MapinfoForm {
   waterSurfaceColor?: [number, number, number];
   waterSurfaceAlpha?: number;
   terrainHardness?: number;
-  /** One slot per team, in team order. `null` is a row left unfilled. */
-  startPositions: ({ x: number; z: number } | null)[];
+  /**
+   * One slot per team, in team order. `null` is a row left unfilled. Left out,
+   * the page has no opinion and the file's teams stay. An empty list says the
+   * map has no start positions, which removes `teams` from the file. A list
+   * shorter than the file's teams removes the ones past its end.
+   */
+  startPositions?: ({ x: number; z: number } | null)[];
 }
+
+/**
+ * The start positions in `<outDir>/mapinfo.lua`, one slot per team in team
+ * order, `null` for a team without one. Empty when there is no file or it has
+ * no teams.
+ */
+export const mcReadTeams = defineCommand<
+  { outDir: string },
+  { teams: ({ x: number; z: number } | null)[] }
+>("coilbox-mapconv", "mc_read_teams");
 
 /**
  * Write `<outDir>/mapinfo.lua` for a map just compiled as `<outSuffix>.smf`, or
