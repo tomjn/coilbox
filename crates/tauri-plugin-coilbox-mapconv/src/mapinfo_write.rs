@@ -203,7 +203,18 @@ fn new_file_defaults() -> Vec<Edit> {
 /// order from this list. The identity and the compile's files come first, then
 /// the defaults, then the form's overrides, which need the defaults' tables to
 /// exist so they change a value instead of starting a half empty table.
-pub fn edits(opts: &WriteOpts, min_height: f64, max_height: f64, new_file: bool) -> Vec<Edit> {
+///
+/// `teams` is what the file's start positions evaluate to now, or `None` when
+/// that could not be read. A start position the page sends unchanged is not
+/// written, so a file whose teams are computed can be written while the page
+/// leaves them as they are.
+pub fn edits(
+    opts: &WriteOpts,
+    min_height: f64,
+    max_height: f64,
+    new_file: bool,
+    teams: Option<&[Option<StartPos>]>,
+) -> Vec<Edit> {
     let suffix = opts.out_suffix.trim();
     let form = &opts.info;
     let mut out = Vec::new();
@@ -274,8 +285,12 @@ pub fn edits(opts: &WriteOpts, min_height: f64, max_height: f64, new_file: bool)
             path: vec![n("teams")],
         }),
         Some(rows) => {
+            let now = teams.unwrap_or(&[]);
             for (team, pos) in rows.iter().enumerate() {
                 let Some(pos) = pos else { continue };
+                if teams.is_some() && now.get(team) == Some(&Some(*pos)) {
+                    continue;
+                }
                 for (axis, v) in [("x", pos.x), ("z", pos.z)] {
                     out.push(Edit::Put {
                         path: vec![n("teams"), Key::Index(team as i64), n("startPos"), n(axis)],
@@ -284,10 +299,12 @@ pub fn edits(opts: &WriteOpts, min_height: f64, max_height: f64, new_file: bool)
                     });
                 }
             }
-            out.push(Edit::Trim {
-                path: vec![n("teams")],
-                keep: rows.len(),
-            });
+            if teams.is_none() || now.len() > rows.len() {
+                out.push(Edit::Trim {
+                    path: vec![n("teams")],
+                    keep: rows.len(),
+                });
+            }
         }
     }
     out
@@ -300,12 +317,16 @@ pub fn patch(src: &str, edits: &[Edit]) -> Result<String, String> {
         Edit::Remove { path } => remove(&text, path),
         Edit::Trim { path, keep } => {
             let mut text = text;
-            for i in index_keys(&text, path)? {
-                if usize::try_from(i).map_or(true, |i| i >= *keep) {
-                    let mut at = path.clone();
-                    at.push(Key::Index(i));
-                    text = remove(&text, &at)?;
-                }
+            let mut doomed: Vec<i64> = index_keys(&text, path)?
+                .into_iter()
+                .filter(|&i| usize::try_from(i).is_ok_and(|i| i >= *keep))
+                .collect();
+            // Highest first, so removing one never renumbers a value still to go.
+            doomed.sort_unstable_by(|a, b| b.cmp(a));
+            for i in doomed {
+                let mut at = path.clone();
+                at.push(Key::Index(i));
+                text = remove(&text, &at)?;
             }
             Ok(text)
         }
@@ -408,9 +429,19 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     }
     let (min_height, max_height) = heights(opts, &dir)?;
     let before = existing.as_deref().unwrap_or(SKELETON);
+    let teams = match existing {
+        Some(_) => read_teams(&dir).ok(),
+        None => Some(Vec::new()),
+    };
     let after = patch(
         before,
-        &edits(opts, min_height, max_height, existing.is_none()),
+        &edits(
+            opts,
+            min_height,
+            max_height,
+            existing.is_none(),
+            teams.as_deref(),
+        ),
     )?;
 
     if existing.as_deref().is_some_and(|e| evaluates(&dir, e)) && !evaluates(&dir, &after) {
@@ -603,6 +634,40 @@ mod tests {
         let v = eval(&dir);
         assert_eq!(v["teams"]["1"]["startPos"]["x"], 3);
         assert_eq!(v["teams"]["2"]["startPos"]["x"], 7);
+    }
+
+    #[test]
+    fn computed_teams_the_page_did_not_change_are_not_an_error() {
+        let dir = temp_dir("computed-teams");
+        let src = "return {\n    teams = { [0] = (function() return { startPos = { x = 1, z = 2 } } end)() },\n}\n";
+        std::fs::write(dir.join("mapinfo.lua"), src).unwrap();
+        let mut o = opts(&dir);
+        o.info.start_positions = Some(vec![pos(1.0, 2.0)]);
+        write(&o).unwrap();
+        let text = std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap();
+        assert!(text.contains(
+            "teams = { [0] = (function() return { startPos = { x = 1, z = 2 } } end)() },"
+        ));
+
+        o.info.start_positions = Some(vec![pos(9.0, 2.0)]);
+        assert!(write(&o).is_err());
+        o.info.start_positions = Some(Vec::new());
+        write(&o).unwrap();
+        assert!(eval(&dir).get("teams").is_none());
+    }
+
+    #[test]
+    fn a_team_list_written_without_keys_is_trimmed_and_negative_keys_are_left() {
+        let dir = temp_dir("positional-teams");
+        let src = "return {\n    teams = {\n        [-1] = { startPos = { x = 7, z = 7 } },\n        [0] = { startPos = { x = 1, z = 2 } },\n        { startPos = { x = 3, z = 4 } },\n        { startPos = { x = 5, z = 6 } },\n    },\n}\n";
+        std::fs::write(dir.join("mapinfo.lua"), src).unwrap();
+        let mut o = opts(&dir);
+        o.info.start_positions = Some(vec![pos(1.0, 2.0), pos(3.0, 4.0)]);
+        write(&o).unwrap();
+        let v = eval(&dir);
+        assert_eq!(v["teams"]["-1"]["startPos"]["x"], 7);
+        assert_eq!(v["teams"]["1"]["startPos"]["x"], 3);
+        assert!(v["teams"].get("2").is_none());
     }
 
     #[test]
