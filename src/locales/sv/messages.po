@@ -10167,6 +10167,10 @@ msgstr "Lägg till server"
 msgid "Add spawn"
 msgstr "Lägg till spawn"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Add start position"
+msgstr ""
+
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Add tag…"
@@ -10836,6 +10840,11 @@ msgstr "Redan upptaget"
 #, fuzzy
 msgid "Already tried, and did not reproduce the match: {triedLabels}."
 msgstr "Redan provat, och återskapade inte matchen: {triedLabels}."
+
+#. placeholder {0}: mapinfoResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Already up to date <0>{0}</0>"
+msgstr ""
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
@@ -11991,6 +12000,7 @@ msgstr "Försök registrerat på {name}."
 msgid "Audio"
 msgstr "Ljud"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Author"
@@ -18263,6 +18273,11 @@ msgstr "Skapa uppsättning"
 msgid "Create the first admin, or set an account to the <0>fresh</0> or <1>agreement</1> levels. <2>SETACCESS</2> only accepts <3>user</3>, <4>mod</4> and <5>admin</5>."
 msgstr "Skapa den första administratören, eller sätt ett konto till nivåerna <0>fresh</0> eller <1>agreement</1>. <2>SETACCESS</2> godtar bara <3>user</3>, <4>mod</4> och <5>admin</5>."
 
+#. placeholder {0}: mapinfoResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Created <0>{0}</0>"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Created and nothing else. Shows what a script does unasked."
@@ -19377,6 +19392,7 @@ msgstr "Beskriv den i stället"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/hub/PublishSection.tsx
+#: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/UnitTextPanel.tsx
@@ -22867,6 +22883,10 @@ msgstr "Flyter på vatten"
 msgid "Fly over the smoothed map"
 msgstr "Flyg över den utjämnade kartan"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Fog colour"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -24248,6 +24268,14 @@ msgstr "Bara rutnät"
 msgid "Ground"
 msgstr "Mark"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Ground ambient"
+msgstr ""
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Ground diffuse"
+msgstr ""
+
 #: src/workshop/explosionGenerators.ts
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -25584,6 +25612,7 @@ msgid "Icon set, no background"
 msgstr "Ikon vald, ingen bakgrund"
 
 #: src/content/pages/components/UnitModelPanel.tsx
+#: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Identity"
 msgstr "Identitet"
@@ -29120,6 +29149,14 @@ msgstr "Kartmapp ”{folder}”"
 msgid "Map icon"
 msgstr "Kartikon"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Map info"
+msgstr ""
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Map info ({mapinfoCount})"
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Map keys. Full stop and comma step through what is on the map, including a path's points, which follow the group they belong to. Arrow keys move what is selected one build square north, south, east or west. Hold Shift for ten squares, Alt for one elmo. With nothing selected the arrows move the view's cursor instead. R turns, Shift R turns the other way. Delete removes. T turns everything selected as one shape instead, so a base swings round its own middle rather than each building spinning where it stands, and Shift T swings it the other way. S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. North and east make it bigger, south and west make it smaller. Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. Escape lets go of the selection. More than one thing can be selected at once, and then every one of those keys acts on all of it. Full stop and comma replace the selection rather than growing it. A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. Contents' Shift with Enter on a row adds that row the same way. P reads how many of the buildings on the map cannot be built where they stand. Question mark reads this out again."
@@ -30732,6 +30769,7 @@ msgstr "mysql-binärfil"
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
@@ -39798,6 +39836,10 @@ msgstr "Ta bort spawn"
 msgid "Remove tag {tag}"
 msgstr "Ta bort taggen {tag}"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Remove team {team}"
+msgstr ""
+
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
 msgid "Remove the audio"
@@ -40392,6 +40434,7 @@ msgstr "Återställ {eventLabel} till {defaultSoundLabel}"
 msgid "Reset {game}'s own widgets"
 msgstr "Återställ de egna widgetarna i {game}"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy
 msgid "Reset {label}"
@@ -43577,6 +43620,10 @@ msgstr "Chockvågens utbredningshastighet"
 msgid "Shoot at each piece"
 msgstr "Skjut på varje del"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Short name"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Short replays"
@@ -44428,6 +44475,14 @@ msgstr "Inställningar för skärmytsling"
 #, fuzzy
 msgid "Sky"
 msgstr "Himmel"
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Sky and light"
+msgstr ""
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Sky colour"
+msgstr ""
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -45286,6 +45341,10 @@ msgstr "Startpositioner"
 msgid "Start positions · {startCount}"
 msgstr "Startpositioner · {startCount}"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Start positions (elmos)"
+msgstr ""
+
 #: src/content/pages/components/MapExportButtons.tsx
 #, fuzzy
 msgid "Start positions exported."
@@ -45836,6 +45895,14 @@ msgstr "Föreslaget utifrån vad spelet kallar varje sidas enheter, och bara dä
 msgid "Suggested map"
 msgstr "Föreslagen karta"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Sun colour"
+msgstr ""
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Sun direction {axis}"
+msgstr ""
+
 #: src/lego/balance.ts
 #, fuzzy
 msgid "Support guessed from the lowest pieces."
@@ -46249,9 +46316,18 @@ msgid "Team {number}"
 msgstr "Lag {number}"
 
 #: src/content/matchStats.ts
+#: src/mapconv/pages/components/MapinfoOptions.tsx
 #, fuzzy
 msgid "Team {team}"
 msgstr "Lag {team}"
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Team {team} X"
+msgstr ""
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Team {team} Z"
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -46342,6 +46418,10 @@ msgstr "Terräng"
 #, fuzzy
 msgid "Terrain changes"
 msgstr "Terrängändringar"
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Terrain hardness"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -53515,6 +53595,11 @@ msgstr "Uppdatera widget"
 msgid "Updated"
 msgstr "Uppdaterad"
 
+#. placeholder {0}: mapinfoResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Updated <0>{0}</0>"
+msgstr ""
+
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
 msgid "Updated the blueprint widget. Its panel opens on its own the first time a match starts."
@@ -54352,10 +54437,22 @@ msgstr "Tittar…"
 msgid "Water"
 msgstr "Vatten"
 
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Water and ground"
+msgstr ""
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Water colour"
+msgstr ""
+
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
 msgid "Water depth"
 msgstr "Vattendjup"
+
+#: src/mapconv/pages/components/MapinfoOptions.tsx
+msgid "Water opacity"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -55712,6 +55809,10 @@ msgstr "skrivningen misslyckades"
 #, fuzzy
 msgid "Write into {gameLabel}'s {gameFileName}"
 msgstr "Skriv in i {gameFileName} för {gameLabel}"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write mapinfo.lua"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
