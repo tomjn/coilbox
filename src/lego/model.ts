@@ -925,6 +925,12 @@ export interface LegoProject {
    */
   skeleton?: LegoSkeleton;
   /**
+   * The inputs the generator made this unit from, and the module instances it
+   * hung on it (#3231). Absent on a unit somebody built by hand. See
+   * `generate.ts`.
+   */
+  generated?: LegoGenerated;
+  /**
    * The named loadouts of this chassis, in the order the switch lists them
    * (#3281). Absent means a unit with no loadouts, which is every unit saved
    * before this existed. When present there are at least two, and the one
@@ -1104,6 +1110,21 @@ export interface LegoSkeleton {
    * the plan made.
    */
   fitted?: true;
+}
+
+/**
+ * What made a generated unit (#3231). The four inputs remake it, given the same
+ * module library. `modules` names each module instance the generator hung on
+ * the skeleton, by the slot it filled, so a later reroll can tell its own
+ * pieces from ones the game maker added: every piece of an instance carries
+ * `LegoModuleRef.instance`.
+ */
+export interface LegoGenerated {
+  seed: number;
+  plan: string;
+  job: string;
+  size: string;
+  modules: { slot: string; module: string; instance: string }[];
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -1877,6 +1898,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       return guides ? { guides } : {};
     })(),
     ...(skeleton ? { skeleton } : {}),
+    ...(() => {
+      const generated = parseGenerated(d.generated);
+      return generated ? { generated } : {};
+    })(),
     ...loadouts,
     ...(budget !== null ? { budget } : {}),
     ...(lockedModules.length > 0 ? { lockedModules } : {}),
@@ -1920,6 +1945,34 @@ function parseSkeleton(value: unknown): LegoSkeleton | null {
     ...(target ? { target } : {}),
     ...(v.fitted === true ? { fitted: true as const } : {}),
   };
+}
+
+/** A generator record with a whole seed and named inputs, or null. A module
+ *  entry missing any of its three names is dropped. */
+function parseGenerated(value: unknown): LegoGenerated | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.seed !== "number" ||
+    !Number.isSafeInteger(v.seed) ||
+    typeof v.plan !== "string" ||
+    typeof v.job !== "string" ||
+    typeof v.size !== "string"
+  ) {
+    return null;
+  }
+  const modules = Array.isArray(v.modules)
+    ? v.modules.flatMap((entry) => {
+        if (typeof entry !== "object" || entry === null) return [];
+        const { slot, module, instance } = entry as Record<string, unknown>;
+        return typeof slot === "string" &&
+          typeof module === "string" &&
+          typeof instance === "string"
+          ? [{ slot, module, instance }]
+          : [];
+      })
+    : [];
+  return { seed: v.seed, plan: v.plan, job: v.job, size: v.size, modules };
 }
 
 /** A target with whole footprint steps of 1 or more and a positive height, or
