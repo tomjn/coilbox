@@ -679,7 +679,8 @@ fn only_a_comment_follows(src: &str, pos: usize) -> bool {
     }
     let b = src.as_bytes();
     let at = eol - rest.len();
-    rest.starts_with("--") && !(b.get(at + 2) == Some(&b'[') && long_bracket_level(b, at + 2).is_some())
+    rest.starts_with("--")
+        && !(b.get(at + 2) == Some(&b'[') && long_bracket_level(b, at + 2).is_some())
 }
 
 /// Delete `table.fields[i]`, and the line it sits on when it has the line to
@@ -687,12 +688,10 @@ fn only_a_comment_follows(src: &str, pos: usize) -> bool {
 fn delete_field(src: &str, table: &Table, i: usize) -> String {
     let f = &table.fields[i];
     let ls = line_start(src, f.start);
-    let alone = src[ls..f.start].trim_matches([' ', '\t']).is_empty()
-        && only_a_comment_follows(src, f.end);
+    let alone =
+        src[ls..f.start].trim_matches([' ', '\t']).is_empty() && only_a_comment_follows(src, f.end);
     if alone {
-        let eol = src[f.end..]
-            .find('\n')
-            .map_or(src.len(), |p| f.end + p + 1);
+        let eol = src[f.end..].find('\n').map_or(src.len(), |p| f.end + p + 1);
         return splice(src, ls, eol - ls, "");
     }
     let prev = i.checked_sub(1).map(|p| &table.fields[p]);
@@ -701,7 +700,11 @@ fn delete_field(src: &str, table: &Table, i: usize) -> String {
         (_, Some(next)) => splice(src, f.start, next.start - f.start, ""),
         // The last field: take the separator that joined it to the one before.
         (Some(prev), None) => {
-            let from = if f.end > f.v_end { prev.end } else { prev.v_end };
+            let from = if f.end > f.v_end {
+                prev.end
+            } else {
+                prev.v_end
+            };
             splice(src, from, f.end - from, "")
         }
         (None, None) => splice(src, table.open + 1, table.close - table.open - 1, ""),

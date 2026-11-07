@@ -348,9 +348,7 @@ pub fn read_teams(dir: &Path) -> Result<Vec<Option<StartPos>>, String> {
         Err(e) => return Err(format!("could not read {}: {e}", path.display())),
     };
     let value = SpringLua::new(dir)
-        .and_then(|lua| {
-            lua.eval_expr_value(&format!("(function()\n{src}\nend)()"), "mapinfo.lua")
-        })
+        .and_then(|lua| lua.eval_expr_value(&format!("(function()\n{src}\nend)()"), "mapinfo.lua"))
         .map_err(|e| format!("could not evaluate {}: {e}", path.display()))?;
     let field = |v: &serde_json::Value, name: &str| {
         v.as_object()?
