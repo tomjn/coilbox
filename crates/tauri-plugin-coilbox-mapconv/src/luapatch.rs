@@ -668,6 +668,118 @@ fn insert_field(src: &str, table: &Table, key: &Key, val: &Val) -> String {
     }
 }
 
+/// The rest of the line after `pos` holds no code: it is blank or a `--` line
+/// comment. A comment that opens a long bracket is not counted, because it can
+/// run past the end of the line.
+fn only_a_comment_follows(src: &str, pos: usize) -> bool {
+    let eol = src[pos..].find('\n').map_or(src.len(), |p| pos + p);
+    let rest = src[pos..eol].trim_start_matches([' ', '\t', '\r']);
+    if rest.is_empty() {
+        return true;
+    }
+    let b = src.as_bytes();
+    let at = eol - rest.len();
+    rest.starts_with("--") && !(b.get(at + 2) == Some(&b'[') && long_bracket_level(b, at + 2).is_some())
+}
+
+/// Delete `table.fields[i]`, and the line it sits on when it has the line to
+/// itself.
+fn delete_field(src: &str, table: &Table, i: usize) -> String {
+    let f = &table.fields[i];
+    let ls = line_start(src, f.start);
+    let alone = src[ls..f.start].trim_matches([' ', '\t']).is_empty()
+        && only_a_comment_follows(src, f.end);
+    if alone {
+        let eol = src[f.end..]
+            .find('\n')
+            .map_or(src.len(), |p| f.end + p + 1);
+        return splice(src, ls, eol - ls, "");
+    }
+    let prev = i.checked_sub(1).map(|p| &table.fields[p]);
+    match (prev, table.fields.get(i + 1)) {
+        // Something follows on the line: take the field up to the next one.
+        (_, Some(next)) => splice(src, f.start, next.start - f.start, ""),
+        // The last field: take the separator that joined it to the one before.
+        (Some(prev), None) => {
+            let from = if f.end > f.v_end { prev.end } else { prev.v_end };
+            splice(src, from, f.end - from, "")
+        }
+        (None, None) => splice(src, table.open + 1, table.close - table.open - 1, ""),
+    }
+}
+
+/// Delete the field at `path` from the table `src` returns, together with the
+/// line it sits on when it has the line to itself (so its trailing comment goes
+/// with it). Every other byte stays as it was, and so does a comment on a line
+/// above the field. A field the file does not have is not an error. A table
+/// along the path that is not a table constructor cannot be edited, which is an
+/// error.
+pub fn remove(src: &str, path: &[Key]) -> Result<String, String> {
+    let mut text = src.to_string();
+    // A key written twice is read as its last value, so every copy goes.
+    loop {
+        let toks = lex(&text)?;
+        let lv = levels(&text, &toks);
+        let cx = Ctx {
+            src: &text,
+            toks,
+            lv,
+        };
+        let root = cx.root()?;
+        let mut table = &root;
+        let mut found = None;
+        for (depth, key) in path.iter().enumerate() {
+            let last = depth + 1 == path.len();
+            let Some(i) = table
+                .fields
+                .iter()
+                .rposition(|f| f.key.as_ref().is_some_and(|k| k.matches(key)))
+            else {
+                break;
+            };
+            if last {
+                found = Some(i);
+            } else if let Some(inner) = &table.fields[i].table {
+                table = inner;
+            } else {
+                return Err(format!(
+                    "`{}` in mapinfo.lua is not a table written out in the file, so `{}` cannot be removed from inside it",
+                    key.describe(),
+                    path.iter().map(Key::describe).collect::<Vec<_>>().join(".")
+                ));
+            }
+        }
+        match found {
+            Some(i) => text = delete_field(&text, table, i),
+            None => return Ok(text),
+        }
+    }
+}
+
+/// The integer keys written in the table at `path`, in file order. Empty when
+/// the table is missing or is not written out in the file.
+pub fn index_keys(src: &str, path: &[Key]) -> Result<Vec<i64>, String> {
+    let toks = lex(src)?;
+    let lv = levels(src, &toks);
+    let cx = Ctx { src, toks, lv };
+    let root = cx.root()?;
+    let mut table = &root;
+    for key in path {
+        match find_field(table, key).and_then(|f| f.table.as_ref()) {
+            Some(inner) => table = inner,
+            None => return Ok(Vec::new()),
+        }
+    }
+    Ok(table
+        .fields
+        .iter()
+        .filter_map(|f| match f.key {
+            Some(Key::Index(i)) => Some(i),
+            _ => None,
+        })
+        .collect())
+}
+
 /// Set `val` at `path` in the table `src` returns.
 ///
 /// Tables along the path that are missing are created. With [`Mode::Default`]
@@ -850,6 +962,113 @@ mod tests {
     fn keeps_crlf_line_endings() {
         let out = set("return {\r\n    a = 1,\r\n}\r\n", &[n("b")], Val::Num(2.0));
         assert_eq!(out, "return {\r\n    a = 1,\r\n    b = 2,\r\n}\r\n");
+    }
+
+    const TEAMS: &str = "-- my map\nlocal mapinfo = {\n    name = \"Mine\", -- hand edit\n    teams = {\n        [0] = { startPos = { x = 1, z = 2 } },\n        [1] = { startPos = { x = 3, z = 4 } }, -- the middle one\n        [2] = {\n            startPos = { x = 5, z = 6 },\n        },\n    },\n    gravity = 90, -- floaty\n}\nreturn mapinfo\n";
+
+    fn team(i: i64) -> Vec<Key> {
+        vec![n("teams"), Key::Index(i)]
+    }
+
+    #[test]
+    fn removes_an_entry_from_the_middle_with_its_line_and_comment() {
+        let out = remove(TEAMS, &team(1)).unwrap();
+        assert_eq!(
+            out,
+            TEAMS.replace(
+                "        [1] = { startPos = { x = 3, z = 4 } }, -- the middle one\n",
+                ""
+            )
+        );
+    }
+
+    #[test]
+    fn removes_the_last_entry_and_leaves_the_table_closed() {
+        let out = remove(TEAMS, &team(2)).unwrap();
+        assert_eq!(
+            out,
+            TEAMS.replace(
+                "        [2] = {\n            startPos = { x = 5, z = 6 },\n        },\n",
+                ""
+            )
+        );
+    }
+
+    #[test]
+    fn removes_a_whole_table_and_keeps_hand_edits_around_it() {
+        let out = remove(TEAMS, &[n("teams")]).unwrap();
+        assert!(out.starts_with("-- my map\nlocal mapinfo = {\n    name = \"Mine\", -- hand edit\n    gravity = 90, -- floaty\n}\nreturn mapinfo\n"));
+        assert!(!out.contains("teams"));
+    }
+
+    #[test]
+    fn removes_from_a_single_line_table() {
+        let src = "return { teams = { [0] = 1, [1] = 2, [2] = 3 }, a = 1 }";
+        assert_eq!(
+            remove(src, &team(0)).unwrap(),
+            "return { teams = { [1] = 2, [2] = 3 }, a = 1 }"
+        );
+        assert_eq!(
+            remove(src, &team(1)).unwrap(),
+            "return { teams = { [0] = 1, [2] = 3 }, a = 1 }"
+        );
+        assert_eq!(
+            remove(src, &team(2)).unwrap(),
+            "return { teams = { [0] = 1, [1] = 2 }, a = 1 }"
+        );
+        assert_eq!(
+            remove("return { a = 1, b = 2, }", &[n("b")]).unwrap(),
+            "return { a = 1, }"
+        );
+        assert_eq!(
+            remove("return { teams = { [0] = 1 } }", &team(0)).unwrap(),
+            "return { teams = {} }"
+        );
+    }
+
+    #[test]
+    fn removes_a_last_entry_that_has_no_trailing_comma() {
+        let src = "return {\n    a = 1,\n    b = 2 -- two\n}\n";
+        assert_eq!(remove(src, &[n("b")]).unwrap(), "return {\n    a = 1,\n}\n");
+    }
+
+    #[test]
+    fn removes_every_copy_of_a_repeated_key() {
+        let src = "return { a = 1, b = 2, a = 3 }";
+        assert_eq!(remove(src, &[n("a")]).unwrap(), "return { b = 2 }");
+    }
+
+    #[test]
+    fn removing_a_field_that_is_not_there_changes_nothing() {
+        assert_eq!(remove(TEAMS, &team(7)).unwrap(), TEAMS);
+        assert_eq!(remove(TEAMS, &[n("water"), n("x")]).unwrap(), TEAMS);
+    }
+
+    #[test]
+    fn removing_inside_a_computed_table_is_an_error() {
+        assert!(remove("return { teams = load() }", &team(0)).is_err());
+    }
+
+    #[test]
+    fn removal_keeps_crlf_and_a_long_comment_on_the_line() {
+        let src = "return {\r\n    a = 1,\r\n    b = 2, --[[ x ]] c = 3,\r\n    d = 4,\r\n}\r\n";
+        assert_eq!(
+            remove(src, &[n("a")]).unwrap(),
+            "return {\r\n    b = 2, --[[ x ]] c = 3,\r\n    d = 4,\r\n}\r\n"
+        );
+        assert_eq!(
+            remove(src, &[n("b")]).unwrap(),
+            "return {\r\n    a = 1,\r\n    c = 3,\r\n    d = 4,\r\n}\r\n"
+        );
+    }
+
+    #[test]
+    fn lists_the_integer_keys_of_a_table() {
+        assert_eq!(index_keys(TEAMS, &[n("teams")]).unwrap(), vec![0, 1, 2]);
+        assert!(index_keys(TEAMS, &[n("water")]).unwrap().is_empty());
+        assert!(index_keys("return { teams = load() }", &[n("teams")])
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
