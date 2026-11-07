@@ -11,11 +11,13 @@ import {
   FolderOpen,
   Hammer,
   Loader2,
+  Package,
+  PackageCheck,
   Play,
   Square,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,6 +26,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover";
+import { useWriteRoot } from "@/downloads/config";
 import { basename, errorText } from "@/lib/helpers";
 import {
   type CompileOpts,
@@ -32,7 +40,9 @@ import {
   type MapAppearance,
   mcCancel,
   mcCompile,
+  mcInstallMap,
   mcOpenPath,
+  mcPackMap,
   mcProbe,
   mcReadMapinfo,
   mcReadSkybox,
@@ -165,6 +175,21 @@ export default function CompilePage() {
     changed: boolean;
   } | null>(null);
   const [mapinfoError, setMapinfoError] = useState<string | null>(null);
+  const [packaging, setPackaging] = useState(false);
+  const [packResult, setPackResult] = useState<{
+    path: string;
+    files: string[];
+  } | null>(null);
+  const [packError, setPackError] = useState<string | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [installResult, setInstallResult] = useState<{
+    path: string;
+    replaced: boolean;
+  } | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+  // Opens when the maps folder already holds an archive with this name.
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const mapsRoot = useWriteRoot("maps");
   const [probe, setProbe] = useState<{
     available: boolean;
     compile: boolean;
@@ -230,6 +255,7 @@ export default function CompilePage() {
     setRunError(null);
     setMapinfoResult(null);
     setMapinfoError(null);
+    clearPackage();
     setLogLines([]);
     const runId = crypto.randomUUID();
     runIdRef.current = runId;
@@ -262,8 +288,9 @@ export default function CompilePage() {
     }
   }
 
-  async function writeMapinfo() {
-    if (!result) return;
+  /** Writes mapinfo.lua. Resolves to whether it was written. */
+  async function writeMapinfo(): Promise<boolean> {
+    if (!result) return false;
     setWritingMapinfo(true);
     setMapinfoResult(null);
     setMapinfoError(null);
@@ -278,10 +305,62 @@ export default function CompilePage() {
           },
         }),
       );
+      return true;
     } catch (e) {
       setMapinfoError(errorText(e));
+      return false;
     } finally {
       setWritingMapinfo(false);
+    }
+  }
+
+  function clearPackage() {
+    setPackResult(null);
+    setPackError(null);
+    setInstallResult(null);
+    setInstallError(null);
+    setReplaceOpen(false);
+  }
+
+  // An archive without mapinfo.lua cannot be loaded, so a compile that has had
+  // none written this session gets one first. A mapinfo.lua the user already
+  // wrote with the button beside this one is packaged as it is.
+  async function packageMap() {
+    if (!result) return;
+    clearPackage();
+    setPackaging(true);
+    try {
+      if (!mapinfoResult && !(await writeMapinfo())) return;
+      setPackResult(
+        await mcPackMap({
+          outDir: result.outDir,
+          outSuffix: result.outSuffix,
+        }),
+      );
+    } catch (e) {
+      setPackError(errorText(e));
+    } finally {
+      setPackaging(false);
+    }
+  }
+
+  async function installMap(replace: boolean) {
+    if (!packResult || !mapsRoot.path) return;
+    setInstalling(true);
+    setInstallError(null);
+    try {
+      const r = await mcInstallMap({
+        sdzPath: packResult.path,
+        rootPath: mapsRoot.path,
+        replace,
+      });
+      setReplaceOpen(!r.installed);
+      if (r.installed) setInstallResult(r);
+    } catch (e) {
+      setReplaceOpen(false);
+      setInstallError(errorText(e));
+    } finally {
+      setInstalling(false);
     }
   }
 
@@ -670,7 +749,139 @@ export default function CompilePage() {
                   )}{" "}
                   <Trans>Write mapinfo.lua</Trans>
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={packageMap}
+                  disabled={packaging || writingMapinfo}
+                >
+                  {packaging ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Package />
+                  )}{" "}
+                  <Trans>Package</Trans>
+                </Button>
+                {packResult && (
+                  <Popover
+                    open={replaceOpen}
+                    onOpenChange={(o) => {
+                      if (!o) setReplaceOpen(false);
+                    }}
+                  >
+                    <PopoverAnchor asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void installMap(false)}
+                        disabled={installing || !mapsRoot.path}
+                      >
+                        {installing ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <PackageCheck />
+                        )}{" "}
+                        <Trans>Install</Trans>
+                      </Button>
+                    </PopoverAnchor>
+                    <PopoverContent
+                      align="start"
+                      side="bottom"
+                      className="flex w-80 flex-col gap-3"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <h3 className="break-words text-sm font-medium">
+                          {t`Replace ${basename(packResult.path)}?`}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          <Trans>
+                            A map with this name is already installed. The
+                            engine caches archives by name, so a changed map
+                            under an unchanged name can confuse it. Package it
+                            under a new name with a version suffix, such as{" "}
+                            {result.outSuffix}_v2, to keep both.
+                          </Trans>
+                        </p>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setReplaceOpen(false)}
+                        >
+                          <Trans>Cancel</Trans>
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          disabled={installing}
+                          onClick={() => void installMap(true)}
+                        >
+                          <Trans>Replace</Trans>
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
+              {packResult && (
+                <p className="mt-2 break-all text-sm">
+                  <Trans>
+                    Packaged{" "}
+                    <span className="font-mono text-xs">{packResult.path}</span>
+                  </Trans>
+                </p>
+              )}
+              {packResult && !mapsRoot.loading && !mapsRoot.path && (
+                <p className="mt-2 text-sm text-destructive">
+                  <Trans>
+                    No maps folder is set, so there is nowhere to install to.
+                    Add a content folder in Settings.
+                  </Trans>
+                </p>
+              )}
+              {installResult && (
+                <p className="mt-2 break-all text-sm">
+                  {installResult.replaced ? (
+                    <Trans>
+                      Replaced{" "}
+                      <span className="font-mono text-xs">
+                        {installResult.path}
+                      </span>
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      Installed{" "}
+                      <span className="font-mono text-xs">
+                        {installResult.path}
+                      </span>
+                    </Trans>
+                  )}{" "}
+                  <Trans>
+                    The engine sees it on its next archive scan. Press Rescan on
+                    the{" "}
+                    <Link
+                      className="underline underline-offset-4"
+                      to="/library/maps"
+                    >
+                      Maps page
+                    </Link>
+                    .
+                  </Trans>
+                </p>
+              )}
+              {packError && (
+                <p className="mt-2 break-words text-sm text-destructive">
+                  {packError}
+                </p>
+              )}
+              {installError && (
+                <p className="mt-2 break-words text-sm text-destructive">
+                  {installError}
+                </p>
+              )}
               {mapinfoResult && (
                 <p className="mt-2 break-all text-sm">
                   {mapinfoResult.created ? (

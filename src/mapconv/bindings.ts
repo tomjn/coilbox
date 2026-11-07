@@ -224,6 +224,25 @@ export const mcWriteMapinfo = defineCommand<
   { path: string; created: boolean; changed: boolean }
 >("coilbox-mapconv", "mc_write_mapinfo");
 
+/**
+ * Write `<outDir>/<outSuffix>.sdz` from the compile and the `mapinfo.lua` beside
+ * it. `files` lists the archive's entries by their path inside it.
+ */
+export const mcPackMap = defineCommand<
+  { outDir: string; outSuffix: string },
+  { path: string; files: string[] }
+>("coilbox-mapconv", "mc_package_map");
+
+/**
+ * Copy a packed `.sdz` into `<rootPath>/maps/`. When an archive with that name
+ * is already there and `replace` is false, nothing is copied and `installed` is
+ * false.
+ */
+export const mcInstallMap = defineCommand<
+  { sdzPath: string; rootPath: string; replace: boolean },
+  { installed: boolean; replaced: boolean; path: string }
+>("coilbox-mapconv", "mc_install_map");
+
 export const mcDecompile = defineCommand<
   { inputPath: string; runId: string; onLog: Channel<LogLine> },
   {
