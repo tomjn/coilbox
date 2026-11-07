@@ -7,6 +7,7 @@ import {
   galaxyFromChallenge,
 } from "./challenge";
 import { GENERATED_CITIES_IMAGE, generateCities } from "./cities";
+import { terrainMarginPixels } from "./galaxy3d/terrain";
 import { type GenerateOptions, generateGalaxy } from "./generate";
 import {
   drawsAsGalaxy,
@@ -23,10 +24,11 @@ import {
   type MapSkin,
   parseGalaxyJson,
 } from "./model";
-import { TERRAIN_PIXELS } from "./terrainGen";
+import { extendTerrain, TERRAIN_PIXELS } from "./terrainGen";
 import {
   GENERATED_TERRITORIES_IMAGE,
   generatedTerrain,
+  generatedTerrainWithMargin,
   generateTerritories,
 } from "./territories";
 
@@ -253,7 +255,8 @@ describe("drawsAsGalaxy", () => {
   });
 });
 
-describe("generatedTerrainPixels", () => {
+// Each case builds a full map's land and erodes it, which takes seconds.
+describe("generatedTerrainPixels", { timeout: 30_000 }, () => {
   it("is undefined for a map with no generated land", () => {
     expect(generatedTerrainPixels(generateMap(base, NOW))).toBeUndefined();
   });
@@ -268,6 +271,48 @@ describe("generatedTerrainPixels", () => {
     expect(px?.extension?.biomes?.a.length).toBe(
       (image?.width ?? 0) * (image?.height ?? 0) * 4,
     );
+  });
+
+  describe("display erosion", () => {
+    const land = () => generateTerritories({ ...base, planet: "temperate" });
+    /** The land as the generator makes it, before any erosion. */
+    const generated = (doc: GalaxyDoc) => {
+      const built = generatedTerrainWithMargin(
+        doc,
+        terrainMarginPixels(doc.nodes.length, TERRAIN_PIXELS),
+      );
+      if (!built) throw new Error("no land");
+      return { built, wide: extendTerrain(built.terrain, built.margin) };
+    };
+
+    it("carves the shading heights and leaves the pinned heights alone", () => {
+      const doc = land();
+      const { built, wide } = generated(doc);
+      const pixels = generatedTerrainPixels(doc);
+      expect(pixels?.extension?.heights.data).toEqual(wide.heights);
+      expect(pixels?.height?.data).toEqual(built.terrain.heightmap);
+      expect(pixels?.extension?.relief?.data).not.toEqual(wide.relief);
+    });
+
+    it("erodes a map the same way every time", () => {
+      const doc = land();
+      const a = generatedTerrainPixels(doc)?.extension?.relief?.data;
+      const b = generatedTerrainPixels(doc)?.extension?.relief?.data;
+      expect(a).toBeDefined();
+      expect(
+        Buffer.from(a?.buffer ?? new ArrayBuffer(0)).equals(
+          Buffer.from(b?.buffer ?? new ArrayBuffer(1)),
+        ),
+      ).toBe(true);
+    });
+
+    it("leaves a cratered world's relief as the generator made it", () => {
+      const doc = generateTerritories({ ...base, planet: "moon" });
+      const pixels = generatedTerrainPixels(doc);
+      expect(pixels?.extension?.relief?.data).toEqual(
+        generated(doc).wide.relief,
+      );
+    });
   });
 
   for (const skin of LAND) {
