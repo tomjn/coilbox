@@ -5,6 +5,7 @@
 //! matching every other picoframe plugin.
 
 mod archive;
+mod install;
 mod luapatch;
 mod mapinfo;
 mod mapinfo_write;
@@ -652,6 +653,56 @@ async fn mc_write_mapinfo(opts: mapinfo_write::WriteOpts) -> CliResult {
     }
 }
 
+/// `mc_package_map` writes `<outDir>/<outSuffix>.sdz` from a finished compile and
+/// the `mapinfo.lua` beside it. Returns `{ path, files }`.
+#[tauri::command]
+async fn mc_package_map(out_dir: String, out_suffix: String) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&out_dir)) {
+        return CliResult::err(e);
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        archive::pack_map(Path::new(&out_dir), &out_suffix)
+    })
+    .await;
+    match result {
+        Ok(Ok(p)) => CliResult::ok(json!({
+            "path": p.path.to_string_lossy(),
+            "files": p.files,
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("package task failed: {e}")),
+    }
+}
+
+/// `mc_install_map` copies a packed `.sdz` into `<rootPath>/maps/`. Returns
+/// `{ installed, replaced, path }`. When an archive with that name is already
+/// there and `replace` is not set, nothing is copied and `installed` is false.
+#[tauri::command]
+async fn mc_install_map(sdz_path: String, root_path: String, replace: bool) -> CliResult {
+    let maps = Path::new(&root_path).join("maps");
+    if let Err(e) = coilbox_portable::refuse_read_only(&maps) {
+        return CliResult::err(e);
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        install::install_map(Path::new(&sdz_path), Path::new(&root_path), replace)
+    })
+    .await;
+    match result {
+        Ok(Ok(install::Outcome::Installed { path, replaced })) => CliResult::ok(json!({
+            "installed": true,
+            "replaced": replaced,
+            "path": path.to_string_lossy(),
+        })),
+        Ok(Ok(install::Outcome::Exists { path })) => CliResult::ok(json!({
+            "installed": false,
+            "replaced": false,
+            "path": path.to_string_lossy(),
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("install task failed: {e}")),
+    }
+}
+
 /// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
 /// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
@@ -850,6 +901,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_height_field,
             mc_compile,
             mc_write_mapinfo,
+            mc_package_map,
+            mc_install_map,
             mc_decompile,
             mc_cancel,
             mc_open_path,

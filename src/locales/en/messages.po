@@ -7243,6 +7243,11 @@ msgstr "A map called \"{existingTitle}\" is already installed. Replace it with t
 msgid "A map needs both a start and a goal, or neither of them."
 msgstr "A map needs both a start and a goal, or neither of them."
 
+#. placeholder {0}: result.outSuffix
+#: src/mapconv/pages/CompilePage.tsx
+msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
+msgstr "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
+
 #: src/content/pages/components/ReplayMap.tsx
 msgid "A mark is one order, in its player's colour."
 msgstr "A mark is one order, in its player's colour."
@@ -21199,6 +21204,7 @@ msgstr "inserted mid-queue"
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/mapconv/pages/CompilePage.tsx
 msgid "Install"
 msgstr "Install"
 
@@ -21319,6 +21325,11 @@ msgstr "Installed — restart to apply."
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Installed {fileName}"
 msgstr "Installed {fileName}"
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Installed <0>{0}</0>"
+msgstr "Installed <0>{0}</0>"
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "Installed and ready."
@@ -26159,6 +26170,10 @@ msgstr "No mapinfo.lua or .smd file"
 msgid "No mapinfo.lua, settings from the .smd file"
 msgstr "No mapinfo.lua, settings from the .smd file"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "No maps folder is set, so there is nowhere to install to. Add a content folder in Settings."
+msgstr "No maps folder is set, so there is nowhere to install to. Add a content folder in Settings."
+
 #: src/content/pages/MapsPage.tsx
 msgid "No maps found for this engine."
 msgstr "No maps found for this engine."
@@ -29183,6 +29198,7 @@ msgid "Pack for tweak slots"
 msgstr "Pack for tweak slots"
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/workshop/routes.ts
 msgid "Package"
 msgstr "Package"
@@ -29194,6 +29210,11 @@ msgstr "package {rapidPackage} via {rapidTag}"
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Package tweak project"
 msgstr "Package tweak project"
+
+#. placeholder {0}: packResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Packaged <0>{0}</0>"
+msgstr "Packaged <0>{0}</0>"
 
 #: src/content/pages/components/RootCard.tsx
 msgid "packages"
@@ -32480,10 +32501,16 @@ msgstr "repeats · {cooldown}s"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "Replace"
 msgstr "Replace"
+
+#. placeholder {0}: basename(packResult.path)
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replace {0}?"
+msgstr "Replace {0}?"
 
 #: src/workshop/pages/components/CloneActions.tsx
 msgid "Replace {replacedKey}"
@@ -32536,6 +32563,11 @@ msgstr "replaced"
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "Replaced \"{layoutName}\" in {dest}."
 msgstr "Replaced \"{layoutName}\" in {dest}."
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replaced <0>{0}</0>"
+msgstr "Replaced <0>{0}</0>"
 
 #: src/content/compatReport.ts
 msgid "replaced by {replacement}"
@@ -38337,6 +38369,10 @@ msgstr "The engine only logs a warning and ignores this key. Set weaponType to \
 #: src/lego/unitCheck.ts
 msgid "The engine ran out of time and was stopped."
 msgstr "The engine ran out of time and was stopped."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "The engine sees it on its next archive scan. Press Rescan on the <0>Maps page</0>."
+msgstr "The engine sees it on its next archive scan. Press Rescan on the <0>Maps page</0>."
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "The engine set as preferred could not be read. Pick another in Settings → Engines and try this again, or continue without the check and find out when you play."

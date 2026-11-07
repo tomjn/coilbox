@@ -8923,6 +8923,11 @@ msgstr "已安装名为“{existingTitle}”的地图。要用此 zip 中的地�
 msgid "A map needs both a start and a goal, or neither of them."
 msgstr "地图需要同时有起点和终点，或者两者都没有。"
 
+#. placeholder {0}: result.outSuffix
+#: src/mapconv/pages/CompilePage.tsx
+msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "A mark is one order, in its player's colour."
@@ -26024,6 +26029,7 @@ msgstr "插入到队列中间"
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Install"
 msgstr "安装"
@@ -26171,6 +26177,11 @@ msgstr "已安装，重新启动后生效。"
 #, fuzzy
 msgid "Installed {fileName}"
 msgstr "已安装 {fileName}"
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Installed <0>{0}</0>"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
@@ -32118,6 +32129,10 @@ msgstr "没有 mapinfo.lua 或 .smd 文件"
 msgid "No mapinfo.lua, settings from the .smd file"
 msgstr "没有 mapinfo.lua，设置来自 .smd 文件"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "No maps folder is set, so there is nowhere to install to. Add a content folder in Settings."
+msgstr ""
+
 #: src/content/pages/MapsPage.tsx
 #, fuzzy
 msgid "No maps found for this engine."
@@ -35836,6 +35851,7 @@ msgid "Pack for tweak slots"
 msgstr "打包到调整槽位"
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/workshop/routes.ts
 #, fuzzy
 msgid "Package"
@@ -35850,6 +35866,11 @@ msgstr "通过 {rapidTag} 获取的包 {rapidPackage}"
 #, fuzzy
 msgid "Package tweak project"
 msgstr "打包调整项目"
+
+#. placeholder {0}: packResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Packaged <0>{0}</0>"
+msgstr ""
 
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
@@ -39870,11 +39891,17 @@ msgstr "重复 · {cooldown} 秒"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
 msgstr "替换"
+
+#. placeholder {0}: basename(packResult.path)
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replace {0}?"
+msgstr ""
 
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
@@ -39939,6 +39966,11 @@ msgstr "已替换"
 #, fuzzy
 msgid "Replaced \"{layoutName}\" in {dest}."
 msgstr "已替换 {dest} 中的“{layoutName}”。"
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replaced <0>{0}</0>"
+msgstr ""
 
 #: src/content/compatReport.ts
 #, fuzzy
@@ -47052,6 +47084,10 @@ msgstr "引擎只会记录一条警告并忽略此键。请改为将 weaponType 
 #, fuzzy
 msgid "The engine ran out of time and was stopped."
 msgstr "引擎超时并被停止。"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "The engine sees it on its next archive scan. Press Rescan on the <0>Maps page</0>."
+msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy

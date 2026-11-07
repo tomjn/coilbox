@@ -8984,6 +8984,11 @@ msgstr "Um mapa chamado “{existingTitle}” já está instalado. Substituí-lo
 msgid "A map needs both a start and a goal, or neither of them."
 msgstr "Um mapa precisa de um início e de um objetivo, ou de nenhum dos dois."
 
+#. placeholder {0}: result.outSuffix
+#: src/mapconv/pages/CompilePage.tsx
+msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "A mark is one order, in its player's colour."
@@ -26184,6 +26189,7 @@ msgstr "inserido no meio da fila"
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Install"
 msgstr "Instalar"
@@ -26331,6 +26337,11 @@ msgstr "Instalado — reinicie para aplicar."
 #, fuzzy
 msgid "Installed {fileName}"
 msgstr "{fileName} instalado"
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Installed <0>{0}</0>"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
@@ -32308,6 +32319,10 @@ msgstr "Sem mapinfo.lua nem arquivo .smd"
 msgid "No mapinfo.lua, settings from the .smd file"
 msgstr "Sem mapinfo.lua, configurações do arquivo .smd"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "No maps folder is set, so there is nowhere to install to. Add a content folder in Settings."
+msgstr ""
+
 #: src/content/pages/MapsPage.tsx
 #, fuzzy
 msgid "No maps found for this engine."
@@ -36063,6 +36078,7 @@ msgid "Pack for tweak slots"
 msgstr "Empacotar para slots de ajuste"
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/workshop/routes.ts
 #, fuzzy
 msgid "Package"
@@ -36077,6 +36093,11 @@ msgstr "pacote {rapidPackage} via {rapidTag}"
 #, fuzzy
 msgid "Package tweak project"
 msgstr "Empacotar projeto de ajustes"
+
+#. placeholder {0}: packResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Packaged <0>{0}</0>"
+msgstr ""
 
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
@@ -40127,11 +40148,17 @@ msgstr "repete · {cooldown}s"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
 msgstr "Substituir"
+
+#. placeholder {0}: basename(packResult.path)
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replace {0}?"
+msgstr ""
 
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
@@ -40197,6 +40224,11 @@ msgstr "substituído"
 #, fuzzy
 msgid "Replaced \"{layoutName}\" in {dest}."
 msgstr "\"{layoutName}\" substituído em {dest}."
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replaced <0>{0}</0>"
+msgstr ""
 
 #: src/content/compatReport.ts
 #, fuzzy
@@ -47363,6 +47395,10 @@ msgstr "A engine só registra um aviso e ignora esta chave. Defina weaponType co
 #, fuzzy
 msgid "The engine ran out of time and was stopped."
 msgstr "A engine ficou sem tempo e foi interrompida."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "The engine sees it on its next archive scan. Press Rescan on the <0>Maps page</0>."
+msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy

@@ -187,6 +187,37 @@ fn skip_long(b: &[u8], i: usize, level: usize) -> Result<usize, String> {
         .ok_or_else(|| "unterminated long bracket in mapinfo.lua".to_string())
 }
 
+/// The value of every string literal in `src`, in file order: quoted strings
+/// with a backslash taking the next character as it is, and long bracket
+/// strings without their brackets. Comments are skipped. Escapes beyond that
+/// (`\n`, `\065`) are not interpreted, which is enough for the file names this
+/// is used to find.
+pub fn string_literals(src: &str) -> Result<Vec<String>, String> {
+    Ok(lex(src)?
+        .into_iter()
+        .filter(|t| t.kind == Kind::Str)
+        .map(|t| {
+            let raw = &src[t.start..t.end];
+            if let Some(after) = raw.strip_prefix('[') {
+                let level = after.bytes().take_while(|&c| c == b'=').count();
+                let body = &raw[level + 2..raw.len() - level - 2];
+                let body = body.strip_prefix("\r\n").unwrap_or(body);
+                body.strip_prefix('\n').unwrap_or(body).to_string()
+            } else {
+                let mut out = String::new();
+                let mut chars = raw[1..raw.len() - 1].chars();
+                while let Some(c) = chars.next() {
+                    match c {
+                        '\\' => out.extend(chars.next()),
+                        c => out.push(c),
+                    }
+                }
+                out
+            }
+        })
+        .collect())
+}
+
 fn lex(src: &str) -> Result<Vec<Tok>, String> {
     let b = src.as_bytes();
     let mut i = 0;

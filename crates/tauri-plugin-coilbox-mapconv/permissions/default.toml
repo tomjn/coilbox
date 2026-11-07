@@ -11,6 +11,8 @@ permissions = [
   "allow-mc-height-field",
   "allow-mc-compile",
   "allow-mc-write-mapinfo",
+  "allow-mc-package-map",
+  "allow-mc-install-map",
   "allow-mc-decompile",
   "allow-mc-cancel",
   "allow-mc-open-path",

@@ -8987,6 +8987,11 @@ msgstr "Er is al een kaart met de naam “{existingTitle}” geïnstalleerd. Ver
 msgid "A map needs both a start and a goal, or neither of them."
 msgstr "Een kaart heeft een start en een doel nodig, of geen van beide."
 
+#. placeholder {0}: result.outSuffix
+#: src/mapconv/pages/CompilePage.tsx
+msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "A mark is one order, in its player's colour."
@@ -26194,6 +26199,7 @@ msgstr "midden in de wachtrij ingevoegd"
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "Install"
 msgstr "Installeren"
@@ -26341,6 +26347,11 @@ msgstr "Geïnstalleerd — start opnieuw om toe te passen."
 #, fuzzy
 msgid "Installed {fileName}"
 msgstr "{fileName} geïnstalleerd"
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Installed <0>{0}</0>"
+msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
@@ -32325,6 +32336,10 @@ msgstr "Geen mapinfo.lua- of .smd-bestand"
 msgid "No mapinfo.lua, settings from the .smd file"
 msgstr "Geen mapinfo.lua, instellingen uit het .smd-bestand"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "No maps folder is set, so there is nowhere to install to. Add a content folder in Settings."
+msgstr ""
+
 #: src/content/pages/MapsPage.tsx
 #, fuzzy
 msgid "No maps found for this engine."
@@ -36080,6 +36095,7 @@ msgid "Pack for tweak slots"
 msgstr "Verpakken voor aanpassingsslots"
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/workshop/routes.ts
 #, fuzzy
 msgid "Package"
@@ -36094,6 +36110,11 @@ msgstr "pakket {rapidPackage} via {rapidTag}"
 #, fuzzy
 msgid "Package tweak project"
 msgstr "Aanpassingsproject verpakken"
+
+#. placeholder {0}: packResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Packaged <0>{0}</0>"
+msgstr ""
 
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
@@ -40144,11 +40165,17 @@ msgstr "herhaalt · {cooldown} s"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/mapconv/pages/CompilePage.tsx
 #: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
 msgstr "Vervangen"
+
+#. placeholder {0}: basename(packResult.path)
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replace {0}?"
+msgstr ""
 
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
@@ -40214,6 +40241,11 @@ msgstr "vervangen"
 #, fuzzy
 msgid "Replaced \"{layoutName}\" in {dest}."
 msgstr "\"{layoutName}\" vervangen in {dest}."
+
+#. placeholder {0}: installResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Replaced <0>{0}</0>"
+msgstr ""
 
 #: src/content/compatReport.ts
 #, fuzzy
@@ -47380,6 +47412,10 @@ msgstr "De engine logt alleen een waarschuwing en negeert deze sleutel. Zet in p
 #, fuzzy
 msgid "The engine ran out of time and was stopped."
 msgstr "De engine had geen tijd meer en is gestopt."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "The engine sees it on its next archive scan. Press Rescan on the <0>Maps page</0>."
+msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
