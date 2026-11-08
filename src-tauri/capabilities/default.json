@@ -15,6 +15,7 @@
     "process:allow-restart",
     "process:allow-exit",
     "notification:default",
+    "clipboard-manager:allow-read-text",
     "deep-link:default"
   ]
 }
