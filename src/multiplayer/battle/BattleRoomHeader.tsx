@@ -27,6 +27,7 @@ import {
 import { inviteLink, inviteLinkProblem } from "@/direct/invite";
 import { ShareRoomButton } from "@/direct/ShareRoomButton";
 import type { Battle, MemberStatus } from "../bindings";
+import { relayPingLabel, useBattleRelayPing } from "../relayPing";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
 import { linkifyTitle } from "./linkifyTitle";
@@ -171,9 +172,27 @@ export function BattleRoomHeader({
   // it separately, with `BATTLEISRELAYED`, to clients that asked for relay
   // support (issue #2133). `joinedBattleRouteLabel` says why nothing else gets a
   // word.
-  const routeLabel = selfHost
+  //
+  // A lobby that also sends the relay's address (issue #2869) lets the joiner
+  // time their half of the ping to it, which the detail then reports. One that
+  // does not is never asked, and the detail says nothing about a figure.
+  const joinedRelayAddress =
+    !selfHost && battle.relayed ? battle.relayAddress : null;
+  const joinerPing = useBattleRelayPing(
+    serverKey,
+    battle.id,
+    joinedRelayAddress !== null,
+  );
+  const baseLabel = selfHost
     ? battleRouteLabel(hostingRoute, { lanRoom: directRoom })
     : joinedBattleRouteLabel(battle.relayed);
+  const routeLabel =
+    baseLabel && joinedRelayAddress !== null
+      ? {
+          ...baseLabel,
+          detail: `${baseLabel.detail} ${relayPingLabel(joinerPing)}`,
+        }
+      : baseLabel;
   // A match is running. Zero-K says so on the battle, where there is no host
   // whose in-game bit could.
   const routeWord = routeLabel?.word;

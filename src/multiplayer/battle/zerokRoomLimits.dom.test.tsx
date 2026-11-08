@@ -32,6 +32,7 @@ function battle(): Battle {
     port: "",
     natType: "0",
     relayed: false,
+    relayAddress: null,
     map: "Comet Catcher Remake 1.8",
     maphash: "",
     modname: "Zero-K v1.12.6.0",

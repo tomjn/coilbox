@@ -42,6 +42,7 @@ function battle(runningSince: number | null): Battle {
     port: "",
     natType: "0",
     relayed: false,
+    relayAddress: null,
     map: "Comet Catcher Remake 1.8",
     maphash: "",
     modname: "Beyond All Reason test-1234",
