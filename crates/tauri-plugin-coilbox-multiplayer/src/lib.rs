@@ -136,8 +136,9 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Cancellation tokens for connects still in their TCP/TLS handshake, so not yet in
 /// the live [`Registry`]. Keyed by the same `serverKey`. [`open_and_spawn`] inserts
-/// one on entry and removes it once the handshake resolves; `mp_cancel_connect`
-/// fires it to abandon a stuck connect that `mp_disconnect` can't reach yet.
+/// one on entry and removes it once the connection is registered or the connect
+/// has failed. `mp_cancel_connect` fires it to abandon a stuck connect that
+/// `mp_disconnect` can't reach yet.
 pub(crate) type PendingConnects = Arc<Mutex<HashMap<String, CancellationToken>>>;
 
 /// Lock a mutex, recovering the guard if a previous holder panicked and poisoned
@@ -398,17 +399,19 @@ async fn open_and_spawn<R: Runtime>(
         &token,
     )
     .await;
-    lock_or_recover(pending).remove(&server_key);
     let stream = match result {
         Ok(s) => s,
-        Err(ConnectError::Cancelled) => return CliResult::err("connection cancelled"),
-        Err(ConnectError::TimedOut) => {
-            return CliResult::err(format!(
-                "connection timed out after {}s",
-                CONNECT_TIMEOUT.as_secs()
-            ))
+        Err(e) => {
+            lock_or_recover(pending).remove(&server_key);
+            return match e {
+                ConnectError::Cancelled => CliResult::err("connection cancelled"),
+                ConnectError::TimedOut => CliResult::err(format!(
+                    "connection timed out after {}s",
+                    CONNECT_TIMEOUT.as_secs()
+                )),
+                ConnectError::Failed(e) => CliResult::err(e),
+            };
         }
-        Err(ConnectError::Failed(e)) => return CliResult::err(e),
     };
 
     let login_cfg = LoginConfig {
@@ -430,13 +433,20 @@ async fn open_and_spawn<R: Runtime>(
 
     spawn_connection(
         registry.clone(),
-        server_key,
+        server_key.clone(),
         stream,
         login_cfg,
         on_event,
         dm_log,
         chan_log,
     );
+    // The token stays published until the connection is registered, so a Cancel
+    // that lands between the socket coming up and that registration still finds
+    // it. Anything after this reaches the connection through the registry.
+    lock_or_recover(pending).remove(&server_key);
+    if token.is_cancelled() {
+        conn::cancel_unanswered_login(registry, &server_key);
+    }
     CliResult::ok(json!({ "connected": true }))
 }
 
@@ -979,20 +989,29 @@ fn mp_disconnect(registry: State<'_, Registry>, server_key: String) -> CliResult
     }
 }
 
-/// `mp_cancel_connect` — abort a connect that is still mid-handshake (before it
-/// registers as a live connection, which is when `mp_disconnect` takes over). Fires
-/// the pending cancel token; `open_and_spawn` then unwinds with "connection
-/// cancelled" and never spawns a task, leaving no lingering socket. Idempotent: a
-/// no-op if the connect already completed or was already cancelled.
+/// `mp_cancel_connect` — abort a connect that has not been answered yet. While
+/// the socket is still opening, that fires the pending cancel token;
+/// `open_and_spawn` then unwinds with "connection cancelled" and never spawns a
+/// task, leaving no lingering socket. Once the socket is up and the connection is
+/// registered, the token is gone and the login is the thing that may be stalled,
+/// so a connection that has not reached `ready` is asked to close instead. A
+/// connection that is already logged in is left to `mp_disconnect`. Idempotent: a
+/// no-op if there is nothing left to cancel.
 #[tauri::command]
-fn mp_cancel_connect(pending: State<'_, PendingConnects>, server_key: String) -> CliResult {
-    match lock_or_recover(&pending).remove(&server_key) {
+fn mp_cancel_connect(
+    pending: State<'_, PendingConnects>,
+    registry: State<'_, Registry>,
+    server_key: String,
+) -> CliResult {
+    let token = lock_or_recover(&pending).remove(&server_key);
+    let cancelled = match token {
         Some(token) => {
             token.cancel();
-            CliResult::ok(json!({ "cancelled": true }))
+            true
         }
-        None => CliResult::ok(json!({ "cancelled": false })),
-    }
+        None => conn::cancel_unanswered_login(&registry, &server_key),
+    };
+    CliResult::ok(json!({ "cancelled": cancelled }))
 }
 
 /// `mp_wait_until_ready`: resolve once a connection has finished logging in.
