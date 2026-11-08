@@ -151,7 +151,7 @@
       "partId": "d2c111537495",
       "position": [
         0,
-        21.54639727815985,
+        23.828506038911634,
         0
       ],
       "rotation": [
@@ -160,9 +160,9 @@
         0
       ],
       "scale": [
-        43.0927945563197,
-        43.0927945563197,
-        43.0927945563197
+        7.695141885057091,
+        7.695141885057091,
+        7.695141885057091
       ],
       "module": {
         "id": "builtin.hull",
@@ -187,9 +187,9 @@
         0
       ],
       "scale": [
-        40.49266090339846,
-        40.49266090339846,
-        40.49266090339846
+        7.230832304178298,
+        7.230832304178298,
+        7.230832304178298
       ],
       "role": "turret",
       "weapon": {},
@@ -265,6 +265,321 @@
         "rev": "0402a3ff06943b",
         "fp": "0e85b23aad74ae"
       }
+    },
+    {
+      "id": "unit.12",
+      "name": "hullcover",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        -44.8,
+        8.780935096,
+        -46.629554082
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.13",
+      "name": "hullcover2",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        -44.8,
+        8.780935096,
+        -23.314777041
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.14",
+      "name": "hullcover3",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        -44.8,
+        8.780935096,
+        0
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.15",
+      "name": "hullcover4",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        -44.8,
+        8.780935096,
+        23.314777041
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.16",
+      "name": "hullcover5",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        -44.8,
+        8.780935096,
+        46.629554082
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.17",
+      "name": "hullcover6",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        0,
+        8.780935096,
+        -46.629554082
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.18",
+      "name": "hullcover7",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        0,
+        8.780935096,
+        -23.314777041
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.19",
+      "name": "hullcover8",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        0,
+        8.780935096,
+        0
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.20",
+      "name": "hullcover9",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        0,
+        8.780935096,
+        23.314777041
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.21",
+      "name": "hullcover10",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        0,
+        8.780935096,
+        46.629554082
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.22",
+      "name": "hullcover11",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        44.8,
+        8.780935096,
+        -46.629554082
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.23",
+      "name": "hullcover12",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        44.8,
+        8.780935096,
+        -23.314777041
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.24",
+      "name": "hullcover13",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        44.8,
+        8.780935096,
+        0
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.25",
+      "name": "hullcover14",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        44.8,
+        8.780935096,
+        23.314777041
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
+    },
+    {
+      "id": "unit.26",
+      "name": "hullcover15",
+      "parentId": "root",
+      "partId": "56c48d03a55a",
+      "position": [
+        44.8,
+        8.780935096,
+        46.629554082
+      ],
+      "rotation": [
+        -1.570796327,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        11.2,
+        11.2,
+        11.2
+      ]
     }
   ],
   "animations": [
@@ -310,6 +625,68 @@
         "slot": "weapon.1",
         "module": "builtin.turret",
         "instance": "unit.11"
+      }
+    ],
+    "covering": [
+      {
+        "bone": "hull",
+        "piece": "unit.12"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.13"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.14"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.15"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.16"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.17"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.18"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.19"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.20"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.21"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.22"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.23"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.24"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.25"
+      },
+      {
+        "bone": "hull",
+        "piece": "unit.26"
       }
     ]
   }

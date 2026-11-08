@@ -227,7 +227,7 @@
       "partId": "d2c111537495",
       "position": [
         0,
-        5.770199279586976,
+        4.368227956071497,
         0
       ],
       "rotation": [
@@ -236,9 +236,9 @@
         0
       ],
       "scale": [
-        11.540398559173953,
-        11.540398559173953,
-        11.540398559173953
+        8.736455912142992,
+        8.736455912142992,
+        8.736455912142992
       ],
       "module": {
         "id": "builtin.hull",
@@ -263,9 +263,9 @@
         0
       ],
       "scale": [
-        11.540398559173953,
-        11.540398559173953,
-        11.540398559173953
+        8.736455912142992,
+        8.736455912142992,
+        8.736455912142992
       ],
       "role": "turret",
       "weapon": {},
@@ -335,6 +335,279 @@
         "rev": "0402a3ff06943b",
         "fp": "0abf90a24e2154"
       }
+    },
+    {
+      "id": "unit.15",
+      "name": "torsocover",
+      "parentId": "unit.2",
+      "partId": "3a0f52a0daf5",
+      "position": [
+        -7.925684288,
+        -3.259988601,
+        -7.925684288
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        6.519977203,
+        6.519977203,
+        6.519977203
+      ]
+    },
+    {
+      "id": "unit.16",
+      "name": "torsocover2",
+      "parentId": "unit.2",
+      "partId": "3a0f52a0daf5",
+      "position": [
+        -7.925684288,
+        -3.259988601,
+        7.925684288
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        6.519977203,
+        6.519977203,
+        6.519977203
+      ]
+    },
+    {
+      "id": "unit.17",
+      "name": "torsocover3",
+      "parentId": "unit.2",
+      "partId": "3a0f52a0daf5",
+      "position": [
+        7.925684288,
+        -3.259988601,
+        -7.925684288
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        6.519977203,
+        6.519977203,
+        6.519977203
+      ]
+    },
+    {
+      "id": "unit.18",
+      "name": "torsocover4",
+      "parentId": "unit.2",
+      "partId": "3a0f52a0daf5",
+      "position": [
+        7.925684288,
+        -3.259988601,
+        7.925684288
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.570796327
+      ],
+      "scale": [
+        6.519977203,
+        6.519977203,
+        6.519977203
+      ]
+    },
+    {
+      "id": "unit.19",
+      "name": "hipcover",
+      "parentId": "unit.1",
+      "partId": "2dd56342bad3",
+      "position": [
+        0,
+        2.61823761,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        1.570796327
+      ],
+      "scale": [
+        5.23647522,
+        5.23647522,
+        5.23647522
+      ]
+    },
+    {
+      "id": "unit.20",
+      "name": "hipcover2",
+      "parentId": "unit.1",
+      "partId": "d2a6be853590",
+      "position": [
+        3.962842144,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796327,
+        0
+      ],
+      "scale": [
+        6.34054743,
+        6.34054743,
+        6.34054743
+      ]
+    },
+    {
+      "id": "unit.21",
+      "name": "hipcover3",
+      "parentId": "unit.1",
+      "partId": "d2a6be853590",
+      "position": [
+        11.888526432,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.570796327,
+        0
+      ],
+      "scale": [
+        6.34054743,
+        6.34054743,
+        6.34054743
+      ]
+    },
+    {
+      "id": "unit.22",
+      "name": "hipcover4",
+      "parentId": "unit.1",
+      "partId": "d2a6be853590",
+      "position": [
+        -3.962842144,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        -1.570796327,
+        0
+      ],
+      "scale": [
+        6.34054743,
+        6.34054743,
+        6.34054743
+      ]
+    },
+    {
+      "id": "unit.23",
+      "name": "hipcover5",
+      "parentId": "unit.1",
+      "partId": "d2a6be853590",
+      "position": [
+        -11.888526432,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        -1.570796327,
+        0
+      ],
+      "scale": [
+        6.34054743,
+        6.34054743,
+        6.34054743
+      ]
+    },
+    {
+      "id": "unit.24",
+      "name": "lthighcover",
+      "parentId": "unit.3",
+      "partId": "40d4c3d0baf9",
+      "position": [
+        0,
+        -3.434990719,
+        0
+      ],
+      "rotation": [
+        3.141592654,
+        1.570796327,
+        0
+      ],
+      "scale": [
+        4.579987625,
+        4.579987625,
+        4.579987625
+      ]
+    },
+    {
+      "id": "unit.25",
+      "name": "lshincover",
+      "parentId": "unit.4",
+      "partId": "dfde7de76059",
+      "position": [
+        0,
+        -5.261188316,
+        0
+      ],
+      "rotation": [
+        1.570796327,
+        0,
+        0
+      ],
+      "scale": [
+        4.858424892,
+        4.858424892,
+        4.858424892
+      ]
+    },
+    {
+      "id": "unit.26",
+      "name": "rthighcover",
+      "parentId": "unit.6",
+      "partId": "40d4c3d0baf9",
+      "position": [
+        0,
+        -3.434990719,
+        0
+      ],
+      "rotation": [
+        3.141592654,
+        1.570796327,
+        0
+      ],
+      "scale": [
+        4.579987625,
+        4.579987625,
+        4.579987625
+      ]
+    },
+    {
+      "id": "unit.27",
+      "name": "rshincover",
+      "parentId": "unit.7",
+      "partId": "dfde7de76059",
+      "position": [
+        0,
+        -5.261188316,
+        0
+      ],
+      "rotation": [
+        1.570796327,
+        0,
+        0
+      ],
+      "scale": [
+        4.858424892,
+        4.858424892,
+        4.858424892
+      ]
     }
   ],
   "animations": [
@@ -375,6 +648,60 @@
         "slot": "weapon.1",
         "module": "builtin.turret",
         "instance": "unit.14"
+      }
+    ],
+    "covering": [
+      {
+        "bone": "torso",
+        "piece": "unit.15"
+      },
+      {
+        "bone": "torso",
+        "piece": "unit.16"
+      },
+      {
+        "bone": "torso",
+        "piece": "unit.17"
+      },
+      {
+        "bone": "torso",
+        "piece": "unit.18"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.19"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.20"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.21"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.22"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.23"
+      },
+      {
+        "bone": "thigh.l1",
+        "piece": "unit.24"
+      },
+      {
+        "bone": "shin.l1",
+        "piece": "unit.25"
+      },
+      {
+        "bone": "thigh.r1",
+        "piece": "unit.26"
+      },
+      {
+        "bone": "shin.r1",
+        "piece": "unit.27"
       }
     ]
   }
