@@ -10,7 +10,8 @@
  *
  * Only `+`, `-`, `*`, `/` and `Math.sqrt` are used, which every engine
  * computes exactly as IEEE 754 says. `portableAtan2` is a port of fdlibm's
- * `atan` and `atan2`, the code V8 runs, so it also matches V8 bit for bit.
+ * `atan` and `atan2`. What it must give is the same answer everywhere, not
+ * V8's, though it matched Node 24's V8 on every sample in its test.
  */
 
 const ATAN_HI = [
