@@ -19,6 +19,7 @@ import { BODY_PLANS } from "../bodyPlans";
 import ProjectsPage from "./ProjectsPage";
 
 const saveProject = vi.fn();
+const saveThumbnailPng = vi.fn();
 const saved = vi.hoisted(() => ({ projects: [] as unknown[] }));
 const navigate = vi.fn();
 
@@ -39,6 +40,7 @@ vi.mock("../projects", () => ({
     error: null,
   }),
   saveProject: (project: unknown) => saveProject(project),
+  saveThumbnailPng: (id: string, png: string) => saveThumbnailPng(id, png),
   deleteProject: vi.fn(),
 }));
 vi.mock("../pack", () => ({
@@ -90,10 +92,13 @@ vi.mock("./components/RosterDrawer", () => ({
     onSaved,
   }: {
     open: boolean;
-    onSaved: (units: unknown[]) => void;
+    onSaved: (units: unknown[], pictures: string[]) => void;
   }) =>
     open ? (
-      <button type="button" onClick={() => onSaved(ROSTER)}>
+      <button
+        type="button"
+        onClick={() => onSaved(ROSTER, ["data:image/png;base64,AA==", ""])}
+      >
         Save roster
       </button>
     ) : null,
@@ -112,6 +117,8 @@ beforeEach(() => {
   saved.projects = [];
   navigate.mockReset();
   saveProject.mockReset();
+  saveThumbnailPng.mockReset();
+  saveThumbnailPng.mockResolvedValue(undefined);
   saveProject.mockImplementation((project) => Promise.resolve(project));
 });
 afterEach(cleanup);
@@ -187,6 +194,13 @@ describe("ProjectsPage rosters (#3239)", () => {
 
     await waitFor(() => expect(saveProject).toHaveBeenCalledTimes(2));
     expect(saveProject.mock.calls.map((call) => call[0])).toEqual(ROSTER);
+    // Only the unit with a picture gets one, and before its card can ask.
+    expect(saveThumbnailPng.mock.calls).toEqual([
+      ["roster-unit-2", "data:image/png;base64,AA=="],
+    ]);
+    expect(saveThumbnailPng.mock.invocationCallOrder[0]).toBeLessThan(
+      saveProject.mock.invocationCallOrder[0],
+    );
     expect(navigate).not.toHaveBeenCalled();
   });
 

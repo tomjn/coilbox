@@ -39,7 +39,12 @@ import {
   type LegoGameGroup,
 } from "../projectGroups";
 import { validateProjectName } from "../projectNames";
-import { deleteProject, saveProject, useLegoProjects } from "../projects";
+import {
+  deleteProject,
+  saveProject,
+  saveThumbnailPng,
+  useLegoProjects,
+} from "../projects";
 import { projectFromTarget } from "../skeletonSize";
 import { gameRecordFor } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
@@ -266,11 +271,17 @@ export default function ProjectsPage() {
     }
   }
 
-  /** A roster's units, saved together and shown in their group. */
-  async function savedRoster(units: LegoProject[]) {
+  /** A roster's units, saved together and shown in their group, each with the
+   *  picture the drawer drew of it. The picture goes first, so the card that
+   *  appears when the unit is saved finds it. */
+  async function savedRoster(units: LegoProject[], pictures: string[]) {
     setProblem(null);
     try {
-      for (const unit of units) await saveProject(unit);
+      for (const [index, unit] of units.entries()) {
+        const picture = pictures[index];
+        if (picture) await saveThumbnailPng(unit.id, picture);
+        await saveProject(unit);
+      }
       setRostering(false);
     } catch (e) {
       const reason = describeError(e);
@@ -513,7 +524,7 @@ export default function ProjectsPage() {
         open={rostering}
         onOpenChange={setRostering}
         projects={projects}
-        onSaved={(units) => void savedRoster(units)}
+        onSaved={(units, pictures) => void savedRoster(units, pictures)}
       />
 
       <ImportDrawer

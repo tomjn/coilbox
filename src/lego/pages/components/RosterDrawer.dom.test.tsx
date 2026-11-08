@@ -253,5 +253,10 @@ describe("RosterDrawer", () => {
     expect(onSaved.mock.calls[0][0]).toEqual(
       units(generateRoster.mock.calls[0][0]),
     );
+    expect(onSaved.mock.calls[0][1]).toEqual(
+      units(generateRoster.mock.calls[0][0]).map(
+        (u) => `data:image/png;base64,${u.id}`,
+      ),
+    );
   });
 });

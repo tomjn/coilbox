@@ -41,8 +41,9 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** The units already saved, so a roster's names never clash with theirs. */
   projects: readonly LegoProject[];
-  /** The roster's units, for the page to save. */
-  onSaved: (units: LegoProject[]) => void;
+  /** The roster's units, for the page to save, and the picture of each in
+   *  the same order. Empty when the pictures could not be drawn. */
+  onSaved: (units: LegoProject[], pictures: string[]) => void;
 }
 
 /** The roster on screen and the request that made it. */
@@ -285,7 +286,10 @@ export function RosterDrawer({ open, onOpenChange, projects, onSaved }: Props) {
                     >
                       <Dices size={16} /> <Trans>Reroll</Trans>
                     </Button>
-                    <Button type="button" onClick={() => onSaved(made.units)}>
+                    <Button
+                      type="button"
+                      onClick={() => onSaved(made.units, pictures)}
+                    >
                       <Trans>Save roster</Trans>
                     </Button>
                   </>

@@ -164,6 +164,25 @@ export async function saveThumbnail(
 }
 
 /**
+ * Store a picture already drawn as a PNG data URL as a project's thumbnail,
+ * such as one from `drawUnitPictures`, which is drawn at the thumbnail's size.
+ */
+export async function saveThumbnailPng(
+  id: string,
+  dataUrl: string,
+): Promise<void> {
+  const prefix = "data:image/png;base64,";
+  if (!dataUrl.startsWith(prefix)) {
+    throw new Error(
+      `a thumbnail is a PNG data URL, not ${dataUrl.slice(0, 30)}`,
+    );
+  }
+  const text = atob(dataUrl.slice(prefix.length));
+  const png = Array.from(text, (c) => c.charCodeAt(0));
+  await legoThumbSave({ id, png });
+}
+
+/**
  * Store the build picture an export writes into a game (issue #3347).
  *
  * Unlike the thumbnail this is not scaled: the canvas is already the size the
