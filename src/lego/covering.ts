@@ -44,7 +44,8 @@ import {
   uniquePieceName,
 } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
-import { portableEuler } from "./portableAngles";
+import { portableEuler, portableLog } from "./portableAngles";
+import { quaternionFromEuler } from "./portableRotation";
 import { worldMatrix } from "./reparent";
 
 /**
@@ -230,11 +231,11 @@ function fits(
       );
       const byWidth = width / (across * mid.size);
       scale = Math.min(byLength, byWidth);
-      widthError = Math.abs(Math.log(byLength / byWidth));
+      widthError = Math.abs(portableLog(byLength / byWidth));
     } else {
-      widthError = Math.abs(Math.log((mid.size * scale) / width));
+      widthError = Math.abs(portableLog((mid.size * scale) / width));
     }
-    const depthError = Math.abs(Math.log((short.size * scale) / depth));
+    const depthError = Math.abs(portableLog((short.size * scale) / depth));
     // The final scale is the smaller of the two, so the axis that wanted more
     // takes more copies, with no gap between them.
     const copies = (extent: number, size: number) =>
@@ -257,7 +258,7 @@ function fits(
   // the fewest any part needs counts against a part as much as a poor fit.
   const fewest = Math.min(...out.map((fit) => fit.along * fit.across));
   for (const fit of out) {
-    fit.error += Math.log((fit.along * fit.across) / fewest);
+    fit.error += portableLog((fit.along * fit.across) / fewest);
   }
   return out.sort(
     (a, b) =>
@@ -519,9 +520,7 @@ export function coverSkeleton(
             .multiply(
               new THREE.Matrix4().compose(
                 new THREE.Vector3(...piece.position),
-                new THREE.Quaternion().setFromEuler(
-                  new THREE.Euler(...piece.rotation),
-                ),
+                quaternionFromEuler(piece.rotation),
                 new THREE.Vector3(...piece.scale),
               ),
             ),

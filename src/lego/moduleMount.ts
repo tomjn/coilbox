@@ -32,6 +32,7 @@ import {
 import { isMount, mountRefusal } from "./mountPoints";
 import type { LoadedPack } from "./pack";
 import { type FaceTarget, freeFace, type PlaceOptions } from "./placePart";
+import { quaternionFromEuler } from "./portableRotation";
 import { worldMatrix } from "./reparent";
 
 /** A module with its mount dropped when the piece it names is gone. */
@@ -179,7 +180,7 @@ function chooseMount(
 function moved(piece: LegoPiece, matrix: THREE.Matrix4): LegoPiece {
   const own = new THREE.Matrix4().compose(
     new THREE.Vector3(...piece.position),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(...piece.rotation)),
+    quaternionFromEuler(piece.rotation),
     new THREE.Vector3(...piece.scale),
   );
   return { ...piece, ...transformOf(matrix.clone().multiply(own)) };
@@ -261,9 +262,7 @@ export function insertModule(
     shift = new THREE.Matrix4()
       .compose(
         new THREE.Vector3(...placed.position),
-        new THREE.Quaternion().setFromEuler(
-          new THREE.Euler(...placed.rotation),
-        ),
+        quaternionFromEuler(placed.rotation),
         scale,
       )
       .multiply(mount.world.clone().invert());

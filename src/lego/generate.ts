@@ -45,6 +45,7 @@ import {
 } from "./model";
 import { insertModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
+import { applyEuler } from "./portableRotation";
 import { worldMatrix } from "./reparent";
 import { defaultTarget, skeletonSize } from "./skeletonSize";
 import { ELMOS_PER_FOOTPRINT } from "./unitDef";
@@ -308,9 +309,10 @@ function stretchPiece(
   if (!piece) return project;
   const box = pieceOwnBox(pack, piece);
   const half = box ? ((box.max[1] - box.min[1]) * piece.scale[1]) / 2 : 0;
-  const along = new THREE.Vector3(0, 1, 0)
-    .applyEuler(new THREE.Euler(...piece.rotation))
-    .multiplyScalar((factor - 1) * half);
+  const along = applyEuler(
+    new THREE.Vector3(0, 1, 0),
+    piece.rotation,
+  ).multiplyScalar((factor - 1) * half);
   return {
     ...project,
     pieces: project.pieces.map((p) =>

@@ -29,6 +29,12 @@ import type {
   LegoProject,
 } from "./model";
 import type { LoadedPack } from "./pack";
+import { portableAtan2 } from "./portableAngles";
+import {
+  applyAxisAngle,
+  eulerFromMatrix,
+  eulerFromQuaternion,
+} from "./portableRotation";
 import { framesAgree, isJoined, localFromWorld, worldMatrix } from "./reparent";
 import { shapeConnectors } from "./shapeConnectors";
 import { shapeBox } from "./shapes";
@@ -332,10 +338,11 @@ export function placeJoin(
   // is only the parent's turn. So the face the piece meets is the parent's face
   // as it sits in the world, scale and mirror included.
   const { facing, up } = scaledFrame(theirs, parentScale);
-  const twistedUp = up
-    .clone()
-    .applyAxisAngle(facing, connection.twist ?? 0)
-    .normalize();
+  const twistedUp = applyAxisAngle(
+    up.clone(),
+    facing,
+    connection.twist ?? 0,
+  ).normalize();
 
   // The piece's own connector after its scale. A face's direction goes through
   // the inverse scale, which is what turns a mirrored part's "+x" face round to
@@ -352,14 +359,14 @@ export function placeJoin(
   const from = frame(ownFacing, ownUp);
   const to = frame(facing.clone().negate(), twistedUp);
   const turn = to.multiply(from.transpose());
-  const rotation = new THREE.Euler().setFromRotationMatrix(turn);
+  const rotation = eulerFromMatrix(turn);
 
   // The piece's own offset from its connector is not carried by the parent's
   // scale, so it is divided by it to land the connector on the target.
   const position = target.sub(point.applyMatrix4(turn).divide(parentScale));
   return {
     position: [position.x, position.y, position.z],
-    rotation: [rotation.x, rotation.y, rotation.z],
+    rotation,
   };
 }
 
@@ -499,7 +506,7 @@ export function twistOf(
   const { facing, up: from } = scaledFrame(theirs, parentScale);
   up.addScaledVector(facing, -up.dot(facing)).normalize();
 
-  const twist = Math.atan2(
+  const twist = portableAtan2(
     facing.dot(new THREE.Vector3().crossVectors(from, up)),
     from.dot(up),
   );
@@ -1073,10 +1080,9 @@ export function transformOf(
   const rotation = new THREE.Quaternion();
   const scale = new THREE.Vector3();
   local.decompose(position, rotation, scale);
-  const euler = new THREE.Euler().setFromQuaternion(rotation);
   return {
     position: [position.x, position.y, position.z],
-    rotation: [euler.x, euler.y, euler.z],
+    rotation: eulerFromQuaternion(rotation),
     scale: [scale.x, scale.y, scale.z],
   };
 }
