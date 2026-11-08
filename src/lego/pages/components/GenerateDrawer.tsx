@@ -41,6 +41,13 @@ import { starterModules } from "../../starterModules";
 /** How many candidates a batch holds. See the file comment for the cost. */
 export const CANDIDATE_COUNT = 12;
 
+/** The form's choices, without the seed. */
+interface Inputs {
+  plan: string;
+  job: string;
+  size: GeneratorSize;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,7 +63,11 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
   const [size, setSize] = useState<GeneratorSize>("medium");
   const [seedText, setSeedText] = useState("");
   const [seedError, setSeedError] = useState<string | null>(null);
-  const [batch, setBatch] = useState<CandidateBatch | null>(null);
+  /** The batch on screen, with the inputs that made it, so Reroll carries on
+   *  from those rather than from whatever the form now says. */
+  const [batch, setBatch] = useState<
+    (CandidateBatch & { inputs: Inputs }) | null
+  >(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [pictures, setPictures] = useState<string[]>([]);
   /** Bumped when a texture arrives, so pictures drawn too early are redrawn. */
@@ -104,26 +115,25 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
     }
   }, [pack, batch, arrivals]);
 
-  function generate(start: number) {
+  function generate(inputs: Inputs, start: number) {
     if (!pack) return;
-    const chosen = bodyPlanById(plan);
+    const chosen = bodyPlanById(inputs.plan);
     if (!chosen) return;
     setProblem(null);
     try {
-      setBatch(
-        generateCandidates(
-          { plan: chosen, job, size },
-          start,
-          CANDIDATE_COUNT,
-          () => ({
-            id: crypto.randomUUID(),
-            rootPieceId: crypto.randomUUID(),
-            now: new Date().toISOString(),
-            pack,
-            modules,
-          }),
-        ),
+      const made = generateCandidates(
+        { plan: chosen, job: inputs.job, size: inputs.size },
+        start,
+        CANDIDATE_COUNT,
+        () => ({
+          id: crypto.randomUUID(),
+          rootPieceId: crypto.randomUUID(),
+          now: new Date().toISOString(),
+          pack,
+          modules,
+        }),
       );
+      setBatch({ ...made, inputs });
     } catch (error) {
       const reason = describeError(error);
       setBatch(null);
@@ -139,7 +149,7 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
       return;
     }
     setSeedError(null);
-    generate(seed);
+    generate({ plan, job, size }, seed);
   }
 
   return (
@@ -217,7 +227,7 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
                     type="button"
                     variant="outline"
                     disabled={!pack}
-                    onClick={() => generate(batch.next)}
+                    onClick={() => generate(batch.inputs, batch.next)}
                   >
                     <Dices size={16} /> <Trans>Reroll</Trans>
                   </Button>
@@ -250,7 +260,7 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
                             className="aspect-square w-full rounded-t bg-muted object-cover"
                           />
                         ) : (
-                          <div className="aspect-square w-full rounded-t bg-muted" />
+                          <span className="block aspect-square w-full rounded-t bg-muted" />
                         )}
                         <span className="block px-3 py-2 text-sm">
                           <Trans>Seed {seed}</Trans>

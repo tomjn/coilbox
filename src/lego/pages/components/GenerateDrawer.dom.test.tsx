@@ -140,6 +140,18 @@ describe("GenerateDrawer", () => {
     ).toBeTruthy();
   });
 
+  it("rerolls with the choices that made the grid", async () => {
+    const generate = await show();
+    fireEvent.click(generate);
+    fireEvent.click(screen.getByRole("combobox", { name: "Size" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Large" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reroll" }));
+
+    expect(generateCandidates.mock.calls[1][0]).toMatchObject({
+      size: "medium",
+    });
+  });
+
   it("shows each candidate's picture", async () => {
     const generate = await show();
     fireEvent.change(screen.getByPlaceholderText("Random"), {
