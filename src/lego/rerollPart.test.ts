@@ -11,7 +11,13 @@ import {
   pieceById,
 } from "./model";
 import { rerollUnit } from "./reroll";
-import { partFamily, rerolledSeed, rerollKind, rerollPart } from "./rerollPart";
+import {
+  partFamily,
+  rerolledSeed,
+  rerollKind,
+  rerollPart,
+  rerollRefusal,
+} from "./rerollPart";
 import { starterModules } from "./starterModules";
 import { bundledPack } from "./testPack";
 
@@ -68,6 +74,38 @@ const partPiece = (project: LegoProject) =>
   ) as LegoPiece;
 
 describe("what can be rerolled", () => {
+  it("is refused for a part with nothing else of its shape and colour", () => {
+    const mixed = pack.parts.find((p) => p.category === "mixed");
+    if (!mixed) throw new Error("the bundled pack has no mixed part");
+    const piece = partPiece(unit);
+    const odd: LegoProject = {
+      ...unit,
+      pieces: unit.pieces.map((p) =>
+        p.id === piece.id ? { ...p, partId: mixed.id } : p,
+      ),
+    };
+    expect(rerollRefusal(odd, pack, piece.id, modules)).not.toBeNull();
+    expect(rerollRefusal(unit, pack, piece.id, modules)).toBeNull();
+  });
+
+  it("is refused for a turret that has no other and nothing to roll", () => {
+    const { top } = moduleOf(unit, "weapon.1");
+    expect(rerollRefusal(unit, pack, top.id, modules)).toContain("Turret");
+    const rolled = moduleOf(artillery, "weapon.1").top;
+    expect(rerollRefusal(artillery, pack, rolled.id, modules)).toBeNull();
+  });
+
+  it("is nothing for a module that holds an imported mesh", () => {
+    const { pieces, top } = moduleOf(unit, "chassis.1");
+    const meshed: LegoProject = {
+      ...unit,
+      pieces: unit.pieces.map((p) =>
+        p.id === pieces[pieces.length - 1].id ? { ...p, meshId: "m" } : p,
+      ),
+    };
+    expect(rerollKind(meshed, top.id)).toBeNull();
+  });
+
   it("is a module piece as a module and a pack part as a part", () => {
     const { top } = moduleOf(unit, "chassis.1");
     expect(rerollKind(unit, top.id)).toBe("module");
@@ -149,6 +187,8 @@ describe("rerolling a module", () => {
     });
     if (result.status !== "ok") throw new Error(result.message);
     const next = moduleOf(result.project, "chassis.1").top;
+    // A module that was joined stays joined.
+    expect(next.connection !== undefined).toBe(top.connection !== undefined);
     const to = modules.find((m) => m.id === next.module?.id) as LegoProject;
     const now =
       Math.abs(next.scale[0]) /
@@ -263,6 +303,21 @@ describe("rerolling a plain part", () => {
       family.every((p) => p.shape === "plate" && p.category === "grey"),
     ).toBe(true);
     expect(family.some((p) => p.tags.includes("tiny"))).toBe(false);
+    const piece = partPiece(unit);
+    const onLone: LegoProject = {
+      ...unit,
+      pieces: unit.pieces.map((p) =>
+        p.id === piece.id ? { ...p, partId: lone.id } : p,
+      ),
+    };
+    const result = rerollPart(onLone, pack, piece.id, { modules });
+    if (result.status !== "ok") throw new Error(result.message);
+    const part = pack.byId.get(
+      pieceById(result.project, piece.id)?.partId as string,
+    );
+    expect(part?.id).not.toBe(lone.id);
+    expect(part?.shape).toBe("plate");
+    expect(part?.category).toBe("grey");
   });
 
   it("keeps the piece's place, children, role and connection", () => {

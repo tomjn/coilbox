@@ -94,7 +94,16 @@ export function rerollKind(
 ): RerollKind | null {
   const piece = pieceById(project, pieceId);
   if (!piece) return null;
-  if (piece.module) return "module";
+  if (piece.module) {
+    // Imported meshes have no kind to match, and a module holding one is made
+    // of them.
+    const instance = piece.module.instance;
+    return project.pieces.some(
+      (p) => p.module?.instance === instance && p.meshId,
+    )
+      ? null
+      : "module";
+  }
   return piece.partId && !piece.meshId ? "part" : null;
 }
 
@@ -257,23 +266,26 @@ function rerollPlain(
   );
 }
 
-function rerollModule(
+/** What a module reroll works from, or why it cannot go ahead. */
+function moduleSetup(
   project: LegoProject,
-  pack: LoadedPack,
   pieceId: string,
-  options: RerollPartOptions,
-  seeds: number[],
-): RerollPartResult {
+  modules: readonly LegoProject[],
+) {
   const top = moduleTop(project, pieceId) as LegoPiece;
   const ref = top.module as NonNullable<LegoPiece["module"]>;
-  const current = options.modules.find((m) => m.id === ref.id);
+  const current = modules.find((m) => m.id === ref.id);
   if (!current) {
-    return failed(t`This module is not in the module library.`);
+    return {
+      ok: false as const,
+      message: t`This module is not in the module library.`,
+    };
   }
   if (!current.category) {
-    return failed(
-      t`This module has no category, so there is no other of its kind.`,
-    );
+    return {
+      ok: false as const,
+      message: t`This module has no category, so there is no other of its kind.`,
+    };
   }
   const generated = project.generated;
   const slotName = generated?.modules.find(
@@ -285,18 +297,60 @@ function rerollModule(
   // it, as the generator does, so only those can be rolled again.
   const chassisSize =
     slot?.scale && slot !== job?.slots[0]
-      ? moduleSize(project, options.modules, job?.slots[0]?.id)
+      ? moduleSize(project, modules, job?.slots[0]?.id)
       : undefined;
   const rollable =
     chassisSize !== undefined || Object.keys(slot?.roles ?? {}).length > 0;
-  const family = moduleFamily(project, options.modules, current);
+  const family = moduleFamily(project, modules, current);
   // With nothing else of its category, a generated module is rolled again, as
   // far as its slot's rules for its size and its pieces go. That is all a
   // reroll can change.
   if (family.length === 0 && !rollable) {
     const category = current.category;
-    return failed(t`No other module is in the ${category} category.`);
+    return {
+      ok: false as const,
+      message: t`No other module is in the ${category} category.`,
+    };
   }
+  return { ok: true as const, top, ref, current, slot, chassisSize, family };
+}
+
+/**
+ * Why `pieceId` cannot be rerolled, or null when it can: it has no kind, or
+ * nothing else is of its kind. Whether a seed finds one that fits is not told.
+ */
+export function rerollRefusal(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  modules: readonly LegoProject[],
+): string | null {
+  const kind = rerollKind(project, pieceId);
+  if (kind === "module") {
+    const setup = moduleSetup(project, pieceId, modules);
+    return setup.ok ? null : setup.message;
+  }
+  if (kind === "part") {
+    const piece = pieceById(project, pieceId) as LegoPiece;
+    const current = pack.byId.get(piece.partId as string);
+    if (!current) return t`This piece's part is not in the parts library.`;
+    return partFamily(pack, current).length === 0
+      ? t`No other part has this part's shape and colour.`
+      : null;
+  }
+  return t`This piece is not a part or module, so it cannot be rerolled.`;
+}
+
+function rerollModule(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  options: RerollPartOptions,
+  seeds: number[],
+): RerollPartResult {
+  const setup = moduleSetup(project, pieceId, options.modules);
+  if (!setup.ok) return failed(setup.message);
+  const { top, ref, current, slot, chassisSize, family } = setup;
   const draw = byId(family.length > 0 ? [...family, current] : [current]);
   const rootScale = Math.abs(
     pieceById(current, current.rootPieceId)?.scale[0] ?? 1,
@@ -344,6 +398,10 @@ function rerollModule(
       }),
     };
     const root = swapped.rootPieceIds[0];
+    // A module that was joined stays joined. `swapModule` falls back to the old
+    // place when the new one cannot form the join, which is not a reroll that
+    // keeps its connections.
+    if (top.connection && !pieceById(next, root)?.connection) continue;
     const instance = pieceById(next, root)?.module?.instance;
     if (slot && instance !== undefined) {
       next = applyRoleRules(next, pack, instance, slot, (key) =>
