@@ -4130,6 +4130,31 @@ export const unitsyncHeightField = defineCommand<
   HeightFieldResult
 >("coilbox-unitsync", "unitsync_height_field");
 
+export interface MetalFieldResult {
+  /** Cache file name, served over `coilbox://unitsyncthumb/`. One byte per
+   *  sample as `GetInfoMap "metal"` returned it, row major, `width * height` of
+   *  them. No inline fallback, as for the height field. */
+  file?: string;
+  /** Grid dimensions `(mapx/2, mapy/2)`. */
+  width?: number;
+  height?: number;
+  /** The map's `extractorRadius` in elmos. Absent when the map declares none
+   *  (unitsync answers 0 for both that and a declared 0), so the caller applies
+   *  the engine's default of 500. */
+  extractorRadius?: number;
+  errors: string[];
+}
+
+/**
+ * Write one map's raw 8 bit metal density grid to the thumbnail cache and
+ * report the file, with the extractor radius the map declares. Lazy, a separate
+ * unitsync session, cached on disk.
+ */
+export const unitsyncMetalField = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string },
+  MetalFieldResult
+>("coilbox-unitsync", "unitsync_metal_field");
+
 export interface MetalmapResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
    * render reached disk, and preferred over `dataUrl`. */

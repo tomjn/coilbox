@@ -48,6 +48,7 @@ mod lua;
 mod luacompat;
 mod mapcatalog;
 mod mapmeta;
+mod metalfield;
 mod metalmap;
 mod metalspots;
 mod minimap;
@@ -109,6 +110,11 @@ struct Args {
     /// field lives once in `coilbox_unitsync_worker::HeightFieldArgs`, shared
     /// with the sidecar plugin that builds this flag's argv (issue #2448).
     height_field: Option<Mode>,
+    /// `--metal-field`: write one map's raw 8 bit metal density to the cache,
+    /// with the extractor radius the map declares. Its field lives once in
+    /// `coilbox_unitsync_worker::MetalFieldArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv.
+    metal_field: Option<Mode>,
     /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG,
     /// and with `--asset-dir` also store the raw density as the hub's asset.
     /// Its fields live once in `coilbox_unitsync_worker::MetalmapArgs`,
@@ -860,6 +866,16 @@ fn dispatch(args: &Args) -> i32 {
         );
     }
 
+    // Metal field: write one map's raw metal density out, with its extractor radius.
+    if let Some(Mode::MetalField(mode)) = &args.metal_field {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return run_mode(
+            || metalfield::render(&args.lib, &mode.map, cache_dir),
+            print_ok,
+            || metalfield::emit_error("worker panicked while reading metal density".into()),
+        );
+    }
+
     // Metalmap: render one map's metal infomap to a green-on-transparent RGBA PNG.
     if let Some(Mode::Metalmap(mode)) = &args.metalmap {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
@@ -1018,6 +1034,9 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     // `Mode::HeightField`'s `from_args` below re-scans `raw` for those
     // (issue #2448).
     let mut height_field_flag = false;
+    // `--metal-field`'s own fields (map, cache directory) are collected the
+    // same way: `Mode::MetalField`'s `from_args` below re-scans `raw`.
+    let mut metal_field_flag = false;
     // `--metalmap`'s own fields (map, max side, cache directory, asset
     // directory) are not collected into locals here for its own use, the
     // same treatment as above: `Mode::Metalmap`'s `from_args` below re-scans
@@ -1155,6 +1174,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--thumbnails" => thumbnails_flag = true,
             "--heightmap" => heightmap_flag = true,
             "--height-field" => height_field_flag = true,
+            "--metal-field" => metal_field_flag = true,
             "--metalmap" => metalmap_flag = true,
             "--typemap" => typemap = true,
             "--map-catalog" => map_catalog_flag = true,
@@ -1301,6 +1321,13 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         height_field: if height_field_flag {
             Some(Mode::HeightField(
                 coilbox_unitsync_worker::HeightFieldArgs::from_args(raw)?,
+            ))
+        } else {
+            None
+        },
+        metal_field: if metal_field_flag {
+            Some(Mode::MetalField(
+                coilbox_unitsync_worker::MetalFieldArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -1640,6 +1667,17 @@ fn absolutize(args: &mut Args) {
     // treatment. `--map` is a unitsync name, not a path, so it is left
     // alone.
     if let Some(Mode::HeightField(mode)) = args.height_field.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::MetalField` holds its own copy of `--cache-dir`, read
+    // separately from `raw` in `parse_args`, so it needs the same
+    // treatment. `--map` is a unitsync name, not a path, so it is left
+    // alone.
+    if let Some(Mode::MetalField(mode)) = args.metal_field.as_mut() {
         if let Some(dir) = &mut mode.cache_dir {
             if let Some(abs) = absolute_path(dir) {
                 *dir = abs;
@@ -2326,6 +2364,7 @@ mod tests {
             thumbnails: None,
             heightmap: None,
             height_field: None,
+            metal_field: None,
             metalmap: None,
             typemap: false,
             map_catalog: None,

@@ -35,6 +35,7 @@ import {
   type MapInfoResult,
   type MapSkyboxResult,
   type MatchSetup,
+  type MetalFieldResult,
   type MetalmapResult,
   type MinimapResult,
   type SaveFile,
@@ -58,6 +59,7 @@ import {
   unitsyncMapInfo,
   unitsyncMapMeta,
   unitsyncMapSkybox,
+  unitsyncMetalField,
   unitsyncMetalmap,
   unitsyncMinimap,
   unitsyncScan,
@@ -2275,6 +2277,11 @@ const heightmapPending = new Map<string, Promise<HeightmapResult>>();
 const heightFieldCache = new Map<string, HeightFieldResult>();
 const heightFieldPending = new Map<string, Promise<HeightFieldResult>>();
 
+/** Session cache of raw metal grids, keyed by `dataDir::enginePath::mapName`.
+ *  The result is a file name, not the grid, so this is small. */
+const metalFieldCache = new Map<string, MetalFieldResult>();
+const metalFieldPending = new Map<string, Promise<MetalFieldResult>>();
+
 /** Session cache of metalmap results, keyed by `dataDir::enginePath::mapName`. */
 const metalmapCache = new Map<string, MetalmapResult>();
 const metalmapPending = new Map<string, Promise<MetalmapResult>>();
@@ -2304,6 +2311,7 @@ export function invalidateMapPreview(
     }
   }
   heightFieldCache.delete(key);
+  metalFieldCache.delete(key);
   metalmapCache.delete(key);
 }
 
@@ -2439,6 +2447,28 @@ export function useUnitsyncHeightField(
     heightFieldCache,
     heightFieldPending,
     unitsyncHeightField,
+    enginePath,
+    dataDir,
+    mapName,
+  );
+}
+
+/**
+ * Lazily write and cache a map's raw 8 bit metal density grid.
+ *
+ * The url is the file the worker wrote, which the caller fetches as bytes. The
+ * extractor radius comes back with it in `data`, absent when the map declares
+ * none, and the caller then applies the engine's default of 500.
+ */
+export function useUnitsyncMetalField(
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  return useUnitsyncMapAsset(
+    metalFieldCache,
+    metalFieldPending,
+    unitsyncMetalField,
     enginePath,
     dataDir,
     mapName,
