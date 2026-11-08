@@ -571,10 +571,10 @@ export function coverSkeleton(
       plan.rows,
     );
     // A deck part thicker than the deck reaches below it, and the unit sitting
-    // on the ground would then lift its wheels off it.
+    // on the ground would then lift its wheels off it. With no part thin
+    // enough, there is no deck.
     if (plan.rows && options.gear?.size) {
-      const level = ranked.filter((fit) => fit.depth <= plan.depth + TOUCH);
-      if (level.length > 0) ranked = level;
+      ranked = ranked.filter((fit) => fit.depth <= plan.depth + TOUCH);
     }
     const candidates = ranked.slice(0, CLOSEST);
     if (candidates.length === 0) continue;
