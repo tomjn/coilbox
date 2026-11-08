@@ -130,6 +130,7 @@ uniform vec3 uBiomeSteep[2];
 uniform vec3 uBiomeClearing;
 uniform vec3 uBiomeColour[8];
 uniform float uSeaLiquid;
+uniform float uTerrainFrost;
 uniform float uSeaPattern;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
@@ -521,7 +522,22 @@ const DETAIL = /* glsl */ `
     float faceNear = cav.b;
     float seaNear = cav.a;
 
+    // Scree gathers on ground level enough to hold it, low against its
+    // surroundings, with a steep face close above. It covers whatever grows
+    // there, so the other patterns give way to it.
+    float level = 1.0 - smoothstep(0.1, 0.24, 1.0 - n.y);
+    float talus = level * smoothstep(0.04, 0.3, faceNear) * smoothstep(0.15, -0.15, cavCoarse) * land * (1.0 - steep);
+    // The drop to the sea counts as a face, but the shore is left to the wet
+    // band.
+    talus = smoothstep(0.0, 0.5, talus) * (1.0 - pw[${P.snow}]) * (1.0 - smoothstep(0.02, 0.2, seaNear));
+    for (int k = 0; k < ${PATTERN_COUNT}; k++) pw[k] *= 1.0 - talus;
+    pw[${P.scree}] += talus;
+
     float shadeMul = 1.0;
+    // Light and dark from the ground's shape: strata, rims, crevices and
+    // scree. Set as it should look on screen, and turned into linear light
+    // below, since a step in linear light shows as about half as much.
+    float form = 1.0;
     // The slope each pattern adds, seen from above, and for rock in space.
     vec2 bump = vec2(0.0);
     vec3 bump3 = vec3(0.0);
@@ -759,12 +775,6 @@ const DETAIL = /* glsl */ `
     // Rock, scree and mesa, and any steep slope: creased stone in layers. It
     // is drawn from the point in space, not from above, so it does not smear
     // down a cliff.
-    // Scree gathers on ground level enough to hold it, low against its
-    // surroundings, with a steep face close above.
-    float level = 1.0 - smoothstep(0.1, 0.24, 1.0 - n.y);
-    float talus = level * smoothstep(0.08, 0.45, faceNear) * smoothstep(0.05, -0.3, cavCoarse) * land * (1.0 - steep);
-    talus *= 1.0 - pw[${P.snow}];
-    pw[${P.scree}] += talus;
     float crag = max(pw[${P.rock}] + pw[${P.scree}] + pw[${P.mesa}] * 0.5, steep);
     if (crag > 0.02) {
       vec3 squash = vec3(1.0, 1.3, 1.0);
@@ -788,12 +798,16 @@ const DETAIL = /* glsl */ `
       // a dark seam where one meets the next. They show on a slope and not on
       // the level. The noise bends the beds and varies their thickness, so
       // they read as layers and not as contour lines.
-      float tilt = smoothstep(0.03, 0.15, 1.0 - n.y);
-      float strata = (steep + pw[${P.mesa}] * tilt) * (1.0 - pw[${P.snow}]);
-      float warp = broad.x * 1.1 + stone.x * 0.45 + fine.x * 0.1;
+      float tilt = smoothstep(0.012, 0.07, 1.0 - n.y);
+      float strata = max(steep, (pw[${P.rock}] + pw[${P.mesa}]) * tilt) * (1.0 - pw[${P.snow}]);
+      float warp = broad.x * 1.4 + stone.x * 0.45 + fine.x * 0.25;
+      // The beds thicken and thin from place to place, and dip a little
+      // across the map, so they never follow one height all the way round.
+      vec3 vary = tSimplex(p / 9.0 + 41.0);
+      float dip = dot(p, vec2(0.6, -0.8)) * 0.05;
       for (int k = 0; k < 2; k++) {
-        float rate = k == 0 ? 3.0 : 10.0;
-        float depth = vTerrainPos.y * rate + warp * (k == 0 ? 1.0 : 0.6) + float(k) * 5.3;
+        float rate = (k == 0 ? 3.0 : 10.0) * (1.0 + 0.3 * vary.x);
+        float depth = (vTerrainPos.y + dip) * rate + warp * (k == 0 ? 1.0 : 0.6) + float(k) * 5.3;
         float keepBed = 1.0 - smoothstep(0.5, 1.4, fwidth(depth));
         if (keepBed <= 0.0) break;
         float bed = floor(depth);
@@ -802,26 +816,41 @@ const DETAIL = /* glsl */ `
         float within = fract(depth);
         float seam = 1.0 - smoothstep(0.0, 0.09 + fwidth(depth), within);
         float lip = smoothstep(0.82, 1.0, within) * (1.0 - seam);
-        float weight = strata * keepBed * (k == 0 ? 1.0 : 0.45);
-        shadeMul += weight * ((pick.x - 0.5) * 0.7 - seam * 0.3 + lip * 0.14);
-        vec3 tint = mix(vec3(1.12, 1.0, 0.8), vec3(0.84, 0.88, 1.0), pick.y);
-        albedo = mix(albedo, albedo * tint, weight * 0.75);
+        // Each bed pinches out in places along the slope.
+        float lens = smoothstep(-0.45, 0.1, tSimplex(p / 2.5 + bed * 3.1 + float(k) * 11.0).x);
+        float weight = strata * keepBed * lens * (k == 0 ? 1.0 : 0.45);
+        // Hard and soft beds alternate, so neighbours differ in tone.
+        float hard = mod(bed, 2.0) * 2.0 - 1.0;
+        form += weight * (hard * (0.1 + 0.12 * pick.x) - seam * 0.12 + lip * 0.05);
+        vec3 tint = mix(vec3(1.08, 1.0, 0.9), vec3(0.94, 0.95, 0.97), pick.y);
+        albedo = mix(albedo, albedo * tint, weight * 0.6);
       }
       shadeMul += pw[${P.mesa}] * fine.x * 0.12;
       // Edges and ridges weather pale, and the crevices between fill dark.
       float rock = min(crag, 1.0);
-      float rim = smoothstep(0.12, 0.7, cavFine);
-      float crevice = smoothstep(-0.08, -0.6, cavFine);
-      albedo = mix(albedo, albedo * 1.35 + vec3(0.05, 0.045, 0.035), rock * rim * 0.7);
-      shadeMul -= rock * (1.0 - min(talus, 1.0)) * (crevice * 0.4 + smoothstep(0.0, -0.5, cavCoarse) * 0.1);
+      float rim = smoothstep(0.03, 0.4, cavFine);
+      float crevice = smoothstep(-0.03, -0.35, cavFine);
+      form += rock * rim * 0.3;
+      form -= rock * (1.0 - min(talus, 1.0)) * (crevice * 0.35 + smoothstep(0.0, -0.5, cavCoarse) * 0.1);
+      // Frost on a cold world: rime on the ledges and in the cracks, and a
+      // fine pale grain over the rest, so the stone reads matte.
+      if (uTerrainFrost > 0.0) {
+        float rime = smoothstep(0.4, 0.85, (1.0 - tilt) * 0.6 + crevice * 0.45 + broad.x * 0.25 + fine.x * 0.15);
+        vec3 grey = vec3(dot(albedo, vec3(0.2126, 0.7152, 0.0722)));
+        albedo = mix(albedo, grey, rock * uTerrainFrost * 0.5);
+        albedo = mix(albedo, vec3(0.8, 0.84, 0.88), rock * uTerrainFrost * rime * 0.4);
+        form += rock * uTerrainFrost * (fine.x * 0.05 - rim * 0.08);
+      }
       // Talus is loose stone, greyer than the face it broke from.
-      albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.35 + broad.x * 0.4), min(talus, 1.0) * 0.6);
-      shadeMul += min(talus, 1.0) * 0.15;
-      // Scree is the same stone broken small.
-      float keep = tShow(0.04, footprint);
-      if (pw[${P.scree}] > 0.02 && keep > 0.0) {
-        vec4 cell = tCell(p / 0.11 + 6.1);
-        shadeMul += pw[${P.scree}] * keep * (cell.w - 0.5) * 0.45 * (1.0 - smoothstep(0.15, 0.45, cell.x));
+      albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.45 + broad.x * 0.4), talus * 0.85);
+      form += talus * 0.1;
+      // Scree is the same stone broken small: blocks, then the chips between.
+      for (int k = 0; k < 2; k++) {
+        float size = k == 0 ? 0.32 : 0.11;
+        float keep = tShow(size * 0.36, footprint);
+        if (pw[${P.scree}] <= 0.02 || keep <= 0.0) break;
+        vec4 cell = tCell(p / size + 6.1 + float(k) * 3.7);
+        form += pw[${P.scree}] * keep * (cell.w - 0.5) * (k == 0 ? 0.4 : 0.3) * (1.0 - smoothstep(0.15, 0.45, cell.x));
       }
     }
     // Snow and ice lie in the hollows, bluer there, and give way to bare rock
@@ -829,8 +858,8 @@ const DETAIL = /* glsl */ `
     float cold = min(pw[${P.snow}] + pw[${P.ice}], 1.0);
     if (cold > 0.02) {
       float hollow = smoothstep(0.05, -0.45, cavFine * 0.5 + cavCoarse);
-      albedo = mix(albedo, albedo * vec3(0.74, 0.86, 1.0), cold * hollow * 0.8);
-      float bare = smoothstep(0.3, 0.7, cavFine);
+      albedo = mix(albedo, albedo * vec3(0.55, 0.74, 1.0), cold * hollow * 0.8);
+      float bare = smoothstep(0.12, 0.45, cavFine);
       albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.5 + broad.x * 0.5), cold * bare * 0.85);
     }
     // Lava: plates of dark crust adrift on the melt, which glows in the gaps
@@ -910,8 +939,9 @@ const DETAIL = /* glsl */ `
     bump = mix(bump, wave.yz * 0.03, liquid);
     bump3 *= 1.0 - liquid;
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
+    form = mix(form, 1.0, liquid);
 
-    albedo *= max(shadeMul, 0.2);
+    albedo *= max(shadeMul, 0.2) * pow(clamp(form, 0.3, 1.6), 2.2);
     // Wet ground at the water line: darker and a little bluer, with a ragged
     // upper edge.
     float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
@@ -1077,6 +1107,7 @@ export function applyTerrainShader(
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
     };
+    shader.uniforms.uTerrainFrost = { value: planet?.frost ?? 0 };
     shader.uniforms.uSeaPattern = {
       value: (planet && SEA_PATTERN[planet.sea.look]) ?? -1,
     };
