@@ -18,6 +18,7 @@ mod bundle;
 mod caches;
 mod container_file;
 mod demo;
+mod duplicates;
 mod engine;
 mod install3do;
 mod keybinds;
@@ -1341,6 +1342,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             rapid_pool::content_prune_rapid_pool,
             caches::content_reclaim_caches,
             storage::content_storage_overview,
+            duplicates::content_duplicate_report,
             storage::content_delete_engine,
             build_tree_export::content_export_build_tree_html,
             build_tree_export::content_export_build_tree_zip,

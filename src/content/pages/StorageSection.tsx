@@ -30,6 +30,10 @@ import { useContentState, usePreferredEngine } from "../config";
 import { canPrune } from "../rapidPool";
 import { BulkDeleteReplaysPanel } from "./components/BulkDeleteReplaysPanel";
 import { DeleteEngineButton } from "./components/DeleteEngineButton";
+import {
+  clearDuplicateReportCache,
+  DuplicateContent,
+} from "./components/DuplicateContent";
 import { ReclaimCachesButton } from "./components/ReclaimCachesButton";
 import { ReclaimSpaceButton } from "./components/ReclaimSpaceButton";
 import { ReplayTracksStorage } from "./components/ReplayTracksStorage";
@@ -106,8 +110,13 @@ export default function StorageSection() {
 
   const refreshing = Object.values(sizes).some((s) => s.status === "loading");
 
+  /** Bumped by Refresh and by a delete, so the duplicate report reads again. */
+  const [reportVersion, setReportVersion] = useState(0);
+
   const refresh = () => {
     sizeCache.clear();
+    clearDuplicateReportCache();
+    setReportVersion((v) => v + 1);
     for (const root of roots) size(root.path, true);
   };
 
@@ -122,6 +131,8 @@ export default function StorageSection() {
    */
   const refreshRoot = useCallback(
     async (path: string) => {
+      clearDuplicateReportCache();
+      setReportVersion((v) => v + 1);
       await size(path, true);
       try {
         const { root } = await contentScanRoot({ path });
@@ -196,6 +207,11 @@ export default function StorageSection() {
           ))}
         </div>
       </section>
+
+      <DuplicateContent
+        roots={roots.map((r) => r.path)}
+        version={reportVersion}
+      />
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

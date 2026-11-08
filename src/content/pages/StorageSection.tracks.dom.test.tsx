@@ -32,6 +32,9 @@ vi.mock("../bindings", async () => {
     contentStorageOverview: async () => ({
       overview: { categories: [], engines: [], totalBytes: 0 },
     }),
+    contentDuplicateReport: async () => ({
+      report: { groups: [], wastedBytes: 0 },
+    }),
     contentUnitDefSetsUsage: async () => ({ sets: 0, replays: 0, bytes: 0 }),
     contentScanRoot: async () => ({}),
     contentReplayTracks: async () => ({

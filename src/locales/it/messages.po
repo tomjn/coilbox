@@ -674,6 +674,11 @@ msgstr "{0, plural, one {# perdita era fuori dalla mappa e non viene disegnata.}
 msgid "{0, plural, one {# def override} other {# def overrides}}"
 msgstr "{0, plural, one {# sostituzione di definizione} other {# sostituzioni di definizione}}"
 
+#. placeholder {0}: state.report.groups.length
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "{0, plural, one {# duplicate} other {# duplicates}}"
+msgstr ""
+
 #. placeholder {0}: model.paletteFaces
 #: src/content/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -1412,6 +1417,11 @@ msgstr "{0} dall’ultima versione"
 #, fuzzy
 msgid "{0} has no folder for RmlUi widgets."
 msgstr "{0} non ha una cartella per i widget RmlUi."
+
+#. placeholder {0}: formatBytes(state.report.wastedBytes)
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "{0} in extra copies"
+msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
@@ -20697,6 +20707,10 @@ msgstr "Duplica {missionTitle}"
 msgid "Duplicate {poseName}"
 msgstr "Duplica {poseName}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Duplicate content"
+msgstr ""
+
 #: src/scenario/pages/components/shortcuts.ts
 #, fuzzy
 msgid "Duplicate the selected placement, or the trigger you are editing"
@@ -29185,6 +29199,10 @@ msgstr "Torna indietro per attaccare"
 msgid "Loose .sdd directory (uncompressed)"
 msgstr "Cartella .sdd non compressa"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Loose map and rapid package"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Lose this defence and the system falls — it is your homeworld."
@@ -32221,6 +32239,10 @@ msgstr "Nessuna cartella di scrittura per i download"
 #, fuzzy
 msgid "No downloads match \"{query}\"."
 msgstr "Nessun download corrisponde a «{query}»."
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "No duplicates found."
+msgstr ""
 
 #: src/multiplayer/chat/EmojiPicker.tsx
 #, fuzzy
@@ -38864,6 +38886,10 @@ msgstr "Rapid"
 msgid "Rapid index {refreshed} from {hosts}"
 msgstr "Indice rapid {refreshed} da {hosts}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Rapid package"
+msgstr ""
+
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
@@ -41323,6 +41349,10 @@ msgstr "Mostra {enginePath}"
 msgid "Reveal {firstPath}"
 msgstr "Mostra {firstPath}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Reveal {folder}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Reveal in file manager"
@@ -41342,6 +41372,11 @@ msgstr "Mostra la barra laterale"
 #, fuzzy
 msgid "Reveal the {engineVersion} folder"
 msgstr "Mostra la cartella {engineVersion}"
+
+#. placeholder {0}: copy.path
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Reveal the folder holding {0}"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41803,6 +41838,14 @@ msgstr "Come la precisione, ma usata mentre l’unità che spara è in movimento
 #, fuzzy
 msgid "Same as default"
 msgstr "Come il predefinito"
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Same name and size"
+msgstr ""
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Same name, different sizes"
+msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 msgid "sand"

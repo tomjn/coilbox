@@ -118,29 +118,33 @@ fn fold_members(names: impl Iterator<Item = String>) -> Vec<GameMissionEntry> {
 }
 
 fn list_packaged(root: &Path) -> Result<Vec<GameMissionEntry>, String> {
+    Ok(fold_members(member_names(root)?.into_iter()))
+}
+
+/// Every member path a packaged archive lists, with forward slashes: a `.sdz`
+/// zip, a `.sd7` 7-zip or a rapid `.sdp` package. Only the archive's own index
+/// is read, never a member's contents. A loose folder is not packaged, so it is
+/// refused here.
+pub fn member_names(root: &Path) -> Result<Vec<String>, String> {
     match kind(root) {
         Kind::Zip => {
             let file = std::fs::File::open(root).map_err(|e| format!("{e}"))?;
             let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("{e}"))?;
-            let names: Vec<String> = (0..zip.len())
+            Ok((0..zip.len())
                 .filter_map(|i| zip.by_index(i).ok().map(|f| f.name().to_string()))
-                .collect();
-            Ok(fold_members(names.into_iter()))
+                .collect())
         }
         Kind::SevenZip => {
             let archive = sevenz_rust2::ArchiveReader::open(root, sevenz_rust2::Password::empty())
                 .map_err(|e| format!("{e}"))?;
-            let names: Vec<String> = archive
+            Ok(archive
                 .archive()
                 .files
                 .iter()
                 .map(|f| f.name().replace('\\', "/"))
-                .collect();
-            Ok(fold_members(names.into_iter()))
+                .collect())
         }
-        Kind::Pool => Ok(fold_members(
-            pool_entries(root)?.into_iter().map(|e| e.name),
-        )),
+        Kind::Pool => Ok(pool_entries(root)?.into_iter().map(|e| e.name).collect()),
         Kind::Unknown => Err(format!("not a game archive: {}", root.display())),
     }
 }

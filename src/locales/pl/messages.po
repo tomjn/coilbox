@@ -668,6 +668,11 @@ msgstr "{0, plural, one {# strata była poza mapą, więc jej nie narysowano.} f
 msgid "{0, plural, one {# def override} other {# def overrides}}"
 msgstr "{0, plural, one {# nadpisanie definicji} few {# nadpisania definicji} many {# nadpisań definicji} other {# nadpisania definicji}}"
 
+#. placeholder {0}: state.report.groups.length
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "{0, plural, one {# duplicate} other {# duplicates}}"
+msgstr ""
+
 #. placeholder {0}: model.paletteFaces
 #: src/content/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -1396,6 +1401,11 @@ msgstr "{0} z najnowszego wydania"
 #. placeholder {0}: s.game
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "{0} has no folder for RmlUi widgets."
+msgstr ""
+
+#. placeholder {0}: formatBytes(state.report.wastedBytes)
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "{0} in extra copies"
 msgstr ""
 
 #. placeholder {0}: game.game
@@ -20560,6 +20570,10 @@ msgstr "Duplikuj {missionTitle}"
 msgid "Duplicate {poseName}"
 msgstr "Duplikuj {poseName}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Duplicate content"
+msgstr ""
+
 #: src/scenario/pages/components/shortcuts.ts
 #, fuzzy
 msgid "Duplicate the selected placement, or the trigger you are editing"
@@ -28998,6 +29012,10 @@ msgstr "Zawraca do ataku"
 msgid "Loose .sdd directory (uncompressed)"
 msgstr "Rozpakowany katalog .sdd (bez kompresji)"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Loose map and rapid package"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Lose this defence and the system falls — it is your homeworld."
@@ -32018,6 +32036,10 @@ msgstr "Nie ustawiono folderu zapisu pobrań"
 #, fuzzy
 msgid "No downloads match \"{query}\"."
 msgstr "Żadne pobieranie nie pasuje do „{query}”."
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "No duplicates found."
+msgstr ""
 
 #: src/multiplayer/chat/EmojiPicker.tsx
 #, fuzzy
@@ -38600,6 +38622,10 @@ msgstr "Rapid"
 msgid "Rapid index {refreshed} from {hosts}"
 msgstr "Indeks rapid {refreshed} z {hosts}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Rapid package"
+msgstr ""
+
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
@@ -41044,6 +41070,10 @@ msgstr "Pokaż {enginePath}"
 msgid "Reveal {firstPath}"
 msgstr "Pokaż {firstPath}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Reveal {folder}"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
 msgid "Reveal in file manager"
@@ -41063,6 +41093,11 @@ msgstr "Pokaż pasek boczny"
 #, fuzzy
 msgid "Reveal the {engineVersion} folder"
 msgstr "Pokaż folder {engineVersion}"
+
+#. placeholder {0}: copy.path
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Reveal the folder holding {0}"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -41523,6 +41558,14 @@ msgstr "To samo co accuracy, ale używane, gdy strzelająca jednostka się porus
 #, fuzzy
 msgid "Same as default"
 msgstr "Tak jak domyślnie"
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Same name and size"
+msgstr ""
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Same name, different sizes"
+msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 msgid "sand"
