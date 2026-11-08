@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import { hashString } from "../conquest/rng";
 import { BODY_PLANS, bodyPlanById } from "./bodyPlans";
+import { boxesOverlap, MAX_PART_SCALE, pieceWorldBox } from "./covering";
 import {
   GENERATOR_JOBS,
   GENERATOR_SIZES,
@@ -18,6 +20,7 @@ import {
   projectProblems,
 } from "./model";
 import { type LegoPackManifest, type LoadedPack, mergePacks } from "./pack";
+import { worldMatrix } from "./reparent";
 import { applyProportions } from "./skeletonEdit";
 import { starterModules } from "./starterModules";
 
@@ -78,6 +81,7 @@ function summary(unit: LegoProject) {
   return {
     pieces: unit.pieces.length,
     modules: unit.generated?.modules.map((m) => `${m.slot}=${m.module}`),
+    covering: unit.generated?.covering?.length,
     proportions: unit.skeleton?.proportions,
     hash: hashString(JSON.stringify(unit)),
   };
@@ -293,6 +297,115 @@ describe("generateUnit", () => {
       }
       for (const role of GUN_ROLES) {
         expect(rolePieces(edited, role).length, role).toBeLessThanOrEqual(1);
+      }
+    });
+  });
+
+  describe("covering (#3233)", () => {
+    const covering = (unit: LegoProject) =>
+      new Set(unit.generated?.covering?.map((c) => c.piece));
+
+    it("gives the same covering for the same seed", () => {
+      for (const { plan, job, size } of EVERY) {
+        const a = generate(5, plan, job, size);
+        const b = generate(5, plan, job, size);
+        expect(a.generated?.covering).toEqual(b.generated?.covering);
+        const pieces = (u: LegoProject) =>
+          u.pieces.filter((p) => covering(u).has(p.id));
+        expect(pieces(a)).toEqual(pieces(b));
+      }
+    });
+
+    it("hangs each covering part from the bone it names, as a part from the pack", () => {
+      for (const { plan, job, size } of EVERY) {
+        const unit = generate(1, plan, job, size);
+        for (const entry of unit.generated?.covering ?? []) {
+          const piece = unit.pieces.find((p) => p.id === entry.piece);
+          const parent = unit.pieces.find((p) => p.id === piece?.parentId);
+          expect(parent?.bone, `${plan} ${job} ${size}`).toBe(entry.bone);
+          expect(pack.byId.has(piece?.partId ?? "")).toBe(true);
+          expect(piece?.module).toBeUndefined();
+        }
+      }
+    });
+
+    it("covers a walker, a vehicle and a ship", () => {
+      for (const plan of ["biped", "quadruped", "wheeled", "ship", "hover"]) {
+        const unit = generate(1, plan, "assault", "medium");
+        expect(covering(unit).size, plan).toBeGreaterThan(0);
+      }
+    });
+
+    it("buries no weapon, build arm, wheel or mount", () => {
+      for (const { plan, job, size } of EVERY) {
+        for (const seed of [1, 2, 3]) {
+          const unit = generate(seed, plan, job, size);
+          const where = `${plan} ${job} ${size} ${seed}`;
+          const chassis = unit.generated?.modules[0]?.instance;
+          const kept = unit.pieces.filter(
+            (p) => p.module && p.module.instance !== chassis,
+          );
+          // Every module but the chassis, and the room each wheel bone needs:
+          // a cube round its joint as wide as the joint is high.
+          const rooms = kept.flatMap((p) => {
+            const box = pieceWorldBox(unit, pack, p);
+            return box ? [box] : [];
+          });
+          for (const wheel of unit.pieces.filter(
+            (p) => p.bone !== undefined && p.role === "wheel",
+          )) {
+            const joint = new THREE.Vector3().setFromMatrixPosition(
+              worldMatrix(unit, wheel.id),
+            );
+            const half = Math.max(joint.y, 0);
+            const r = new THREE.Vector3(half, half, half);
+            rooms.push({
+              min: joint.clone().sub(r),
+              max: joint.clone().add(r),
+            });
+          }
+          for (const id of covering(unit)) {
+            const piece = unit.pieces.find((p) => p.id === id);
+            const box = piece && pieceWorldBox(unit, pack, piece);
+            expect(box, where).toBeTruthy();
+            for (const room of rooms) {
+              expect(boxesOverlap(box as typeof room, room), where).toBe(false);
+            }
+          }
+        }
+      }
+    });
+
+    it("scales no generated piece past the bound", () => {
+      for (const { plan, job, size } of EVERY) {
+        const unit = generate(1, plan, job, size);
+        for (const piece of unit.pieces) {
+          if (!piece.module && !covering(unit).has(piece.id)) continue;
+          // A barrel's length is stretched on top, by the job's own rule.
+          for (const s of [piece.scale[0], piece.scale[2]]) {
+            expect(Math.abs(s), `${plan} ${job} ${size}`).toBeLessThanOrEqual(
+              MAX_PART_SCALE + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it("covers a heavy unit more thickly than a scout", () => {
+      const volume = (unit: LegoProject) =>
+        unit.pieces
+          .filter((p) => covering(unit).has(p.id))
+          .reduce((sum, p) => {
+            const box = pieceWorldBox(unit, pack, p);
+            if (!box) return sum;
+            const size = box.max.clone().sub(box.min);
+            return sum + size.x * size.y * size.z;
+          }, 0);
+      for (const plan of ["biped", "quadruped", "hexapod", "wheeled"]) {
+        expect(
+          volume(generate(1, plan, "assault", "medium")),
+          plan,
+        ).toBeGreaterThan(volume(generate(1, plan, "scout", "medium")));
       }
     });
   });
