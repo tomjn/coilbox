@@ -211,7 +211,23 @@ describe("generateCheckedUnit", () => {
 
 describe("repairCandidate", () => {
   it("puts a floating unit on the ground", () => {
-    const raw = generateUnit(inputs(1, "wheeled", "scout", "medium"), options);
+    const grounded = generateUnit(
+      inputs(1, "wheeled", "scout", "medium"),
+      options,
+    );
+    // The wheels have parts now, so the generator's own unit stands on them.
+    // Lifting the root floats it.
+    const raw = {
+      ...grounded,
+      pieces: grounded.pieces.map((p) =>
+        p.id === grounded.rootPieceId
+          ? {
+              ...p,
+              position: [p.position[0], p.position[1] + 2, p.position[2]],
+            }
+          : p,
+      ),
+    } as typeof grounded;
     expect(
       generatorFaults(raw, pack).filter((f) => f.check === "ground"),
     ).not.toEqual([]);
