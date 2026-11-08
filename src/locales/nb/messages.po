@@ -9255,6 +9255,14 @@ msgstr "En reprise som aldri registrerte kampslutt, kan ikke analyseres, men mot
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr "Enhetsnumrene i en reprise betyr bare noe mot enhetslisten til versjonen den ble spilt på. En kamp uten en slik liste utelates helt, og det samme gjør en kamp der ordrene ikke passer til listen."
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll keeps it with a kept part"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll replaces it"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
@@ -20843,6 +20851,10 @@ msgstr "redigert"
 msgid "edited {edited}"
 msgstr "redigert {edited}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Edited by hand, so a reroll keeps it"
+msgstr ""
+
 #: src/workshop/deathExplosions.ts
 #, fuzzy
 msgid "Editing makes a copy for {unitName}."
@@ -28714,6 +28726,10 @@ msgstr "Lås"
 msgid "Lock {loadoutName}"
 msgstr "Lås {loadoutName}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Lock {pieceName}"
+msgstr ""
+
 #: src/lego/pages/components/LoadoutPicker.tsx
 #, fuzzy
 msgid "Lock module {name}"
@@ -28739,6 +28755,10 @@ msgstr "Låst"
 #, fuzzy
 msgid "Locked until a campaign grants it"
 msgstr "Låst til en kampanje gir den"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Locked, so a reroll keeps it"
+msgstr ""
 
 #: src/conquest/unlocks.ts
 #, fuzzy
@@ -33127,6 +33147,10 @@ msgstr "Ingen skript her."
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
+#: src/lego/reroll.ts
+msgid "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -40581,6 +40605,7 @@ msgstr "Krever at waterweapon også er på."
 msgid "Requisition their cache"
 msgstr "Rekvirer lageret deres"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr ""
@@ -40590,6 +40615,10 @@ msgstr ""
 #, fuzzy
 msgid "Reroll seed"
 msgstr "Trekk nytt frø"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll the parts that are not locked. Seed {rerollSeed}"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -51810,10 +51839,18 @@ msgstr "Denne enheten blander komponenter med deler hentet fra et spill, så eks
 msgid "This unit moves but names no movement class, so the engine drops it at load. Pick one."
 msgstr "Denne enheten beveger seg, men oppgir ingen bevegelsesklasse, så motoren dropper den ved lasting. Velg en."
 
+#: src/lego/reroll.ts
+msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "Denne enheten ble bygget mot pakken «{builtAgainst}», og den pakken er ikke installert."
+
+#: src/lego/reroll.ts
+msgid "This unit was not generated."
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -51887,6 +51924,10 @@ msgstr "Denne URL-en er for lang for en lenke."
 #, fuzzy
 msgid "This value has been changed from the game's default."
 msgstr "Denne verdien er endret fra spillets standard."
+
+#: src/lego/reroll.ts
+msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy

@@ -9192,6 +9192,14 @@ msgstr ""
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr "Numery jednostek w powtórce mają sens tylko względem listy jednostek wersji, na której ją rozegrano. Gra bez takiej listy jest pomijana w całości, podobnie jak gra, której własne rozkazy nie pasują do jej listy."
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll keeps it with a kept part"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll replaces it"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
@@ -20710,6 +20718,10 @@ msgstr "edytowane"
 msgid "edited {edited}"
 msgstr "edytowano {edited}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Edited by hand, so a reroll keeps it"
+msgstr ""
+
 #: src/workshop/deathExplosions.ts
 #, fuzzy
 msgid "Editing makes a copy for {unitName}."
@@ -28540,6 +28552,10 @@ msgstr "Zablokuj"
 msgid "Lock {loadoutName}"
 msgstr "Zablokuj {loadoutName}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Lock {pieceName}"
+msgstr ""
+
 #: src/lego/pages/components/LoadoutPicker.tsx
 #, fuzzy
 msgid "Lock module {name}"
@@ -28565,6 +28581,10 @@ msgstr "Zablokowane"
 #, fuzzy
 msgid "Locked until a campaign grants it"
 msgstr "Zablokowane, dopóki nie przyzna go kampania"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Locked, so a reroll keeps it"
+msgstr ""
 
 #: src/conquest/unlocks.ts
 #, fuzzy
@@ -32935,6 +32955,10 @@ msgstr "Brak skryptów."
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
+#: src/lego/reroll.ts
+msgid "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -40323,6 +40347,7 @@ msgstr "Wymaga, aby waterweapon też było włączone."
 msgid "Requisition their cache"
 msgstr "Zarekwiruj ich skrytkę"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr ""
@@ -40332,6 +40357,10 @@ msgstr ""
 #, fuzzy
 msgid "Reroll seed"
 msgstr "Losuj ziarno ponownie"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll the parts that are not locked. Seed {rerollSeed}"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -51470,10 +51499,18 @@ msgstr "Ta jednostka łączy części z elementami wziętymi z gry, więc ekspor
 msgid "This unit moves but names no movement class, so the engine drops it at load. Pick one."
 msgstr "Ta jednostka się porusza, ale nie wskazuje klasy ruchu, więc silnik pomija ją przy wczytywaniu. Wybierz klasę."
 
+#: src/lego/reroll.ts
+msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "Tę jednostkę zbudowano na paczce \"{builtAgainst}\", która nie jest zainstalowana."
+
+#: src/lego/reroll.ts
+msgid "This unit was not generated."
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -51547,6 +51584,10 @@ msgstr "Ten URL jest za długi na link."
 #, fuzzy
 msgid "This value has been changed from the game's default."
 msgstr "Ta wartość różni się od domyślnej wartości gry."
+
+#: src/lego/reroll.ts
+msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy

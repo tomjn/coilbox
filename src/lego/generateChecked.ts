@@ -31,6 +31,7 @@ import {
   type GeneratorOptions,
   generateUnit,
 } from "./generate";
+import { withStamps } from "./generatedStamps";
 import { childrenOf, type LegoProject } from "./model";
 import { checkOverlap, overlapProblems } from "./overlap";
 import type { LoadedPack } from "./pack";
@@ -255,7 +256,10 @@ export function generateCheckedUnit(
       options.pack,
     );
     const faults = generatorFaults(unit, options.pack);
-    if (faults.length === 0) return { status: "ok", unit, seed, tries: n };
+    // Stamped once checked and repaired, so what a hand edit is measured
+    // against is the unit the game maker is shown (#3235).
+    if (faults.length === 0)
+      return { status: "ok", unit: withStamps(unit), seed, tries: n };
     for (const { id } of GENERATOR_CHECKS) {
       const fault = faults.find((f) => f.check === id);
       if (!fault) continue;

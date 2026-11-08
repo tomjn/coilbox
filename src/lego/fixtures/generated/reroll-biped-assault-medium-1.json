@@ -1,0 +1,607 @@
+{
+  "schemaVersion": 1,
+  "id": "unit",
+  "name": "Assault Two legs 3",
+  "unitName": "assault_two_legs_3",
+  "packId": "splinterfaction-legosv2",
+  "packVersion": "2026.07.28",
+  "createdAt": "2026-11-08T00:00:00.000Z",
+  "updatedAt": "2026-11-08T00:00:00.000Z",
+  "rootPieceId": "root",
+  "pieces": [
+    {
+      "id": "root",
+      "name": "base",
+      "parentId": null,
+      "partId": null,
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "bone": "base"
+    },
+    {
+      "id": "unit.1",
+      "name": "hip",
+      "parentId": "root",
+      "partId": null,
+      "position": [
+        0,
+        19.39376422520727,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "base",
+      "bone": "hip"
+    },
+    {
+      "id": "unit.2",
+      "name": "torso",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        0,
+        5.757544398922473,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "bone": "torso"
+    },
+    {
+      "id": "unit.3",
+      "name": "lthigh",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        17.999763090142515,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.l1.thigh",
+      "twin": "unit.6",
+      "bone": "thigh.l1"
+    },
+    {
+      "id": "unit.4",
+      "name": "lshin",
+      "parentId": "unit.3",
+      "partId": null,
+      "position": [
+        0,
+        -7.660536868956872,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.l1.shin",
+      "twin": "unit.7",
+      "bone": "shin.l1"
+    },
+    {
+      "id": "unit.5",
+      "name": "lfoot",
+      "parentId": "unit.4",
+      "partId": null,
+      "position": [
+        0,
+        -11.7332273562504,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.l1.foot",
+      "twin": "unit.8",
+      "bone": "foot.l1"
+    },
+    {
+      "id": "unit.6",
+      "name": "rthigh",
+      "parentId": "unit.1",
+      "partId": null,
+      "position": [
+        -17.999763090142515,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.r1.thigh",
+      "twin": "unit.3",
+      "bone": "thigh.r1"
+    },
+    {
+      "id": "unit.7",
+      "name": "rshin",
+      "parentId": "unit.6",
+      "partId": null,
+      "position": [
+        0,
+        -7.660536868956872,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.r1.shin",
+      "twin": "unit.4",
+      "bone": "shin.r1"
+    },
+    {
+      "id": "unit.8",
+      "name": "rfoot",
+      "parentId": "unit.7",
+      "partId": null,
+      "position": [
+        0,
+        -11.7332273562504,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "leg.r1.foot",
+      "twin": "unit.5",
+      "bone": "foot.r1"
+    },
+    {
+      "id": "unit.4.12",
+      "name": "turret",
+      "parentId": "unit.9",
+      "partId": "17ddbb403e05",
+      "position": [
+        0,
+        0.8506050083342148,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        9.45624950956553,
+        9.45624950956553,
+        9.45624950956553
+      ],
+      "role": "turret",
+      "weapon": {},
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.4.15",
+        "rev": "0402a3ff06943b",
+        "fp": "12075dc5e6c72d"
+      },
+      "connection": {
+        "connector": "-y",
+        "to": "+y"
+      }
+    },
+    {
+      "id": "unit.4.13",
+      "name": "barrel",
+      "parentId": "unit.4.12",
+      "partId": "1fdca59c9339",
+      "position": [
+        0,
+        0,
+        0.375
+      ],
+      "rotation": [
+        1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "barrel",
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.4.15",
+        "rev": "0402a3ff06943b",
+        "fp": "0a07abff47a0d1"
+      }
+    },
+    {
+      "id": "unit.4.14",
+      "name": "flare",
+      "parentId": "unit.4.13",
+      "partId": null,
+      "position": [
+        0,
+        0.25,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "role": "flare",
+      "module": {
+        "id": "builtin.turret",
+        "instance": "unit.4.15",
+        "rev": "0402a3ff06943b",
+        "fp": "0abf90a24e2154"
+      }
+    },
+    {
+      "id": "unit.4.16",
+      "name": "torsocover",
+      "parentId": "unit.2",
+      "partId": "1b4e92ac3e9a",
+      "position": [
+        0,
+        -2.2499703862678144,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        8.999881545071258,
+        8.999881545071258,
+        8.999881545071258
+      ]
+    },
+    {
+      "id": "unit.4.17",
+      "name": "hipcover",
+      "parentId": "unit.1",
+      "partId": "181974eb09f1",
+      "position": [
+        0,
+        2.8787721994612365,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        1.5707963267948966
+      ],
+      "scale": [
+        2.8787721994612365,
+        2.8787721994612365,
+        2.8787721994612365
+      ]
+    },
+    {
+      "id": "unit.4.18",
+      "name": "hipcover2",
+      "parentId": "unit.1",
+      "partId": "a53b1deb6dfa",
+      "position": [
+        8.999881545071258,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "scale": [
+        5.999921030047505,
+        5.999921030047505,
+        5.999921030047505
+      ]
+    },
+    {
+      "id": "unit.4.19",
+      "name": "hipcover3",
+      "parentId": "unit.1",
+      "partId": "a53b1deb6dfa",
+      "position": [
+        -8.999881545071258,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        -1.5707963267948966,
+        0
+      ],
+      "scale": [
+        5.999921030047505,
+        5.999921030047505,
+        5.999921030047505
+      ]
+    },
+    {
+      "id": "unit.4.20",
+      "name": "lthighcover",
+      "parentId": "unit.3",
+      "partId": "c8f7aeaf68fd",
+      "position": [
+        0,
+        -3.830268434478436,
+        0
+      ],
+      "rotation": [
+        1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": [
+        4.704333621319622,
+        4.704333621319622,
+        4.704333621319622
+      ]
+    },
+    {
+      "id": "unit.4.21",
+      "name": "lshincover",
+      "parentId": "unit.4",
+      "partId": "2c8f1cd8eeae",
+      "position": [
+        0,
+        -5.8666136781252,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.5707963267948966
+      ],
+      "scale": [
+        11.7332273562504,
+        11.7332273562504,
+        11.7332273562504
+      ]
+    },
+    {
+      "id": "unit.4.22",
+      "name": "rthighcover",
+      "parentId": "unit.6",
+      "partId": "c8f7aeaf68fd",
+      "position": [
+        0,
+        -3.830268434478436,
+        0
+      ],
+      "rotation": [
+        1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": [
+        4.704333621319622,
+        4.704333621319622,
+        4.704333621319622
+      ]
+    },
+    {
+      "id": "unit.4.23",
+      "name": "rshincover",
+      "parentId": "unit.7",
+      "partId": "2c8f1cd8eeae",
+      "position": [
+        0,
+        -5.8666136781252,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.5707963267948966
+      ],
+      "scale": [
+        11.7332273562504,
+        11.7332273562504,
+        11.7332273562504
+      ]
+    },
+    {
+      "id": "unit.9",
+      "name": "hull",
+      "parentId": "unit.2",
+      "partId": "d2c111537495",
+      "position": [
+        0,
+        4.214255218114705,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        8.428510436229407,
+        8.428510436229407,
+        8.428510436229407
+      ],
+      "module": {
+        "id": "builtin.hull",
+        "instance": "unit.10",
+        "rev": "136160dce45c06",
+        "fp": "0f93623723cd16"
+      },
+      "locked": true
+    }
+  ],
+  "animations": [
+    {
+      "presetId": "walk.biped",
+      "params": {}
+    },
+    {
+      "presetId": "turret.track",
+      "params": {}
+    },
+    {
+      "presetId": "recoil",
+      "params": {}
+    }
+  ],
+  "skeleton": {
+    "plan": "biped",
+    "proportions": {
+      "legLength": 19.39376422520727,
+      "stance": 35.99952618028503,
+      "bodyHeight": 5.757544398922473
+    }
+  },
+  "notes": "Generated from seed 3, body plan Two legs, job Assault, size Medium.",
+  "generated": {
+    "seed": 4,
+    "plan": "biped",
+    "job": "assault",
+    "size": "medium",
+    "modules": [
+      {
+        "slot": "weapon.1",
+        "module": "builtin.turret",
+        "instance": "unit.4.15"
+      },
+      {
+        "slot": "chassis.1",
+        "module": "builtin.hull",
+        "instance": "unit.10"
+      }
+    ],
+    "covering": [
+      {
+        "bone": "torso",
+        "piece": "unit.4.16"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.4.17"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.4.18"
+      },
+      {
+        "bone": "hip",
+        "piece": "unit.4.19"
+      },
+      {
+        "bone": "thigh.l1",
+        "piece": "unit.4.20"
+      },
+      {
+        "bone": "shin.l1",
+        "piece": "unit.4.21"
+      },
+      {
+        "bone": "thigh.r1",
+        "piece": "unit.4.22"
+      },
+      {
+        "bone": "shin.r1",
+        "piece": "unit.4.23"
+      }
+    ],
+    "stamps": {
+      "root": "00b7a0cfa1ca56",
+      "unit.1": "089d924c8b3cc8",
+      "unit.2": "10718c967a6d67",
+      "unit.3": "0464ae0a98fea4",
+      "unit.4": "0a248e44922766",
+      "unit.5": "1ed4a287a46873",
+      "unit.6": "1f3d0b18cc921a",
+      "unit.7": "01c9e2f0f84651",
+      "unit.8": "1b424d881b7ff0",
+      "unit.4.12": "055a4a90b46889 unit.4.15",
+      "unit.4.13": "0fa134e5abb0bc unit.4.15",
+      "unit.4.14": "0e786f37f6ee16 unit.4.15",
+      "unit.4.16": "04db2c3e52fa67",
+      "unit.4.17": "0a361e2a6f3c9c",
+      "unit.4.18": "0da2985418532f",
+      "unit.4.19": "164c8196efcfd9",
+      "unit.4.20": "0705c85935fd0c",
+      "unit.4.21": "0142323cdd5d85",
+      "unit.4.22": "1c805c08063bc7",
+      "unit.4.23": "1fb95cfa38fded",
+      "unit.9": "019be67e2d7da6 unit.10"
+    }
+  }
+}

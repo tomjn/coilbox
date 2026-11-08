@@ -108,6 +108,9 @@ export interface GeneratorOptions {
   /** Ids for the pieces. Left off, they count up from the unit's id, so the
    *  document is the same on every run. */
   newId?: () => string;
+  /** The skeleton's proportions as they are, rather than rolled. A reroll that
+   *  keeps parts passes the unit's own, so the parts still fit (#3235). */
+  proportions?: Record<string, number>;
 }
 
 /** A PRNG for one choice, seeded off the inputs and the choice's key. */
@@ -428,7 +431,9 @@ export function generateUnit(
   const newId = options.newId ?? (() => `${options.id}.${++counter}`);
 
   const factor = job.size[size.id];
-  const proportions = rollProportions(inputs, job, factor);
+  const proportions = options.proportions
+    ? planProportions(inputs.plan, options.proportions)
+    : rollProportions(inputs, job, factor);
   const jobLabel = job.label;
   const planLabel = inputs.plan.label;
   const seed = inputs.seed;

@@ -22,7 +22,7 @@ export function isGeneratedModule(id: string): boolean {
 }
 
 /** JSON with object keys sorted, so key order never changes the stamp. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (typeof value === "object" && value !== null) {
     const entries = Object.entries(value as Record<string, unknown>)
@@ -34,7 +34,7 @@ function canonical(value: unknown): string {
 }
 
 /** cyrb53: 53 bits of hash from a string, as 14 hex digits. */
-function hash(text: string): string {
+export function hash(text: string): string {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
   for (let i = 0; i < text.length; i++) {
