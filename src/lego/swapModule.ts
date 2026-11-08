@@ -58,6 +58,7 @@ import { placeModule } from "./moduleMount";
 import { pieceFingerprint } from "./moduleUpdates";
 import { mountPointAt, mountRefusal } from "./mountPoints";
 import type { LoadedPack } from "./pack";
+import { quaternionFromEuler } from "./portableRotation";
 import { ringMembers } from "./ringSet";
 import { carriedId } from "./swapPart";
 
@@ -309,7 +310,7 @@ function swapOne(
   const fresh = new Set(inserted.idMap.values());
   const own = new THREE.Matrix4().compose(
     new THREE.Vector3(...top.position),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(...top.rotation)),
+    quaternionFromEuler(top.rotation),
     new THREE.Vector3(...top.scale),
   );
   const roots = new Set(inserted.rootPieceIds);
@@ -328,7 +329,7 @@ function swapOne(
       }
       const local = new THREE.Matrix4().compose(
         new THREE.Vector3(...p.position),
-        new THREE.Quaternion().setFromEuler(new THREE.Euler(...p.rotation)),
+        quaternionFromEuler(p.rotation),
         new THREE.Vector3(...p.scale),
       );
       return { ...p, ...transformOf(own.clone().multiply(local)) };

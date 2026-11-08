@@ -526,6 +526,12 @@ export interface LegoPiece {
    * it only when it was edited by hand since it was generated. See `reroll.ts`.
    */
   locked?: boolean;
+  /**
+   * The seed of the last reroll of just this part, or of the module whose top
+   * piece this is (#3236). The same seed on the unit as it was gives the same
+   * part again. See `rerollPart.ts`.
+   */
+  rerolled?: { seed: number };
   customAnchors?: LegoAnchor[];
   /** Set on a piece lifted off a game's unit. See {@link LegoLifted}. */
   lifted?: LegoLifted;
@@ -2186,6 +2192,12 @@ function parsePiece(raw: unknown): LegoPiece | null {
       : {}),
     ...(p.hidden === true ? { hidden: true } : {}),
     ...(typeof p.locked === "boolean" ? { locked: p.locked } : {}),
+    ...(() => {
+      const seed = (p.rerolled as { seed?: unknown } | null | undefined)?.seed;
+      return typeof seed === "number" && Number.isSafeInteger(seed)
+        ? { rerolled: { seed } }
+        : {};
+    })(),
     ...(() => {
       const collision = parsePieceCollision(p.collision);
       return collision ? { collision } : {};

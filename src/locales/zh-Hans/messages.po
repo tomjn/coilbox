@@ -9245,6 +9245,7 @@ msgstr "搜索条件"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "位于 y = 0 的透明海面，用于查看船体在其中的位置。"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "A seed is a whole number."
 msgstr ""
@@ -32586,10 +32587,18 @@ msgstr "这段时间内没有下达命令。"
 msgid "No orders with a place on the map were given in this replay."
 msgstr "此回放中没有下达过带地图位置的命令。"
 
+#: src/lego/rerollPart.ts
+msgid "No other module is in the {category} category."
+msgstr ""
+
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #, fuzzy
 msgid "No other modules in this category"
 msgstr "此类别中没有其他模块"
+
+#: src/lego/rerollPart.ts
+msgid "No other part has this part's shape and colour."
+msgstr ""
 
 #: src/lego/resizePackBlock.ts
 #, fuzzy
@@ -33021,6 +33030,14 @@ msgstr "未找到脚本，所以单位会使用动画预设打开。"
 #, fuzzy
 msgid "No scripts here."
 msgstr "这里没有脚本。"
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another module that fits. Try again or change it by hand."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
+msgstr ""
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
@@ -38050,6 +38067,14 @@ msgstr "恢复游戏的类型"
 msgid "Put back the game's weapon"
 msgstr "恢复游戏的武器"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another module of the same category"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another part of the same shape, colour and size"
+msgstr ""
+
 #: src/scenario/pages/components/MissionHomeActions.tsx
 #, fuzzy
 msgid "Put it in the game"
@@ -40437,6 +40462,14 @@ msgstr "征用他们的储藏点"
 msgid "Reroll"
 msgstr ""
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll module"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll part"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -42405,6 +42438,7 @@ msgstr "在玩家统计中查看全部"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -50896,6 +50930,10 @@ msgstr "此模型大小为 {modelSize}，超过了预览可读取的 {previewCap
 msgid "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 msgstr "此模型是从打包的归档中打开的，没有可写回的路径。请改为保存到所选路径。"
 
+#: src/lego/rerollPart.ts
+msgid "This module has no category, so there is no other of its kind."
+msgstr ""
+
 #: src/lego/moduleShare.ts
 msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
 msgstr ""
@@ -50904,6 +50942,10 @@ msgstr ""
 #, fuzzy
 msgid "This module is {size} KB, over the {limit} KB a code can carry."
 msgstr "此模块大小为 {size} KB，超过了代码能承载的 {limit} KB。"
+
+#: src/lego/rerollPart.ts
+msgid "This module is not in the module library."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy
@@ -50994,6 +51036,14 @@ msgstr "此部件没有说明它来自哪款游戏。"
 #, fuzzy
 msgid "This piece is from {pieceGame}. This unit is for {unitGameName}."
 msgstr "此部件来自 {pieceGame}。此单位适用于 {unitGameName}。"
+
+#: src/lego/rerollPart.ts
+msgid "This piece is not a part or module, so it cannot be rerolled."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "This piece's part is not in the parts library."
+msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy

@@ -9311,6 +9311,7 @@ msgstr "En sökfråga"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "Ett genomskinligt hav vid y = 0, för hur ett skrov ligger i det."
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "A seed is a whole number."
 msgstr ""
@@ -32795,10 +32796,18 @@ msgstr "Inga order gavs under den här perioden."
 msgid "No orders with a place on the map were given in this replay."
 msgstr "Inga order med en plats på kartan gavs i den här reprisen."
 
+#: src/lego/rerollPart.ts
+msgid "No other module is in the {category} category."
+msgstr ""
+
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #, fuzzy
 msgid "No other modules in this category"
 msgstr "Inga andra moduler i den här kategorin"
+
+#: src/lego/rerollPart.ts
+msgid "No other part has this part's shape and colour."
+msgstr ""
 
 #: src/lego/resizePackBlock.ts
 #, fuzzy
@@ -33230,6 +33239,14 @@ msgstr "Inget skript hittades, så enheten öppnas med animationsförinställnin
 #, fuzzy
 msgid "No scripts here."
 msgstr "Inga skript här."
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another module that fits. Try again or change it by hand."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
+msgstr ""
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
@@ -38310,6 +38327,14 @@ msgstr "Sätt tillbaka spelets klass"
 msgid "Put back the game's weapon"
 msgstr "Sätt tillbaka spelets vapen"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another module of the same category"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another part of the same shape, colour and size"
+msgstr ""
+
 #: src/scenario/pages/components/MissionHomeActions.tsx
 #, fuzzy
 msgid "Put it in the game"
@@ -40712,6 +40737,14 @@ msgstr "Rekvirera deras förråd"
 msgid "Reroll"
 msgstr ""
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll module"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll part"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -42694,6 +42727,7 @@ msgstr "Se alla i Statistik"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -51247,6 +51281,10 @@ msgstr "Den här modellen är {modelSize}, mer än de {previewCap} som en förha
 msgid "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 msgstr "Den här modellen öppnades inifrån ett packat arkiv, som inte har någon sökväg att skriva tillbaka till. Spara den till en vald sökväg i stället."
 
+#: src/lego/rerollPart.ts
+msgid "This module has no category, so there is no other of its kind."
+msgstr ""
+
 #: src/lego/moduleShare.ts
 msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
 msgstr ""
@@ -51255,6 +51293,10 @@ msgstr ""
 #, fuzzy
 msgid "This module is {size} KB, over the {limit} KB a code can carry."
 msgstr "Den här modulen är {size} KB, mer än de {limit} KB som en kod kan bära."
+
+#: src/lego/rerollPart.ts
+msgid "This module is not in the module library."
+msgstr ""
 
 #: src/lego/moduleShare.ts
 #, fuzzy
@@ -51345,6 +51387,14 @@ msgstr "Den här delen säger inte vilket spel den kommer från."
 #, fuzzy
 msgid "This piece is from {pieceGame}. This unit is for {unitGameName}."
 msgstr "Den här delen kommer från {pieceGame}. Den här enheten är för {unitGameName}."
+
+#: src/lego/rerollPart.ts
+msgid "This piece is not a part or module, so it cannot be rerolled."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "This piece's part is not in the parts library."
+msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy

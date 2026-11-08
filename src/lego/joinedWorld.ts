@@ -57,22 +57,48 @@ export class JoinedGroup extends THREE.Group {
     this.matrixWorldNeedsUpdate = true;
   }
 
+  /**
+   * `Box3.setFromObject` and `BoxHelper` call this on every object they visit,
+   * not `updateMatrixWorld`. three's own version multiplies the parent's world
+   * matrix by the local one, which puts the parent's scale back on a joined
+   * piece and made a covering part's children several times their size.
+   */
+  override updateWorldMatrix(
+    updateParents: boolean,
+    updateChildren: boolean,
+    force = false,
+  ): void {
+    if (!this.joinedToParent || !this.parent) {
+      super.updateWorldMatrix(updateParents, updateChildren, force);
+      return;
+    }
+    if (updateParents === true) this.parent.updateWorldMatrix(true, false);
+    const propagate = this.poseFromParent(this.parent, force);
+    if (updateChildren === true) {
+      for (const child of this.children) {
+        child.updateWorldMatrix(false, true, propagate);
+      }
+    }
+  }
+
   override updateMatrixWorld(force?: boolean): void {
     if (!this.joinedToParent || !this.parent) {
       super.updateMatrixWorld(force);
       return;
     }
-    if (this.matrixAutoUpdate) this.updateMatrix();
-    let propagate = force ?? false;
-    if (this.matrixWorldNeedsUpdate || propagate) {
-      if (this.matrixWorldAutoUpdate) {
-        this.matrixWorld.copy(
-          joinedWorld(this.parent.matrixWorld, this.matrix),
-        );
-      }
-      this.matrixWorldNeedsUpdate = false;
-      propagate = true;
-    }
+    const propagate = this.poseFromParent(this.parent, force ?? false);
     for (const child of this.children) child.updateMatrixWorld(propagate);
+  }
+
+  /** Place this piece against its parent's world matrix. Answers whether the
+   *  children have to follow. */
+  private poseFromParent(parent: THREE.Object3D, force: boolean): boolean {
+    if (this.matrixAutoUpdate) this.updateMatrix();
+    if (!this.matrixWorldNeedsUpdate && !force) return false;
+    if (this.matrixWorldAutoUpdate) {
+      this.matrixWorld.copy(joinedWorld(parent.matrixWorld, this.matrix));
+    }
+    this.matrixWorldNeedsUpdate = false;
+    return true;
   }
 }

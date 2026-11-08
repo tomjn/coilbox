@@ -31,7 +31,7 @@ export const STARTER_CATEGORIES = [
   "Detail",
 ];
 
-function sameCategory(a: string, b: string): boolean {
+export function sameCategory(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
