@@ -338,6 +338,50 @@ describe("one section per game (#4328)", () => {
   });
 });
 
+describe("variants listed with their original (#3240)", () => {
+  const unit = (id: string, imported?: LegoImported, variantOf?: string) =>
+    ({
+      ...project(id, imported),
+      id,
+      ...(variantOf ? { variantOf } : {}),
+    }) as LegoProject;
+  const opened: LegoImported = {
+    source: "/games/Game.sdd/objects3d/armcom.s3o",
+    game: { name: "Some Game", archive: "Game.sdd", member: "x.s3o" },
+  };
+
+  it("lists each variant right after its original", () => {
+    const grouped = groupProjects([
+      unit("a"),
+      unit("b"),
+      unit("a-heavier", undefined, "a"),
+      unit("a-lighter", undefined, "a"),
+    ]);
+    expect(grouped.own.map((p) => p.name)).toEqual([
+      "a",
+      "a-heavier",
+      "a-lighter",
+      "b",
+    ]);
+  });
+
+  it("files a variant in its original's section", () => {
+    const original = unit("orig", opened);
+    const variant = unit("orig-variant", undefined, "orig");
+    const grouped = groupProjects([variant, original]);
+    expect(grouped.own).toEqual([]);
+    expect(grouped.games[0]?.projects.map((p) => p.name)).toEqual([
+      "orig",
+      "orig-variant",
+    ]);
+  });
+
+  it("treats a variant whose original was deleted as a unit of its own", () => {
+    const grouped = groupProjects([unit("v", undefined, "deleted")]);
+    expect(grouped.own.map((p) => p.name)).toEqual(["v"]);
+  });
+});
+
 describe("carryFoldedKeys (#4328)", () => {
   const group = {
     key: "short:sf",

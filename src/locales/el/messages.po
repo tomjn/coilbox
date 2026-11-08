@@ -5437,6 +5437,18 @@ msgstr "{paletteFaces, plural, one {# όψη αναφέρει καταχώρισ
 msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr "{paletteFaces} όψεις πήραν χρώμα παλέτας που δεν μπόρεσε να αντιστοιχιστεί"
 
+#: src/lego/variant.ts
+msgid "{parent} (different weapon)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (heavier)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (lighter)"
+msgstr ""
+
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "{parentName} ({toName}) by its {connectorName}"
@@ -8902,6 +8914,10 @@ msgstr "Ένας πυργίσκος όπλου σε βάση που δεν κι�
 msgid "A gunship circling or attacking keeps picking new points around the circle rather than holding one spot."
 msgstr "Ένα ελικόπτερο εφόδου που κάνει κύκλους ή επιτίθεται επιλέγει συνεχώς νέα σημεία γύρω από τον κύκλο αντί να μένει σε ένα σημείο."
 
+#: src/lego/variant.ts
+msgid "A heavier variant of {parent}."
+msgstr ""
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "A hill rising ahead of the unit."
@@ -8952,6 +8968,10 @@ msgstr "Μια εκκίνηση ξεκινά ήδη."
 #, fuzzy
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
 msgstr "Μια διάταξη ονομάζει τα κτίριά της με τα ονόματα μονάδων του ίδιου του παιχνιδιού, οπότε σχεδιάζεται από τις μονάδες ενός παιχνιδιού."
+
+#: src/lego/variant.ts
+msgid "A lighter variant of {parent}."
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -9505,6 +9525,14 @@ msgstr "Μια μεταβλητή είναι ένας αριθμός με τον
 #, fuzzy
 msgid "A variable needs a name"
 msgstr "Μια μεταβλητή χρειάζεται όνομα"
+
+#: src/lego/variant.ts
+msgid "A variant at seed {seed} fails the {check} check, and a variant keeps its seed. It said: {said}"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A variant of {parent} with a different weapon."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -18131,6 +18159,10 @@ msgstr ""
 msgid "Could not save the unit: {reason}"
 msgstr "Δεν ήταν δυνατή η αποθήκευση της μονάδας: {reason}"
 
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Could not save the variant: {reason}"
+msgstr ""
+
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
 msgid "Could not set up engine {engineVersion} from this package. {failureReason}"
@@ -19703,6 +19735,10 @@ msgstr "Καταστρέφεται έχοντας χάσει το ένα πέμ�
 #, fuzzy
 msgid "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has."
 msgstr "Καταστρέφεται έχοντας χάσει μιάμιση φορά τους πόντους ζωής του τα τελευταία δευτερόλεπτα, ο βαρύτερος βαθμός καταστροφής που έχει ένα script."
+
+#: src/lego/variant.ts
+msgid "Different weapon"
+msgstr ""
 
 #: src/campaign/pages/components/RunDifficulty.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -24765,6 +24801,10 @@ msgstr "bitmap θερμικού νέφους"
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr "heatfalloff: πόσο γρήγορα χάνεται η θερμότητα του νέφους, όχι σταθερός αριθμός καρέ. Αυτή η κατηγορία δεν έχει δικό της χρώμα."
 
+#: src/lego/variant.ts
+msgid "Heavier"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "height"
@@ -28456,6 +28496,10 @@ msgstr "Ανοιχτό"
 msgid "Light hit up to"
 msgstr "Ελαφρύ χτύπημα έως"
 
+#: src/lego/variant.ts
+msgid "Lighter"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Lightly hit and destroyed"
@@ -29227,6 +29271,14 @@ msgstr "{rowLabel}: σταθερός αριθμός"
 #, fuzzy
 msgid "Make {rowLabel} follow the game"
 msgstr "{rowLabel}: τιμή του παιχνιδιού"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant of this unit as a new unit"
+msgstr ""
 
 #: src/multiplayer/battle/MemberRow.tsx
 #, fuzzy
@@ -33632,6 +33684,10 @@ msgstr "Κανένα όπλο στο {gameName} δεν ταιριάζει."
 #, fuzzy
 msgid "No weapon matches that."
 msgstr "Κανένα όπλο δεν ταιριάζει."
+
+#: src/lego/variant.ts
+msgid "No weapon seed from {first} to {last} made a different weapon that passes the checks."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -41875,6 +41931,10 @@ msgstr "Αποθηκεύτηκε"
 #, fuzzy
 msgid "Saved \"{copyName}\" to your presets."
 msgstr "Το «{copyName}» αποθηκεύτηκε στις προρρυθμίσεις σας."
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Saved \"{name}\" beside this unit."
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -51994,6 +52054,10 @@ msgstr "Αυτή η μονάδα δεν έχει τμήμα με όνομα «{n
 msgid "This unit has no root piece."
 msgstr "Αυτή η μονάδα δεν έχει ριζικό τμήμα."
 
+#: src/lego/variant.ts
+msgid "This unit has no weapon module to change."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
 msgid "This unit has no weapons."
@@ -52035,6 +52099,7 @@ msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is
 msgstr "Αυτή η μονάδα κατασκευάστηκε με το πακέτο «{builtAgainst}», και αυτό το πακέτο δεν είναι εγκατεστημένο."
 
 #: src/lego/reroll.ts
+#: src/lego/variant.ts
 msgid "This unit was not generated."
 msgstr ""
 
@@ -52079,6 +52144,10 @@ msgstr "δεν ήταν δυνατή η ανάγνωση του αρχείου �
 msgid "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes."
 msgstr "λείπει το αρχείο γεωμετρίας αυτής της μονάδας (404). Γράφτηκε κατά την εισαγωγή του μοντέλου και είναι το μοναδικό αντίγραφο των πλεγμάτων."
 
+#: src/lego/variant.ts
+msgid "This unit's job fixes its weapon's size and shape, and the module library has no other weapon of its kind, so there is nothing to change."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "This unit's name"
@@ -52113,6 +52182,10 @@ msgstr "Αυτή η τιμή έχει αλλάξει από την προεπι�
 
 #: src/lego/reroll.ts
 msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "This version cannot generate the job {name} at size {sized}, so a variant cannot be made."
 msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
@@ -54423,6 +54496,14 @@ msgstr "μεταβλητός αστέρας"
 #, fuzzy
 msgid "Variables"
 msgstr "Μεταβλητές"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Variant"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Variant of {parentName}"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy

@@ -5396,6 +5396,18 @@ msgstr "{paletteFaces, plural, other {# 個の面が Total Annihilation のパ�
 msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr "{paletteFaces} 個の面のパレット色を変換できませんでした"
 
+#: src/lego/variant.ts
+msgid "{parent} (different weapon)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (heavier)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (lighter)"
+msgstr ""
+
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "{parentName} ({toName}) by its {connectorName}"
@@ -8839,6 +8851,10 @@ msgstr "動かないベースの上の砲塔。"
 msgid "A gunship circling or attacking keeps picking new points around the circle rather than holding one spot."
 msgstr "旋回中や攻撃中のガンシップは、1 か所に留まらず、円周上の新しい地点を選び続けます。"
 
+#: src/lego/variant.ts
+msgid "A heavier variant of {parent}."
+msgstr ""
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "A hill rising ahead of the unit."
@@ -8888,6 +8904,10 @@ msgstr ""
 #, fuzzy
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
 msgstr "レイアウトは建物をゲーム自身のユニット名で指定するため、1 つのゲームのユニットで描画されます。"
+
+#: src/lego/variant.ts
+msgid "A lighter variant of {parent}."
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -9438,6 +9458,14 @@ msgstr "変数は、送り込んだウェーブ数、解放した捕虜の数、
 #, fuzzy
 msgid "A variable needs a name"
 msgstr "変数には名前が必要です"
+
+#: src/lego/variant.ts
+msgid "A variant at seed {seed} fails the {check} check, and a variant keeps its seed. It said: {said}"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A variant of {parent} with a different weapon."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -18003,6 +18031,10 @@ msgstr ""
 msgid "Could not save the unit: {reason}"
 msgstr "ユニットを保存できませんでした：{reason}"
 
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Could not save the variant: {reason}"
+msgstr ""
+
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
 msgid "Could not set up engine {engineVersion} from this package. {failureReason}"
@@ -19569,6 +19601,10 @@ msgstr "直前の数秒で HP の 5 分の 1 を失って撃破されます。�
 #, fuzzy
 msgid "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has."
 msgstr "直前の数秒で HP の 1.5 倍を失って撃破されます。スクリプトの撃破の程度で最も重いものです。"
+
+#: src/lego/variant.ts
+msgid "Different weapon"
+msgstr ""
 
 #: src/campaign/pages/components/RunDifficulty.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -24604,6 +24640,10 @@ msgstr "ヒートクラウドのビットマップ"
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr "heatfalloff: 雲の熱が抜ける速さで、固定のフレーム数ではありません。このクラスには独自の色がありません。"
 
+#: src/lego/variant.ts
+msgid "Heavier"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "height"
@@ -28275,6 +28315,10 @@ msgstr "ライト"
 msgid "Light hit up to"
 msgstr "軽い被弾の上限"
 
+#: src/lego/variant.ts
+msgid "Lighter"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Lightly hit and destroyed"
@@ -29040,6 +29084,14 @@ msgstr "{rowLabel} を固定値にする"
 #, fuzzy
 msgid "Make {rowLabel} follow the game"
 msgstr "{rowLabel} をゲームに合わせる"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant of this unit as a new unit"
+msgstr ""
 
 #: src/multiplayer/battle/MemberRow.tsx
 #, fuzzy
@@ -33423,6 +33475,10 @@ msgstr "{gameName} にはそれに一致する武器はありません。"
 #, fuzzy
 msgid "No weapon matches that."
 msgstr "一致する武器はありません。"
+
+#: src/lego/variant.ts
+msgid "No weapon seed from {first} to {last} made a different weapon that passes the checks."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -41591,6 +41647,10 @@ msgstr "保存済み"
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Saved \"{copyName}\" to your presets."
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Saved \"{name}\" beside this unit."
 msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -51637,6 +51697,10 @@ msgstr "このユニットには \"{name}\" というピースがありません
 msgid "This unit has no root piece."
 msgstr "このユニットにはルートピースがありません。"
 
+#: src/lego/variant.ts
+msgid "This unit has no weapon module to change."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
 msgid "This unit has no weapons."
@@ -51678,6 +51742,7 @@ msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is
 msgstr "このユニットは \"{builtAgainst}\" パックを基に作られましたが、そのパックはインストールされていません。"
 
 #: src/lego/reroll.ts
+#: src/lego/variant.ts
 msgid "This unit was not generated."
 msgstr ""
 
@@ -51722,6 +51787,10 @@ msgstr "このユニットのジオメトリファイルを読み込めません
 msgid "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes."
 msgstr "このユニットのジオメトリファイルがありません（404）。モデルのインポート時に書き出されたもので、メッシュの唯一のコピーです。"
 
+#: src/lego/variant.ts
+msgid "This unit's job fixes its weapon's size and shape, and the module library has no other weapon of its kind, so there is nothing to change."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "This unit's name"
@@ -51756,6 +51825,10 @@ msgstr "この値はゲームのデフォルトから変更されています。
 
 #: src/lego/reroll.ts
 msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "This version cannot generate the job {name} at size {sized}, so a variant cannot be made."
 msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
@@ -54051,6 +54124,14 @@ msgstr "変光星"
 #, fuzzy
 msgid "Variables"
 msgstr "変数"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Variant"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Variant of {parentName}"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy

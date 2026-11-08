@@ -5435,6 +5435,18 @@ msgstr "{paletteFaces, plural, one {# flate viser til en Total Annihilation-pale
 msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr "{paletteFaces} flater fikk en palettfarge ingenting kunne løse opp"
 
+#: src/lego/variant.ts
+msgid "{parent} (different weapon)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (heavier)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (lighter)"
+msgstr ""
+
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "{parentName} ({toName}) by its {connectorName}"
@@ -8899,6 +8911,10 @@ msgstr "Et kanontårn på en base som ikke beveger seg."
 msgid "A gunship circling or attacking keeps picking new points around the circle rather than holding one spot."
 msgstr "Et kamphelikopter som sirkler eller angriper, velger stadig nye punkter rundt sirkelen i stedet for å holde ett sted."
 
+#: src/lego/variant.ts
+msgid "A heavier variant of {parent}."
+msgstr ""
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "A hill rising ahead of the unit."
@@ -8949,6 +8965,10 @@ msgstr "En oppstart er allerede i gang."
 #, fuzzy
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
 msgstr "Et oppsett navngir bygningene sine med spillets egne enhetsnavn, så det tegnes med enhetene fra ett spill."
+
+#: src/lego/variant.ts
+msgid "A lighter variant of {parent}."
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -9502,6 +9522,14 @@ msgstr "En variabel er et tall oppdraget teller med: bølger sendt, fanger satt 
 #, fuzzy
 msgid "A variable needs a name"
 msgstr "En variabel trenger et navn"
+
+#: src/lego/variant.ts
+msgid "A variant at seed {seed} fails the {check} check, and a variant keeps its seed. It said: {said}"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A variant of {parent} with a different weapon."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -18128,6 +18156,10 @@ msgstr ""
 msgid "Could not save the unit: {reason}"
 msgstr "Kunne ikke lagre enheten: {reason}"
 
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Could not save the variant: {reason}"
+msgstr ""
+
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
 msgid "Could not set up engine {engineVersion} from this package. {failureReason}"
@@ -19699,6 +19731,10 @@ msgstr "Dør med en femtedel av helsen tatt de siste sekundene, den letteste dø
 #, fuzzy
 msgid "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has."
 msgstr "Dør med halvannen gang helsen tatt de siste sekundene, den tyngste dødsgraden et skript har."
+
+#: src/lego/variant.ts
+msgid "Different weapon"
+msgstr ""
 
 #: src/campaign/pages/components/RunDifficulty.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -24755,6 +24791,10 @@ msgstr "varmeskybitmap"
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr "heatfalloff: hvor raskt varmen i skyen tappes, ikke et fast antall frames. Denne klassen har ingen egen farge."
 
+#: src/lego/variant.ts
+msgid "Heavier"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "height"
@@ -28445,6 +28485,10 @@ msgstr "Lys"
 msgid "Light hit up to"
 msgstr "Lett treff opptil"
 
+#: src/lego/variant.ts
+msgid "Lighter"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Lightly hit and destroyed"
@@ -29216,6 +29260,14 @@ msgstr "Gjør {rowLabel} til et fast tall"
 #, fuzzy
 msgid "Make {rowLabel} follow the game"
 msgstr "La {rowLabel} følge spillet"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant of this unit as a new unit"
+msgstr ""
 
 #: src/multiplayer/battle/MemberRow.tsx
 #, fuzzy
@@ -33615,6 +33667,10 @@ msgstr "Ingen våpen i {gameName} passer til det."
 #, fuzzy
 msgid "No weapon matches that."
 msgstr "Ingen våpen passer til det."
+
+#: src/lego/variant.ts
+msgid "No weapon seed from {first} to {last} made a different weapon that passes the checks."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -41858,6 +41914,10 @@ msgstr "Lagret"
 #, fuzzy
 msgid "Saved \"{copyName}\" to your presets."
 msgstr "Lagret «{copyName}» i forhåndsinnstillingene dine."
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Saved \"{name}\" beside this unit."
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -51977,6 +52037,10 @@ msgstr "Denne enheten har ingen del som heter \"{name}\". Motoren klarer ikke å
 msgid "This unit has no root piece."
 msgstr "Denne enheten har ingen rotdel."
 
+#: src/lego/variant.ts
+msgid "This unit has no weapon module to change."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
 msgid "This unit has no weapons."
@@ -52018,6 +52082,7 @@ msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is
 msgstr "Denne enheten ble bygget mot pakken «{builtAgainst}», og den pakken er ikke installert."
 
 #: src/lego/reroll.ts
+#: src/lego/variant.ts
 msgid "This unit was not generated."
 msgstr ""
 
@@ -52062,6 +52127,10 @@ msgstr "geometrifilen til denne enheten kunne ikke leses ({status}). Den er den 
 msgid "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes."
 msgstr "geometrifilen til denne enheten mangler (404). Den ble skrevet da modellen ble importert, og den er den eneste kopien av meshene."
 
+#: src/lego/variant.ts
+msgid "This unit's job fixes its weapon's size and shape, and the module library has no other weapon of its kind, so there is nothing to change."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "This unit's name"
@@ -52096,6 +52165,10 @@ msgstr "Denne verdien er endret fra spillets standard."
 
 #: src/lego/reroll.ts
 msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "This version cannot generate the job {name} at size {sized}, so a variant cannot be made."
 msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
@@ -54399,6 +54472,14 @@ msgstr "variabel stjerne"
 #, fuzzy
 msgid "Variables"
 msgstr "Variabler"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Variant"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Variant of {parentName}"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy

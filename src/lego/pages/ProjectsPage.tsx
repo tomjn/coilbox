@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Dices,
   FileUp,
+  GitFork,
   ImageOff,
   Package,
   Pencil,
@@ -308,6 +309,9 @@ export default function ProjectsPage() {
     const projectName = project.name;
     const pieceCount = project.pieces.length;
     const unitName = project.unitName;
+    const parentName = project.variantOf
+      ? projects.find((p) => p.id === project.variantOf)?.name
+      : undefined;
     return (
       <li
         key={project.id}
@@ -338,7 +342,14 @@ export default function ProjectsPage() {
             <p className="truncate text-sm font-medium">
               {isRenaming ? "" : project.name}
             </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+              {parentName !== undefined && !isRenaming ? (
+                <GitFork
+                  size={12}
+                  className="shrink-0"
+                  aria-label={t`Variant of ${parentName}`}
+                />
+              ) : null}
               {isRenaming
                 ? ""
                 : plural(pieceCount, {

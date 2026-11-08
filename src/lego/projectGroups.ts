@@ -14,6 +14,7 @@
 import type { GameItem } from "@/content/bindings";
 import type { LegoProject } from "./model";
 import { gameKey, unitGame } from "./unitGame";
+import { variantRoot, withVariantsTogether } from "./variantFamily";
 
 /** The archive extensions a game's models can arrive from. */
 const ARCHIVE_EXT = /\.(sdd|sdz|sd7|sdp)$/i;
@@ -78,20 +79,24 @@ export function groupProjects(
     opened: LegoProject[];
   }
   const games = new Map<string, Building>();
+  const byId = new Map(projects.map((p) => [p.id, p]));
 
   for (const project of projects) {
-    let game = unitGame(project);
+    // A variant is filed where the unit it came from is (#3240), and listed
+    // after it below.
+    const home = variantRoot(project, byId);
+    let game = unitGame(home);
     let guessed = false;
-    if (!game && project.imported && project.game === undefined) {
+    if (!game && home.imported && home.game === undefined) {
       // Opened before the picker recorded a game: all that is left is the path.
-      const archive = archiveFromSource(project.imported.source);
+      const archive = archiveFromSource(home.imported.source);
       if (archive) {
         game = { name: archive, archive };
         guessed = true;
       }
     }
     if (!game) {
-      (project.imported ? files : own).push(project);
+      (home.imported ? files : own).push(project);
       continue;
     }
     const key = gameKey(game, installed);
@@ -102,7 +107,7 @@ export function groupProjects(
     }
     group.archives.add(game.archive.toLowerCase());
     group.names.push({ name: (game.base ?? game).name, guessed });
-    (project.imported ? group.opened : group.built).push(project);
+    (home.imported ? group.opened : group.built).push(project);
   }
 
   const newest = (a: string, b: string) =>
@@ -116,16 +121,19 @@ export function groupProjects(
       key: group.key,
       label,
       archives: [...group.archives],
-      projects: [...group.built, ...group.opened],
+      projects: [
+        ...withVariantsTogether(group.built),
+        ...withVariantsTogether(group.opened),
+      ],
     };
   });
 
   return {
-    own,
+    own: withVariantsTogether(own),
     games: groups.sort((a, b) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
     ),
-    files,
+    files: withVariantsTogether(files),
   };
 }
 

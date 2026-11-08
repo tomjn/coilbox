@@ -286,6 +286,7 @@ import { UnitGamePicker } from "./components/UnitGamePicker";
 import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
 import { useMoreBelow } from "./components/useMoreBelow";
+import { VariantMenu } from "./components/VariantMenu";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
@@ -3117,6 +3118,13 @@ function Builder({ id }: { id: string | undefined }) {
                       >
                         <Dices size={14} />
                       </Button>
+                    ) : null}
+                    {pack && draft.generated ? (
+                      <VariantMenu
+                        project={draft}
+                        pack={pack}
+                        projects={projects}
+                      />
                     ) : null}
                     {pack && !draft.imported ? (
                       <Button
