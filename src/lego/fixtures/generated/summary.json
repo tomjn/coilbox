@@ -834,7 +834,7 @@
       "turretHeight": 11.02047788835014,
       "barrelLength": 26.615566647313535
     },
-    "hash": 4085192991
+    "hash": 1198390173
   },
   "turret.building assault large": {
     "pieces": 9,
@@ -847,7 +847,7 @@
       "turretHeight": 20.609084123309,
       "barrelLength": 63.989922779873005
     },
-    "hash": 2300418504
+    "hash": 3744479934
   },
   "turret.building artillery small": {
     "pieces": 9,
@@ -860,7 +860,7 @@
       "turretHeight": 11.421854336291318,
       "barrelLength": 39.681486574441195
     },
-    "hash": 1732410193
+    "hash": 191756857
   },
   "turret.building artillery large": {
     "pieces": 8,
@@ -873,7 +873,7 @@
       "turretHeight": 21.0761005032463,
       "barrelLength": 72.43621320007229
     },
-    "hash": 820054416
+    "hash": 3621999956
   },
   "turret.building scout small": {
     "pieces": 8,
@@ -886,7 +886,7 @@
       "turretHeight": 6.250048959576524,
       "barrelLength": 19.130184541598428
     },
-    "hash": 2719463445
+    "hash": 1433948941
   },
   "turret.building scout large": {
     "pieces": 5,
@@ -937,7 +937,7 @@
       "turretHeight": 10.186079557130578,
       "barrelLength": 31.380708125529925
     },
-    "hash": 1379635265
+    "hash": 1370640333
   },
   "turret.building antiair large": {
     "pieces": 9,
@@ -950,7 +950,7 @@
       "turretHeight": 21.691597463075063,
       "barrelLength": 60.99070161847584
     },
-    "hash": 1558830032
+    "hash": 302065022
   },
   "building assault small": {
     "pieces": 5,
@@ -1191,7 +1191,7 @@
       "turretHeight": 4.253254053335404,
       "barrelLength": 10
     },
-    "hash": 1113193155
+    "hash": 3132236199
   },
   "ship assault large": {
     "pieces": 11,
@@ -1205,7 +1205,7 @@
       "turretHeight": 7.895657339897006,
       "barrelLength": 21.579507187495476
     },
-    "hash": 3395914828
+    "hash": 646890470
   },
   "ship artillery small": {
     "pieces": 10,
@@ -1219,7 +1219,7 @@
       "turretHeight": 4.985364872011821,
       "barrelLength": 13.359116337923565
     },
-    "hash": 2751727185
+    "hash": 1836533643
   },
   "ship artillery large": {
     "pieces": 11,
@@ -1233,7 +1233,7 @@
       "turretHeight": 10.027974563864523,
       "barrelLength": 23.46429911432788
     },
-    "hash": 2438611947
+    "hash": 677700861
   },
   "ship scout small": {
     "pieces": 7,
@@ -1260,7 +1260,7 @@
       "turretHeight": 5.535475150658981,
       "barrelLength": 12.674003382576396
     },
-    "hash": 3605563049
+    "hash": 1491720177
   },
   "ship builder small": {
     "pieces": 11,
@@ -1302,7 +1302,7 @@
       "turretHeight": 4.7303577340662,
       "barrelLength": 10.445614218109986
     },
-    "hash": 2197113045
+    "hash": 2606124483
   },
   "ship antiair large": {
     "pieces": 10,
@@ -1316,7 +1316,7 @@
       "turretHeight": 7.503929972575045,
       "barrelLength": 21.443540182546243
     },
-    "hash": 977677544
+    "hash": 3365334748
   },
   "aircraft assault small": {
     "pieces": 8,
@@ -1329,7 +1329,7 @@
       "gunHeight": 1.2185101512208347,
       "barrelLength": 3.563446587834042
     },
-    "hash": 1103845387
+    "hash": 3650552597
   },
   "aircraft assault large": {
     "pieces": 8,
@@ -1342,7 +1342,7 @@
       "gunHeight": 2.4943734426121225,
       "barrelLength": 7.66534447719343
     },
-    "hash": 3320800278
+    "hash": 2863537770
   },
   "aircraft artillery small": {
     "pieces": 9,
@@ -1355,7 +1355,7 @@
       "gunHeight": 1.8836111042029222,
       "barrelLength": 4.462301206684671
     },
-    "hash": 1629638193
+    "hash": 2111340283
   },
   "aircraft artillery large": {
     "pieces": 9,
@@ -1368,7 +1368,7 @@
       "gunHeight": 3.6653760096365584,
       "barrelLength": 9.290498082464559
     },
-    "hash": 1104193738
+    "hash": 3256021586
   },
   "aircraft scout small": {
     "pieces": 5,
@@ -1431,7 +1431,7 @@
       "gunHeight": 1.293635368926334,
       "barrelLength": 3.3588794477772903
     },
-    "hash": 3856168399
+    "hash": 49322609
   },
   "aircraft antiair large": {
     "pieces": 9,
@@ -1444,6 +1444,6 @@
       "gunHeight": 2.486325372894294,
       "barrelLength": 6.732333110708742
     },
-    "hash": 3039656727
+    "hash": 3540129673
   }
 }

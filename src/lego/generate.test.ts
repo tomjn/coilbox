@@ -190,6 +190,89 @@ describe("generateUnit", () => {
     expect(assault.pieces.some((p) => p.role === "turret")).toBe(true);
   });
 
+  describe("a plan with a gun of its own (#5103)", () => {
+    const GUNNED = ["ship", "aircraft", "turret.building"];
+    const GUN_ROLES = ["turret", "aim", "barrel", "flare"];
+    const rolePieces = (unit: LegoProject, role: string) =>
+      unit.pieces.filter((p) => p.role === role);
+
+    it("has at most one turret and one barrel, whatever the job", () => {
+      for (const plan of GUNNED) {
+        for (const job of JOBS) {
+          for (const size of ["small", "medium", "large"] as const) {
+            for (const seed of [1, 2, 3, 4]) {
+              const unit = generate(seed, plan, job, size);
+              const where = `${plan} ${job} ${size} ${seed}`;
+              for (const role of GUN_ROLES) {
+                expect(
+                  rolePieces(unit, role).length,
+                  `${where} ${role}`,
+                ).toBeLessThanOrEqual(1);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    it("keeps the plan's own gun when the job hangs no weapon on it", () => {
+      for (const plan of GUNNED) {
+        const unit = generate(1, plan, "builder", "medium");
+        for (const role of ["turret", "barrel", "flare"]) {
+          const pieces = rolePieces(unit, role);
+          expect(pieces, `${plan} ${role}`).toHaveLength(1);
+          expect(pieces[0]?.bone, `${plan} ${role}`).toBe(role);
+        }
+      }
+    });
+
+    it("puts the artillery barrel length on the one barrel", () => {
+      const rule = GENERATOR_JOBS.find((j) => j.id === "artillery")?.slots[1]
+        ?.roles?.barrel?.stretch as [number, number];
+      for (const plan of GUNNED) {
+        for (const seed of [1, 2, 3]) {
+          const [barrel] = rolePieces(
+            generate(seed, plan, "artillery", "medium"),
+            "barrel",
+          );
+          const bare = rolePieces(
+            generate(seed, plan, "assault", "medium"),
+            "barrel",
+          )[0];
+          const where = `${plan} ${seed}`;
+          expect(barrel?.module, where).toBeDefined();
+          // The assault job's barrel is as the module has it, so the ratio is
+          // the stretch.
+          const stretch =
+            (barrel?.scale[1] as number) / (bare?.scale[1] as number);
+          expect(stretch, where).toBeGreaterThanOrEqual(rule[0] - 1e-9);
+          expect(stretch, where).toBeLessThanOrEqual(rule[1] + 1e-9);
+        }
+      }
+    });
+
+    it("puts the anti-air aim limit on the one barrel", () => {
+      const rule = GENERATOR_JOBS.find((j) => j.id === "antiair")?.slots[1]
+        ?.roles?.barrel?.pitch;
+      expect(rule).toBeDefined();
+      for (const plan of GUNNED) {
+        const unit = generate(1, plan, "antiair", "medium");
+        expect(rolePieces(unit, "barrel")[0]?.limits?.pitch, plan).toEqual(
+          rule,
+        );
+      }
+    });
+
+    it("leaves the plan's gun joints in place, so a proportion edit does not bring them back", () => {
+      const unit = generate(1, "ship", "artillery", "medium");
+      for (const bone of ["turret", "barrel", "flare"]) {
+        const piece = unit.pieces.find((p) => p.bone === bone);
+        expect(piece, bone).toBeDefined();
+        expect(piece?.role, bone).toBeUndefined();
+      }
+    });
+  });
+
   it("makes a large unit bigger than a small one", () => {
     const small = generate(1, "biped", "assault", "small");
     const large = generate(1, "biped", "assault", "large");

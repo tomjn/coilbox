@@ -358,6 +358,38 @@ function applyRoleRules(
   return next;
 }
 
+/** The roles that make a piece part of a weapon. */
+const GUN_ROLES: readonly string[] = ["turret", "aim", "barrel", "flare"];
+
+/**
+ * The plan's own gun joints made plain, for each gun role the module brings.
+ *
+ * A plan such as the ship's has a turret, barrel and flare of its own, but they
+ * are bare joints with no part on them, and the chassis is built around them.
+ * The module is the gun that can be seen. Left with their roles, the joints
+ * would be a second gun, a second weapon in the export that nothing aims.
+ * They stay as pieces rather than being deleted, because changing a proportion
+ * adds back any bone the unit lacks (`applyProportions`).
+ */
+function yieldPlanGun(project: LegoProject, instance: string): LegoProject {
+  const brought = new Set(
+    project.pieces
+      .filter((p) => p.module?.instance === instance && p.role)
+      .map((p) => p.role),
+  );
+  const yielded = GUN_ROLES.filter((role) => brought.has(role));
+  if (yielded.length === 0) return project;
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) => {
+      if (piece.bone === undefined || !piece.role) return piece;
+      if (!yielded.includes(piece.role)) return piece;
+      const { role: _role, ...plain } = piece;
+      return plain;
+    }),
+  };
+}
+
 /** The inputs in words, for the unit's notes. */
 export function describeInputs(inputs: GeneratorInputs): string {
   const seed = inputs.seed;
@@ -469,6 +501,7 @@ export function generateUnit(
         roll(inputs, `slot:${slot.id}:${n}:${key}`),
       );
       project = resolveConnections(project, pack).project;
+      project = yieldPlanGun(project, instance);
       generated.push({ slot: `${slot.id}.${n}`, module: module.id, instance });
     }
   }
