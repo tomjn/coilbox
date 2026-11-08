@@ -462,7 +462,9 @@ export function erodeRelief(
   const valley = blur(valleys, hw, hh, VALLEY_BLUR, VALLEY_PASSES);
   const change = new Float32Array(half.length);
   for (let i = 0; i < change.length; i++) {
-    change[i] = spread[i] - cut[i] - gully[i] - valley[i];
+    // The valley cut and the blurs can take a cell past its own cap.
+    const channel = Math.min(gully[i] + valley[i], eroded[i] * CHANNEL_SHARE);
+    change[i] = spread[i] - cut[i] - channel;
   }
   // Only the fine part stays. Mass the drops moved over a wide area would
   // change the shape of whole hills, which belongs to the pinned heightmap.
