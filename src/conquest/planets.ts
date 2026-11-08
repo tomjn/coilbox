@@ -108,6 +108,8 @@ export interface Planet {
   steep: [Rgb, Rgb];
   /** Colour of a clearing in a `forest` pattern slot, in sRGB. */
   clearing: Rgb;
+  /** How much rime lies on the rock, 0 to 1. Display only. None when left out. */
+  frost?: number;
   /** Added to moisture and to cold before the rule runs. */
   climate: { wet: number; cold: number };
   /**
@@ -314,6 +316,7 @@ const ICE: Planet = {
     [132, 138, 126],
   ],
   clearing: [238, 242, 246],
+  frost: 1,
   climate: { wet: 0, cold: 0.6 },
   weights(h, wet, cold, out) {
     out.fill(0);

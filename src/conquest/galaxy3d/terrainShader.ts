@@ -1107,10 +1107,7 @@ export function applyTerrainShader(
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
     };
-    // Frost on the rock of a cold world.
-    shader.uniforms.uTerrainFrost = {
-      value: Math.min(1, Math.max(0, (planet?.climate.cold ?? 0) / 0.6)),
-    };
+    shader.uniforms.uTerrainFrost = { value: planet?.frost ?? 0 };
     shader.uniforms.uSeaPattern = {
       value: (planet && SEA_PATTERN[planet.sea.look]) ?? -1,
     };
