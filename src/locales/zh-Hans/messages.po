@@ -15778,9 +15778,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox 无法绘制此图片。游戏仍可读取它。"
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "Coilbox 无法读取此地图的天空盒。地图附带了天空盒，但其 DDS 格式读取器无法处理，因此预览改为绘制地图的天空颜色。"
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -22744,11 +22743,6 @@ msgstr "弹坑强度的固定加成，在高度衰减之后、craterMult 之前�
 msgid "Flat impulse bonus"
 msgstr "固定冲量加成"
 
-#: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "flat sky"
-msgstr "纯色天空"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Flattens the ground"
@@ -23906,6 +23900,10 @@ msgstr ""
 #, fuzzy
 msgid "Generated Lua"
 msgstr "生成的 Lua"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -50621,9 +50619,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "无法读取这张地图的高度。这里的内容都没有与地面核对过，所以每个方格都显示为虚线而不是实线。"
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "这张地图的天空盒是 DDS，但不是立方体贴图，所以预览会改为绘制地图的天空颜色。"
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -55709,6 +55706,10 @@ msgstr "写入文件夹 \"{writeRootPath}\" 位于包（\"{appDir}\"）之外。
 msgid "Write root portability n/a (not portable)"
 msgstr "写入文件夹便携性：不适用（非便携）"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -55838,6 +55839,11 @@ msgstr "已将 {modelsFound} 个模型中的 {modelsWritten} 个写入 {0, plura
 #, fuzzy
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "已写入 <0/>。重新启动 Coilbox 即可加载。"
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy

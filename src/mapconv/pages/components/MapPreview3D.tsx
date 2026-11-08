@@ -24,6 +24,8 @@ import {
   skyboxFromDds,
   skyboxNote,
 } from "../../skyboxNote";
+import { generatedSkyCanvas } from "../../skyCanvas";
+import { skyboxImageKind } from "../../skyPanorama";
 import { WheelCoalescer } from "./wheelCoalescer";
 import { groundHit, releaseWheel } from "./wheelGate";
 
@@ -113,58 +115,93 @@ type DdsData = {
   mipmapCount: number;
 };
 
+type SkyboxLoad =
+  | { sky: THREE.Texture; problem?: undefined }
+  | { sky?: undefined; problem: SkyboxProblem };
+
 /**
- * Decode a skybox DDS `data:` URL into a `CompressedCubeTexture` usable as
+ * Decode a map's skybox `data:` URL into a texture usable as
  * `scene.background`, or say why it could not be.
+ *
+ * Recoil takes either a DDS cube map or a flat 2D image, PNG or JPG, which it
+ * reads as a 2:1 panorama (#5089). The panorama is handed to three as an
+ * equirectangular map, which samples the same pixel for a direction as the
+ * engine's converter does, so no conversion happens here.
+ */
+async function loadSkybox(src: string): Promise<SkyboxLoad> {
+  try {
+    const buffer = await (await fetch(src)).arrayBuffer();
+    const kind = skyboxImageKind(new Uint8Array(buffer, 0, 4));
+    if (kind === "dds") return ddsSkyboxCube(buffer);
+    if (kind !== "png" && kind !== "jpeg") return { problem: "unreadable" };
+    // The `data:` URL says octet-stream, which an image element will not
+    // decode, so the bytes go back in with their real type.
+    const url = URL.createObjectURL(
+      new Blob([buffer], { type: kind === "png" ? "image/png" : "image/jpeg" }),
+    );
+    try {
+      const tex = await new THREE.TextureLoader().loadAsync(url);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return { sky: tex };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    return { problem: "unreadable" };
+  }
+}
+
+/**
+ * A skybox DDS as a `CompressedCubeTexture`.
  *
  * `DDSLoader.load` yields a plain `CompressedTexture` that three's background
  * renderer treats as a flat plane (it only takes the cube path for
  * `isCubeTexture`). So we `parse()` the bytes ourselves and assemble the six faces
  * into a `CompressedCubeTexture` (`isCubeTexture === true`) — the same face layout
  * `CompressedTextureLoader` builds internally.
- *
- * A failure keeps the caller's flat sky colour, and now names itself so the
- * preview can say the sky is not the map's own (issue #1650).
  */
-async function loadSkyboxCube(
-  src: string,
-): Promise<
-  | { cube: THREE.CompressedCubeTexture; problem?: undefined }
-  | { cube?: undefined; problem: SkyboxProblem }
-> {
-  try {
-    const buffer = await (await fetch(src)).arrayBuffer();
-    const data = new DDSLoader().parse(buffer, true) as unknown as DdsData;
-    const problem = skyboxFromDds(data);
-    if (problem) return { problem };
-    const faces = [];
-    for (let f = 0; f < 6; f++) {
-      const mipmaps = [];
-      for (let i = 0; i < data.mipmapCount; i++) {
-        mipmaps.push(data.mipmaps[f * data.mipmapCount + i]);
-      }
-      faces.push({
-        mipmaps,
-        width: data.width,
-        height: data.height,
-        format: data.format,
-      });
+function ddsSkyboxCube(buffer: ArrayBuffer): SkyboxLoad {
+  const data = new DDSLoader().parse(buffer, true) as unknown as DdsData;
+  const problem = skyboxFromDds(data);
+  if (problem) return { problem };
+  const faces = [];
+  for (let f = 0; f < 6; f++) {
+    const mipmaps = [];
+    for (let i = 0; i < data.mipmapCount; i++) {
+      mipmaps.push(data.mipmaps[f * data.mipmapCount + i]);
     }
-    // three types the `images` param as CompressedTexture[], but the loader really
-    // passes these lightweight face records (mipmaps + dimensions + format).
-    const tex = new THREE.CompressedCubeTexture(
-      faces as unknown as THREE.CompressedTexture[],
-      data.format as THREE.CompressedPixelFormat,
-      THREE.UnsignedByteType,
-    );
-    // No mip chain in the file — don't ask the sampler for levels that don't exist.
-    if (data.mipmapCount === 1) tex.minFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    return { cube: tex };
-  } catch {
-    return { problem: "unreadable" };
+    faces.push({
+      mipmaps,
+      width: data.width,
+      height: data.height,
+      format: data.format,
+    });
   }
+  // three types the `images` param as CompressedTexture[], but the loader really
+  // passes these lightweight face records (mipmaps + dimensions + format).
+  const tex = new THREE.CompressedCubeTexture(
+    faces as unknown as THREE.CompressedTexture[],
+    data.format as THREE.CompressedPixelFormat,
+    THREE.UnsignedByteType,
+  );
+  // No mip chain in the file — don't ask the sampler for levels that don't exist.
+  if (data.mipmapCount === 1) tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return { sky: tex };
+}
+
+/**
+ * The sky built from the map's `mapinfo.lua` colours, for a map with no
+ * skybox of its own (#5089). Linear, like every other mapinfo colour in this
+ * scene, so its horizon is the same colour the fog reaches.
+ */
+function generatedSkyTexture(appearance?: MapAppearance | null): THREE.Texture {
+  const tex = new THREE.CanvasTexture(generatedSkyCanvas(appearance));
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.LinearSRGBColorSpace;
+  return tex;
 }
 
 /** Longest sides requested from `mc_image_info`. The relief normally comes from
@@ -319,9 +356,9 @@ export function MapPreview3D({
   worldHeight: number;
   /** Optional `mapinfo.lua` hints — water colour/visibility, sky, sun. */
   appearance?: MapAppearance | null;
-  /** Optional `data:` URL of a skybox DDS cube map (`atmosphere.skyBox`). When it
-   * is a cube map it becomes the sky (and the water's reflection); otherwise the
-   * flat `skyColor` sky is kept. */
+  /** Optional `data:` URL of the map's `atmosphere.skyBox`, a DDS cube map or a
+   * PNG or JPG panorama. When it reads it becomes the sky (and the water's
+   * reflection); otherwise the sky is built from the mapinfo colours. */
   skyboxSrc?: string | null;
   className?: string;
   /** Continuous auto-orbit as an `OrbitControls.autoRotateSpeed` multiplier
@@ -336,7 +373,7 @@ export function MapPreview3D({
   /** Render the default bordered/aspect container. When false the canvas fills its
    * parent (no border/rounded/aspect). Default true. */
   framed?: boolean;
-  /** Draw the sky (skybox / `skyColor`) as the background. When false the canvas
+  /** Draw the sky (the skybox, or one built from the mapinfo colours) as the background. When false the canvas
    * stays transparent so it layers over whatever is behind it. Default true. */
   showSky?: boolean;
   /** Draw the high-overcast cloud plane (only when the map defines `cloudColor`).
@@ -429,6 +466,7 @@ export function MapPreview3D({
     appearance?.skyColor,
     appearance?.sunDir,
     appearance?.sunColor,
+    appearance?.skySunColor,
     appearance?.voidWater,
     appearance?.fogColor,
     appearance?.cloudColor,
@@ -616,28 +654,22 @@ export function MapPreview3D({
         disposables.push(detailTex);
 
         const scene = new THREE.Scene();
-        // Sky colour from mapinfo becomes the backdrop; otherwise stay transparent
-        // so the card background shows through. `showSky=false` keeps it transparent
-        // regardless, so the canvas layers over whatever is behind it.
-        if (showSky && appearance?.skyColor)
-          scene.background = colorFrom(appearance.skyColor, 0);
-
-        // If the map declares a skybox DDS, decode it and (when it's a cube map) use
-        // it as the sky, replacing the flat colour. Done before the water reflection
-        // capture below so the water mirrors the real sky. A failure still leaves the
-        // flat `skyColor` sky, and now says so on the preview rather than looking the
-        // same as a map that asked for no sky of its own (issue #1650).
-        if (showSky && skyboxSrc) {
-          const sky = await loadSkyboxCube(skyboxSrc);
+        // The map's own skybox when it ships one that reads, else a sky built
+        // from its mapinfo colours. Done before the water reflection capture
+        // below so the water mirrors the sky. A skybox that will not read says
+        // so on the preview rather than looking the same as a map that asked
+        // for no sky of its own (issue #1650). `showSky=false` stays
+        // transparent, so the canvas layers over whatever is behind it.
+        if (showSky) {
+          const own = skyboxSrc ? await loadSkybox(skyboxSrc) : null;
           if (cancelled) {
-            sky.cube?.dispose();
+            own?.sky?.dispose();
             return;
           }
-          if (sky.cube) {
-            scene.background = sky.cube;
-            disposables.push(sky.cube);
-          }
-          setSkyProblem(sky.problem ?? null);
+          const sky = own?.sky ?? generatedSkyTexture(appearance);
+          scene.background = sky;
+          disposables.push(sky);
+          setSkyProblem(own?.problem ?? null);
         }
 
         const segments = forceWireframe ? WIRE_SEGMENTS : SEGMENTS;

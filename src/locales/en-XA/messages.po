@@ -12849,7 +12849,7 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr ""
 
 #: src/mapconv/skyboxNote.ts
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
 msgstr ""
 
 #: src/content/buildPicMissing.ts
@@ -18545,10 +18545,6 @@ msgstr ""
 msgid "Flat impulse bonus"
 msgstr ""
 
-#: src/mapconv/skyboxNote.ts
-msgid "flat sky"
-msgstr ""
-
 #: src/content/unitFieldNotes.ts
 msgid "Flattens the ground"
 msgstr ""
@@ -19495,6 +19491,10 @@ msgstr ""
 
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "Generated Lua"
+msgstr ""
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
 msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
@@ -41271,7 +41271,7 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr ""
 
 #: src/mapconv/skyboxNote.ts
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
 msgstr ""
 
 #: src/content/replayAnalysis.ts
@@ -45415,6 +45415,10 @@ msgstr ""
 msgid "Write root portability n/a (not portable)"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Write stats to the server log"
 msgstr ""
@@ -45518,6 +45522,11 @@ msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "Wrote <0/>. Restart Coilbox to load it."
+msgstr ""
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
 msgstr ""
 
 #: src/blueprint/pack.ts

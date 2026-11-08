@@ -69,7 +69,15 @@ fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<String>, St
         {
             continue;
         }
-        if dir.join(&rel).is_file() {
+        // The engine reads `skyBox` only from `maps/<ref>`, and the other
+        // textures from `<ref>` or else `maps/<ref>` (`ISky.cpp`,
+        // `FIND_MAP_TEXTURE`). So a file under `maps/` is the one to pack.
+        if dir.join("maps").join(&rel).is_file() {
+            let in_maps = format!("maps/{archive_path}");
+            if !out.contains(&in_maps) {
+                out.push(in_maps);
+            }
+        } else if dir.join(&rel).is_file() {
             out.push(archive_path);
         }
     }
@@ -306,6 +314,30 @@ mod tests {
         let out = dir.join("out");
         extract_archive(&packed.path, &out).unwrap();
         assert!(find_smf(&out).unwrap().ends_with("maps/MyMap.smf"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The engine reads `skyBox` from `maps/<skyBox>`, so a sky named as
+    /// `skybox.jpg` and written to `maps/` goes in under `maps/`.
+    #[test]
+    fn a_reference_found_only_under_maps_is_packed_there() {
+        let dir = compiled_dir("in-maps");
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { mapfile = \"MyMap.smf\", atmosphere = { skyBox = \"skybox.jpg\" } }",
+        )
+        .unwrap();
+        std::fs::write(dir.join("maps/skybox.jpg"), b"sky").unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "maps/skybox.jpg"
+            ]
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

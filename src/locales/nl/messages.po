@@ -15879,9 +15879,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox kan deze afbeelding niet tekenen. Het spel kan haar nog wel lezen."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "Coilbox kan de skybox van deze kaart niet lezen. De kaart levert er een mee in een DDS-formaat dat de lezer niet ondersteunt, dus het voorbeeld tekent in plaats daarvan de hemelkleur van de kaart."
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -22897,11 +22896,6 @@ msgstr "Vaste toevoeging aan de kratersterkte, toegepast na de hoogtereductie ma
 msgid "Flat impulse bonus"
 msgstr "Vaste impulsbonus"
 
-#: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "flat sky"
-msgstr "vlakke hemel"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Flattens the ground"
@@ -24064,6 +24058,10 @@ msgstr ""
 #, fuzzy
 msgid "Generated Lua"
 msgstr "Gegenereerde Lua"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -50972,9 +50970,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "De hoogtes van deze kaart konden niet gelezen worden. Niets hier is tegen de grond gecontroleerd, dus elk vak is gestippeld in plaats van strak."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "De skybox van deze kaart is een DDS, maar geen cubemap, dus het voorbeeld tekent in plaats daarvan de luchtkleur van de kaart."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -56091,6 +56088,10 @@ msgstr "Schrijfmap \"{writeRootPath}\" ligt buiten het pakket (\"{appDir}\"). Do
 msgid "Write root portability n/a (not portable)"
 msgstr "Draagbaarheid van de schrijfmap n.v.t. (niet draagbaar)"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56221,6 +56222,11 @@ msgstr "{modelsWritten} van {modelsFound} modellen geschreven in {0, plural, one
 #, fuzzy
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "<0/> geschreven. Start Coilbox opnieuw om het te laden."
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy

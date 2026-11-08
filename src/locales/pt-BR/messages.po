@@ -15876,9 +15876,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "O coilbox não consegue desenhar esta imagem. O jogo ainda consegue lê-la."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "O coilbox não consegue ler o skybox deste mapa. O mapa inclui um, em um formato DDS que o leitor não suporta, então a prévia desenha a cor do céu do mapa."
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -22887,11 +22886,6 @@ msgstr "Acréscimo fixo à força da cratera, aplicado após a redução por alt
 msgid "Flat impulse bonus"
 msgstr "Bônus fixo de impulso"
 
-#: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "flat sky"
-msgstr "céu plano"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Flattens the ground"
@@ -24054,6 +24048,10 @@ msgstr ""
 #, fuzzy
 msgid "Generated Lua"
 msgstr "Lua gerado"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -50955,9 +50953,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "Não foi possível ler as alturas deste mapa. Nada aqui foi conferido com o terreno, então toda casa aparece tracejada em vez de limpa."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "O skybox deste mapa é um DDS, mas não um cube map, então a prévia desenha a cor do céu do mapa no lugar."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -56067,6 +56064,10 @@ msgstr "A raiz de gravação \"{writeRootPath}\" está fora do pacote (\"{appDir
 msgid "Write root portability n/a (not portable)"
 msgstr "Portabilidade da raiz de gravação n/a (não portátil)"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56197,6 +56198,11 @@ msgstr "{modelsWritten} de {modelsFound} modelos gravados em {0, plural, one {# 
 #, fuzzy
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "<0/> gravado. Reinicie o Coilbox para carregá-lo."
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy

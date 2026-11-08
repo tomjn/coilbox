@@ -15879,9 +15879,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox kan inte rita den här bilden. Spelet kan ändå läsa den."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "Coilbox kan inte läsa den här kartans skybox. Kartan har en, i ett DDS-format som läsaren inte hanterar, så förhandsvisningen ritar kartans himmelsfärg i stället."
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -22897,11 +22896,6 @@ msgstr "Fast tillägg till kraterstyrkan, tillämpat efter höjdminskningen men 
 msgid "Flat impulse bonus"
 msgstr "Fast impulsbonus"
 
-#: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "flat sky"
-msgstr "platt himmel"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Flattens the ground"
@@ -24064,6 +24058,10 @@ msgstr ""
 #, fuzzy
 msgid "Generated Lua"
 msgstr "Genererad Lua"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -50972,9 +50970,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "Den här kartans höjder kunde inte läsas. Inget här har kontrollerats mot marken, så varje ruta är streckad i stället för ren."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "Den här kartans skybox är en DDS, men inte en kubkarta, så förhandsvisningen ritar kartans himmelsfärg i stället."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -56091,6 +56088,10 @@ msgstr "Skrivroten ”{writeRootPath}” ligger utanför paketet (”{appDir}”
 msgid "Write root portability n/a (not portable)"
 msgstr "Skrivrotens portabilitet ej tillämplig (inte portabel)"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56221,6 +56222,11 @@ msgstr "Skrev {modelsWritten} av {modelsFound} modeller till {0, plural, one {# 
 #, fuzzy
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "Skrev <0/>. Starta om Coilbox för att läsa in den."
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy

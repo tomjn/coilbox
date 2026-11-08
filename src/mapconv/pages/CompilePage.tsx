@@ -15,6 +15,7 @@ import {
   PackageCheck,
   Play,
   Square,
+  Sunrise,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -49,6 +50,7 @@ import {
   mcReadTeams,
   mcSuggestSources,
   mcWriteMapinfo,
+  mcWriteSkybox,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
@@ -57,6 +59,7 @@ import {
   type MapinfoDraft,
   readSavedMapinfo,
   toMapinfoForm,
+  withFormSky,
 } from "../mapinfoForm";
 import { mapNameFromDir } from "../mapName";
 import { useMapProjects } from "../projects";
@@ -66,6 +69,7 @@ import {
   SOURCE_KEYS,
   settleNoclamp,
 } from "../recompile";
+import { panoramaJpeg } from "../skyPanorama";
 import AdvancedOptions, {
   type AdvancedCompileOpts,
   defaultAdvanced,
@@ -182,6 +186,9 @@ export default function CompilePage() {
     changed: boolean;
   } | null>(null);
   const [mapinfoError, setMapinfoError] = useState<string | null>(null);
+  const [writingSky, setWritingSky] = useState(false);
+  const [skyResult, setSkyResult] = useState<{ path: string } | null>(null);
+  const [skyError, setSkyError] = useState<string | null>(null);
   const [packaging, setPackaging] = useState(false);
   const [packResult, setPackResult] = useState<{
     path: string;
@@ -239,6 +246,7 @@ export default function CompilePage() {
   const canRun =
     !running &&
     !writingMapinfo &&
+    !writingSky &&
     !packaging &&
     !installing &&
     maintexture !== "" &&
@@ -273,6 +281,8 @@ export default function CompilePage() {
     setRunError(null);
     setMapinfoResult(null);
     setMapinfoError(null);
+    setSkyResult(null);
+    setSkyError(null);
     clearPackage();
     setLogLines([]);
     const runId = crypto.randomUUID();
@@ -361,6 +371,35 @@ export default function CompilePage() {
       return false;
     } finally {
       setWritingMapinfo(false);
+    }
+  }
+
+  /**
+   * Writes the sky the preview shows into the compiled map as
+   * `maps/skybox.jpg` (#5089). It is built from the compiled map's own
+   * `mapinfo.lua`, written from the form first, so its horizon is the fog
+   * colour the engine will draw.
+   */
+  async function writeSky() {
+    if (!result) return;
+    clearPackage();
+    setWritingSky(true);
+    setSkyResult(null);
+    setSkyError(null);
+    try {
+      // Always written first, so the sky follows the form as it is now.
+      if (!(await writeMapinfo())) return;
+      const info = await mcReadMapinfo({ path: result.outDir });
+      const jpeg = await panoramaJpeg(info);
+      setSkyResult(
+        await mcWriteSkybox({ outDir: result.outDir, jpeg: Array.from(jpeg) }),
+      );
+      // mapinfo.lua now names the sky, so its earlier status is out of date.
+      setMapinfoResult(null);
+    } catch (e) {
+      setSkyError(errorText(e));
+    } finally {
+      setWritingSky(false);
     }
   }
 
@@ -756,7 +795,7 @@ export default function CompilePage() {
                 // loading state until they're known (worldWidth/Height > 0).
                 worldWidth={textureInfo?.width ?? 0}
                 worldHeight={textureInfo?.height ?? 0}
-                appearance={appearance}
+                appearance={withFormSky(appearance, toMapinfoForm(mapinfo))}
                 skyboxSrc={skyboxSrc}
               />
             </div>
@@ -798,11 +837,28 @@ export default function CompilePage() {
                   )}{" "}
                   <Trans>Write mapinfo.lua</Trans>
                 </Button>
+                {!skyboxSrc && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={writeSky}
+                    disabled={writingSky || writingMapinfo || packaging}
+                  >
+                    {writingSky ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Sunrise />
+                    )}{" "}
+                    <Trans>Write sky</Trans>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={packageMap}
-                  disabled={packaging || writingMapinfo || installing}
+                  disabled={
+                    packaging || writingMapinfo || writingSky || installing
+                  }
                 >
                   {packaging ? (
                     <Loader2 className="animate-spin" />
@@ -955,6 +1011,19 @@ export default function CompilePage() {
                       </span>
                     </Trans>
                   )}
+                </p>
+              )}
+              {skyResult && (
+                <p className="mt-2 break-all text-sm">
+                  <Trans>
+                    Wrote{" "}
+                    <span className="font-mono text-xs">{skyResult.path}</span>
+                  </Trans>
+                </p>
+              )}
+              {skyError && (
+                <p className="mt-2 break-words text-sm text-destructive">
+                  {skyError}
                 </p>
               )}
               {mapinfoError && (

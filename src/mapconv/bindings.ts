@@ -91,6 +91,9 @@ export interface MapAppearance {
   cloudDensity?: number | null;
   sunDir?: [number, number, number] | null;
   sunColor?: [number, number, number] | null;
+  /** `atmosphere.sunColor` alone: the colour the engine draws the sky's sun in.
+   * `sunColor` prefers `lighting.sunColor`, which the engine ignores. */
+  skySunColor?: [number, number, number] | null;
   /** `lighting.*` ground shading colours. */
   groundAmbientColor?: [number, number, number] | null;
   groundDiffuseColor?: [number, number, number] | null;
@@ -264,6 +267,16 @@ export const mcWriteMapinfo = defineCommand<
   },
   { path: string; created: boolean; changed: boolean }
 >("coilbox-mapconv", "mc_write_mapinfo");
+
+/**
+ * Write a generated sky into a compiled map as `<outDir>/maps/skybox.jpg` and
+ * point `atmosphere.skyBox` at it. Refused when `mapinfo.lua` already names
+ * another skybox.
+ */
+export const mcWriteSkybox = defineCommand<
+  { outDir: string; jpeg: number[] },
+  { path: string; mapinfoChanged: boolean }
+>("coilbox-mapconv", "mc_write_skybox");
 
 /**
  * Write `<outDir>/<outSuffix>.sdz` from the compile and the `mapinfo.lua` beside

@@ -63,6 +63,9 @@ pub struct MapAppearance {
     pub cloud_density: Option<f32>,
     pub sun_dir: Option<[f32; 3]>,
     pub sun_color: Option<[f32; 3]>,
+    /// `atmosphere.sunColor` alone, the colour the engine draws the sky's sun
+    /// in. `sun_color` prefers `lighting.sunColor`, which the engine ignores.
+    pub sky_sun_color: Option<[f32; 3]>,
     pub ground_ambient_color: Option<[f32; 3]>,
     pub ground_diffuse_color: Option<[f32; 3]>,
     pub ground_specular_color: Option<[f32; 3]>,
@@ -353,6 +356,8 @@ pub struct MinimapOutput {
     pub sun_dir: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sun_color: Option<[f32; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sky_sun_color: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ground_ambient_color: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]

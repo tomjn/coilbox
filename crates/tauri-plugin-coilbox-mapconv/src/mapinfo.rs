@@ -69,6 +69,10 @@ pub struct MapAppearance {
     pub cloud_density: Option<f32>,
     pub sun_dir: Option<[f32; 3]>,
     pub sun_color: Option<[f32; 3]>,
+    /// `atmosphere.sunColor` alone, the colour the engine draws the sky's sun
+    /// in. `sun_color` prefers `lighting.sunColor`, which the engine ignores.
+    /// The scanner cannot tell the two tables apart, so only eval sets it.
+    pub sky_sun_color: Option<[f32; 3]>,
     /// `lighting.*` ground shading colours.
     pub ground_ambient_color: Option<[f32; 3]>,
     pub ground_diffuse_color: Option<[f32; 3]>,
@@ -188,6 +192,7 @@ pub fn parse_appearance(src: &str) -> MapAppearance {
         cloud_density: scan_f64(&lower, "clouddensity").map(|v| v as f32),
         sun_dir: scan_vec3(&lower, "sundir"),
         sun_color: scan_vec3(&lower, "suncolor"),
+        sky_sun_color: None,
         ground_ambient_color: scan_vec3(&lower, "groundambientcolor"),
         ground_diffuse_color: scan_vec3(&lower, "grounddiffusecolor"),
         ground_specular_color: scan_vec3(&lower, "groundspecularcolor"),
@@ -286,6 +291,7 @@ impl From<MapInfoRaw> for MapAppearance {
             // Spring's canonical sun colour is `lighting.sunColor`; fall back to
             // `atmosphere.sunColor` (matches the unitsync reader).
             sun_color: r.lighting.suncolor.or(r.atmosphere.suncolor),
+            sky_sun_color: r.atmosphere.suncolor,
             ground_ambient_color: r.lighting.groundambientcolor,
             ground_diffuse_color: r.lighting.grounddiffusecolor,
             ground_specular_color: r.lighting.groundspecularcolor,
@@ -447,6 +453,19 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let a = eval_appearance(root, RICH).expect("RICH evaluates");
         assert_rich(&a);
+        // RICH sets only `lighting.sunColor`, which the engine's sky ignores.
+        assert_eq!(a.sky_sun_color, None);
+    }
+
+    #[test]
+    fn the_sky_sun_colour_comes_from_atmosphere_only() {
+        let src = r#"return {
+            atmosphere = { sunColor = {1.0, 0.5, 0.25} },
+            lighting = { sunColor = {0.1, 0.2, 0.3} },
+        }"#;
+        let a = eval_appearance(Path::new(env!("CARGO_MANIFEST_DIR")), src).expect("evaluates");
+        assert_eq!(a.sky_sun_color, Some([1.0, 0.5, 0.25]));
+        assert_eq!(a.sun_color, Some([0.1, 0.2, 0.3]));
     }
 
     #[test]
@@ -511,6 +530,10 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let src = format!("{TMA}\nreturn mapinfo");
         let evaled = eval_appearance(root, &src).expect("TMA evaluates");
-        assert_eq!(evaled, parse_appearance(TMA));
+        assert_eq!(evaled.sky_sun_color, Some([1.0, 0.91, 0.75]));
+        // The scanner cannot tell `atmosphere.sunColor` from `lighting.sunColor`.
+        let mut scanned = parse_appearance(TMA);
+        scanned.sky_sun_color = evaled.sky_sun_color;
+        assert_eq!(evaled, scanned);
     }
 }

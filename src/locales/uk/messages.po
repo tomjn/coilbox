@@ -15778,9 +15778,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox не може намалювати це зображення. Гра все одно може його прочитати."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "Coilbox не може прочитати скайбокс цієї мапи. Мапа його має, але у форматі DDS, з яким читач не працює, тому перегляд малює колір неба мапи."
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -22744,11 +22743,6 @@ msgstr "Пряма добавка до сили кратерів, що заст�
 msgid "Flat impulse bonus"
 msgstr "Фіксований бонус імпульсу"
 
-#: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "flat sky"
-msgstr "пласке небо"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Flattens the ground"
@@ -23906,6 +23900,10 @@ msgstr ""
 #, fuzzy
 msgid "Generated Lua"
 msgstr "Згенерований Lua"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -50621,9 +50619,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "Не вдалося прочитати висоти цієї мапи. Тут нічого не перевірено щодо землі, тож кожна клітинка штрихова, а не чиста."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "Небо цієї мапи у форматі DDS, але це не кубічна карта, тож перегляд малює колір неба мапи."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -55709,6 +55706,10 @@ msgstr "Папка запису \"{writeRootPath}\" поза пакетом (\"{
 msgid "Write root portability n/a (not portable)"
 msgstr "Портативність папки запису не застосовується (не портативна)"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -55838,6 +55839,11 @@ msgstr "Записано моделі ({modelsWritten} з {modelsFound}) на {0
 #, fuzzy
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "Записано <0/>. Перезапустіть Coilbox, щоб завантажити його."
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy

@@ -1,4 +1,4 @@
-import type { MapinfoForm } from "./bindings";
+import type { MapAppearance, MapinfoForm } from "./bindings";
 
 /**
  * The Compile page's `mapinfo.lua` fields, held as strings so an empty field
@@ -167,4 +167,25 @@ export function countMapinfo(d: MapinfoDraft): number {
     Object.values(rest).filter((v) => v !== undefined).length +
     (startPositions ?? []).filter((p) => p !== null).length
   );
+}
+
+/**
+ * The sky the Compile page's preview shows: the source folder's `mapinfo.lua`
+ * with the page's own sky, fog and sun overriding it, the values Write
+ * mapinfo.lua puts in the compiled map. The page writes its sun colour to
+ * `atmosphere.sunColor`, so it colours the sky's sun and not the ground.
+ */
+export function withFormSky(
+  app: MapAppearance | null,
+  form: MapinfoForm,
+): MapAppearance | null {
+  if (!form.skyColor && !form.fogColor && !form.sunColor && !form.sunDir)
+    return app;
+  return {
+    ...app,
+    skyColor: form.skyColor ?? app?.skyColor,
+    fogColor: form.fogColor ?? app?.fogColor,
+    skySunColor: form.sunColor ?? app?.skySunColor,
+    sunDir: form.sunDir ?? app?.sunDir,
+  };
 }

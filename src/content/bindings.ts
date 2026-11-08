@@ -4045,6 +4045,7 @@ export interface MinimapResult {
   cloudDensity?: number;
   sunDir?: [number, number, number];
   sunColor?: [number, number, number];
+  skySunColor?: [number, number, number];
   groundAmbientColor?: [number, number, number];
   groundDiffuseColor?: [number, number, number];
   groundSpecularColor?: [number, number, number];
