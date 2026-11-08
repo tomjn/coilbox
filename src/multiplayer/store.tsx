@@ -46,6 +46,7 @@ import {
   forgetBattleMovedUnless,
   recordBattleMoved,
 } from "./battle/battleMoved";
+import { forgetJoinKey, joinKeyFor } from "./battleKeys";
 import { useSavedBattleSearches } from "./battles/savedSearch";
 import {
   type ChatMsg,
@@ -1108,6 +1109,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     (serverKey: string) => {
       stopReconnect(serverKey);
       runtimesRef.current.delete(serverKey);
+      forgetJoinKey(serverKey);
       dispatchConn({ type: "close", serverKey });
       if (roomKeyRef.current === serverKey) saveRoomKey("");
     },
@@ -1911,6 +1913,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         rt.rejoinBattle = {
           id: st.currentBattle,
           scriptPassword: me?.scriptPassword ?? null,
+          key: joinKeyFor(serverKey, st.currentBattle),
         };
       } else {
         rt.rejoinBattle = null;

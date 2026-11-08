@@ -48,6 +48,7 @@ import { useLastLogin } from "../../lobby-servers/config";
 import { getGameMatcher } from "../../profile/profile";
 import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
+import { rememberJoinKey } from "../battleKeys";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
 import {
@@ -744,6 +745,7 @@ function BattlesPage() {
       if (!battle) throw new Error(noRoomBattleFailure());
       clearJoinError(key);
       pending.current = { serverKey: key, seeded: false };
+      rememberJoinKey(key, battle.id, args.password);
       await mpJoinBattle({
         serverKey: key,
         id: battle.id,

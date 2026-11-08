@@ -415,6 +415,7 @@ export function ConnectionSession({
     mpJoinBattle({
       serverKey: activeKey,
       id: target.id,
+      key: target.key,
       // A fresh one when the server never echoed the old back: teiserver
       // refuses a JOINBATTLE that carries no script password at all.
       scriptPassword: target.scriptPassword ?? newScriptPassword(),

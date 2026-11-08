@@ -272,7 +272,12 @@ export interface ConnectionRuntime {
     direct?: boolean;
   } | null;
   /** The battle to rejoin once a reconnect reaches `ready`. */
-  rejoinBattle: { id: number; scriptPassword: string | null } | null;
+  rejoinBattle: {
+    id: number;
+    scriptPassword: string | null;
+    /** The key the join used, from `battleKeys.ts`, or null for no password. */
+    key: string | null;
+  } | null;
   /** Bumped to invalidate a running reconnect loop. */
   reconnectGen: number;
   reconnectAttempt: number;
