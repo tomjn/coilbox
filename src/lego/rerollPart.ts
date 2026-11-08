@@ -14,6 +14,10 @@
  * - Anything else (a generated shape, an imported mesh, an empty piece) has no
  *   kind to match, so there is nothing to reroll.
  *
+ * A part of the generator's deck is rerolled only to parts with a flat floor
+ * (#5140), the rule the generator picks a deck by. A unit generated before the
+ * deck was recorded rerolls its deck as any other part.
+ *
  * Either way the piece keeps its place, children, role and joins by the rules
  * of those two swaps, and a candidate that leaves a join unable to be made is
  * skipped. A module also keeps its size: the scale the old module had over its
@@ -34,7 +38,7 @@ import { t } from "@lingui/core/macro";
 import { hashString, mulberry32, pick } from "../conquest/rng";
 import type { PresetOutcome } from "./compounds";
 import { resolveConnections } from "./connectors";
-import { MAX_PART_SCALE } from "./covering";
+import { floorOf, hasFlatFloor, MAX_PART_SCALE } from "./covering";
 import { applyRoleRules } from "./generate";
 import { GENERATOR_TRIES, nextSeed } from "./generateChecked";
 import { GENERATOR_JOBS } from "./generatorJobs";
@@ -179,6 +183,27 @@ export function moduleFamily(
   );
 }
 
+/**
+ * The parts a reroll of the plain part `piece` can put in. A part of the
+ * generator's deck stands the unit on its underside, so its replacements are
+ * only those with a flat floor the way the piece lies, as the generator picks a
+ * deck (#5140). Any other part has the whole family.
+ */
+function rerollFamily(
+  project: LegoProject,
+  pack: LoadedPack,
+  piece: LegoPiece,
+  current: LegoPartInfo,
+) {
+  const family = partFamily(pack, current);
+  const deck = project.generated?.covering?.some(
+    (c) => c.piece === piece.id && c.deck,
+  );
+  if (!deck) return family;
+  const { axis, down } = floorOf(piece.rotation);
+  return family.filter((part) => hasFlatFloor(pack, part, axis, down));
+}
+
 function failed(message: string): RerollPartResult {
   return { status: "failed", message };
 }
@@ -229,7 +254,7 @@ function rerollPlain(
   if (!current) {
     return failed(t`This piece's part is not in the parts library.`);
   }
-  const family = partFamily(pack, current);
+  const family = rerollFamily(project, pack, piece, current);
   if (family.length === 0) {
     return failed(t`No other part has this part's shape and colour.`);
   }
@@ -334,7 +359,7 @@ export function rerollRefusal(
     const piece = pieceById(project, pieceId) as LegoPiece;
     const current = pack.byId.get(piece.partId as string);
     if (!current) return t`This piece's part is not in the parts library.`;
-    return partFamily(pack, current).length === 0
+    return rerollFamily(project, pack, piece, current).length === 0
       ? t`No other part has this part's shape and colour.`
       : null;
   }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { bodyPlanById } from "./bodyPlans";
+import { BODY_PLANS, bodyPlanById } from "./bodyPlans";
+import { floorOf, hasFlatFloor } from "./covering";
 import { emptyDocument, reduceDocument } from "./document";
+import { GENERATOR_JOBS, generateUnit } from "./generate";
 import { generateCheckedUnit } from "./generateChecked";
 import {
   childrenOf,
@@ -10,6 +12,7 @@ import {
   parseLegoProjectJson,
   pieceById,
 } from "./model";
+import type { LoadedPack } from "./pack";
 import { rerollUnit } from "./reroll";
 import {
   partFamily,
@@ -513,24 +516,119 @@ describe("a unit rerolled whole afterwards", () => {
   });
 
   it("keeps the part that was rerolled", () => {
-    // A rerolled part is kept whatever it does to the unit's balance, so a
-    // whole reroll can find no seed that passes with the part a game maker
-    // swapped in. The first part with one that does is the one to check.
-    const kept = unit.pieces
-      .filter((p) => p.partId && !p.module && p.id !== unit.rootPieceId)
-      .flatMap((piece) => {
-        const part = rerollPart(unit, pack, piece.id, { modules });
-        if (part.status !== "ok") return [];
-        const whole = rerollUnit(part.project, { pack, modules });
-        if (whole.status !== "ok") return [];
-        return [
-          {
-            chosen: pieceById(part.project, piece.id)?.partId,
-            after: pieceById(whole.unit, piece.id)?.partId,
-          },
-        ];
-      });
-    expect(kept.length).toBeGreaterThan(0);
-    for (const { chosen, after } of kept) expect(after).toBe(chosen);
+    const piece = partPiece(unit);
+    const part = rerollPart(unit, pack, piece.id, { modules });
+    if (part.status !== "ok") throw new Error(part.message);
+    const chosen = pieceById(part.project, piece.id)?.partId;
+    const whole = rerollUnit(part.project, { pack, modules });
+    if (whole.status !== "ok") throw new Error(whole.message);
+    expect(pieceById(whole.unit, piece.id)?.partId).toBe(chosen);
+  });
+});
+
+/** Every plan and job, at one size, as the generator makes them. */
+function everyUnit(): LegoProject[] {
+  return BODY_PLANS.flatMap((plan) =>
+    GENERATOR_JOBS.map((job) => {
+      return generateUnit(
+        { seed: 1, plan, job: job.id, size: "small" },
+        {
+          id: "unit",
+          rootPieceId: "root",
+          now: "2026-11-08T00:00:00.000Z",
+          pack,
+          modules,
+        },
+      );
+    }),
+  );
+}
+
+describe("rerolling a part of the covering", () => {
+  const units = everyUnit();
+  const covering = units.flatMap((project) =>
+    (project.generated?.covering ?? []).flatMap((entry) => {
+      const piece = pieceById(project, entry.piece);
+      return piece?.partId ? [{ project, entry, piece }] : [];
+    }),
+  );
+  const decks = covering.filter(({ entry }) => entry.deck);
+  const limbs = covering.filter(({ entry }) => !entry.deck);
+  const SEEDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+  /** Whether the piece's part, as it lies, has a flat floor. */
+  function flat(project: LegoProject, pieceId: string): boolean {
+    const piece = pieceById(project, pieceId) as LegoPiece;
+    const part = pack.byId.get(piece.partId as string);
+    if (!part) throw new Error("no part");
+    const { axis, down } = floorOf(piece.rotation);
+    return hasFlatFloor(pack, part, axis, down);
+  }
+
+  it("records which parts are a deck", () => {
+    expect(decks.length).toBeGreaterThan(0);
+    expect(limbs.length).toBeGreaterThan(0);
+    const saved = parseLegoProjectJson(JSON.stringify(decks[0]?.project));
+    expect(saved?.generated?.covering?.filter((c) => c.deck)).toEqual(
+      decks[0]?.project.generated?.covering?.filter((c) => c.deck),
+    );
+  });
+
+  it("never swaps a deck for a part with no flat floor, on any plan", () => {
+    let withoutFloor = 0;
+    for (const { project, piece } of decks) {
+      expect(flat(project, piece.id)).toBe(true);
+      const current = pack.byId.get(piece.partId as string);
+      if (!current) throw new Error("no part");
+      // The test bites only where the family has such a part to bring back.
+      const { axis, down } = floorOf(piece.rotation);
+      if (
+        partFamily(pack, current).some(
+          (p) => !hasFlatFloor(pack, p, axis, down),
+        )
+      )
+        withoutFloor++;
+      for (const seed of SEEDS) {
+        const result = rerollPart(project, pack, piece.id, { modules, seed });
+        if (result.status !== "ok") continue;
+        expect(flat(result.project, piece.id)).toBe(true);
+      }
+    }
+    expect(withoutFloor).toBeGreaterThan(0);
+  });
+
+  it("rerolls a limb as it did, whatever the deck rule", () => {
+    for (const { project, piece } of limbs) {
+      const old: LegoProject = {
+        ...project,
+        generated: project.generated && {
+          ...project.generated,
+          covering: project.generated.covering?.map(({ deck: _, ...c }) => c),
+        },
+      };
+      for (const seed of SEEDS) {
+        const now = rerollPart(project, pack, piece.id, { modules, seed });
+        const before = rerollPart(old, pack, piece.id, { modules, seed });
+        expect(now.status).toBe(before.status);
+        if (now.status === "ok" && before.status === "ok") {
+          expect(pieceById(now.project, piece.id)).toEqual(
+            pieceById(before.project, piece.id),
+          );
+        }
+      }
+    }
+  });
+
+  it("refuses a deck part with no other part that has a flat floor", () => {
+    const { project, piece } = decks[0] as (typeof decks)[number];
+    const current = pack.byId.get(piece.partId as string);
+    if (!current) throw new Error("no part");
+    const alone: LoadedPack = {
+      ...pack,
+      parts: pack.parts.filter(
+        (p) => p.id === current.id || !partFamily(pack, current).includes(p),
+      ),
+    };
+    expect(rerollRefusal(project, alone, piece.id, modules)).not.toBeNull();
   });
 });

@@ -770,19 +770,23 @@
     "covering": [
       {
         "bone": "body",
-        "piece": "unit.25"
+        "piece": "unit.25",
+        "deck": true
       },
       {
         "bone": "body",
-        "piece": "unit.26"
+        "piece": "unit.26",
+        "deck": true
       },
       {
         "bone": "body",
-        "piece": "unit.27"
+        "piece": "unit.27",
+        "deck": true
       },
       {
         "bone": "body",
-        "piece": "unit.28"
+        "piece": "unit.28",
+        "deck": true
       },
       {
         "bone": "body",
