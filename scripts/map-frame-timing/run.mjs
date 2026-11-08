@@ -6,7 +6,8 @@
 //   node scripts/map-frame-timing/run.mjs --label new --runs 1 --port 1479
 //
 // Options: --label (names the output), --runs (page loads per map),
-// --port (the vite dev server's), --perf (performance mode), --maps (comma
+// --port (the vite dev server's), --perf (performance mode), --towns (time
+// the towns' share at all six views, see README.md), --maps (comma
 // list from the table below), --out (default docs/reports/map-frame-timing),
 // --max-load (do not start a run at or above this 1 minute load average,
 // default 6) and --max-wait (seconds to wait for it to fall, default 240).
@@ -34,6 +35,7 @@ const label = args.label ?? "run";
 const runs = Number(args.runs ?? 3);
 const port = args.port ?? "1479";
 const perf = args.perf === "1";
+const towns = args.towns === "1";
 const maxLoad = Number(args["max-load"] ?? 6);
 const maxWaitMs = Number(args["max-wait"] ?? 240) * 1000;
 for (const [option, value] of Object.entries({ runs, maxLoad, maxWaitMs })) {
@@ -45,7 +47,7 @@ const maps = (args.maps ?? Object.keys(MAPS).join(",")).split(",");
 const out = args.out ?? "docs/reports/map-frame-timing";
 const session = `map-frame-timing-${label}`;
 mkdirSync(out, { recursive: true });
-const jsonl = `${out}/${label}${perf ? "-perf" : ""}.jsonl`;
+const jsonl = `${out}/${label}${perf ? "-perf" : ""}${towns ? "-towns" : ""}.jsonl`;
 
 const ab = (...a) =>
   execFileSync("agent-browser", a, {
@@ -75,7 +77,7 @@ for (const name of maps) {
       ab("close");
       process.exit(2);
     }
-    const url = `http://localhost:${port}/scripts/map-frame-timing/probe.html?${MAPS[name]}${perf ? "&perf=1" : ""}&_=${Date.now()}`;
+    const url = `http://localhost:${port}/scripts/map-frame-timing/probe.html?${MAPS[name]}${perf ? "&perf=1" : ""}${towns ? "&towns=1" : ""}&_=${Date.now()}`;
     ab("open", url);
     ab("wait", "--fn", "window.probeGo !== undefined");
     ab("eval", "window.probeGo(); 1");
@@ -87,7 +89,9 @@ for (const name of maps) {
     result.loadAfter = loadavg()[0];
     appendFileSync(jsonl, `${JSON.stringify(result)}\n`);
     console.error(
-      `${name} run ${run}: ${["far", "close", "tilt"].map((p) => `${p} ${result.frames[p].best}`).join(", ")} ms, load ${loadBefore.toFixed(2)} to ${result.loadAfter.toFixed(2)}`,
+      `${name} run ${run}: ${Object.entries(result.frames)
+        .map(([p, f]) => `${p} ${f.best}${towns ? ` (towns ${f.townMs})` : ""}`)
+        .join(", ")} ms, load ${loadBefore.toFixed(2)} to ${result.loadAfter.toFixed(2)}`,
     );
   }
 }
