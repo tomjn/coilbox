@@ -11343,7 +11343,7 @@ msgstr "Een andere eenheid heeft deze naam al"
 msgid "Answered the question at {spot}."
 msgstr "De vraag bij {spot} beantwoord."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Anti-air"
 msgstr ""
 
@@ -11760,7 +11760,7 @@ msgstr "Geluid bij aankomst"
 msgid "Arsenal"
 msgstr "Arsenaal"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Artillery"
 msgstr ""
 
@@ -11882,7 +11882,7 @@ msgstr "Vraagt het eenheidsscript vóór elke controle op eigen vuur vanaf welk 
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "Vraagt je router de poort van de ruimte en de poort van het spel {hostPort} door te sturen, zodat mensen buiten dit netwerk kunnen meedoen. Allebei, want als alleen die van de ruimte open is, komt iedereen binnen en mislukt het daarna bij het starten."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Assault"
 msgstr ""
 
@@ -13672,7 +13672,7 @@ msgstr "bouwer"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -42084,7 +42084,7 @@ msgstr "Beperken tot een set"
 msgid "Scope: {scopeText}."
 msgstr "Bereik: {scopeText}."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Scout"
 msgstr ""
 

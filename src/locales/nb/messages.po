@@ -11340,7 +11340,7 @@ msgstr "En annen enhet har allerede dette navnet"
 msgid "Answered the question at {spot}."
 msgstr "Besvarte spørsmålet ved {spot}."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Anti-air"
 msgstr ""
 
@@ -11757,7 +11757,7 @@ msgstr "Lyd ved ankomst"
 msgid "Arsenal"
 msgstr "Arsenal"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Artillery"
 msgstr ""
 
@@ -11879,7 +11879,7 @@ msgstr "Spør enhetsskriptet hvilken del det skyter fra før hver sjekk for egen
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "Ber ruteren din videresende rommets port og spillets port {hostPort} så folk utenfor dette nettverket kan bli med. Begge, fordi å åpne bare rommets port slipper alle inn og så feiler ved start."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Assault"
 msgstr ""
 
@@ -13669,7 +13669,7 @@ msgstr "bygger"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -42067,7 +42067,7 @@ msgstr "Begrens til et sett"
 msgid "Scope: {scopeText}."
 msgstr "Omfang: {scopeText}."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Scout"
 msgstr ""
 

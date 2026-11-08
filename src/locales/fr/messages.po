@@ -11268,7 +11268,7 @@ msgstr "Une autre unité porte déjà ce nom"
 msgid "Answered the question at {spot}."
 msgstr "Question répondue à {spot}."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Anti-air"
 msgstr ""
 
@@ -11683,7 +11683,7 @@ msgstr "Son d’arrivée"
 msgid "Arsenal"
 msgstr "Arsenal"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Artillery"
 msgstr ""
 
@@ -11805,7 +11805,7 @@ msgstr "Demande au script de l’unité de quelle pièce elle tire avant chaque 
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "Demande à votre routeur de rediriger le port du salon et le port du jeu {hostPort} pour que des personnes hors de ce réseau puissent rejoindre. Les deux, car n’ouvrir que celui du salon fait entrer tout le monde puis échoue au lancement."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Assault"
 msgstr ""
 
@@ -13588,7 +13588,7 @@ msgstr "constructeur"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -41795,7 +41795,7 @@ msgstr "Limiter à un ensemble"
 msgid "Scope: {scopeText}."
 msgstr "Portée : {scopeText}."
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Scout"
 msgstr ""
 

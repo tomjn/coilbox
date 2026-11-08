@@ -27,6 +27,16 @@ import { hashString, mulberry32, pick, randInt } from "../conquest/rng";
 import { type BodyPlan, planProportions, projectFromPlan } from "./bodyPlans";
 import { pieceConnectors, pieceOwnBox, resolveConnections } from "./connectors";
 import {
+  DEFAULT_SPREAD,
+  GENERATOR_JOBS,
+  type GeneratorJob,
+  type GeneratorJobDef,
+  type GeneratorSize,
+  type JobSlot,
+  type Range,
+} from "./generatorJobs";
+import { withLimits } from "./jointLimits";
+import {
   type LegoGenerated,
   type LegoPiece,
   type LegoProject,
@@ -38,123 +48,40 @@ import { worldMatrix } from "./reparent";
 import { defaultTarget, skeletonSize } from "./skeletonSize";
 import { ELMOS_PER_FOOTPRINT } from "./unitDef";
 
-export type GeneratorJob =
-  | "assault"
-  | "artillery"
-  | "scout"
-  | "builder"
-  | "antiair";
-
-export type GeneratorSize = "small" | "medium" | "large";
-
-/** One kind of module a job hangs on the unit. */
-export interface JobSlot {
-  /** Names the slot in `LegoGenerated.modules`, and seeds its rolls. */
-  id: string;
-  /** The module category it is filled from (`LegoProject.category`). */
-  category: string;
-  /** How many, rolled between the two. Only one fits on a chassis today,
-   *  because its top face is the one place a module goes. */
-  count: [number, number];
-}
-
-export interface GeneratorJobDef {
-  id: GeneratorJob;
-  label: string;
-  /** The chassis's width as a share of the unit's, rolled between the two. */
-  bulk: [number, number];
-  /** Filled in order. The first slot is the chassis the others go on. */
-  slots: JobSlot[];
-}
-
-const CHASSIS: JobSlot = { id: "chassis", category: "Chassis", count: [1, 1] };
-const WEAPON: JobSlot = { id: "weapon", category: "Turret", count: [1, 1] };
-
-/**
- * The five jobs. A minimal built-in table: #3232 moves the rules to a data
- * file and adds proportion ranges. The bulk ranges are choices, not
- * measurements: a scout carries a slimmer body than an assault unit.
- */
-export const GENERATOR_JOBS: readonly GeneratorJobDef[] = [
-  {
-    id: "assault",
-    get label() {
-      return t`Assault`;
-    },
-    bulk: [0.7, 0.9],
-    slots: [CHASSIS, WEAPON],
-  },
-  {
-    id: "artillery",
-    get label() {
-      return t`Artillery`;
-    },
-    bulk: [0.6, 0.8],
-    slots: [CHASSIS, WEAPON],
-  },
-  {
-    id: "scout",
-    get label() {
-      return t`Scout`;
-    },
-    bulk: [0.4, 0.6],
-    slots: [CHASSIS, { ...WEAPON, count: [0, 1] }],
-  },
-  {
-    id: "builder",
-    get label() {
-      return t`Builder`;
-    },
-    bulk: [0.5, 0.7],
-    slots: [CHASSIS, { id: "buildarm", category: "Arm", count: [1, 1] }],
-  },
-  {
-    id: "antiair",
-    get label() {
-      return t`Anti-air`;
-    },
-    bulk: [0.5, 0.7],
-    slots: [CHASSIS, WEAPON],
-  },
-];
+export {
+  GENERATOR_JOBS,
+  type GeneratorJob,
+  type GeneratorJobDef,
+  type GeneratorSize,
+  type JobSlot,
+} from "./generatorJobs";
 
 export interface GeneratorSizeDef {
   id: GeneratorSize;
   label: string;
-  /** Times the plan's default proportions. A choice, not a measurement. */
-  factor: number;
 }
 
+/** What each size scales is in the job (`GeneratorJobData.size`). */
 export const GENERATOR_SIZES: readonly GeneratorSizeDef[] = [
   {
     id: "small",
     get label() {
       return t`Small`;
     },
-    factor: 0.75,
   },
   {
     id: "medium",
     get label() {
       return t`Medium`;
     },
-    factor: 1,
   },
   {
     id: "large",
     get label() {
       return t`Large`;
     },
-    factor: 1.5,
   },
 ];
-
-/**
- * How far each length proportion is rolled from the plan's default, as a share
- * either way. A choice: enough that two seeds look different, small enough that
- * a unit keeps the plan's shape.
- */
-const JITTER = 0.15;
 
 /** The upper body bones a chassis goes on, best first, by bone id. A plan
  *  with none of them takes its root. */
@@ -187,23 +114,41 @@ function roll(inputs: GeneratorInputs, key: string): () => number {
 }
 
 /** `low` to `high`, from one roll. */
-function between(rng: () => number, [low, high]: [number, number]): number {
+function between(rng: () => number, [low, high]: Range): number {
   return low + (high - low) * rng();
 }
 
-/** Each proportion rolled: a length about its default times the size, a count
- *  anywhere in its range. `planProportions` holds each to its range. */
+/**
+ * Each proportion rolled. A length is its default times the job's size factor
+ * times a roll in the job's range for it (`DEFAULT_SPREAD` when the job has
+ * none), a count anywhere in its range. A proportion the job states against
+ * another is then that one's rolled value times a roll in the job's range.
+ * `planProportions` holds each to its range.
+ */
 function rollProportions(
   inputs: GeneratorInputs,
+  job: GeneratorJobDef,
   factor: number,
 ): Record<string, number> {
   const values: Record<string, number> = {};
+  const rules = job.proportions.filter((rule) =>
+    inputs.plan.proportions.some((p) => p.id === rule.id),
+  );
+  const rule = (id: string) =>
+    rules.find((r) => r.id === id && r.against === undefined);
   for (const { id, unit, min, max, fallback } of inputs.plan.proportions) {
     const rng = roll(inputs, `proportion:${id}`);
     values[id] =
       unit === "count"
         ? randInt(rng, min, max)
-        : fallback * factor * between(rng, [1 - JITTER, 1 + JITTER]);
+        : fallback * factor * between(rng, rule(id)?.range ?? DEFAULT_SPREAD);
+  }
+  for (const { id, against, range } of rules) {
+    const base = against === undefined ? undefined : values[against];
+    if (base !== undefined) {
+      values[id] =
+        base * between(roll(inputs, `proportion:${id}:against`), range);
+    }
   }
   return planProportions(inputs.plan, values);
 }
@@ -230,15 +175,24 @@ function anchorBone(project: LegoProject): LegoPiece {
   return pieceById(project, project.rootPieceId) as LegoPiece;
 }
 
-/** The library's modules in a category, in id order, so the order the library
- *  lists them in cannot change a roll. */
-function modulesIn(
+/**
+ * The library's modules a slot is filled from: those of its category carrying
+ * all its tags, or all of the category when none does. In id order, so the
+ * order the library lists them in cannot change a roll.
+ */
+function modulesFor(
   modules: readonly LegoProject[],
-  category: string,
+  slot: JobSlot,
 ): LegoProject[] {
-  return modules
-    .filter((m) => m.category === category)
+  const inCategory = modules
+    .filter((m) => m.category === slot.category)
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const tagged = inCategory.filter((m) =>
+    (slot.tags ?? []).every((tag) =>
+      m.tags?.some((own) => own.toLowerCase() === tag.toLowerCase()),
+    ),
+  );
+  return tagged.length > 0 ? tagged : inCategory;
 }
 
 /** A module's own width in elmos: its first piece's box across x. */
@@ -336,6 +290,74 @@ function scaleInstance(
   return next;
 }
 
+/**
+ * A piece lengthened by `factor` along its own y axis, with its near end where
+ * it was: a barrel is a beam centred on its position, so the centre moves out
+ * by half the added length.
+ */
+function stretchPiece(
+  project: LegoProject,
+  pack: LoadedPack,
+  pieceId: string,
+  factor: number,
+): LegoProject {
+  const piece = pieceById(project, pieceId);
+  if (!piece) return project;
+  const box = pieceOwnBox(pack, piece);
+  const half = box ? ((box.max[1] - box.min[1]) * piece.scale[1]) / 2 : 0;
+  const along = new THREE.Vector3(0, 1, 0)
+    .applyEuler(new THREE.Euler(...piece.rotation))
+    .multiplyScalar((factor - 1) * half);
+  return {
+    ...project,
+    pieces: project.pieces.map((p) =>
+      p.id === pieceId
+        ? {
+            ...p,
+            position: [
+              p.position[0] + along.x,
+              p.position[1] + along.y,
+              p.position[2] + along.z,
+            ],
+            scale: [p.scale[0], p.scale[1] * factor, p.scale[2]],
+          }
+        : p,
+    ),
+  };
+}
+
+/**
+ * The slot's rules for the pieces of one inserted module, by role: a barrel
+ * stretched, or held to an elevation. Every piece with the role gets the same
+ * roll, so a pair of barrels stays a pair. `rolls` makes a PRNG for a key.
+ */
+function applyRoleRules(
+  project: LegoProject,
+  pack: LoadedPack,
+  instance: string,
+  slot: JobSlot,
+  rolls: (key: string) => () => number,
+): LegoProject {
+  let next = project;
+  for (const [role, rule] of Object.entries(slot.roles ?? {})) {
+    const ids = next.pieces
+      .filter((p) => p.module?.instance === instance && p.role === role)
+      .map((p) => p.id);
+    const stretch =
+      rule.stretch && between(rolls(`${role}:stretch`), rule.stretch);
+    for (const id of ids) {
+      if (stretch !== undefined) next = stretchPiece(next, pack, id, stretch);
+      if (rule.pitch) {
+        next = withLimits(next, id, {
+          ...pieceById(next, id)?.limits,
+          pitch: rule.pitch,
+        });
+      }
+    }
+  }
+  return next;
+}
+
 /** The inputs in words, for the unit's notes. */
 export function describeInputs(inputs: GeneratorInputs): string {
   const seed = inputs.seed;
@@ -356,7 +378,8 @@ export function generateUnit(
   const job = GENERATOR_JOBS.find((j) => j.id === inputs.job);
   const size = GENERATOR_SIZES.find((s) => s.id === inputs.size);
   if (!job) throw new Error(`no generator job ${inputs.job}`);
-  if (!size) throw new Error(`no generator size ${inputs.size}`);
+  if (!size || !(size.id in job.size))
+    throw new Error(`no generator size ${inputs.size}`);
   // A saved unit keeps only a whole seed (`parseGenerated`), so any other
   // could not be remade.
   if (!Number.isSafeInteger(inputs.seed)) {
@@ -366,7 +389,8 @@ export function generateUnit(
   let counter = 0;
   const newId = options.newId ?? (() => `${options.id}.${++counter}`);
 
-  const proportions = rollProportions(inputs, size.factor);
+  const factor = job.size[size.id];
+  const proportions = rollProportions(inputs, job, factor);
   const jobLabel = job.label;
   const planLabel = inputs.plan.label;
   const seed = inputs.seed;
@@ -384,12 +408,12 @@ export function generateUnit(
 
   const generated: LegoGenerated["modules"] = [];
   const bulk = between(roll(inputs, "bulk"), job.bulk);
-  const width = unitWidth(inputs.plan, proportions, size.factor);
+  const width = unitWidth(inputs.plan, proportions, factor);
   let scale = 1;
   let chassisTop: string | null = null;
 
   for (const [index, slot] of job.slots.entries()) {
-    const candidates = modulesIn(options.modules, slot.category);
+    const candidates = modulesFor(options.modules, slot);
     if (candidates.length === 0) continue;
     const count = randInt(roll(inputs, `slot:${slot.id}:count`), ...slot.count);
     for (let n = 1; n <= count; n++) {
@@ -422,6 +446,12 @@ export function generateUnit(
         scale = own ? (width * bulk) / own : 1;
         chassisTop = top;
       }
+      const slotScale = isChassis
+        ? 1
+        : between(
+            roll(inputs, `slot:${slot.id}:${n}:scale`),
+            slot.scale ?? [1, 1],
+          );
       const mountId = module.mount && inserted.idMap.get(module.mount.piece);
       project = scaleInstance(
         inserted.project,
@@ -431,7 +461,12 @@ export function generateUnit(
         mountId && module.mount
           ? { piece: mountId, connector: module.mount.connector }
           : null,
-        scale,
+        scale * slotScale,
+      );
+      // Before the joins are resolved, so a joined piece that is stretched is
+      // put where its join says.
+      project = applyRoleRules(project, pack, instance, slot, (key) =>
+        roll(inputs, `slot:${slot.id}:${n}:${key}`),
       );
       project = resolveConnections(project, pack).project;
       generated.push({ slot: `${slot.id}.${n}`, module: module.id, instance });
