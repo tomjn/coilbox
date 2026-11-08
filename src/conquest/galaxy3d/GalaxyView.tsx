@@ -625,6 +625,7 @@ export function GalaxyView({
   const terrainSpec = terrainSpecOf(galaxy);
   const terrainColor = terrainPixels?.color;
   const terrainBiomes = terrainPixels?.biomes;
+  const terrainRivers = terrainPixels?.rivers;
   const { ready: terrainReady, grid: terrainHeights } = useTerrainHeights(
     terrainSpec,
     terrainPixels?.height,
@@ -755,6 +756,7 @@ export function GalaxyView({
         drawTowns,
         crossingPlan?.landLinks,
         terrainBiomes?.planet,
+        terrainRivers,
       );
       if (planned.towns) {
         towns = buildTownLayer(
@@ -1831,6 +1833,7 @@ export function GalaxyView({
     terrainColor,
     terrainExtension,
     terrainBiomes,
+    terrainRivers,
   ]);
 
   // Models added to the scene that is already built.

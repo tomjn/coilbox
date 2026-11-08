@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cheapestCells,
   type MapXY,
+  markRivers,
   markRoad,
   ROUTE_MAX_CELLS,
   roundCorners,
@@ -178,5 +179,69 @@ describe("markRoad", () => {
     expect(middle.length).toBeGreaterThan(100);
     // More than the three cells either side that count as beside a road.
     expect(nearest).toBeGreaterThan(3 * g.stepY);
+  });
+});
+
+describe("markRivers", () => {
+  it("routes a road across a river once and straight over", () => {
+    const g = routeGrid(
+      MAP,
+      MAP,
+      64,
+      1,
+      grid(() => 0.1),
+    );
+    // A river down the middle, bending left then right, 16 map units wide.
+    const course: MapXY[] = [
+      [300, 0],
+      [280, 300],
+      [340, MAP],
+    ];
+    markRivers(g, [new Float32Array(course.flatMap(([x, y]) => [x, y, 8]))]);
+    const line = routeRoad(g, [100, 200], [500, 420]);
+    const inRiver = ([px, py]: MapXY) =>
+      course.slice(1).some(([bx, by], k) => {
+        const [ax, ay] = course[k];
+        const dx = bx - ax;
+        const dy = by - ay;
+        const t = Math.max(
+          0,
+          Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)),
+        );
+        return Math.hypot(ax + dx * t - px, ay + dy * t - py) < 8;
+      });
+    // Walked a map unit at a time, since the route keeps only its corners.
+    let crossings = 0;
+    let wet = 0;
+    let was = false;
+    for (let k = 1; k < line.length; k++) {
+      const [ax, ay] = line[k - 1];
+      const [bx, by] = line[k];
+      const n = Math.ceil(Math.hypot(bx - ax, by - ay));
+      for (let j = 0; j < n; j++) {
+        const on = inRiver([
+          ax + ((bx - ax) * j) / n,
+          ay + ((by - ay) * j) / n,
+        ]);
+        if (on) wet++;
+        if (on && !was) crossings++;
+        was = on;
+      }
+    }
+    expect(crossings).toBe(1);
+    // Straight over is 16 map units. At a slant it would be well over 22.
+    expect(wet).toBeLessThanOrEqual(22);
+  });
+
+  it("leaves a grid with no rivers alone", () => {
+    const g = routeGrid(
+      MAP,
+      MAP,
+      64,
+      1,
+      grid(() => 0.1),
+    );
+    markRivers(g, []);
+    expect(g.river?.every((v) => v === 0)).toBe(true);
   });
 });

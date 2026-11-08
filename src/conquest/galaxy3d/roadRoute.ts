@@ -43,6 +43,12 @@ export interface RouteGrid {
    * {@link OUTSIDE_COST} for every step into any other.
    */
   region?: Int32Array;
+  /**
+   * 1 for a cell on or beside a river, written by {@link markRivers}. A step
+   * onto one pays {@link RIVER_COST}, so a road crosses a river once and
+   * straight across.
+   */
+  river?: Uint8Array;
 }
 
 /** The two regions a route keeps to. */
@@ -82,6 +88,13 @@ const END_CELLS = 8;
  * cuts through a third, and finite so a route always exists.
  */
 const OUTSIDE_COST = 40;
+/**
+ * The extra cost of a step onto a river, as a share of its length. Each cell
+ * of river crossed costs as much as a dozen of dry ground, so a road takes the
+ * shortest way over and never runs along one, and still crosses where it has
+ * to.
+ */
+const RIVER_COST = 12;
 
 /** True when cell `c` is in a province other than the two in `keep`. */
 function outside(grid: RouteGrid, c: number, keep?: Keep): boolean {
@@ -262,7 +275,8 @@ export function stepCost(
     GRADE_WEIGHT * grade * grade +
     HEIGHT_WEIGHT * h +
     WANDER * wander[to] +
-    BESIDE_ROAD * grid.taken[to];
+    BESIDE_ROAD * grid.taken[to] +
+    (grid.river ? RIVER_COST * grid.river[to] : 0);
   return run * (outside(grid, to, keep) ? base + OUTSIDE_COST : base);
 }
 
@@ -385,7 +399,8 @@ function heightNear(grid: RouteGrid, [x, y]: MapXY): number {
  * beside another road where it does not. A shortcut like that would carry a
  * smoothed road over a shoulder of the hill the route went round, or back
  * alongside the road it kept off. A shortcut into a province outside `keep`
- * is refused too.
+ * is refused too, and so is any across a river, so a road keeps the square
+ * crossing its route found.
  */
 function shortcutClimbs(
   grid: RouteGrid,
@@ -417,6 +432,9 @@ function shortcutClimbs(
       return true;
     }
     if (clear && grid.taken[cellAt(grid, p)]) return true;
+    // The route's cells cross a river square on, and a shortcut over one
+    // would cross at a slant.
+    if (grid.river?.[cellAt(grid, p)]) return true;
     if (outside(grid, cellAt(grid, p), keep)) return true;
   }
   return false;
@@ -487,6 +505,55 @@ export function routeRoad(
   // Rounding leaves many points along gentle curves. Thinning them to within
   // a fiftieth of a cell keeps the curve and makes the line cheap to draw.
   return simplifyLine(round, cell * 0.02);
+}
+
+/**
+ * Mark the cells on and beside each river in `rivers` for routing, given as
+ * x, y and half width triples in map units.
+ */
+export function markRivers(
+  grid: RouteGrid,
+  rivers: readonly Float32Array[],
+): void {
+  const { cols, rows, stepX, stepY } = grid;
+  const river = grid.river ?? new Uint8Array(cols * rows);
+  grid.river = river;
+  // Half a cell more than the water, so a road keeps a little off the bank.
+  const extra = Math.min(stepX, stepY) * 0.5;
+  for (const points of rivers) {
+    for (let k = 0; k + 5 < points.length; k += 3) {
+      const ax = points[k];
+      const ay = points[k + 1];
+      const bx = points[k + 3];
+      const by = points[k + 4];
+      const reach = Math.max(points[k + 2], points[k + 5]) + extra;
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      const inv = len2 === 0 ? 0 : 1 / len2;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - reach) / stepX));
+      const i1 = Math.min(
+        cols - 1,
+        Math.ceil((Math.max(ax, bx) + reach) / stepX),
+      );
+      const j0 = Math.max(0, Math.floor((Math.min(ay, by) - reach) / stepY));
+      const j1 = Math.min(
+        rows - 1,
+        Math.ceil((Math.max(ay, by) + reach) / stepY),
+      );
+      for (let j = j0; j <= j1; j++) {
+        const ry = j * stepY - ay;
+        for (let i = i0; i <= i1; i++) {
+          const rx = i * stepX - ax;
+          let t = (rx * dx + ry * dy) * inv;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const ex = dx * t - rx;
+          const ey = dy * t - ry;
+          if (ex * ex + ey * ey <= reach * reach) river[j * cols + i] = 1;
+        }
+      }
+    }
+  }
 }
 
 /**

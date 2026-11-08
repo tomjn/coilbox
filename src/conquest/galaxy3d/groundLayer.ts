@@ -10,7 +10,7 @@ import {
 import { planProvinceRoads } from "./provinceRoads";
 import { buildRoadMask, ROAD_REACH, type RoadLine } from "./roadMask";
 import { planRoads, sceneSeed } from "./roadNetwork";
-import { routeGrid } from "./roadRoute";
+import { markRivers, routeGrid } from "./roadRoute";
 import type { RoadLink } from "./roads";
 import type { HeightGrid, TerrainSurface } from "./terrain";
 
@@ -88,6 +88,11 @@ export function buildGroundLayer(
    * is a hand-made one, and gets Temperate's.
    */
   planet: PlanetId = "temperate",
+  /**
+   * The map's rivers, which roads cross at bridges: `TerrainPixels.rivers`,
+   * in pixels of `heights`.
+   */
+  rivers: readonly Float32Array[] = [],
 ): GroundLayer {
   const grid = routeGrid(
     surface.width,
@@ -96,6 +101,24 @@ export function buildGroundLayer(
     sceneSeed(galaxy),
     heights,
   );
+  if (heights && rivers.length > 0) {
+    // Pixel i of the heights is at map i / (width - 1) of the map's width,
+    // as the routing grid reads them.
+    const sx = surface.width / (heights.width - 1);
+    const sy = surface.height / (heights.height - 1);
+    markRivers(
+      grid,
+      rivers.map((course) => {
+        const out = new Float32Array(course.length);
+        for (let k = 0; k < course.length; k += 3) {
+          out[k] = course[k] * sx;
+          out[k + 1] = course[k + 1] * sy;
+          out[k + 2] = course[k + 2] * Math.max(sx, sy);
+        }
+        return out;
+      }),
+    );
+  }
   const linkRoads = planRoads(
     galaxy,
     surface.width,
