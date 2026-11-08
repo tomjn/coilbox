@@ -38,9 +38,6 @@ const cell = (rs, map, pose) => {
   };
 };
 
-console.log(
-  `view | ${names.map((n) => `${n} ms`).join(" | ")} | headroom to ${BUDGET_MS.toFixed(1)} ms (${names.at(-1)}) | load`,
-);
 // The towns' share is the best whole frame less the best with them hidden.
 const townCell = (rs, map, pose) => {
   const mine = rs.filter((r) => r.map === map && r.frames[pose]);
@@ -63,6 +60,9 @@ if (townRuns) {
   }
   console.log("");
 }
+console.log(
+  `view | ${names.map((n) => `${n} ms`).join(" | ")} | headroom to ${BUDGET_MS.toFixed(1)} ms (${names.at(-1)}) | load`,
+);
 for (const map of maps) {
   for (const pose of townRuns ? TOWN_POSES : POSES) {
     const cells = rows.map((rs) => cell(rs, map, pose));

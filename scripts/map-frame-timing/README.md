@@ -48,3 +48,11 @@ You need `agent-browser` on `PATH`. Measure with the machine quiet. `run.mjs` wi
    ```
 
 `run.mjs` takes `--maps temperate,desert,ice,cities` to measure some of them, and `--out` to write elsewhere.
+
+## The towns' share
+
+`--towns 1` times the towns and their fields on their own. It measures far, close and tilted over both the map centre and the capital, six views. In each, batches with the towns and fields shown and hidden take turns, and the towns' share is the best shown batch less the best hidden one. Output goes to `<label>-towns.jsonl`, and `summary.mjs` prints the share first.
+
+```sh
+node scripts/map-frame-timing/run.mjs --label new --runs 1 --towns 1 --maps cities,temperate
+```
