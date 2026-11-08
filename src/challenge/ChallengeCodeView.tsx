@@ -56,11 +56,11 @@ export function ChallengeCodeView({
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
-  // A link caps the code at `MAX_CODE_LENGTH`, well below what a pasted code may
-  // be, because a URL passes through software that truncates long ones. A
-  // scenario carrying dialogue clips clears the code ceiling and misses this one
-  // routinely (issue #1336), so the button goes rather than handing out a link
-  // that would not parse back.
+  // A link caps the code at `MAX_LINK_CODE_LENGTH`, well below what a pasted
+  // code may be, because Windows and Linux hand the link to Coilbox on a command
+  // line with a maximum length (issue #5150). A scenario carrying dialogue clips
+  // clears the code ceiling and misses this one routinely (issue #1336), so the
+  // button goes rather than handing out a link that would not open.
   const link = buildImportCodeLink(code);
 
   const copy = async () => {

@@ -3,8 +3,11 @@ import {
   BATTLE_PASSWORD_REFUSAL,
   battleKeyFor,
   battlePasswordProblem,
+  IMPORT_CODE_LINK_PREFIX,
   MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
+  MAX_LINK_CODE_LENGTH,
+  MAX_LINK_LENGTH,
   openScreenRoute,
   parseDeepLink,
 } from "./parse";
@@ -378,10 +381,31 @@ describe("parseDeepLink", () => {
       expect(parseDeepLink("coilbox://import").kind).toBe("invalid");
     });
 
-    it("rejects an oversized code", () => {
-      const big = "a".repeat(MAX_CODE_LENGTH + 1);
+    it("rejects a code one character over the link limit", () => {
+      const big = "a".repeat(MAX_LINK_CODE_LENGTH + 1);
       const r = parseDeepLink(`coilbox://import?code=${big}`);
       expect(r.kind).toBe("invalid");
+    });
+
+    it("accepts a code at the link limit", () => {
+      const code = "a".repeat(MAX_LINK_CODE_LENGTH);
+      const r = parseDeepLink(`coilbox://import?code=${code}`);
+      expect(r).toEqual({ kind: "import", source: { type: "code", code } });
+    });
+
+    it("fits the smallest documented command line limit", () => {
+      // Windows: 32,767 less the null, a 260 character path and 5 quoting
+      // characters. Linux allows 131,071 so Windows decides.
+      expect(MAX_LINK_LENGTH).toBe(32_767 - 1 - 260 - 5);
+      expect(MAX_LINK_CODE_LENGTH).toBe(MAX_LINK_LENGTH - 22);
+      expect(IMPORT_CODE_LINK_PREFIX.length).toBe(22);
+      const link = `${IMPORT_CODE_LINK_PREFIX}${"a".repeat(MAX_LINK_CODE_LENGTH)}`;
+      expect(link.length).toBe(MAX_LINK_LENGTH);
+    });
+
+    it("leaves the paste limit where it was", () => {
+      expect(MAX_CODE_LENGTH).toBe(128 * 1024);
+      expect(MAX_LINK_CODE_LENGTH).toBeLessThan(MAX_CODE_LENGTH);
     });
   });
 

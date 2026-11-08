@@ -17,6 +17,7 @@ import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { identify } from "../container/container";
+import { MAX_CODE_LENGTH, MAX_LINK_CODE_LENGTH } from "../deeplink/parse";
 import {
   installSettingsStorage,
   memorySettingsStorage,
@@ -322,6 +323,46 @@ describe("a project survives being closed", () => {
     const result = modProjectCode(project);
     expect(result.ok).toBe(true);
     if (result.ok) expect(parseModProjectJson(result.code)).toBeTruthy();
+  });
+
+  describe("paste limit (issue #5150)", () => {
+    // Hex does not compress below half its length, so the code grows with it.
+    const hexNoise = (length: number) => {
+      let state = 123456789;
+      return Array.from({ length }, () => {
+        state ^= state << 13;
+        state ^= state >>> 17;
+        state ^= state << 5;
+        return ((state >>> 0) % 16).toString(16);
+      }).join("");
+    };
+    const projectWithDescription = (hexChars: number) => ({
+      id: "whatever",
+      name: "Big guns",
+      description: hexNoise(hexChars),
+      gameName: "Balanced Annihilation V15.9.8",
+      edits: fullEdits(),
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    });
+
+    it("still shares as a code too long for a link", () => {
+      const result = modProjectCode(projectWithDescription(100_000));
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.code.length).toBeGreaterThan(MAX_LINK_CODE_LENGTH);
+        expect(result.code.length).toBeLessThanOrEqual(MAX_CODE_LENGTH);
+      }
+    });
+
+    it("refuses a code over the paste limit, naming that limit", () => {
+      const result = modProjectCode(projectWithDescription(400_000));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.limit).toBe(131_072);
+        expect(result.length).toBeGreaterThan(131_072);
+      }
+    });
   });
 });
 
