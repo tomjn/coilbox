@@ -117,11 +117,11 @@ vec4 gGlow = vec4(0.0);
     if (shown > 0.5) {
       float d = gDist * uRoadReach;
       float surf = idx.g;
-      // Over a river the road is a bridge, which spans a little past the
-      // water on each side.
-      float gBridge = 0.0;
+      // A road stops at a river's bank, where its bridge (bridges.ts)
+      // carries it over.
+      float gDry = 1.0;
       if (uRiverOn > 0.5) {
-        gBridge = 1.0 - smoothstep(0.01, 0.04, tRiverEdge(vTerrainUv));
+        gDry = smoothstep(-0.01, 0.01, tRiverEdge(vTerrainUv));
       }
       // Half the track's width in world units: a dirt track is the narrowest.
       float hw = mix(0.055, 0.085, surf) * (1.0 + 0.3 * uRoadSealed);
@@ -136,17 +136,15 @@ vec4 gGlow = vec4(0.0);
       }
       // Only a dirt track's edge wanders. A laid road's is straight.
       bool gTube = uRoadSealed > 0.5 && surf > 0.75;
-      bool gRuts = uRoadSealed > 0.5 && surf < 0.25 && gBridge < 0.5;
-      hw *= 1.0 + 0.45 * wob * (1.0 - surf) * (1.0 - gBridge);
-      // A bridge's deck is a little wider than the road it carries.
-      hw *= 1.0 + 0.3 * gBridge;
+      bool gRuts = uRoadSealed > 0.5 && surf < 0.25;
+      hw *= 1.0 + 0.45 * wob * (1.0 - surf);
       // Never thinner than a pixel and a half, and fainter when held there,
       // so a far road reads as a fine line and not a band.
       float hwMin = 0.75 * gFoot;
       float hwE = max(hw, hwMin);
       float soft = max(hw * 0.3, gFoot * 0.7);
       float cover = 1.0 - smoothstep(hwE - soft, hwE + soft, d);
-      cover *= mix(1.0, 0.7, smoothstep(hw, hw * 2.5, hwMin)) * gFade;
+      cover *= mix(1.0, 0.7, smoothstep(hw, hw * 2.5, hwMin)) * gFade * gDry;
 
       vec3 track = surf < 0.5 ? mix(uRoadTone[0], uRoadTone[1], surf * 2.0) : mix(uRoadTone[1], uRoadTone[2], surf * 2.0 - 1.0);
       track *= 1.0 + grain * 0.35 * (gTube ? 0.0 : 1.0);
@@ -158,22 +156,10 @@ vec4 gGlow = vec4(0.0);
       }
       // Worn ground beside the track, paler and drier than what grows there.
       // Nothing grows beside a sealed planet's, so it has none.
-      float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover) * (1.0 - uRoadSealed) * (1.0 - gBridge);
+      float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover) * (1.0 - uRoadSealed) * gDry;
       vec3 worn = mix(albedo, track * 0.85 + albedo * 0.15, 0.35);
       albedo = mix(albedo, worn, verge * 0.55 * tKeep(0.2, gFoot) * gFade);
-      if (gBridge > 0.0) {
-        // A bridge: a deck of the road's own stone with a dark parapet along
-        // each side, and its shadow on the water beside it.
-        track = mix(track, vec3(0.32, 0.29, 0.25), 0.6 * gBridge);
-        float shadow = smoothstep(hwE, hwE + gFoot, d) * (1.0 - smoothstep(hwE + 0.03, hwE + 0.08 + gFoot, d));
-        albedo *= 1.0 - 0.6 * shadow * gBridge * gFade;
-      }
       albedo = mix(albedo, track, cover * 0.95);
-      if (gBridge > 0.0) {
-        float railW = max(0.014, gFoot * 0.8);
-        float rail = 1.0 - smoothstep(railW * 0.5, railW * 0.5 + gFoot, abs(d - hwE + railW));
-        albedo = mix(albedo, vec3(0.05, 0.045, 0.04), rail * gBridge * gFade * 0.9);
-      }
       // A line down the middle of a surfaced road.
       if (uRoadSealed < 0.5) {
         float lineW = hw * 0.1;
@@ -182,7 +168,7 @@ vec4 gGlow = vec4(0.0);
 
       // A slight cut: the ground falls into the track at its edges, so one
       // side catches the sun and the other is in shade.
-      float keepCut = tKeep(0.12, gFoot);
+      float keepCut = tKeep(0.12, gFoot) * gDry;
       if (keepCut > 0.0) {
         vec2 texelW = uGroundFrame.zw / uRoadMaskSize;
         vec2 du = vec2(1.0 / uRoadMaskSize.x, 0.0);

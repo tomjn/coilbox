@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import { type PlanetId, planetOf } from "../planets";
+import { type BridgeLayer, buildBridges, findCrossings } from "./bridges";
 import {
   type GroundShading,
   ROAD_MODE,
@@ -53,6 +54,11 @@ export interface GroundLayer {
   setRoadStyle: (k: number, style: RoadStyle) => void;
   /** Send the road states to the GPU. */
   commit: () => void;
+  /**
+   * The bridges where roads cross rivers, to add to the scene. Each is
+   * hidden with its road.
+   */
+  bridges: BridgeLayer;
 }
 
 const scratch = new THREE.Color();
@@ -72,7 +78,7 @@ export function buildGroundLayer(
    * Reshape the roads and tracks before they are painted, keeping each one's
    * index, as `townsOnRoads` cuts them where they reach a town.
    */
-  shape?: (roads: RoadLine[]) => RoadLine[],
+  shape?: (roads: RoadLine[], rivers: readonly Float32Array[]) => RoadLine[],
   /**
    * Also join the towns of every two neighbouring provinces by a road. Only
    * where towns are drawn, since the roads run from town to town.
@@ -101,24 +107,23 @@ export function buildGroundLayer(
     sceneSeed(galaxy),
     heights,
   );
-  if (heights && rivers.length > 0) {
-    // Pixel i of the heights is at map i / (width - 1) of the map's width,
-    // as the routing grid reads them.
-    const sx = surface.width / (heights.width - 1);
-    const sy = surface.height / (heights.height - 1);
-    markRivers(
-      grid,
-      rivers.map((course) => {
-        const out = new Float32Array(course.length);
-        for (let k = 0; k < course.length; k += 3) {
-          out[k] = course[k] * sx;
-          out[k + 1] = course[k + 1] * sy;
-          out[k + 2] = course[k + 2] * Math.max(sx, sy);
-        }
-        return out;
-      }),
-    );
-  }
+  // The rivers in map units. Pixel i of the heights is at map
+  // i / (width - 1) of the map's width, as the routing grid reads them.
+  const courses =
+    heights && rivers.length > 0
+      ? rivers.map((course) => {
+          const sx = surface.width / (heights.width - 1);
+          const sy = surface.height / (heights.height - 1);
+          const out = new Float32Array(course.length);
+          for (let k = 0; k < course.length; k += 3) {
+            out[k] = course[k] * sx;
+            out[k + 1] = course[k + 1] * sy;
+            out[k + 2] = course[k + 2] * Math.max(sx, sy);
+          }
+          return out;
+        })
+      : [];
+  if (courses.length > 0) markRivers(grid, courses);
   const linkRoads = planRoads(
     galaxy,
     surface.width,
@@ -141,7 +146,13 @@ export function buildGroundLayer(
       index: firstExtra + j,
     })),
   ];
-  const roads = shape ? shape(planned) : planned;
+  const roads = shape ? shape(planned, courses) : planned;
+  const bridges = buildBridges(
+    disposables,
+    findCrossings(roads, courses, surface.scale),
+    surface,
+    planetOf(planet).steep[1],
+  );
   const mask = buildRoadMask(
     roads,
     surface.width,
@@ -210,8 +221,10 @@ export function buildGroundLayer(
         surface.worldDepth,
       ),
     },
+    bridges,
     setRoadStyle: (k, style) => {
       if (k < 0 || k >= planned.length) return;
+      bridges.setShown(k, style.shown);
       const top = k * 4;
       scratch.copy(style.color).convertLinearToSRGB();
       state[top] = byte(scratch.r);

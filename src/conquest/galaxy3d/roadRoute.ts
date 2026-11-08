@@ -44,9 +44,10 @@ export interface RouteGrid {
    */
   region?: Int32Array;
   /**
-   * 1 for a cell on or beside a river, written by {@link markRivers}. A step
-   * onto one pays {@link RIVER_COST}, so a road crosses a river once and
-   * straight across.
+   * 2 for a cell on a river and 1 for one on its banks, written by
+   * {@link markRivers}. A step onto one pays {@link RIVER_COST} for it, so a
+   * road crosses a river once and straight across, and runs straight over
+   * the banks either side.
    */
   river?: Uint8Array;
 }
@@ -89,12 +90,15 @@ const END_CELLS = 8;
  */
 const OUTSIDE_COST = 40;
 /**
- * The extra cost of a step onto a river, as a share of its length. Each cell
- * of river crossed costs as much as a dozen of dry ground, so a road takes the
- * shortest way over and never runs along one, and still crosses where it has
- * to.
+ * The extra cost of a step onto a river's bank and onto the river, as a share
+ * of its length. Each cell of river crossed costs as much as a dozen of dry
+ * ground, so a road takes the shortest way over and never runs along one, and
+ * still crosses where it has to. The banks cost less, enough that a road
+ * crosses them square on too, so it meets its bridge straight.
  */
-const RIVER_COST = 12;
+const RIVER_COST = [0, 3, 12];
+/** How far a river's banks reach past the water for routing, in cells. */
+const BANK_CELLS = 3;
 
 /** True when cell `c` is in a province other than the two in `keep`. */
 function outside(grid: RouteGrid, c: number, keep?: Keep): boolean {
@@ -276,7 +280,7 @@ export function stepCost(
     HEIGHT_WEIGHT * h +
     WANDER * wander[to] +
     BESIDE_ROAD * grid.taken[to] +
-    (grid.river ? RIVER_COST * grid.river[to] : 0);
+    (grid.river ? RIVER_COST[grid.river[to]] : 0);
   return run * (outside(grid, to, keep) ? base + OUTSIDE_COST : base);
 }
 
@@ -518,8 +522,10 @@ export function markRivers(
   const { cols, rows, stepX, stepY } = grid;
   const river = grid.river ?? new Uint8Array(cols * rows);
   grid.river = river;
-  // Half a cell more than the water, so a road keeps a little off the bank.
-  const extra = Math.min(stepX, stepY) * 0.5;
+  // The water reaches half a cell past the river's edge, so a road keeps a
+  // little off it. The banks reach further.
+  const cell = Math.min(stepX, stepY);
+  const extra = cell * BANK_CELLS;
   for (const points of rivers) {
     for (let k = 0; k + 5 < points.length; k += 3) {
       const ax = points[k];
@@ -549,7 +555,12 @@ export function markRivers(
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const ex = dx * t - rx;
           const ey = dy * t - ry;
-          if (ex * ex + ey * ey <= reach * reach) river[j * cols + i] = 1;
+          const d = Math.sqrt(ex * ex + ey * ey);
+          if (d > reach) continue;
+          const half = points[k + 2] + (points[k + 5] - points[k + 2]) * t;
+          const level = d <= half + cell * 0.5 ? 2 : 1;
+          const at = j * cols + i;
+          if (level > river[at]) river[at] = level;
         }
       }
     }

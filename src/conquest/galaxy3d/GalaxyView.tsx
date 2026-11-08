@@ -747,8 +747,8 @@ export function GalaxyView({
         terrainHeights,
         crossingPlan?.tracks,
         drawTowns
-          ? (roads) => {
-              const shaped = townsOnRoads(galaxy, terrain, roads);
+          ? (roads, rivers) => {
+              const shaped = townsOnRoads(galaxy, terrain, roads, rivers);
               planned.towns = shaped.towns;
               return shaped.roads;
             }
@@ -756,8 +756,11 @@ export function GalaxyView({
         drawTowns,
         crossingPlan?.landLinks,
         terrainBiomes?.planet,
-        terrainRivers,
+        // Rivers are drawn only with the detail, which performance mode
+        // leaves out, so there nothing crosses them and nothing is bridged.
+        performanceMode ? undefined : terrainRivers,
       );
+      scene.add(ground.bridges.group);
       if (planned.towns) {
         towns = buildTownLayer(
           scene,
