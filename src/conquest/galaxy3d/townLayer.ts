@@ -6,9 +6,12 @@ import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
 import type { TerrainSurface } from "./terrain";
 import type { BiomePixels } from "./terrainMesh";
-import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
+import { blockBakeMaterial, TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
   anyTexelNear,
+  BLOCK_BAKE_TEXELS,
+  blockBakeLayout,
+  blockSlotTexels,
   buildableAt,
   buildTownIndex,
   clipRoads,
@@ -55,6 +58,11 @@ export interface TownLayer {
   setTownStyle: (i: number, style: TownStyle) => void;
   /** Send the town states to the GPU. */
   commit: () => void;
+  /**
+   * Call with the renderer before each draw. The first call draws the block
+   * bake, which the town shader reads from then on.
+   */
+  prepare: (renderer: THREE.WebGLRenderer) => void;
 }
 
 /** How far along a road its direction into a town is read, in world units. */
@@ -220,7 +228,13 @@ export function buildTownLayer(
   dry.needsUpdate = true;
   const dryRgb = (biomes && dryFarmColour(biomes.planet)) ?? [0, 0, 0];
   const clearing = planetOf(biomes?.planet ?? "temperate").clearing;
+  const blocks = buildBlockBake(
+    towns,
+    settlement.style === "organic",
+    disposables,
+  );
   const shading = {
+    blocks: blocks.shading,
     settlement,
     garden: new THREE.Color().setRGB(
       clearing[0] / 255,
@@ -274,7 +288,77 @@ export function buildTownLayer(
     commit: () => {
       stateTexture.needsUpdate = true;
     },
+    prepare: blocks.draw,
   };
+}
+
+/**
+ * The block pattern of every open town, drawn once on the GPU into one
+ * picture (`blockBakeMaterial`), so the town shader looks each block up
+ * rather than searching nine cells for it (#3666). A sealed outpost has no
+ * blocks, so none is drawn.
+ */
+function buildBlockBake(
+  towns: Town[],
+  open: boolean,
+  disposables: { dispose(): void }[],
+) {
+  const layout = open
+    ? blockBakeLayout(towns)
+    : { width: 1, height: 1, slots: towns.map(() => null) };
+  const target = new THREE.WebGLRenderTarget(layout.width, layout.height, {
+    depthBuffer: false,
+    generateMipmaps: false,
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+  });
+  const slots = exact(
+    new THREE.DataTexture(
+      blockSlotTexels(layout.slots),
+      Math.max(1, towns.length),
+      2,
+      THREE.RGBAFormat,
+      THREE.FloatType,
+    ),
+  );
+  const ready = { value: 0 };
+  disposables.push(target, slots);
+  // A quad a town, its corners at the texels its square covers.
+  const placed = layout.slots.filter((s) => s !== null);
+  let pending = placed.length > 0;
+  const draw = (renderer: THREE.WebGLRenderer) => {
+    if (!pending) return;
+    pending = false;
+    const position = new Float32Array(placed.length * 18);
+    const slot = new Float32Array(placed.length * 24);
+    placed.forEach((s, k) => {
+      const side = s.cells * BLOCK_BAKE_TEXELS;
+      const [x0, y0, x1, y1] = [s.x, s.y, s.x + side, s.y + side];
+      position.set(
+        [x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y0, 0, x1, y1, 0, x0, y1, 0],
+        k * 18,
+      );
+      for (let v = 0; v < 6; v++)
+        slot.set([s.x, s.y, s.base[0], s.base[1]], k * 24 + v * 4);
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(position, 3));
+    geo.setAttribute("slot", new THREE.BufferAttribute(slot, 4));
+    const mat = blockBakeMaterial(layout.width, layout.height);
+    const mesh = new THREE.Mesh(geo, mat);
+    // Placed in the picture by the vertex shader, not the camera.
+    mesh.frustumCulled = false;
+    const scene = new THREE.Scene();
+    scene.add(mesh);
+    const previous = renderer.getRenderTarget();
+    renderer.setRenderTarget(target);
+    renderer.render(scene, new THREE.OrthographicCamera());
+    renderer.setRenderTarget(previous);
+    geo.dispose();
+    mat.dispose();
+    ready.value = 1;
+  };
+  return { shading: { bake: target.texture, slots, ready }, draw };
 }
 
 /**
