@@ -346,6 +346,80 @@ vec4 wBlocks(vec2 x, out vec2 mid, out float cell) {
   return vec4(md, bn, tHash(other + ip + mg + 1.7));
 }
 
+// As wBlocks, for x and for the points d1 and d2 away from it, all from the
+// one search: the edges of x's block are the same for any point inside it,
+// so only the distances to them change. in1 and in2 say whether each point
+// lies inside the block, and one that does not needs a search of its own.
+void wBlocks3(vec2 x, vec2 d1, vec2 d2, out vec4 b0, out vec4 b1, out vec4 b2, out vec2 mid0, out vec2 mid1, out vec2 mid2, out float cell, out bool in1, out bool in2) {
+  vec2 ip = floor(x);
+  vec2 fp = fract(x);
+  vec2 mg = vec2(0.0);
+  vec2 mr = vec2(0.0);
+  float md = 8.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      vec2 r = g + 0.2 + tHash2(ip + g) * 0.6 - fp;
+      float d = dot(r, r);
+      if (d < md) {
+        md = d;
+        mr = r;
+        mg = g;
+      }
+    }
+  }
+  float m0 = 8.0;
+  float m1 = 8.0;
+  float m2 = 8.0;
+  vec2 n0 = vec2(1.0, 0.0);
+  vec2 n1 = n0;
+  vec2 n2 = n0;
+  vec2 o0 = vec2(0.0);
+  vec2 o1 = o0;
+  vec2 o2 = o0;
+  mid0 = vec2(0.0);
+  mid1 = vec2(0.0);
+  mid2 = vec2(0.0);
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = mg + vec2(float(i), float(j));
+      vec2 r = g + 0.2 + tHash2(ip + g) * 0.6 - fp;
+      vec2 dr = r - mr;
+      if (dot(dr, dr) > 1e-5) {
+        vec2 nn = normalize(dr);
+        vec2 h = 0.5 * (mr + r);
+        float d = dot(h, nn);
+        if (d < m0) {
+          m0 = d;
+          n0 = nn;
+          mid0 = h;
+          o0 = ip + g;
+        }
+        float e1 = d - dot(d1, nn);
+        if (e1 < m1) {
+          m1 = e1;
+          n1 = nn;
+          mid1 = h - d1;
+          o1 = ip + g;
+        }
+        float e2 = d - dot(d2, nn);
+        if (e2 < m2) {
+          m2 = e2;
+          n2 = nn;
+          mid2 = h - d2;
+          o2 = ip + g;
+        }
+      }
+    }
+  }
+  cell = tHash(ip + mg + 0.37);
+  b0 = vec4(m0, n0, tHash(o0 + ip + mg + 1.7));
+  b1 = vec4(m1, n1, tHash(o1 + ip + mg + 1.7));
+  b2 = vec4(m2, n2, tHash(o2 + ip + mg + 1.7));
+  in1 = m1 >= 0.0;
+  in2 = m2 >= 0.0;
+}
+
 // How high a building stands, in world units. More than a house is to its
 // plot, so that it reads from as far off as the map is seen. A first guess.
 const float W_HIGH = 0.035;
@@ -370,22 +444,38 @@ struct WLot {
   float v;
 };
 
-WLot wLotAt(vec2 q, float dens, float capital, float foot) {
-  WLot lot;
-  // Streets curve, so the blocks are bent a little.
+// Where a point of the town's own frame lies in the block pattern (wBlocks).
+// Streets curve, so the blocks are bent a little.
+vec2 wBlockAt(vec2 q) {
   vec2 warp = vec2(tNoise(q * 0.9 + wTSeed * 13.0).x, tNoise(q * 0.9 + wTSeed * 29.0 + 5.0).x) - 0.5;
-  vec2 bMid;
-  vec4 blk = wBlocks((q + warp * 0.35) / W_BLOCK + wTSeed * 101.0, bMid, lot.cell);
+  return (q + warp * 0.35) / W_BLOCK + wTSeed * 101.0;
+}
+
+// How much of an estate of sheds stands at q: a town of any size has one or
+// two out towards its edge.
+float wShedAt(vec2 q) {
+  // Small towns have none, and none stand near the middle.
+  if (wTR < 1.2 || length(q) <= 0.4 * wTR) return 0.0;
+  return smoothstep(0.75, 0.79, tNoise(q / wTR * 1.7 + wTSeed * 91.0).x) * smoothstep(0.4, 0.6, length(q) / wTR) * step(1.2, wTR);
+}
+
+// Whether the plot at q is one of a large town's tall blocks: the middle of
+// one is built in those, not houses.
+float wTallAt(float dens, float shed) {
+  return smoothstep(0.8, 0.95, dens) * step(2.2, wTR) * (1.0 - shed);
+}
+
+// The plot at q, from what wBlocks found there and wShedAt.
+WLot wLotOf(vec2 q, vec4 blk, vec2 bMid, float cell, float shed, float dens, float capital, float foot) {
+  WLot lot;
+  lot.cell = cell;
   lot.e = blk.x * W_BLOCK;
   float sw = mix(0.007, 0.011, dens);
   // Buildings side by side along each street, in a front row and, nearer
   // the middle of town, rows behind it.
   vec2 tang = vec2(-blk.z, blk.y);
-  // The middle of a large town is built in tall blocks, not houses, and a
-  // town of any size has an estate of sheds or two out towards its edge.
-  float out_ = length(q) / wTR;
-  lot.shed = smoothstep(0.75, 0.79, tNoise(q / wTR * 1.7 + wTSeed * 91.0).x) * smoothstep(0.4, 0.6, out_) * step(1.2, wTR);
-  lot.tall = smoothstep(0.8, 0.95, dens) * step(2.2, wTR) * (1.0 - lot.shed);
+  lot.shed = shed;
+  lot.tall = wTallAt(dens, shed);
   float big = lot.tall * 0.8 + lot.shed * 1.8;
   float lotW = W_LOT * mix(0.85, 1.25, fract(blk.w * 13.7)) * (1.0 + 0.15 * capital) * (1.0 + big);
   float depth = W_LOT * mix(0.85, 1.2, fract(blk.w * 7.3)) * (1.0 + 0.6 * big);
@@ -520,7 +610,50 @@ void main() {
 #if W_STYLE == 0
   float keepBlock = clamp((W_BLOCK / gFoot - 4.0) / 4.0, 0.0, 1.0);
   if (keepBlock > 0.0 && dens > 0.004) {
-    WLot base = wLotAt(q, dens, w1.z, gFoot);
+    // Once single roofs are fully drawn the grain is never seen.
+    float keepLot = clamp((W_LOT / gFoot - 1.5) / 2.0, 0.0, 1.0);
+    vec2 x0 = wBlockAt(q);
+    float shed0 = wShedAt(q);
+    vec4 b0;
+    vec2 mid0;
+    float cell0;
+    // Close in, the roof seen over this point and the roof whose shadow
+    // falls on it are looked up a little away, along the line of sight and
+    // towards the sun (below). One search of the blocks serves all three
+    // while they lie in the same block.
+    vec2 lift = vec2(0.0);
+    vec2 sunQ = vec2(1.0, 0.0);
+    vec2 qTop = q;
+    vec2 qShadow = q;
+    WLot top;
+    WLot shadow;
+    if (keepLot > 0.0) {
+      vec3 toEye = normalize(cameraPosition - vPos);
+      lift = vec2(dot(toEye.xz, wAlong), dot(toEye.xz, wAcross)) / max(toEye.y, 0.3);
+      sunQ = normalize(vec2(dot(uSun.xz, wAlong), dot(uSun.xz, wAcross)));
+      // Tall blocks stand three times a house's height.
+      float high = W_HIGH * (1.0 + 2.0 * wTallAt(dens, shed0));
+      qTop = q + lift * high;
+      qShadow = q + sunQ * high * 1.3;
+      vec2 xTop = wBlockAt(qTop);
+      vec2 xShadow = wBlockAt(qShadow);
+      vec4 bT;
+      vec4 bS;
+      vec2 midT;
+      vec2 midS;
+      bool inT;
+      bool inS;
+      wBlocks3(x0, xTop - x0, xShadow - x0, b0, bT, bS, mid0, midT, midS, cell0, inT, inS);
+      float cellT = cell0;
+      float cellS = cell0;
+      if (!inT) bT = wBlocks(xTop, midT, cellT);
+      if (!inS) bS = wBlocks(xShadow, midS, cellS);
+      top = wLotOf(qTop, bT, midT, cellT, wShedAt(qTop), dens, w1.z, gFoot);
+      shadow = wLotOf(qShadow, bS, midS, cellS, wShedAt(qShadow), dens, w1.z, gFoot);
+    } else {
+      b0 = wBlocks(x0, mid0, cell0);
+    }
+    WLot base = wLotOf(q, b0, mid0, cell0, shed0, dens, w1.z, gFoot);
     float e = base.e;
     float swE = max(mix(0.007, 0.011, dens), gFoot * 0.4);
     float street = (1.0 - smoothstep(swE - gFoot * 0.5, swE + gFoot * 0.5, e)) * smoothstep(0.2, 0.45, dens) * 0.7;
@@ -535,8 +668,6 @@ void main() {
     // be drawn, a grain of roof colours stands for them.
     float built = clamp(dens * 1.4 - 0.1, 0.0, 1.0) * offRoad;
     vec3 roofs = W_FAR * (0.8 + 0.4 * base.cell);
-    // Once single roofs are fully drawn the grain is never seen.
-    float keepLot = clamp((W_LOT / gFoot - 1.5) / 2.0, 0.0, 1.0);
     float keepGrain = tShow(0.08, gFoot);
     if (keepGrain > 0.0 && keepLot < 1.0) {
       vec4 speck = tCell(q / 0.08 + wSeed * 7.0);
@@ -552,13 +683,6 @@ void main() {
       // tilted camera is a little beyond the plot, and the wall facing the
       // camera shows on the rest of the plot. Each casts a shadow away
       // from the sun.
-      vec3 toEye = normalize(cameraPosition - vPos);
-      vec2 lift = vec2(dot(toEye.xz, wAlong), dot(toEye.xz, wAcross)) / max(toEye.y, 0.3);
-      vec2 sunQ = normalize(vec2(dot(uSun.xz, wAlong), dot(uSun.xz, wAcross)));
-      // Tall blocks stand three times a house's height.
-      float high = W_HIGH * (1.0 + 2.0 * base.tall);
-      WLot top = wLotAt(q + lift * high, dens, w1.z, gFoot);
-      WLot shadow = wLotAt(q + sunQ * high * 1.3, dens, w1.z, gFoot);
       float roofA = top.house * offRoad;
       float wallA = base.house * offRoad * (1.0 - roofA);
       float shadeA = shadow.house * offRoad;
@@ -622,20 +746,6 @@ void main() {
   float sown = (1.0 - smoothstep(0.45, 1.0, fd + rag * 0.3)) * smoothstep(0.85, 1.1, rr) * farm;
   sown *= smoothstep(0.1, 0.16, roadD);
   if (uLayer < 0.5 && sown > 0.004) {
-    vec2 bend = vec2(tNoise(q * 0.35 + wSeed * 3.0).x, tNoise(q * 0.35 + wSeed * 9.0 + 4.0).x) - 0.5;
-    vec2 fq = q + bend * 0.9;
-    float rowH = W_PLOT * 0.8;
-    float row = floor(fq.y / rowH);
-    float rowHash = tHash(vec2(row, wSeed * 71.0));
-    float plotW = W_PLOT * mix(0.8, 2.0, rowHash);
-    float along = fq.x / plotW + rowHash * 13.0;
-    vec2 plot = vec2(floor(along), row);
-    float ph = tHash(plot + wSeed * 17.0);
-    float ph2 = tHash(plot * 1.7 + wSeed * 5.0 + 0.3);
-    // Distance to the plot's edge, in world units.
-    float fa = fract(along);
-    float fr = fract(fq.y / rowH);
-    float border = min(min(fa, 1.0 - fa) * plotW, min(fr, 1.0 - fr) * rowH);
     // Plots fade to their average once they are a few pixels across, so a
     // distant patchwork never shimmers.
     float keepPlot = clamp((W_PLOT / gFoot - 2.0) / 4.0, 0.0, 1.0);
@@ -643,53 +753,75 @@ void main() {
     // tight up to a hard edge, where wetter country's fields thin out.
     float arid = texture(uDryFarm, uv).r;
     float packed = mix(sown, smoothstep(0.08, 0.2, sown), arid);
-    float sowThis = mix(min(1.0, packed * 1.2), step(ph, packed * 1.7), keepPlot);
-    vec3 crop = wCropTone(ph2);
-    vec3 cropMean = W_CROP_MEAN;
-    if (arid > 0.01) {
-      // Irrigated crops, bare and fallow plots, groves and vines.
-      vec2 inPlot = vec2(fa * plotW, fr * rowH);
-      vec3 dry = W_DRYPLOUGH;
-      if (ph2 < 0.22) {
-        dry = W_WET;
-      } else if (ph2 < 0.4) {
-        dry = W_WET2;
-      } else if (ph2 < 0.55) {
-        // A grove: trees in a grid on bare soil, an even tone from far off.
-        float keepTree = clamp((W_TREES / gFoot - 2.0) / 2.0, 0.0, 1.0);
-        float tree = 1.0 - smoothstep(0.2, 0.34, length(fract(inPlot / W_TREES) - 0.5));
-        dry = mix(W_SOIL, W_OLIVE, mix(0.32, tree, keepTree));
-      } else if (ph2 < 0.67) {
-        // Vines: green rows with soil between.
-        float keepVine = clamp((W_VINES / gFoot - 2.0) / 2.0, 0.0, 1.0);
-        float vine = smoothstep(-0.2, 0.3, sin((ph > 0.5 ? inPlot.x : inPlot.y) / W_VINES * 6.2832));
-        dry = mix(W_SOIL, W_VINE, mix(0.5, vine, keepVine) * 0.9);
-      } else if (ph2 < 0.82) {
-        dry = W_SOIL;
-      } else if (ph2 < 0.92) {
-        dry = W_FALLOW;
+    float sowThis = min(1.0, packed * 1.2);
+    vec3 cropMean = arid > 0.01 ? mix(W_CROP_MEAN, W_DRY_MEAN, arid) : W_CROP_MEAN;
+    vec3 crop = cropMean;
+    float hedge = 0.0;
+    vec3 hedgeCol = W_HEDGE;
+    // Faded out entirely, the plots need none of the work below.
+    if (keepPlot > 0.0) {
+      vec2 bend = vec2(tNoise(q * 0.35 + wSeed * 3.0).x, tNoise(q * 0.35 + wSeed * 9.0 + 4.0).x) - 0.5;
+      vec2 fq = q + bend * 0.9;
+      float rowH = W_PLOT * 0.8;
+      float row = floor(fq.y / rowH);
+      float rowHash = tHash(vec2(row, wSeed * 71.0));
+      float plotW = W_PLOT * mix(0.8, 2.0, rowHash);
+      float along = fq.x / plotW + rowHash * 13.0;
+      vec2 plot = vec2(floor(along), row);
+      float ph = tHash(plot + wSeed * 17.0);
+      float ph2 = tHash(plot * 1.7 + wSeed * 5.0 + 0.3);
+      // Distance to the plot's edge, in world units.
+      float fa = fract(along);
+      float fr = fract(fq.y / rowH);
+      float border = min(min(fa, 1.0 - fa) * plotW, min(fr, 1.0 - fr) * rowH);
+      sowThis = mix(sowThis, step(ph, packed * 1.7), keepPlot);
+      vec3 tone = wCropTone(ph2);
+      if (arid > 0.01) {
+        // Irrigated crops, bare and fallow plots, groves and vines.
+        vec2 inPlot = vec2(fa * plotW, fr * rowH);
+        vec3 dry = W_DRYPLOUGH;
+        if (ph2 < 0.22) {
+          dry = W_WET;
+        } else if (ph2 < 0.4) {
+          dry = W_WET2;
+        } else if (ph2 < 0.55) {
+          // A grove: trees in a grid on bare soil, an even tone from far off.
+          float keepTree = clamp((W_TREES / gFoot - 2.0) / 2.0, 0.0, 1.0);
+          float tree = 1.0 - smoothstep(0.2, 0.34, length(fract(inPlot / W_TREES) - 0.5));
+          dry = mix(W_SOIL, W_OLIVE, mix(0.32, tree, keepTree));
+        } else if (ph2 < 0.67) {
+          // Vines: green rows with soil between.
+          float keepVine = clamp((W_VINES / gFoot - 2.0) / 2.0, 0.0, 1.0);
+          float vine = smoothstep(-0.2, 0.3, sin((ph > 0.5 ? inPlot.x : inPlot.y) / W_VINES * 6.2832));
+          dry = mix(W_SOIL, W_VINE, mix(0.5, vine, keepVine) * 0.9);
+        } else if (ph2 < 0.82) {
+          dry = W_SOIL;
+        } else if (ph2 < 0.92) {
+          dry = W_FALLOW;
+        }
+        tone = mix(tone, dry, arid);
       }
-      crop = mix(crop, dry, arid);
-      cropMean = mix(cropMean, W_DRY_MEAN, arid);
+      // Furrows close in, along or across the plot.
+      float keepFurrow = tKeep(0.16, gFoot);
+      if (keepFurrow > 0.0) tone *= 1.0 + 0.07 * sin((ph > 0.5 ? fq.x : fq.y) / 0.025) * keepFurrow;
+      // Uneven growth across a plot.
+      float keepGrowth = tKeep(0.12, gFoot);
+      tone *= 0.9 + (keepGrowth > 0.0 ? 0.2 * tNoise(fq / 0.12 + ph * 31.0).x * keepGrowth : 0.0);
+      crop = mix(cropMean, tone, keepPlot);
+      // Hedges along most plot edges where fields are thick.
+      float hedgeW = max(0.014, gFoot * 0.7);
+      hedge = 1.0 - smoothstep(hedgeW * 0.5, hedgeW * 0.5 + gFoot, border);
+      hedge *= mix(step(0.2, tHash(plot * 2.3 + wSeed)), 1.0, arid) * smoothstep(0.15, 0.4, sown) * keepPlot;
+      // On dry ground most plots are edged by a pale track, and a few by a
+      // row of trees against the wind.
+      float windbreak = step(0.82, tHash(plot * 3.1 + wSeed));
+      hedgeCol = mix(W_HEDGE, W_TRACK, arid * (1.0 - windbreak));
     }
-    // Furrows close in, along or across the plot.
-    float furrow = sin((ph > 0.5 ? fq.x : fq.y) / 0.025) * tKeep(0.16, gFoot);
-    crop *= 1.0 + 0.07 * furrow;
-    // Uneven growth across a plot.
-    crop *= 0.9 + 0.2 * tNoise(fq / 0.12 + ph * 31.0).x * tKeep(0.12, gFoot);
-    crop = mix(cropMean, crop, keepPlot);
     // Dry ground is levelled before it is farmed, so the fields lie on bare
     // earth and none of the dunes show between them.
     vec4 fields = vec4(uDryGround * (0.9 + 0.2 * rag), 1.0) * smoothstep(0.0, 0.2, sown) * arid;
     fields = wOver(fields, crop, sowThis * mix(0.8, 0.96, arid));
-    // Hedges along most plot edges where fields are thick.
-    float hedgeW = max(0.014, gFoot * 0.7);
-    float hedge = 1.0 - smoothstep(hedgeW * 0.5, hedgeW * 0.5 + gFoot, border);
-    hedge *= mix(step(0.2, tHash(plot * 2.3 + wSeed)), 1.0, arid) * smoothstep(0.15, 0.4, sown) * keepPlot;
-    // On dry ground most plots are edged by a pale track, and a few by a row
-    // of trees against the wind.
-    float windbreak = step(0.82, tHash(plot * 3.1 + wSeed));
-    fields = wOver(fields, mix(W_HEDGE, W_TRACK, arid * (1.0 - windbreak)), hedge * 0.85);
+    fields = wOver(fields, hedgeCol, hedge * 0.85);
     town = town + fields * (1.0 - town.a);
   }
 #else
