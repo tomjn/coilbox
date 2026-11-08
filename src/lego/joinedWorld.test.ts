@@ -107,6 +107,25 @@ describe("JoinedGroup", () => {
     expect(child.matrixWorld.equals(expected)).toBe(true);
   });
 
+  it("keeps its own size when something asks for its world matrix alone", () => {
+    // `Box3.setFromObject` and `BoxHelper` walk the tree with
+    // `updateWorldMatrix(false, false)`, which is not `updateMatrixWorld`.
+    // Left to its default, that put the parent's scale back on a joined piece.
+    const child = tree(true);
+    child.updateWorldMatrix(false, false);
+    expect(parts(child.matrixWorld).scale.toArray()).toEqual([1, 1, 1]);
+    expect(new THREE.Vector3().setFromMatrixPosition(child.matrixWorld).x).toBe(
+      2,
+    );
+  });
+
+  it("gives the bounds of its own size, not its parent's, to a bounding box", () => {
+    const child = tree(true);
+    child.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)));
+    const box = new THREE.Box3().setFromObject(child.parent as THREE.Object3D);
+    expect(box.getSize(new THREE.Vector3()).toArray()).toEqual([1, 1, 1]);
+  });
+
   it("updates when it becomes joined", () => {
     const child = tree(false);
     child.joined = true;
