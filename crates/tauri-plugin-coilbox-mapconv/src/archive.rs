@@ -145,7 +145,9 @@ fn listed_files(root: &Path, list: &DirList) -> Vec<Wanted> {
                 if glob_matches(list.pattern.as_bytes(), name.as_bytes()) {
                     out.push((format!("{archive}/{name}"), path));
                 }
-            } else if list.recursive && path.is_dir() {
+            } else if list.recursive && e.file_type().is_ok_and(|t| t.is_dir()) {
+                // `file_type` does not follow a link, so a linked folder is
+                // skipped rather than walked.
                 walk(&path, &format!("{archive}/{name}"), list, out);
             }
         }
@@ -630,6 +632,43 @@ mod tests {
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A recursive `DirList` does not follow a folder that is a link, so a link
+    /// back up the tree cannot repeat files or loop, and a link out of the map
+    /// does not pull in files from outside it.
+    #[cfg(unix)]
+    #[test]
+    fn a_recursive_dir_list_does_not_follow_a_linked_folder() {
+        let dir = compiled_dir("dirlist-link");
+        let outside =
+            std::env::temp_dir().join(format!("mapconv_pack_{}_outside", std::process::id()));
+        let _ = std::fs::remove_dir_all(&outside);
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("secret.lua"), "return {}").unwrap();
+        std::fs::create_dir_all(dir.join("tree/deep")).unwrap();
+        std::fs::write(dir.join("tree/t.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("tree/deep/u.lua"), "return {}").unwrap();
+        std::os::unix::fs::symlink(&dir, dir.join("tree/up")).unwrap();
+        std::os::unix::fs::symlink(&outside, dir.join("tree/out")).unwrap();
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "local c = VFS.DirList(\"tree\", \"*.lua\", nil, true)\nreturn { mapfile = \"MyMap.smf\" }",
+        )
+        .unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "tree/deep/u.lua",
+                "tree/t.lua"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
     }
 
     /// A pattern with many `*` and a name that nearly matches must not take
