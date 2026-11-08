@@ -473,7 +473,13 @@ export default function ProjectsPage() {
             <Button variant="outline" onClick={() => setGenerating(true)}>
               <Dices size={16} /> <Trans>Generate</Trans>
             </Button>
-            <Button variant="outline" onClick={() => setRostering(true)}>
+            {/* A roster's names are checked against the saved units, so not
+                until those have been read. */}
+            <Button
+              variant="outline"
+              disabled={loading || error !== null}
+              onClick={() => setRostering(true)}
+            >
               <Rows3 size={16} /> <Trans>Roster</Trans>
             </Button>
             <NewUnitPopover

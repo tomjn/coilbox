@@ -149,7 +149,7 @@ export function rosterRequestProblem(
     return t`A roster has from 1 to ${max} tiers.`;
   }
   const names = new Set(saved.map((p) => p.name.trim().toLowerCase()));
-  const unitNames = new Set(saved.map((p) => p.unitName));
+  const unitNames = new Set(saved.map((p) => p.unitName.toLowerCase()));
   for (const job of request.jobs) {
     for (let tier = 1; tier <= request.tiers; tier++) {
       const name = rosterDisplayName(request.name, job, tier);

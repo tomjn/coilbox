@@ -139,6 +139,10 @@ describe("rosterRequestProblem", () => {
       { name: "Other", unitName: "raiders_assault_t1" },
     ] as unknown as LegoProject[];
     expect(rosterRequestProblem(REQUEST, sameUnit)).toMatch(/already called/);
+    const upper = [
+      { name: "Other", unitName: "RAIDERS_ASSAULT_T1" },
+    ] as unknown as LegoProject[];
+    expect(rosterRequestProblem(REQUEST, upper)).toMatch(/already called/);
   });
 
   it("refuses a request with nothing to make", () => {

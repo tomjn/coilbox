@@ -70,6 +70,14 @@ export function RosterDrawer({ open, onOpenChange, projects, onSaved }: Props) {
   /** Bumped when a texture arrives, so pictures drawn too early are redrawn. */
   const [arrivals, setArrivals] = useState(0);
 
+  // A roster left from the last visit could be saved over units since
+  // renamed or deleted, so closing forgets it.
+  useEffect(() => {
+    if (open) return;
+    setMade(null);
+    setProblem(null);
+  }, [open]);
+
   useEffect(() => {
     if (!open || pack) return;
     let live = true;

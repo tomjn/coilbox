@@ -156,8 +156,8 @@ describe("RosterDrawer", () => {
       jobs: [GENERATOR_JOBS[0].id, GENERATOR_JOBS[2].id],
     });
     expect(
-      screen.getByRole("heading", { name: GENERATOR_JOBS[0].label }),
-    ).toBeTruthy();
+      [...document.querySelectorAll("section h3")].map((h) => h.textContent),
+    ).toEqual([GENERATOR_JOBS[0].label, GENERATOR_JOBS[2].label]);
     expect(document.querySelectorAll("li")).toHaveLength(6);
     expect(screen.getByText(`raiders_${GENERATOR_JOBS[0].id}_t1`)).toBeTruthy();
   });
@@ -215,6 +215,33 @@ describe("RosterDrawer", () => {
     expect(screen.queryByRole("button", { name: "Save roster" })).toBeNull();
   });
 
+  it("forgets the roster when the drawer closes", async () => {
+    const view = render(
+      <RosterDrawer
+        open
+        onOpenChange={() => {}}
+        projects={[]}
+        onSaved={onSaved}
+      />,
+    );
+    const generate = screen.getByRole("button", { name: "Generate" });
+    await waitFor(() => expect(generate.hasAttribute("disabled")).toBe(false));
+    type("Roster name", "Raiders");
+    fireEvent.click(generate);
+    expect(screen.getByRole("button", { name: "Save roster" })).toBeTruthy();
+    const closed = (open: boolean) => (
+      <RosterDrawer
+        open={open}
+        onOpenChange={() => {}}
+        projects={[]}
+        onSaved={onSaved}
+      />
+    );
+    view.rerender(closed(false));
+    view.rerender(closed(true));
+    expect(screen.queryByRole("button", { name: "Save roster" })).toBeNull();
+  });
+
   it("hands every unit to the page to save", async () => {
     const generate = await show();
     type("Roster name", "Raiders");
@@ -223,6 +250,8 @@ describe("RosterDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save roster" }));
 
     expect(onSaved).toHaveBeenCalledTimes(1);
-    expect(onSaved.mock.calls[0][0]).toHaveLength(9);
+    expect(onSaved.mock.calls[0][0]).toEqual(
+      units(generateRoster.mock.calls[0][0]),
+    );
   });
 });
