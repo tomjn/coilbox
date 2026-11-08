@@ -103,6 +103,16 @@ describe("opening the replay page with an unverified engine", () => {
     expect(h.contentVerifyEngine).not.toHaveBeenCalled();
   });
 
+  // Issue #1340: a report that is not a plausible version is no report.
+  it.each([
+    ["blank", ""],
+    ["a hidden folder", ".spring"],
+  ])("treats an engine that reports a version that is %s as unchecked", (_name, syncVersion) => {
+    h.engines = [{ ...folderEngine, syncVersion }];
+    const { result } = renderHook(() => useReplayEngine(RECORDED));
+    expect(result.current.watch).toEqual({ kind: "verify" });
+  });
+
   it("does not count an engine that reports another version under a matching folder", () => {
     h.engines = [{ ...folderEngine, syncVersion: "104.0.1-1828-g1234567" }];
     const { result } = renderHook(() => useReplayEngine(RECORDED));

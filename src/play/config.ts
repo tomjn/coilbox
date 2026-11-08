@@ -12,7 +12,10 @@ import {
   useScanEpoch,
   useUnitsyncScan,
 } from "../content/config";
-import { compareEngineVersions } from "../content/engineVersion";
+import {
+  compareEngineVersions,
+  isRealEngineVersion,
+} from "../content/engineVersion";
 import { isSddName } from "../content/format";
 import { shareInFlight } from "../content/inFlight";
 import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
@@ -242,9 +245,11 @@ export function useReplayTarget(demoVersion: string): {
   for (const r of roots) {
     for (const e of r.engines) {
       // Only a version the engine reported counts. A folder name is not one
-      // (issue #3452), so an engine that has not reported never matches.
+      // (issue #3452), so an engine that has not reported never matches, and
+      // neither does one whose report is not a plausible version (issue #1340).
       if (
         e.syncVersion &&
+        isRealEngineVersion(e.syncVersion) &&
         compareEngineVersions(demoVersion, e.syncVersion) === 0
       ) {
         return {

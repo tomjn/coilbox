@@ -61,4 +61,16 @@ describe("RemixPanel engine stamp", () => {
     open();
     expect(screen.queryByText("Also stamp the engine version")).toBeNull();
   });
+
+  // Issue #1340: a reported version that is blank or a leaked path fragment is
+  // dropped, as the setup pack export drops it.
+  it.each([
+    ["blank", ""],
+    ["whitespace", "   "],
+    ["a hidden folder", ".spring"],
+  ])("offers no stamp for a version that is %s", (_name, syncVersion) => {
+    target.current = { engineVersion: syncVersion, syncVersion };
+    open();
+    expect(screen.queryByText("Also stamp the engine version")).toBeNull();
+  });
 });

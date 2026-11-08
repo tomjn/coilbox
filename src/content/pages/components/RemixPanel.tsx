@@ -15,6 +15,7 @@ import { useReplayTarget } from "../../../play/config";
 import { compareGameVersions } from "../../../play/installedGames";
 import { contentRewriteDemo } from "../../bindings";
 import { useUnitsyncScan } from "../../config";
+import { isRealEngineVersion } from "../../engineVersion";
 import {
   gameMatchesShortId,
   resolveReplayShortGameId,
@@ -139,8 +140,12 @@ function RemixForm({
   }, [candidates, target]);
 
   // Only a version the engine reported. Its folder name is not one, so an
-  // engine that has not been checked offers no stamp (issue #3452).
-  const engineVersion = resolved?.target.syncVersion;
+  // engine that has not been checked offers no stamp (issue #3452). Nor does one
+  // whose report is not a plausible version (issue #1340).
+  const reportedVersion = resolved?.target.syncVersion;
+  const engineVersion = isRealEngineVersion(reportedVersion)
+    ? reportedVersion?.trim()
+    : undefined;
 
   async function rewrite() {
     if (!target) return;
