@@ -46,6 +46,7 @@ import {
   mcProbe,
   mcReadMapinfo,
   mcReadSkybox,
+  mcReadTeams,
   mcSuggestSources,
   mcWriteMapinfo,
 } from "../bindings";
@@ -53,8 +54,8 @@ import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
 import {
   countMapinfo,
-  defaultMapinfoDraft,
   type MapinfoDraft,
+  readSavedMapinfo,
   toMapinfoForm,
 } from "../mapinfoForm";
 import { mapNameFromDir } from "../mapName";
@@ -136,10 +137,9 @@ export default function CompilePage() {
     ...draft.advanced,
   }));
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [mapinfo, setMapinfo] = useState<MapinfoDraft>(() => ({
-    ...defaultMapinfoDraft,
-    ...draft.mapinfo,
-  }));
+  const [mapinfo, setMapinfo] = useState<MapinfoDraft>(() =>
+    readSavedMapinfo(draft.mapinfo),
+  );
   const [showMapinfo, setShowMapinfo] = useState(false);
   const [textureInfo, setTextureInfo] = useState<{
     width: number;
@@ -267,6 +267,9 @@ export default function CompilePage() {
     try {
       const opts = buildOpts();
       const res = await mcCompile({ opts, outDir, runId, onLog });
+      // The rows are filled before the result shows, so Write mapinfo.lua is
+      // never pressed while they still describe an earlier folder.
+      await loadTeams(outDir);
       setResult({ smfPath: res.smfPath, outDir, outSuffix: res.outSuffix });
       // Record (or refresh) this map as a project, remembering its compile
       // options. The source texture is a reliable preview for compile projects.
@@ -288,6 +291,33 @@ export default function CompilePage() {
     } finally {
       setRunning(false);
       runIdRef.current = null;
+    }
+  }
+
+  /**
+   * Fills the start position rows from the mapinfo.lua already in the folder, so
+   * a team the mapper then removes is told apart from a list never filled in.
+   * Rows the user already has are kept. A file that cannot be read leaves the
+   * rows as they are and says so, because the page then cannot tell which teams
+   * it would be removing.
+   */
+  async function loadTeams(dir: string) {
+    try {
+      const { teams } = await mcReadTeams({ outDir: dir });
+      if (teams.length === 0) return;
+      setMapinfo((m) =>
+        m.startRows !== null
+          ? m
+          : {
+              ...m,
+              startRows: teams.map((t) => ({
+                x: t ? String(t.x) : "",
+                z: t ? String(t.z) : "",
+              })),
+            },
+      );
+    } catch (e) {
+      setMapinfoError(errorText(e));
     }
   }
 
@@ -924,7 +954,7 @@ export default function CompilePage() {
             <div className="border-b border-border bg-card/50 px-4 py-3">
               <CompiledPlayability
                 smfPath={result.smfPath}
-                starts={mapinfo.startPositions
+                starts={(mapinfo.startRows ?? [])
                   .filter((p) => p.x.trim() !== "" && p.z.trim() !== "")
                   .map((p) => ({ x: Number(p.x), z: Number(p.z) }))
                   .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z))}
