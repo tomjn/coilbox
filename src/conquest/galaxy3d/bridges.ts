@@ -114,9 +114,10 @@ export function straightenOverRivers(
         const s = at[k] + (at[k + 1] - at[k]) * t;
         // A river crossed at a slant is wider along the road, so reach on
         // past both banks in any case.
+        // The half width is in map units already, the rest in world units.
         const half =
-          (Math.max(r[j + 2], r[j + 5]) * 1.6 + BRIDGE_OVERHANG + APPROACH) /
-          scale;
+          Math.max(r[j + 2], r[j + 5]) * 1.6 +
+          (BRIDGE_OVERHANG + APPROACH) / scale;
         cuts.push({ from: s - half, to: s + half });
       }
     }
