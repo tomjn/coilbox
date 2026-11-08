@@ -10,6 +10,10 @@ import { basename } from "node:path";
 
 const BUDGET_MS = 1000 / 60;
 const POSES = ["far", "close", "tilt"];
+// A --towns run's views, and the towns' share of each.
+const TOWN_POSES = ["centre", "capital"].flatMap((over) =>
+  POSES.map((p) => `${p}@${over}`),
+);
 const files = process.argv.slice(2);
 if (files.length === 0) throw new Error("give one or more .jsonl files");
 
@@ -23,7 +27,7 @@ const maps = [...new Set(rows.flat().map((r) => r.map))];
 const names = files.map((f) => basename(f, ".jsonl"));
 
 const cell = (rs, map, pose) => {
-  const mine = rs.filter((r) => r.map === map);
+  const mine = rs.filter((r) => r.map === map && r.frames[pose]);
   if (mine.length === 0) return undefined;
   const loads = mine.map((r) => r.loadBefore);
   return {
@@ -34,12 +38,37 @@ const cell = (rs, map, pose) => {
   };
 };
 
+// The towns' share is the best whole frame less the best with them hidden.
+const townCell = (rs, map, pose) => {
+  const mine = rs.filter((r) => r.map === map && r.frames[pose]);
+  if (mine.length === 0) return undefined;
+  return (
+    Math.min(...mine.map((r) => r.frames[pose].best)) -
+    Math.min(...mine.map((r) => r.frames[pose].hiddenBest))
+  );
+};
+const townRuns = rows.some((rs) => rs.some((r) => r.frames[TOWN_POSES[0]]));
+if (townRuns) {
+  console.log(`towns' share | ${names.map((n) => `${n} ms`).join(" | ")}`);
+  for (const map of maps) {
+    for (const pose of TOWN_POSES) {
+      const cells = rows.map((rs) => townCell(rs, map, pose));
+      console.log(
+        `${map} ${pose} | ${cells.map((c) => (c === undefined ? "-" : c.toFixed(2))).join(" | ")}`,
+      );
+    }
+  }
+  console.log("");
+}
 console.log(
   `view | ${names.map((n) => `${n} ms`).join(" | ")} | headroom to ${BUDGET_MS.toFixed(1)} ms (${names.at(-1)}) | load`,
 );
 for (const map of maps) {
-  for (const pose of POSES) {
+  // A plain run has the three views and a --towns run the six, so print
+  // whichever any file holds for this map.
+  for (const pose of [...POSES, ...TOWN_POSES]) {
     const cells = rows.map((rs) => cell(rs, map, pose));
+    if (!cells.some(Boolean)) continue;
     const last = cells.at(-1);
     const lo = Math.min(...cells.filter(Boolean).map((c) => c.lo));
     const hi = Math.max(...cells.filter(Boolean).map((c) => c.hi));

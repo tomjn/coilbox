@@ -2,7 +2,7 @@
 // GalaxyView on a generated land map and times one frame of the whole scene.
 // See README.md. Query:
 //   probe.html?skin=territories|cities&planet=temperate|desert|ice|...
-//             &seed=N&nodes=N&perf=1
+//             &seed=N&nodes=N&perf=1&towns=1
 import "@/index.css";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -17,6 +17,8 @@ const q = new URLSearchParams(location.search);
 const skin = (q.get("skin") ?? "territories") as "territories" | "cities";
 const planet = (q.get("planet") ?? "temperate") as PlanetId;
 const performanceMode = q.get("perf") === "1";
+// Also time each pose over both spots with the towns and fields hidden.
+const townCost = q.get("towns") === "1";
 
 const genStart = performance.now();
 const galaxy: GalaxyDoc = generateMap(
@@ -121,11 +123,11 @@ const POSES = {
 } as const;
 type PoseName = keyof typeof POSES;
 
-function pose(name: PoseName) {
+function pose(name: PoseName, over?: "centre" | "capital") {
   if (!controls || !camera || !spots) throw new Error("not ready");
   const p = POSES[name];
   const t = controls.target;
-  t.copy(spots[p.over]);
+  t.copy(spots[over ?? p.over]);
   const off = new THREE.Vector3().setFromSphericalCoords(p.dist, p.polar, 0);
   camera.position.copy(t).add(off);
   controls.update();
@@ -153,6 +155,41 @@ function still(n: number, batches: number) {
     all.push((performance.now() - t0) / n);
   }
   return { best: r2(Math.min(...all)), all: all.map(r2) };
+}
+
+// As `still`, with the towns and their fields shown and then hidden batch by
+// batch, so both see the same machine. Their cost is the difference.
+function paired(n: number, batches: number) {
+  if (!scene) throw new Error("not ready");
+  const meshes = ["towns", "fields"].flatMap((name) => {
+    const found: THREE.Object3D[] = [];
+    scene?.traverse((o) => {
+      if (o.name === name) found.push(o);
+    });
+    return found;
+  });
+  // A map or mode with nothing to hide would read as towns that cost nothing.
+  if (meshes.length === 0) throw new Error("no towns or fields to hide");
+  const show = (on: boolean) => {
+    for (const m of meshes) m.visible = on;
+  };
+  const whole: number[] = [];
+  const hidden: number[] = [];
+  for (let b = 0; b < batches; b++) {
+    show(true);
+    whole.push(still(n, 1).best);
+    show(false);
+    hidden.push(still(n, 1).best);
+  }
+  show(true);
+  const best = Math.min(...whole);
+  const hiddenBest = Math.min(...hidden);
+  return {
+    best,
+    hiddenBest,
+    townMs: r2(best - hiddenBest),
+    meshes: meshes.length,
+  };
 }
 
 const api = {
@@ -216,6 +253,16 @@ const api = {
   // The steady frame at each pose: best of `batches` batches of `n` renders.
   async frames(n = 30, batches = 6) {
     const out: Record<string, unknown> = {};
+    if (townCost) {
+      for (const over of ["centre", "capital"] as const) {
+        for (const name of Object.keys(POSES) as PoseName[]) {
+          const at = pose(name, over);
+          await sleep(100);
+          out[`${name}@${over}`] = { ...paired(n, batches), ...at };
+        }
+      }
+      return out;
+    }
     for (const name of Object.keys(POSES) as PoseName[]) {
       const at = pose(name);
       await sleep(100);
@@ -249,7 +296,16 @@ const api = {
   }
   const startup = api.startup();
   const spots = await api.settle();
-  const frames = await api.frames();
+  let frames: unknown;
+  try {
+    frames = await api.frames();
+  } catch (e) {
+    // Hand the runner the reason rather than leaving it to time out.
+    (window as unknown as { __result: unknown }).__result = JSON.stringify({
+      error: String(e),
+    });
+    return;
+  }
   (window as unknown as { __result: unknown }).__result = JSON.stringify({
     query: location.search,
     info: api.info(),
