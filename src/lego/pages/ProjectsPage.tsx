@@ -239,11 +239,12 @@ export default function ProjectsPage() {
   }
 
   /**
-   * A unit that came out of a model file, saved and opened like a new one.
+   * A unit made somewhere other than New model, saved and opened like a new
+   * one.
    *
-   * Either a project rebuilt from an export or a model imported whole. Both
-   * arrive as an ordinary document, and an imported one already has its
-   * geometry and its textures on disk.
+   * A project rebuilt from an export, a model imported whole, or a generated
+   * candidate. All arrive as an ordinary document, and an imported one already
+   * has its geometry and its textures on disk.
    */
   async function opened(project: LegoProject) {
     setOpening(false);
