@@ -1,12 +1,21 @@
 import { select, t } from "@lingui/core/macro";
 import { generateCities } from "./cities";
 import { erodeLand } from "./displayErosion";
+import { playExtentFor } from "./galaxy3d/layout";
 import { terrainMarginPixels } from "./galaxy3d/terrain";
 import type { TerrainPixels } from "./galaxy3d/terrainLoad";
 import { type GenerateOptions, type GenMap, generateGalaxy } from "./generate";
 import type { GalaxyDoc, MapSkin } from "./model";
 import type { ConquestNames } from "./names";
 import { planetOf } from "./planets";
+import {
+  carveRiverValleys,
+  findRivers,
+  halfDryness,
+  riverFieldPixels,
+  riverFieldSize,
+  widenForField,
+} from "./rivers";
 import { extendTerrain, TERRAIN_PIXELS } from "./terrainGen";
 import { generatedTerrainWithMargin, generateTerritories } from "./territories";
 
@@ -156,10 +165,45 @@ export function generatedTerrainPixels(
   const wide = extendTerrain(terrain, built.margin);
   // Shading only: the heights above stay the pinned ones. A cratered world is
   // dry, and gullies would cut through the rims.
-  const eroded = planetOf(terrain.planet).craters
+  const planet = planetOf(terrain.planet);
+  const eroded = planet.craters
     ? undefined
     : erodeLand(wide.relief, wide.width, wide.height, doc.generated?.seed ?? 0);
-  const relief = eroded?.relief ?? wide.relief;
+  let relief = eroded?.relief ?? wide.relief;
+  // Rivers down the channels the erosion cut, on a world that has them, each
+  // in a valley of its own. The sheet's world units a pixel, as the view
+  // lays the map out.
+  let rivers: NonNullable<TerrainPixels["extension"]>["rivers"];
+  if (planet.rivers && eroded?.network) {
+    const perPixel = playExtentFor(doc.nodes.length) / (width - 1);
+    const lines = findRivers(
+      eroded.network,
+      planet.rivers.drained,
+      halfDryness(
+        wide.biomes.a,
+        wide.biomes.b,
+        wide.width,
+        wide.height,
+        planet,
+      ),
+    );
+    widenForField(
+      lines,
+      riverFieldSize(wide.width, wide.height, perPixel).texel,
+    );
+    relief = carveRiverValleys(
+      relief,
+      wide.width,
+      wide.height,
+      lines,
+      perPixel,
+    );
+    rivers = {
+      lines,
+      field: riverFieldPixels(lines, wide.width, wide.height, perPixel),
+      look: planet.rivers.look,
+    };
+  }
   return {
     color: { data: terrain.image, width, height },
     height: { data: terrain.heightmap, width, height },
@@ -170,6 +214,7 @@ export function generatedTerrainPixels(
       heights: { data: wide.heights, width: wide.width, height: wide.height },
       relief: { data: relief, width: wide.width, height: wide.height },
       drainage: eroded?.drainage,
+      rivers,
       biomes: {
         ...wide.biomes,
         width: wide.width,

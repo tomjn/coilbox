@@ -130,6 +130,12 @@ export interface Planet {
     crossing: "lane" | "solid" | "none";
   };
   craters: boolean;
+  /**
+   * Rivers on the land: running water, or frozen over. `drained` is how many
+   * half resolution cells' rain must drain through a channel before it is a
+   * river, so a higher number means fewer. None when left out.
+   */
+  rivers?: { look: "water" | "frozen"; drained: number };
   settlement: Settlement;
 }
 
@@ -224,6 +230,7 @@ const TEMPERATE: Planet = {
     crossing: "lane",
   },
   craters: false,
+  rivers: { look: "water", drained: 420 },
   settlement: {
     style: "organic",
     domes: 0,
@@ -284,6 +291,7 @@ const DESERT: Planet = {
     crossing: "lane",
   },
   craters: false,
+  rivers: { look: "water", drained: 420 },
   settlement: {
     style: "organic",
     domes: 0,
@@ -335,6 +343,7 @@ const ICE: Planet = {
     crossing: "solid",
   },
   craters: false,
+  rivers: { look: "frozen", drained: 800 },
   settlement: {
     style: "organic",
     domes: 0,
