@@ -91,7 +91,9 @@ for (const name of maps) {
     console.error(
       `${name} run ${run}: ${Object.entries(result.frames)
         .map(([p, f]) => `${p} ${f.best}${towns ? ` (towns ${f.townMs})` : ""}`)
-        .join(", ")} ms, load ${loadBefore.toFixed(2)} to ${result.loadAfter.toFixed(2)}`,
+        .join(
+          ", ",
+        )} ms, load ${loadBefore.toFixed(2)} to ${result.loadAfter.toFixed(2)}`,
     );
   }
 }
