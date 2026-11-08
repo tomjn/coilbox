@@ -763,7 +763,10 @@ mod tests {
         assert_eq!(v["mapfile"], "mymap.smf");
         assert_eq!(v["smf"]["maxheight"], 480);
         assert!(!v.as_object().unwrap().contains_key("lighting"));
-        assert_eq!(std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap(), OWN_INFO);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap(),
+            OWN_INFO
+        );
     }
 
     #[test]
