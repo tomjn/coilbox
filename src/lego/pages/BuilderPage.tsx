@@ -15,6 +15,7 @@ import {
   ImageIcon,
   Maximize2,
   Minimize2,
+  Palette,
   PanelRightClose,
   PanelRightOpen,
   Plus,
@@ -105,6 +106,7 @@ import {
 } from "../environment";
 import { fitPlan } from "../fitPlan";
 import { checkFootprint, footprintProblems } from "../footprint";
+import { useGeneratorStyles } from "../generatorStyles";
 import {
   applyGroupTransform,
   type PieceTransform,
@@ -229,6 +231,7 @@ import { applyProportions, resetToPlan } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
 import type { Vec3 } from "../snapping";
 import { starterModules } from "../starterModules";
+import { styleFromUnit } from "../styleFromUnit";
 import { swapModule, swapRefusal } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { upgradeChainProblems } from "../upgradeChain";
@@ -1900,6 +1903,29 @@ function Builder({ id }: { id: string | undefined }) {
     }
   }
 
+  const generatorStyles = useGeneratorStyles();
+  /** Keep a style made from this unit beside the ones made by hand (#3238). */
+  function createStyle() {
+    if (!draft || !pack) return;
+    const result = styleFromUnit(draft, pack);
+    if (result.status === "refused") {
+      void notify({
+        title: t`Create a style`,
+        body: result.message,
+        level: "error",
+      });
+      return;
+    }
+    const unitName = draft.name;
+    const name = t`${unitName} style`;
+    generatorStyles.copy({ id: "", name, ...result.style });
+    void notify({
+      title: t`Created a style`,
+      body: t`It is in the style list under Generate on the Projects page.`,
+      level: "success",
+    });
+  }
+
   const rerollSeed = draft?.generated?.seed ?? 0;
   function reroll() {
     if (!draft || !pack) return;
@@ -3106,11 +3132,22 @@ function Builder({ id }: { id: string | undefined }) {
                     <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       <Trans>Pieces</Trans>
                     </h2>
-                    {pack && draft.generated ? (
+                    {pack ? (
                       <Button
                         size="sm"
                         variant="ghost"
                         className="ml-auto"
+                        onClick={createStyle}
+                        aria-label={t`Create a style from this unit`}
+                        title={t`Create a generator style from this unit's colours, shapes, proportions and number of parts`}
+                      >
+                        <Palette size={14} />
+                      </Button>
+                    ) : null}
+                    {pack && draft.generated ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={reroll}
                         aria-label={t`Reroll`}
                         title={t`Reroll the parts that are not locked. Seed ${rerollSeed}`}
@@ -3122,7 +3159,6 @@ function Builder({ id }: { id: string | undefined }) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className={draft.generated ? undefined : "ml-auto"}
                         onClick={addArm}
                         aria-label={t`Add a build arm`}
                         title={t`Add a build arm with its nozzle and nano point, and the build presets`}
@@ -3144,11 +3180,7 @@ function Builder({ id }: { id: string | undefined }) {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className={
-                        pack && (!draft.imported || draft.generated)
-                          ? undefined
-                          : "ml-auto"
-                      }
+                      className={pack ? undefined : "ml-auto"}
                       onClick={addEmpty}
                       title={t`Add an empty piece, which is how flares and aim points are made`}
                     >

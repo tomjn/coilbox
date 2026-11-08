@@ -7265,6 +7265,10 @@ msgstr "Jednostka {unitName} nie ustawia {explosionField}, więc przy samozniszc
 msgid "{unitName} sets no {explosionField}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing."
 msgstr "Jednostka {unitName} nie ustawia {explosionField}, więc silnik używa pustej definicji NOWEAPON i jednostka nie wybucha niczym."
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "{unitName} style"
+msgstr ""
+
 #: src/scenario/pages/components/teams.ts
 #, fuzzy
 msgid "{units, plural, one {# start unit} other {# start units}}"
@@ -18185,6 +18189,10 @@ msgstr "Utwórz konto bota"
 msgid "Create a bounce effect"
 msgstr "Utwórz efekt odbicia"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a generator style from this unit's colours, shapes, proportions and number of parts"
+msgstr ""
+
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
 msgid "Create a lobby"
@@ -18194,6 +18202,14 @@ msgstr "Utwórz lobby"
 #, fuzzy
 msgid "Create a new account"
 msgstr "Utwórz nowe konto"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a style"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a style from this unit"
+msgstr ""
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -18289,6 +18305,10 @@ msgstr "Utwórz pierwszego admina albo ustaw kontu poziom <0>fresh</0> lub <1>ag
 #. placeholder {0}: mapinfoResult.path
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Created <0>{0}</0>"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Created a style"
 msgstr ""
 
 #: src/lego/scriptPlayback.ts
@@ -26704,6 +26724,10 @@ msgstr "Zostanie ponownie przekonwertowany z BOS gry. Zmiany wprowadzone od tego
 #, fuzzy
 msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr "Zostanie skopiowany do {destDir}. Otwarty plik zostaje na miejscu."
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "It is in the style list under Generate on the Projects page."
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -51608,6 +51632,10 @@ msgstr "Ta jednostka nie ma eksplozji przy zniszczeniu."
 msgid "This unit has no game, so its effects are drawn as a plain round sprite."
 msgstr "Ta jednostka nie ma gry, więc jej efekty są rysowane jako zwykły okrągły sprite."
 
+#: src/lego/styleFromUnit.ts
+msgid "This unit has no parts to make a style from."
+msgstr ""
+
 #: src/lego/pages/components/WorthSection.tsx
 #, fuzzy
 msgid "This unit has no parts, so there is nothing to total."
@@ -51664,6 +51692,10 @@ msgstr ""
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "Tę jednostkę zbudowano na paczce \"{builtAgainst}\", która nie jest zainstalowana."
+
+#: src/lego/styleFromUnit.ts
+msgid "This unit was imported from a game model, so it has no parts to make a style from."
+msgstr ""
 
 #: src/lego/reroll.ts
 msgid "This unit was not generated."
