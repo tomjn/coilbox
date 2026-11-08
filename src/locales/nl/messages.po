@@ -9311,6 +9311,10 @@ msgstr "Een zoekopdracht"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "Een doorzichtige zee op y = 0, om te zien hoe een romp erin ligt."
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "A seed is a whole number."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A series of RGBA colours the scar's glow fades through over its lifetime."
@@ -13146,6 +13150,10 @@ msgstr "Romphoogte"
 msgid "Body length"
 msgstr "Romplengte"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Body plan"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Body rocks on starting and stopping"
@@ -15667,6 +15675,7 @@ msgstr "Kosten van onzichtbaarheid tijdens bewegen"
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
 #: src/lego/pages/components/GameModelDrawer.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
@@ -17742,6 +17751,10 @@ msgstr "Kan {name} niet dupliceren: {reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "Kan {name} niet naar het gevecht volgen"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not generate units: {reason}"
+msgstr ""
+
 #: src/multiplayer/battles/hostBattle.ts
 #, fuzzy
 msgid "Could not host the battle: {raw}"
@@ -17782,6 +17795,10 @@ msgstr "Kan de inhoud van dit archief niet tonen."
 #, fuzzy
 msgid "Could not load the module"
 msgstr "Kan de module niet laden"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not load the parts: {reason}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -24047,6 +24064,8 @@ msgstr "Weggegeven"
 msgid "General"
 msgstr "Algemeen"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
 msgid "Generate"
@@ -24061,6 +24080,10 @@ msgstr "Een kaart genereren"
 #, fuzzy
 msgid "Generate seed SQL"
 msgstr "Seed-SQL genereren"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Generate units"
+msgstr ""
 
 #: src/lego/generate.ts
 msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
@@ -27083,6 +27106,10 @@ msgstr "De wapens zijn zoals dat bestand ze heeft."
 #, fuzzy
 msgid "Its workshop project is gone."
 msgstr "Het werkplaatsproject bestaat niet meer."
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Job"
+msgstr ""
 
 #: src/direct/LanRooms.tsx
 #: src/multiplayer/battles/battleFilters.ts
@@ -38483,6 +38510,7 @@ msgid "ramping up"
 msgstr "opvoeren"
 
 #: src/hub/preview.ts
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 #, fuzzy
@@ -40595,6 +40623,7 @@ msgid "Requisition their cache"
 msgstr "Hun voorraad vorderen"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr ""
 
@@ -42574,10 +42603,15 @@ msgstr "Bekijk ze allemaal bij Statistieken"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Seed"
 msgstr "Seed"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Seed {seed}"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44598,6 +44632,7 @@ msgstr "Zes poten"
 #: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/mapconv/pages/DecompilePage.tsx

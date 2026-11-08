@@ -9311,6 +9311,10 @@ msgstr "Una query di ricerca"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "Un mare trasparente a y = 0, per vedere come vi galleggia uno scafo."
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "A seed is a whole number."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A series of RGBA colours the scar's glow fades through over its lifetime."
@@ -13146,6 +13150,10 @@ msgstr "Altezza del corpo"
 msgid "Body length"
 msgstr "Lunghezza del corpo"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Body plan"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Body rocks on starting and stopping"
@@ -15667,6 +15675,7 @@ msgstr "Costo dell’occultamento in movimento"
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
 #: src/lego/pages/components/GameModelDrawer.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
@@ -17742,6 +17751,10 @@ msgstr "Impossibile duplicare {name}: {reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "Impossibile seguire {name} nella sua battaglia"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not generate units: {reason}"
+msgstr ""
+
 #: src/multiplayer/battles/hostBattle.ts
 #, fuzzy
 msgid "Could not host the battle: {raw}"
@@ -17782,6 +17795,10 @@ msgstr "Impossibile elencare il contenuto di questo archivio."
 #, fuzzy
 msgid "Could not load the module"
 msgstr "Impossibile caricare il modulo"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not load the parts: {reason}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -24047,6 +24064,8 @@ msgstr "Ha ceduto"
 msgid "General"
 msgstr "Generale"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
 msgid "Generate"
@@ -24061,6 +24080,10 @@ msgstr "Genera una mappa"
 #, fuzzy
 msgid "Generate seed SQL"
 msgstr "Genera SQL di base"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Generate units"
+msgstr ""
 
 #: src/lego/generate.ts
 msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
@@ -27083,6 +27106,10 @@ msgstr "Le sue armi sono come le ha quel file."
 #, fuzzy
 msgid "Its workshop project is gone."
 msgstr "Il suo progetto del laboratorio non c’è più."
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Job"
+msgstr ""
 
 #: src/direct/LanRooms.tsx
 #: src/multiplayer/battles/battleFilters.ts
@@ -38483,6 +38510,7 @@ msgid "ramping up"
 msgstr "in aumento"
 
 #: src/hub/preview.ts
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 #, fuzzy
@@ -40595,6 +40623,7 @@ msgid "Requisition their cache"
 msgstr "Requisisci il loro deposito"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr ""
 
@@ -42574,10 +42603,15 @@ msgstr "Vedili tutti in Statistiche"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Seed"
 msgstr "Seme"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Seed {seed}"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44598,6 +44632,7 @@ msgstr "Sei zampe"
 #: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/mapconv/pages/DecompilePage.tsx

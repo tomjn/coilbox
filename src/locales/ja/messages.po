@@ -9245,6 +9245,10 @@ msgstr "検索クエリ"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "y = 0 にある透明な海。本体の浮かび方を確認できます。"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "A seed is a whole number."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A series of RGBA colours the scar's glow fades through over its lifetime."
@@ -13065,6 +13069,10 @@ msgstr "本体の高さ"
 msgid "Body length"
 msgstr "本体の長さ"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Body plan"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Body rocks on starting and stopping"
@@ -15567,6 +15575,7 @@ msgstr "移動中のクロークのコスト"
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
 #: src/lego/pages/components/GameModelDrawer.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
@@ -17619,6 +17628,10 @@ msgstr "{name} を複製できませんでした：{reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "{name} を追って試合に参加できませんでした"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not generate units: {reason}"
+msgstr ""
+
 #: src/multiplayer/battles/hostBattle.ts
 #, fuzzy
 msgid "Could not host the battle: {raw}"
@@ -17659,6 +17672,10 @@ msgstr "このアーカイブの内容を一覧表示できませんでした。
 #, fuzzy
 msgid "Could not load the module"
 msgstr "モジュールを読み込めませんでした"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not load the parts: {reason}"
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -23889,6 +23906,8 @@ msgstr "軍の譲渡"
 msgid "General"
 msgstr "一般"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
 msgid "Generate"
@@ -23903,6 +23922,10 @@ msgstr "マップを生成"
 #, fuzzy
 msgid "Generate seed SQL"
 msgstr "シード SQL を生成"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Generate units"
+msgstr ""
 
 #: src/lego/generate.ts
 msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
@@ -26911,6 +26934,10 @@ msgstr "武器はそのファイルのままです。"
 #, fuzzy
 msgid "Its workshop project is gone."
 msgstr "ワークショップのプロジェクトがなくなっています。"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Job"
+msgstr ""
 
 #: src/direct/LanRooms.tsx
 #: src/multiplayer/battles/battleFilters.ts
@@ -38219,6 +38246,7 @@ msgid "ramping up"
 msgstr "段階的に増加中"
 
 #: src/hub/preview.ts
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 #, fuzzy
@@ -40320,6 +40348,7 @@ msgid "Requisition their cache"
 msgstr "相手の隠し場所を徴発"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr ""
 
@@ -42285,10 +42314,15 @@ msgstr "すべてプレイヤー統計で見る"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Seed"
 msgstr "シード"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Seed {seed}"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44299,6 +44333,7 @@ msgstr "6 本脚"
 #: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/mapconv/pages/DecompilePage.tsx

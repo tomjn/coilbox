@@ -7512,6 +7512,10 @@ msgstr "A search query"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "A see-through sea at y = 0, for how a hull sits in it."
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "A seed is a whole number."
+msgstr "A seed is a whole number."
+
 #: src/content/unitFieldNotes.ts
 msgid "A series of RGBA colours the scar's glow fades through over its lifetime."
 msgstr "A series of RGBA colours the scar's glow fades through over its lifetime."
@@ -10615,6 +10619,10 @@ msgstr "Body height"
 msgid "Body length"
 msgstr "Body length"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Body plan"
+msgstr "Body plan"
+
 #: src/lego/animPresets.ts
 msgid "Body rocks on starting and stopping"
 msgstr "Body rocks on starting and stopping"
@@ -12675,6 +12683,7 @@ msgstr "Cloak cost moving"
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
 #: src/lego/pages/components/GameModelDrawer.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
@@ -14359,6 +14368,10 @@ msgstr "Could not duplicate {name}: {reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "Could not follow {name} into their battle"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not generate units: {reason}"
+msgstr "Could not generate units: {reason}"
+
 #: src/multiplayer/battles/hostBattle.ts
 msgid "Could not host the battle: {raw}"
 msgstr "Could not host the battle: {raw}"
@@ -14391,6 +14404,10 @@ msgstr "Could not list this archive's contents."
 #: src/lego/moduleFileIo.ts
 msgid "Could not load the module"
 msgstr "Could not load the module"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Could not load the parts: {reason}"
+msgstr "Could not load the parts: {reason}"
 
 #: src/lego/pack.ts
 msgid "Could not look for extension packs: {reason}"
@@ -19486,6 +19503,8 @@ msgstr "Gave away"
 msgid "General"
 msgstr "General"
 
+#: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 msgid "Generate"
 msgstr "Generate"
@@ -19497,6 +19516,10 @@ msgstr "Generate a map"
 #: src/uberstress/pages/RunPage.tsx
 msgid "Generate seed SQL"
 msgstr "Generate seed SQL"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Generate units"
+msgstr "Generate units"
 
 #: src/lego/generate.ts
 msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
@@ -21942,6 +21965,10 @@ msgstr "Its weapons are as that file has them."
 #: src/lego/weaponModule.ts
 msgid "Its workshop project is gone."
 msgstr "Its workshop project is gone."
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Job"
+msgstr "Job"
 
 #: src/direct/LanRooms.tsx
 #: src/multiplayer/battles/battleFilters.ts
@@ -31171,6 +31198,7 @@ msgid "ramping up"
 msgstr "ramping up"
 
 #: src/hub/preview.ts
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 msgid "Random"
@@ -32889,6 +32917,7 @@ msgid "Requisition their cache"
 msgstr "Requisition their cache"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr "Reroll"
 
@@ -34495,9 +34524,14 @@ msgstr "See them all on Player stats"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Seed"
 msgstr "Seed"
+
+#: src/lego/pages/components/GenerateDrawer.tsx
+msgid "Seed {seed}"
+msgstr "Seed {seed}"
 
 #: src/uberstress/pages/RunPage.tsx
 msgid "Seed accounts before the timed phase (register)"
@@ -36132,6 +36166,7 @@ msgstr "Six legs"
 #: src/content/pages/StorageSection.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
 #: src/lego/pages/components/MeasureReadout.tsx
 #: src/mapconv/pages/DecompilePage.tsx

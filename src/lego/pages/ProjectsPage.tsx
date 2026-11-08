@@ -7,6 +7,7 @@ import {
   Boxes,
   ChevronDown,
   ChevronRight,
+  Dices,
   FileUp,
   ImageOff,
   Package,
@@ -41,6 +42,7 @@ import { deleteProject, saveProject, useLegoProjects } from "../projects";
 import { projectFromTarget } from "../skeletonSize";
 import { gameRecordFor } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
+import { GenerateDrawer } from "./components/GenerateDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
 import { NewUnitPopover } from "./components/NewUnitPopover";
 import { useTestGame } from "./components/useTestGame";
@@ -146,6 +148,7 @@ export default function ProjectsPage() {
   const { games, scan } = useTestGame();
   const [opening, setOpening] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [generating, setGenerating] = useState(false);
   /** The units whose thumbnail would not load, so the card says so instead. */
   const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
@@ -236,15 +239,17 @@ export default function ProjectsPage() {
   }
 
   /**
-   * A unit that came out of a model file, saved and opened like a new one.
+   * A unit made somewhere other than New model, saved and opened like a new
+   * one.
    *
-   * Either a project rebuilt from an export or a model imported whole. Both
-   * arrive as an ordinary document, and an imported one already has its
-   * geometry and its textures on disk.
+   * A project rebuilt from an export, a model imported whole, or a generated
+   * candidate. All arrive as an ordinary document, and an imported one already
+   * has its geometry and its textures on disk.
    */
   async function opened(project: LegoProject) {
     setOpening(false);
     setPicking(false);
+    setGenerating(false);
     setProblem(null);
     try {
       await saveProject(project);
@@ -447,6 +452,9 @@ export default function ProjectsPage() {
             <Button variant="outline" onClick={() => setOpening(true)}>
               <FileUp size={16} /> <Trans>Open a model</Trans>
             </Button>
+            <Button variant="outline" onClick={() => setGenerating(true)}>
+              <Dices size={16} /> <Trans>Generate</Trans>
+            </Button>
             <NewUnitPopover
               plans={BODY_PLANS}
               label={t`New model`}
@@ -466,6 +474,12 @@ export default function ProjectsPage() {
           setPicking(false);
           navigate(`/lego/${id}`);
         }}
+      />
+
+      <GenerateDrawer
+        open={generating}
+        onOpenChange={setGenerating}
+        onOpened={(project) => void opened(project)}
       />
 
       <ImportDrawer
