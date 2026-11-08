@@ -22,7 +22,7 @@ import { readHeightGrid } from "@/placement/terrain";
 import { useSkirmishDraft } from "@/play/drafts";
 import { GamePickerField } from "@/play/pages/components/GamePickerButton";
 import { useUnitDefs } from "@/workshop/config";
-import { mcSmfHeights } from "../../bindings";
+import { mcReadMapinfo, mcSmfHeights } from "../../bindings";
 import { readMetalGrid } from "../../metalGrid";
 import { ENGINE_EXTRACTOR_RADIUS, type MetalGrid } from "../../metalSpots";
 import {
@@ -364,23 +364,26 @@ export function PlayabilityPanel({
  */
 export function CompiledPlayability({
   smfPath,
+  outDir,
   starts,
-  extractorRadius,
 }: {
   smfPath: string;
+  /** The folder the compile wrote to, whose `mapinfo.lua` holds the map's
+   *  `extractorRadius` when it sets one. */
+  outDir: string;
   starts: { x: number; z: number }[];
-  /** The map's `extractorRadius` from its `mapinfo.lua`, when it sets one. */
-  extractorRadius?: number | null;
 }) {
   const [heights, setHeights] = useState<Heights | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [metalGrid, setMetalGrid] = useState<MetalGrid | null>(null);
   const [metalError, setMetalError] = useState<string | null>(null);
+  const [extractorRadius, setExtractorRadius] = useState<number | null>(null);
   useEffect(() => {
     setHeights(null);
     setError(null);
     setMetalGrid(null);
     setMetalError(null);
+    setExtractorRadius(null);
     let cancelled = false;
     (async () => {
       const smf = await mcSmfHeights({ path: smfPath });
@@ -397,6 +400,12 @@ export function CompiledPlayability({
         if (!smf.metalFile || !smf.metalWidth || !smf.metalHeight) {
           throw new Error("the compiled map has no metal map to read");
         }
+        // The radius is read before the grid is handed over, so the panel
+        // measures once and not again when the radius arrives.
+        const radius = await mcReadMapinfo({ path: outDir })
+          .then((info) => info.extractorRadius ?? null)
+          .catch(() => null);
+        if (!cancelled) setExtractorRadius(radius);
         const metal = await readMetalGrid(
           mapconvThumbUrl(smf.metalFile),
           smf.metalWidth,
@@ -414,7 +423,7 @@ export function CompiledPlayability({
     return () => {
       cancelled = true;
     };
-  }, [smfPath]);
+  }, [smfPath, outDir]);
   return (
     <PlayabilityPanel
       heights={heights}

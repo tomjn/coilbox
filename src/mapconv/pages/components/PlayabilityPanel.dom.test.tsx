@@ -7,7 +7,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Heights } from "../../playability";
-import { PlayabilityPanel } from "./PlayabilityPanel";
+import { CompiledPlayability, PlayabilityPanel } from "./PlayabilityPanel";
 
 const GAME = {
   name: "Some Game 1.0",
@@ -29,6 +29,21 @@ vi.mock("@/content/config", () => ({
     error: null,
   }),
   useUnitsyncGameHeaders: () => ({ headers: new Map() }),
+}));
+const smf = vi.hoisted(() => ({
+  heights: vi.fn(),
+  mapinfo: vi.fn(),
+}));
+vi.mock("../../bindings", () => ({
+  mcSmfHeights: smf.heights,
+  mcReadMapinfo: smf.mapinfo,
+}));
+vi.mock("@/placement/terrain", () => ({
+  readHeightGrid: async () => ({
+    words: new Uint16Array(17 * 17).fill(32768),
+    width: 17,
+    height: 17,
+  }),
 }));
 vi.mock("@/play/pages/components/GamePickerButton", () => ({
   GamePickerField: ({ value }: { value: string }) => <span>{value}</span>,
@@ -119,6 +134,81 @@ describe("the playability panel", () => {
     );
     expect(
       await screen.findByText("Could not read the map's metal: no file"),
+    ).toBeTruthy();
+    expect(screen.getByText("KBOT2")).toBeTruthy();
+  });
+
+  it("reads a compiled map's metal map and the radius from its mapinfo.lua", async () => {
+    const bytes = new Uint8Array(64);
+    bytes[1 * 8 + 1] = 100;
+    bytes[1 * 8 + 5] = 100;
+    smf.heights.mockResolvedValue({
+      file: "h.bin",
+      width: 17,
+      height: 17,
+      minHeight: 0,
+      maxHeight: 100,
+      metalFile: "m.bin",
+      metalWidth: 8,
+      metalHeight: 8,
+    });
+    smf.mapinfo.mockResolvedValue({ extractorRadius: 90 });
+    vi.stubGlobal("fetch", async () => ({
+      ok: true,
+      arrayBuffer: async () => bytes.buffer,
+    }));
+    render(
+      <CompiledPlayability smfPath="/out/a.smf" outDir="/out" starts={[]} />,
+    );
+    expect(
+      await screen.findByText("2 metal spots, extractor radius is 90 elmos"),
+    ).toBeTruthy();
+    expect(smf.mapinfo).toHaveBeenCalledWith({ path: "/out" });
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to the engine's radius when the folder has no mapinfo.lua", async () => {
+    const bytes = new Uint8Array(64);
+    bytes[1 * 8 + 1] = 100;
+    smf.heights.mockResolvedValue({
+      file: "h.bin",
+      width: 17,
+      height: 17,
+      minHeight: 0,
+      maxHeight: 100,
+      metalFile: "m.bin",
+      metalWidth: 8,
+      metalHeight: 8,
+    });
+    smf.mapinfo.mockResolvedValue({});
+    vi.stubGlobal("fetch", async () => ({
+      ok: true,
+      arrayBuffer: async () => bytes.buffer,
+    }));
+    render(
+      <CompiledPlayability smfPath="/out/a.smf" outDir="/out" starts={[]} />,
+    );
+    expect(
+      await screen.findByText("1 metal spot, extractor radius is 500 elmos"),
+    ).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it("says the compiled map has no metal map when the file has none", async () => {
+    smf.heights.mockResolvedValue({
+      file: "h.bin",
+      width: 17,
+      height: 17,
+      minHeight: 0,
+      maxHeight: 100,
+    });
+    render(
+      <CompiledPlayability smfPath="/out/a.smf" outDir="/out" starts={[]} />,
+    );
+    expect(
+      await screen.findByText(
+        "Could not read the map's metal: the compiled map has no metal map to read",
+      ),
     ).toBeTruthy();
     expect(screen.getByText("KBOT2")).toBeTruthy();
   });

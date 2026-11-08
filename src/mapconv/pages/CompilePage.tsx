@@ -954,7 +954,7 @@ export default function CompilePage() {
             <div className="border-b border-border bg-card/50 px-4 py-3">
               <CompiledPlayability
                 smfPath={result.smfPath}
-                extractorRadius={appearance?.extractorRadius}
+                outDir={result.outDir}
                 starts={(mapinfo.startRows ?? [])
                   .filter((p) => p.x.trim() !== "" && p.z.trim() !== "")
                   .map((p) => ({ x: Number(p.x), z: Number(p.z) }))

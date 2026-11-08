@@ -140,11 +140,15 @@ export default function MapDetailPage() {
     metalField.data?.width,
     metalField.data?.height,
   );
-  const playMetal = {
-    grid: metalGrid.grid,
-    error: metalField.error ?? metalGrid.error,
-    extractorRadius: metalField.data?.extractorRadius,
-  };
+  // The hook keeps the last map's answer until the next one arrives, so while
+  // it loads the metal is still being read, not the old map's.
+  const playMetal = metalField.loading
+    ? { grid: null }
+    : {
+        grid: metalGrid.grid,
+        error: metalField.error ?? metalGrid.error,
+        extractorRadius: metalField.data?.extractorRadius,
+      };
   const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
     selected?.rootPath,
