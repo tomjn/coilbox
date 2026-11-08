@@ -940,31 +940,31 @@
     "hash": 488812674
   },
   "turret.building scout small": {
-    "pieces": 8,
+    "pieces": 9,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
-    "covering": 0,
+    "covering": 1,
     "proportions": {
       "baseHeight": 22.754037070390766,
       "turretHeight": 6.250048959576524,
       "barrelLength": 19.130184541598428
     },
-    "hash": 3700446975
+    "hash": 412124923
   },
   "turret.building scout large": {
-    "pieces": 5,
+    "pieces": 8,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 3,
     "proportions": {
       "baseHeight": 29.880758613647195,
       "turretHeight": 11.742305510394157,
       "barrelLength": 30.94509302403429
     },
-    "hash": 4209791689
+    "hash": 2379928611
   },
   "turret.building builder small": {
     "pieces": 13,
@@ -1063,22 +1063,22 @@
     "hash": 3815706347
   },
   "building scout small": {
-    "pieces": 2,
+    "pieces": 6,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 4,
     "proportions": {},
-    "hash": 4138899422
+    "hash": 522890142
   },
   "building scout large": {
-    "pieces": 2,
+    "pieces": 11,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 9,
     "proportions": {},
-    "hash": 3686308693
+    "hash": 3377876593
   },
   "building builder small": {
     "pieces": 15,
@@ -1195,19 +1195,19 @@
     "hash": 309633063
   },
   "hover scout large": {
-    "pieces": 13,
+    "pieces": 15,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
-    "covering": 3,
+    "covering": 5,
     "proportions": {
       "hullLength": 28.270552763911436,
       "hullWidth": 30.169879200619874,
       "hullHeight": 13.177194426280446,
       "gap": 0.08197623873571865
     },
-    "hash": 4252685021
+    "hash": 3662097864
   },
   "hover builder small": {
     "pieces": 16,
@@ -1330,33 +1330,33 @@
     "hash": 2962859053
   },
   "ship scout small": {
-    "pieces": 7,
+    "pieces": 10,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 3,
     "proportions": {
       "hullLength": 45,
       "deckHeight": 5,
       "turretHeight": 2.949789529107511,
       "barrelLength": 10
     },
-    "hash": 2620961162
+    "hash": 2303887714
   },
   "ship scout large": {
-    "pieces": 10,
+    "pieces": 16,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
-    "covering": 0,
+    "covering": 6,
     "proportions": {
       "hullLength": 73.11722138372065,
       "deckHeight": 7.042384257437778,
       "turretHeight": 5.535475150658981,
       "barrelLength": 12.674003382576396
     },
-    "hash": 3907307407
+    "hash": 3125422931
   },
   "ship builder small": {
     "pieces": 14,
@@ -1475,30 +1475,30 @@
     "hash": 1862849268
   },
   "aircraft scout small": {
-    "pieces": 5,
+    "pieces": 6,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 1,
     "proportions": {
       "gunForward": 2.6322976733953687,
       "gunHeight": 0.9881179854483343,
       "barrelLength": 2.5076534295035526
     },
-    "hash": 4111503116
+    "hash": 3392222615
   },
   "aircraft scout large": {
-    "pieces": 5,
+    "pieces": 9,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 4,
     "proportions": {
       "gunForward": 3.871542377814883,
       "gunHeight": 1.519276239612256,
       "barrelLength": 5.002902842960785
     },
-    "hash": 409793586
+    "hash": 1815674239
   },
   "aircraft builder small": {
     "pieces": 10,

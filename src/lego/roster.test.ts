@@ -253,12 +253,13 @@ describe("generateRoster", () => {
   });
 
   it("says which unit it could not make bigger than the tier below", () => {
-    // A scout aircraft is one deck part, which barely grows with its size, so
-    // no seed from 1 makes its large tier bigger.
+    // With no modules to hang on the skeleton a unit has no box to measure, so
+    // no seed makes any tier bigger than the (empty) tier below.
     const { style: _none, ...plain } = REQUEST;
+    const options = unitOptions();
     const result = generateRoster(
       { ...plain, seed: 1, plans: [plan("aircraft")], jobs: ["scout"] },
-      unitOptions(),
+      () => ({ ...options(), modules: [] }),
     );
     expect(result).toEqual({
       status: "failed",
