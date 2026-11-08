@@ -2219,6 +2219,7 @@ export function useUnitsyncMinimap(
         cloudDensity: res.cloudDensity,
         sunDir: res.sunDir,
         sunColor: res.sunColor,
+        skySunColor: res.skySunColor,
         groundAmbientColor: res.groundAmbientColor,
         groundDiffuseColor: res.groundDiffuseColor,
         groundSpecularColor: res.groundSpecularColor,

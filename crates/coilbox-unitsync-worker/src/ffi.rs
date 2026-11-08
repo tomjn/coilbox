@@ -1611,6 +1611,7 @@ impl Unitsync {
                     app.cloud_color = read_vec3(&["cloudColor", "cloudcolor"]);
                     app.cloud_density = read_f32(&["cloudDensity", "clouddensity"]);
                     app.sun_color = read_vec3(&["sunColor", "suncolor"]);
+                    app.sky_sun_color = app.sun_color;
                     pop(); // atmosphere
                 }
                 if sub_str(lighting.as_ptr()) != 0 {

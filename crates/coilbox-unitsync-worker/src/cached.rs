@@ -440,7 +440,7 @@ pub fn dims_elmos(dims: Option<(u32, u32)>) -> (Option<u32>, Option<u32>) {
 
 /// Bump when [`CachedDetail`] changes shape or the way it is read changes, so a
 /// record from an older build is read again instead of returning an old answer.
-pub const DETAIL_VERSION: u32 = 1;
+pub const DETAIL_VERSION: u32 = 2;
 
 /// Everything a map's page asks for beside its picture, stored under the same
 /// key (issue #3724).
@@ -495,6 +495,7 @@ impl CachedDetail {
             cloud_density: app.cloud_density,
             sun_dir: app.sun_dir,
             sun_color: app.sun_color,
+            sky_sun_color: app.sky_sun_color,
             ground_ambient_color: app.ground_ambient_color,
             ground_diffuse_color: app.ground_diffuse_color,
             ground_specular_color: app.ground_specular_color,
