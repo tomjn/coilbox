@@ -39,8 +39,8 @@ pub struct DuplicateCopy {
     pub path: String,
     /// The content folder this copy is in.
     pub root: String,
-    /// What the copy occupies. For a rapid package, the pool files it lists that
-    /// are on disk, which another package in the same pool may also use.
+    /// What deleting the copy frees. For a rapid package, the pool files only it
+    /// lists, as a file another package in the same folder lists stays.
     pub bytes: u64,
     /// `file` for a loose archive, `rapid` for a rapid package.
     pub source: &'static str,
@@ -173,7 +173,11 @@ fn same_name_groups(loose: &[Loose]) -> Vec<DuplicateGroup> {
     }
     by_name
         .into_iter()
-        .filter(|(_, files)| files.len() > 1)
+        .filter(|(_, files)| {
+            // Two names that differ only by case in one folder are two files
+            // there, not a copy kept across folders.
+            files.iter().map(|f| &f.root).collect::<HashSet<_>>().len() > 1
+        })
         .map(|((category, _), files)| {
             let sizes_match = files.iter().all(|f| f.bytes == files[0].bytes);
             let total: u64 = files.iter().map(|f| f.bytes).sum();
@@ -189,6 +193,9 @@ fn same_name_groups(loose: &[Loose]) -> Vec<DuplicateGroup> {
         })
         .collect()
 }
+
+/// What a rapid package lists: each file's name and its pool md5.
+type Manifest = Vec<(String, [u8; 16])>;
 
 /// A rapid package's map file stems, or none when it holds no map.
 fn map_stems(entries: &[(String, [u8; 16])]) -> Vec<String> {
@@ -215,13 +222,17 @@ fn hex(md5: &[u8; 16]) -> String {
     md5.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Every rapid package across the roots that holds a map.
+/// Every rapid package across the roots that holds a map. A package's size is the
+/// pool files only it uses, which is what removing it frees. A pool file another
+/// package in the same folder also lists stays, so it is not counted.
 fn rapid_maps(roots: &[PathBuf]) -> Vec<RapidMap> {
     let mut out = Vec::new();
     for root in roots {
         let Ok(rd) = std::fs::read_dir(root.join("packages")) else {
             continue;
         };
+        let mut packages: Vec<(PathBuf, Manifest)> = Vec::new();
+        let mut users: HashMap<[u8; 16], usize> = HashMap::new();
         for entry in rd.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("sdp") {
@@ -230,14 +241,26 @@ fn rapid_maps(roots: &[PathBuf]) -> Vec<RapidMap> {
             let Ok(entries) = parse_sdp_entries(&path) else {
                 continue;
             };
+            let unique: HashSet<[u8; 16]> = entries.iter().map(|(_, md5)| *md5).collect();
+            for md5 in unique {
+                *users.entry(md5).or_default() += 1;
+            }
+            packages.push((path, entries));
+        }
+        for (path, entries) in packages {
             // A package holds one map. Naming it by its first map file keeps a
             // package from landing in two groups.
             let Some(stem) = map_stems(&entries).into_iter().next() else {
                 continue;
             };
-            let bytes = entries
+            let only_this: HashSet<[u8; 16]> = entries
                 .iter()
-                .filter_map(|(_, md5)| {
+                .map(|(_, md5)| *md5)
+                .filter(|md5| users.get(md5) == Some(&1))
+                .collect();
+            let bytes = only_this
+                .iter()
+                .filter_map(|md5| {
                     let h = hex(md5);
                     std::fs::metadata(
                         root.join("pool")
@@ -468,6 +491,44 @@ mod tests {
         write(&a.path().join("maps/m.sd7"), b"12");
         std::os::unix::fs::symlink(a.path().join("maps"), b.path().join("maps")).unwrap();
         assert!(report(&roots(&[&a, &b])).groups.is_empty());
+    }
+
+    #[test]
+    fn names_that_differ_by_case_in_one_folder_are_not_a_duplicate() {
+        let a = tempfile::tempdir().unwrap();
+        write(&a.path().join("maps/Map.sd7"), b"12");
+        // A case sensitive folder can hold both. A case insensitive one cannot,
+        // so this only writes the second where it can.
+        if !a.path().join("maps/map.sd7").exists() {
+            write(&a.path().join("maps/map.sd7"), b"12");
+        }
+        assert!(report(&roots(&[&a])).groups.is_empty());
+    }
+
+    #[test]
+    fn a_pool_file_another_package_lists_is_not_counted_as_freed() {
+        let (a, b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        write_sdz(&a.path().join("maps/t.sdz"), &["maps/t.smf"]);
+        write_package(b.path(), "a", &["maps/t.smf", "maps/t.smt"], &[0u8; 10]);
+
+        let alone = report(&roots(&[&a, &b]));
+        assert_eq!(alone.groups[0].copies[1].bytes, 20);
+
+        // A second package listing the same two pool files shares both of them.
+        fs::copy(
+            b.path().join("packages/a.sdp"),
+            b.path().join("packages/copy.sdp"),
+        )
+        .unwrap();
+
+        let shared = report(&roots(&[&a, &b]));
+        let rapid: Vec<_> = shared.groups[0]
+            .copies
+            .iter()
+            .filter(|c| c.source == "rapid")
+            .collect();
+        assert_eq!(rapid.len(), 2);
+        assert!(rapid.iter().all(|c| c.bytes == 0), "nothing is freed");
     }
 
     #[test]

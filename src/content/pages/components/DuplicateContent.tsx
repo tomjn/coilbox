@@ -27,13 +27,27 @@ function parentFolder(path: string): string {
 }
 
 /**
+ * Reports already read this session, keyed by the folders they cover. Reading
+ * one parses every rapid package manifest, so leaving the section and coming
+ * back must not pay for it again, as with the section's size walk. Cleared by
+ * {@link clearDuplicateReportCache}.
+ */
+const reportCache = new Map<string, DuplicateReport>();
+
+/** Forget every report, so the next read goes to the disk. */
+export function clearDuplicateReportCache(): void {
+  reportCache.clear();
+}
+
+/**
  * Content stored twice (issue #399): one archive name in two content folders,
  * and a map that is both a loose archive and inside a rapid package. A read
  * only list. Removing a copy stays a manual step, because a replay or save may
  * depend on it.
  *
  * `roots` are the content folder paths. `version` changes when the section's
- * Refresh is pressed, which reads the folders again.
+ * Refresh is pressed or something is deleted, and the caller clears the cache
+ * first so the folders are read again.
  */
 export function DuplicateContent({
   roots,
@@ -42,16 +56,24 @@ export function DuplicateContent({
   roots: string[];
   version: number;
 }) {
-  const rootKey = roots.join("\n");
+  const rootKey = JSON.stringify(roots);
   const [state, setState] = useState<State>({ status: "loading" });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is the refresh signal
   useEffect(() => {
+    const cached = reportCache.get(rootKey);
+    if (cached) {
+      setState({ status: "ready", report: cached });
+      return;
+    }
     let live = true;
     setState({ status: "loading" });
-    contentDuplicateReport({ roots: rootKey.split("\n").filter(Boolean) })
+    contentDuplicateReport({ roots: JSON.parse(rootKey) as string[] })
       .then(({ report }) => {
-        if (live) setState({ status: "ready", report });
+        // A read that a refresh has replaced must not be stored.
+        if (!live) return;
+        reportCache.set(rootKey, report);
+        setState({ status: "ready", report });
       })
       .catch((e) => {
         if (live) setState({ status: "error", message: describeError(e) });

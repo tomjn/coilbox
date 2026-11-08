@@ -60,15 +60,25 @@ fn md5_hex(md5: &[u8; 16]) -> String {
 /// each entry. Byte-exact with pr-downloader: a gzip stream of `u8 name-len | name
 /// | 16-byte md5 | 4-byte crc32 | 4-byte size` records until EOF.
 pub fn parse_sdp_pool_refs(path: &Path) -> Result<Vec<[u8; 16]>, String> {
-    Ok(parse_sdp_entries(path)?
-        .into_iter()
-        .map(|(_, md5)| md5)
-        .collect())
+    let mut refs = Vec::new();
+    for_each_sdp_record(path, |_, md5| refs.push(md5))?;
+    Ok(refs)
 }
 
 /// Parse a rapid `.sdp` manifest, returning each entry's file name inside the
 /// package and its pool md5. See [`parse_sdp_pool_refs`] for the format.
 pub fn parse_sdp_entries(path: &Path) -> Result<Vec<(String, [u8; 16])>, String> {
+    let mut entries = Vec::new();
+    for_each_sdp_record(path, |name, md5| {
+        entries.push((String::from_utf8_lossy(name).into_owned(), md5));
+    })?;
+    Ok(entries)
+}
+
+/// Walk a `.sdp` manifest's records, handing each one's name bytes and pool md5
+/// to `visit`. Nothing is allocated per record, which matters to the prune, as it
+/// reads every manifest in a pool.
+fn for_each_sdp_record(path: &Path, mut visit: impl FnMut(&[u8], [u8; 16])) -> Result<(), String> {
     let compressed = std::fs::read(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     // A real `.sdp` is a non-empty gzip stream; an empty file is corrupt, and
     // `GzDecoder` (unlike the lenient multi-member decoder) errors on non-gzip
@@ -82,7 +92,6 @@ pub fn parse_sdp_entries(path: &Path) -> Result<Vec<(String, [u8; 16])>, String>
         .map_err(|e| format!("inflate {}: {e}", path.display()))?;
 
     // Each record: u8 name-len | name | 16-byte md5 | 4-byte crc32 | 4-byte size.
-    let mut entries = Vec::new();
     let mut pos = 0usize;
     while pos < raw.len() {
         let name_len = raw[pos] as usize;
@@ -91,13 +100,12 @@ pub fn parse_sdp_entries(path: &Path) -> Result<Vec<(String, [u8; 16])>, String>
             return Err(format!("truncated record in {}", path.display()));
         }
         let md5_start = pos + 1 + name_len;
-        let name = String::from_utf8_lossy(&raw[pos + 1..md5_start]).into_owned();
         let mut md5 = [0u8; 16];
         md5.copy_from_slice(&raw[md5_start..md5_start + 16]);
-        entries.push((name, md5));
+        visit(&raw[pos + 1..md5_start], md5);
         pos = record_end;
     }
-    Ok(entries)
+    Ok(())
 }
 
 /// True for a `packages/*.sdp` file (not `.sdp.incomplete`).

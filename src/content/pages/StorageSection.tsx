@@ -30,7 +30,10 @@ import { useContentState, usePreferredEngine } from "../config";
 import { canPrune } from "../rapidPool";
 import { BulkDeleteReplaysPanel } from "./components/BulkDeleteReplaysPanel";
 import { DeleteEngineButton } from "./components/DeleteEngineButton";
-import { DuplicateContent } from "./components/DuplicateContent";
+import {
+  clearDuplicateReportCache,
+  DuplicateContent,
+} from "./components/DuplicateContent";
 import { ReclaimCachesButton } from "./components/ReclaimCachesButton";
 import { ReclaimSpaceButton } from "./components/ReclaimSpaceButton";
 import { ReplayTracksStorage } from "./components/ReplayTracksStorage";
@@ -112,6 +115,7 @@ export default function StorageSection() {
 
   const refresh = () => {
     sizeCache.clear();
+    clearDuplicateReportCache();
     setReportVersion((v) => v + 1);
     for (const root of roots) size(root.path, true);
   };
@@ -127,6 +131,7 @@ export default function StorageSection() {
    */
   const refreshRoot = useCallback(
     async (path: string) => {
+      clearDuplicateReportCache();
       setReportVersion((v) => v + 1);
       await size(path, true);
       try {

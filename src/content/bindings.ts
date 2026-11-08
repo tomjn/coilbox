@@ -299,7 +299,10 @@ export interface DuplicateCopy {
   path: string;
   /** The content folder this copy is in. */
   root: string;
-  /** What the copy occupies. A rapid package's figure is its pool files. */
+  /**
+   * What deleting the copy frees. A rapid package's figure is the pool files
+   * only it lists.
+   */
   bytes: number;
   /** `file` is a loose archive, `rapid` is a rapid package. */
   source: "file" | "rapid";
@@ -317,7 +320,11 @@ export interface DuplicateGroup {
   copies: DuplicateCopy[];
   /** For `sameName`, false means the copies differ. Null for `mapInRapid`. */
   sizesMatch: boolean | null;
-  /** What deleting every copy but the largest would free. */
+  /**
+   * What deleting every copy but the largest would free. Zero for a `sameName`
+   * group whose `sizesMatch` is false, because those are different versions
+   * rather than copies of one.
+   */
   wastedBytes: number;
 }
 

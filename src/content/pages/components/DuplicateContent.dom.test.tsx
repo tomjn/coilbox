@@ -24,10 +24,13 @@ vi.mock("../../bindings", async () => {
   };
 });
 
-const { DuplicateContent } = await import("./DuplicateContent");
+const { DuplicateContent, clearDuplicateReportCache } = await import(
+  "./DuplicateContent"
+);
 
 afterEach(() => {
   cleanup();
+  clearDuplicateReportCache();
   h.report = null;
   h.fail = null;
   h.calls = [];
@@ -124,12 +127,30 @@ describe("DuplicateContent", () => {
     expect(await screen.findByText(/boom/)).toBeTruthy();
   });
 
+  it("keeps a report read this session, so coming back is free", async () => {
+    h.report = { groups: [], wastedBytes: 0 };
+    const first = render(<DuplicateContent roots={["/a"]} version={0} />);
+    await screen.findByText("No duplicates found.");
+    first.unmount();
+    render(<DuplicateContent roots={["/a"]} version={0} />);
+    await screen.findByText("No duplicates found.");
+    expect(h.calls).toHaveLength(1);
+  });
+
+  it("reads a path with a newline in it as one folder", async () => {
+    h.report = { groups: [], wastedBytes: 0 };
+    render(<DuplicateContent roots={["/a\nb", "/c"]} version={0} />);
+    await screen.findByText("No duplicates found.");
+    expect(h.calls).toEqual([["/a\nb", "/c"]]);
+  });
+
   it("reads again when the version changes", async () => {
     h.report = { groups: [], wastedBytes: 0 };
     const { rerender } = render(
       <DuplicateContent roots={["/a"]} version={0} />,
     );
     await screen.findByText("No duplicates found.");
+    clearDuplicateReportCache();
     rerender(<DuplicateContent roots={["/a"]} version={1} />);
     await vi.waitFor(() => expect(h.calls).toHaveLength(2));
   });
