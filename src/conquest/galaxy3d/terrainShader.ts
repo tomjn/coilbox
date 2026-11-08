@@ -474,10 +474,22 @@ const DETAIL = /* glsl */ `
     // gives way to the next along a ragged line, and recolour to match.
     float sum = 0.0;
     vec3 soft = vec3(0.0);
+    // How much forest, cold ground and open ground the unsharpened weights
+    // give here. The kind of forest follows what it gives way to.
+    float softForest = 0.0;
+    float softCold = 0.0;
+    float softOpen = 0.0;
     for (int k = 0; k < 8; k++) {
       sum += w[k];
       soft += w[k] * uBiomeColour[k];
+      float pat = uBiomePattern[k];
+      softForest += w[k] * step(abs(pat - ${P.forest}.0), 0.5);
+      softCold += w[k] * (step(abs(pat - ${P.tundra}.0), 0.5) + step(abs(pat - ${P.snow}.0), 0.5));
+      softOpen += w[k] * (step(abs(pat - ${P.grass}.0), 0.5) + step(abs(pat - ${P.scrub}.0), 0.5)
+        + step(abs(pat - ${P.earth}.0), 0.5) + step(abs(pat - ${P.cracked}.0), 0.5));
     }
+    float forestCold = softCold / max(softCold + softForest, 1e-3);
+    float forestOpen = softOpen / max(softOpen + softForest, 1e-3);
     if (sum > 0.5) {
       float sharp = 1e-6;
       for (int k = 0; k < 8; k++) {
@@ -546,29 +558,60 @@ const DETAIL = /* glsl */ `
     vec3 view = normalize(cameraPosition - vTerrainPos);
     float glint = max(dot(n, normalize(view + uTerrainSun)), 0.0);
 
-    // Forest: a canopy of crowns with dark gaps between them.
+    // Forest: a canopy of crowns with dark gaps between them, in three kinds.
+    // Conifers, small, pointed and dark, where it gives way to cold ground.
+    // Open woodland, single trees with ground between, where it gives way to
+    // grass or bare ground. Broadleaf canopy between the two.
     if (pw[${P.forest}] > 0.02) {
       float s = pw[${P.forest}];
-      shadeMul += s * (broad.x * 0.2 + fine.x * 0.12);
-      // Where the broad noise is low the trees thin out into clearings.
-      float thin = smoothstep(0.05, -0.35, broad.x);
+      // Conifers also take the higher ground, and whole stands of them grow
+      // within the broadleaf, so a wood is mixed.
+      float conifer = max(smoothstep(0.05, 0.25, forestCold + broad.x * 0.1),
+        smoothstep(0.24, 0.34, nh.a + broad.x * 0.04));
+      conifer = max(conifer, smoothstep(0.3, 0.55, tSimplex(p / 7.0 + 3.0).x));      float open = max(smoothstep(0.0, 0.15, forestOpen - broad.x * 0.1),
+        smoothstep(0.35, 0.6, tSimplex(p / 5.0 + 11.0).x)) * (1.0 - conifer);
+      // Stands a few crowns across, some thicker and some thinner, and groves
+      // of lighter and darker trees.
+      float stand = tSimplex(p / 1.3 + 19.0).x;
+      float grove = tSimplex(p / 0.8 + 41.0).x;
+      // Woods run thicker and darker down gullies and thin on crests, so the
+      // ground's shape shows through the canopy.
+      float gully = smoothstep(0.0, -0.3, cavFine);
+      float crest = smoothstep(0.1, 0.4, cavFine);
+      float thin = clamp(smoothstep(0.05, -0.35, broad.x) + open * 0.55 + smoothstep(0.1, 0.7, stand) * 0.35
+        - gully * 0.5 + crest * 0.3, 0.0, 0.92);
+      shadeMul += s * (broad.x * 0.12 + grove * 0.22 + stand * 0.1 + fine.x * 0.1 - gully * 0.25 - conifer * 0.15);
+      albedo *= mix(vec3(1.0), vec3(0.48, 0.62, 0.66), s * conifer);
+      albedo *= mix(vec3(1.0), vec3(1.1, 1.06, 0.88), s * open);
+      albedo *= 1.0 + s * grove * vec3(0.08, 0.12, 0.03) * (1.0 - conifer * 0.5);
+      // How much of the ground the crowns cover. Past the crowns' reach, a
+      // thin stand shows a share of the ground evenly.
+      float cover = 1.0 - thin;
+      vec2 sunXZ = normalize(uTerrainSun.xz + vec2(1e-4));
       for (int k = 0; k < 2; k++) {
-        float size = k == 0 ? 0.5 : 0.17;
+        float size = k == 0 ? mix(0.45, 0.22, conifer) : mix(0.15, 0.09, conifer);
         float keep = tKeep(size, footprint);
         if (keep <= 0.0) break;
         vec4 cell = tCell(p / size + float(k) * 7.3 + fine.x * 0.3);
-        // Each crown a little bigger or smaller, lighter or darker.
-        float reach = 0.45 + 0.25 * cell.w - thin * 0.25;
-        float dome = 1.0 - smoothstep(0.05, reach, cell.x);
-        float tone = (cell.w - 0.5) * 0.35;
-        // Clumps light and shade both ways. Single crowns mostly darken their
-        // gaps, since bright tops on that scale read as a scatter of dots.
-        float lift = k == 0 ? (dome - 0.6) * 0.45 : (dome - 0.85) * 0.4;
+        // Some spots stand empty, more of them where the stand is thin.
+        float here = step(thin, fract(cell.w * 7.13));
+        // Each crown a little bigger or smaller, lighter or darker. A conifer
+        // narrows to a point, a broadleaf crown is a soft dome.
+        float reach = (0.42 + 0.22 * cell.w) * mix(1.0, 0.8, conifer);
+        float r = cell.x / reach;
+        float dome = here * (1.0 - smoothstep(mix(0.2, 0.0, conifer), 1.0, r));
+        float tone = (cell.w - 0.5) * 0.3;
+        // The sun side of a crown lit, the far side in shade, sharper on a cone.
+        float side = dot(cell.yz, sunXZ) * dome * mix(0.12, 0.3, conifer);
+        // Gaps in a closed canopy are dark. Open ground between single trees
+        // is not.
+        float lift = (dome - 0.7) * 0.4 * mix(1.0, 0.35, open) + side;
         shadeMul += s * keep * (lift + tone * dome);
-        bump += s * keep * cell.yz * (dome * (1.0 - dome)) / size * (k == 0 ? 0.12 : 0.05);
+        bump += s * keep * cell.yz * (dome * (1.0 - dome)) / size * (k == 0 ? 0.1 : 0.05);
+        if (k == 1) cover = mix(cover, max(dome, cover * 0.4), keep);
       }
-      // Clearings show the ground between the trees.
-      albedo = mix(albedo, uBiomeClearing, s * thin * 0.5);
+      // Ground shows where the crowns leave it.
+      albedo = mix(albedo, uBiomeClearing, s * (1.0 - cover) * mix(0.25, 0.85, open));
     }
     // Grass: lighter and darker patches with a fine grain.
     if (pw[${P.grass}] > 0.02) {
