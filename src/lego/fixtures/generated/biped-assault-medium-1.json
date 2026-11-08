@@ -340,88 +340,25 @@
       "id": "unit.15",
       "name": "torsocover",
       "parentId": "unit.2",
-      "partId": "3a0f52a0daf5",
+      "partId": "1b4e92ac3e9a",
       "position": [
-        -7.925684288,
-        -3.259988601,
-        -7.925684288
+        0,
+        -1.981421072,
+        0
       ],
       "rotation": [
         0,
         0,
-        -1.570796327
+        0
       ],
       "scale": [
-        6.519977203,
-        6.519977203,
-        6.519977203
+        7.925684288,
+        7.925684288,
+        7.925684288
       ]
     },
     {
       "id": "unit.16",
-      "name": "torsocover2",
-      "parentId": "unit.2",
-      "partId": "3a0f52a0daf5",
-      "position": [
-        -7.925684288,
-        -3.259988601,
-        7.925684288
-      ],
-      "rotation": [
-        0,
-        0,
-        -1.570796327
-      ],
-      "scale": [
-        6.519977203,
-        6.519977203,
-        6.519977203
-      ]
-    },
-    {
-      "id": "unit.17",
-      "name": "torsocover3",
-      "parentId": "unit.2",
-      "partId": "3a0f52a0daf5",
-      "position": [
-        7.925684288,
-        -3.259988601,
-        -7.925684288
-      ],
-      "rotation": [
-        0,
-        0,
-        -1.570796327
-      ],
-      "scale": [
-        6.519977203,
-        6.519977203,
-        6.519977203
-      ]
-    },
-    {
-      "id": "unit.18",
-      "name": "torsocover4",
-      "parentId": "unit.2",
-      "partId": "3a0f52a0daf5",
-      "position": [
-        7.925684288,
-        -3.259988601,
-        7.925684288
-      ],
-      "rotation": [
-        0,
-        0,
-        -1.570796327
-      ],
-      "scale": [
-        6.519977203,
-        6.519977203,
-        6.519977203
-      ]
-    },
-    {
-      "id": "unit.19",
       "name": "hipcover",
       "parentId": "unit.1",
       "partId": "2dd56342bad3",
@@ -442,12 +379,12 @@
       ]
     },
     {
-      "id": "unit.20",
+      "id": "unit.17",
       "name": "hipcover2",
       "parentId": "unit.1",
-      "partId": "d2a6be853590",
+      "partId": "474a7c2e52cb",
       "position": [
-        3.962842144,
+        7.925684288,
         0,
         0
       ],
@@ -457,39 +394,18 @@
         0
       ],
       "scale": [
-        6.34054743,
-        6.34054743,
-        6.34054743
+        7.925684288,
+        7.925684288,
+        7.925684288
       ]
     },
     {
-      "id": "unit.21",
+      "id": "unit.18",
       "name": "hipcover3",
       "parentId": "unit.1",
-      "partId": "d2a6be853590",
+      "partId": "474a7c2e52cb",
       "position": [
-        11.888526432,
-        0,
-        0
-      ],
-      "rotation": [
-        0,
-        1.570796327,
-        0
-      ],
-      "scale": [
-        6.34054743,
-        6.34054743,
-        6.34054743
-      ]
-    },
-    {
-      "id": "unit.22",
-      "name": "hipcover4",
-      "parentId": "unit.1",
-      "partId": "d2a6be853590",
-      "position": [
-        -3.962842144,
+        -7.925684288,
         0,
         0
       ],
@@ -499,34 +415,13 @@
         0
       ],
       "scale": [
-        6.34054743,
-        6.34054743,
-        6.34054743
+        7.925684288,
+        7.925684288,
+        7.925684288
       ]
     },
     {
-      "id": "unit.23",
-      "name": "hipcover5",
-      "parentId": "unit.1",
-      "partId": "d2a6be853590",
-      "position": [
-        -11.888526432,
-        0,
-        0
-      ],
-      "rotation": [
-        0,
-        -1.570796327,
-        0
-      ],
-      "scale": [
-        6.34054743,
-        6.34054743,
-        6.34054743
-      ]
-    },
-    {
-      "id": "unit.24",
+      "id": "unit.19",
       "name": "lthighcover",
       "parentId": "unit.3",
       "partId": "40d4c3d0baf9",
@@ -547,7 +442,7 @@
       ]
     },
     {
-      "id": "unit.25",
+      "id": "unit.20",
       "name": "lshincover",
       "parentId": "unit.4",
       "partId": "dfde7de76059",
@@ -568,7 +463,7 @@
       ]
     },
     {
-      "id": "unit.26",
+      "id": "unit.21",
       "name": "rthighcover",
       "parentId": "unit.6",
       "partId": "40d4c3d0baf9",
@@ -589,7 +484,7 @@
       ]
     },
     {
-      "id": "unit.27",
+      "id": "unit.22",
       "name": "rshincover",
       "parentId": "unit.7",
       "partId": "dfde7de76059",
@@ -656,52 +551,32 @@
         "piece": "unit.15"
       },
       {
-        "bone": "torso",
+        "bone": "hip",
         "piece": "unit.16"
       },
       {
-        "bone": "torso",
+        "bone": "hip",
         "piece": "unit.17"
       },
       {
-        "bone": "torso",
+        "bone": "hip",
         "piece": "unit.18"
       },
       {
-        "bone": "hip",
+        "bone": "thigh.l1",
         "piece": "unit.19"
       },
       {
-        "bone": "hip",
+        "bone": "shin.l1",
         "piece": "unit.20"
       },
       {
-        "bone": "hip",
+        "bone": "thigh.r1",
         "piece": "unit.21"
       },
       {
-        "bone": "hip",
-        "piece": "unit.22"
-      },
-      {
-        "bone": "hip",
-        "piece": "unit.23"
-      },
-      {
-        "bone": "thigh.l1",
-        "piece": "unit.24"
-      },
-      {
-        "bone": "shin.l1",
-        "piece": "unit.25"
-      },
-      {
-        "bone": "thigh.r1",
-        "piece": "unit.26"
-      },
-      {
         "bone": "shin.r1",
-        "piece": "unit.27"
+        "piece": "unit.22"
       }
     ]
   }

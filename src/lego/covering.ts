@@ -122,11 +122,19 @@ export function pieceWorldBox(
   pack: LoadedPack,
   piece: LegoPiece,
 ): Box | null {
+  return boxIn(worldMatrix(project, piece.id), pack, piece);
+}
+
+/** A piece's own box, with `world` the piece's matrix in the unit's space. */
+function boxIn(
+  world: THREE.Matrix4,
+  pack: LoadedPack,
+  piece: LegoPiece,
+): Box | null {
   const bbox = pieceOwnBox(pack, piece);
   if (!bbox) return null;
   const pivot = piece.pivot ?? [0, 0, 0];
-  const world = worldMatrix(project, piece.id);
-  const box = { min: new THREE.Vector3(Infinity, Infinity, Infinity) };
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity);
   const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
   for (let corner = 0; corner < 8; corner++) {
     const point = new THREE.Vector3(
@@ -134,10 +142,10 @@ export function pieceWorldBox(
       (corner & 2 ? bbox.max[1] : bbox.min[1]) - pivot[1],
       (corner & 4 ? bbox.max[2] : bbox.min[2]) - pivot[2],
     ).applyMatrix4(world);
-    box.min.min(point);
+    min.min(point);
     max.max(point);
   }
-  return { min: box.min, max };
+  return { min, max };
 }
 
 /** Where a piece's origin is in the unit's space. */
@@ -239,17 +247,25 @@ function fits(
     // takes more copies, with no gap between them.
     const copies = (extent: number, size: number) =>
       Math.max(1, Math.ceil(extent / (size * scale) - 1e-9));
+    const finalAlong = copies(length, long.size);
+    const finalAcross = rows ? copies(width, mid.size) : 1;
     out.push({
       part,
       scale,
-      along: copies(length, long.size),
-      across: rows ? copies(width, mid.size) : 1,
+      along: finalAlong,
+      across: finalAcross,
       long: long.size * scale,
       wide: mid.size * scale,
       axes: [long.axis, mid.axis, short.axis],
       depth: short.size * scale,
       error: widthError + depthError,
     });
+  }
+  // Every copy is a piece the game maker has to look after, so each one past
+  // the fewest any part needs counts against a part as much as a poor fit.
+  const fewest = Math.min(...out.map((fit) => fit.along * fit.across));
+  for (const fit of out) {
+    fit.error += Math.log((fit.along * fit.across) / fewest);
   }
   return out.sort(
     (a, b) =>
@@ -466,6 +482,8 @@ export function coverSkeleton(
   }
 
   const covering: CoveringResult["covering"] = [];
+  const added: LegoPiece[] = [];
+  const names = project.pieces.map((p) => p.name);
   for (const plan of plans) {
     const candidates = fits(
       parts.filter((p) => plan.shapes.includes(p.shape)),
@@ -478,6 +496,7 @@ export function coverSkeleton(
     const fit = pick(roll(`covering:${plan.key}`), candidates);
     const rotation = laidAlong(fit.axes, plan.frame);
     const [along, across] = plan.frame as [THREE.Vector3, THREE.Vector3];
+    const boneWorld = worldMatrix(project, plan.bone.id);
     for (let i = 0; i < fit.along; i++) {
       for (let j = 0; j < fit.across; j++) {
         const at = plan.centre
@@ -496,10 +515,7 @@ export function coverSkeleton(
           );
         const piece: LegoPiece = {
           id: PROBE,
-          name: uniquePieceName(
-            `${plan.bone.name}cover`,
-            project.pieces.map((p) => p.name),
-          ),
+          name: "",
           parentId: plan.bone.id,
           partId: fit.part.id,
           position: [settle(at.x), settle(at.y), settle(at.z)],
@@ -510,17 +526,32 @@ export function coverSkeleton(
           ],
           scale: [settle(fit.scale), settle(fit.scale), settle(fit.scale)],
         };
-        const next = { ...project, pieces: [...project.pieces, piece] };
-        const box = pieceWorldBox(next, pack, piece);
+        const box = boxIn(
+          boneWorld
+            .clone()
+            .multiply(
+              new THREE.Matrix4().compose(
+                new THREE.Vector3(...piece.position),
+                new THREE.Quaternion().setFromEuler(
+                  new THREE.Euler(...piece.rotation),
+                ),
+                new THREE.Vector3(...piece.scale),
+              ),
+            ),
+          pack,
+          piece,
+        );
         if (!box || keepOut.some((room) => boxesOverlap(box, room))) continue;
         const id = options.newId();
-        project = {
-          ...project,
-          pieces: [...project.pieces, { ...piece, id }],
-        };
+        const name = uniquePieceName(`${plan.bone.name}cover`, names);
+        names.push(name);
+        added.push({ ...piece, id, name });
         covering.push({ bone: plan.bone.bone ?? plan.bone.id, piece: id });
       }
     }
   }
-  return { project, covering };
+  return {
+    project: { ...project, pieces: [...project.pieces, ...added] },
+    covering,
+  };
 }
