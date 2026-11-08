@@ -413,8 +413,10 @@ fn read_heights(smf_path: &Path) -> Result<Heights, String> {
     let words = smf::read_smf_heights(smf_path, &at)?;
     let (lo, hi) = (f64::from(at.info.min_height), f64::from(at.info.max_height));
     let elmos = words
-        .chunks_exact(2)
-        .map(|w| lo + (hi - lo) * f64::from(u16::from_le_bytes([w[0], w[1]])) / 65535.0)
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|w| lo + (hi - lo) * f64::from(u16::from_le_bytes(*w)) / 65535.0)
         .collect();
     Ok(Heights {
         w: at.info.mapx as usize + 1,
