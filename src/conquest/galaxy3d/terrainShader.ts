@@ -1047,7 +1047,7 @@ gl_Position = vec4((uv - uBakeRect.xy) / uBakeRect.zw * 2.0 - 1.0, 0.0, 1.0);
 `;
 
 /** A frozen river's ice in sRGB: clear, with dark water under it. */
-const RIVER_ICE: [number, number, number] = [126, 160, 180];
+const RIVER_ICE: [number, number, number] = [70, 122, 160];
 
 /** Seas that ripple, foam and glint. The rest are drawn as the picture has them. */
 const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
