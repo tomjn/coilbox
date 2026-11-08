@@ -38,8 +38,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::conn::now_ms;
 use crate::conn::{
-    emit, ConnProtocol, EventSink, LobbyEvent, Outbound, Registry, ServerConn, StartedBattle,
-    TachyonHandle,
+    emit, server_owes_a_line, stalled_reason, ConnProtocol, EventSink, LobbyEvent, Outbound,
+    Registry, ServerConn, StartedBattle, TachyonHandle, HANDSHAKE_SILENCE,
 };
 use crate::dmlog::DmLog;
 use crate::tls::ConnectError;
@@ -137,6 +137,28 @@ pub fn spawn_connection(
     on_event: Channel<LobbyEvent>,
     dm_log: DmLog,
 ) {
+    spawn_connection_within(
+        registry,
+        server_key,
+        stream,
+        login,
+        on_event,
+        dm_log,
+        HANDSHAKE_SILENCE,
+    );
+}
+
+/// [`spawn_connection`] with the silence a login may go through chosen by the
+/// caller, so a test does not have to wait out [`HANDSHAKE_SILENCE`].
+fn spawn_connection_within(
+    registry: Registry,
+    server_key: String,
+    stream: TcpStream,
+    login: ZerokLogin,
+    on_event: Channel<LobbyEvent>,
+    dm_log: DmLog,
+    silence_limit: Duration,
+) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
     let mut initial = LobbyState::new();
     // The same store the other two connections keep their threads in, so a
@@ -161,6 +183,7 @@ pub fn spawn_connection(
             phase_slot: phase_tx,
             started: started.clone(),
             dm_log,
+            silence_limit,
         },
     ));
 
@@ -208,6 +231,8 @@ struct ZerokConnContext {
     /// Filled from each `ConnectSpring`, read by `mp_build_battle_config`.
     started: StartedBattle,
     dm_log: DmLog,
+    /// How long the login may go without a line before it is dropped.
+    silence_limit: Duration,
 }
 
 /// The connection event loop. Interleaves inbound lines with the ones commands
@@ -226,6 +251,7 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
         phase_slot,
         started,
         dm_log,
+        silence_limit,
     } = ctx;
 
     emit(&sink, LobbyEvent::Connected);
@@ -243,13 +269,27 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
     // straight after. `None` once that has arrived.
     let mut held_joins: Option<Vec<ZerokAction>> = Some(Vec::new());
 
+    // When the server last spoke or the login last changed phase, which is where
+    // its silence is counted from. The same rule as `crate::conn::run_loop`, see
+    // [`HANDSHAKE_SILENCE`].
+    let mut heard_anything = false;
+    let mut quiet_since = tokio::time::Instant::now();
+    let mut quiet_in = phase.current();
+
     let reason: Option<String> = 'conn: loop {
         let mut outbound: Vec<String> = Vec::new();
         let mut shutdown = false;
+        if phase.current() != quiet_in {
+            quiet_in = phase.current();
+            quiet_since = tokio::time::Instant::now();
+        }
+        let stalled_at = server_owes_a_line(quiet_in).then(|| quiet_since + silence_limit);
 
         tokio::select! {
             item = framed.next() => match item {
                 Some(Ok(raw)) => {
+                    heard_anything = true;
+                    quiet_since = tokio::time::Instant::now();
                     emit(&sink, LobbyEvent::Console {
                         direction: "in".into(),
                         line: raw.clone(),
@@ -471,6 +511,14 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                 | Outbound::SayPrivate { .. }
                 | Outbound::SayPrivateEx { .. } => {}
             },
+            // A server that accepted the socket and went quiet before the
+            // welcome or before answering the login. The socket is open, so
+            // there is no read error and no close to report.
+            _ = tokio::time::sleep_until(stalled_at.unwrap_or_else(tokio::time::Instant::now)),
+                if stalled_at.is_some() =>
+            {
+                break 'conn Some(stalled_reason(heard_anything, silence_limit));
+            }
         }
 
         for line in outbound {
@@ -588,6 +636,11 @@ struct Phase {
 }
 
 impl Phase {
+    /// The phase last set.
+    fn current(&self) -> LoginPhase {
+        *self.slot.borrow()
+    }
+
     fn set(&mut self, phase: LoginPhase) {
         let _ = self.slot.send(phase);
         emit(
