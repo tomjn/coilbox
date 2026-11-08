@@ -308,8 +308,12 @@ async fn mc_read_skybox(path: String) -> CliResult {
             search.push(d);
         }
         search.extend(dirs.iter().cloned());
-        for d in &search {
-            let candidate = d.join(&rel);
+        // The engine reads `maps/<skyBox>`. A file beside mapinfo.lua is still
+        // tried first, as this reader always has.
+        let candidates = search
+            .iter()
+            .flat_map(|d| [d.join(&rel), d.join("maps").join(&rel)]);
+        for candidate in candidates {
             if let Ok(meta) = std::fs::metadata(&candidate) {
                 if meta.is_file() && meta.len() <= SKYBOX_MAX_BYTES {
                     if let Ok(bytes) = std::fs::read(&candidate) {
@@ -759,6 +763,28 @@ async fn mc_write_mapinfo(opts: mapinfo_write::WriteOpts) -> CliResult {
     }
 }
 
+/// `mc_write_skybox` writes a generated sky into a compiled map as
+/// `<outDir>/maps/skybox.jpg` and sets `atmosphere.skyBox` in its `mapinfo.lua`.
+/// `jpeg` is the picture's bytes. Returns `{ path, mapinfoChanged }`.
+#[tauri::command]
+async fn mc_write_skybox(out_dir: String, jpeg: Vec<u8>) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&out_dir)) {
+        return CliResult::err(e);
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        mapinfo_write::write_skybox(Path::new(&out_dir), &jpeg)
+    })
+    .await;
+    match result {
+        Ok(Ok(w)) => CliResult::ok(json!({
+            "path": w.path.to_string_lossy(),
+            "mapinfoChanged": w.mapinfo_changed,
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("skybox task failed: {e}")),
+    }
+}
+
 /// `mc_package_map` writes `<outDir>/<outSuffix>.sdz` from a finished compile and
 /// the `mapinfo.lua` beside it. Returns `{ path, files }`.
 #[tauri::command]
@@ -1030,6 +1056,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_compile,
             mc_read_teams,
             mc_write_mapinfo,
+            mc_write_skybox,
             mc_package_map,
             mc_install_map,
             mc_decompile,

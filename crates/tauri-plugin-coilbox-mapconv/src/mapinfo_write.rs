@@ -472,9 +472,138 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     })
 }
 
+/// What `atmosphere.skyBox` is set to for a sky coilbox generates. The engine
+/// reads the skybox from `maps/<skyBox>` (`rts/Rendering/Env/ISky.cpp`), so the
+/// file is `maps/skybox.jpg` beside `mapinfo.lua`.
+pub const GENERATED_SKYBOX: &str = "skybox.jpg";
+
+/// What [`write_skybox`] wrote.
+#[derive(Debug)]
+pub struct SkyboxWritten {
+    pub path: PathBuf,
+    /// `mapinfo.lua` did not already name the generated sky.
+    pub mapinfo_changed: bool,
+}
+
+/// Write a generated sky into the map in `dir` as `maps/skybox.jpg`, and point
+/// `atmosphere.skyBox` at it.
+///
+/// `jpeg` must be a 2:1 JPEG, the shape the engine reads as a panorama. A map
+/// whose `mapinfo.lua` already names another skybox is refused rather than
+/// having its own sky replaced.
+pub fn write_skybox(dir: &Path, jpeg: &[u8]) -> Result<SkyboxWritten, String> {
+    let img = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("the sky is not a readable JPEG: {e}"))?;
+    if img.width() != 2 * img.height() {
+        return Err(format!(
+            "the sky is {}x{}, but the engine reads a panorama as twice as wide as it is tall",
+            img.width(),
+            img.height()
+        ));
+    }
+    let info = dir.join("mapinfo.lua");
+    let src = std::fs::read_to_string(&info).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => {
+            format!("{} is not there. Write mapinfo.lua first.", info.display())
+        }
+        _ => format!("could not read {}: {e}", info.display()),
+    })?;
+    let named = mapinfo::eval_appearance(dir, &src)
+        .unwrap_or_else(|| mapinfo::parse_appearance(&src))
+        .sky_box;
+    if let Some(name) = named.filter(|n| !n.eq_ignore_ascii_case(GENERATED_SKYBOX)) {
+        return Err(format!(
+            "mapinfo.lua already names the skybox {name}, so the generated sky was not written"
+        ));
+    }
+    let after = patch(
+        &src,
+        &[set(&["atmosphere", "skyBox"], text(GENERATED_SKYBOX))],
+    )?;
+    if evaluates(dir, &src) && !evaluates(dir, &after) {
+        return Err(format!(
+            "the edited {} no longer evaluates, so nothing was written",
+            info.display()
+        ));
+    }
+
+    let maps = dir.join("maps");
+    std::fs::create_dir_all(&maps)
+        .map_err(|e| format!("could not create {}: {e}", maps.display()))?;
+    let path = maps.join(GENERATED_SKYBOX);
+    let tmp = maps.join(format!("{GENERATED_SKYBOX}.tmp"));
+    std::fs::write(&tmp, jpeg).map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, &path)
+        .map_err(|e| format!("could not replace {}: {e}", path.display()))?;
+
+    let mapinfo_changed = after != src;
+    if mapinfo_changed {
+        let tmp = dir.join("mapinfo.lua.tmp");
+        std::fs::write(&tmp, &after)
+            .map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
+        std::fs::rename(&tmp, &info)
+            .map_err(|e| format!("could not replace {}: {e}", info.display()))?;
+    }
+    Ok(SkyboxWritten {
+        path,
+        mapinfo_changed,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `w` by `h` JPEG.
+    fn jpeg(w: u32, h: u32) -> Vec<u8> {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(w, h, image::Rgb([40, 80, 200]))
+            .write_to(&mut out, image::ImageFormat::Jpeg)
+            .unwrap();
+        out.into_inner()
+    }
+
+    #[test]
+    fn a_generated_sky_is_written_under_maps_and_named_in_mapinfo() {
+        let dir = temp_dir("sky");
+        write(&opts(&dir)).unwrap();
+        let w = write_skybox(&dir, &jpeg(64, 32)).unwrap();
+        assert_eq!(w.path, dir.join("maps").join("skybox.jpg"));
+        assert!(w.mapinfo_changed);
+        assert_eq!(std::fs::read(&w.path).unwrap(), jpeg(64, 32));
+        assert_eq!(eval(&dir)["atmosphere"]["skyBox"], "skybox.jpg");
+        // Writing it again replaces the picture and leaves mapinfo.lua alone.
+        assert!(!write_skybox(&dir, &jpeg(64, 32)).unwrap().mapinfo_changed);
+    }
+
+    #[test]
+    fn a_map_with_its_own_skybox_keeps_it() {
+        let dir = temp_dir("own-sky");
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { atmosphere = { skyBox = \"mine.dds\" } }",
+        )
+        .unwrap();
+        let err = write_skybox(&dir, &jpeg(64, 32)).unwrap_err();
+        assert!(err.contains("mine.dds"), "{err}");
+        assert!(!dir.join("maps").exists());
+    }
+
+    #[test]
+    fn a_sky_that_is_not_a_two_to_one_jpeg_is_refused() {
+        let dir = temp_dir("bad-sky");
+        write(&opts(&dir)).unwrap();
+        assert!(write_skybox(&dir, &jpeg(64, 64)).is_err());
+        assert!(write_skybox(&dir, b"not a picture").is_err());
+        assert!(!dir.join("maps").exists());
+    }
+
+    #[test]
+    fn a_sky_needs_a_mapinfo_to_name_it() {
+        let dir = temp_dir("no-info");
+        let err = write_skybox(&dir, &jpeg(64, 32)).unwrap_err();
+        assert!(err.contains("Write mapinfo.lua first"), "{err}");
+    }
 
     /// Options for `mymap`, with a stand-in `.smf` in `dir` unless one is there.
     fn opts(dir: &Path) -> WriteOpts {

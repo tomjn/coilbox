@@ -13,6 +13,7 @@ permissions = [
   "allow-mc-compile",
   "allow-mc-read-teams",
   "allow-mc-write-mapinfo",
+  "allow-mc-write-skybox",
   "allow-mc-package-map",
   "allow-mc-install-map",
   "allow-mc-decompile",
