@@ -11,7 +11,7 @@
       "stance": 28.224323896461865,
       "bodyHeight": 3.892263590275543
     },
-    "hash": 2299915229
+    "hash": 3284229369
   },
   "biped assault large": {
     "pieces": 25,
@@ -25,7 +25,7 @@
       "stance": 55.09591408346314,
       "bodyHeight": 9.22153893613955
     },
-    "hash": 4171192716
+    "hash": 4174817924
   },
   "biped artillery small": {
     "pieces": 22,
@@ -39,7 +39,7 @@
       "stance": 29.6042675780654,
       "bodyHeight": 5.262571504082065
     },
-    "hash": 1923003270
+    "hash": 1889379221
   },
   "biped artillery large": {
     "pieces": 24,
@@ -53,7 +53,7 @@
       "stance": 60,
       "bodyHeight": 9.57031382656563
     },
-    "hash": 2807994969
+    "hash": 4123876473
   },
   "biped scout small": {
     "pieces": 20,
@@ -67,7 +67,7 @@
       "stance": 12.243661172720604,
       "bodyHeight": 2.9587509098136793
     },
-    "hash": 595103480
+    "hash": 3675677006
   },
   "biped scout large": {
     "pieces": 17,
@@ -80,7 +80,7 @@
       "stance": 18.063976534166837,
       "bodyHeight": 4.097430137211923
     },
-    "hash": 3116461231
+    "hash": 2971859361
   },
   "biped builder small": {
     "pieces": 22,
@@ -94,7 +94,7 @@
       "stance": 25.580492186082996,
       "bodyHeight": 4.3479711031238555
     },
-    "hash": 388864262
+    "hash": 2997350411
   },
   "biped builder large": {
     "pieces": 25,
@@ -108,7 +108,7 @@
       "stance": 45.78912555110268,
       "bodyHeight": 7.248107216164469
     },
-    "hash": 41585435
+    "hash": 2206830831
   },
   "biped antiair small": {
     "pieces": 22,
@@ -122,7 +122,7 @@
       "stance": 22.759575653616345,
       "bodyHeight": 4.196348100568867
     },
-    "hash": 2618280298
+    "hash": 2429871122
   },
   "biped antiair large": {
     "pieces": 22,
@@ -136,7 +136,7 @@
       "stance": 42.2717581310235,
       "bodyHeight": 8.197200047565623
     },
-    "hash": 1259018534
+    "hash": 2659101948
   },
   "quadruped assault small": {
     "pieces": 34,
@@ -151,7 +151,7 @@
       "bodyHeight": 3.7960260028322232,
       "bodyLength": 15.719619041254031
     },
-    "hash": 3160977053
+    "hash": 1290257457
   },
   "quadruped assault large": {
     "pieces": 38,
@@ -166,7 +166,7 @@
       "bodyHeight": 7.851946090289859,
       "bodyLength": 43.40975081820219
     },
-    "hash": 2275503516
+    "hash": 2467437839
   },
   "quadruped artillery small": {
     "pieces": 34,
@@ -181,7 +181,7 @@
       "bodyHeight": 4.4407361908634195,
       "bodyLength": 27.69049433015547
     },
-    "hash": 1363994804
+    "hash": 1327768439
   },
   "quadruped artillery large": {
     "pieces": 36,
@@ -196,7 +196,7 @@
       "bodyHeight": 9.809760426746216,
       "bodyLength": 61.017433208773554
     },
-    "hash": 1237791452
+    "hash": 2360907320
   },
   "quadruped scout small": {
     "pieces": 32,
@@ -211,7 +211,7 @@
       "bodyHeight": 2.588721642731689,
       "bodyLength": 13.318445027639909
     },
-    "hash": 245708458
+    "hash": 513619387
   },
   "quadruped scout large": {
     "pieces": 32,
@@ -226,7 +226,7 @@
       "bodyHeight": 4.627266211735317,
       "bodyLength": 21.123858054772555
     },
-    "hash": 2387338421
+    "hash": 3831045816
   },
   "quadruped builder small": {
     "pieces": 35,
@@ -241,7 +241,7 @@
       "bodyHeight": 4.033446322154488,
       "bodyLength": 20.827525493388798
     },
-    "hash": 2230804390
+    "hash": 3686748598
   },
   "quadruped builder large": {
     "pieces": 35,
@@ -256,7 +256,7 @@
       "bodyHeight": 6.505320593071169,
       "bodyLength": 31.97632366127855
     },
-    "hash": 4080916638
+    "hash": 1877038128
   },
   "quadruped antiair small": {
     "pieces": 35,
@@ -271,7 +271,7 @@
       "bodyHeight": 4.445930070695467,
       "bodyLength": 23.315924380477245
     },
-    "hash": 3629279122
+    "hash": 2695452857
   },
   "quadruped antiair large": {
     "pieces": 35,
@@ -286,7 +286,7 @@
       "bodyHeight": 8.079970597199164,
       "bodyLength": 38.00335354685054
     },
-    "hash": 3478172781
+    "hash": 3032531225
   },
   "hexapod assault small": {
     "pieces": 47,
@@ -301,7 +301,7 @@
       "bodyHeight": 3.6211995629360905,
       "legGap": 21.043188422405507
     },
-    "hash": 2113922653
+    "hash": 92374871
   },
   "hexapod assault large": {
     "pieces": 50,
@@ -316,7 +316,7 @@
       "bodyHeight": 9.122892946042121,
       "legGap": 38.726077482118264
     },
-    "hash": 480357841
+    "hash": 3245273655
   },
   "hexapod artillery small": {
     "pieces": 46,
@@ -331,7 +331,7 @@
       "bodyHeight": 5.392230466541369,
       "legGap": 24.14551677994081
     },
-    "hash": 1974592718
+    "hash": 1580178040
   },
   "hexapod artillery large": {
     "pieces": 53,
@@ -346,7 +346,7 @@
       "bodyHeight": 8.88880423584301,
       "legGap": 46.17492770820157
     },
-    "hash": 1839003114
+    "hash": 4069220546
   },
   "hexapod scout small": {
     "pieces": 44,
@@ -361,7 +361,7 @@
       "bodyHeight": 2.9643420697026888,
       "legGap": 13.702919600916792
     },
-    "hash": 2428096882
+    "hash": 2478892088
   },
   "hexapod scout large": {
     "pieces": 45,
@@ -375,7 +375,7 @@
       "bodyHeight": 4.131630534009542,
       "legGap": 26.194732169769
     },
-    "hash": 1766430058
+    "hash": 4196015442
   },
   "hexapod builder small": {
     "pieces": 47,
@@ -390,7 +390,7 @@
       "bodyHeight": 4.308400826939614,
       "legGap": 19.85676765814307
     },
-    "hash": 1560874216
+    "hash": 525420368
   },
   "hexapod builder large": {
     "pieces": 51,
@@ -405,7 +405,7 @@
       "bodyHeight": 7.822454215994104,
       "legGap": 41.52700991694907
     },
-    "hash": 4001251777
+    "hash": 1929473637
   },
   "hexapod antiair small": {
     "pieces": 46,
@@ -420,7 +420,7 @@
       "bodyHeight": 4.225749475210906,
       "legGap": 18.607726173594124
     },
-    "hash": 1673062725
+    "hash": 2533479216
   },
   "hexapod antiair large": {
     "pieces": 48,
@@ -435,7 +435,7 @@
       "bodyHeight": 7.39873334544897,
       "legGap": 44.15564148187683
     },
-    "hash": 970774093
+    "hash": 3728877920
   },
   "octopod assault small": {
     "pieces": 59,
@@ -450,7 +450,7 @@
       "bodyHeight": 4.46419756025076,
       "legGap": 18.04800090580713
     },
-    "hash": 2072746093
+    "hash": 2377309443
   },
   "octopod assault large": {
     "pieces": 69,
@@ -465,7 +465,7 @@
       "bodyHeight": 8.485686824165752,
       "legGap": 41.4922946642444
     },
-    "hash": 2883873039
+    "hash": 2900956054
   },
   "octopod artillery small": {
     "pieces": 61,
@@ -480,7 +480,7 @@
       "bodyHeight": 4.738899126833305,
       "legGap": 26.029664143925295
     },
-    "hash": 2225445542
+    "hash": 3744113421
   },
   "octopod artillery large": {
     "pieces": 73,
@@ -495,7 +495,7 @@
       "bodyHeight": 9.515041584949941,
       "legGap": 46.18275436919601
     },
-    "hash": 1598494566
+    "hash": 3948389257
   },
   "octopod scout small": {
     "pieces": 53,
@@ -509,7 +509,7 @@
       "bodyHeight": 2.817089068999048,
       "legGap": 11.92842729051248
     },
-    "hash": 4095997579
+    "hash": 771237646
   },
   "octopod scout large": {
     "pieces": 58,
@@ -524,7 +524,7 @@
       "bodyHeight": 4.978971559064928,
       "legGap": 22.724537934357066
     },
-    "hash": 4237775938
+    "hash": 699542062
   },
   "octopod builder small": {
     "pieces": 60,
@@ -539,7 +539,7 @@
       "bodyHeight": 4.413703473089264,
       "legGap": 21.68048585068958
     },
-    "hash": 3687299671
+    "hash": 2877862510
   },
   "octopod builder large": {
     "pieces": 65,
@@ -554,7 +554,7 @@
       "bodyHeight": 7.535459345541894,
       "legGap": 38.047120955853714
     },
-    "hash": 1042269227
+    "hash": 2338302816
   },
   "octopod antiair small": {
     "pieces": 61,
@@ -569,7 +569,7 @@
       "bodyHeight": 3.9839443730749196,
       "legGap": 23.095421018624904
     },
-    "hash": 4123854326
+    "hash": 1665410064
   },
   "octopod antiair large": {
     "pieces": 61,
@@ -584,7 +584,7 @@
       "bodyHeight": 7.8352802713494745,
       "legGap": 33.03522535105002
     },
-    "hash": 1949652859
+    "hash": 4115366407
   },
   "wheeled assault small": {
     "pieces": 17,
@@ -599,7 +599,7 @@
       "trackWidth": 19.171796979568896,
       "wheelHeight": 3.4669829521147766
     },
-    "hash": 2628450877
+    "hash": 2771149444
   },
   "wheeled assault large": {
     "pieces": 23,
@@ -614,7 +614,7 @@
       "trackWidth": 41.340437390282744,
       "wheelHeight": 7.165181722120614
     },
-    "hash": 3338638699
+    "hash": 2659552971
   },
   "wheeled artillery small": {
     "pieces": 18,
@@ -629,7 +629,7 @@
       "trackWidth": 25.349175847973672,
       "wheelHeight": 4.462768442497356
     },
-    "hash": 2997812338
+    "hash": 186185332
   },
   "wheeled artillery large": {
     "pieces": 18,
@@ -644,7 +644,7 @@
       "trackWidth": 46.37334102361463,
       "wheelHeight": 7.808303394014248
     },
-    "hash": 197944681
+    "hash": 2148571341
   },
   "wheeled scout small": {
     "pieces": 18,
@@ -658,7 +658,7 @@
       "trackWidth": 13.366805543098597,
       "wheelHeight": 1.9981918589468115
     },
-    "hash": 3465551769
+    "hash": 4122598662
   },
   "wheeled scout large": {
     "pieces": 20,
@@ -673,7 +673,7 @@
       "trackWidth": 20.78907890958246,
       "wheelHeight": 3.8438142965186852
     },
-    "hash": 2216600156
+    "hash": 3333199286
   },
   "wheeled builder small": {
     "pieces": 18,
@@ -688,7 +688,7 @@
       "trackWidth": 20.604339359002186,
       "wheelHeight": 3.9332400271279035
     },
-    "hash": 1998366824
+    "hash": 570184998
   },
   "wheeled builder large": {
     "pieces": 15,
@@ -703,7 +703,7 @@
       "trackWidth": 42.05167684823274,
       "wheelHeight": 5.86031011432968
     },
-    "hash": 30296807
+    "hash": 444956705
   },
   "wheeled antiair small": {
     "pieces": 18,
@@ -718,7 +718,7 @@
       "trackWidth": 19.76221791228745,
       "wheelHeight": 3.803954693134292
     },
-    "hash": 2188316713
+    "hash": 1693368196
   },
   "wheeled antiair large": {
     "pieces": 22,
@@ -733,7 +733,7 @@
       "trackWidth": 42.244517909474666,
       "wheelHeight": 5.87271835457161
     },
-    "hash": 2938649705
+    "hash": 1630876259
   },
   "tracked assault small": {
     "pieces": 28,
@@ -748,7 +748,7 @@
       "trackHeight": 7.309132867986337,
       "roadWheels": 8
     },
-    "hash": 3609987973
+    "hash": 3413641105
   },
   "tracked assault large": {
     "pieces": 27,
@@ -763,7 +763,7 @@
       "trackHeight": 14.052821901943533,
       "roadWheels": 7
     },
-    "hash": 1234092892
+    "hash": 953262916
   },
   "tracked artillery small": {
     "pieces": 31,
@@ -778,7 +778,7 @@
       "trackHeight": 8.40548383492604,
       "roadWheels": 10
     },
-    "hash": 219962241
+    "hash": 2449803748
   },
   "tracked artillery large": {
     "pieces": 25,
@@ -793,7 +793,7 @@
       "trackHeight": 15,
       "roadWheels": 7
     },
-    "hash": 689090300
+    "hash": 18165733
   },
   "tracked scout small": {
     "pieces": 19,
@@ -836,7 +836,7 @@
       "trackHeight": 6.358709253980779,
       "roadWheels": 7
     },
-    "hash": 2409042781
+    "hash": 1765762926
   },
   "tracked builder large": {
     "pieces": 24,
@@ -851,7 +851,7 @@
       "trackHeight": 12.388028231739996,
       "roadWheels": 6
     },
-    "hash": 1386217764
+    "hash": 4002442055
   },
   "tracked antiair small": {
     "pieces": 34,
@@ -866,7 +866,7 @@
       "trackHeight": 6.5965599434729665,
       "roadWheels": 11
     },
-    "hash": 2683182044
+    "hash": 1494314195
   },
   "tracked antiair large": {
     "pieces": 34,
@@ -881,7 +881,7 @@
       "trackHeight": 12.782799019325525,
       "roadWheels": 11
     },
-    "hash": 2172411363
+    "hash": 3093864400
   },
   "turret.building assault small": {
     "pieces": 13,
@@ -895,7 +895,7 @@
       "turretHeight": 11.02047788835014,
       "barrelLength": 26.615566647313535
     },
-    "hash": 816796331
+    "hash": 3712178853
   },
   "turret.building assault large": {
     "pieces": 18,
@@ -909,7 +909,7 @@
       "turretHeight": 20.609084123309,
       "barrelLength": 63.989922779873005
     },
-    "hash": 1676278855
+    "hash": 498968956
   },
   "turret.building artillery small": {
     "pieces": 13,
@@ -923,7 +923,7 @@
       "turretHeight": 11.421854336291318,
       "barrelLength": 39.681486574441195
     },
-    "hash": 706917798
+    "hash": 418107952
   },
   "turret.building artillery large": {
     "pieces": 17,
@@ -937,7 +937,7 @@
       "turretHeight": 21.0761005032463,
       "barrelLength": 72.43621320007229
     },
-    "hash": 4134610431
+    "hash": 488812674
   },
   "turret.building scout small": {
     "pieces": 8,
@@ -978,7 +978,7 @@
       "turretHeight": 9.546847811974,
       "barrelLength": 30.53237373583834
     },
-    "hash": 4053525653
+    "hash": 979951743
   },
   "turret.building builder large": {
     "pieces": 13,
@@ -992,7 +992,7 @@
       "turretHeight": 16.95832653206447,
       "barrelLength": 50.351713558342766
     },
-    "hash": 1347580354
+    "hash": 1234721408
   },
   "turret.building antiair small": {
     "pieces": 10,
@@ -1006,7 +1006,7 @@
       "turretHeight": 10.186079557130578,
       "barrelLength": 31.380708125529925
     },
-    "hash": 2543630633
+    "hash": 1840465800
   },
   "turret.building antiair large": {
     "pieces": 13,
@@ -1020,7 +1020,7 @@
       "turretHeight": 21.691597463075063,
       "barrelLength": 60.99070161847584
     },
-    "hash": 3276851915
+    "hash": 3764961853
   },
   "building assault small": {
     "pieces": 14,
@@ -1030,7 +1030,7 @@
     ],
     "covering": 9,
     "proportions": {},
-    "hash": 939981322
+    "hash": 2669204119
   },
   "building assault large": {
     "pieces": 42,
@@ -1040,7 +1040,7 @@
     ],
     "covering": 36,
     "proportions": {},
-    "hash": 2070490962
+    "hash": 1055547042
   },
   "building artillery small": {
     "pieces": 14,
@@ -1050,7 +1050,7 @@
     ],
     "covering": 9,
     "proportions": {},
-    "hash": 590253156
+    "hash": 4218181494
   },
   "building artillery large": {
     "pieces": 42,
@@ -1060,7 +1060,7 @@
     ],
     "covering": 36,
     "proportions": {},
-    "hash": 4062390661
+    "hash": 3815706347
   },
   "building scout small": {
     "pieces": 2,
@@ -1088,7 +1088,7 @@
     ],
     "covering": 9,
     "proportions": {},
-    "hash": 3069873035
+    "hash": 995481679
   },
   "building builder large": {
     "pieces": 31,
@@ -1098,7 +1098,7 @@
     ],
     "covering": 25,
     "proportions": {},
-    "hash": 2736671088
+    "hash": 3320552845
   },
   "building antiair small": {
     "pieces": 15,
@@ -1108,7 +1108,7 @@
     ],
     "covering": 9,
     "proportions": {},
-    "hash": 3645252483
+    "hash": 981776649
   },
   "building antiair large": {
     "pieces": 42,
@@ -1118,7 +1118,7 @@
     ],
     "covering": 36,
     "proportions": {},
-    "hash": 3233943406
+    "hash": 2293208380
   },
   "hover assault small": {
     "pieces": 15,
@@ -1133,7 +1133,7 @@
       "hullHeight": 9.572366055175081,
       "gap": 0.08272785635723266
     },
-    "hash": 1259289804
+    "hash": 1190542730
   },
   "hover assault large": {
     "pieces": 17,
@@ -1148,7 +1148,7 @@
       "hullHeight": 21.22491839452414,
       "gap": 0.16866475501097739
     },
-    "hash": 990852694
+    "hash": 3988740556
   },
   "hover artillery small": {
     "pieces": 16,
@@ -1163,7 +1163,7 @@
       "hullHeight": 12.434596237111602,
       "gap": 0.10267847109376453
     },
-    "hash": 3128976545
+    "hash": 1681780638
   },
   "hover artillery large": {
     "pieces": 19,
@@ -1178,7 +1178,7 @@
       "hullHeight": 25,
       "gap": 0.1509567818834912
     },
-    "hash": 675232800
+    "hash": 148840062
   },
   "hover scout small": {
     "pieces": 10,
@@ -1192,7 +1192,7 @@
       "hullHeight": 7.065567220028024,
       "gap": 0.05589497697656043
     },
-    "hash": 3922656316
+    "hash": 309633063
   },
   "hover scout large": {
     "pieces": 13,
@@ -1207,7 +1207,7 @@
       "hullHeight": 13.177194426280446,
       "gap": 0.08197623873571865
     },
-    "hash": 3875675981
+    "hash": 4252685021
   },
   "hover builder small": {
     "pieces": 16,
@@ -1222,7 +1222,7 @@
       "hullHeight": 10.356718187240185,
       "gap": 0.06557010788354092
     },
-    "hash": 2082583569
+    "hash": 405797429
   },
   "hover builder large": {
     "pieces": 18,
@@ -1237,7 +1237,7 @@
       "hullHeight": 21.193363928304983,
       "gap": 0.12291709235263987
     },
-    "hash": 2734033814
+    "hash": 3521583966
   },
   "hover antiair small": {
     "pieces": 16,
@@ -1252,7 +1252,7 @@
       "hullHeight": 10.438414959194489,
       "gap": 0.07919698129640892
     },
-    "hash": 1696199009
+    "hash": 3012625683
   },
   "hover antiair large": {
     "pieces": 19,
@@ -1267,7 +1267,7 @@
       "hullHeight": 19.3320243265219,
       "gap": 0.13282327931420876
     },
-    "hash": 2814648684
+    "hash": 3594166044
   },
   "ship assault small": {
     "pieces": 16,
@@ -1282,7 +1282,7 @@
       "turretHeight": 4.253254053335404,
       "barrelLength": 10
     },
-    "hash": 117889037
+    "hash": 569050081
   },
   "ship assault large": {
     "pieces": 23,
@@ -1297,7 +1297,7 @@
       "turretHeight": 7.895657339897006,
       "barrelLength": 21.579507187495476
     },
-    "hash": 2294231484
+    "hash": 3814510502
   },
   "ship artillery small": {
     "pieces": 19,
@@ -1312,7 +1312,7 @@
       "turretHeight": 4.985364872011821,
       "barrelLength": 13.359116337923565
     },
-    "hash": 4251235416
+    "hash": 2489521689
   },
   "ship artillery large": {
     "pieces": 27,
@@ -1327,7 +1327,7 @@
       "turretHeight": 10.027974563864523,
       "barrelLength": 23.46429911432788
     },
-    "hash": 2827242875
+    "hash": 2962859053
   },
   "ship scout small": {
     "pieces": 7,
@@ -1371,7 +1371,7 @@
       "turretHeight": 3.8190981375100086,
       "barrelLength": 10.563200832423174
     },
-    "hash": 3292785574
+    "hash": 1001022053
   },
   "ship builder large": {
     "pieces": 23,
@@ -1386,7 +1386,7 @@
       "turretHeight": 8.125485386298969,
       "barrelLength": 19.659494094005318
     },
-    "hash": 2319360844
+    "hash": 1747442226
   },
   "ship antiair small": {
     "pieces": 16,
@@ -1401,7 +1401,7 @@
       "turretHeight": 4.7303577340662,
       "barrelLength": 10.445614218109986
     },
-    "hash": 3415646595
+    "hash": 3362217151
   },
   "ship antiair large": {
     "pieces": 22,
@@ -1416,7 +1416,7 @@
       "turretHeight": 7.503929972575045,
       "barrelLength": 21.443540182546243
     },
-    "hash": 657578294
+    "hash": 1589278642
   },
   "aircraft assault small": {
     "pieces": 12,
@@ -1430,7 +1430,7 @@
       "gunHeight": 1.2185101512208347,
       "barrelLength": 3.563446587834042
     },
-    "hash": 1371648143
+    "hash": 2449285253
   },
   "aircraft assault large": {
     "pieces": 12,
@@ -1444,7 +1444,7 @@
       "gunHeight": 2.4943734426121225,
       "barrelLength": 7.66534447719343
     },
-    "hash": 1264868636
+    "hash": 1847252380
   },
   "aircraft artillery small": {
     "pieces": 13,
@@ -1458,7 +1458,7 @@
       "gunHeight": 1.8836111042029222,
       "barrelLength": 4.462301206684671
     },
-    "hash": 1382583261
+    "hash": 1549010493
   },
   "aircraft artillery large": {
     "pieces": 18,
@@ -1472,7 +1472,7 @@
       "gunHeight": 3.6653760096365584,
       "barrelLength": 9.290498082464559
     },
-    "hash": 4168125004
+    "hash": 1862849268
   },
   "aircraft scout small": {
     "pieces": 5,
@@ -1512,7 +1512,7 @@
       "gunHeight": 1.4396357041335428,
       "barrelLength": 4.284394727493636
     },
-    "hash": 2384526724
+    "hash": 4082355109
   },
   "aircraft builder large": {
     "pieces": 13,
@@ -1526,7 +1526,7 @@
       "gunHeight": 2.3430414428859945,
       "barrelLength": 6.603747385926544
     },
-    "hash": 3241183256
+    "hash": 2812821124
   },
   "aircraft antiair small": {
     "pieces": 13,
@@ -1540,7 +1540,7 @@
       "gunHeight": 1.293635368926334,
       "barrelLength": 3.3588794477772903
     },
-    "hash": 1758644865
+    "hash": 775400065
   },
   "aircraft antiair large": {
     "pieces": 13,
@@ -1554,6 +1554,6 @@
       "gunHeight": 2.486325372894294,
       "barrelLength": 6.732333110708742
     },
-    "hash": 1153581201
+    "hash": 3564190105
   }
 }

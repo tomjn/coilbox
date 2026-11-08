@@ -44,6 +44,7 @@ import {
   uniquePieceName,
 } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
+import { portableEuler } from "./portableAngles";
 import { worldMatrix } from "./reparent";
 
 /**
@@ -91,15 +92,6 @@ const TOUCH = 1e-6;
 /** The parts that may cover a span, and those that may make a deck. */
 const SPAN_SHAPES = ["beam", "block"];
 const DECK_SHAPES = ["plate", "block"];
-
-/**
- * A number held to nine places, so the same seed gives the same document. A
- * part's turn is worked out with trigonometry, and its last bit differed
- * between a full test run and a run of the generator's tests alone.
- */
-function settle(value: number): number {
-  return Math.round(value * 1e9) / 1e9 || 0;
-}
 
 /** The id a part is measured under before it is kept. */
 const PROBE = "covering.probe";
@@ -279,7 +271,10 @@ function fits(
  * directions. A part is a box, so a direction may be reversed to keep it a
  * rotation rather than a mirror.
  */
-function laidAlong(axes: number[], frame: THREE.Vector3[]): THREE.Euler {
+function laidAlong(
+  axes: number[],
+  frame: THREE.Vector3[],
+): [number, number, number] {
   const columns = [
     new THREE.Vector3(),
     new THREE.Vector3(),
@@ -293,16 +288,12 @@ function laidAlong(axes: number[], frame: THREE.Vector3[]): THREE.Euler {
     columns[1] as THREE.Vector3,
     columns[2] as THREE.Vector3,
   );
-  if (basis.determinant() < 0) {
-    const last = axes[2] as number;
-    columns[last]?.negate();
-    basis.makeBasis(
-      columns[0] as THREE.Vector3,
-      columns[1] as THREE.Vector3,
-      columns[2] as THREE.Vector3,
-    );
-  }
-  return new THREE.Euler().setFromRotationMatrix(basis);
+  if (basis.determinant() < 0) columns[axes[2] as number]?.negate();
+  return portableEuler(
+    columns[0] as THREE.Vector3,
+    columns[1] as THREE.Vector3,
+    columns[2] as THREE.Vector3,
+  );
 }
 
 /** The middle of copy `i` of `count`, each `size` long, laid end to end from
@@ -518,13 +509,9 @@ export function coverSkeleton(
           name: "",
           parentId: plan.bone.id,
           partId: fit.part.id,
-          position: [settle(at.x), settle(at.y), settle(at.z)],
-          rotation: [
-            settle(rotation.x),
-            settle(rotation.y),
-            settle(rotation.z),
-          ],
-          scale: [settle(fit.scale), settle(fit.scale), settle(fit.scale)],
+          position: [at.x, at.y, at.z],
+          rotation: [...rotation],
+          scale: [fit.scale, fit.scale, fit.scale],
         };
         const box = boxIn(
           boneWorld

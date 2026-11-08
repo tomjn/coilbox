@@ -305,6 +305,16 @@ describe("generateUnit", () => {
     const covering = (unit: LegoProject) =>
       new Set(unit.generated?.covering?.map((c) => c.piece));
 
+    it("gives the same document again after generating many others", () => {
+      const first = JSON.stringify(generate(1, "quadruped", "scout", "small"));
+      for (const { plan, job, size } of EVERY) {
+        for (const seed of [1, 2, 3]) generate(seed, plan, job, size);
+      }
+      expect(JSON.stringify(generate(1, "quadruped", "scout", "small"))).toBe(
+        first,
+      );
+    });
+
     it("gives the same covering for the same seed", () => {
       for (const { plan, job, size } of EVERY) {
         const a = generate(5, plan, job, size);
