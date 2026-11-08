@@ -1,14 +1,21 @@
 import { select, t } from "@lingui/core/macro";
 import { generateCities } from "./cities";
 import { erodeRelief } from "./displayErosion";
+import { playExtentFor } from "./galaxy3d/layout";
 import { terrainMarginPixels } from "./galaxy3d/terrain";
 import type { TerrainPixels } from "./galaxy3d/terrainLoad";
+import { OUTPOST_RADIUS, TOWN_EDGE_MOST } from "./galaxy3d/towns";
 import { type GenerateOptions, type GenMap, generateGalaxy } from "./generate";
 import type { GalaxyDoc, MapSkin } from "./model";
 import type { ConquestNames } from "./names";
 import { planetOf } from "./planets";
-import { desertShare, findRivers, riverEdgePixels } from "./rivers";
-import { extendTerrain, TERRAIN_PIXELS } from "./terrainGen";
+import {
+  carveValleys,
+  desertShare,
+  findRivers,
+  riverEdgePixels,
+} from "./rivers";
+import { extendTerrain, TERRAIN_MAP_UNITS, TERRAIN_PIXELS } from "./terrainGen";
 import { generatedTerrainWithMargin, generateTerritories } from "./territories";
 
 /**
@@ -135,6 +142,30 @@ export function drawsAsGalaxy(
   return !doc.terrain && (doc.theme?.skin ?? "galaxy") === "galaxy";
 }
 
+/** Seas whose worlds have rivers. */
+const RIVER_SEAS: readonly string[] = ["water", "acid", "ice"];
+
+/**
+ * Room round every location that rivers keep out of, in pixels of the
+ * extended picture: as much as the smallest town reaches, so every town has
+ * dry ground to stand on. A bigger town is kept off the river where it is
+ * drawn (`planTowns`), so it stands on the bank.
+ */
+function townRoom(doc: GalaxyDoc, mapPixels: number, margin: number) {
+  const worldPerMapUnit = playExtentFor(doc.nodes.length) / TERRAIN_MAP_UNITS;
+  // As the routing grid and the view read the heights: pixel i is at map
+  // i / (pixels - 1) of the way across.
+  const pixelsPerMapUnit = (mapPixels - 1) / TERRAIN_MAP_UNITS;
+  const radius =
+    ((OUTPOST_RADIUS * TOWN_EDGE_MOST) / worldPerMapUnit) * pixelsPerMapUnit +
+    1.5;
+  return doc.nodes.map((n) => ({
+    x: n.pos[0] * pixelsPerMapUnit + margin,
+    y: n.pos[1] * pixelsPerMapUnit + margin,
+    radius,
+  }));
+}
+
 /**
  * The land of a generated Cities or Territories document, as the pixels the
  * strategic view takes in place of the document's `generated:` markers.
@@ -168,15 +199,23 @@ export function generatedTerrainPixels(
       );
   // Rivers run on the eroded heights, so they lie in the valleys the light
   // shows. The water is the pinned heights' alone, since a gully can be cut
-  // to 0 where the view still draws land. A cratered world has none.
-  const rivers = planet.craters
-    ? []
-    : findRivers(
+  // to 0 where the view still draws land. Only a world with water or acid in
+  // its seas, or ice, has rivers: a cratered one is dry, nothing rains lava,
+  // and a dry basin has nothing to rain.
+  const rivers = RIVER_SEAS.includes(planet.sea.look)
+    ? findRivers(
         relief.map((v, i) => (wide.relief[i] > 0 ? Math.max(v, 1e-6) : 0)),
         wide.width,
         wide.height,
         desertShare(wide.biomes.a, wide.biomes.b, planet),
-      );
+        townRoom(doc, width, wide.margin),
+      )
+    : [];
+  // Each river cuts its own valley into the heights the light comes from.
+  const lit =
+    rivers.length > 0
+      ? carveValleys(relief, wide.width, wide.height, rivers)
+      : relief;
   return {
     color: { data: terrain.image, width, height },
     height: { data: terrain.heightmap, width, height },
@@ -194,7 +233,7 @@ export function generatedTerrainPixels(
       margin: wide.margin,
       image: { data: wide.image, width: wide.width, height: wide.height },
       heights: { data: wide.heights, width: wide.width, height: wide.height },
-      relief: { data: relief, width: wide.width, height: wide.height },
+      relief: { data: lit, width: wide.width, height: wide.height },
       rivers:
         rivers.length > 0
           ? riverEdgePixels(rivers, wide.width, wide.height)

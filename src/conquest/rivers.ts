@@ -264,16 +264,58 @@ function roundCorners(points: number[][], rounds: number): number[][] {
   return out;
 }
 
+/** Ground a river keeps out of: a disc, in pixels of the picture. */
+export interface RiverBlock {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+/** How much a block raises the ground at its middle, above any land. */
+const BLOCK_RISE = 2;
+
+/** Points back from a joining river's end that bend to meet the river it joins. */
+const JOIN_BEND = 8;
+
+/** The nearest point to `(px, py)` on a course of x, y, half width triples. */
+function nearestOn(
+  course: number[][],
+  px: number,
+  py: number,
+): { x: number; y: number; w: number } {
+  let best = Number.POSITIVE_INFINITY;
+  let out = { x: course[0][0], y: course[0][1], w: course[0][2] };
+  for (let k = 0; k + 1 < course.length; k++) {
+    const [ax, ay, aw] = course[k];
+    const [bx, by, bw] = course[k + 1];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / len2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const x = ax + dx * t;
+    const y = ay + dy * t;
+    const d = (x - px) ** 2 + (y - py) ** 2;
+    if (d < best) {
+      best = d;
+      out = { x, y, w: aw + (bw - aw) * t };
+    }
+  }
+  return out;
+}
+
 /**
  * The rivers on `relief`, `width` by `height` heights from 0 to 1 where 0 is
- * sea or lake. `dryness` is how much of each pixel is desert, 0 to 1. Points
- * are in the same pixels.
+ * sea or lake. `dryness` is how much of each pixel is desert, 0 to 1. Water
+ * runs round each of `blocks`, so no river crosses one. Points are in the
+ * same pixels.
  */
 export function findRivers(
   relief: Float32Array,
   width: number,
   height: number,
   dryness?: Float32Array,
+  blocks: readonly RiverBlock[] = [],
 ): RiverLine[] {
   const hw = Math.ceil(width / 2);
   const hh = Math.ceil(height / 2);
@@ -309,6 +351,28 @@ export function findRivers(
         half[c] = sum / lands;
         rain[c] = 1 - (1 - DESERT_RAIN) * dry[c];
         land++;
+      }
+    }
+  }
+
+  // A block is a dome higher than any land, so water runs round it.
+  for (const block of blocks) {
+    const cx = block.x / 2;
+    const cy = block.y / 2;
+    const r = block.radius / 2;
+    for (
+      let y = Math.max(0, Math.floor(cy - r));
+      y <= Math.min(hh - 1, cy + r);
+      y++
+    ) {
+      for (
+        let x = Math.max(0, Math.floor(cx - r));
+        x <= Math.min(hw - 1, cx + r);
+        x++
+      ) {
+        const c = y * hw + x;
+        const f = ((x + 0.25 - cx) ** 2 + (y + 0.25 - cy) ** 2) / (r * r);
+        if (half[c] > 0 && f < 1) half[c] += BLOCK_RISE * (1 - f);
       }
     }
   }
@@ -370,8 +434,12 @@ export function findRivers(
   const halfWidth = (c: number) => {
     const grow = Math.sqrt(flow[c] / threshold) - 1;
     const w = Math.min(MOST_HALF_WIDTH, SOURCE_HALF_WIDTH * (1 + grow * 0.9));
-    return w * (1 - DESERT_THIN * dry[c]);
+    // Never below a source's width, which is the narrowest the edge field
+    // draws without breaking into dashes.
+    return Math.max(SOURCE_HALF_WIDTH, w * (1 - DESERT_THIN * dry[c]));
   };
+  // Each river's course once smoothed, so one that joins it can meet it.
+  const finals: number[][][] = [];
   return kept.map((k) => {
     const course = courses[k];
     const { cells } = course;
@@ -390,13 +458,112 @@ export function findRivers(
     }
     smooth(pts, 3, 2);
     const round = roundCorners(pts, 2);
+    const joins = course.end === "join" ? newIndex[course.joins] : -1;
+    if (joins >= 0) {
+      // Smoothing moved the river this one joins off the cell they share, so
+      // the last stretch bends onto its middle and ends inside its water.
+      const last = round[round.length - 1];
+      const meet = nearestOn(finals[joins], last[0], last[1]);
+      const ox = meet.x - last[0];
+      const oy = meet.y - last[1];
+      const bend = Math.min(JOIN_BEND, round.length - 1);
+      for (let j = 0; j < bend; j++) {
+        const f = ((bend - j) / bend) ** 2;
+        const p = round[round.length - 1 - j];
+        p[0] += ox * f;
+        p[1] += oy * f;
+      }
+      last[2] = Math.min(last[2], meet.w);
+    }
+    finals.push(round);
     const points = new Float32Array(round.length * 3);
     round.forEach((p, j) => {
       points.set(p, j * 3);
     });
-    const joins = course.end === "join" ? newIndex[course.joins] : -1;
     return { points, end: course.end, joins };
   });
+}
+
+/**
+ * A pixel of the picture is 2 map units across, and a white heightmap pixel
+ * stands 64 map units high, so 1 map unit of height is 1 / 64 of the relief.
+ */
+const RELIEF_PER_MAP_UNIT = 1 / 64;
+const MAP_UNITS_PER_PIXEL = 2;
+/** How far a river's bed lies below the ground it runs on, in map units. */
+const BED_DEPTH = 4;
+/** How steeply a river's banks rise from its edge, rise over run. */
+const BANK_SLOPE = 0.6;
+/** The furthest from a river's edge its valley reaches, in pixels. */
+const VALLEY_REACH = 14;
+
+/**
+ * `relief` with a valley cut along every river in `lines`: a level bed under
+ * the water, below the ground it runs over and never rising downstream, and
+ * banks that climb from the water's edge until they meet the land. For the
+ * light alone, so the view shows the valley each river runs in. Water, at 0,
+ * stays as it is.
+ */
+export function carveValleys(
+  relief: Float32Array,
+  width: number,
+  height: number,
+  lines: readonly RiverLine[],
+): Float32Array {
+  const out = relief.slice();
+  const depth = BED_DEPTH * RELIEF_PER_MAP_UNIT;
+  const rise = BANK_SLOPE * MAP_UNITS_PER_PIXEL * RELIEF_PER_MAP_UNIT;
+  const at = (x: number, y: number) =>
+    relief[
+      Math.min(height - 1, Math.max(0, Math.round(y))) * width +
+        Math.min(width - 1, Math.max(0, Math.round(x)))
+    ];
+  for (const { points } of lines) {
+    const n = points.length / 3;
+    // The bed, from source to mouth, never climbing.
+    const bed = new Float32Array(n);
+    let low = Number.POSITIVE_INFINITY;
+    for (let k = 0; k < n; k++) {
+      const h = at(points[k * 3], points[k * 3 + 1]);
+      if (h > 0 && h < low) low = h;
+      bed[k] = Math.max(
+        0,
+        (low === Number.POSITIVE_INFINITY ? 0 : low) - depth,
+      );
+    }
+    for (let k = 0; k + 1 < n; k++) {
+      const ax = points[k * 3];
+      const ay = points[k * 3 + 1];
+      const aw = points[k * 3 + 2];
+      const bx = points[k * 3 + 3];
+      const by = points[k * 3 + 4];
+      const bw = points[k * 3 + 5];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      const inv = len2 === 0 ? 0 : 1 / len2;
+      const reach = Math.max(aw, bw) + VALLEY_REACH;
+      const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach));
+      const x1 = Math.min(width - 1, Math.ceil(Math.max(ax, bx) + reach));
+      const y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach));
+      const y1 = Math.min(height - 1, Math.ceil(Math.max(ay, by) + reach));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = y * width + x;
+          if (relief[i] <= 0) continue;
+          let t = ((x - ax) * dx + (y - ay) * dy) * inv;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const d = Math.hypot(ax + dx * t - x, ay + dy * t - y);
+          const edge = d - (aw + (bw - aw) * t);
+          if (edge > VALLEY_REACH) continue;
+          const bank = rise * Math.max(0, edge);
+          const floor = bed[k] + (bed[k + 1] - bed[k]) * t + bank;
+          if (floor < out[i]) out[i] = floor;
+        }
+      }
+    }
+  }
+  return out;
 }
 
 /** The edge field's range below zero, inside a river, in pixels. */
@@ -476,4 +643,31 @@ export function riverEdgePixels(
     data[at] = Math.round((v < 0 ? 0 : v > 1 ? 1 : v) * 255);
   }
   return { data, width: tw, height: th };
+}
+
+/**
+ * How far a map position lies from the nearest river's bank, in map units:
+ * 0 on the water. `rivers` are x, y and half width triples in map units.
+ */
+export function riverRoom(
+  rivers: readonly Float32Array[],
+  x: number,
+  y: number,
+): number {
+  let room = Number.POSITIVE_INFINITY;
+  for (const course of rivers) {
+    for (let k = 0; k + 5 < course.length; k += 3) {
+      const ax = course[k];
+      const ay = course[k + 1];
+      const dx = course[k + 3] - ax;
+      const dy = course[k + 4] - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 === 0 ? 0 : ((x - ax) * dx + (y - ay) * dy) / len2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const w = course[k + 2] + (course[k + 5] - course[k + 2]) * t;
+      const edge = Math.hypot(ax + dx * t - x, ay + dy * t - y) - w;
+      if (edge < room) room = edge;
+    }
+  }
+  return Math.max(0, room);
 }

@@ -36,6 +36,9 @@ export interface Town {
   streets: number[];
 }
 
+/** The furthest a town's edge reaches, as a multiple of its radius. */
+export const TOWN_EDGE_MOST = 1.27;
+
 /** The most main streets a town has. */
 export const MAX_STREETS = 8;
 
@@ -43,7 +46,8 @@ export const MAX_STREETS = 8;
  * How far the built-up area reaches in the world direction `angle`, in world
  * units from the anchor: an ellipse along the town's axis, wobbled by three
  * waves so no town is a regular shape. `townShader.ts` works out the same.
- * Between 0.73 and 1.27 times the ellipse.
+ * Between 0.73 and {@link TOWN_EDGE_MOST} times the ellipse, which is at
+ * most the radius.
  */
 export function townEdge(town: Town, angle: number): number {
   const a = angle - town.axis;
@@ -195,6 +199,12 @@ export interface TownSite {
    * Empty for a place with no roads.
    */
   roads: number[];
+  /**
+   * The furthest the town's edge may reach from the anchor, in world units,
+   * such as the distance to a river's bank. Left out, nothing but its
+   * neighbours limits it.
+   */
+  room?: number;
 }
 
 /**
@@ -329,6 +339,7 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
     const radius = Math.min(
       want,
       nearest * (site.capital ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE),
+      site.room === undefined ? want : site.room / TOWN_EDGE_MOST,
     );
     const { axis, strength } =
       site.roads.length > 0

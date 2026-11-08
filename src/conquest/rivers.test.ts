@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  carveValleys,
   drainage,
   findRivers,
   RIVER_EDGE_TEXELS,
@@ -99,6 +100,30 @@ describe("findRivers", () => {
     });
   });
 
+  it("keeps out of a block, running round it", () => {
+    const h = island();
+    const free = findRivers(h, SIDE, SIDE);
+    // A block on a river's course, partway down it.
+    const { points } = free.reduce((a, b) =>
+      b.points.length > a.points.length ? b : a,
+    );
+    const k = Math.floor(points.length / 6) * 3;
+    const block = { x: points[k], y: points[k + 1], radius: 8 };
+    const lines = findRivers(h, SIDE, SIDE, undefined, [block]);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      for (let j = 0; j < line.points.length; j += 3) {
+        const d = Math.hypot(
+          line.points[j] - block.x,
+          line.points[j + 1] - block.y,
+        );
+        // Smoothing moves a course up to a pixel and a half off the cells
+        // it was found on, which is why a block is drawn that much larger.
+        expect(d).toBeGreaterThan(block.radius - line.points[j + 2] - 1.5);
+      }
+    }
+  });
+
   it("gives the same rivers every time for the same heights", () => {
     const a = findRivers(island(), SIDE, SIDE);
     const b = findRivers(island(), SIDE, SIDE);
@@ -133,6 +158,46 @@ describe("findRivers", () => {
 
   it("finds none on land with no sea and no slope", () => {
     expect(findRivers(new Float32Array(16), 4, 4)).toEqual([]);
+  });
+});
+
+describe("carveValleys", () => {
+  it("cuts a bed under each river and banks rising from it, and leaves the sea", () => {
+    const h = island();
+    const lines = findRivers(h, SIDE, SIDE);
+    const cut = carveValleys(h, SIDE, SIDE, lines);
+    for (let i = 0; i < h.length; i++) {
+      if (h[i] === 0) expect(cut[i]).toBe(0);
+      expect(cut[i]).toBeLessThanOrEqual(h[i]);
+    }
+    // Along every river the ground is lower than it was, and it rises away
+    // from the water on either side.
+    const { points } = lines.reduce((a, b) =>
+      b.points.length > a.points.length ? b : a,
+    );
+    const at = (x: number, y: number) => Math.round(y) * SIDE + Math.round(x);
+    let lowered = 0;
+    let rising = 0;
+    let looked = 0;
+    for (let j = 6; j + 6 < points.length; j += 3) {
+      const [x, y] = [points[j], points[j + 1]];
+      const tx = points[j + 3] - points[j - 3];
+      const ty = points[j + 4] - points[j - 2];
+      const len = Math.hypot(tx, ty) || 1;
+      const [nx, ny] = [-ty / len, tx / len];
+      const mid = cut[at(x, y)];
+      const side = Math.min(
+        cut[at(x + nx * 5, y + ny * 5)],
+        cut[at(x - nx * 5, y - ny * 5)],
+      );
+      if (mid === 0 || side === 0) continue;
+      looked++;
+      if (mid < h[at(x, y)]) lowered++;
+      if (side > mid) rising++;
+    }
+    expect(looked).toBeGreaterThan(10);
+    expect(lowered).toBe(looked);
+    expect(rising / looked).toBeGreaterThan(0.9);
   });
 });
 

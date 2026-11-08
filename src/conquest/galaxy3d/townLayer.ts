@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import { planetOf } from "../planets";
+import { riverRoom } from "../rivers";
 import type { GroundLayer } from "./groundLayer";
 import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
@@ -288,6 +289,11 @@ export function townsOnRoads(
   galaxy: GalaxyDoc,
   surface: TerrainSurface,
   roads: RoadLine[],
+  /**
+   * The map's rivers in map units, as x, y and half width triples. A town
+   * stops at a river's bank and never reaches over the water.
+   */
+  rivers: readonly Float32Array[] = [],
 ): { towns: Town[]; roads: RoadLine[] } {
   const toWorld = (x: number, y: number) => surface.mapToWorldXZ(x, y);
   // Every road and every crossing's track to its landing ends on an anchor.
@@ -300,7 +306,16 @@ export function townsOnRoads(
   const planned = planTowns(
     galaxy.nodes.map((n, i) => {
       const [x, z] = toWorld(n.pos[0], n.pos[1]);
-      return { x, z, capital: n.kind === "capital", roads: entries[i] };
+      return {
+        x,
+        z,
+        capital: n.kind === "capital",
+        roads: entries[i],
+        room:
+          rivers.length > 0
+            ? riverRoom(rivers, n.pos[0], n.pos[1]) * surface.scale
+            : undefined,
+      };
     }),
     sceneSeed(galaxy),
   );
