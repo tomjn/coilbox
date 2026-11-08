@@ -96,10 +96,14 @@ describe("portableSin and portableCos", () => {
   });
 
   it("stay between -1 and 1 for an angle too large to reduce exactly", () => {
+    // Past the range it reduces exactly, the angle is taken modulo 2pi first,
+    // so the answer is the sine and cosine of that remainder.
     for (const x of [1e7, -1e7, 1e20, -1e20, 1e300, Number.MAX_VALUE]) {
-      for (const value of [portableSin(x), portableCos(x)]) {
-        expect(Math.abs(value), `${x}`).toBeLessThanOrEqual(1);
-      }
+      const rest = x % (2 * Math.PI);
+      expect(Math.abs(portableSin(x)), `${x}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(portableCos(x)), `${x}`).toBeLessThanOrEqual(1);
+      expect(portableSin(x), `${x}`).toBeCloseTo(Math.sin(rest), 12);
+      expect(portableCos(x), `${x}`).toBeCloseTo(Math.cos(rest), 12);
     }
     // A multiple of 2pi folds to nothing, and keeps its sign.
     expect(portableSin(2 * Math.PI * 2 ** 30)).toBeCloseTo(0, 5);

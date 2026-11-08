@@ -13,5 +13,6 @@ fi
 
 exec node node_modules/vitest/vitest.mjs run \
   src/lego/generate.test.ts \
+  src/lego/generatorJobs.test.ts \
   src/lego/portableAngles.test.ts \
   src/lego/portableRotation.test.ts
