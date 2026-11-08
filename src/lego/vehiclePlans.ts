@@ -44,7 +44,7 @@ import type { BodyPlan, BodyPlanBone, BodyPlanProportion } from "./bodyPlans";
 import { between, type Joints, mean, spacingAlongZ } from "./planMeasure";
 
 /** How much of a track's length lies between its first and last road wheel. */
-const ROAD_WHEEL_SPAN = 0.65;
+export const ROAD_WHEEL_SPAN = 0.65;
 /** How high a road wheel's middle is, as a share of the track's height. */
 const ROAD_WHEEL_HEIGHT = 0.34;
 
