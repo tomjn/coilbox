@@ -34,6 +34,7 @@ import {
 } from "./balance";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { portableHypot } from "./portableAngles";
 import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { bakedPieces, type PieceBox } from "./s3oBuild";
@@ -74,7 +75,7 @@ const RAYS: Point[] = [
   [-0.2689, 0.8423, 0.4672],
   [0.1931, -0.5127, 0.8363],
 ].map((d) => {
-  const length = Math.hypot(d[0], d[1], d[2]);
+  const length = portableHypot(d[0], d[1], d[2]);
   return [d[0] / length, d[1] / length, d[2] / length] as Point;
 });
 
@@ -261,7 +262,7 @@ function witnessesOf(geometry: Geometry, unique: Point[]): Point[] {
   const inward = signed > 0 ? -1 : 1;
   for (const [a, b, c] of corners) {
     const normal = cross(sub(b, a), sub(c, a));
-    const length = Math.hypot(normal[0], normal[1], normal[2]);
+    const length = portableHypot(normal[0], normal[1], normal[2]);
     if (length <= SAME_POSITION * SAME_POSITION) continue;
     const scale = (inward * WITNESS_STEP) / length;
     found.push([

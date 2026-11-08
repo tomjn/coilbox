@@ -24,6 +24,7 @@ import {
   pieceById,
 } from "./model";
 import type { LoadedPack } from "./pack";
+import { quaternionFromEuler } from "./portableRotation";
 import { pieceMesh, type RawGeometry } from "./rawGeometry";
 import { isKnownShapeKind, shapeMesh } from "./shapes";
 import type { SheetUv } from "./textureSheet";
@@ -479,7 +480,7 @@ function bakePiece(
   const start = world.length;
   const local = new THREE.Matrix4().compose(
     new THREE.Vector3(...piece.position),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(...piece.rotation)),
+    quaternionFromEuler(piece.rotation),
     new THREE.Vector3(...piece.scale),
   );
   // A joined piece follows its parent's connector but keeps its own size.
