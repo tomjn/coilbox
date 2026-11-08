@@ -11726,6 +11726,10 @@ msgstr "Як {account} на {serverName}. Ви приєднуєтеся до м�
 msgid "As a copy"
 msgstr "Як копію"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As generated"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
 msgid "as it dies"
@@ -11745,6 +11749,14 @@ msgstr "За команду 2"
 #, fuzzy
 msgid "As the builder would write it"
 msgstr "Як записав би конструктор"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As the job rolls it"
+msgstr ""
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As the job rolls them"
+msgstr ""
 
 #: src/hub/preview.ts
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -12782,6 +12794,10 @@ msgstr "Лише для BeamLaser. Найменша частка повної ш
 msgid "BeamLaser only. Uses burst mechanics, with beamtime forced to the length of one sim frame."
 msgstr "Лише для BeamLaser. Використовує механіку черг, а beamtime примусово дорівнює одному кадру симуляції."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Beams"
+msgstr ""
+
 #: src/content/achievements.ts
 #, fuzzy
 msgid "Beat 3 different AIs."
@@ -12982,6 +12998,10 @@ msgstr "Блокувальна проблема"
 #, fuzzy
 msgid "Blockers"
 msgstr "Блокувальні проблеми"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Blocks"
+msgstr ""
 
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 #, fuzzy
@@ -16284,6 +16304,10 @@ msgstr ""
 msgid "Coilbox scenario"
 msgstr "Сценарій Coilbox"
 
+#: src/lego/generatorStyles.ts
+msgid "Coilbox style"
+msgstr ""
+
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
 msgid "Coilbox tells you once when a battle matching this appears on any server you are connected to."
@@ -16476,6 +16500,7 @@ msgstr "Розмір об’єму зіткнення (плоске написа
 msgid "colormap, held as one constant colour."
 msgstr "colormap, утримується як один сталий колір."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Colour"
@@ -17327,6 +17352,7 @@ msgstr "Копіює {placeCount, plural, one {власну текстуру} fe
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/direct/ReachablePorts.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
@@ -17678,6 +17704,10 @@ msgstr "Не вдалося завантажити модуль"
 msgid "Could not load the parts: {reason}"
 msgstr ""
 
+#: src/lego/generatorStyles.ts
+msgid "Could not load the style"
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "Could not look for extension packs: {reason}"
@@ -17962,6 +17992,10 @@ msgstr "Не вдалося зберегти модуль"
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
+msgstr ""
+
+#: src/lego/generatorStyles.ts
+msgid "Could not save the style"
 msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
@@ -18915,6 +18949,7 @@ msgstr "Затримка між пострілами в черзі"
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
@@ -19126,6 +19161,10 @@ msgstr "Видалити збереження {saveFilename}"
 msgid "Delete set"
 msgstr "Видалити набір"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19156,6 +19195,10 @@ msgstr "Видалити виділене"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "Видалити набір «{setName}»? Зникне лише набір."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy
@@ -19299,6 +19342,10 @@ msgstr "Шляхи доставки"
 msgid "Demo files in your content folder."
 msgstr "Демо-файли у вашій папці вмісту."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Dense"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Density layer"
@@ -19433,6 +19480,10 @@ msgstr "Від’єднано: зсунуто з грані."
 #, fuzzy
 msgid "Detached: turned off its face."
 msgstr "Від’єднано: повернуто з грані."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Detail"
+msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
@@ -27699,6 +27750,10 @@ msgstr "Макет \"{layoutName}\""
 msgid "Leading accuracy"
 msgstr "Точність упередження"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Lean"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Lean at full power"
@@ -28300,6 +28355,10 @@ msgstr "Завантажити модуль"
 msgid "Load a rapid master to list its repositories."
 msgstr "Завантажте rapid master, щоб побачити його репозиторії."
 
+#: src/lego/generatorStyles.ts
+msgid "Load a style"
+msgstr ""
+
 #: src/lego/pages/components/Inventory.tsx
 #: src/lego/pages/PartsPage.tsx
 #, fuzzy
@@ -28319,6 +28378,10 @@ msgstr ""
 #, fuzzy
 msgid "Load repos"
 msgstr "Завантажити репозиторії"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Load style"
+msgstr ""
 
 #: src/play/PresetLoadGate.tsx
 msgid "Load this preset"
@@ -30752,6 +30815,7 @@ msgstr "виконуваний файл mysql"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -31355,6 +31419,11 @@ msgstr "Новий набір"
 #, fuzzy
 msgid "New set name"
 msgstr "Назва нового набору"
+
+#: src/lego/generatorStyles.ts
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "New style"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
@@ -33113,6 +33182,10 @@ msgstr "Для цих даних входу немає збереженого п
 #, fuzzy
 msgid "No stored scenario has this id any more, so there is nothing to compare against. The mission plays its own copy."
 msgstr "Жоден збережений сценарій більше не має цього id, тож немає з чим порівнювати. Місія відтворює власну копію."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "No style"
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -36968,6 +37041,10 @@ msgstr "Планета"
 msgid "Planet Wars"
 msgstr "Planet Wars"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Plates"
+msgstr ""
+
 #: src/campaign/index.ts
 #: src/conquest/index.ts
 #: src/content/pages/components/GameCard.tsx
@@ -37529,6 +37606,10 @@ msgstr "Заздалегідь створити облікові записи, �
 msgid "Preferred"
 msgstr "Бажаний"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Preferred shapes"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Prefers targets it already faces"
@@ -37888,6 +37969,10 @@ msgstr "Підвищення"
 #, fuzzy
 msgid "Promoted to {name}"
 msgstr "Підвищення до рангу {name}"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Proportions"
+msgstr ""
 
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -41448,6 +41533,10 @@ msgstr "Зберегти перебудований .bos"
 msgid "Save the selection as a module"
 msgstr "Зберегти виділене як модуль"
 
+#: src/lego/generatorStyles.ts
+msgid "Save the style"
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Save these boxes for {mapName}"
@@ -41464,6 +41553,7 @@ msgid "Save to a chosen file"
 msgstr "Зберегти у вибраний файл"
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #, fuzzy
 msgid "Save to file"
 msgstr "Зберегти у файл"
@@ -41511,6 +41601,7 @@ msgstr "Збережено {0}"
 msgid "Saved {dest}."
 msgstr "Збережено {dest}."
 
+#: src/lego/generatorStyles.ts
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Saved {name}"
@@ -44856,6 +44947,10 @@ msgstr "Назви категорій через пробіл."
 msgid "Space separated category names. Empty means anything."
 msgstr "Назви категорій через пробіл. Порожнє значення означає будь-що."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Sparse"
+msgstr ""
+
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
 msgid "Spawn {spawnNumber}"
@@ -45685,6 +45780,10 @@ msgstr "Час накопичення одного боєприпасу"
 msgid "Stockpile round time (old name)"
 msgstr "Час накопичення одного боєприпасу (стара назва)"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Stocky"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Stone"
@@ -45872,6 +45971,10 @@ msgstr "Тривалість оглушення"
 #, fuzzy
 msgid "Stuns instead of damaging"
 msgstr "Оглушує замість шкоди"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Style"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -50344,6 +50447,10 @@ msgstr "Цей файл не читається як повтор."
 #, fuzzy
 msgid "This file is empty and nothing in it can be played. A game that was closed, killed or crashed before it ended leaves a file like this."
 msgstr "Цей файл порожній, і в ньому нічого не можна відтворити. Гра, яку закрили, примусово завершили чи яка аварійно завершилася до кінця, залишає такий файл."
+
+#: src/lego/generatorStyles.ts
+msgid "This file is not a coilbox style."
+msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 #, fuzzy

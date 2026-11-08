@@ -37,6 +37,12 @@ import { pick } from "../conquest/rng";
 import { pieceOwnBox } from "./connectors";
 import type { CoveringRule } from "./generatorJobs";
 import {
+  type GeneratorStyle,
+  girthLean,
+  preferredShapes,
+  skewed,
+} from "./generatorStyle";
+import {
   childrenOf,
   descendantIds,
   type LegoPiece,
@@ -56,6 +62,12 @@ import { worldMatrix } from "./reparent";
  */
 export const MAX_PART_SCALE = 12;
 
+/**
+ * The most a covering part is scaled for a dense style (#3237), so a length
+ * takes more, smaller parts. A choice, half of `MAX_PART_SCALE`.
+ */
+export const DENSE_PART_SCALE = MAX_PART_SCALE / 2;
+
 export interface CoveringOptions {
   pack: LoadedPack;
   rule: CoveringRule;
@@ -73,6 +85,8 @@ export interface CoveringOptions {
   newId: () => string;
   /** A PRNG for a choice's key. */
   roll: (key: string) => () => number;
+  /** A look to bias the choices towards (#3237). */
+  style?: GeneratorStyle;
 }
 
 export interface CoveringResult {
@@ -250,20 +264,18 @@ function fits(
   width: number,
   depth: number,
   rows: boolean,
+  maxScale: number = MAX_PART_SCALE,
 ): Fit[] {
   const out: Fit[] = [];
   for (const part of parts) {
     const [long, mid, short] = sortedSizes(part);
     if (!long || !mid || !short || short.size <= 0) continue;
-    const along = Math.max(1, Math.ceil(length / (long.size * MAX_PART_SCALE)));
+    const along = Math.max(1, Math.ceil(length / (long.size * maxScale)));
     const byLength = length / (along * long.size);
     let scale = byLength;
     let widthError: number;
     if (rows) {
-      const across = Math.max(
-        1,
-        Math.ceil(width / (mid.size * MAX_PART_SCALE)),
-      );
+      const across = Math.max(1, Math.ceil(width / (mid.size * maxScale)));
       const byWidth = width / (across * mid.size);
       scale = Math.min(byLength, byWidth);
       widthError = Math.abs(portableLog(byLength / byWidth));
@@ -392,12 +404,13 @@ export function coverSkeleton(
   start: LegoProject,
   options: CoveringOptions,
 ): CoveringResult {
-  const { pack, rule, anchor, roll } = options;
+  const { pack, rule, anchor, roll, style } = options;
   let project = start;
   const thickness =
     options.width *
     (rule.thickness[0] +
-      (rule.thickness[1] - rule.thickness[0]) * roll("covering:thickness")());
+      (rule.thickness[1] - rule.thickness[0]) *
+        skewed(roll("covering:thickness"), girthLean(style))());
   if (!(thickness > 0)) return { project, covering: [] };
 
   const parts = coverParts(project, pack, options.chassis);
@@ -563,18 +576,29 @@ export function coverSkeleton(
   const added: LegoPiece[] = [];
   const names = project.pieces.map((p) => p.name);
   for (const plan of plans) {
+    const shapes = preferredShapes(
+      plan.shapes.filter((shape) => parts.some((p) => p.shape === shape)),
+      style,
+    );
     let ranked = fits(
-      parts.filter((p) => plan.shapes.includes(p.shape)),
+      parts.filter((p) => shapes.includes(p.shape)),
       plan.length,
       plan.width,
       plan.depth,
       plan.rows,
+      style?.detail === "dense" ? DENSE_PART_SCALE : MAX_PART_SCALE,
     );
     // A deck part thicker than the deck reaches below it, and the unit sitting
     // on the ground would then lift its wheels off it. With no part thin
     // enough, there is no deck.
     if (plan.rows && options.gear?.size) {
       ranked = ranked.filter((fit) => fit.depth <= plan.depth + TOUCH);
+    }
+    // A sparse style takes the fewest copies any part needs, the best fits
+    // among those first.
+    if (style?.detail === "sparse") {
+      const fewest = Math.min(...ranked.map((f) => f.along * f.across));
+      ranked = ranked.filter((f) => f.along * f.across === fewest);
     }
     const candidates = ranked.slice(0, CLOSEST);
     if (candidates.length === 0) continue;

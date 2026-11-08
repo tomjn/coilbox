@@ -2,7 +2,8 @@
  * Ask for several generated units at once and open the one you like (#3234).
  *
  * The form takes a body plan, a job, a size and a seed, and the grid shows a
- * batch of candidates from consecutive seeds. Reroll starts the next batch
+ * batch of candidates from consecutive seeds. A saved style, chosen above the
+ * form, biases what they look like (#3237). Reroll starts the next batch
  * where the last one stopped. Nothing is saved until a candidate is opened,
  * and then it is an ordinary unit.
  *
@@ -33,10 +34,13 @@ import {
   GENERATOR_SIZES,
   type GeneratorSize,
 } from "../../generate";
+import type { GeneratorStyle } from "../../generatorStyle";
+import { useGeneratorStyles } from "../../generatorStyles";
 import { partMaterial } from "../../geometry";
 import type { LegoProject } from "../../model";
 import { type LoadedPack, loadPack } from "../../pack";
 import { starterModules } from "../../starterModules";
+import { GeneratorStyleSection } from "./GeneratorStyleSection";
 
 /** How many candidates a batch holds. See the file comment for the cost. */
 export const CANDIDATE_COUNT = 12;
@@ -46,6 +50,8 @@ interface Inputs {
   plan: string;
   job: string;
   size: GeneratorSize;
+  /** The style as it was when the batch was made. */
+  style: GeneratorStyle | null;
 }
 
 interface Props {
@@ -62,6 +68,9 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
   const [job, setJob] = useState(GENERATOR_JOBS[0].id);
   const [size, setSize] = useState<GeneratorSize>("medium");
   const [seedText, setSeedText] = useState("");
+  const styleStore = useGeneratorStyles();
+  const [styleId, setStyleId] = useState<string | null>(null);
+  const style = styleStore.styles.find((s) => s.id === styleId) ?? null;
   const [seedError, setSeedError] = useState<string | null>(null);
   /** The batch on screen, with the inputs that made it, so Reroll carries on
    *  from those rather than from whatever the form now says. */
@@ -131,6 +140,7 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
           now: new Date().toISOString(),
           pack,
           modules,
+          ...(inputs.style ? { style: inputs.style } : {}),
         }),
       );
       setBatch({ ...made, inputs });
@@ -149,7 +159,7 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
       return;
     }
     setSeedError(null);
-    generate({ plan, job, size }, seed);
+    generate({ plan, job, size, style }, seed);
   }
 
   return (
@@ -172,6 +182,13 @@ export function GenerateDrawer({ open, onOpenChange, onOpened }: Props) {
           </div>
 
           <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
+            <GeneratorStyleSection
+              pack={pack}
+              store={styleStore}
+              chosen={style}
+              onChoose={setStyleId}
+            />
+
             <form
               onSubmit={submit}
               className="grid grid-cols-2 items-start gap-4"

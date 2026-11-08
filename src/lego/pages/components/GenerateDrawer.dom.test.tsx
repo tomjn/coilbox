@@ -15,6 +15,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+  readStoredSetting,
+} from "@/lib/storedSetting";
 import { BODY_PLANS } from "../../bodyPlans";
 import type { CandidateBatch } from "../../candidates";
 import { GENERATOR_JOBS } from "../../generate";
@@ -22,13 +27,64 @@ import type { LegoProject } from "../../model";
 import { CANDIDATE_COUNT, GenerateDrawer } from "./GenerateDrawer";
 
 const generateCandidates = vi.fn();
+const save = vi.fn();
+const open = vi.fn();
+const write = vi.fn();
+const read = vi.fn();
+const ask = vi.fn();
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  save: (a: unknown) => save(a),
+  open: (a: unknown) => open(a),
+  ask: (...a: unknown[]) => ask(...a),
+}));
+vi.mock("../../bindings", () => ({
+  legoWriteTextFile: (a: unknown) => write(a),
+  legoReadTextFile: (a: unknown) => read(a),
+}));
+vi.mock("@/notify/notify", () => ({ notify: vi.fn() }));
+// The frame's setting hook needs the whole app round it. This one keeps the
+// value in the settings storage the test installs, as the app's does.
+vi.mock("@picoframe/frame", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@picoframe/frame")>();
+  const { useState } = await import("react");
+  const stored = await import("@/lib/storedSetting");
+  return {
+    ...actual,
+    useSetting: <T,>(key: string, fallback: T) => {
+      const [value, setValue] = useState<T>(() =>
+        stored.readStoredSetting(key, fallback),
+      );
+      return [
+        value,
+        (next: T) => {
+          stored.writeStoredSetting(key, next);
+          setValue(next);
+        },
+      ] as const;
+    },
+  };
+});
 
 vi.mock("../../pack", () => ({
   loadPack: () =>
     Promise.resolve({
-      manifest: { id: "lego", version: "1" },
+      manifest: {
+        id: "lego",
+        version: "1",
+        categories: [
+          { id: "green", label: "Team colour" },
+          { id: "tan", label: "Tan" },
+        ],
+      },
+      parts: [
+        { colourway: "green", shape: "block" },
+        { colourway: "tan", shape: "beam" },
+      ],
       library: { atlases: [{ tex1: "atlas.png" }] },
     }),
+  colourwayLabel: (_pack: unknown, id: string) =>
+    id === "tan" ? "Tan" : "Team colour",
 }));
 vi.mock("../../starterModules", () => ({ starterModules: () => [] }));
 vi.mock("../../geometry", () => ({ partMaterial: () => ({}) }));
@@ -66,6 +122,8 @@ function batch(start: number, count: number): CandidateBatch {
 const onOpened = vi.fn();
 
 beforeEach(() => {
+  installSettingsStorage(memorySettingsStorage());
+  for (const fn of [save, open, write, read, ask]) fn.mockReset();
   generateCandidates.mockReset();
   generateCandidates.mockImplementation(
     (_inputs: unknown, start: number, count: number) => batch(start, count),
@@ -192,5 +250,83 @@ describe("GenerateDrawer", () => {
         "No seed from 1 to 20 made a unit that passes the checks.",
       ),
     ).toBeTruthy();
+  });
+
+  it("generates with a new style and its colour, and rerolls with it", async () => {
+    const generate = await show();
+    fireEvent.click(screen.getByRole("button", { name: "New style" }));
+    fireEvent.click(await screen.findByRole("combobox", { name: "Colour" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Tan" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Blocks" }));
+    fireEvent.click(generate);
+
+    const options = generateCandidates.mock.calls[0][3]();
+    expect(options.style).toMatchObject({
+      name: "New style",
+      colourway: "tan",
+      shapes: ["block"],
+    });
+    expect(readStoredSetting("lego.generatorStyles", [])).toEqual([
+      options.style,
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Reroll" }));
+    expect(generateCandidates.mock.calls[1][3]().style).toEqual(options.style);
+  });
+
+  it("generates with no style once it is set back to none", async () => {
+    const generate = await show();
+    fireEvent.click(screen.getByRole("button", { name: "New style" }));
+    fireEvent.click(await screen.findByRole("combobox", { name: "Style" }));
+    fireEvent.click(await screen.findByRole("option", { name: "No style" }));
+    fireEvent.click(generate);
+
+    expect(generateCandidates.mock.calls[0][3]().style).toBeUndefined();
+  });
+
+  it("keeps several styles, renamed, copied and deleted", async () => {
+    await show();
+    fireEvent.click(screen.getByRole("button", { name: "New style" }));
+    const name = screen.getByRole("textbox", { name: "Name" });
+    fireEvent.change(name, { target: { value: "Green faction" } });
+    fireEvent.blur(name);
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    fireEvent.click(screen.getByRole("button", { name: "New style" }));
+    const names = () =>
+      readStoredSetting<{ name: string }[]>("lego.generatorStyles", []).map(
+        (s) => s.name,
+      );
+    expect(names()).toEqual(["Green faction", "Green faction 2", "New style"]);
+    ask.mockResolvedValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+    expect(names()).toHaveLength(3);
+    ask.mockResolvedValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(names()).toEqual(["Green faction", "Green faction 2"]),
+    );
+  });
+
+  it("saves a style to a file and loads it back as a copy", async () => {
+    await show();
+    fireEvent.click(screen.getByRole("button", { name: "New style" }));
+    save.mockResolvedValue("/tmp/New style.coilbox-style.json");
+    fireEvent.click(screen.getByRole("button", { name: "Save to file" }));
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    const { path, text } = write.mock.calls[0][0];
+    expect(path).toBe("/tmp/New style.coilbox-style.json");
+
+    open.mockResolvedValue(path);
+    read.mockResolvedValue({ text });
+    fireEvent.click(screen.getByRole("button", { name: "Load style" }));
+    await waitFor(() =>
+      expect(readStoredSetting("lego.generatorStyles", [])).toHaveLength(2),
+    );
+    const [first, second] = readStoredSetting<{ id: string; name: string }[]>(
+      "lego.generatorStyles",
+      [],
+    );
+    expect(second?.name).toBe("New style 2");
+    expect(second?.id).not.toBe(first?.id);
   });
 });

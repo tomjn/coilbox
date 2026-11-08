@@ -27,6 +27,7 @@
 
 import { plural, t } from "@lingui/core/macro";
 import { comparablePath } from "./exportRecord";
+import { type GeneratorStyle, parseStyle } from "./generatorStyle";
 import { type Problem, type ProblemSeverity, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { ringMembers, validRingCount } from "./ringSet";
@@ -1125,8 +1126,8 @@ export interface LegoSkeleton {
 }
 
 /**
- * What made a generated unit (#3231). The four inputs remake it, given the same
- * module library and parts pack. `modules` names each module instance the generator hung on
+ * What made a generated unit (#3231). The four inputs and the style, when
+ * there was one, remake it, given the same module library and parts pack. `modules` names each module instance the generator hung on
  * the skeleton, by the slot it filled, so a later reroll can tell its own
  * pieces from ones the game maker added: every piece of an instance carries
  * `LegoModuleRef.instance`.
@@ -1157,6 +1158,9 @@ export interface LegoGenerated {
    * the lists above say which pieces are the generator's. See `reroll.ts`.
    */
   stamps?: Record<string, string>;
+  /** The style the unit was generated in (#3237), as it was then, so a
+   *  reroll applies it again. Absent when it had none. */
+  style?: GeneratorStyle;
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -2023,6 +2027,7 @@ function parseGenerated(value: unknown): LegoGenerated | null {
           : [];
       })
     : undefined;
+  const style = v.style === undefined ? null : parseStyle(v.style);
   const stamps =
     typeof v.stamps === "object" && v.stamps !== null
       ? Object.fromEntries(
@@ -2040,6 +2045,7 @@ function parseGenerated(value: unknown): LegoGenerated | null {
     ...(covering ? { covering } : {}),
     ...(running ? { running } : {}),
     ...(stamps ? { stamps } : {}),
+    ...(style ? { style } : {}),
   };
 }
 
