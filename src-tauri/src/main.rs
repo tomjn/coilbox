@@ -213,6 +213,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // `coilbox://` deep links (issue #388): a link in Discord or lobby chat
         // carries an action (join a battle, import a preset/challenge, open a
