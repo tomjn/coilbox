@@ -179,6 +179,8 @@ export function findRivers(
     for (let c = from; c >= 0; c = main(c)) cells.push(c);
     cells.reverse();
     if (parent >= 0 && cells.length < SHORTEST_BRANCH) continue;
+    // A river one cell long has no course to draw, and nothing runs into it.
+    if (cells.length < 2) continue;
     const pts: number[][] = cells.map((c) => [...at(c), halfWidth(c)]);
     const last = cells[cells.length - 1];
     if (parent >= 0) {

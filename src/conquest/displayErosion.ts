@@ -129,7 +129,11 @@ export interface DrainNetwork {
   height: number;
   to: Int32Array;
   area: Float32Array;
-  /** Land cells, the first `reached` of them, lowest first. */
+  /**
+   * The first `reached` cells are land, in the order the flood reached them,
+   * which is by the level water stands at there, so after the cell each one
+   * drains into.
+   */
   order: Int32Array;
   reached: number;
 }

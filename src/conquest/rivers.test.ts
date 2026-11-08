@@ -157,6 +157,9 @@ describe("rivers on generated land", () => {
 
   it("keeps the eroded network that rivers follow", () => {
     const h = slope();
-    expect(erodeLand(h, SIDE, SIDE, 3).network).toBeDefined();
+    const net = erodeLand(h, SIDE, SIDE, 3).network;
+    expect(net?.width).toBe(SIDE / 2);
+    expect(net?.height).toBe(SIDE / 2);
+    expect(net?.reached).toBeGreaterThan(0);
   });
 });
