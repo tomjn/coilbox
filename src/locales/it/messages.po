@@ -9258,6 +9258,14 @@ msgstr "Un replay che non ha mai registrato la fine della partita non può esser
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr "I numeri delle unità di un replay hanno senso solo rispetto all’elenco delle unità della build su cui è stato giocato. Una partita senza tale elenco è esclusa per intero, così come una partita i cui ordini non corrispondono al suo elenco."
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll keeps it, because a part on it is kept"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll replaces it"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
@@ -20830,6 +20838,10 @@ msgstr "modificato"
 msgid "edited {edited}"
 msgstr "modificato {edited}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Edited by hand, so a reroll keeps it"
+msgstr ""
+
 #: src/workshop/deathExplosions.ts
 #, fuzzy
 msgid "Editing makes a copy for {unitName}."
@@ -23350,6 +23362,10 @@ msgstr "Inquadra la selezione"
 #, fuzzy
 msgid "Free"
 msgstr "Libero"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Free {pieceName}"
+msgstr ""
 
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -28698,6 +28714,10 @@ msgstr "Blocca"
 msgid "Lock {loadoutName}"
 msgstr "Blocca {loadoutName}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Lock {pieceName}"
+msgstr ""
+
 #: src/lego/pages/components/LoadoutPicker.tsx
 #, fuzzy
 msgid "Lock module {name}"
@@ -28723,6 +28743,10 @@ msgstr "Bloccato"
 #, fuzzy
 msgid "Locked until a campaign grants it"
 msgstr "Bloccato finché una campagna non lo concede"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Locked, so a reroll keeps it"
+msgstr ""
 
 #: src/conquest/unlocks.ts
 #, fuzzy
@@ -33117,6 +33141,10 @@ msgstr "Nessuno script qui."
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
+#: src/lego/reroll.ts
+msgid "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -40570,11 +40598,19 @@ msgstr "Richiede che anche waterweapon sia attivo."
 msgid "Requisition their cache"
 msgstr "Requisisci il loro deposito"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "Reroll seed"
 msgstr "Nuovo seme"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll the parts that are not locked. Seed {rerollSeed}"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -51789,10 +51825,18 @@ msgstr "Questa unità mescola componenti e pezzi presi da un gioco, quindi l’e
 msgid "This unit moves but names no movement class, so the engine drops it at load. Pick one."
 msgstr "Questa unità si muove ma non nomina una classe di movimento, quindi il motore la scarta al caricamento. Scegline una."
 
+#: src/lego/reroll.ts
+msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "Questa unità è stata costruita con il pacchetto «{builtAgainst}», e quel pacchetto non è installato."
+
+#: src/lego/reroll.ts
+msgid "This unit was not generated."
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -51866,6 +51910,10 @@ msgstr "Questo URL è troppo lungo per un link."
 #, fuzzy
 msgid "This value has been changed from the game's default."
 msgstr "Questo valore è stato cambiato rispetto al valore predefinito del gioco."
+
+#: src/lego/reroll.ts
+msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy

@@ -21,6 +21,8 @@ import {
   EyeOff,
   Link2,
   Link2Off,
+  Lock,
+  LockOpen,
 } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -51,6 +53,11 @@ interface Props {
   onSelect: (pieceId: string, additive: boolean) => void;
   onReparent: (pieceId: string, parentId: string) => void;
   onToggleHidden: (pieceId: string) => void;
+  /** What a reroll of a generated unit keeps (#3235): every kept piece, those
+   *  kept by their own lock or edit, and those edited by hand. Null or absent
+   *  for a unit that was not generated, which shows no locks. */
+  locks?: RerollLocks | null;
+  onToggleLocked?: (pieceId: string) => void;
   /** The piece to highlight as hovered, e.g. because the pointer is over its
    *  mesh in the 3D view instead of over its row here. */
   hoveredId?: string | null;
@@ -63,6 +70,12 @@ interface Props {
   onToggleCollapsed: (pieceId: string) => void;
   /** What each joined piece is joined to, by piece id. */
   joins?: ReadonlyMap<string, JoinSummary>;
+}
+
+export interface RerollLocks {
+  kept: ReadonlySet<string>;
+  own: ReadonlySet<string>;
+  edited: ReadonlySet<string>;
 }
 
 interface Drag {
@@ -80,6 +93,8 @@ export function PieceTree({
   onSelect,
   onReparent,
   onToggleHidden,
+  locks,
+  onToggleLocked,
   hoveredId,
   onHoverChange,
   collapsedIds,
@@ -155,6 +170,8 @@ export function PieceTree({
         selectedIds={selectedIds}
         onSelect={onSelect}
         onToggleHidden={onToggleHidden}
+        locks={locks ?? null}
+        onToggleLocked={onToggleLocked}
         draggingId={drag?.pieceId ?? null}
         overId={drag?.over ?? null}
         hoveredId={hoveredId ?? null}
@@ -189,6 +206,8 @@ function Rows({
   selectedIds,
   onSelect,
   onToggleHidden,
+  locks,
+  onToggleLocked,
   draggingId,
   overId,
   hoveredId,
@@ -204,6 +223,8 @@ function Rows({
   selectedIds: string[];
   onSelect: (pieceId: string, additive: boolean) => void;
   onToggleHidden: (pieceId: string) => void;
+  locks: RerollLocks | null;
+  onToggleLocked?: (pieceId: string) => void;
   draggingId: string | null;
   overId: string | null;
   hoveredId: string | null;
@@ -361,6 +382,15 @@ function Rows({
                   </span>
                 ) : null}
               </button>
+              {locks && onToggleLocked ? (
+                <LockButton
+                  pieceName={pieceName}
+                  kept={locks.kept.has(piece.id)}
+                  own={locks.own.has(piece.id)}
+                  edited={locks.edited.has(piece.id)}
+                  onToggle={() => onToggleLocked(piece.id)}
+                />
+              ) : null}
               <Button
                 size="icon"
                 variant="ghost"
@@ -388,6 +418,8 @@ function Rows({
                 selectedIds={selectedIds}
                 onSelect={onSelect}
                 onToggleHidden={onToggleHidden}
+                locks={locks}
+                onToggleLocked={onToggleLocked}
                 draggingId={draggingId}
                 overId={overId}
                 hoveredId={hoveredId}
@@ -402,5 +434,47 @@ function Rows({
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * Whether a reroll keeps a piece, and the toggle that locks or frees it. A
+ * kept piece always shows its lock, a free one only on hover, as the eye does.
+ */
+function LockButton({
+  pieceName,
+  kept,
+  own,
+  edited,
+  onToggle,
+}: {
+  pieceName: string;
+  kept: boolean;
+  own: boolean;
+  edited: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useLingui();
+  const title = own
+    ? edited
+      ? t`Edited by hand, so a reroll keeps it`
+      : t`Locked, so a reroll keeps it`
+    : kept
+      ? t`A reroll keeps it, because a part on it is kept`
+      : t`A reroll replaces it`;
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      className={`h-6 w-6 shrink-0 transition-opacity focus:opacity-100 group-hover:opacity-100 ${
+        kept ? "opacity-100" : "opacity-0"
+      } ${own ? "" : "text-muted-foreground"}`}
+      onClick={onToggle}
+      aria-pressed={own}
+      aria-label={own ? t`Free ${pieceName}` : t`Lock ${pieceName}`}
+      title={title}
+    >
+      {kept ? <Lock size={14} /> : <LockOpen size={14} />}
+    </Button>
   );
 }

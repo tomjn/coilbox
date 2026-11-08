@@ -7468,6 +7468,14 @@ msgstr "A replay that never recorded a game over cannot be analysed, but the eng
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll keeps it, because a part on it is kept"
+msgstr "A reroll keeps it, because a part on it is kept"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll replaces it"
+msgstr "A reroll replaces it"
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 msgid "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
 msgstr "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
@@ -16876,6 +16884,10 @@ msgstr "edited"
 msgid "edited {edited}"
 msgstr "edited {edited}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Edited by hand, so a reroll keeps it"
+msgstr "Edited by hand, so a reroll keeps it"
+
 #: src/workshop/deathExplosions.ts
 msgid "Editing makes a copy for {unitName}."
 msgstr "Editing makes a copy for {unitName}."
@@ -18912,6 +18924,10 @@ msgstr "Frame the selection"
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "Free"
 msgstr "Free"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Free {pieceName}"
+msgstr "Free {pieceName}"
 
 #: src/content/mapAggregate.ts
 msgid "Free for all"
@@ -23244,6 +23260,10 @@ msgstr "Lock"
 msgid "Lock {loadoutName}"
 msgstr "Lock {loadoutName}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Lock {pieceName}"
+msgstr "Lock {pieceName}"
+
 #: src/lego/pages/components/LoadoutPicker.tsx
 msgid "Lock module {name}"
 msgstr "Lock module {name}"
@@ -23265,6 +23285,10 @@ msgstr "Locked"
 #: src/lego/pages/components/LoadoutPicker.tsx
 msgid "Locked until a campaign grants it"
 msgstr "Locked until a campaign grants it"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Locked, so a reroll keeps it"
+msgstr "Locked, so a reroll keeps it"
 
 #: src/conquest/unlocks.ts
 msgid "Locked. Win a conquest at level {top}."
@@ -26828,6 +26852,10 @@ msgstr "No scripts here."
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
 msgstr "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+
+#: src/lego/reroll.ts
+msgid "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
+msgstr "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
 
 #: src/direct/ReachablePorts.tsx
 msgid "No server would say what your public address is."
@@ -32864,10 +32892,18 @@ msgstr "Requires waterweapon to also be on."
 msgid "Requisition their cache"
 msgstr "Requisition their cache"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll"
+msgstr "Reroll"
+
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Reroll seed"
 msgstr "Reroll seed"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll the parts that are not locked. Seed {rerollSeed}"
+msgstr "Reroll the parts that are not locked. Seed {rerollSeed}"
 
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "Rescale onto {mapName}"
@@ -41932,9 +41968,17 @@ msgstr "This unit mixes parts with pieces lifted from a game, so export always w
 msgid "This unit moves but names no movement class, so the engine drops it at load. Pick one."
 msgstr "This unit moves but names no movement class, so the engine drops it at load. Pick one."
 
+#: src/lego/reroll.ts
+msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
+msgstr "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
+
 #: src/lego/pack.ts
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
+
+#: src/lego/reroll.ts
+msgid "This unit was not generated."
+msgstr "This unit was not generated."
 
 #: src/lego/pack.ts
 msgid "This unit's atlas, \"{texture}\", is not installed, so it is drawn with \"{drawnWith}\" instead. An export still names its own."
@@ -41994,6 +42038,10 @@ msgstr "This URL is too long for a link."
 #: src/workshop/pages/components/UnitTextPanel.tsx
 msgid "This value has been changed from the game's default."
 msgstr "This value has been changed from the game's default."
+
+#: src/lego/reroll.ts
+msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 msgid "this warpath"
