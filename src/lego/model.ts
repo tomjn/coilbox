@@ -519,6 +519,12 @@ export interface LegoPiece {
   tags?: string[];
   /** Editor only, never affects export. */
   hidden?: boolean;
+  /**
+   * Whether a reroll of a generated unit keeps this piece (#3235). True keeps
+   * it, false lets the reroll replace it even after a hand edit. Absent keeps
+   * it only when it was edited by hand since it was generated. See `reroll.ts`.
+   */
+  locked?: boolean;
   customAnchors?: LegoAnchor[];
   /** Set on a piece lifted off a game's unit. See {@link LegoLifted}. */
   lifted?: LegoLifted;
@@ -1138,6 +1144,13 @@ export interface LegoGenerated {
    * generated before wheels.
    */
   running?: { bone: string; piece: string; kind: "wheel" | "tread" }[];
+  /**
+   * A stamp of each piece as it was generated, by piece id (#3235), so a piece
+   * edited by hand since can be told from the generator's own. A piece with no
+   * stamp was added by hand. Absent on a unit generated before stamps, where
+   * the lists above say which pieces are the generator's. See `reroll.ts`.
+   */
+  stamps?: Record<string, string>;
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -2004,6 +2017,14 @@ function parseGenerated(value: unknown): LegoGenerated | null {
           : [];
       })
     : undefined;
+  const stamps =
+    typeof v.stamps === "object" && v.stamps !== null
+      ? Object.fromEntries(
+          Object.entries(v.stamps).filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string",
+          ),
+        )
+      : undefined;
   return {
     seed: v.seed,
     plan: v.plan,
@@ -2012,6 +2033,7 @@ function parseGenerated(value: unknown): LegoGenerated | null {
     modules,
     ...(covering ? { covering } : {}),
     ...(running ? { running } : {}),
+    ...(stamps ? { stamps } : {}),
   };
 }
 
@@ -2157,6 +2179,7 @@ function parsePiece(raw: unknown): LegoPiece | null {
       ? { tags: p.tags.filter((t): t is string => typeof t === "string") }
       : {}),
     ...(p.hidden === true ? { hidden: true } : {}),
+    ...(typeof p.locked === "boolean" ? { locked: p.locked } : {}),
     ...(() => {
       const collision = parsePieceCollision(p.collision);
       return collision ? { collision } : {};
