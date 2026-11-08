@@ -1,5 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ClipboardPaste, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -63,18 +64,19 @@ export default function ImportSection() {
 
   useEffect(() => {
     let cancelled = false;
-    navigator.clipboard
-      ?.readText()
+    // Read through Tauri's clipboard plugin rather than the webview's
+    // `navigator.clipboard`, which macOS WKWebView refuses with no user gesture
+    // behind it (issue #1344). There is no webview fallback: the plugin works
+    // on every platform coilbox ships, and the webview read can only fail where
+    // the plugin would not.
+    readText()
       .then((text) => {
         if (cancelled) return;
         const line = clipboardOffer(text);
         if (line) setOffer({ text, line });
       })
-      // Denied, empty, or unavailable. Say nothing about it either way. macOS
-      // WKWebView refuses a read with no user gesture behind it
-      // (NotAllowedError), so on macOS today this never gets as far as an
-      // offer, which is exactly the no-op it is meant to be. Reading the
-      // clipboard natively instead is issue #1344.
+      // An empty clipboard, one holding an image, or a refused read. Say
+      // nothing about it either way.
       .catch(() => {});
     return () => {
       cancelled = true;
