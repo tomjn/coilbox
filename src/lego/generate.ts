@@ -123,6 +123,17 @@ export interface GeneratorOptions {
    *  keys, so the same seed with and without it makes a unit alike in the
    *  choices the style leaves alone. */
   style?: GeneratorStyle;
+  /** Times the plan's default proportions, in place of the job's factor for
+   *  the size. A roster's tiers between two sizes take one (#3239). It is not
+   *  part of the rolls' keys, which keep the size. */
+  factor?: number;
+  /** Times the covering thickness the job rolls (#3240). Not part of the
+   *  rolls' keys, so the covering is the same parts a little thicker. */
+  thickness?: number;
+  /** The seed the weapon slots' module, size and role rolls are keyed to, in
+   *  place of the unit's own (#3240). Everything else keeps the unit's seed, so
+   *  only the weapon differs. */
+  weaponSeed?: number;
 }
 
 /** A PRNG for one choice, seeded off the inputs and the choice's key. */
@@ -204,7 +215,7 @@ function anchorBone(project: LegoProject): LegoPiece {
  * all its tags, or all of the category when none does. In id order, so the
  * order the library lists them in cannot change a roll.
  */
-function modulesFor(
+export function modulesFor(
   modules: readonly LegoProject[],
   slot: JobSlot,
 ): LegoProject[] {
@@ -386,6 +397,11 @@ export function applyRoleRules(
 /** The roles that make a piece part of a weapon. */
 const GUN_ROLES: readonly string[] = ["turret", "aim", "barrel", "flare"];
 
+/** Whether a module carries a weapon: any of its pieces has a gun role. */
+export function holdsGun(module: LegoProject): boolean {
+  return module.pieces.some((p) => p.role && GUN_ROLES.includes(p.role));
+}
+
 /**
  * The plan's own gun joints made plain, for each gun role the module brings.
  *
@@ -471,7 +487,29 @@ export function generateUnit(
   let counter = 0;
   const newId = options.newId ?? (() => `${options.id}.${++counter}`);
 
-  const factor = job.size[size.id];
+  if (
+    options.factor !== undefined &&
+    !(Number.isFinite(options.factor) && options.factor > 0)
+  ) {
+    throw new Error(`a size factor is above zero, not ${options.factor}`);
+  }
+  if (
+    options.thickness !== undefined &&
+    !(Number.isFinite(options.thickness) && options.thickness > 0)
+  ) {
+    throw new Error(
+      `a covering thickness is above zero, not ${options.thickness}`,
+    );
+  }
+  if (
+    options.weaponSeed !== undefined &&
+    !Number.isSafeInteger(options.weaponSeed)
+  ) {
+    throw new Error(
+      `a weapon seed is a whole number, not ${options.weaponSeed}`,
+    );
+  }
+  const factor = options.factor ?? job.size[size.id];
   const proportions = options.proportions
     ? planProportions(inputs.plan, options.proportions)
     : rollProportions(inputs, job, factor, options.style);
@@ -505,13 +543,18 @@ export function generateUnit(
   for (const [index, slot] of job.slots.entries()) {
     const candidates = modulesFor(options.modules, slot);
     if (candidates.length === 0) continue;
+    // A weapon slot rolls its module, size and roles off the weapon seed.
+    const slotInputs =
+      options.weaponSeed !== undefined && index > 0 && candidates.some(holdsGun)
+        ? { ...inputs, seed: options.weaponSeed }
+        : inputs;
     const count = randInt(
       skewed(roll(inputs, `slot:${slot.id}:count`), countLean(style)),
       ...slot.count,
     );
     for (let n = 1; n <= count; n++) {
       const module = pick(
-        roll(inputs, `slot:${slot.id}:${n}:module`),
+        roll(slotInputs, `slot:${slot.id}:${n}:module`),
         candidates,
       );
       const isChassis = index === 0;
@@ -555,7 +598,7 @@ export function generateUnit(
       const slotScale = isChassis
         ? 1
         : between(
-            roll(inputs, `slot:${slot.id}:${n}:scale`),
+            roll(slotInputs, `slot:${slot.id}:${n}:scale`),
             slot.scale ?? [1, 1],
           );
       const mountId = module.mount && inserted.idMap.get(module.mount.piece);
@@ -572,7 +615,7 @@ export function generateUnit(
       // Before the joins are resolved, so a joined piece that is stretched is
       // put where its join says.
       project = applyRoleRules(project, pack, instance, slot, (key) =>
-        roll(inputs, `slot:${slot.id}:${n}:${key}`),
+        roll(slotInputs, `slot:${slot.id}:${n}:${key}`),
       );
       project = resolveConnections(project, pack).project;
       project = yieldPlanGun(project, instance);
@@ -591,7 +634,16 @@ export function generateUnit(
 
   const covered = coverSkeleton(project, {
     pack,
-    rule: job.covering,
+    rule:
+      options.thickness === undefined
+        ? job.covering
+        : {
+            ...job.covering,
+            thickness: [
+              job.covering.thickness[0] * options.thickness,
+              job.covering.thickness[1] * options.thickness,
+            ],
+          },
     anchor: anchorBone(project),
     chassis: chassisTop,
     keepClear,
@@ -615,7 +667,14 @@ export function generateUnit(
       modules: generated,
       covering: covered.covering,
       ...(running.gear.length > 0 ? { running: running.gear } : {}),
+      ...(options.thickness !== undefined
+        ? { thickness: options.thickness }
+        : {}),
+      ...(options.weaponSeed !== undefined
+        ? { weaponSeed: options.weaponSeed }
+        : {}),
       ...(style ? { style } : {}),
+      ...(options.factor !== undefined ? { factor: options.factor } : {}),
     },
   };
 }

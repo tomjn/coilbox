@@ -571,6 +571,13 @@ export function rerollUnit(
         newId,
         ...(kept.size > 0 ? { proportions: project.skeleton.proportions } : {}),
         ...(generated.style ? { style: generated.style } : {}),
+        ...(generated.factor !== undefined ? { factor: generated.factor } : {}),
+        ...(generated.thickness !== undefined
+          ? { thickness: generated.thickness }
+          : {}),
+        ...(generated.weaponSeed !== undefined
+          ? { weaponSeed: generated.weaponSeed }
+          : {}),
       },
     );
     const merged = resolveConnections(

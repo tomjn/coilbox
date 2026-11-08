@@ -938,6 +938,12 @@ export interface LegoProject {
    */
   skeleton?: LegoSkeleton;
   /**
+   * The id of the unit this one is a variant of (#3240). Absent on a unit made
+   * on its own, so no migration is needed. The unit may since have been
+   * deleted, which leaves this one a unit of its own. See `variant.ts`.
+   */
+  variantOf?: string;
+  /**
    * The inputs the generator made this unit from, and the module instances it
    * hung on it (#3231). Absent on a unit somebody built by hand. See
    * `generate.ts`.
@@ -1151,6 +1157,12 @@ export interface LegoGenerated {
    * generated before wheels.
    */
   running?: { bone: string; piece: string; kind: "wheel" | "tread" }[];
+  /** Times the covering thickness the job rolls (#3240). A heavier variant has
+   *  more than 1 and a lighter one less. Absent means 1. */
+  thickness?: number;
+  /** The seed the weapon slots' rolls are keyed to, when a variant has a
+   *  different weapon from the unit's seed (#3240). Absent means the seed. */
+  weaponSeed?: number;
   /**
    * A stamp of each piece as it was generated, by piece id (#3235), so a piece
    * edited by hand since can be told from the generator's own. A piece with no
@@ -1161,6 +1173,9 @@ export interface LegoGenerated {
   /** The style the unit was generated in (#3237), as it was then, so a
    *  reroll applies it again. Absent when it had none. */
   style?: GeneratorStyle;
+  /** The size factor the unit was generated at when it was not the job's own
+   *  for its size, as a roster's tiers between two sizes are (#3239). */
+  factor?: number;
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -1934,6 +1949,9 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       return guides ? { guides } : {};
     })(),
     ...(skeleton ? { skeleton } : {}),
+    ...(typeof d.variantOf === "string" && d.variantOf !== ""
+      ? { variantOf: d.variantOf }
+      : {}),
     ...(() => {
       const generated = parseGenerated(d.generated);
       return generated ? { generated } : {};
@@ -2044,8 +2062,21 @@ function parseGenerated(value: unknown): LegoGenerated | null {
     modules,
     ...(covering ? { covering } : {}),
     ...(running ? { running } : {}),
+    ...(typeof v.thickness === "number" &&
+    Number.isFinite(v.thickness) &&
+    v.thickness > 0
+      ? { thickness: v.thickness }
+      : {}),
+    ...(typeof v.weaponSeed === "number" && Number.isSafeInteger(v.weaponSeed)
+      ? { weaponSeed: v.weaponSeed }
+      : {}),
     ...(stamps ? { stamps } : {}),
     ...(style ? { style } : {}),
+    ...(typeof v.factor === "number" &&
+    Number.isFinite(v.factor) &&
+    v.factor > 0
+      ? { factor: v.factor }
+      : {}),
   };
 }
 
