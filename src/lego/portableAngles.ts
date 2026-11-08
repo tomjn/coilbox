@@ -93,6 +93,15 @@ function atan(input: number): number {
   return negative ? -r : r;
 }
 
+/** The length of a vector, in place of `Math.hypot`, which engines also
+ *  differ on. It gives up `hypot`'s guard against overflow, which no length
+ *  in a unit comes near. */
+export function portableHypot(...values: number[]): number {
+  let sum = 0;
+  for (const v of values) sum += v * v;
+  return Math.sqrt(sum);
+}
+
 /** fdlibm's `atan2`: the angle of the point `x`, `y`. */
 export function portableAtan2(y: number, x: number): number {
   if (Number.isNaN(x) || Number.isNaN(y)) return Number.NaN;

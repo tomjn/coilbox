@@ -12411,6 +12411,7 @@ msgstr "Backup: {backup}"
 msgid "bad pic"
 msgstr "imagem ruim"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -23084,6 +23085,7 @@ msgid "Food"
 msgstr "Comida"
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -24354,6 +24356,7 @@ msgstr "Cresceu {step}, agora {size}."
 msgid "Grid only"
 msgstr "Só a grade"
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -33097,6 +33100,10 @@ msgstr "Nenhum script encontrado, então a unidade abre com as predefinições d
 msgid "No scripts here."
 msgstr "Nenhum script aqui."
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "No server would say what your public address is."
@@ -36157,6 +36164,7 @@ msgstr "Geral"
 msgid "Overclocked Reactor"
 msgstr "Reator sobrecarregado"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
 msgid "Overlap"
@@ -49846,6 +49854,14 @@ msgstr "O script de unidade ali foi alterado desde que o coilbox o gravou, ou n�
 #, fuzzy
 msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "A unidade solta um chamariz sempre que um míssil vem na direção dela."
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #, fuzzy

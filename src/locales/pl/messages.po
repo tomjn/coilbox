@@ -12334,6 +12334,7 @@ msgstr ""
 msgid "bad pic"
 msgstr "zły obrazek"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -22939,6 +22940,7 @@ msgid "Food"
 msgstr "Jedzenie"
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -24204,6 +24206,7 @@ msgstr "Powiększono o {step}, teraz {size}."
 msgid "Grid only"
 msgstr "Tylko siatka"
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -32905,6 +32908,10 @@ msgstr "Nie znaleziono skryptu, więc jednostka otwiera się z gotowymi animacja
 msgid "No scripts here."
 msgstr "Brak skryptów."
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "No server would say what your public address is."
@@ -35931,6 +35938,7 @@ msgstr "Ogółem"
 msgid "Overclocked Reactor"
 msgstr "Przetaktowany reaktor"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
 msgid "Overlap"
@@ -49514,6 +49522,14 @@ msgstr "Tamtejszy skrypt jednostki zmienił się, odkąd zapisał go coilbox, al
 #, fuzzy
 msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "Jednostka wyrzuca wabik za każdym razem, gdy leci na nią pocisk rakietowy."
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #, fuzzy

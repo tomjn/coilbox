@@ -52,6 +52,16 @@ export function skeletonProblems(
   ];
 }
 
+/** The first of the three on its own: each foot or wheel off the ground. */
+export function groundProblems(
+  project: LegoProject,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+): Problem[] {
+  const baked = bakedPieces(project, pack, raw);
+  return feetOffGround(project, baked, pieceOrigins(project, baked.pieces));
+}
+
 /** Where each piece's origin rests in the unit's space. */
 function pieceOrigins(
   project: LegoProject,

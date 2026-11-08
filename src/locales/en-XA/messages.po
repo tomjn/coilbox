@@ -10020,6 +10020,7 @@ msgstr ""
 msgid "bad pic"
 msgstr ""
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -18704,6 +18705,7 @@ msgid "Food"
 msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Footprint"
@@ -19737,6 +19739,7 @@ msgstr ""
 msgid "Grid only"
 msgstr ""
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Ground"
@@ -26821,6 +26824,10 @@ msgstr ""
 msgid "No scripts here."
 msgstr ""
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "No server would say what your public address is."
 msgstr ""
@@ -29290,6 +29297,7 @@ msgstr ""
 msgid "Overclocked Reactor"
 msgstr ""
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 msgid "Overlap"
 msgstr ""
@@ -40376,6 +40384,14 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "The unit throws out a decoy whenever a missile comes at it."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx

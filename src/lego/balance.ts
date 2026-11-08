@@ -16,6 +16,7 @@ import { t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import { childrenOf, type LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
+import { portableHypot } from "./portableAngles";
 import { type Problem, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { type BakedPiece, bakedPieces } from "./s3oBuild";
@@ -178,7 +179,7 @@ function distanceToSegment(
             ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / lengthSquared,
           ),
         );
-  return Math.hypot(p[0] - (a[0] + dx * along), p[1] - (a[1] + dz * along));
+  return portableHypot(p[0] - (a[0] + dx * along), p[1] - (a[1] + dz * along));
 }
 
 /**
@@ -192,7 +193,7 @@ export function signedDistanceToHull(
 ): number {
   if (hull.length === 0) return Number.POSITIVE_INFINITY;
   if (hull.length === 1)
-    return Math.hypot(p[0] - hull[0][0], p[1] - hull[0][1]);
+    return portableHypot(p[0] - hull[0][0], p[1] - hull[0][1]);
   let nearest = Number.POSITIVE_INFINITY;
   let inside = hull.length >= 3;
   for (let i = 0; i < hull.length; i++) {
@@ -214,7 +215,7 @@ function width(points: GroundPoint[]): number {
   let best = 0;
   for (const p of points) {
     for (const q of points) {
-      const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+      const d = portableHypot(p[0] - q[0], p[1] - q[1]);
       if (d > best) {
         best = d;
         a = p;

@@ -10021,6 +10021,7 @@ msgstr "Backup: {backup}"
 msgid "bad pic"
 msgstr "bad pic"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -18705,6 +18706,7 @@ msgid "Food"
 msgstr "Food"
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Footprint"
@@ -19738,6 +19740,7 @@ msgstr "Grew {step}, now {size}."
 msgid "Grid only"
 msgstr "Grid only"
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Ground"
@@ -26822,6 +26825,10 @@ msgstr "No script found, so the unit opens with the animation presets."
 msgid "No scripts here."
 msgstr "No scripts here."
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+
 #: src/direct/ReachablePorts.tsx
 msgid "No server would say what your public address is."
 msgstr "No server would say what your public address is."
@@ -29291,6 +29298,7 @@ msgstr "Overall"
 msgid "Overclocked Reactor"
 msgstr "Overclocked Reactor"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 msgid "Overlap"
 msgstr "Overlap"
@@ -40378,6 +40386,14 @@ msgstr "The unit script there has been changed since coilbox wrote it, or coilbo
 #: src/content/unitFieldNotes.ts
 msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "The unit throws out a decoy whenever a missile comes at it."
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr "The unit's lowest point is {distance} elmos above the ground."
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr "The unit's lowest point is {distance} elmos below the ground."
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 msgid "The units of {gameName} could not be read, so each event shows its unit definition id."

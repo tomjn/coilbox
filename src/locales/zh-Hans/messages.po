@@ -12334,6 +12334,7 @@ msgstr ""
 msgid "bad pic"
 msgstr "图片损坏"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -22939,6 +22940,7 @@ msgid "Food"
 msgstr "食物"
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -24204,6 +24206,7 @@ msgstr "已增大 {step}，当前 {size}。"
 msgid "Grid only"
 msgstr "仅网格"
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -32905,6 +32908,10 @@ msgstr "未找到脚本，所以单位会使用动画预设打开。"
 msgid "No scripts here."
 msgstr "这里没有脚本。"
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "No server would say what your public address is."
@@ -35931,6 +35938,7 @@ msgstr "总体"
 msgid "Overclocked Reactor"
 msgstr "超频反应堆"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
 msgid "Overlap"
@@ -49514,6 +49522,14 @@ msgstr "那里的单位脚本在 coilbox 写入后被修改过，或者不是 co
 #, fuzzy
 msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "每当有导弹来袭时，单位会抛出诱饵弹。"
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #, fuzzy

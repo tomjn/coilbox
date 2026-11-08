@@ -12414,6 +12414,7 @@ msgstr "Säkerhetskopia: {backup}"
 msgid "bad pic"
 msgstr "felaktig bild"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -23094,6 +23095,7 @@ msgid "Food"
 msgstr "Mat"
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -24364,6 +24366,7 @@ msgstr "Växte {step}, nu {size}."
 msgid "Grid only"
 msgstr "Bara rutnät"
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -33114,6 +33117,10 @@ msgstr "Inget skript hittades, så enheten öppnas med animationsförinställnin
 msgid "No scripts here."
 msgstr "Inga skript här."
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "No server would say what your public address is."
@@ -36174,6 +36181,7 @@ msgstr "Totalt"
 msgid "Overclocked Reactor"
 msgstr "Överklockad reaktor"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
 msgid "Overlap"
@@ -49863,6 +49871,14 @@ msgstr "Enhetsskriptet där har ändrats sedan coilbox skrev det, eller så skre
 #, fuzzy
 msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "Enheten kastar ut ett lockbete varje gång en robot kommer mot den."
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #, fuzzy
