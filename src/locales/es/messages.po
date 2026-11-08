@@ -3433,6 +3433,10 @@ msgstr "{ip} no es la dirección de una sola máquina, así que el motor no pued
 msgid "{itemName} ({itemModule}). Added before changes were tracked."
 msgstr "{itemName} ({itemModule}). Añadido antes de que se registraran los cambios."
 
+#: src/lego/generate.ts
+msgid "{jobLabel} {planLabel} {seed}"
+msgstr ""
+
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
 msgid "{jobs, plural, one {Analysing # replay} other {Analysing # replays}}"
@@ -11264,6 +11268,10 @@ msgstr "Ya hay otra unidad con este nombre"
 msgid "Answered the question at {spot}."
 msgstr "Se respondió a la pregunta en {spot}."
 
+#: src/lego/generate.ts
+msgid "Anti-air"
+msgstr ""
+
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
 msgid "Antispam"
@@ -11675,6 +11683,10 @@ msgstr "Sonido de llegada"
 msgid "Arsenal"
 msgstr "Arsenal"
 
+#: src/lego/generate.ts
+msgid "Artillery"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "As {account} on {serverName}. You join the battles they join and leave when they leave."
@@ -11792,6 +11804,10 @@ msgstr "Pregunta al script de la unidad desde qué parte dispara antes de cada c
 #, fuzzy
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "Pide a tu router que redirija el puerto de la sala y el puerto del juego {hostPort} para que puedan unirse personas de fuera de esta red. Los dos, porque abrir solo el de la sala deja entrar a todos y luego falla al iniciar."
+
+#: src/lego/generate.ts
+msgid "Assault"
+msgstr ""
 
 #: src/home/groupDescription.ts
 #, fuzzy
@@ -13572,6 +13588,7 @@ msgstr "constructor"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/lego/generate.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -23855,6 +23872,10 @@ msgstr "Generar un mapa"
 msgid "Generate seed SQL"
 msgstr "Generar SQL de semilla"
 
+#: src/lego/generate.ts
+msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
+msgstr ""
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -27373,6 +27394,10 @@ msgstr "Idioma"
 msgid "Language packs loaded: {loadedList}"
 msgstr ""
 
+#: src/lego/generate.ts
+msgid "Large"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -29567,6 +29592,10 @@ msgstr "Mediana"
 #, fuzzy
 msgid "median {median}"
 msgstr "mediana {median}"
+
+#: src/lego/generate.ts
+msgid "Medium"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -41766,6 +41795,10 @@ msgstr "Limitar a un conjunto"
 msgid "Scope: {scopeText}."
 msgstr "Alcance: {scopeText}."
 
+#: src/lego/generate.ts
+msgid "Scout"
+msgstr ""
+
 #: src/content/pages/components/BrandingScreenshots.tsx
 #, fuzzy
 msgid "Screenshot"
@@ -44374,6 +44407,10 @@ msgstr "Frena una unidad mientras derrapa."
 #, fuzzy
 msgid "SM3 map, not supported since Spring 95.0"
 msgstr "Mapa SM3, no compatible desde Spring 95.0"
+
+#: src/lego/generate.ts
+msgid "Small"
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

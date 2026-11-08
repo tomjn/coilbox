@@ -16,6 +16,7 @@
       "!scripts/data",
       "!src/content/fixtures/replay-track-window.json",
       "!src/play/fixtures/optionsPresets.chobby.json",
+      "!src/lego/fixtures/generated",
       "!src/dev/tauri-mcp-bridge.ts"
     ]
   },

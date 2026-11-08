@@ -3466,6 +3466,10 @@ msgstr "{ip} är inte en enskild dators adress, så motorn kan inte ansluta till
 msgid "{itemName} ({itemModule}). Added before changes were tracked."
 msgstr "{itemName} ({itemModule}). Tillagd innan ändringar spårades."
 
+#: src/lego/generate.ts
+msgid "{jobLabel} {planLabel} {seed}"
+msgstr ""
+
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
 msgid "{jobs, plural, one {Analysing # replay} other {Analysing # replays}}"
@@ -11339,6 +11343,10 @@ msgstr "En annan enhet har redan det här namnet"
 msgid "Answered the question at {spot}."
 msgstr "Besvarade frågan vid {spot}."
 
+#: src/lego/generate.ts
+msgid "Anti-air"
+msgstr ""
+
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
 msgid "Antispam"
@@ -11752,6 +11760,10 @@ msgstr "Ljud vid ankomst"
 msgid "Arsenal"
 msgstr "Arsenal"
 
+#: src/lego/generate.ts
+msgid "Artillery"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "As {account} on {serverName}. You join the battles they join and leave when they leave."
@@ -11869,6 +11881,10 @@ msgstr "Frågar enhetsskriptet vilken del det skjuter från före varje kontroll
 #, fuzzy
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "Ber din router vidarebefordra rummets port och spelets port {hostPort} så att personer utanför det här nätverket kan gå med. Båda, eftersom om bara rummets öppnas kommer alla in men det misslyckas vid start."
+
+#: src/lego/generate.ts
+msgid "Assault"
+msgstr ""
 
 #: src/home/groupDescription.ts
 #, fuzzy
@@ -13656,6 +13672,7 @@ msgstr "byggare"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/lego/generate.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -24013,6 +24030,10 @@ msgstr "Generera en karta"
 msgid "Generate seed SQL"
 msgstr "Generera SQL för startdata"
 
+#: src/lego/generate.ts
+msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
+msgstr ""
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
 msgid "Generated Lua"
@@ -27548,6 +27569,10 @@ msgstr "Språk"
 msgid "Language packs loaded: {loadedList}"
 msgstr "Inlästa språkpaket: {loadedList}"
 
+#: src/lego/generate.ts
+msgid "Large"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Large beam laser texturing"
@@ -29756,6 +29781,10 @@ msgstr "Median"
 #, fuzzy
 msgid "median {median}"
 msgstr "median {median}"
+
+#: src/lego/generate.ts
+msgid "Medium"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -42055,6 +42084,10 @@ msgstr "Begränsa till en uppsättning"
 msgid "Scope: {scopeText}."
 msgstr "Omfång: {scopeText}."
 
+#: src/lego/generate.ts
+msgid "Scout"
+msgstr ""
+
 #: src/content/pages/components/BrandingScreenshots.tsx
 #, fuzzy
 msgid "Screenshot"
@@ -44675,6 +44708,10 @@ msgstr "Saktar ned en enhet medan den slirar."
 #, fuzzy
 msgid "SM3 map, not supported since Spring 95.0"
 msgstr "SM3-karta, stöds inte sedan Spring 95.0"
+
+#: src/lego/generate.ts
+msgid "Small"
+msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
