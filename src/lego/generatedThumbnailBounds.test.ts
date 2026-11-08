@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 /**
  * A generated unit's thumbnail frames the unit's own parts (#5128).
  *
@@ -9,9 +8,10 @@
  */
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { bodyPlanById } from "./bodyPlans";
 import { unitObject } from "./candidatePictures";
@@ -21,9 +21,17 @@ import { type SceneGraph, syncScene } from "./pages/components/sceneState";
 import { starterModules } from "./starterModules";
 import { thumbnailCamera } from "./thumbnail";
 
+// The part material loads its atlas through the DOM, which bounds do not need.
+vi.mock("./geometry", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./geometry")>()),
+  partMaterial: () => new THREE.MeshStandardMaterial(),
+}));
+
 /** The bundled parts with their geometry, which the generator measures. */
 function bundledPack(): LoadedPack {
-  const dir = `${process.cwd()}/src-tauri/legoparts/`;
+  const dir = fileURLToPath(
+    new URL("../../src-tauri/legoparts/", import.meta.url),
+  );
   const manifest = JSON.parse(
     readFileSync(`${dir}pack.json`, "utf8"),
   ) as LegoPackManifest;

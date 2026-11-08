@@ -73,17 +73,7 @@ export class JoinedGroup extends THREE.Group {
       return;
     }
     if (updateParents === true) this.parent.updateWorldMatrix(true, false);
-    if (this.matrixAutoUpdate) this.updateMatrix();
-    let propagate = force;
-    if (this.matrixWorldNeedsUpdate || force) {
-      if (this.matrixWorldAutoUpdate) {
-        this.matrixWorld.copy(
-          joinedWorld(this.parent.matrixWorld, this.matrix),
-        );
-      }
-      this.matrixWorldNeedsUpdate = false;
-      propagate = true;
-    }
+    const propagate = this.poseFromParent(this.parent, force);
     if (updateChildren === true) {
       for (const child of this.children) {
         child.updateWorldMatrix(false, true, propagate);
@@ -96,17 +86,19 @@ export class JoinedGroup extends THREE.Group {
       super.updateMatrixWorld(force);
       return;
     }
-    if (this.matrixAutoUpdate) this.updateMatrix();
-    let propagate = force ?? false;
-    if (this.matrixWorldNeedsUpdate || propagate) {
-      if (this.matrixWorldAutoUpdate) {
-        this.matrixWorld.copy(
-          joinedWorld(this.parent.matrixWorld, this.matrix),
-        );
-      }
-      this.matrixWorldNeedsUpdate = false;
-      propagate = true;
-    }
+    const propagate = this.poseFromParent(this.parent, force ?? false);
     for (const child of this.children) child.updateMatrixWorld(propagate);
+  }
+
+  /** Place this piece against its parent's world matrix. Answers whether the
+   *  children have to follow. */
+  private poseFromParent(parent: THREE.Object3D, force: boolean): boolean {
+    if (this.matrixAutoUpdate) this.updateMatrix();
+    if (!this.matrixWorldNeedsUpdate && !force) return false;
+    if (this.matrixWorldAutoUpdate) {
+      this.matrixWorld.copy(joinedWorld(parent.matrixWorld, this.matrix));
+    }
+    this.matrixWorldNeedsUpdate = false;
+    return true;
   }
 }
