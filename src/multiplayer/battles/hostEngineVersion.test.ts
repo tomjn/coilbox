@@ -42,4 +42,38 @@ describe("hostEngineVersion", () => {
       hostEngineVersion({ executable: "/e/spring" }),
     ).rejects.toThrow("Could not read the engine's version.");
   });
+
+  // Issue #1340: a recorded version that is blank or a leaked path fragment is
+  // not a version a joiner can match, so it is asked for again rather than sent.
+  it.each([
+    ["blank", ""],
+    ["whitespace", "   "],
+    ["a hidden folder", ".spring"],
+  ])("does not advertise a verified version that is %s", async (_name, bad) => {
+    verify.mockResolvedValue({ engine: { syncVersion: "2025.06.20" } });
+    await expect(
+      hostEngineVersion({ executable: "/e/spring", syncVersion: bad }),
+    ).resolves.toBe("2025.06.20");
+    expect(verify).toHaveBeenCalledWith({ path: "/e/spring" });
+  });
+
+  it.each([
+    ["blank", ""],
+    ["whitespace", "   "],
+    ["a hidden folder", ".spring"],
+  ])("refuses when the engine reports a version that is %s", async (_name, bad) => {
+    verify.mockResolvedValue({ engine: { syncVersion: bad } });
+    await expect(
+      hostEngineVersion({ executable: "/e/spring" }),
+    ).rejects.toThrow("Could not read the engine's version.");
+  });
+
+  it("trims the version it advertises", async () => {
+    await expect(
+      hostEngineVersion({
+        executable: "/e/spring",
+        syncVersion: " 2025.06.20 ",
+      }),
+    ).resolves.toBe("2025.06.20");
+  });
 });

@@ -74,6 +74,28 @@ describe("useReplayTarget", () => {
     );
   });
 
+  // Issue #1340: two unparseable strings compare equal, so a recorded ".spring"
+  // would otherwise pick an engine that reported ".spring".
+  it.each([
+    ["a hidden folder", ".spring"],
+    ["whitespace", "   "],
+  ])("does not match an engine whose reported version is %s", (_name, bad) => {
+    roots.current = [
+      {
+        path: "/root",
+        engines: [
+          engine("pref", "recoil_2026.03.01", "2026.03.01"),
+          engine("odd", "any-folder", bad),
+        ],
+      },
+    ];
+    const { result } = renderHook(() => useReplayTarget(bad));
+    expect(result.current.resolved?.matched).toBe(false);
+    expect(result.current.resolved?.target.executable).toBe(
+      "/root/engine/pref/spring",
+    );
+  });
+
   it("does not match a verified engine on its folder name when it reports another version", () => {
     roots.current = [
       {
