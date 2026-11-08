@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 
 /// One entry from the springfiles `json.php` catalog. Field names match the
 /// springfiles JSON (all lowercase) and pass straight through to the frontend.
-/// Unknown fields (md5, timestamp, metadata, ...) are ignored.
+/// Unknown fields (fid, sdp, ...) are ignored. `md5` is kept, because the
+/// frontend checks it against the archives it refuses to offer.
 /// Map metadata from springfiles' `metadata=1` query. Source keys are
 /// capitalised (`Author`, `Width`, `Height`); accepted via serde aliases and
 /// re-emitted as lowercase for the frontend. Empty/zero for non-map entries.
