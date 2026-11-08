@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 import { notify } from "../../notify/notify";
+import { rememberJoinKey } from "../battleKeys";
 import { type Battle, mpJoinBattle } from "../bindings";
 import { forgetOaPassword, holdOaJoinPassword } from "../oaPassword";
 import { newScriptPassword } from "../scriptPassword";
@@ -37,6 +38,7 @@ export async function joinBattle(args: {
   }
   awaitLanding();
   holdOaJoinPassword(serverKey, battle, key);
+  rememberJoinKey(serverKey, battle.id, key);
   try {
     await mpJoinBattle({
       serverKey,

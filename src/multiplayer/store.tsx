@@ -46,6 +46,7 @@ import {
   forgetBattleMovedUnless,
   recordBattleMoved,
 } from "./battle/battleMoved";
+import { forgetJoinKey, joinKeyFor } from "./battleKeys";
 import { useSavedBattleSearches } from "./battles/savedSearch";
 import {
   type ChatMsg,
@@ -1108,6 +1109,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     (serverKey: string) => {
       stopReconnect(serverKey);
       runtimesRef.current.delete(serverKey);
+      forgetJoinKey(serverKey);
       dispatchConn({ type: "close", serverKey });
       if (roomKeyRef.current === serverKey) saveRoomKey("");
     },
@@ -1845,12 +1847,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // than that: it logs failed attempts per IP address, so a loop bans the
           // address rather than the account. Stop and let the person fix it.
           // `doConnect` has already said so.
-          if (rt.denied) return;
+          if (rt.denied) {
+            forgetJoinKey(serverKey);
+            return;
+          }
           // A Tachyon sign-in the server has refused will be refused again, so
           // retrying it only delays the one thing that can fix it: another trip
           // through the browser, which a reconnect must never open by itself.
           if (await needsSignIn(ctx.server, ctx.username)) {
             if (superseded()) return;
+            forgetJoinKey(serverKey);
             void notify({
               title: t`Signed out of multiplayer`,
               body: t`The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.`,
@@ -1860,6 +1866,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           }
           const attempt = ++rt.reconnectAttempt;
           if (attempt >= RECONNECT_DELAYS_MS.length) {
+            forgetJoinKey(serverKey);
             void notify({
               title: t`Couldn't reconnect to multiplayer`,
               body: t`Log in again from the topbar when you're ready.`,
@@ -1890,7 +1897,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       if (!liveKeysRef.current.has(serverKey)) return;
       markGone(serverKey);
       const rt = runtimesRef.current.get(serverKey);
-      if (!rt || rt.intentional) return;
+      // The battle key is kept only while a reconnect can still use it, so a
+      // drop that ends the session forgets it here.
+      if (!rt || rt.intentional) {
+        forgetJoinKey(serverKey);
+        return;
+      }
       // A room is one running process, not an address worth retrying: once it
       // has told us why it ended (a stop, and later a kick), reconnecting would
       // dial whatever else has since taken that address and port, and land us
@@ -1898,12 +1910,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // the reconnect below, since that is the shape a network blip takes and
       // the same room is what is still there to reclaim a seat in.
       if (rt.reconnectCtx?.direct && reason) {
+        forgetJoinKey(serverKey);
         void notify({ title: t`Disconnected from the room`, body: reason });
         return;
       }
-      if (!autoRejoinRef.current) return;
-      if (!rt.loggedIn) return;
-      if (!rt.reconnectCtx) return;
+      if (!autoRejoinRef.current || !rt.loggedIn || !rt.reconnectCtx) {
+        forgetJoinKey(serverKey);
+        return;
+      }
       const st = rt.state;
       if (st?.currentBattle != null) {
         const battle = st.battles[String(st.currentBattle)];
@@ -1911,6 +1925,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         rt.rejoinBattle = {
           id: st.currentBattle,
           scriptPassword: me?.scriptPassword ?? null,
+          key: joinKeyFor(serverKey, st.currentBattle),
         };
       } else {
         rt.rejoinBattle = null;
