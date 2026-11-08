@@ -210,6 +210,7 @@ import {
   rerollUnit,
   setPartLocked,
 } from "../reroll";
+import { rerolledSeed, rerollKind, rerollPart } from "../rerollPart";
 import { type Axis, resizePackBlock } from "../resizePackBlock";
 import { resizeShapeFace } from "../resizeShape";
 import { unringPiece } from "../ring";
@@ -476,6 +477,11 @@ function Builder({ id }: { id: string | undefined }) {
     text: string;
   } | null>(null);
   const [swapNote, setSwapNote] = useState<string | null>(null);
+  /** A seed typed for rerolling one part, and the piece it was typed for. */
+  const [seedEntry, setSeedEntry] = useState<{
+    id: string;
+    text: string;
+  } | null>(null);
   /** Whether the module picker for "Swap module" is open. */
   const [swappingModule, setSwappingModule] = useState(false);
   /** What the module update banner was dismissed at (#3304). */
@@ -1516,26 +1522,36 @@ function Builder({ id }: { id: string | undefined }) {
     if (!result) return;
     docRef.current.edit(() => result.project);
     docRef.current.selectMany(result.rootPieceIds);
-    const movedNames = result.moved.join(", ");
-    const removedLabels = result.removedPresets
-      .map((id) => presetById(id)?.label ?? id)
-      .join(", ");
-    const said = [
-      result.moved.length > 0 ? t`Moved ${movedNames} to the new root.` : null,
-      result.removedPresets.length > 0
-        ? t`Removed ${removedLabels}, no piece uses it now.`
-        : null,
-      describePresets(result.presets),
-      result.broken.length > 0
-        ? t`A join lost its connector. See the problems list.`
-        : null,
-    ].filter(Boolean);
+    const said = moduleSwapNotes(result, result.broken.length > 0);
     if (said.length > 0)
       void notify({
         title,
         body: said.join(" "),
         level: "info",
       });
+  }
+
+  /** What a module swap did to kept pieces and presets, in words. */
+  function moduleSwapNotes(
+    result: {
+      moved: string[];
+      removedPresets: string[];
+      presets?: Parameters<typeof describePresets>[0];
+    },
+    broken: boolean,
+  ) {
+    const movedNames = result.moved.join(", ");
+    const removedLabels = result.removedPresets
+      .map((id) => presetById(id)?.label ?? id)
+      .join(", ");
+    return [
+      result.moved.length > 0 ? t`Moved ${movedNames} to the new root.` : null,
+      result.removedPresets.length > 0
+        ? t`Removed ${removedLabels}, no piece uses it now.`
+        : null,
+      result.presets ? describePresets(result.presets) : null,
+      broken ? t`A join lost its connector. See the problems list.` : null,
+    ].filter(Boolean);
   }
 
   /** Update one out of date instance to the module as it is now. */
@@ -1833,6 +1849,52 @@ function Builder({ id }: { id: string | undefined }) {
   function toggleLocked(pieceId: string) {
     const kept = rerollLocks?.own.has(pieceId) ?? false;
     edit((project) => setPartLocked(project, pieceId, !kept));
+  }
+
+  /**
+   * Another part or module like the selected one (#3236). One undo step. A
+   * seed typed in the box is used as it is, to remake a result. Left as it
+   * shows, the next seed is tried.
+   */
+  function rerollSelected() {
+    if (!draft || !pack || !selected) return;
+    const shown = rerolledSeed(draft, selected.id);
+    const text = seedEntry?.id === selected.id ? seedEntry.text.trim() : "";
+    const typed = text === "" ? undefined : Number(text);
+    if (typed !== undefined && !Number.isSafeInteger(typed)) {
+      void notify({
+        title: t`Reroll`,
+        body: t`A seed is a whole number.`,
+        level: "error",
+      });
+      return;
+    }
+    const result = rerollPart(draft, pack, selected.id, {
+      modules: compounds,
+      symmetry: symmetry.on,
+      ...(typed !== undefined && typed !== shown ? { seed: typed } : {}),
+    });
+    if (result.status === "failed") {
+      void notify({
+        title: t`Reroll`,
+        body: result.message,
+        level: "error",
+      });
+      return;
+    }
+    edit(() => result.project, { alone: true });
+    docRef.current.selectMany(result.select);
+    setSeedEntry(null);
+    const droppedNames = result.droppedAnchors.join(", ");
+    const said = [
+      result.droppedAnchors.length > 0
+        ? t`Dropped an anchor outside the new part: ${droppedNames}.`
+        : null,
+      ...moduleSwapNotes(result, false),
+    ].filter(Boolean);
+    if (said.length > 0) {
+      void notify({ title: t`Reroll`, body: said.join(" "), level: "info" });
+    }
   }
 
   const rerollSeed = draft?.generated?.seed ?? 0;
@@ -3536,6 +3598,49 @@ function Builder({ id }: { id: string | undefined }) {
                                   {swapNote}
                                 </p>
                               ) : null}
+                            </div>
+                          ) : null}
+
+                          {pack && rerollKind(draft, selected.id) ? (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={rerollSelected}
+                                title={
+                                  selected.module
+                                    ? t`Put in another module of the same category`
+                                    : t`Put in another part of the same shape, colour and size`
+                                }
+                              >
+                                <Dices size={14} />
+                                {selected.module ? (
+                                  <Trans>Reroll module</Trans>
+                                ) : (
+                                  <Trans>Reroll part</Trans>
+                                )}
+                              </Button>
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                className="h-8 w-28 text-xs"
+                                aria-label={t`Seed`}
+                                placeholder={t`Seed`}
+                                value={
+                                  seedEntry?.id === selected.id
+                                    ? seedEntry.text
+                                    : (
+                                        rerolledSeed(draft, selected.id) ?? ""
+                                      ).toString()
+                                }
+                                onChange={(event) =>
+                                  setSeedEntry({
+                                    id: selected.id,
+                                    text: event.target.value,
+                                  })
+                                }
+                              />
                             </div>
                           ) : null}
 

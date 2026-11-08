@@ -606,3 +606,95 @@ describe("the build picture action", () => {
     ).toBeTruthy();
   });
 });
+
+/** Reroll one part of the unit (#3236). */
+describe("the reroll action for a selected piece", () => {
+  const beam = (id: string) => ({
+    id,
+    name: id,
+    shape: "beam",
+    shapeId: id,
+    category: "grey",
+    colourway: "grey",
+    material: "",
+    tags: ["beam", "small"],
+    sourceNames: [],
+    packId: "lego",
+    bbox: { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] },
+    pivot: [0, 0, 0],
+  });
+  const parts = ["a", "b", "c"].map(beam);
+
+  function withParts() {
+    packLoad = loadedPack(parts).then((pack) => ({
+      ...(pack as object),
+      byId: new Map(parts.map((part) => [part.id, part])),
+    }));
+    const base = unit();
+    return {
+      ...base,
+      pieces: [
+        ...base.pieces,
+        {
+          id: "s",
+          name: "strut",
+          parentId: "base",
+          partId: "a",
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          role: "leg",
+        },
+      ],
+    } as LegoProject;
+  }
+
+  it("puts in another part of the same kind as one undo step", async () => {
+    const start = withParts();
+    show(start, "s");
+    fireEvent.click(await screen.findByRole("button", { name: "Reroll part" }));
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    expect(edit).toHaveBeenCalledTimes(1);
+    expect(edit.mock.calls[0][1]).toEqual({ alone: true });
+    const next = edit.mock.calls[0][0](start) as LegoProject;
+    const piece = next.pieces.find((p) => p.id === "s");
+    expect(["b", "c"]).toContain(piece?.partId);
+    expect(piece?.role).toBe("leg");
+    expect(piece?.rerolled?.seed).toBeDefined();
+  });
+
+  it("uses a seed typed in the box, to remake a result", async () => {
+    const start = withParts();
+    show(start, "s");
+    const box = await screen.findByRole("spinbutton", { name: "Seed" });
+    fireEvent.change(box, { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reroll part" }));
+    const edit = doc.current.edit as ReturnType<typeof vi.fn>;
+    const next = edit.mock.calls[0][0](start) as LegoProject;
+    expect(next.pieces.find((p) => p.id === "s")?.rerolled).toEqual({
+      seed: 7,
+    });
+  });
+
+  it("shows the seed the piece was last rerolled with", async () => {
+    const start = withParts();
+    const seeded = {
+      ...start,
+      pieces: start.pieces.map((p) =>
+        p.id === "s" ? { ...p, rerolled: { seed: 42 } } : p,
+      ),
+    };
+    show(seeded, "s");
+    const box = (await screen.findByRole("spinbutton", {
+      name: "Seed",
+    })) as HTMLInputElement;
+    expect(box.value).toBe("42");
+  });
+
+  it("is not offered for a piece with no part or module", async () => {
+    show(withParts(), "base");
+    await screen.findByRole("button", { name: "Script" });
+    expect(screen.queryByRole("button", { name: "Reroll part" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reroll module" })).toBeNull();
+  });
+});

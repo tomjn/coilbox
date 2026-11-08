@@ -7512,6 +7512,7 @@ msgstr "A search query"
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr "A see-through sea at y = 0, for how a hull sits in it."
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "A seed is a whole number."
 msgstr "A seed is a whole number."
@@ -16604,6 +16605,10 @@ msgstr "Drop unit {unit}"
 #: src/multiplayer/debriefing.ts
 msgid "Dropped a rank"
 msgstr "Dropped a rank"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Dropped an anchor outside the new part: {droppedNames}."
+msgstr "Dropped an anchor outside the new part: {droppedNames}."
 
 #: src/multiplayer/debriefing.ts
 msgid "Dropped to {name}"
@@ -26522,9 +26527,17 @@ msgstr "No orders were given in this stretch."
 msgid "No orders with a place on the map were given in this replay."
 msgstr "No orders with a place on the map were given in this replay."
 
+#: src/lego/rerollPart.ts
+msgid "No other module is in the {category} category."
+msgstr "No other module is in the {category} category."
+
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 msgid "No other modules in this category"
 msgstr "No other modules in this category"
+
+#: src/lego/rerollPart.ts
+msgid "No other part has this part's shape and colour."
+msgstr "No other part has this part's shape and colour."
 
 #: src/lego/resizePackBlock.ts
 msgid "No other size in the pack on this axis"
@@ -26871,6 +26884,14 @@ msgstr "No script found, so the unit opens with the animation presets."
 #: src/workshop/pages/components/AssetPicker.tsx
 msgid "No scripts here."
 msgstr "No scripts here."
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another module that fits. Try again or change it by hand."
+msgstr "No seed from {first} to {last} found another module that fits. Try again or change it by hand."
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
+msgstr "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
@@ -30966,6 +30987,14 @@ msgstr "Put back the game's class"
 msgid "Put back the game's weapon"
 msgstr "Put back the game's weapon"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another module of the same category"
+msgstr "Put in another module of the same category"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another part of the same shape, colour and size"
+msgstr "Put in another part of the same shape, colour and size"
+
 #: src/scenario/pages/components/MissionHomeActions.tsx
 msgid "Put it in the game"
 msgstr "Put it in the game"
@@ -34524,6 +34553,7 @@ msgstr "See them all on Player stats"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Seed"
@@ -41422,6 +41452,10 @@ msgstr "This model is {modelSize}, past the {previewCap} a preview reads. Downlo
 msgid "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 msgstr "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 
+#: src/lego/rerollPart.ts
+msgid "This module has no category, so there is no other of its kind."
+msgstr "This module has no category, so there is no other of its kind."
+
 #: src/lego/moduleShare.ts
 msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
 msgstr "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
@@ -41429,6 +41463,10 @@ msgstr "This module holds geometry from a game, or meshes with no record that th
 #: src/lego/moduleShare.ts
 msgid "This module is {size} KB, over the {limit} KB a code can carry."
 msgstr "This module is {size} KB, over the {limit} KB a code can carry."
+
+#: src/lego/rerollPart.ts
+msgid "This module is not in the module library."
+msgstr "This module is not in the module library."
 
 #: src/lego/moduleShare.ts
 msgid "This module was made by a newer version of coilbox."
@@ -41501,6 +41539,14 @@ msgstr "This piece does not say which game it is from."
 #: src/lego/unitGame.ts
 msgid "This piece is from {pieceGame}. This unit is for {unitGameName}."
 msgstr "This piece is from {pieceGame}. This unit is for {unitGameName}."
+
+#: src/lego/rerollPart.ts
+msgid "This piece is not a part or module, so it cannot be rerolled."
+msgstr "This piece is not a part or module, so it cannot be rerolled."
+
+#: src/lego/rerollPart.ts
+msgid "This piece's part is not in the parts library."
+msgstr "This piece's part is not in the parts library."
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "This project changes nothing yet, so there is nothing to check."

@@ -7511,6 +7511,7 @@ msgstr ""
 msgid "A see-through sea at y = 0, for how a hull sits in it."
 msgstr ""
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "A seed is a whole number."
 msgstr ""
@@ -16602,6 +16603,10 @@ msgstr ""
 
 #: src/multiplayer/debriefing.ts
 msgid "Dropped a rank"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Dropped an anchor outside the new part: {droppedNames}."
 msgstr ""
 
 #: src/multiplayer/debriefing.ts
@@ -26521,8 +26526,16 @@ msgstr ""
 msgid "No orders with a place on the map were given in this replay."
 msgstr ""
 
+#: src/lego/rerollPart.ts
+msgid "No other module is in the {category} category."
+msgstr ""
+
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 msgid "No other modules in this category"
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "No other part has this part's shape and colour."
 msgstr ""
 
 #: src/lego/resizePackBlock.ts
@@ -26869,6 +26882,14 @@ msgstr ""
 
 #: src/workshop/pages/components/AssetPicker.tsx
 msgid "No scripts here."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another module that fits. Try again or change it by hand."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 msgstr ""
 
 #: src/lego/generateChecked.ts
@@ -30965,6 +30986,14 @@ msgstr ""
 msgid "Put back the game's weapon"
 msgstr ""
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another module of the same category"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Put in another part of the same shape, colour and size"
+msgstr ""
+
 #: src/scenario/pages/components/MissionHomeActions.tsx
 msgid "Put it in the game"
 msgstr ""
@@ -34523,6 +34552,7 @@ msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Seed"
@@ -41421,12 +41451,20 @@ msgstr ""
 msgid "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
 msgstr ""
 
+#: src/lego/rerollPart.ts
+msgid "This module has no category, so there is no other of its kind."
+msgstr ""
+
 #: src/lego/moduleShare.ts
 msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
 msgstr ""
 
 #: src/lego/moduleShare.ts
 msgid "This module is {size} KB, over the {limit} KB a code can carry."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "This module is not in the module library."
 msgstr ""
 
 #: src/lego/moduleShare.ts
@@ -41499,6 +41537,14 @@ msgstr ""
 
 #: src/lego/unitGame.ts
 msgid "This piece is from {pieceGame}. This unit is for {unitGameName}."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "This piece is not a part or module, so it cannot be rerolled."
+msgstr ""
+
+#: src/lego/rerollPart.ts
+msgid "This piece's part is not in the parts library."
 msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
