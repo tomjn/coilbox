@@ -134,6 +134,63 @@ describe("generateUnit", () => {
     }
   });
 
+  // The engines differ in the last bit of these (#5113), so a unit generated
+  // in the macOS app and one in the Windows app could differ. Only `+ - * /` and
+  // `Math.sqrt` are the same everywhere, and three.js calls these inside Euler,
+  // Quaternion.setFromEuler and Vector3.applyAxisAngle. A call here would pass
+  // on either engine alone, so the test refuses the call rather than comparing
+  // two engines' answers.
+  it("calls no maths function the engines disagree on (#5113)", () => {
+    const names = [
+      "sin",
+      "cos",
+      "tan",
+      "asin",
+      "acos",
+      "atan",
+      "atan2",
+      "sinh",
+      "cosh",
+      "tanh",
+      "asinh",
+      "acosh",
+      "atanh",
+      "log",
+      "log2",
+      "log10",
+      "log1p",
+      "exp",
+      "expm1",
+      "pow",
+      "hypot",
+      "cbrt",
+    ] as const;
+    const originals = new Map<string, unknown>();
+    for (const name of names) {
+      originals.set(name, Math[name]);
+      Object.defineProperty(Math, name, {
+        configurable: true,
+        writable: true,
+        value: () => {
+          throw new Error(`generateUnit called Math.${name}`);
+        },
+      });
+    }
+    try {
+      for (const { plan, job, size } of EVERY) {
+        for (const seed of [1, 2, 3, 4]) generate(seed, plan, job, size);
+      }
+    } finally {
+      for (const name of names) {
+        Object.defineProperty(Math, name, {
+          configurable: true,
+          writable: true,
+          value: originals.get(name),
+        });
+      }
+    }
+  });
+
   it("refuses a seed that is not a whole number", () => {
     expect(() => generate(1.5, "biped", "assault", "small")).toThrow();
     expect(() => generate(Number.NaN, "biped", "assault", "small")).toThrow();

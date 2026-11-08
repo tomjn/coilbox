@@ -21,6 +21,7 @@ import {
   type LegoProject,
   pieceById,
 } from "./model";
+import { quaternionFromEuler } from "./portableRotation";
 import { MIN_SCREEN_THRESHOLD } from "./snapping";
 
 /**
@@ -86,7 +87,7 @@ export function worldMatrix(
   for (const link of chain.reverse()) {
     const local = new THREE.Matrix4().compose(
       new THREE.Vector3(...link.position),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(...link.rotation)),
+      quaternionFromEuler(link.rotation),
       new THREE.Vector3(...link.scale),
     );
     world = isJoined(project, link)
