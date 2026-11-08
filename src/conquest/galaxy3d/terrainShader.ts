@@ -461,14 +461,17 @@ const FOREST = /* glsl */ `
 // the crown the ragged outline of a spruce's branches seen from above.
 vec4 tCrown(vec2 q, float density, float cone, float reach, float star) {
   vec4 cell = tCell(q);
-  float r = reach * (0.75 + 0.5 * fract(cell.w * 13.7));
-  r *= 1.0 + star * 0.22 * sin(atan(cell.z, cell.y) * 7.0 + cell.w * 40.0);
+  float r0 = reach * (0.75 + 0.5 * fract(cell.w * 13.7));
+  float angle = atan(cell.z, cell.y) * 7.0 + cell.w * 40.0;
+  float r = r0 * (1.0 + star * 0.22 * sin(angle));
   float u = cell.x / r;
   if (cell.w >= density || u >= 1.0) return vec4(0.0, 0.0, 0.0, cell.w);
   float dome = sqrt(1.0 - u * u);
   float h = mix(dome, 1.0 - u, cone);
   float dh = mix(-u / max(dome, 0.3), -1.0, cone) / r;
-  return vec4(h, cell.yz * dh, cell.w);
+  // A ragged cone also slopes round the crown, so each branch is lit apart.
+  float dr = r0 * star * 0.22 * 7.0 * cos(angle);
+  return vec4(h, cell.yz * dh + vec2(-cell.z, cell.y) * cone * dr / (r * r), cell.w);
 }
 
 // The canopy's colour at q, in cells of one crown grid, lit by the sun: each
@@ -663,7 +666,7 @@ const DETAIL = /* glsl */ `
       density -= lane * conifer * (1.0 - taiga) * smoothstep(0.45, 0.7, stands);
       // Cold forest is a mostly closed canopy, thinner on ridges, with small
       // snowy clearings.
-      float glade = smoothstep(-0.45, -0.65, tField(p + 71.0, 0.9, 2, footprint).x + fine.x * 0.15);
+      float glade = 1.0 - smoothstep(-0.65, -0.45, tField(p + 71.0, 0.9, 2, footprint).x + fine.x * 0.15);
       density = mix(density, 0.95 + dens.x * 0.3 - smoothstep(0.15, 0.55, cavFine) * 0.25 - glade * 0.75, taiga);
       density = clamp(density, 0.0, 0.97) * smoothstep(0.05, mix(0.75, 0.4, taiga), s);
 
