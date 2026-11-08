@@ -150,10 +150,15 @@ function sizeTags(part: LegoPartInfo): string {
  * The other parts of the same kind as `part`, in id order: the same shape,
  * category and colourway, and the same size tags when any other part has them.
  */
-export function partFamily(pack: LoadedPack, part: LegoPartInfo) {
+export function partFamily(
+  pack: LoadedPack,
+  part: LegoPartInfo,
+  accept: (other: LegoPartInfo) => boolean = () => true,
+) {
   const alike = pack.parts.filter(
     (other) =>
       other.id !== part.id &&
+      accept(other) &&
       other.shape === part.shape &&
       other.category === part.category &&
       other.colourway === part.colourway,
@@ -195,13 +200,16 @@ function rerollFamily(
   piece: LegoPiece,
   current: LegoPartInfo,
 ) {
-  const family = partFamily(pack, current);
   const deck = project.generated?.covering?.some(
     (c) => c.piece === piece.id && c.deck,
   );
-  if (!deck) return family;
-  const { axis, down } = floorOf(piece.rotation);
-  return family.filter((part) => hasFlatFloor(pack, part, axis, down));
+  if (!deck) return partFamily(pack, current);
+  // Filtered before the size match, so a size with no flat part does not shut
+  // out the flat parts of the other sizes.
+  const { axis, down } = floorOf(piece.rotation, piece.scale);
+  return partFamily(pack, current, (part) =>
+    hasFlatFloor(pack, part, axis, down),
+  );
 }
 
 function failed(message: string): RerollPartResult {

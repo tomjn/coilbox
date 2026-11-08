@@ -561,7 +561,7 @@ describe("rerolling a part of the covering", () => {
     const piece = pieceById(project, pieceId) as LegoPiece;
     const part = pack.byId.get(piece.partId as string);
     if (!part) throw new Error("no part");
-    const { axis, down } = floorOf(piece.rotation);
+    const { axis, down } = floorOf(piece.rotation, piece.scale);
     return hasFlatFloor(pack, part, axis, down);
   }
 
@@ -574,6 +574,17 @@ describe("rerolling a part of the covering", () => {
     );
   });
 
+  it("turns a deck part's low end over when it is mirrored upright", () => {
+    const { piece } = decks[0] as (typeof decks)[number];
+    const plain = floorOf(piece.rotation, piece.scale);
+    const scale = piece.scale.map((s, axis) =>
+      axis === plain.axis ? -s : s,
+    ) as LegoPiece["scale"];
+    const mirrored = floorOf(piece.rotation, scale);
+    expect(mirrored.axis).toBe(plain.axis);
+    expect(mirrored.down).toBe(-plain.down);
+  });
+
   it("never swaps a deck for a part with no flat floor, on any plan", () => {
     let withoutFloor = 0;
     for (const { project, piece } of decks) {
@@ -581,7 +592,7 @@ describe("rerolling a part of the covering", () => {
       const current = pack.byId.get(piece.partId as string);
       if (!current) throw new Error("no part");
       // The test bites only where the family has such a part to bring back.
-      const { axis, down } = floorOf(piece.rotation);
+      const { axis, down } = floorOf(piece.rotation, piece.scale);
       if (
         partFamily(pack, current).some(
           (p) => !hasFlatFloor(pack, p, axis, down),
