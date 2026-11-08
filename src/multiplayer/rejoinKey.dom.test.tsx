@@ -37,6 +37,8 @@ const wire = vi.hoisted(() => ({
   joinCalls: [] as unknown[],
   /** What `mpSnapshot` answers, so the player is in a battle after a connect. */
   state: null as unknown,
+  /** Makes every connect attempt fail, so a reconnect loop runs out. */
+  connectFails: false,
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -103,6 +105,7 @@ const lobbyState = (inBattle: boolean): LobbyState =>
 
 vi.mock("./bindings", () => {
   const open = async (args: { serverKey: string; onEvent: FakeChannel }) => {
+    if (wire.connectFails) throw new Error("connection refused");
     wire.channels.set(args.serverKey, args.onEvent);
     return { connected: true };
   };
@@ -212,6 +215,7 @@ beforeEach(() => {
   wire.channels.clear();
   wire.notified.length = 0;
   wire.joinCalls.length = 0;
+  wire.connectFails = false;
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   logged = [];
   for (const level of ["log", "info", "warn", "error", "debug"] as const) {
@@ -289,6 +293,45 @@ describe("auto-rejoin after a dropped connection", () => {
     expect(lastJoin()?.key).toBe(SECRET_KEY);
     expect(JSON.stringify(wire.notified)).not.toContain(SECRET_KEY);
     expect(logged.join("\n")).not.toContain(SECRET_KEY);
+  });
+
+  it("keeps the key of the battle it is in when a join of another battle is sent", async () => {
+    await inBattleJoinedWith(SECRET_KEY);
+    await act(async () => {
+      await joinBattle({
+        serverKey: BAR_KEY,
+        battle: { id: 9, engine: "spring" } as unknown as Battle,
+        key: "wrong-key",
+        leaveOther: async () => {},
+        awaitLanding: () => {},
+        giveUp: () => {},
+      });
+    });
+    wire.joinCalls.length = 0;
+
+    await dropAndReconnect();
+
+    expect(lastJoin()).toMatchObject({ id: BATTLE_ID, key: SECRET_KEY });
+  });
+
+  it("forgets the key when the reconnect gives up", async () => {
+    await inBattleJoinedWith(SECRET_KEY);
+    wire.connectFails = true;
+
+    await fire(BAR_KEY, { kind: "disconnected", reason: "connection reset" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    });
+
+    expect(joinKeyFor(BAR_KEY, BATTLE_ID)).toBeNull();
+  });
+
+  it("keeps the key while a reconnect is still pending", async () => {
+    await inBattleJoinedWith(SECRET_KEY);
+
+    await fire(BAR_KEY, { kind: "disconnected", reason: "connection reset" });
+
+    expect(joinKeyFor(BAR_KEY, BATTLE_ID)).toBe(SECRET_KEY);
   });
 
   it("forgets the key when the connection is closed", async () => {
