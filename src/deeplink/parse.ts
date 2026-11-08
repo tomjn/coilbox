@@ -153,7 +153,7 @@ export function parseDeepLink(raw: string): DeepLinkParseResult {
     case "room":
       return parseRoom(params);
     case "import":
-      return parseImport(params);
+      return parseImport(params, raw.trim().length);
     case "open":
       return parseOpen(params);
     default: {
@@ -298,7 +298,10 @@ function parseRoom(params: URLSearchParams): DeepLinkParseResult {
   return { kind: "room", address: normal.host, port: normal.port };
 }
 
-function parseImport(params: URLSearchParams): DeepLinkParseResult {
+function parseImport(
+  params: URLSearchParams,
+  linkLength: number,
+): DeepLinkParseResult {
   const code = params.get("code")?.trim() || null;
   const rawUrl = params.get("url")?.trim() || null;
 
@@ -306,7 +309,9 @@ function parseImport(params: URLSearchParams): DeepLinkParseResult {
     return invalid(t`This import link has both a code and a URL.`);
   }
   if (code) {
-    if (code.length > MAX_LINK_CODE_LENGTH) {
+    // The link as written, not the code decoded from it: percent-escapes make
+    // the link longer than the code, and the link is what the OS passes on.
+    if (code.length > MAX_LINK_CODE_LENGTH || linkLength > MAX_LINK_LENGTH) {
       return invalid(t`This import link is too large.`);
     }
     return { kind: "import", source: { type: "code", code } };

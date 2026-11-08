@@ -387,6 +387,14 @@ describe("parseDeepLink", () => {
       expect(r.kind).toBe("invalid");
     });
 
+    it("rejects a link over the limit whose decoded code is within it", () => {
+      // A quote is `%22` in a link, so the code is a third the link's length.
+      const encoded = "%22".repeat(Math.floor(MAX_LINK_CODE_LENGTH / 3) + 1);
+      const link = `${IMPORT_CODE_LINK_PREFIX}${encoded}`;
+      expect(link.length).toBeGreaterThan(MAX_LINK_LENGTH);
+      expect(parseDeepLink(link).kind).toBe("invalid");
+    });
+
     it("accepts a code at the link limit", () => {
       const code = "a".repeat(MAX_LINK_CODE_LENGTH);
       const r = parseDeepLink(`coilbox://import?code=${code}`);

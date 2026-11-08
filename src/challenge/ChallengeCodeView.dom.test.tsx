@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
-/** The share drawer offers a Copy link button only for a code short enough for
- * a link to open on Windows and Linux, and always offers the code itself
- * (issue #5150). */
+/** The share drawer offers a Copy link button only for a code within
+ * `MAX_LINK_CODE_LENGTH`, and always offers the code itself (issue #5150). That
+ * limit comes from documented Windows and Linux command line limits and has not
+ * been measured on either system. */
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
