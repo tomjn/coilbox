@@ -149,6 +149,7 @@ uniform sampler2D uRiverEdge;
 uniform float uRiverOn;
 uniform float uRiverPixel;
 uniform vec3 uRiverColour;
+uniform float uRiverFrozen;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
 // How far a point lies outside the nearest river's edge in world units,
@@ -511,20 +512,20 @@ const DETAIL = /* glsl */ `
       albedo *= mix(vec3(1.0), change, smoothstep(0.5, 0.95, sum));
     }
 
-    // Rivers (rivers.ts) are the sea laid along their courses: water that
-    // ripples and glints, or whatever else this planet's sea is, on level
-    // ground.
+    // Rivers (rivers.ts): level water of their own, which ripples and
+    // glints, or clear ice on a frozen world. Never the sea's floes or
+    // pattern, and the land's patterns stop at the water.
     float riverEdge = 1.0;
+    float river = 0.0;
     if (uRiverOn > 0.5) {
       riverEdge = tRiverEdge(vTerrainUv);
       float rSoft = max(footprint * 0.75, 0.004);
-      float river = (1.0 - smoothstep(-rSoft, rSoft, riverEdge)) * land;
+      river = (1.0 - smoothstep(-rSoft, rSoft, riverEdge)) * land;
       if (river > 0.0) {
         albedo = mix(albedo, uRiverColour, river);
         n = normalize(mix(n, vec3(0.0, 1.0, 0.0), river * 0.85));
-        sea += river;
-        land = 1.0 - sea;
-        liquid = sea * uSeaLiquid;
+        land -= river;
+        liquid = max(liquid, river * (1.0 - uRiverFrozen));
       }
     }
 
@@ -941,6 +942,10 @@ const DETAIL = /* glsl */ `
     // Coasts past the edge are drawn at half the map's resolution, and foam
     // traces their steps, so it thins out there.
     foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
+    // A river foams along its edge as the sea does, broken in places.
+    // Only the outer edge, so a narrow river is never all foam.
+    float riverFoam = smoothstep(-0.014 - footprint, -0.006, riverEdge) * (1.0 - smoothstep(-0.003, 0.0, riverEdge)) * smoothstep(0.0, 0.5, broad.x + fine.x * 0.5) * (1.0 - uRiverFrozen) * uRiverOn;
+    foam = max(foam, riverFoam * 0.5);
     bump = mix(bump, wave.yz * 0.03, liquid);
     bump3 *= 1.0 - liquid;
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
@@ -950,9 +955,17 @@ const DETAIL = /* glsl */ `
     // upper edge.
     float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
     albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), wet * 0.85);
-    // A river's banks are wet too, in a narrower band.
-    float bank = (1.0 - smoothstep(0.0, 0.05 + 0.03 * fine.x, riverEdge)) * land * uSeaLiquid * (1.0 - 0.5 * steep);
-    albedo = mix(albedo, albedo * vec3(0.45, 0.47, 0.5), bank * 0.7);
+    // A river's banks are wet as the shore is, darker and bluer with a
+    // ragged edge, in a band narrower than the sea's.
+    float bank = (1.0 - smoothstep(0.1, 0.7 + 0.2 * fine.x, riverEdge)) * land * (1.0 - uRiverFrozen) * (1.0 - 0.5 * steep);
+    albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), bank * 0.85);
+    if (uRiverFrozen > 0.5 && river > 0.0) {
+      // Frozen: white frost along the edges and in drifts across the ice,
+      // and a smooth glint where it is clear.
+      float frost = clamp(smoothstep(-0.05, 0.0, riverEdge) + smoothstep(0.2, 0.6, fine.x) * 0.6, 0.0, 1.0);
+      albedo = mix(albedo, vec3(0.86, 0.92, 0.96), river * frost * 0.75);
+      spec += river * (1.0 - frost) * pow(glint, 80.0) * 0.35;
+    }
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
     n = normalize(n + vec3(-bump.x, 0.0, -bump.y) - (bump3 - n * dot(bump3, n)));
 
@@ -1032,6 +1045,9 @@ uniform float uBakeReady;
 const BAKE_VERTEX = /* glsl */ `
 gl_Position = vec4((uv - uBakeRect.xy) / uBakeRect.zw * 2.0 - 1.0, 0.0, 1.0);
 `;
+
+/** A frozen river's ice in sRGB: clear, with dark water under it. */
+const RIVER_ICE: [number, number, number] = [126, 160, 180];
 
 /** Seas that ripple, foam and glint. The rest are drawn as the picture has them. */
 const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
@@ -1143,12 +1159,17 @@ export function applyTerrainShader(
     shader.uniforms.uRiverEdge = { value: rivers?.edge ?? placeholder };
     shader.uniforms.uRiverOn = { value: rivers ? 1 : 0 };
     shader.uniforms.uRiverPixel = { value: rivers?.pixel ?? 0 };
-    // Between the sea's shallows and its deeps: a river is not as deep as
-    // the open sea, and not as pale as a sandbar.
+    // A frozen world's rivers are clear ice. Any other's are its seas'
+    // water, between the shallows and the deeps: not as deep as the open
+    // sea, and not as pale as a sandbar.
+    const frozen = planet?.sea.look === "ice";
+    shader.uniforms.uRiverFrozen = { value: frozen ? 1 : 0 };
     shader.uniforms.uRiverColour = {
-      value: planet
-        ? colour(planet.sea.shallow).lerp(colour(planet.sea.deep), 0.6)
-        : new THREE.Color(),
+      value: !planet
+        ? new THREE.Color()
+        : frozen
+          ? colour(RIVER_ICE)
+          : colour(planet.sea.shallow).lerp(colour(planet.sea.deep), 0.6),
     };
     // Roads (groundShader.ts).
     if (shading.ground) {
