@@ -34,6 +34,7 @@
 
 import * as THREE from "three";
 import { pick } from "../conquest/rng";
+import { convexHull, type GroundPoint } from "./balance";
 import { pieceOwnBox } from "./connectors";
 import type { CoveringRule } from "./generatorJobs";
 import {
@@ -52,7 +53,7 @@ import {
 } from "./model";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import { portableEuler, portableLog } from "./portableAngles";
-import { quaternionFromEuler } from "./portableRotation";
+import { applyEuler, quaternionFromEuler } from "./portableRotation";
 import { worldMatrix } from "./reparent";
 
 /**
@@ -93,6 +94,9 @@ export interface CoveringResult {
   project: LegoProject;
   covering: { bone: string; piece: string }[];
 }
+
+/** Floats per vertex in a pack: position, normal and uv. */
+const VERTEX_FLOATS = 8;
 
 /** An axis aligned box in the unit's space. */
 interface Box {
@@ -312,6 +316,79 @@ function fits(
       a.error - b.error ||
       (a.part.id < b.part.id ? -1 : a.part.id > b.part.id ? 1 : 0),
   );
+}
+
+/**
+ * How much of its box's footprint the hull of a part's lowest vertices takes
+ * up for the part to have a floor: the balance check reads a unit with no feet
+ * by those vertices, so a part whose underside is a wedge, a ramp or a few
+ * corners puts the unit's support at one edge. Measured on the bundled pack's
+ * grey plates and blocks (their better side), 35 of 96 take up 0.5 or less and
+ * the other 61 0.667 or more, a round plate 0.707, so 0.6 sits in the gap.
+ */
+const FLAT_FLOOR = 0.6;
+
+/** Whether each part, down axis and direction has a flat floor, by pack. */
+const floors = new WeakMap<LoadedPack, Map<string, boolean>>();
+
+/**
+ * Whether a part standing with `down` of its `axis` towards the ground has a
+ * floor: the vertices at its lowest height, seen from above, take up at least
+ * `FLAT_FLOOR` of the part's footprint. `down` is 1 when the low end is the
+ * part's maximum along `axis`, and -1 when it is the minimum.
+ */
+export function hasFlatFloor(
+  pack: LoadedPack,
+  part: LegoPartInfo,
+  axis: number,
+  down: 1 | -1,
+): boolean {
+  const key = `${part.id}|${axis}|${down}`;
+  let known = floors.get(pack);
+  if (!known) {
+    known = new Map();
+    floors.set(pack, known);
+  }
+  const cached = known.get(key);
+  if (cached !== undefined) return cached;
+  // A pack without the part's vertices (a manifest alone) cannot be judged.
+  if (
+    part.vCount === 0 ||
+    pack.vertices.length < (part.vFirst + part.vCount) * VERTEX_FLOATS
+  ) {
+    return true;
+  }
+  const across = [0, 1, 2].filter((a) => a !== axis);
+  const height = (i: number) =>
+    (pack.vertices[(part.vFirst + i) * VERTEX_FLOATS + axis] as number) * -down;
+  let lowest = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < part.vCount; i++) lowest = Math.min(lowest, height(i));
+  // Float32 vertices on one face differ in the last bit or two, so a face is
+  // the vertices within a thousandth of the part's thickness of the lowest.
+  const slack = (part.bbox.max[axis] - part.bbox.min[axis]) * 1e-3;
+  const floor: GroundPoint[] = [];
+  for (let i = 0; i < part.vCount; i++) {
+    if (height(i) > lowest + slack) continue;
+    const at = (part.vFirst + i) * VERTEX_FLOATS;
+    floor.push([
+      pack.vertices[at + (across[0] as number)] as number,
+      pack.vertices[at + (across[1] as number)] as number,
+    ]);
+  }
+  const hull = convexHull(floor);
+  let area = 0;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i] as GroundPoint;
+    const b = hull[(i + 1) % hull.length] as GroundPoint;
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+  const footprint = across.reduce(
+    (product, a) => product * (part.bbox.max[a] - part.bbox.min[a]),
+    1,
+  );
+  const flat = footprint > 0 && Math.abs(area) / 2 >= FLAT_FLOOR * footprint;
+  known.set(key, flat);
+  return flat;
 }
 
 /**
@@ -576,23 +653,44 @@ export function coverSkeleton(
   const added: LegoPiece[] = [];
   const names = project.pieces.map((p) => p.name);
   for (const plan of plans) {
-    const shapes = preferredShapes(
-      plan.shapes.filter((shape) => parts.some((p) => p.shape === shape)),
-      style,
+    const allowed = plan.shapes.filter((shape) =>
+      parts.some((p) => p.shape === shape),
     );
-    let ranked = fits(
-      parts.filter((p) => shapes.includes(p.shape)),
-      plan.length,
-      plan.width,
-      plan.depth,
-      plan.rows,
-      style?.detail === "dense" ? DENSE_PART_SCALE : MAX_PART_SCALE,
-    );
-    // A deck part thicker than the deck reaches below it, and the unit sitting
-    // on the ground would then lift its wheels off it. With no part thin
-    // enough, there is no deck.
-    if (plan.rows && options.gear?.size) {
-      ranked = ranked.filter((fit) => fit.depth <= plan.depth + TOUCH);
+    const rank = (shapes: readonly string[]) => {
+      const fitted = fits(
+        parts.filter((p) => shapes.includes(p.shape)),
+        plan.length,
+        plan.width,
+        plan.depth,
+        plan.rows,
+        style?.detail === "dense" ? DENSE_PART_SCALE : MAX_PART_SCALE,
+      );
+      // A deck part thicker than the deck reaches below it, and the unit
+      // sitting on the ground would then lift its wheels off it. With no part
+      // thin enough, there is no deck.
+      return plan.rows && options.gear?.size
+        ? fitted.filter((fit) => fit.depth <= plan.depth + TOUCH)
+        : fitted;
+    };
+    const preferred = preferredShapes(allowed, style);
+    let ranked = rank(preferred);
+    // A deck part with no flat underside leaves the unit propped on one edge.
+    // A style's preferred shapes give way to the others when none of them has
+    // a flat part, so the style does not cost the unit its deck.
+    if (plan.rows) {
+      const up = plan.frame[2] as THREE.Vector3;
+      const flat = (fit: Fit) => {
+        const axis = fit.axes[2] as number;
+        const unit = new THREE.Vector3();
+        unit.setComponent(axis, 1);
+        const turned = applyEuler(unit, laidAlong(fit.axes, plan.frame));
+        return hasFlatFloor(pack, fit.part, axis, turned.dot(up) > 0 ? -1 : 1);
+      };
+      let floored = ranked.filter(flat);
+      if (floored.length === 0 && preferred.length < allowed.length) {
+        floored = rank(allowed).filter(flat);
+      }
+      ranked = floored;
     }
     // A sparse style takes the fewest copies any part needs, the best fits
     // among those first.
