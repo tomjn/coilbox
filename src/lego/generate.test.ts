@@ -18,6 +18,7 @@ import {
   projectProblems,
 } from "./model";
 import { type LegoPackManifest, type LoadedPack, mergePacks } from "./pack";
+import { applyProportions } from "./skeletonEdit";
 import { starterModules } from "./starterModules";
 
 const bundled = JSON.parse(
@@ -209,6 +210,16 @@ describe("generateUnit", () => {
                   `${where} ${role}`,
                 ).toBeLessThanOrEqual(1);
               }
+              // The one gun is the job's module when the job has a weapon, so
+              // the cap is not met by the weapon going missing.
+              if (["assault", "artillery", "antiair"].includes(job)) {
+                for (const role of ["turret", "barrel", "flare"]) {
+                  expect(
+                    rolePieces(unit, role)[0]?.module,
+                    `${where} ${role} from the module`,
+                  ).toBeDefined();
+                }
+              }
             }
           }
         }
@@ -263,12 +274,25 @@ describe("generateUnit", () => {
       }
     });
 
-    it("leaves the plan's gun joints in place, so a proportion edit does not bring them back", () => {
+    it("keeps the plan's gun joints, so a proportion edit does not bring a second gun back", () => {
+      const plan = bodyPlanById("ship");
+      if (!plan) throw new Error("no ship");
       const unit = generate(1, "ship", "artillery", "medium");
+      let counter = 0;
+      const edited = applyProportions(
+        unit,
+        plan,
+        { barrelLength: 20, deckHeight: 10 },
+        () => `edit.${++counter}`,
+      ).project;
+      expect(counter).toBe(0);
       for (const bone of ["turret", "barrel", "flare"]) {
-        const piece = unit.pieces.find((p) => p.bone === bone);
+        const piece = edited.pieces.find((p) => p.bone === bone);
         expect(piece, bone).toBeDefined();
         expect(piece?.role, bone).toBeUndefined();
+      }
+      for (const role of GUN_ROLES) {
+        expect(rolePieces(edited, role).length, role).toBeLessThanOrEqual(1);
       }
     });
   });
