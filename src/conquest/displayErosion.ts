@@ -13,6 +13,13 @@ import { hashString, mulberry32 } from "./rng";
  * little so they stay crisp and deposits more so they spread into fans, and
  * the sum, less its own wide blur so only fine detail is left, is added back
  * to the full resolution heights.
+ *
+ * Drops shape the mountains well but reach lower ground full and set their
+ * load down there, so on their own they smooth the low hills rather than
+ * cut them (#5153). The channels water would follow are cut as well: every
+ * cell drains to a neighbour, and a cell is cut deeper the more ground
+ * drains through it. That draws gullies down every hillside, joining into
+ * valleys.
  */
 
 /** Drops per half resolution cell. */
@@ -43,6 +50,162 @@ const DEPOSIT_PASSES = 2;
 /** The blur whose result is taken back out, so only fine detail is left. */
 const BROAD_BLUR = 6;
 const BROAD_PASSES = 2;
+
+/** Half resolution cells that must drain through a cell before a gully starts. */
+const GULLY_HEAD = 16;
+/**
+ * Depth of a gully, in heights, for each step of the square root of what
+ * drains through it past the head. Shallower gullies are lost under the
+ * ground's own small bumps and the biome patterns at the default zoom.
+ */
+const GULLY_DEPTH = 0.06;
+/** The deepest a channel gets, where a whole valley drains through it. */
+const GULLY_MAX = 0.25;
+/** Noise on the heights water is routed over, so channels do not run straight. */
+const ROUTE_JITTER = 0.012;
+/**
+ * Rise per half resolution cell at which a channel is cut its full depth.
+ * Gentler ground is cut less, and flat ground not at all. Nine tenths of the
+ * lower half of a generated temperate map's land rises at least twice this.
+ */
+const SLOPE_FOR_FULL_CUT = 0.003;
+/** Most of the height above the sea a channel may cut. */
+const CHANNEL_SHARE = 0.9;
+/** Depth past which a channel is also a valley, cut again wider. */
+const VALLEY_FROM = 0.1;
+const CHANNEL_BLUR = 1;
+const CHANNEL_PASSES = 1;
+const VALLEY_BLUR = 2;
+const VALLEY_PASSES = 2;
+
+/**
+ * How deep to cut the channels water would run in on `h`, `width` by `height`
+ * heights where 0 and below is sea. Every land cell drains to its lowest
+ * neighbour, with hollows filled so the water always reaches the sea or the
+ * edge, and a cell is cut deeper the more ground drains through it. Lines of
+ * cells with a lot draining through them are gullies on a hillside and
+ * valleys where gullies join.
+ */
+export function channelDepths(
+  h: Float32Array,
+  width: number,
+  height: number,
+): Float32Array {
+  const count = h.length;
+  // Where each cell's water goes, -1 for the sea and the edge.
+  const to = new Int32Array(count).fill(-1);
+  // Cells in the order the flood reached them, lowest first.
+  const order = new Int32Array(count);
+  let reached = 0;
+  const seen = new Uint8Array(count);
+  // A binary heap on height, ties broken by when a cell was pushed so the
+  // order is fixed and a flat is crossed from the side the water came in.
+  const heapCell = new Int32Array(count);
+  const heapLevel = new Float64Array(count);
+  const heapSeq = new Float64Array(count);
+  let size = 0;
+  let seq = 0;
+  const less = (a: number, b: number) =>
+    heapLevel[a] < heapLevel[b] ||
+    (heapLevel[a] === heapLevel[b] && heapSeq[a] < heapSeq[b]);
+  const swap = (a: number, b: number) => {
+    const c = heapCell[a];
+    heapCell[a] = heapCell[b];
+    heapCell[b] = c;
+    const l = heapLevel[a];
+    heapLevel[a] = heapLevel[b];
+    heapLevel[b] = l;
+    const s = heapSeq[a];
+    heapSeq[a] = heapSeq[b];
+    heapSeq[b] = s;
+  };
+  const push = (cell: number, level: number) => {
+    let k = size++;
+    heapCell[k] = cell;
+    heapLevel[k] = level;
+    heapSeq[k] = seq++;
+    while (k > 0) {
+      const parent = (k - 1) >> 1;
+      if (!less(k, parent)) break;
+      swap(k, parent);
+      k = parent;
+    }
+  };
+  const pop = (): number => {
+    const cell = heapCell[0];
+    size--;
+    if (size > 0) {
+      heapCell[0] = heapCell[size];
+      heapLevel[0] = heapLevel[size];
+      heapSeq[0] = heapSeq[size];
+      let k = 0;
+      for (;;) {
+        const l = 2 * k + 1;
+        if (l >= size) break;
+        const m = l + 1 < size && less(l + 1, l) ? l + 1 : l;
+        if (!less(m, k)) break;
+        swap(m, k);
+        k = m;
+      }
+    }
+    return cell;
+  };
+
+  // The flood starts from the sea and the edge, where water leaves the land.
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (
+        h[i] <= 0 ||
+        x === 0 ||
+        y === 0 ||
+        x === width - 1 ||
+        y === height - 1
+      ) {
+        seen[i] = 1;
+        push(i, h[i]);
+      }
+    }
+  }
+  while (size > 0) {
+    const level0 = heapLevel[0];
+    const i = pop();
+    if (h[i] > 0) order[reached++] = i;
+    const x = i % width;
+    const y = (i - x) / width;
+    for (let oy = -1; oy <= 1; oy++) {
+      const ny = y + oy;
+      if (ny < 0 || ny >= height) continue;
+      for (let ox = -1; ox <= 1; ox++) {
+        const nx = x + ox;
+        if ((ox === 0 && oy === 0) || nx < 0 || nx >= width) continue;
+        const j = ny * width + nx;
+        if (seen[j]) continue;
+        seen[j] = 1;
+        // A land cell drains to the cell the flood reached it from: downhill,
+        // or across a filled hollow towards the way out.
+        to[j] = h[i] > 0 ? i : -1;
+        push(j, Math.max(h[j], level0));
+      }
+    }
+  }
+
+  // What drains through each cell, counting itself, highest first.
+  const area = new Float32Array(count);
+  for (let k = reached - 1; k >= 0; k--) {
+    const i = order[k];
+    area[i] += 1;
+    if (to[i] >= 0) area[to[i]] += area[i];
+  }
+  const depth = new Float32Array(count);
+  const head = Math.sqrt(GULLY_HEAD);
+  for (let k = 0; k < reached; k++) {
+    const i = order[k];
+    const over = Math.sqrt(area[i]) - head;
+    if (over > 0) depth[i] = Math.min(GULLY_MAX, over * GULLY_DEPTH);
+  }
+  return depth;
+}
 
 /** `src` through `passes` box blurs of `radius` pixels, edge pixels repeated. */
 function blur(
@@ -265,8 +428,42 @@ export function erodeRelief(
   }
   const cut = blur(cuts, hw, hh, CUT_BLUR, CUT_PASSES);
   const spread = blur(deposits, hw, hh, DEPOSIT_BLUR, DEPOSIT_PASSES);
+  // The channels the water would follow on what the drops left, cut as gullies.
+  // Water is routed over the heights with a little noise on them, so the
+  // channels wander and join as they would on real ground and do not run as
+  // ruled lines down an even slope.
+  const jitter = mulberry32(hashString(`channels:${seed >>> 0}`));
+  const routed = eroded.slice();
+  for (let i = 0; i < routed.length; i++) {
+    if (routed[i] > 0) routed[i] += jitter() * ROUTE_JITTER;
+  }
+  // A channel that deep is a valley too, and is cut again wider.
+  const depths = channelDepths(routed, hw, hh);
+  const gullies = new Float32Array(depths.length);
+  const valleys = new Float32Array(depths.length);
+  for (let i = 0; i < depths.length; i++) {
+    // Never more than part of the way down to the sea, so low ground near
+    // the shore is not cut into trenches.
+    // Flat ground has nothing to cut a gully down, however much drains over it.
+    const x = i % hw;
+    const y = (i - x) / hw;
+    const gx =
+      eroded[y * hw + Math.min(hw - 1, x + 1)] -
+      eroded[y * hw + Math.max(0, x - 1)];
+    const gy =
+      eroded[Math.min(hh - 1, y + 1) * hw + x] -
+      eroded[Math.max(0, y - 1) * hw + x];
+    const fall = Math.min(1, Math.hypot(gx, gy) / 2 / SLOPE_FOR_FULL_CUT);
+    const d = Math.min(depths[i] * fall, eroded[i] * CHANNEL_SHARE);
+    gullies[i] = d;
+    valleys[i] = Math.max(0, d - VALLEY_FROM);
+  }
+  const gully = blur(gullies, hw, hh, CHANNEL_BLUR, CHANNEL_PASSES);
+  const valley = blur(valleys, hw, hh, VALLEY_BLUR, VALLEY_PASSES);
   const change = new Float32Array(half.length);
-  for (let i = 0; i < change.length; i++) change[i] = spread[i] - cut[i];
+  for (let i = 0; i < change.length; i++) {
+    change[i] = spread[i] - cut[i] - gully[i] - valley[i];
+  }
   // Only the fine part stays. Mass the drops moved over a wide area would
   // change the shape of whole hills, which belongs to the pinned heightmap.
   const broad = blur(change, hw, hh, BROAD_BLUR, BROAD_PASSES);

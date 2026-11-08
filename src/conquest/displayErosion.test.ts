@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { erodeRelief, runDrops } from "./displayErosion";
+import { channelDepths, erodeRelief, runDrops } from "./displayErosion";
 import { mulberry32 } from "./rng";
 
 const SIDE = 192;
@@ -147,5 +147,75 @@ describe("erodeRelief", () => {
     const out = erodeRelief(input, side, side, 6);
     expect(out).toHaveLength(input.length);
     expect(out.every(Number.isFinite)).toBe(true);
+  });
+
+  it("cuts gullies down a gentle hillside", () => {
+    // Ground falling gently to the sea at the bottom edge, as steep as most
+    // lower ground on a generated map, with the generator's small bumps on it.
+    // Drops alone smooth ground like this.
+    const rng = mulberry32(21);
+    const input = new Float32Array(SIDE * SIDE);
+    for (let y = 0; y < SIDE - 4; y++) {
+      for (let x = 0; x < SIDE; x++) {
+        input[y * SIDE + x] = 0.03 + (SIDE - y) * 0.003 + rng() * 0.004;
+      }
+    }
+    const out = erodeRelief(input, SIDE, SIDE, 8);
+    // The deepest cut in each row across the slope's lower half, as a share
+    // of the ground's height there. A gully worth seeing is a good part of it.
+    let rows = 0;
+    let deep = 0;
+    for (let y = SIDE / 2; y < SIDE - 12; y++) {
+      let cut = 0;
+      for (let x = 12; x < SIDE - 12; x++) {
+        const i = y * SIDE + x;
+        cut = Math.max(cut, input[i] - out[i]);
+      }
+      rows++;
+      if (cut > input[y * SIDE + SIDE / 2] * 0.15) deep++;
+    }
+    expect(deep / rows).toBeGreaterThan(0.8);
+  });
+});
+
+describe("channelDepths", () => {
+  it("cuts deeper downstream, and never in the sea", () => {
+    // A plane falling to the sea down the left edge.
+    const side = 64;
+    const h = new Float32Array(side * side);
+    for (let y = 0; y < side; y++) {
+      for (let x = 2; x < side; x++) h[y * side + x] = x * 0.01;
+    }
+    const depth = channelDepths(h, side, side);
+    for (let y = 0; y < side; y++) {
+      for (let x = 0; x < 2; x++) expect(depth[y * side + x]).toBe(0);
+    }
+    // The ridge at the far side drains nothing, and the deepest cuts are by
+    // the sea, where the most ground drains through.
+    const column = (x: number) => {
+      let most = 0;
+      for (let y = 0; y < side; y++) most = Math.max(most, depth[y * side + x]);
+      return most;
+    };
+    expect(column(side - 2)).toBe(0);
+    expect(column(2)).toBeGreaterThan(column(side / 2));
+    expect(column(side / 2)).toBeGreaterThan(0);
+  });
+
+  it("drains a hollow over its rim and on to the sea", () => {
+    // A bowl in a slope: water that gathers in it still has a way out.
+    const side = 48;
+    const h = new Float32Array(side * side);
+    for (let y = 0; y < side; y++) {
+      for (let x = 2; x < side; x++) {
+        const bowl = Math.exp(-(((x - 30) / 6) ** 2 + ((y - 24) / 6) ** 2));
+        h[y * side + x] = 0.05 + x * 0.004 - bowl * 0.1 + 0.1;
+      }
+    }
+    const depth = channelDepths(h, side, side);
+    // Something drains past the bowl to the coast on its seaward side.
+    let cut = 0;
+    for (let x = 3; x < 24; x++) cut = Math.max(cut, depth[24 * side + x]);
+    expect(cut).toBeGreaterThan(0);
   });
 });
