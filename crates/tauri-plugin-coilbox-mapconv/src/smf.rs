@@ -115,7 +115,8 @@ pub fn locate_smf_heights(path: &std::path::Path) -> Result<SmfHeights, String> 
     let metal_offset = pointer(OFF_METALMAP_PTR);
     let (width, height) = (info.mapx / 2, info.mapy / 2);
     let metal_len = width as u64 * height as u64;
-    let metal = (metal_offset + metal_len <= size).then_some(SmfMetal {
+    // A zero pointer is a map with no metal block, and would read the header.
+    let metal = (metal_offset != 0 && metal_offset + metal_len <= size).then_some(SmfMetal {
         offset: metal_offset,
         len: metal_len as usize,
         width,
@@ -238,6 +239,11 @@ mod tests {
         let metal = at.metal.as_ref().expect("the metal map is inside the file");
         assert_eq!((metal.width, metal.height, metal.len), (2, 1, 2));
         assert_eq!(read_smf_metal(&path, metal).unwrap(), vec![7, 200]);
+
+        // A null pointer is no metal map, not the header read as one.
+        b[OFF_METALMAP_PTR..OFF_METALMAP_PTR + 4].copy_from_slice(&0u32.to_le_bytes());
+        std::fs::write(&path, &b).unwrap();
+        assert!(locate_smf_heights(&path).unwrap().metal.is_none());
 
         // The metal map pointing past the end leaves the heights readable.
         b[OFF_METALMAP_PTR..OFF_METALMAP_PTR + 4].copy_from_slice(&1000u32.to_le_bytes());

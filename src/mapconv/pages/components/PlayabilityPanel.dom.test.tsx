@@ -65,7 +65,10 @@ vi.mock("@/workshop/config", () => ({
   },
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 /** A flat 16 by 16 square map. */
 function flat(): Heights {
@@ -117,11 +120,23 @@ describe("the playability panel", () => {
   });
 
   it("waits for the metal map before it measures", async () => {
-    render(
+    const bytes = new Uint8Array(64);
+    bytes[1 * 8 + 1] = 100;
+    const { rerender } = render(
       <PlayabilityPanel heights={flat()} starts={[]} metal={{ grid: null }} />,
     );
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText("KBOT2")).toBeNull();
+    // The same panel measures once the metal map arrives, so the wait above
+    // was for it and not for something that never comes.
+    rerender(
+      <PlayabilityPanel
+        heights={flat()}
+        starts={[]}
+        metal={{ grid: { bytes, width: 8, height: 8 } }}
+      />,
+    );
+    expect(await screen.findByText("KBOT2")).toBeTruthy();
   });
 
   it("says why when the metal map could not be read", async () => {
@@ -164,7 +179,6 @@ describe("the playability panel", () => {
       await screen.findByText("2 metal spots, extractor radius is 90 elmos"),
     ).toBeTruthy();
     expect(smf.mapinfo).toHaveBeenCalledWith({ path: "/out" });
-    vi.unstubAllGlobals();
   });
 
   it("falls back to the engine's radius when the folder has no mapinfo.lua", async () => {
@@ -191,7 +205,6 @@ describe("the playability panel", () => {
     expect(
       await screen.findByText("1 metal spot, extractor radius is 500 elmos"),
     ).toBeTruthy();
-    vi.unstubAllGlobals();
   });
 
   it("says the compiled map has no metal map when the file has none", async () => {

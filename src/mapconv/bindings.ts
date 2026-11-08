@@ -197,6 +197,8 @@ export const mcSmfHeights = defineCommand<
     metalFile?: string;
     metalWidth?: number;
     metalHeight?: number;
+    /** Why the metal map could not be read, when it lies inside the file. */
+    metalError?: string;
   }
 >("coilbox-mapconv", "mc_smf_heights");
 

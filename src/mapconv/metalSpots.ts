@@ -149,18 +149,107 @@ const MIRRORS: {
   { mirror: "northSouth", at: (p, _w, h) => ({ x: p.x, z: h - p.z }) },
 ];
 
-/** The largest distance from a point's mirror image to the nearest point. */
+/** Points in a uniform grid, so a nearby point is found without scanning
+ *  them all. */
+class PointGrid {
+  private cells = new Map<number, Point[]>();
+  private reach: number;
+
+  constructor(
+    points: Point[],
+    private cell: number,
+    extent: number,
+  ) {
+    for (const p of points) {
+      const key = this.key(this.index(p.x), this.index(p.z));
+      const list = this.cells.get(key);
+      if (list) list.push(p);
+      else this.cells.set(key, [p]);
+    }
+    this.reach = Math.ceil(extent / cell) + 2;
+    this.empty = points.length === 0;
+  }
+
+  private empty: boolean;
+
+  private index(v: number) {
+    return Math.floor(v / this.cell);
+  }
+
+  /** Offset so a point just outside the map keeps its own key. */
+  private key(cx: number, cz: number) {
+    return (cx + 32768) * 131072 + (cz + 32768);
+  }
+
+  /** The distance to the nearest point, Infinity when there are none. */
+  nearest(x: number, z: number): number {
+    if (this.empty) return Infinity;
+    const cx = this.index(x);
+    const cz = this.index(z);
+    let best = Infinity;
+    for (let k = 0; k <= this.reach; k++) {
+      // Anything in ring `k` is at least `k - 1` whole cells away.
+      if (best <= (k - 1) * this.cell) break;
+      for (let dz = -k; dz <= k; dz++) {
+        const edge = Math.abs(dz) === k;
+        for (let dx = -k; dx <= k; dx += edge || k === 0 ? 1 : 2 * k) {
+          const list = this.cells.get(this.key(cx + dx, cz + dz));
+          if (!list) continue;
+          for (const q of list)
+            best = Math.min(best, Math.hypot(q.x - x, q.z - z));
+        }
+      }
+    }
+    return best;
+  }
+
+  /** The points in the cells that can hold one within `r` of `x`, `z`. */
+  *near(x: number, z: number, r: number): Generator<Point> {
+    for (let cz = this.index(z - r); cz <= this.index(z + r); cz++) {
+      for (let cx = this.index(x - r); cx <= this.index(x + r); cx++) {
+        yield* this.cells.get(this.key(cx, cz)) ?? [];
+      }
+    }
+  }
+}
+
+/** Which side of the fold a point is on: -1, 1, or 0 on the fold. The centre
+ *  mirror swaps east and west, so it folds along the north to south line. */
+function side(p: Point, mirror: MirrorName, w: number, h: number): number {
+  if (mirror === "northSouth") return Math.sign(p.z - h / 2);
+  return Math.sign(p.x - w / 2);
+}
+
+/**
+ * The largest distance from a point's mirror image to the nearest point on
+ * the other side of the fold. A point on the fold may be its own counterpart.
+ */
 function worstGap(
   points: Point[],
-  image: (p: Point) => Point,
+  mirror: MirrorName,
+  w: number,
+  h: number,
 ): { gap: number; at: Point } | null {
+  const at = MIRRORS.find((m) => m.mirror === mirror)?.at;
+  if (!at || points.length === 0) return null;
+  const extent = Math.max(w, h);
+  const cell = Math.max(16, Math.sqrt((w * h) / points.length));
+  const bySide = new Map<number, PointGrid>();
+  for (const sign of [-1, 0, 1]) {
+    // A point on the fold counts for both sides.
+    const list = points.filter((p) => {
+      const s = side(p, mirror, w, h);
+      return sign === 0 ? true : s === sign || s === 0;
+    });
+    bySide.set(sign, new PointGrid(list, cell, extent));
+  }
   let worst: { gap: number; at: Point } | null = null;
   for (const p of points) {
-    const m = image(p);
-    let nearest = Infinity;
-    for (const q of points) {
-      nearest = Math.min(nearest, Math.hypot(q.x - m.x, q.z - m.z));
-    }
+    const m = at(p, w, h);
+    const s = side(p, mirror, w, h);
+    // The other side's points, or all of them when `p` is on the fold.
+    const grid = bySide.get(s === 0 ? 0 : -s);
+    const nearest = grid ? grid.nearest(m.x, m.z) : Infinity;
     if (!worst || nearest > worst.gap) worst = { gap: nearest, at: p };
   }
   return worst;
@@ -186,8 +275,20 @@ export function measureMetal(
 
   const close: MetalResult["close"] = [];
   let closeCount = 0;
+  const pairGrid = new PointGrid(
+    spots,
+    Math.max(16, extractorRadius),
+    Math.max(worldX, worldZ),
+  );
+  const order = new Map(spots.map((s, i) => [s, i]));
   for (let a = 0; a < spots.length; a++) {
-    for (let b = a + 1; b < spots.length; b++) {
+    for (const other of pairGrid.near(
+      spots[a].x,
+      spots[a].z,
+      extractorRadius,
+    )) {
+      const b = order.get(other) ?? -1;
+      if (b <= a) continue;
       const distance = Math.hypot(
         spots[a].x - spots[b].x,
         spots[a].z - spots[b].z,
@@ -220,10 +321,10 @@ export function measureMetal(
     widest = Math.max(widest, s.reach);
   }
 
-  const mirrors = MIRRORS.map(({ mirror, at }): MirrorGap => {
-    const image = (p: Point) => at(p, worldX, worldZ);
-    const startGap = starts.length >= 2 ? worstGap(starts, image) : null;
-    const spotGap = worstGap(spots, image);
+  const mirrors = MIRRORS.map(({ mirror }): MirrorGap => {
+    const startGap =
+      starts.length >= 2 ? worstGap(starts, mirror, worldX, worldZ) : null;
+    const spotGap = worstGap(spots, mirror, worldX, worldZ);
     return {
       mirror,
       starts: startGap ? startGap.gap : null,

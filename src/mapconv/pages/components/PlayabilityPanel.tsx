@@ -398,7 +398,9 @@ export function CompiledPlayability({
       // still gets the rest of the panel.
       try {
         if (!smf.metalFile || !smf.metalWidth || !smf.metalHeight) {
-          throw new Error("the compiled map has no metal map to read");
+          throw new Error(
+            smf.metalError ?? "the compiled map has no metal map to read",
+          );
         }
         // The radius is read before the grid is handed over, so the panel
         // measures once and not again when the radius arrives.

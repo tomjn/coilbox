@@ -3,9 +3,11 @@
  *
  * Numbers rather than a verdict: how much of the map each movement class can
  * drive on, how the passable ground breaks into areas, the narrowest point on
- * the widest way between start positions, and how much of the map takes a
- * building. Each rule is the engine's own, read out of RecoilEngine rather than
- * guessed at, and each is noted where it is used.
+ * the widest way between start positions, how much of the map takes a
+ * building, and where the metal is. Each of the first four follows the
+ * engine's own rule, read out of RecoilEngine rather than guessed at, and each
+ * is noted where it is used. The metal figures follow a game's spot finder
+ * instead, which `metalSpots.ts` explains.
  *
  * Movement is measured on the engine's slope map, one cell per 16 by 16 elmos,
  * because that is the resolution the engine's movement slope test runs at.

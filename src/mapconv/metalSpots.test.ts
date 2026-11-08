@@ -196,6 +196,77 @@ describe("measuring a map's metal", () => {
     );
   });
 
+  it("does not let a spot on the same side stand in for the missing counterpart", () => {
+    // Two spots in the west and none in the east of a 512 elmo wide map.
+    const m = measureMetal(
+      grid(
+        32,
+        32,
+        cells([
+          [10, 5],
+          [12, 5],
+        ]),
+      ),
+      90,
+      [],
+    );
+    const fold = m.mirrors.find((x) => x.mirror === "eastWest");
+    expect(fold?.spots).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("counts a spot on the fold as its own counterpart", () => {
+    // Cell 15 and 16 straddle the middle of a 32 cell map, so one group
+    // centres on the fold.
+    const m = measureMetal(
+      grid(
+        32,
+        32,
+        cells([
+          [15, 5],
+          [16, 5],
+        ]),
+      ),
+      90,
+      [],
+    );
+    expect(m.mirrors.find((x) => x.mirror === "eastWest")?.spots).toBe(0);
+  });
+
+  it("agrees with a scan of every pair on a scattered map", () => {
+    const g = grid(64, 64, []);
+    let seed = 7;
+    const next = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 120; i++) {
+      g.bytes[Math.floor(next() * 64) * 64 + Math.floor(next() * 64)] = 100;
+    }
+    const spots = findSpots(g);
+    const m = measureMetal(g, 100, []);
+    let pairs = 0;
+    for (let a = 0; a < spots.length; a++)
+      for (let b = a + 1; b < spots.length; b++)
+        if (Math.hypot(spots[a].x - spots[b].x, spots[a].z - spots[b].z) < 100)
+          pairs++;
+    expect(m.closeCount).toBe(pairs);
+    // The centre mirror, by brute force over the other side.
+    let worst = 0;
+    for (const p of spots) {
+      let best = Number.POSITIVE_INFINITY;
+      for (const q of spots) {
+        const opposite =
+          Math.sign(q.x - 512) !== Math.sign(p.x - 512) || p.x === 512;
+        if (!opposite) continue;
+        best = Math.min(
+          best,
+          Math.hypot(q.x - (1024 - p.x), q.z - (1024 - p.z)),
+        );
+      }
+      worst = Math.max(worst, best);
+    }
+    expect(m.mirrors.find((x) => x.mirror === "centre")?.spots).toBeCloseTo(
+      worst,
+    );
+  });
+
   it("has no start figures with fewer than two starts", () => {
     const m = measureMetal(grid(32, 32, cells([[2, 3]])), 90, [
       { x: 40, z: 56 },

@@ -25,6 +25,13 @@ export function MetalFigures({
 }) {
   const { t } = useLingui();
   const elmos = (value: number) => Math.round(value);
+  /** A gap, or why there is none. Infinity means nothing on the other side. */
+  const gap = (value: number | null) =>
+    value === null
+      ? "—"
+      : Number.isFinite(value)
+        ? elmos(value)
+        : t`none across`;
   const mirrorName: Record<MirrorName, string> = {
     centre: t`through the centre`,
     eastWest: t`east to west`,
@@ -98,7 +105,9 @@ export function MetalFigures({
           </p>
           <ul className="list-disc pl-5 tabular-nums">
             {metal.close.map((pair) => {
-              const distance = elmos(pair.distance);
+              // One decimal, so a pair listed as closer than the radius never
+              // rounds up to it.
+              const distance = Number(pair.distance.toFixed(1));
               const ax = elmos(pair.ax);
               const az = elmos(pair.az);
               const bx = elmos(pair.bx);
@@ -138,10 +147,10 @@ export function MetalFigures({
               <TableRow key={m.mirror}>
                 <TableCell>{mirrorName[m.mirror]}</TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {m.starts === null ? "—" : elmos(m.starts)}
+                  {gap(m.starts)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {m.spots === null ? "—" : elmos(m.spots)}
+                  {gap(m.spots)}
                 </TableCell>
                 <TableCell className="tabular-nums">
                   {m.worst ? `${elmos(m.worst.x)}, ${elmos(m.worst.z)}` : "—"}

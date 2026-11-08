@@ -146,7 +146,13 @@ export default function MapDetailPage() {
     ? { grid: null }
     : {
         grid: metalGrid.grid,
-        error: metalField.error ?? metalGrid.error,
+        error:
+          metalField.error ??
+          metalGrid.error ??
+          // An answer with no file and no error is a map with no metal map.
+          (metalField.data && !metalField.url
+            ? "the map has no metal map to read"
+            : null),
         extractorRadius: metalField.data?.extractorRadius,
       };
   const mapInfo = useUnitsyncMapInfo(

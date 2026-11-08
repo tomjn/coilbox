@@ -86,7 +86,8 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> MetalField
             .ok_or_else(|| "the metal grid cache file has no name".to_string())?;
         // Only a miss pays for the read. A hit is still a use, and the sweep
         // below reads recency off the file, so say so.
-        if file.is_file() {
+        // A file of the wrong length is a write that did not finish.
+        if std::fs::metadata(&file).is_ok_and(|m| m.len() == u64::from(w) * u64::from(h)) {
             coilbox_thumb_cache::touch(&file);
         } else {
             let raw = us

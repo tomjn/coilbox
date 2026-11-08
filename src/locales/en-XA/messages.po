@@ -27157,6 +27157,10 @@ msgstr ""
 msgid "None"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "none across"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 msgid "None earned yet. {total} to go."
 msgstr ""

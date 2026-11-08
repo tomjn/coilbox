@@ -33326,6 +33326,10 @@ msgstr "brak"
 msgid "None"
 msgstr "Brak"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "none across"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "None earned yet. {total} to go."

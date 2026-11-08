@@ -549,13 +549,34 @@ async fn mc_height_field<R: Runtime>(app: AppHandle<R>, path: String, max: u32) 
     }
 }
 
+/// The compiled map's metal map in the cache under `<key>-smfm.bin`, by file
+/// name. A cache file of the wrong length is a write that did not finish.
+fn metal_cached(
+    path: &str,
+    metal: &smf::SmfMetal,
+    dir: &Path,
+    key: &str,
+) -> Result<String, String> {
+    let name = format!("{key}-smfm.bin");
+    let file = dir.join(&name);
+    if std::fs::metadata(&file).is_ok_and(|m| m.len() == metal.len as u64) {
+        coilbox_thumb_cache::touch(&file);
+    } else {
+        let bytes = smf::read_smf_metal(Path::new(path), metal)?;
+        let _ = std::fs::create_dir_all(dir);
+        std::fs::write(&file, &bytes).map_err(|e| format!("could not write the metal map: {e}"))?;
+    }
+    Ok(name)
+}
+
 /// A compiled map's height words and metal map, written to the cache under
 /// `<key>-smf.bin` and `<key>-smfm.bin` and reported by file name with the grids
 /// and range they are on. Keyed by the file's size and modification time, so a
 /// new compile is read afresh.
 ///
-/// `metalFile` is left out when the metal map does not lie inside the file, so
-/// the panel can say there is none to read.
+/// `metalFile` is left out when the metal map does not lie inside the file or
+/// could not be read, and `metalError` says why in the second case, so the panel
+/// can say there is none to read.
 fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json::Value, String> {
     // The header first, so a missing or broken map says so rather than
     // anything about the cache.
@@ -582,20 +603,16 @@ fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json
         "maxHeight": at.info.max_height,
     });
     if let Some(metal) = &at.metal {
-        let metal_name = format!("{key}-smfm.bin");
-        let metal_file = dir.join(&metal_name);
-        let cached = std::fs::metadata(&metal_file).is_ok_and(|m| m.len() == metal.len as u64);
-        if cached {
-            coilbox_thumb_cache::touch(&metal_file);
-        } else {
-            let bytes = smf::read_smf_metal(Path::new(path), metal)?;
-            let _ = std::fs::create_dir_all(dir);
-            std::fs::write(&metal_file, &bytes)
-                .map_err(|e| format!("could not write the metal map: {e}"))?;
+        // The metal map is extra. A read or write that fails is reported beside
+        // the heights, which are still good.
+        match metal_cached(path, metal, dir, &key) {
+            Ok(metal_name) => {
+                out["metalFile"] = json!(metal_name);
+                out["metalWidth"] = json!(metal.width);
+                out["metalHeight"] = json!(metal.height);
+            }
+            Err(e) => out["metalError"] = json!(e),
         }
-        out["metalFile"] = json!(metal_name);
-        out["metalWidth"] = json!(metal.width);
-        out["metalHeight"] = json!(metal.height);
     }
     Ok(out)
 }
