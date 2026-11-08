@@ -9,6 +9,7 @@ import {
   ChevronUp,
   Copy,
   Crosshair,
+  Dices,
   FlipHorizontal2,
   FlipVertical2,
   ImageIcon,
@@ -202,6 +203,13 @@ import {
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
+import {
+  editedPieces,
+  keptByItself,
+  keptPieces,
+  rerollUnit,
+  setPartLocked,
+} from "../reroll";
 import { type Axis, resizePackBlock } from "../resizePackBlock";
 import { resizeShapeFace } from "../resizeShape";
 import { unringPiece } from "../ring";
@@ -219,6 +227,7 @@ import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions, resetToPlan } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
 import type { Vec3 } from "../snapping";
+import { starterModules } from "../starterModules";
 import { swapModule, swapRefusal } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { upgradeChainProblems } from "../upgradeChain";
@@ -1806,6 +1815,42 @@ function Builder({ id }: { id: string | undefined }) {
     }));
   }
 
+  // What a reroll of a generated unit keeps (#3235), for the lock on each row.
+  const rerollLocks = useMemo(() => {
+    if (!draft?.generated) return null;
+    const edited = editedPieces(draft);
+    return {
+      kept: keptPieces(draft, edited),
+      own: new Set(
+        draft.pieces
+          .filter((piece) => keptByItself(piece, edited))
+          .map((piece) => piece.id),
+      ),
+      edited,
+    };
+  }, [draft]);
+
+  function toggleLocked(pieceId: string) {
+    const kept = rerollLocks?.own.has(pieceId) ?? false;
+    edit((project) => setPartLocked(project, pieceId, !kept));
+  }
+
+  const rerollSeed = draft?.generated?.seed ?? 0;
+  function reroll() {
+    if (!draft || !pack) return;
+    const result = rerollUnit(draft, { pack, modules: starterModules(pack) });
+    if (result.status === "failed") {
+      void notify({
+        title: t`Reroll`,
+        body: result.message,
+        level: "error",
+      });
+      return;
+    }
+    // A step of its own, so one undo takes the whole reroll back.
+    edit(() => result.unit, { alone: true });
+  }
+
   // The collision panel's two readings, both of which walk every vertex in the
   // unit. Only worked out while that panel is open, so a keystroke anywhere
   // else in the builder does not pay for them.
@@ -2996,11 +3041,23 @@ function Builder({ id }: { id: string | undefined }) {
                     <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       <Trans>Pieces</Trans>
                     </h2>
-                    {pack && !draft.imported ? (
+                    {pack && draft.generated ? (
                       <Button
                         size="sm"
                         variant="ghost"
                         className="ml-auto"
+                        onClick={reroll}
+                        aria-label={t`Reroll`}
+                        title={t`Reroll the parts that are not locked. Seed ${rerollSeed}`}
+                      >
+                        <Dices size={14} />
+                      </Button>
+                    ) : null}
+                    {pack && !draft.imported ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={draft.generated ? undefined : "ml-auto"}
                         onClick={addArm}
                         aria-label={t`Add a build arm`}
                         title={t`Add a build arm with its nozzle and nano point, and the build presets`}
@@ -3023,7 +3080,9 @@ function Builder({ id }: { id: string | undefined }) {
                       size="sm"
                       variant="ghost"
                       className={
-                        pack && !draft.imported ? undefined : "ml-auto"
+                        pack && (!draft.imported || draft.generated)
+                          ? undefined
+                          : "ml-auto"
                       }
                       onClick={addEmpty}
                       title={t`Add an empty piece, which is how flares and aim points are made`}
@@ -3045,6 +3104,8 @@ function Builder({ id }: { id: string | undefined }) {
                         onReparent={reparent}
                         joins={joins}
                         onToggleHidden={toggleHidden}
+                        locks={rerollLocks}
+                        onToggleLocked={toggleLocked}
                         hoveredId={hoveredId}
                         onHoverChange={setHoveredId}
                         collapsedIds={collapsedIds}

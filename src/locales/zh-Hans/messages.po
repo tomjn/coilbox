@@ -9192,6 +9192,14 @@ msgstr ""
 msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr "回放中的单位编号只有对照其所用版本的单位列表才有意义。没有此类列表的对局会被整个排除，自身命令与列表不符的对局也是如此。"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll keeps it with a kept part"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "A reroll replaces it"
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "A restriction binds every team the scenario declares, not the player alone: the rule names no team. Teams the scenario says nothing about, Gaia included, are untouched."
@@ -20710,6 +20718,10 @@ msgstr "已编辑"
 msgid "edited {edited}"
 msgstr "编辑于 {edited}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Edited by hand, so a reroll keeps it"
+msgstr ""
+
 #: src/workshop/deathExplosions.ts
 #, fuzzy
 msgid "Editing makes a copy for {unitName}."
@@ -28540,6 +28552,10 @@ msgstr "锁定"
 msgid "Lock {loadoutName}"
 msgstr "锁定 {loadoutName}"
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Lock {pieceName}"
+msgstr ""
+
 #: src/lego/pages/components/LoadoutPicker.tsx
 #, fuzzy
 msgid "Lock module {name}"
@@ -28565,6 +28581,10 @@ msgstr "已锁定"
 #, fuzzy
 msgid "Locked until a campaign grants it"
 msgstr "在战役授予之前保持锁定"
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Locked, so a reroll keeps it"
+msgstr ""
 
 #: src/conquest/unlocks.ts
 #, fuzzy
@@ -32935,6 +32955,10 @@ msgstr "这里没有脚本。"
 
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
+#: src/lego/reroll.ts
+msgid "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -40323,6 +40347,7 @@ msgstr "还需要开启 waterweapon。"
 msgid "Requisition their cache"
 msgstr "征用他们的储藏点"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr ""
@@ -40332,6 +40357,10 @@ msgstr ""
 #, fuzzy
 msgid "Reroll seed"
 msgstr "重新随机种子"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll the parts that are not locked. Seed {rerollSeed}"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -51470,10 +51499,18 @@ msgstr "此单位混合了零件和从游戏中提起的部件，所以导出时
 msgid "This unit moves but names no movement class, so the engine drops it at load. Pick one."
 msgstr "此单位会移动但没有指定移动类型，所以引擎会在加载时丢弃它。请选择一个。"
 
+#: src/lego/reroll.ts
+msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "此单位基于 \"{builtAgainst}\" 包构建，而该包未安装。"
+
+#: src/lego/reroll.ts
+msgid "This unit was not generated."
+msgstr ""
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -51547,6 +51584,10 @@ msgstr "此 URL 太长，无法用于链接。"
 #, fuzzy
 msgid "This value has been changed from the game's default."
 msgstr "此值已不同于游戏的默认值。"
+
+#: src/lego/reroll.ts
+msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
