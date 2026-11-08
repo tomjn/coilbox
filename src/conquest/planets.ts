@@ -49,7 +49,9 @@ export type BiomePattern =
   | "snow"
   | "tundra"
   | "cracked"
-  | "earth";
+  | "earth"
+  /** Cold forest: sparse conifers with snow or bare ground between them. */
+  | "taiga";
 
 export interface Biome {
   name: string;
@@ -108,6 +110,17 @@ export interface Planet {
   steep: [Rgb, Rgb];
   /** Colour of a clearing in a `forest` pattern slot, in sRGB. */
   clearing: Rgb;
+  /**
+   * The colours a `forest` or `taiga` slot's trees are drawn in, lit then
+   * deep, in sRGB, and the share of broadleaf trees turning colour, 0 to 1.
+   * Display only. Planets without forest leave it out.
+   */
+  forest?: {
+    broadleaf: [Rgb, Rgb];
+    conifer: [Rgb, Rgb];
+    autumn: [Rgb, Rgb];
+    turning: number;
+  };
   /** How much rime lies on the rock, 0 to 1. Display only. None when left out. */
   frost?: number;
   /** Added to moisture and to cold before the rule runs. */
@@ -199,6 +212,21 @@ const TEMPERATE: Planet = {
     [152, 146, 140],
   ],
   clearing: [122, 154, 84],
+  forest: {
+    broadleaf: [
+      [96, 130, 56],
+      [36, 72, 46],
+    ],
+    conifer: [
+      [66, 96, 62],
+      [24, 50, 40],
+    ],
+    autumn: [
+      [196, 150, 46],
+      [176, 86, 36],
+    ],
+    turning: 0.3,
+  },
   climate: { wet: 0, cold: 0 },
   weights(h, wet, cold, out) {
     out.fill(0);
@@ -309,6 +337,7 @@ const ICE: Planet = {
     biome("bare ice", [176, 208, 224], "ice"),
     biome("tundra", [132, 138, 126], "tundra"),
     biome("rock", [104, 104, 110], "rock"),
+    biome("cold forest", [84, 100, 96], "taiga"),
   ],
   shore: 0,
   steep: [
@@ -316,6 +345,21 @@ const ICE: Planet = {
     [132, 138, 126],
   ],
   clearing: [238, 242, 246],
+  forest: {
+    broadleaf: [
+      [132, 120, 106],
+      [78, 68, 62],
+    ],
+    conifer: [
+      [62, 86, 76],
+      [22, 40, 40],
+    ],
+    autumn: [
+      [196, 168, 88],
+      [168, 120, 60],
+    ],
+    turning: 0,
+  },
   frost: 1,
   climate: { wet: 0, cold: 0.6 },
   weights(h, wet, cold, out) {
@@ -325,6 +369,12 @@ const ICE: Planet = {
     out[1] = t;
     // Tundra shows through where it is mildest and never takes over.
     blend(out, 2, 1 - cold);
+    // Cold forest in the wetter, milder lowland, below the bare rock.
+    blend(
+      out,
+      4,
+      ramp(wet, 0.4, 0.2) * ramp(1 - cold, 0.3, 0.25) * (1 - ramp(h, 0.3, 0.1)),
+    );
     blend(out, 3, ramp(h, 0.42, 0.15));
     blend(out, 0, ramp(h, 0.84, 0.08));
   },
@@ -511,6 +561,21 @@ const ACID: Planet = {
     [110, 104, 92],
   ],
   clearing: [118, 98, 70],
+  forest: {
+    broadleaf: [
+      [138, 116, 58],
+      [66, 48, 32],
+    ],
+    conifer: [
+      [92, 84, 50],
+      [40, 36, 26],
+    ],
+    autumn: [
+      [176, 104, 44],
+      [116, 54, 38],
+    ],
+    turning: 0.45,
+  },
   climate: { wet: 0, cold: 0 },
   weights(h, wet, _cold, out) {
     out.fill(0);

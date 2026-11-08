@@ -4,6 +4,7 @@ import {
   type BiomePattern,
   type PlanetId,
   planetOf,
+  type Rgb,
   type SeaLook,
 } from "../planets";
 import {
@@ -145,9 +146,13 @@ uniform vec4 uTerrainFrame;
 uniform float uTerrainHaze;
 uniform vec3 uTerrainFar;
 uniform float uTerrainGreyBeyond;
+uniform vec3 uForest[6];
+uniform float uForestAutumn;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
-TERRAIN_NOISE_HERE`;
+TERRAIN_NOISE_HERE
+FOREST_HERE
+`;
 
 /**
  * Hashes, noise and the helpers that fade a pattern out with distance, for
@@ -389,12 +394,13 @@ const PATTERN_INDEX: Record<BiomePattern, number> = {
   tundra: 16,
   cracked: 17,
   earth: 18,
+  taiga: 19,
 };
 const P = PATTERN_INDEX;
 /** Two patterns only a sea draws with, after the land's. */
-const P_LAVA = 19;
-const P_SEA_ICE = 20;
-const PATTERN_COUNT = 21;
+const P_LAVA = 20;
+const P_SEA_ICE = 21;
+const PATTERN_COUNT = 22;
 
 /**
  * The pattern a sea that is not liquid draws with. A dry basin and the maria
@@ -444,6 +450,60 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
   diffuseColor.rgb = lit;
 }
 BAKE_ALPHA_HERE
+`;
+
+/** Tree crowns for the forest in {@link DETAIL}. */
+const FOREST = /* glsl */ `
+// One tree of the canopy at q, in cells of the crown grid: its height 0 to 1,
+// its slope, and a random 0 to 1 for the tree. A cell holds a tree when its
+// random number is below density. cone 0 is a rounded broadleaf crown, 1 a
+// pointed conifer. reach is the crown's radius in cells.
+vec4 tCrown(vec2 q, float density, float cone, float reach) {
+  vec4 cell = tCell(q);
+  float r = reach * (0.75 + 0.5 * fract(cell.w * 13.7));
+  float u = cell.x / r;
+  if (cell.w >= density || u >= 1.0) return vec4(0.0, 0.0, 0.0, cell.w);
+  float dome = sqrt(1.0 - u * u);
+  float h = mix(dome, 1.0 - u, cone);
+  float dh = mix(-u / max(dome, 0.3), -1.0, cone) / r;
+  return vec4(h, cell.yz * dh, cell.w);
+}
+
+// The canopy's colour at q, in cells of one crown grid, lit by the sun: each
+// crown its own colour, bright on its sunward side, with the shadows of the
+// crowns toward the sun cast over it or over the ground between. kind is 0
+// for broadleaf and 1 for conifer. between is the ground under the trees.
+vec3 tCanopy(vec2 q, float density, float kind, vec3 between, float turning, float frost) {
+  float reach = mix(0.62, 0.5 + 0.1 * frost, kind);
+  // How tall a crown stands against its width, for its shadow and slope.
+  float tall = mix(0.7, 1.5, kind);
+  vec2 sunAt = normalize(uTerrainSun.xz);
+  float sunRise = uTerrainSun.y / length(uTerrainSun.xz);
+  vec4 crown = tCrown(q, density, kind, reach);
+  float pick = fract(crown.w * 31.7);
+  vec3 own = mix(mix(uForest[1], uForest[0], pick), mix(uForest[3], uForest[2], pick), kind);
+  // In a turning stand most crowns turn, each its own shade of it.
+  own = mix(own, mix(uForest[4], uForest[5], fract(crown.w * 7.3)), turning * step(fract(crown.w * 3.9), 0.85));
+  vec3 cn = normalize(vec3(-crown.y * tall, 1.0, -crown.z * tall));
+  float lightC = clamp(dot(cn, uTerrainSun) / uTerrainSun.y, 0.25, 1.4);
+  float shadow = 0.0;
+  for (int j = 1; j <= 2; j++) {
+    float t = float(j) * 0.32;
+    vec4 other = tCrown(q + sunAt * t, density, kind, reach);
+    shadow = max(shadow, smoothstep(0.0, 0.15, other.x - crown.x - t * sunRise / tall));
+  }
+  float isCrown = smoothstep(0.0, 0.08, crown.x);
+  // On a cold world snow lies on the sunward side of a conifer's crown, and
+  // a bare broadleaf tree is twigs over the snow.
+  own = mix(own, vec3(0.7, 0.72, 0.72), frost * kind * 0.45 * smoothstep(0.55, 0.95, lightC + fract(crown.w * 5.1) * 0.2));
+  isCrown *= 1.0 - frost * (1.0 - kind) * 0.35;
+  // Low on a crown and in the gaps the light is cut by the crowns round.
+  float occlude = mix(0.55, 1.0, sqrt(crown.x));
+  vec3 near = mix(between * mix(0.7, 1.0, 1.0 - density * 0.6), own * lightC * occlude, isCrown);
+  near *= 1.0 - shadow * mix(0.55, 0.4, isCrown);
+  // Shade on snow is blue, lit by the sky.
+  return near * mix(vec3(1.0), vec3(0.82, 0.92, 1.12), frost * max(shadow, 1.0 - isCrown));
+}
 `;
 
 /** Procedural detail by biome. Drawn once into the baked picture. */
@@ -549,6 +609,7 @@ const DETAIL = /* glsl */ `
     // The trees part along a gully and show the ground beneath.
     albedo = mix(albedo, uBiomeClearing, pw[${P.forest}] * gully * 0.6);
     pw[${P.forest}] *= 1.0 - gully * 0.8;
+    pw[${P.taiga}] *= 1.0 - gully * 0.8;
     pw[${P.scrub}] *= 1.0 - gully * 0.8;
 
     float shadeMul = 1.0;
@@ -564,29 +625,78 @@ const DETAIL = /* glsl */ `
     vec3 view = normalize(cameraPosition - vTerrainPos);
     float glint = max(dot(n, normalize(view + uTerrainSun)), 0.0);
 
-    // Forest: a canopy of crowns with dark gaps between them.
-    if (pw[${P.forest}] > 0.02) {
-      float s = pw[${P.forest}];
-      shadeMul += s * (broad.x * 0.2 + fine.x * 0.12);
-      // Where the broad noise is low the trees thin out into clearings.
-      float thin = smoothstep(0.05, -0.35, broad.x);
-      for (int k = 0; k < 2; k++) {
-        float size = k == 0 ? 0.5 : 0.17;
-        float keep = tKeep(size, footprint);
-        if (keep <= 0.0) break;
-        vec4 cell = tCell(p / size + float(k) * 7.3 + fine.x * 0.3);
-        // Each crown a little bigger or smaller, lighter or darker.
-        float reach = 0.45 + 0.25 * cell.w - thin * 0.25;
-        float dome = 1.0 - smoothstep(0.05, reach, cell.x);
-        float tone = (cell.w - 0.5) * 0.35;
-        // Clumps light and shade both ways. Single crowns mostly darken their
-        // gaps, since bright tops on that scale read as a scatter of dots.
-        float lift = k == 0 ? (dome - 0.6) * 0.45 : (dome - 0.85) * 0.4;
-        shadeMul += s * keep * (lift + tone * dome);
-        bump += s * keep * cell.yz * (dome * (1.0 - dome)) / size * (k == 0 ? 0.12 : 0.05);
+    // Forest: a canopy drawn as a height field of tree crowns, not as a
+    // colour. Each crown is lit on its sunward side and casts a shadow on the
+    // crowns or the ground beyond it, so the canopy's texture is light and
+    // shade. A slow density field thins the trees into open stands, clearings
+    // and lone trees, and the crowns thin out at the forest's edge too.
+    float woods = pw[${P.forest}] + pw[${P.taiga}];
+    if (woods > 0.02) {
+      float s = min(woods, 1.0);
+      float taiga = pw[${P.taiga}] / max(woods, 1e-3);
+      // Conifers take the higher ground and some stands of their own. A
+      // cold forest is all conifers.
+      float stands = tSimplex(p / 7.0 + 23.0).x;
+      float conifer = max(taiga, smoothstep(0.2, 0.32, nh.a + broad.x * 0.06) * 0.85 + smoothstep(0.35, 0.6, stands) * 0.7);
+      // A cold forest has patches of bare birch among its conifers.
+      conifer = min(conifer, 1.0 - taiga * smoothstep(0.3, 0.55, -stands + fine.x * 0.2));
+      conifer = clamp(conifer, 0.0, 1.0);
+      // Patches of broadleaf trees turning colour, as in autumn.
+      float turning = uForestAutumn * (1.0 - conifer) * smoothstep(0.2, 0.45, tSimplex(p / 3.2 + 5.0).x + fine.x * 0.15);
+
+      // How many cells hold a tree: thick in the gullies, thinner on ridges,
+      // with clearings, thinning to single trees at the edge of the forest.
+      vec3 dens = tField(p + 53.0, 2.6, 3, footprint);
+      float density = 0.95 + dens.x * 0.9 - smoothstep(0.15, 0.55, cavFine) * 0.45 + smoothstep(0.0, -0.3, cavFine) * 0.2;
+      // Firebreaks through some conifer stands, as in a plantation.
+      vec2 cut = vec2(dot(p, vec2(0.8, 0.6)), dot(p, vec2(-0.6, 0.8))) / 3.1;
+      vec2 off = abs(fract(cut + fine.x * 0.04) - 0.5);
+      float lane = smoothstep(0.03 + footprint / 3.1, 0.015, min(off.x, off.y) - 0.0);
+      density -= lane * conifer * (1.0 - taiga) * smoothstep(0.45, 0.7, stands);
+      // Cold forest grows in stands with open ground between them.
+      density = mix(density, smoothstep(-0.3, 0.3, dens.x + fine.x * 0.25) * 0.92 - smoothstep(0.15, 0.55, cavFine) * 0.3, taiga);
+      density = clamp(density, 0.0, 0.97) * smoothstep(0.05, 0.75, s);
+
+      // Broadleaf and conifer crowns lie on grids of their own sizes, since
+      // a grid whose size changed from place to place would stretch its
+      // crowns into swirls.
+      float cone = smoothstep(0.3, 0.7, conifer);
+            float keepLeaf = tKeep(0.14, footprint);
+      float keepNeedle = tKeep(0.1, footprint);
+      float keep = mix(keepLeaf, keepNeedle, cone);
+
+      // The palette: lit and deep colours for broadleaf and conifer crowns,
+      // and the colours broadleaf trees turn.
+      vec3 leaf = mix(uForest[1], uForest[0], 0.5);
+      vec3 needle = mix(uForest[3], uForest[2], 0.4);
+      vec3 turn = mix(uForest[4], uForest[5], 0.5);
+      vec3 meanCrown = mix(mix(leaf, turn, turning * 0.6), needle, conifer);
+      // The forest floor between crowns is dark, and clearings show the
+      // clearing ground. At the edge it is the ground beside the forest.
+      vec3 floorCol = mix(meanCrown * 0.4, uBiomeClearing, smoothstep(0.5, 0.15, density));
+      vec3 between = mix(albedo, floorCol, smoothstep(0.3, 0.85, s));
+
+      // Far off, a crown is smaller than a pixel: the canopy averages to its
+      // cover, its tone and the share of it in shade.
+      float meanCover = density * mix(0.8, 0.6, cone);
+      vec3 farCol = mix(between, meanCrown * (1.0 - 0.3 * density), meanCover);
+      vec3 col = farCol;
+      if (keep > 0.0) {
+        vec3 near = vec3(0.0);
+        if (cone < 0.99) near += (1.0 - cone) * mix(farCol, tCanopy(p / 0.14, density, 0.0, between, turning, uTerrainFrost * taiga), keepLeaf);
+        if (cone > 0.01) near += cone * mix(farCol, tCanopy(p / 0.1 + 17.0, density, 1.0, between, turning, uTerrainFrost * taiga), keepNeedle);
+        col = near;
       }
-      // Clearings show the ground between the trees.
-      albedo = mix(albedo, uBiomeClearing, s * thin * 0.5);
+      // Groves: the canopy is lighter and darker in patches larger than a
+      // crown, so it keeps a grain when the crowns are too small to draw.
+      float grove = tField(p + 19.0, 0.7, 2, footprint).x;
+      col *= 1.0 + grove * 0.18 * density;
+      // On a slope turned from the sun the crowns shade each other more, and
+      // on one facing it more of each crown is lit, so a thick canopy shows
+      // the shape of the ground under it more than bare ground does.
+      float faceSun = clamp(dot(n, uTerrainSun) / uTerrainSun.y, 0.5, 1.25);
+      col *= mix(1.0, faceSun, 0.6 * density);
+      albedo = col;
     }
     // Grass: lighter and darker patches with a fine grain.
     if (pw[${P.grass}] > 0.02) {
@@ -1134,6 +1244,14 @@ export function applyTerrainShader(
     shader.uniforms.uBiomeClearing = {
       value: colour(planet?.clearing ?? [0, 0, 0]),
     };
+    const forest = planet?.forest;
+    shader.uniforms.uForest = {
+      value: (forest
+        ? [...forest.broadleaf, ...forest.conifer, ...forest.autumn]
+        : Array.from({ length: 6 }, (): Rgb => [0, 0, 0])
+      ).map(colour),
+    };
+    shader.uniforms.uForestAutumn = { value: forest?.turning ?? 0 };
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
     };
@@ -1192,7 +1310,7 @@ export function applyTerrainShader(
       .replace("GROUND_LIT_HERE", ground ? GROUND_LIT : "")
       .replace("HAZE_HERE", drawing ? "" : HAZE)
       .replace("BAKE_ALPHA_HERE", drawing ? "diffuseColor.a = sheen;" : "");
-    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${bakeHead}${ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
+    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE).replace("FOREST_HERE", bake?.kind === "read" ? "" : FOREST)}${bakeHead}${ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>\n${body}`,
     )}`;

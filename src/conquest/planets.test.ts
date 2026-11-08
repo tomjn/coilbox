@@ -71,6 +71,16 @@ describe("planets", () => {
     }
   });
 
+  it("gives a forest palette to every planet with a forest slot", () => {
+    for (const id of PLANETS) {
+      const p = planetOf(id);
+      const wooded = p.biomes.some(
+        (b) => b.pattern === "forest" || b.pattern === "taiga",
+      );
+      expect(p.forest !== undefined, id).toBe(wooded);
+    }
+  });
+
   it("gives shares that sum to 1 with none in an unused slot", () => {
     for (const id of PLANETS) {
       const p = planetOf(id);
