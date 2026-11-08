@@ -11268,7 +11268,7 @@ msgstr "別のユニットがすでにこの名前を使っています"
 msgid "Answered the question at {spot}."
 msgstr "{spot} の質問に回答しました。"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Anti-air"
 msgstr ""
 
@@ -11683,7 +11683,7 @@ msgstr "到着時のサウンド"
 msgid "Arsenal"
 msgstr "兵器庫"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Artillery"
 msgstr ""
 
@@ -11805,7 +11805,7 @@ msgstr "味方への誤射を確認するたびに、1 秒に 2 回ではなく�
 msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
 msgstr "このネットワークの外の人が参加できるように、ルームのポートとゲームのポート {hostPort} の転送をルーターに依頼します。ルームのポートだけを開くと、全員が参加できても起動時に失敗するため、両方を開きます。"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Assault"
 msgstr ""
 
@@ -13588,7 +13588,7 @@ msgstr "建設ユニット"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Builder"
@@ -41795,7 +41795,7 @@ msgstr "セットに限定"
 msgid "Scope: {scopeText}."
 msgstr "範囲：{scopeText}。"
 
-#: src/lego/generate.ts
+#: src/lego/generatorJobs.ts
 msgid "Scout"
 msgstr ""
 
