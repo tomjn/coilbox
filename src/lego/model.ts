@@ -1166,6 +1166,9 @@ export interface LegoGenerated {
   /** The seed the weapon slots' rolls are keyed to, when a variant has a
    *  different weapon from the unit's seed (#3240). Absent means the seed. */
   weaponSeed?: number;
+  /** The seed the covering's rolls are keyed to, when a variant moved on from
+   *  the unit's seed to pass the checks (#3240). Absent means the seed. */
+  coveringSeed?: number;
   /**
    * A stamp of each piece as it was generated, by piece id (#3235), so a piece
    * edited by hand since can be told from the generator's own. A piece with no
@@ -2109,6 +2112,10 @@ function parseGenerated(value: unknown): LegoGenerated | null {
       : {}),
     ...(typeof v.weaponSeed === "number" && Number.isSafeInteger(v.weaponSeed)
       ? { weaponSeed: v.weaponSeed }
+      : {}),
+    ...(typeof v.coveringSeed === "number" &&
+    Number.isSafeInteger(v.coveringSeed)
+      ? { coveringSeed: v.coveringSeed }
       : {}),
     ...(stamps ? { stamps } : {}),
     ...(style ? { style } : {}),

@@ -289,12 +289,30 @@ describe("a variant of a roster tier between two sizes", () => {
   });
 });
 
-describe("a variant that fails the checks", () => {
-  it("is reported with the check, not replaced by another seed", () => {
-    let said: string | null = null;
-    for (let seed = 1; seed <= 30 && said === null; seed++) {
+describe("a variant that fails the checks with the unit's covering", () => {
+  it("rolls the covering again and keeps the seed", () => {
+    for (let seed = 1; seed <= 40; seed++) {
       const unit = generatedAt("medium", "artillery", "biped", seed);
       const result = makeVariant(unit, "heavier", { pack, modules });
+      if (result.status !== "ok") continue;
+      const record = result.unit.generated;
+      if (record?.coveringSeed === undefined) continue;
+      expect(record.seed).toBe(seed);
+      expect(record.plan).toBe(unit.generated?.plan);
+      expect(record.thickness).toBe(COVERING_STEP);
+      expect(slotScales(result.unit, "weapon")).toHaveLength(
+        slotScales(unit, "weapon").length,
+      );
+      return;
+    }
+    throw new Error("no seed needed another covering");
+  });
+
+  it("is reported with the check when no covering passes", () => {
+    let said: string | null = null;
+    for (let seed = 1; seed <= 40 && said === null; seed++) {
+      const unit = generatedAt("small", "scout", "biped", seed);
+      const result = makeVariant(unit, "lighter", { pack, modules });
       if (result.status === "failed") said = result.message;
     }
     expect(said).toMatch(/fails the \w+ check, and a variant keeps its seed/);

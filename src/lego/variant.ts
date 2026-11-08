@@ -19,14 +19,16 @@
  *   it a stretch. With one weapon module in the library that is all it can
  *   change, and `variantRefusal` refuses a unit where it would change nothing.
  *
- * A variant keeps the original's seed, because another seed is another unit. One
- * that fails the construction checks at that seed is reported with the check
- * that failed, rather than replaced by a different unit. A different weapon
- * moves on a weapon seed at a time instead.
+ * A variant keeps the original's seed, because another seed is another unit.
+ * A heavier or lighter one that fails a construction check with the unit's own
+ * covering moves on a covering seed at a time (`LegoGenerated.coveringSeed`),
+ * so the skeleton, chassis and weapon stay the unit's and only the covering is
+ * rolled again. A different weapon moves on a weapon seed. A variant that no
+ * covering seed passes is reported with the check that failed.
  *
  * A loadout (`loadouts.ts`) is not a variant. A loadout swaps what is mounted
  * on one chassis and exports as extra unit definitions from the same unit. A
- * variant is a separate unit with its own skeleton, covering and size.
+ * variant is a separate unit with its own size and covering.
  */
 
 import { t } from "@lingui/core/macro";
@@ -230,6 +232,9 @@ export function makeVariant(
     ...(generated.weaponSeed !== undefined
       ? { weaponSeed: generated.weaponSeed }
       : {}),
+    ...(generated.coveringSeed !== undefined
+      ? { coveringSeed: generated.coveringSeed }
+      : {}),
   };
   const inputs = {
     seed: generated.seed,
@@ -279,8 +284,17 @@ export function makeVariant(
   };
 
   if (kind !== "weapon") {
-    const result = atSeed(base);
-    return result.status === "ok" ? finish(result.unit) : refused(result);
+    // The unit's own covering first. When that fails a check, the covering
+    // moves on a seed at a time, with everything else the unit's.
+    const first = atSeed(base);
+    if (first.status === "ok") return finish(first.unit);
+    let coveringSeed = nextSeed(generated.coveringSeed ?? generated.seed);
+    for (let n = 1; n <= tries; n++) {
+      const result = atSeed({ ...base, coveringSeed });
+      if (result.status === "ok") return finish(result.unit);
+      coveringSeed = nextSeed(coveringSeed);
+    }
+    return refused(first);
   }
 
   // The unit as it is made without the change, to tell a different weapon from

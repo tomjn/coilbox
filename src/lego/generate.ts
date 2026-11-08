@@ -134,6 +134,11 @@ export interface GeneratorOptions {
    *  place of the unit's own (#3240). Everything else keeps the unit's seed, so
    *  only the weapon differs. */
   weaponSeed?: number;
+  /** The seed the covering's rolls are keyed to, in place of the unit's own
+   *  (#3240). A heavier or lighter variant that fails a check at the unit's
+   *  covering moves on a covering seed at a time, so the skeleton, chassis and
+   *  weapon stay the unit's. */
+  coveringSeed?: number;
 }
 
 /** A PRNG for one choice, seeded off the inputs and the choice's key. */
@@ -509,6 +514,14 @@ export function generateUnit(
       `a weapon seed is a whole number, not ${options.weaponSeed}`,
     );
   }
+  if (
+    options.coveringSeed !== undefined &&
+    !Number.isSafeInteger(options.coveringSeed)
+  ) {
+    throw new Error(
+      `a covering seed is a whole number, not ${options.coveringSeed}`,
+    );
+  }
   const factor = options.factor ?? job.size[size.id];
   const proportions = options.proportions
     ? planProportions(inputs.plan, options.proportions)
@@ -651,7 +664,13 @@ export function generateUnit(
     size: extent,
     width,
     newId,
-    roll: (key) => roll(inputs, key),
+    roll: (key) =>
+      roll(
+        options.coveringSeed === undefined
+          ? inputs
+          : { ...inputs, seed: options.coveringSeed },
+        key,
+      ),
     style,
   });
   project = resolveConnections(covered.project, pack).project;
@@ -672,6 +691,9 @@ export function generateUnit(
         : {}),
       ...(options.weaponSeed !== undefined
         ? { weaponSeed: options.weaponSeed }
+        : {}),
+      ...(options.coveringSeed !== undefined
+        ? { coveringSeed: options.coveringSeed }
         : {}),
       ...(style ? { style } : {}),
       ...(options.factor !== undefined ? { factor: options.factor } : {}),

@@ -578,6 +578,9 @@ export function rerollUnit(
         ...(generated.weaponSeed !== undefined
           ? { weaponSeed: generated.weaponSeed }
           : {}),
+        ...(generated.coveringSeed !== undefined
+          ? { coveringSeed: generated.coveringSeed }
+          : {}),
       },
     );
     const merged = resolveConnections(
