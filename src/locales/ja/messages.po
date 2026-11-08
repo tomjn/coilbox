@@ -7269,6 +7269,10 @@ msgstr "{unitName} は {explosionField} を設定していないため、エン�
 msgid "{unitName} sets no {explosionField}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing."
 msgstr "{unitName} は {explosionField} を設定していないため、エンジンは空の NOWEAPON 定義を使い、ユニットは何も起こさずに爆発します。"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "{unitName} style"
+msgstr ""
+
 #: src/scenario/pages/components/teams.ts
 #, fuzzy
 msgid "{units, plural, one {# start unit} other {# start units}}"
@@ -18224,6 +18228,10 @@ msgstr "ボットアカウントを作成"
 msgid "Create a bounce effect"
 msgstr "跳ね返りのエフェクトを作成"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a generator style from this unit's colours, shapes, proportions and number of parts"
+msgstr ""
+
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
 msgid "Create a lobby"
@@ -18233,6 +18241,14 @@ msgstr "ロビーを作成"
 #, fuzzy
 msgid "Create a new account"
 msgstr "新しいアカウントを作成"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a style"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a style from this unit"
+msgstr ""
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -18328,6 +18344,10 @@ msgstr "最初の管理者を作成するか、アカウントを <0>fresh</0> �
 #. placeholder {0}: mapinfoResult.path
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Created <0>{0}</0>"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Created a style"
 msgstr ""
 
 #: src/lego/scriptPlayback.ts
@@ -26752,6 +26772,10 @@ msgstr "ゲームの BOS から再変換されます。その後の編集は失�
 #, fuzzy
 msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr "{destDir} にコピーされます。開いたファイルは元の場所に残ります。"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "It is in the style list under Generate on the Models page."
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -51691,6 +51715,10 @@ msgstr "このユニットには撃破時の爆発がありません。"
 msgid "This unit has no game, so its effects are drawn as a plain round sprite."
 msgstr "このユニットにはゲームがないため、エフェクトは単純な円形スプライトで描画されます。"
 
+#: src/lego/styleFromUnit.ts
+msgid "This unit has no parts to make a style from."
+msgstr ""
+
 #: src/lego/pages/components/WorthSection.tsx
 #, fuzzy
 msgid "This unit has no parts, so there is nothing to total."
@@ -51747,6 +51775,10 @@ msgstr ""
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "このユニットは \"{builtAgainst}\" パックを基に作られましたが、そのパックはインストールされていません。"
+
+#: src/lego/styleFromUnit.ts
+msgid "This unit was imported from a game model, so it has no parts to make a style from."
+msgstr ""
 
 #: src/lego/reroll.ts
 msgid "This unit was not generated."

@@ -7323,6 +7323,10 @@ msgstr "Η μονάδα {unitName} δεν ορίζει {explosionField}, οπό�
 msgid "{unitName} sets no {explosionField}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing."
 msgstr "Η μονάδα {unitName} δεν ορίζει {explosionField}, οπότε η μηχανή χρησιμοποιεί τον κενό ορισμό NOWEAPON και η μονάδα δεν εκρήγνυται καθόλου."
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "{unitName} style"
+msgstr ""
+
 #: src/scenario/pages/components/teams.ts
 #, fuzzy
 msgid "{units, plural, one {# start unit} other {# start units}}"
@@ -18352,6 +18356,10 @@ msgstr "Δημιουργία λογαριασμού bot"
 msgid "Create a bounce effect"
 msgstr "Δημιουργία εφέ αναπήδησης"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a generator style from this unit's colours, shapes, proportions and number of parts"
+msgstr ""
+
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
 msgid "Create a lobby"
@@ -18361,6 +18369,14 @@ msgstr "Δημιουργία λόμπι"
 #, fuzzy
 msgid "Create a new account"
 msgstr "Δημιουργία νέου λογαριασμού"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a style"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Create a style from this unit"
+msgstr ""
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -18456,6 +18472,10 @@ msgstr "Δημιουργήστε τον πρώτο διαχειριστή ή ο�
 #. placeholder {0}: mapinfoResult.path
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Created <0>{0}</0>"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Created a style"
 msgstr ""
 
 #: src/lego/scriptPlayback.ts
@@ -26923,6 +26943,10 @@ msgstr "Μετατρέπεται ξανά από το BOS του παιχνιδ�
 #, fuzzy
 msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr "Αντιγράφεται στο {destDir}. Το αρχείο που ανοίξατε μένει εκεί που είναι."
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "It is in the style list under Generate on the Models page."
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -52048,6 +52072,10 @@ msgstr "Αυτή η μονάδα δεν έχει εκρήξεις καταστρ
 msgid "This unit has no game, so its effects are drawn as a plain round sprite."
 msgstr "Αυτή η μονάδα δεν έχει παιχνίδι, οπότε τα εφέ της σχεδιάζονται ως απλό στρογγυλό sprite."
 
+#: src/lego/styleFromUnit.ts
+msgid "This unit has no parts to make a style from."
+msgstr ""
+
 #: src/lego/pages/components/WorthSection.tsx
 #, fuzzy
 msgid "This unit has no parts, so there is nothing to total."
@@ -52104,6 +52132,10 @@ msgstr ""
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
 msgstr "Αυτή η μονάδα κατασκευάστηκε με το πακέτο «{builtAgainst}», και αυτό το πακέτο δεν είναι εγκατεστημένο."
+
+#: src/lego/styleFromUnit.ts
+msgid "This unit was imported from a game model, so it has no parts to make a style from."
+msgstr ""
 
 #: src/lego/reroll.ts
 msgid "This unit was not generated."
