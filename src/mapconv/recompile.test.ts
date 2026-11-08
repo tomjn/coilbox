@@ -21,7 +21,10 @@ describe("settleNoclamp", () => {
 
   it("leaves the mapper's own choice alone once they tick or untick the box", () => {
     const off = { ...on, noclamp: false };
-    expect(settleNoclamp(on, off, "/d/h.png").autoFor).toBeNull();
+    expect(settleNoclamp(on, off, "/d/h.png")).toEqual({
+      opts: off,
+      autoFor: null,
+    });
     const later = { ...off, heightmap: "/mine.png", noclamp: true };
     expect(settleNoclamp(off, later, null).opts.noclamp).toBe(true);
   });

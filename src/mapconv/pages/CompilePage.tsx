@@ -205,6 +205,7 @@ export default function CompilePage() {
 
   // The decompiled heightmap that Recompile turned no-clamp on for.
   const autoNoclampFor = useRef<string | null>(null);
+  const pickCount = useRef(0);
   function changeAdvanced(next: AdvancedCompileOpts) {
     const r = settleNoclamp(advanced, next, autoNoclampFor.current);
     autoNoclampFor.current = r.autoFor;
@@ -429,6 +430,9 @@ export default function CompilePage() {
   // `fromDecompile` (Recompile) replaces the sources and height range instead,
   // and leaves clamping off for the decompiled heightmap.
   async function pickTexture(path: string, fromDecompile = false) {
+    // The lookups below settle later. A newer pick makes their answers stale.
+    const pick = ++pickCount.current;
+    const stale = () => pick !== pickCount.current;
     setMaintexture(path);
     setTextureInfo(null);
     setAppearance(null);
@@ -440,13 +444,16 @@ export default function CompilePage() {
     if (!path) return;
     // A map may ship a skybox DDS next to mapinfo.lua; load it for the preview.
     mcReadSkybox({ path })
-      .then((r) => setSkyboxSrc(r.dataUrl ?? null))
+      .then((r) => {
+        if (!stale()) setSkyboxSrc(r.dataUrl ?? null);
+      })
       .catch(() => {});
     // Read mapinfo.lua (or .smf-header fallback) for the height range + the
     // appearance hints the 3D preview uses. Prefill the height fields only when
     // empty, so we never clobber values the user typed; reveal Advanced if found.
     mcReadMapinfo({ path })
       .then((info) => {
+        if (stale()) return;
         setAppearance(info);
         if (info.minHeight != null || info.maxHeight != null) {
           setAdvanced((a) => ({
@@ -466,6 +473,7 @@ export default function CompilePage() {
       .catch(() => {});
     try {
       const s = await mcSuggestSources({ texturePath: path });
+      if (stale()) return;
       if (fromDecompile && s.heightmap) autoNoclampFor.current = s.heightmap;
       setAdvanced((a) => fillSources(a, s, fromDecompile));
       // Not read back from the updater: React runs that later when other

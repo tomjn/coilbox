@@ -6,6 +6,7 @@
  * these start with another map's sources already in the draft.
  */
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -166,6 +167,28 @@ describe("Recompile over a draft holding another map", () => {
     await waitFor(() => {
       expect(field("Heightmap (-h)").value).toBe("");
     });
+    expect(noclampOn()).toBe(false);
+  });
+
+  it("ignores a Recompile lookup that settles after another texture is picked", async () => {
+    let settle: (s: Record<string, string>) => void = () => {};
+    m.suggest.mockImplementationOnce(
+      () => new Promise((resolve) => (settle = resolve)),
+    );
+    m.suggest.mockResolvedValue({});
+    m.mapinfo.mockResolvedValue({ minHeight: -53, maxHeight: 430 });
+    setup("/hbh");
+    fireEvent.click(screen.getByText(/Advanced options/));
+    fireEvent.change(field("Main texture (-t)"), {
+      target: { value: "/next/texture.png" },
+    });
+    await waitFor(() => {
+      expect(m.suggest).toHaveBeenCalledTimes(2);
+    });
+    await act(async () => {
+      settle({ heightmap: "/hbh/heightmap.png" });
+    });
+    expect(field("Heightmap (-h)").value).toBe("");
     expect(noclampOn()).toBe(false);
   });
 
