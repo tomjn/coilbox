@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Drainage } from "../displayErosion";
 import type { PlanetId } from "../planets";
+import type { RiverField, RiverLine } from "../rivers";
 import type { GroundShading } from "./groundShader";
 import {
   apronHeights,
@@ -137,6 +138,15 @@ export interface TerrainExtension {
    * out for a world with no water courses. See {@link Drainage}.
    */
   drainage?: Drainage;
+  /**
+   * The rivers on this picture, in its pixels, and how far each point lies
+   * from one. Left out for a world with none. See `rivers.ts`.
+   */
+  rivers?: {
+    lines: RiverLine[];
+    field: RiverField;
+    look: "water" | "frozen";
+  };
   /** The generator's weights at this picture's size. */
   biomes?: BiomePixels;
 }

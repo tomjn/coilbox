@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Settlement, SettlementStyle } from "../planets";
+import type { GroundRivers } from "./groundShader";
 import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
 import { TERRAIN_NOISE } from "./terrainShader";
 import { TOWN_REACH } from "./towns";
@@ -40,6 +41,8 @@ export interface TownShading {
   settlement: Settlement;
   /** What grows between an open town's buildings, linear. */
   garden: THREE.Color;
+  /** The map's rivers, which nothing is built over. */
+  river?: GroundRivers;
 }
 
 /**
@@ -70,6 +73,10 @@ uniform float uRoadReach;
 uniform float uFieldReach;
 uniform sampler2D uDryFarm;
 uniform vec3 uDryGround;
+uniform sampler2D uRiverField;
+uniform float uRiverOn;
+uniform vec2 uRiverSpan;
+uniform vec4 uRiverToField;
 // 0 draws the fields, 1 the town over them. A constant, so each pass is
 // compiled without the other's code, which holds fewer registers.
 const float uLayer = LAYER_HERE;
@@ -855,6 +862,12 @@ void main() {
 
   // The roads run on through, drawn by the terrain underneath.
   town *= smoothstep(0.07, 0.1, roadD);
+  // So do the rivers, with a strip of open bank either side. Nothing is
+  // built or sown over the water.
+  if (uRiverOn > 0.5) {
+    float rEdge = texture(uRiverField, uv * uRiverToField.xy + uRiverToField.zw).r * (uRiverSpan.x + uRiverSpan.y) - uRiverSpan.x;
+    town *= smoothstep(0.015, 0.05, rEdge);
+  }
   // Light the roofs, pitched toward and away from the sun. Level ground is
   // lit at exactly its own colour, as the terrain's is.
   vec3 n = normalize(mix(vec3(0.0, 1.0, 0.0), roofN, roof));
@@ -914,6 +927,14 @@ export function townMaterial(
       uTrim: { value: linear(settlement.trim) },
       uDomes: { value: settlement.domes },
       uGarden: { value: shading.garden },
+      uRiverField: { value: shading.river?.field ?? null },
+      uRiverOn: { value: shading.river ? 1 : 0 },
+      uRiverSpan: {
+        value: new THREE.Vector2(...(shading.river?.span ?? [0, 1])),
+      },
+      uRiverToField: {
+        value: shading.river?.toField ?? new THREE.Vector4(1, 1, 0, 0),
+      },
       uFrame: { value: shading.frame },
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uAmbient: { value: SHADE_AMBIENT },

@@ -1,7 +1,10 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import { type PlanetId, planetOf } from "../planets";
+import { RIVER_FIELD_INSIDE, RIVER_FIELD_OUTSIDE } from "../rivers";
+import { riversInMapUnits, straightenRoads } from "./bridges";
 import {
+  type GroundRivers,
   type GroundShading,
   ROAD_MODE,
   ROAD_STATE_ROWS,
@@ -10,9 +13,10 @@ import {
 import { planProvinceRoads } from "./provinceRoads";
 import { buildRoadMask, ROAD_REACH, type RoadLine } from "./roadMask";
 import { planRoads, sceneSeed } from "./roadNetwork";
-import { routeGrid } from "./roadRoute";
+import { markRivers, routeGrid } from "./roadRoute";
 import type { RoadLink } from "./roads";
 import type { HeightGrid, TerrainSurface } from "./terrain";
+import type { TerrainExtension } from "./terrainMesh";
 
 /**
  * The textures that paint roads into a terrain map's ground, built once when
@@ -88,6 +92,12 @@ export function buildGroundLayer(
    * is a hand-made one, and gets Temperate's.
    */
   planet: PlanetId = "temperate",
+  /**
+   * The land drawn past the map's edge, whose rivers the roads cross on
+   * bridges. Left out where rivers are not drawn, as in performance mode, so
+   * nothing routes round them there.
+   */
+  extension?: TerrainExtension,
 ): GroundLayer {
   const grid = routeGrid(
     surface.width,
@@ -96,6 +106,19 @@ export function buildGroundLayer(
     sceneSeed(galaxy),
     heights,
   );
+  const rivers = extension?.rivers;
+  const courses = rivers
+    ? riversInMapUnits(
+        rivers.lines,
+        extension.image.width,
+        extension.image.height,
+        extension.margin,
+        surface.width,
+        surface.height,
+        surface.scale,
+      )
+    : [];
+  if (courses.length > 0) markRivers(grid, courses);
   const linkRoads = planRoads(
     galaxy,
     surface.width,
@@ -118,7 +141,41 @@ export function buildGroundLayer(
       index: firstExtra + j,
     })),
   ];
-  const roads = shape ? shape(planned) : planned;
+  const roads = straightenRoads(
+    shape ? shape(planned) : planned,
+    courses,
+    surface.scale,
+  );
+  let river: GroundRivers | undefined;
+  if (rivers && extension) {
+    const field = new THREE.DataTexture(
+      rivers.field.data,
+      rivers.field.width,
+      rivers.field.height,
+      THREE.RedFormat,
+    );
+    field.flipY = false;
+    field.unpackAlignment = 1;
+    field.magFilter = THREE.LinearFilter;
+    field.minFilter = THREE.LinearMipmapLinearFilter;
+    field.generateMipmaps = true;
+    field.needsUpdate = true;
+    disposables.push(field);
+    const across = extension.image.width;
+    const down = extension.image.height;
+    const m = extension.margin;
+    river = {
+      field,
+      span: [RIVER_FIELD_INSIDE, RIVER_FIELD_OUTSIDE],
+      frozen: rivers.look === "frozen",
+      toField: new THREE.Vector4(
+        (across - 2 * m) / across,
+        (down - 2 * m) / down,
+        m / across,
+        m / down,
+      ),
+    };
+  }
   const mask = buildRoadMask(
     roads,
     surface.width,
@@ -180,6 +237,7 @@ export function buildGroundLayer(
       roadState,
       roadReach: ROAD_REACH,
       roads: planetOf(planet).settlement.roads,
+      river,
       frame: new THREE.Vector4(
         surface.worldWidth / 2,
         surface.worldDepth / 2,
