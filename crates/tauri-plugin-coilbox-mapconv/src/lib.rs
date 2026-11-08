@@ -559,7 +559,7 @@ fn metal_cached(
 ) -> Result<String, String> {
     let name = format!("{key}-smfm.bin");
     let file = dir.join(&name);
-    if std::fs::metadata(&file).is_ok_and(|m| m.len() == metal.len as u64) {
+    if std::fs::metadata(&file).is_ok_and(|m| m.is_file() && m.len() == metal.len as u64) {
         coilbox_thumb_cache::touch(&file);
     } else {
         let bytes = smf::read_smf_metal(Path::new(path), metal)?;
@@ -1031,6 +1031,55 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    /// A 4 by 2 square map with a 2 by 1 metal map, as a compiled `.smf`.
+    fn small_smf(dir: &Path) -> String {
+        let mut b = vec![0u8; 80];
+        b[..15].copy_from_slice(b"spring map file");
+        b[24..28].copy_from_slice(&4i32.to_le_bytes());
+        b[28..32].copy_from_slice(&2i32.to_le_bytes());
+        b[32..36].copy_from_slice(&8i32.to_le_bytes());
+        b[52..56].copy_from_slice(&82u32.to_le_bytes());
+        b[68..72].copy_from_slice(&80u32.to_le_bytes());
+        b.extend_from_slice(&[7, 200]);
+        b.extend_from_slice(&[0u8; 30]);
+        let path = dir.join("small.smf");
+        std::fs::write(&path, &b).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
+    /// The metal map is extra: when it cannot be cached the heights still come
+    /// back, with the reason beside them and no metal file named.
+    #[test]
+    fn a_metal_map_that_cannot_be_cached_does_not_take_the_heights_with_it() {
+        let dir = temp_dir("metal-fails");
+        let path = small_smf(&dir);
+        let cache = dir.join("cache");
+        std::fs::create_dir_all(&cache).unwrap();
+        let key = thumb_cache_key(&path, 0).unwrap();
+        // A directory where the metal file belongs, so it is neither a hit
+        // nor writable.
+        std::fs::create_dir_all(cache.join(format!("{key}-smfm.bin"))).unwrap();
+
+        let out = smf_heights_cached(&path, Some(&cache)).unwrap();
+        assert_eq!(out["width"], 5);
+        assert!(out["file"].is_string());
+        assert!(out.get("metalFile").is_none());
+        assert!(out["metalError"].as_str().unwrap().contains("metal map"));
+
+        std::fs::remove_dir_all(cache.join(format!("{key}-smfm.bin"))).unwrap();
+        let out = smf_heights_cached(&path, Some(&cache)).unwrap();
+        assert_eq!(out["metalFile"], format!("{key}-smfm.bin"));
+        assert_eq!(
+            (out["metalWidth"].as_i64(), out["metalHeight"].as_i64()),
+            (Some(2), Some(1))
+        );
+        assert_eq!(
+            std::fs::read(cache.join(format!("{key}-smfm.bin"))).unwrap(),
+            vec![7, 200]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A source image on disk, wider than it is tall so the thumbnail's own
