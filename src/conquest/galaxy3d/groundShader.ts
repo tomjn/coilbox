@@ -230,11 +230,12 @@ vec4 gGlow = vec4(0.0);
         float ew = max(0.022, gFoot * 1.1) * (1.0 + emph * 0.8);
         float e0 = hwE + max(0.03, gFoot * 1.2) + ew * 0.5;
         float edgeLine = 1.0 - smoothstep(ew * 0.5 - gFoot * 0.5, ew * 0.5 + gFoot * 0.5, abs(d - e0));
-        float a = edgeLine;
+        // Not on the water beside a bridge.
+        float a = edgeLine * (1.0 - over);
         if (mode > 1.5 && mode < 2.5) {
           // Round the track and not over it, so the track still shows.
           float halo = (1.0 - smoothstep(hwE, hwE + max(0.16, gFoot * 3.0), d)) * smoothstep(hwE * 0.7, hwE * 1.1, d);
-          a = max(a, halo * 0.5);
+          a = max(a, halo * 0.5 * (1.0 - over));
         } else if (mode > 2.5) {
           a = max(a, cover * 0.8);
         }
