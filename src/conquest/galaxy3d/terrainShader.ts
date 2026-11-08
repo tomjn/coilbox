@@ -51,6 +51,12 @@ export interface TerrainShading {
    * draws the detail, so it costs a frame nothing once the bake is done.
    */
   cavity?: THREE.Texture | null;
+  /**
+   * The land's `Drainage` as a texture: how much water runs through each
+   * pixel in red and how steep its course is in green. Read only by the bake,
+   * which draws gullies along it. Left out, no gullies are drawn.
+   */
+  drainage?: THREE.Texture | null;
   /** The generator's weights and its planet. Null for a hand-made map, which gets no detail. */
   biomes: { a: THREE.Texture; b: THREE.Texture; planet: PlanetId } | null;
   /** Draw the detail. Off in performance mode. */
@@ -121,6 +127,7 @@ vTerrainPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
 const FRAGMENT_HEAD = /* glsl */ `
 uniform sampler2D uTerrainNormals;
 uniform sampler2D uTerrainCavity;
+uniform sampler2D uTerrainDrainage;
 uniform float uTerrainRelief;
 uniform float uTerrainDetail;
 uniform sampler2D uBiomeA;
@@ -533,6 +540,17 @@ const DETAIL = /* glsl */ `
     for (int k = 0; k < ${PATTERN_COUNT}; k++) pw[k] *= 1.0 - talus;
     pw[${P.scree}] += talus;
 
+    // Gullies, along the courses water runs down a hillside. They start thin
+    // where enough ground drains into them and widen downstream as more joins.
+    // Flat ground is left alone. Trees and bushes thin out along them, and
+    // whatever grows is drawn darker there, so each reads as one line.
+    vec2 drain = tSmooth(uTerrainDrainage, vTerrainUv).rg;
+    float gully = smoothstep(0.06, 0.15, drain.r) * smoothstep(0.1, 0.5, drain.g) * land * (1.0 - 0.6 * steep);
+    // The trees part along a gully and show the ground beneath.
+    albedo = mix(albedo, uBiomeClearing, pw[${P.forest}] * gully * 0.6);
+    pw[${P.forest}] *= 1.0 - gully * 0.8;
+    pw[${P.scrub}] *= 1.0 - gully * 0.8;
+
     float shadeMul = 1.0;
     // Light and dark from the ground's shape: strata, rims, crevices and
     // scree. Set as it should look on screen, and turned into linear light
@@ -940,6 +958,11 @@ const DETAIL = /* glsl */ `
     bump3 *= 1.0 - liquid;
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
     form = mix(form, 1.0, liquid);
+    // The pattern evens out along a gully, which reads darker and a little
+    // cooler, as damp ground in shade.
+    shadeMul = mix(shadeMul, 1.0, gully * 0.5);
+    form -= gully * 0.3;
+    albedo = mix(albedo, albedo * vec3(0.82, 0.86, 0.92), gully * 0.6);
 
     albedo *= max(shadeMul, 0.2) * pow(clamp(form, 0.3, 1.6), 2.2);
     // Wet ground at the water line: darker and a little bluer, with a ragged
@@ -1053,6 +1076,10 @@ export function applyTerrainShader(
   );
   flatCavity.needsUpdate = true;
   disposables.push(flatCavity);
+  // No drainage: no water runs anywhere.
+  const dry = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+  dry.needsUpdate = true;
+  disposables.push(dry);
   // Detail tells sea from land by the height the normals carry, so without
   // them it would read every pixel as sea. It reads the biome weights too.
   const detail =
@@ -1079,6 +1106,9 @@ export function applyTerrainShader(
     // Weights are bound only when the detail will read them.
     shader.uniforms.uTerrainCavity = {
       value: weighs ? (shading.cavity ?? flatCavity) : flatCavity,
+    };
+    shader.uniforms.uTerrainDrainage = {
+      value: weighs ? (shading.drainage ?? dry) : dry,
     };
     shader.uniforms.uBiomeA = {
       value: weighs && shading.biomes ? shading.biomes.a : placeholder,

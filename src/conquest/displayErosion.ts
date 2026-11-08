@@ -91,6 +91,30 @@ export function channelDepths(
   width: number,
   height: number,
 ): Float32Array {
+  return depthsFromArea(drainedArea(h, width, height));
+}
+
+/** How deep {@link channelDepths} cuts a cell that `area` cells drain through. */
+function depthsFromArea(area: Float32Array): Float32Array {
+  const depth = new Float32Array(area.length);
+  const head = Math.sqrt(GULLY_HEAD);
+  for (let i = 0; i < area.length; i++) {
+    const over = Math.sqrt(area[i]) - head;
+    if (over > 0) depth[i] = Math.min(GULLY_MAX, over * GULLY_DEPTH);
+  }
+  return depth;
+}
+
+/**
+ * How many cells of `h` drain through each cell, counting itself, as water
+ * would run on it. Every land cell drains to its lowest neighbour, with
+ * hollows filled so the water always reaches the sea or the edge. The sea is 0.
+ */
+export function drainedArea(
+  h: Float32Array,
+  width: number,
+  height: number,
+): Float32Array {
   const count = h.length;
   // Where each cell's water goes, -1 for the sea and the edge.
   const to = new Int32Array(count).fill(-1);
@@ -197,14 +221,7 @@ export function channelDepths(
     area[i] += 1;
     if (to[i] >= 0) area[to[i]] += area[i];
   }
-  const depth = new Float32Array(count);
-  const head = Math.sqrt(GULLY_HEAD);
-  for (let k = 0; k < reached; k++) {
-    const i = order[k];
-    const over = Math.sqrt(area[i]) - head;
-    if (over > 0) depth[i] = Math.min(GULLY_MAX, over * GULLY_DEPTH);
-  }
-  return depth;
+  return area;
 }
 
 /** `src` through `passes` box blurs of `radius` pixels, edge pixels repeated. */
@@ -390,9 +407,46 @@ export function erodeRelief(
   height: number,
   seed: number,
 ): Float32Array {
+  return erodeLand(relief, width, height, seed).relief;
+}
+
+/**
+ * The square root of the half resolution cells drained, past which
+ * {@link Drainage}'s flow is 1. A gully starts at 4 and a valley that has
+ * gathered a few hillsides is past 16.
+ */
+const DRAINAGE_FLOW_FULL = 64;
+
+/**
+ * Where water runs on the eroded land, for drawing the channels it cut. Two
+ * bytes a pixel, `width` by `height` like the relief, top row first:
+ *
+ * - `flow`, byte 0: the square root of how many half resolution cells drain
+ *   through the pixel, over {@link DRAINAGE_FLOW_FULL}. Lines run unbroken
+ *   from where a gully starts to the sea, and grow down them as more ground
+ *   drains in. A gully starts at 16 of 255.
+ * - `fall`, byte 1: how steep the ground the water runs down is, 255 where a
+ *   channel is cut its full depth and 0 on the flat, where none is cut.
+ *
+ * Both are 0 in the sea.
+ */
+export interface Drainage {
+  data: Uint8Array;
+  width: number;
+  height: number;
+}
+
+/** {@link erodeRelief}, and the {@link Drainage} its channels follow. */
+export function erodeLand(
+  relief: Float32Array,
+  width: number,
+  height: number,
+  seed: number,
+): { relief: Float32Array; drainage: Drainage } {
   const hw = Math.ceil(width / 2);
   const hh = Math.ceil(height / 2);
-  if (hw < 3 || hh < 3) return relief.slice();
+  const drainage = { data: new Uint8Array(width * height * 2), width, height };
+  if (hw < 3 || hh < 3) return { relief: relief.slice(), drainage };
 
   // Half resolution copy: each cell is the mean of the pixels it covers. A
   // cell that covers any sea counts as sea, so a drop never carves the shore.
@@ -438,9 +492,12 @@ export function erodeRelief(
     if (routed[i] > 0) routed[i] += jitter() * ROUTE_JITTER;
   }
   // A channel that deep is a valley too, and is cut again wider.
-  const depths = channelDepths(routed, hw, hh);
+  const area = drainedArea(routed, hw, hh);
+  const depths = depthsFromArea(area);
   const gullies = new Float32Array(depths.length);
   const valleys = new Float32Array(depths.length);
+  const flow = new Float32Array(depths.length);
+  const falls = new Float32Array(depths.length);
   for (let i = 0; i < depths.length; i++) {
     // Never more than part of the way down to the sea, so low ground near
     // the shore is not cut into trenches.
@@ -454,6 +511,8 @@ export function erodeRelief(
       eroded[Math.min(hh - 1, y + 1) * hw + x] -
       eroded[Math.max(0, y - 1) * hw + x];
     const fall = Math.min(1, Math.hypot(gx, gy) / 2 / SLOPE_FOR_FULL_CUT);
+    flow[i] = Math.min(1, Math.sqrt(area[i]) / DRAINAGE_FLOW_FULL);
+    falls[i] = fall;
     const d = Math.min(depths[i] * fall, eroded[i] * CHANNEL_SHARE);
     gullies[i] = d;
     valleys[i] = Math.max(0, d - VALLEY_FROM);
@@ -473,6 +532,7 @@ export function erodeRelief(
 
   // Back up to full resolution, bilinear between half resolution cell centres.
   const out = new Float32Array(relief.length);
+  const bytes = drainage.data;
   for (let y = 0; y < height; y++) {
     const cy = Math.min(hh - 1, Math.max(0, (y - 0.5) / 2));
     const y0 = Math.min(hh - 2, Math.floor(cy));
@@ -485,12 +545,15 @@ export function erodeRelief(
       const x0 = Math.min(hw - 2, Math.floor(cx));
       const fx = cx - x0;
       const a = y0 * hw + x0;
-      const top = change[a] + (change[a + 1] - change[a]) * fx;
-      const bottom =
-        change[a + hw] + (change[a + hw + 1] - change[a + hw]) * fx;
-      const moved = top + (bottom - top) * fy;
-      out[o] = Math.min(1, Math.max(0, was + moved));
+      const at = (field: Float32Array) => {
+        const top = field[a] + (field[a + 1] - field[a]) * fx;
+        const bottom = field[a + hw] + (field[a + hw + 1] - field[a + hw]) * fx;
+        return top + (bottom - top) * fy;
+      };
+      out[o] = Math.min(1, Math.max(0, was + at(change)));
+      bytes[o * 2] = Math.round(at(flow) * 255);
+      bytes[o * 2 + 1] = Math.round(at(falls) * 255);
     }
   }
-  return out;
+  return { relief: out, drainage };
 }
