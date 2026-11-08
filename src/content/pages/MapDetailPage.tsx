@@ -21,6 +21,7 @@ import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
+import { useMetalGrid } from "../../mapconv/metalGrid";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { PlayabilityPanel } from "../../mapconv/pages/components/PlayabilityPanel";
 import { heightsOf } from "../../mapconv/playability";
@@ -42,6 +43,7 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncMapMeta,
   useUnitsyncMapSkybox,
+  useUnitsyncMetalField,
   useUnitsyncMinimap,
   useUnitsyncScan,
   useUnitsyncThumbnails,
@@ -126,6 +128,23 @@ export default function MapDetailPage() {
         : null,
     [heightGrid, fieldMin, fieldMax],
   );
+  // The raw metal map and the map's extractor radius, for the playability
+  // panel's metal figures (issue #5098).
+  const metalField = useUnitsyncMetalField(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const metalGrid = useMetalGrid(
+    metalField.url ?? undefined,
+    metalField.data?.width,
+    metalField.data?.height,
+  );
+  const playMetal = {
+    grid: metalGrid.grid,
+    error: metalField.error ?? metalGrid.error,
+    extractorRadius: metalField.data?.extractorRadius,
+  };
   const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
     selected?.rootPath,
@@ -526,6 +545,7 @@ export default function MapDetailPage() {
         heights={playHeights}
         heightsError={heightField.error ?? heightGridError}
         starts={minimap.startPositions}
+        metal={playMetal}
       />
 
       {insightShown && (

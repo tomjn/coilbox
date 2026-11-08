@@ -773,6 +773,11 @@ msgstr "{0, plural, one {# icône de lien inconnue} other {# icônes de lien inc
 msgid "{0, plural, one {# loss} other {# losses}}"
 msgstr "{0, plural, one {# défaite} other {# défaites}}"
 
+#. placeholder {0}: metal.spotCount
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# metal spot, extractor radius is {radius} elmos} other {# metal spots, extractor radius is {radius} elmos}}"
+msgstr ""
+
 #. placeholder {0}: outcome.alreadyInstalled.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -852,6 +857,11 @@ msgstr "{0, plural, one {# ordre a été placé hors de la carte et n’est pas 
 #, fuzzy
 msgid "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
 msgstr "{0, plural, one {# blob orphelin} other {# blobs orphelins}}"
+
+#. placeholder {0}: metal.closeCount
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# pair of spots is closer together than the extractor radius, {radius} elmos:} other {# pairs of spots are closer together than the extractor radius, {radius} elmos:}}"
+msgstr ""
 
 #. placeholder {0}: s.incompletes
 #: src/content/rapidPool.ts
@@ -950,6 +960,11 @@ msgstr "{0, plural, one {# second fichier d’une partie déjà comptée} other 
 #, fuzzy
 msgid "{0, plural, one {# source} other {# sources}}"
 msgstr "{0, plural, one {# source} other {# sources}}"
+
+#. placeholder {0}: metal.wide
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# spot has metal farther than the extractor radius from its centre. The widest reaches {widest} elmos.} other {# spots have metal farther than the extractor radius from their centre. The widest reaches {widest} elmos.}}"
+msgstr ""
 
 #. placeholder {0}: dots.length
 #: src/content/pages/components/MapAggregate.tsx
@@ -11147,6 +11162,7 @@ msgid "and"
 msgstr "et"
 
 #: src/content/pages/components/MatchStatsChart.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #, fuzzy
 msgid "and {hidden} more"
 msgstr "et {hidden} de plus"
@@ -17800,6 +17816,10 @@ msgstr ""
 msgid "Could not read the map's heights: {heightsError}"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Could not read the map's metal: {error}"
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "could not read the parts pack: {status}"
@@ -20530,6 +20550,10 @@ msgstr "est"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "east edge"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "east to west"
 msgstr ""
 
 #: src/play/scenarioDifficulty.ts
@@ -29648,6 +29672,7 @@ msgstr "métal"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/WorthSection.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/scenario/pages/components/StartConditions.tsx
 #, fuzzy
@@ -29860,6 +29885,7 @@ msgid "Minutes before away"
 msgstr "Minutes avant absence"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #, fuzzy
 msgid "Mirror"
 msgstr "Miroir"
@@ -30907,6 +30933,10 @@ msgstr "NE-SO"
 #, fuzzy
 msgid "Nearest multiple of…"
 msgstr "Multiple le plus proche de…"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Nearest spots, in elmos"
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -33063,6 +33093,10 @@ msgstr "aucun emplacement d’ajustement ne peut contenir de texte"
 msgid "no tweak slot left to hold it"
 msgstr "plus aucun emplacement d’ajustement libre pour le contenir"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "No two spots are closer together than the extractor radius, {radius} elmos."
+msgstr ""
+
 #: src/content/pages/components/UnitPicker.tsx
 #, fuzzy
 msgid "No unit data available for this game."
@@ -33417,6 +33451,10 @@ msgstr "nord"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "north edge"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "north to south"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -44811,6 +44849,14 @@ msgstr "Diamètre d’éclaboussure"
 msgid "Splash falloff shape"
 msgstr "Forme d’atténuation de l’éclaboussure"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Spot with the largest gap"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Spots, largest gap"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
@@ -44967,11 +45013,13 @@ msgstr "Scintillement des étoiles, nébuleuses et autres touches décoratives. 
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/lego/pages/components/DescribeUnitForm.tsx
 #: src/lego/pages/components/NewUnitPopover.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/multiplayer/battle/startButtonLabel.ts
 #, fuzzy
 msgid "Start"
 msgstr "Démarrer"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "start {number}"
 msgstr ""
@@ -45338,6 +45386,10 @@ msgstr "Démarre sur Create et chaque fois que l’unité s’arrête, et une ac
 #, fuzzy
 msgid "Starts switched on"
 msgstr "Démarre en marche"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Starts, largest gap"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
@@ -48327,6 +48379,10 @@ msgstr "Les maillages de {moduleName} n’ont pas pu être lus : {reason}"
 #, fuzzy
 msgid "The meshes of {name} could not be read: {reason}"
 msgstr "Les maillages de {name} n’ont pas pu être lus : {reason}"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "The metal map has no metal."
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
@@ -51458,6 +51514,10 @@ msgstr "Trois-quarts, droite"
 msgid "Threshold (-th)"
 msgstr "Seuil (-th)"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "through the centre"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 #, fuzzy
 msgid "Throughput"
@@ -52377,6 +52437,10 @@ msgstr "Deux joueurs, un de chaque côté."
 #, fuzzy
 msgid "Two sides"
 msgstr "Deux camps"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy

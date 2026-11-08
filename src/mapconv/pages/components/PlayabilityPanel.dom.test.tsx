@@ -74,6 +74,55 @@ describe("the playability panel", () => {
     expect(screen.getAllByText("100.0%").length).toBeGreaterThanOrEqual(2);
   });
 
+  it("shows the metal figures against the map's extractor radius", async () => {
+    // The 16 by 16 square map has an 8 by 8 metal map. Two spots 64 elmos
+    // apart, one at each end of a row, and a third far from both.
+    const bytes = new Uint8Array(64);
+    bytes[1 * 8 + 1] = 100;
+    bytes[1 * 8 + 5] = 100;
+    bytes[6 * 8 + 6] = 100;
+    render(
+      <PlayabilityPanel
+        heights={flat()}
+        starts={[{ x: 24, z: 24 }]}
+        metal={{
+          grid: { bytes, width: 8, height: 8 },
+          extractorRadius: 90,
+        }}
+      />,
+    );
+    expect(
+      await screen.findByText("3 metal spots, extractor radius is 90 elmos"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("two spots are 64 elmos apart, at 24, 24 and 88, 24"),
+    ).toBeTruthy();
+    // The nearest spots to the start, which stands on the first.
+    expect(screen.getByText("0, 64, 113")).toBeTruthy();
+  });
+
+  it("waits for the metal map before it measures", async () => {
+    render(
+      <PlayabilityPanel heights={flat()} starts={[]} metal={{ grid: null }} />,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("KBOT2")).toBeNull();
+  });
+
+  it("says why when the metal map could not be read", async () => {
+    render(
+      <PlayabilityPanel
+        heights={flat()}
+        starts={[]}
+        metal={{ grid: null, error: "no file" }}
+      />,
+    );
+    expect(
+      await screen.findByText("Could not read the map's metal: no file"),
+    ).toBeTruthy();
+    expect(screen.getByText("KBOT2")).toBeTruthy();
+  });
+
   it("says why when the heights could not be read", () => {
     render(
       <PlayabilityPanel heights={null} heightsError="no file" starts={[]} />,

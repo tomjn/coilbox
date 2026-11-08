@@ -22,6 +22,7 @@ import {
   type MoveKind,
   moveDefKind,
 } from "@/workshop/moveClasses";
+import { type MetalGrid, type MetalResult, measureMetal } from "./metalSpots";
 
 /** A map's corner heights as the engine reads them. */
 export interface Heights {
@@ -113,6 +114,8 @@ export interface Playability {
   cellsZ: number;
   classes: ClassResult[];
   buildings: BuildResult[];
+  /** The map's metal, or null when the job carried no metal map. */
+  metal: MetalResult | null;
 }
 
 /** Elmos between heightmap corners (`SQUARE_SIZE`). */
@@ -758,6 +761,8 @@ export interface PlayabilityJob {
   buildings: BuildingSpec[];
   /** Start positions in elmos. */
   starts: { x: number; z: number }[];
+  /** The map's metal map and extractor radius, when it could be read. */
+  metal?: { grid: MetalGrid; extractorRadius: number };
 }
 
 /** Every measurement for one map and one game's classes and buildings. */
@@ -810,5 +815,8 @@ export function measurePlayability(job: PlayabilityJob): Playability {
     ...spec,
     ...buildableShare(heights, spec, corners),
   }));
-  return { cellsX, cellsZ, classes, buildings };
+  const metal = job.metal
+    ? measureMetal(job.metal.grid, job.metal.extractorRadius, job.starts)
+    : null;
+  return { cellsX, cellsZ, classes, buildings, metal };
 }
