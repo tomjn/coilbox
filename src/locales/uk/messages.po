@@ -19160,6 +19160,10 @@ msgstr "Видалити збереження {saveFilename}"
 msgid "Delete set"
 msgstr "Видалити набір"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19190,6 +19194,10 @@ msgstr "Видалити виділене"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "Видалити набір «{setName}»? Зникне лише набір."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

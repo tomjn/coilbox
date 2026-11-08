@@ -19294,6 +19294,10 @@ msgstr "Διαγραφή αποθηκευμένου παιχνιδιού {saveFi
 msgid "Delete set"
 msgstr "Διαγραφή συνόλου"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19324,6 +19328,10 @@ msgstr "Διαγραφή της επιλογής"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "Διαγραφή του συνόλου «{setName}»; Διαγράφεται μόνο το σύνολο."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

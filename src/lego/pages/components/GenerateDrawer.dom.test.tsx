@@ -31,10 +31,12 @@ const save = vi.fn();
 const open = vi.fn();
 const write = vi.fn();
 const read = vi.fn();
+const ask = vi.fn();
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: (a: unknown) => save(a),
   open: (a: unknown) => open(a),
+  ask: (...a: unknown[]) => ask(...a),
 }));
 vi.mock("../../bindings", () => ({
   legoWriteTextFile: (a: unknown) => write(a),
@@ -121,7 +123,7 @@ const onOpened = vi.fn();
 
 beforeEach(() => {
   installSettingsStorage(memorySettingsStorage());
-  for (const fn of [save, open, write, read]) fn.mockReset();
+  for (const fn of [save, open, write, read, ask]) fn.mockReset();
   generateCandidates.mockReset();
   generateCandidates.mockImplementation(
     (_inputs: unknown, start: number, count: number) => batch(start, count),
@@ -294,8 +296,15 @@ describe("GenerateDrawer", () => {
         (s) => s.name,
       );
     expect(names()).toEqual(["Green faction", "Green faction 2", "New style"]);
+    ask.mockResolvedValue(false);
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-    expect(names()).toEqual(["Green faction", "Green faction 2"]);
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+    expect(names()).toHaveLength(3);
+    ask.mockResolvedValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(names()).toEqual(["Green faction", "Green faction 2"]),
+    );
   });
 
   it("saves a style to a file and loads it back as a copy", async () => {

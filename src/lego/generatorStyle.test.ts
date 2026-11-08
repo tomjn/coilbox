@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { mulberry32 } from "../conquest/rng";
 import { type BodyPlan, bodyPlanById } from "./bodyPlans";
-import { generateUnit } from "./generate";
+import { GENERATOR_JOBS, generateUnit } from "./generate";
 import { generateCheckedUnit } from "./generateChecked";
 import {
   type GeneratorStyle,
@@ -84,6 +84,22 @@ const colourOf = (unit: LegoProject) =>
     p.partId ? [pack.byId.get(p.partId)?.colourway] : [],
   );
 
+/** A part's shape and size. Two colourways of one shape can be different
+ *  meshes of the same box, so the mesh id is not compared. */
+const shapeAndSize = (partId: string) => {
+  const part = pack.byId.get(partId);
+  return part && `${part.shape} ${JSON.stringify(part.bbox)}`;
+};
+
+/** The shape and size of every part but the covering's, which is chosen
+ *  afresh from the colourway's own parts. */
+const shapesOf = (unit: LegoProject) => {
+  const covering = new Set(unit.generated?.covering?.map((c) => c.piece));
+  return unit.pieces.flatMap((p) =>
+    p.partId && !covering.has(p.id) ? [shapeAndSize(p.partId)] : [],
+  );
+};
+
 const coveringShapes = (unit: LegoProject) =>
   (unit.generated?.covering ?? []).map((c) => {
     const partId = unit.pieces.find((p) => p.id === c.piece)?.partId;
@@ -132,6 +148,13 @@ describe("a style on the generator", () => {
         );
         expect(tan.length).toBe(plain.length);
         expect(new Set(tan)).toEqual(new Set(["tan"]));
+        // Each module part, wheel and tread is the same shape and size, only in
+        // another colour.
+        expect(
+          shapesOf(
+            generate(seed, plan, "assault", style({ colourway: "tan" })),
+          ),
+        ).toEqual(shapesOf(generate(seed, plan, "assault")));
       }
     }
   });
@@ -172,20 +195,64 @@ describe("a style on the generator", () => {
   });
 
   it("keeps every proportion inside the job's range", () => {
-    // Assault's legLength rule is 0.9 to 1.1 of the plan's default.
-    const plan = bodyPlanById("biped");
-    const fallback = plan?.proportions.find(
-      (p) => p.id === "legLength",
-    )?.fallback;
-    if (fallback === undefined) throw new Error("no legLength");
-    for (const proportions of ["stocky", "lean"] as const) {
-      for (const seed of SEEDS) {
-        const leg = generate(seed, "biped", "assault", style({ proportions }))
-          .skeleton?.proportions.legLength as number;
-        expect(leg).toBeGreaterThanOrEqual(fallback * 0.9 - 1e-9);
-        expect(leg).toBeLessThanOrEqual(fallback * 1.1 + 1e-9);
+    // Medium is the plan's default size for an assault unit.
+    const job = GENERATOR_JOBS.find((j) => j.id === "assault");
+    if (!job || job.size.medium !== 1) throw new Error("assault changed");
+    let checked = 0;
+    for (const planId of ["biped", "quadruped", "tracked", "hover", "ship"]) {
+      const plan = bodyPlanById(planId) as BodyPlan;
+      for (const rule of job.proportions) {
+        const own = plan.proportions.find((p) => p.id === rule.id);
+        if (!own || rule.against !== undefined) continue;
+        const held = (n: number) => Math.min(own.max, Math.max(own.min, n));
+        const low = held(own.fallback * rule.range[0]);
+        const high = held(own.fallback * rule.range[1]);
+        for (const proportions of ["stocky", "lean"] as const) {
+          for (const seed of SEEDS) {
+            const value = generate(
+              seed,
+              planId,
+              "assault",
+              style({ proportions }),
+            ).skeleton?.proportions[rule.id] as number;
+            expect(value).toBeGreaterThanOrEqual(low - 1e-9);
+            expect(value).toBeLessThanOrEqual(high + 1e-9);
+            checked++;
+          }
+        }
       }
     }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it("covers in another shape when the pack has none of the preferred one", () => {
+    const parts = pack.parts.filter((p) => p.shape !== "plate");
+    const noPlates: LoadedPack = {
+      ...pack,
+      parts,
+      byId: new Map(parts.map((p) => [p.id, p])),
+    };
+    const make = (s?: GeneratorStyle) =>
+      generateUnit(
+        {
+          seed: 1,
+          plan: bodyPlanById("wheeled") as BodyPlan,
+          job: "assault",
+          size: "medium",
+        },
+        {
+          id: "unit",
+          rootPieceId: "root",
+          now: "2026-11-08T00:00:00.000Z",
+          pack: noPlates,
+          modules,
+          ...(s ? { style: s } : {}),
+        },
+      );
+    const plain = make();
+    const plates = make(style({ shapes: ["plate"] }));
+    expect(plates.generated?.covering?.length).toBeGreaterThan(0);
+    expect(plates.pieces).toEqual(plain.pieces);
   });
 
   it("gives a dense unit more pieces than a sparse one", () => {
@@ -308,6 +375,9 @@ describe("saving styles", () => {
     expect(
       parseStyleFile(JSON.stringify({ kind: "coilbox-generator-style" })),
     ).toBeNull();
+    // A newer file may mean something this version would get wrong.
+    const newer = JSON.parse(serializeStyleFile(full));
+    expect(parseStyleFile(JSON.stringify({ ...newer, version: 2 }))).toBeNull();
   });
 
   it("drops what it does not know and skips what it cannot read", () => {

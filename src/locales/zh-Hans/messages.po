@@ -19160,6 +19160,10 @@ msgstr "删除存档 {saveFilename}"
 msgid "Delete set"
 msgstr "删除回放集"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19190,6 +19194,10 @@ msgstr "删除所选内容"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "删除回放集“{setName}”？只会删除回放集本身。"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

@@ -19160,6 +19160,10 @@ msgstr "Spielstand {saveFilename} löschen"
 msgid "Delete set"
 msgstr "Satz löschen"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19190,6 +19194,10 @@ msgstr "Auswahl löschen"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "Den Satz „{setName}“ löschen? Nur der Satz wird entfernt."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

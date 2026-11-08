@@ -15632,6 +15632,10 @@ msgstr ""
 msgid "Delete set"
 msgstr ""
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 msgid "Delete the alert for {description}"
 msgstr ""
@@ -15655,6 +15659,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
 msgid "Delete the set “{setName}”? Only the set goes."
+msgstr ""
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
 msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx

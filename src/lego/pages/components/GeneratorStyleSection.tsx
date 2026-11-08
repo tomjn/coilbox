@@ -7,6 +7,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { Copy, Download, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CheckField, Field } from "@/components/Field";
@@ -86,6 +87,21 @@ export function GeneratorStyleSection({
     return value === NONE
       ? next
       : ({ ...next, [key]: value } as GeneratorStyle);
+  }
+
+  async function deleteChosen() {
+    if (!chosen) return;
+    const name = chosen.name;
+    const yes = await ask(
+      t`Delete the style "${name}"? This cannot be undone.`,
+      {
+        title: t`Delete style?`,
+        kind: "warning",
+      },
+    );
+    if (!yes) return;
+    remove(chosen.id);
+    onChoose(null);
   }
 
   async function load() {
@@ -219,10 +235,7 @@ export function GeneratorStyleSection({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                remove(chosen.id);
-                onChoose(null);
-              }}
+              onClick={() => void deleteChosen()}
             >
               <Trash2 size={16} /> {t`Delete`}
             </Button>

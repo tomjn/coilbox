@@ -19290,6 +19290,10 @@ msgstr "Excluir jogo salvo {saveFilename}"
 msgid "Delete set"
 msgstr "Excluir conjunto"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19320,6 +19324,10 @@ msgstr "Excluir a seleção"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "Excluir o conjunto “{setName}”? Só o conjunto é excluído."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

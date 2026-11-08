@@ -19290,6 +19290,10 @@ msgstr "Slett det lagrede spillet {saveFilename}"
 msgid "Delete set"
 msgstr "Slett sett"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19320,6 +19324,10 @@ msgstr "Slett utvalget"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "Slette settet «{setName}»? Bare settet forsvinner."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

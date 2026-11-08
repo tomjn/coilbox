@@ -19294,6 +19294,10 @@ msgstr "Opgeslagen spel {saveFilename} verwijderen"
 msgid "Delete set"
 msgstr "Set verwijderen"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19324,6 +19328,10 @@ msgstr "De selectie verwijderen"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "De set “{setName}” verwijderen? Alleen de set verdwijnt."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

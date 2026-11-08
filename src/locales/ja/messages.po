@@ -19160,6 +19160,10 @@ msgstr "セーブデータ {saveFilename} を削除"
 msgid "Delete set"
 msgstr "セットを削除"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete style?"
+msgstr ""
+
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
 msgid "Delete the alert for {description}"
@@ -19190,6 +19194,10 @@ msgstr "選択範囲を削除"
 #, fuzzy
 msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "セット「{setName}」を削除しますか？削除されるのはセットだけです。"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Delete the style \"{name}\"? This cannot be undone."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy

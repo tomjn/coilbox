@@ -576,7 +576,10 @@ export function coverSkeleton(
   const added: LegoPiece[] = [];
   const names = project.pieces.map((p) => p.name);
   for (const plan of plans) {
-    const shapes = preferredShapes(plan.shapes, style);
+    const shapes = preferredShapes(
+      plan.shapes.filter((shape) => parts.some((p) => p.shape === shape)),
+      style,
+    );
     let ranked = fits(
       parts.filter((p) => shapes.includes(p.shape)),
       plan.length,

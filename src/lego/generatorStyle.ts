@@ -179,7 +179,8 @@ export function parseStyleFile(text: string): GeneratorStyle | null {
   }
   if (typeof data !== "object" || data === null) return null;
   const d = data as Record<string, unknown>;
-  if (d.kind !== STYLE_FILE_KIND) return null;
+  if (d.kind !== STYLE_FILE_KIND || d.version !== STYLE_FILE_VERSION)
+    return null;
   return parseStyle(d.style);
 }
 

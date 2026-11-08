@@ -1120,8 +1120,8 @@ export interface LegoSkeleton {
 }
 
 /**
- * What made a generated unit (#3231). The four inputs remake it, given the same
- * module library and parts pack. `modules` names each module instance the generator hung on
+ * What made a generated unit (#3231). The four inputs and the style, when
+ * there was one, remake it, given the same module library and parts pack. `modules` names each module instance the generator hung on
  * the skeleton, by the slot it filled, so a later reroll can tell its own
  * pieces from ones the game maker added: every piece of an instance carries
  * `LegoModuleRef.instance`.
