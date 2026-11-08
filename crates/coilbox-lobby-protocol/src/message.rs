@@ -280,6 +280,16 @@ pub enum ServerMessage {
     /// relay support at login, because that line is identical for a relayed
     /// battle and a direct one on purpose (issue #2017).
     BattleIsRelayed { battle_id: u32 },
+    /// `BATTLERELAYADDRESS <battle_id> <host:port>`, the address of the relay a
+    /// relayed battle goes through, so a joiner can time its own half of the
+    /// ping to it (issue #2869).
+    ///
+    /// A line of its own, straight after `BATTLEISRELAYED`, because a client that
+    /// already reads that line takes everything after the command as a battle
+    /// id. A lobby that never sends it leaves the address unknown, and a line
+    /// whose address names no port is read as unknown rather than guessed at.
+    /// `address` is kept as written, an IPv6 host in its brackets.
+    BattleRelayAddress { battle_id: u32, address: String },
     /// `MOVERELAYEDHOSTFAILED <reason>`, the lobby refusing to move a battle to
     /// the address [`crate::command::move_relayed_host`] named.
     ///
@@ -446,6 +456,19 @@ pub(crate) fn fields<const N: usize>(rest: &str) -> Option<[&str; N]> {
         }
     }
     Some(out)
+}
+
+/// Whether `s` is `host:port` with a port in 1..=65535, where an IPv6 host is
+/// in brackets and any other host has no colon in it.
+fn is_host_and_port(s: &str) -> bool {
+    let Some((host, port)) = s.rsplit_once(':') else {
+        return false;
+    };
+    let host_ok = match host.strip_prefix('[') {
+        Some(inner) => inner.strip_suffix(']').is_some_and(|v6| !v6.is_empty()),
+        None => !host.is_empty() && !host.contains(':'),
+    };
+    host_ok && port.parse::<u16>().is_ok_and(|p| p != 0)
 }
 
 pub(crate) fn parse_bool01(s: &str) -> bool {
@@ -787,6 +810,18 @@ pub fn parse_line(line: &str) -> ServerMessage {
         "BATTLEISRELAYED" => match rest.trim().parse() {
             Ok(battle_id) => ServerMessage::BattleIsRelayed { battle_id },
             Err(_) => ServerMessage::Unknown { raw: raw() },
+        },
+        "BATTLERELAYADDRESS" => match fields::<2>(rest) {
+            Some([battle_id, address]) => match (battle_id.trim().parse(), address.trim()) {
+                (Ok(battle_id), address) if is_host_and_port(address) => {
+                    ServerMessage::BattleRelayAddress {
+                        battle_id,
+                        address: address.to_string(),
+                    }
+                }
+                _ => ServerMessage::Unknown { raw: raw() },
+            },
+            None => ServerMessage::Unknown { raw: raw() },
         },
         "MOVERELAYEDHOSTFAILED" => ServerMessage::MoveRelayedHostFailed {
             reason: rest.to_string(),
@@ -1591,6 +1626,51 @@ mod tests {
                 parse_line(line),
                 ServerMessage::Unknown { raw: line.into() },
                 "a line that names no battle says nothing about one: {line}"
+            );
+        }
+    }
+
+    /// Issue #2869. The address is kept as the lobby wrote it, so a name, an
+    /// IPv4 address and a bracketed IPv6 address all come through unchanged.
+    #[test]
+    fn parses_the_address_of_a_battles_relay() {
+        for address in [
+            "relay.example.org:3478",
+            "185.199.108.153:3478",
+            "[2606:4700:4700::1111]:3478",
+        ] {
+            assert_eq!(
+                parse_line(&format!("BATTLERELAYADDRESS 9 {address}")),
+                ServerMessage::BattleRelayAddress {
+                    battle_id: 9,
+                    address: address.into()
+                }
+            );
+        }
+    }
+
+    /// An address with no port is not one to time, and filling in 3478 would
+    /// send a ping to nothing on a relay that listens elsewhere.
+    #[test]
+    fn a_relay_address_with_no_usable_port_is_not_read_as_one() {
+        for line in [
+            "BATTLERELAYADDRESS 9 relay.example.org",
+            "BATTLERELAYADDRESS 9 relay.example.org:",
+            "BATTLERELAYADDRESS 9 relay.example.org:0",
+            "BATTLERELAYADDRESS 9 relay.example.org:65536",
+            "BATTLERELAYADDRESS 9 relay.example.org:34x8",
+            "BATTLERELAYADDRESS 9 [2606:4700:4700::1111]",
+            "BATTLERELAYADDRESS 9 2606:4700:4700::1111:3478",
+            "BATTLERELAYADDRESS 9 []:3478",
+            "BATTLERELAYADDRESS 9 :3478",
+            "BATTLERELAYADDRESS nine relay.example.org:3478",
+            "BATTLERELAYADDRESS 9",
+            "BATTLERELAYADDRESS",
+        ] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::Unknown { raw: line.into() },
+                "a line this shape names no relay to time: {line}"
             );
         }
     }

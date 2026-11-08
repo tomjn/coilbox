@@ -260,6 +260,12 @@ pub struct Battle {
     /// `BATTLEISRELAYED` can say so, and false means it did not, not that the
     /// battle is direct.
     pub relayed: bool,
+    /// The `host:port` of the relay a relayed battle goes through, as the lobby
+    /// wrote it, so a joiner can time their half of the ping to it (issue
+    /// #2869). `None` when the lobby sent no `BATTLERELAYADDRESS`, which a lobby
+    /// that does not know the line, or one whose relay has no port to give,
+    /// never does.
+    pub relay_address: Option<String>,
     pub map: String,
     pub maphash: String,
     pub modname: String,

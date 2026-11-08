@@ -141,6 +141,11 @@ pub enum Delta {
     BattleIsRelayed {
         id: u32,
     },
+    /// The address of the relay a battle goes through is now held on its copy
+    /// in [`crate::LobbyState`] (issue #2869).
+    BattleRelayAddress {
+        id: u32,
+    },
     /// The lobby would not move our battle to the address its relay came back
     /// at, in its own words, so the battle is still advertised where the
     /// allocation used to be.
@@ -1021,6 +1026,16 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 b.relayed = true;
             }
             vec![Delta::BattleIsRelayed { id: battle_id }]
+        }
+        ServerMessage::BattleRelayAddress { battle_id, address } => {
+            // Held only for a battle this client holds, like the line it
+            // follows, and without marking the battle relayed: the address is
+            // what the lobby says about its relay, and `BATTLEISRELAYED` is what
+            // says this battle uses it.
+            if let Some(b) = state.battles.get_mut(&battle_id) {
+                b.relay_address = Some(address);
+            }
+            vec![Delta::BattleRelayAddress { id: battle_id }]
         }
         ServerMessage::MoveRelayedHostFailed { reason } => {
             // Nothing here changes, and there is nothing here that could be put
@@ -2206,6 +2221,62 @@ mod tests {
         // One the client does not hold changes nothing.
         let before = s.clone();
         reduce(&mut s, parse_line("BATTLEISRELAYED 11"));
+        assert_eq!(s, before);
+    }
+
+    /// Issue #2869. The relay's address is held on the battle it was sent for,
+    /// and only there.
+    #[test]
+    fn the_address_of_a_battles_relay_is_held_on_that_battle() {
+        let mut s = LobbyState::new();
+        for line in [
+            "BATTLEOPENED 9 0 0 bob 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet Catcher\tTheirs\tBAR",
+            "BATTLEOPENED 10 0 0 carol 203.0.113.7 8452 8 0 0 -1 spring\t105\tComet Catcher\tDirect\tBAR",
+            "BATTLEISRELAYED 9",
+        ] {
+            reduce(&mut s, parse_line(line));
+        }
+
+        assert_eq!(
+            reduce(
+                &mut s,
+                parse_line("BATTLERELAYADDRESS 9 [2606:4700:4700::1111]:3478")
+            ),
+            vec![Delta::BattleRelayAddress { id: 9 }]
+        );
+        assert_eq!(
+            s.battles[&9].relay_address.as_deref(),
+            Some("[2606:4700:4700::1111]:3478")
+        );
+        assert!(s.battles[&9].relayed);
+        assert_eq!(s.battles[&10].relay_address, None);
+
+        // One the client does not hold changes nothing.
+        let before = s.clone();
+        reduce(
+            &mut s,
+            parse_line("BATTLERELAYADDRESS 11 relay.example.org:3478"),
+        );
+        assert_eq!(s, before);
+    }
+
+    /// Issue #2869. A lobby that sends only `BATTLEISRELAYED`, as every lobby
+    /// did before the address line existed, leaves the battle relayed and with
+    /// no address, and a line with no port in it changes nothing.
+    #[test]
+    fn a_lobby_that_sends_no_relay_address_leaves_none() {
+        let mut s = LobbyState::new();
+        for line in [
+            "BATTLEOPENED 9 0 0 bob 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet Catcher\tTheirs\tBAR",
+            "BATTLEISRELAYED 9",
+        ] {
+            reduce(&mut s, parse_line(line));
+        }
+        assert!(s.battles[&9].relayed);
+        assert_eq!(s.battles[&9].relay_address, None);
+
+        let before = s.clone();
+        assert!(reduce(&mut s, parse_line("BATTLERELAYADDRESS 9 relay.example.org")).is_empty());
         assert_eq!(s, before);
     }
 
