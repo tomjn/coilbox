@@ -153,3 +153,197 @@ export function portableEuler(
   }
   return [portableAtan2(y.z, y.y), pitch, 0];
 }
+
+const view32 = new DataView(new ArrayBuffer(8));
+
+/** The high 32 bits of a double, as a signed integer. */
+function highWord(value: number): number {
+  view32.setFloat64(0, value);
+  return view32.getInt32(0);
+}
+
+/** The double whose high 32 bits are `high` and whose low 32 bits are 0. */
+function fromHighWord(high: number): number {
+  view32.setUint32(0, high >>> 0);
+  view32.setUint32(4, 0);
+  return view32.getFloat64(0);
+}
+
+const S1 = -1.6666666666666632e-1;
+const S2 = 8.33333333332249e-3;
+const S3 = -1.984126982985795e-4;
+const S4 = 2.7557313707070068e-6;
+const S5 = -2.5050760253406863e-8;
+const S6 = 1.58969099521155e-10;
+const C1 = 4.16666666666666e-2;
+const C2 = -1.388888888887411e-3;
+const C3 = 2.480158728947673e-5;
+const C4 = -2.7557314351390663e-7;
+const C5 = 2.087572321298175e-9;
+const C6 = -1.1359647557788195e-11;
+const INV_PIO2 = 6.366197723675814e-1;
+const PIO2_1 = 1.5707963267341256;
+const PIO2_1T = 6.077100506506192e-11;
+const PIO2_2 = 6.077100506303966e-11;
+const PIO2_2T = 2.0222662487959506e-21;
+const PIO2_3 = 2.0222662487111665e-21;
+const PIO2_3T = 8.4784276603689e-32;
+
+/** fdlibm's `__kernel_sin`: sin of `x + y` for |x| <= pi/4, `y` the tail. */
+function kernelSin(x: number, y: number, tail: boolean): number {
+  if ((highWord(x) & 0x7fffffff) < 0x3e400000 && Math.trunc(x) === 0) return x;
+  const z = x * x;
+  const v = z * x;
+  const r = S2 + z * (S3 + z * (S4 + z * (S5 + z * S6)));
+  if (!tail) return x + v * (S1 + z * r);
+  return x - (z * (0.5 * y - v * r) - y - v * S1);
+}
+
+/** fdlibm's `__kernel_cos`: cos of `x + y` for |x| <= pi/4. */
+function kernelCos(x: number, y: number): number {
+  const ix = highWord(x) & 0x7fffffff;
+  if (ix < 0x3e400000 && Math.trunc(x) === 0) return 1;
+  const z = x * x;
+  const r = z * (C1 + z * (C2 + z * (C3 + z * (C4 + z * (C5 + z * C6)))));
+  if (ix < 0x3fd33333) return 1 - (0.5 * z - (z * r - x * y));
+  const qx = ix > 0x3fe90000 ? 0.28125 : fromHighWord(ix - 0x00200000);
+  const hz = 0.5 * z - qx;
+  return 1 - qx - (hz - (z * r - x * y));
+}
+
+/**
+ * fdlibm's `__ieee754_rem_pio2` for an `x` beyond pi/4: the quadrant count `n`
+ * and `x - n * pi / 2` as the two doubles `y0 + y1`. It is fdlibm's medium
+ * path, exact to about 1.6e6 radians, and past that still the same on every
+ * engine though no longer rounded as fdlibm's large path would.
+ */
+function remPio2(x: number): [number, number, number] {
+  const ix = highWord(x) & 0x7fffffff;
+  if (ix < 0x4002d97c) {
+    // Under 3pi/4, so the quadrant is 1 or -1.
+    const sign = x > 0 ? 1 : -1;
+    let z = x - sign * PIO2_1;
+    if (ix !== 0x3ff921fb) {
+      const y0 = z - sign * PIO2_1T;
+      return [sign, y0, z - y0 - sign * PIO2_1T];
+    }
+    z -= sign * PIO2_2;
+    const y0 = z - sign * PIO2_2T;
+    return [sign, y0, z - y0 - sign * PIO2_2T];
+  }
+  const t0 = Math.abs(x);
+  const n = Math.trunc(t0 * INV_PIO2 + 0.5);
+  let r = t0 - n * PIO2_1;
+  let w = n * PIO2_1T;
+  let y0 = r - w;
+  const j = ix >> 20;
+  if (j - ((highWord(y0) >> 20) & 0x7ff) > 16) {
+    let t = r;
+    w = n * PIO2_2;
+    r = t - w;
+    w = n * PIO2_2T - (t - r - w);
+    y0 = r - w;
+    if (j - ((highWord(y0) >> 20) & 0x7ff) > 49) {
+      t = r;
+      w = n * PIO2_3;
+      r = t - w;
+      w = n * PIO2_3T - (t - r - w);
+      y0 = r - w;
+    }
+  }
+  const y1 = r - y0 - w;
+  return x < 0 ? [-n, -y0, -y1] : [n, y0, y1];
+}
+
+/** fdlibm's `sin`: the sine of an angle in radians. */
+export function portableSin(x: number): number {
+  const ix = highWord(x) & 0x7fffffff;
+  if (ix <= 0x3fe921fb) return kernelSin(x, 0, false);
+  if (ix >= 0x7ff00000) return Number.NaN;
+  const [n, y0, y1] = remPio2(x);
+  switch (n & 3) {
+    case 0:
+      return kernelSin(y0, y1, true);
+    case 1:
+      return kernelCos(y0, y1);
+    case 2:
+      return -kernelSin(y0, y1, true);
+    default:
+      return -kernelCos(y0, y1);
+  }
+}
+
+/** fdlibm's `cos`: the cosine of an angle in radians. */
+export function portableCos(x: number): number {
+  const ix = highWord(x) & 0x7fffffff;
+  if (ix <= 0x3fe921fb) return kernelCos(x, 0);
+  if (ix >= 0x7ff00000) return Number.NaN;
+  const [n, y0, y1] = remPio2(x);
+  switch (n & 3) {
+    case 0:
+      return kernelCos(y0, y1);
+    case 1:
+      return -kernelSin(y0, y1, true);
+    case 2:
+      return -kernelCos(y0, y1);
+    default:
+      return kernelSin(y0, y1, true);
+  }
+}
+
+const LN2_HI = 6.931471803691238e-1;
+const LN2_LO = 1.9082149292705877e-10;
+const TWO54 = 18014398509481984;
+const LG1 = 6.666666666666735e-1;
+const LG2 = 3.999999999940942e-1;
+const LG3 = 2.857142874366239e-1;
+const LG4 = 2.2222198432149784e-1;
+const LG5 = 1.818357216161805e-1;
+const LG6 = 1.5313837699209373e-1;
+const LG7 = 1.4798198605116586e-1;
+
+/** fdlibm's `log`: the natural logarithm. */
+export function portableLog(input: number): number {
+  let x = input;
+  let hx = highWord(x);
+  let k = 0;
+  if (Number.isNaN(x)) return x;
+  if (hx < 0x00100000) {
+    if (x === 0) return Number.NEGATIVE_INFINITY;
+    if (hx < 0) return Number.NaN;
+    k -= 54;
+    x *= TWO54;
+    hx = highWord(x);
+  }
+  if (hx >= 0x7ff00000) return x + x;
+  k += (hx >> 20) - 1023;
+  hx &= 0x000fffff;
+  const i0 = (hx + 0x95f64) & 0x100000;
+  view32.setFloat64(0, x);
+  view32.setUint32(0, (hx | (i0 ^ 0x3ff00000)) >>> 0);
+  x = view32.getFloat64(0);
+  k += i0 >> 20;
+  const f = x - 1;
+  const dk = k;
+  if ((0x000fffff & (2 + hx)) < 3) {
+    if (f === 0) return k === 0 ? 0 : dk * LN2_HI + dk * LN2_LO;
+    const R = f * f * (0.5 - 0.3333333333333333 * f);
+    return k === 0 ? f - R : dk * LN2_HI - (R - dk * LN2_LO - f);
+  }
+  const s = f / (2 + f);
+  const z = s * s;
+  const w = z * z;
+  const t1 = w * (LG2 + w * (LG4 + w * LG6));
+  const t2 = z * (LG1 + w * (LG3 + w * (LG5 + w * LG7)));
+  const R = t2 + t1;
+  const i = (hx - 0x6147a) | (0x6b851 - hx);
+  if (i > 0) {
+    const hfsq = 0.5 * f * f;
+    return k === 0
+      ? f - (hfsq - s * (hfsq + R))
+      : dk * LN2_HI - (hfsq - (s * (hfsq + R) + dk * LN2_LO) - f);
+  }
+  return k === 0
+    ? f - s * (f - R)
+    : dk * LN2_HI - (s * (f - R) - dk * LN2_LO - f);
+}
