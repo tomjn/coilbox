@@ -24440,6 +24440,10 @@ msgstr "Gi tillatelse"
 msgid "Graphics"
 msgstr "Grafikk"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "grass"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Gravity"
@@ -41698,6 +41702,10 @@ msgstr "Samme som accuracy, men brukes mens enheten som skyter, er i bevegelse."
 msgid "Same as default"
 msgstr "Samme som standard"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "sand"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -45112,6 +45120,10 @@ msgstr "Øyeblikksbilde"
 #, fuzzy
 msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
 msgstr "Ta øyeblikksbilde av og bytt <0>springsettings.cfg</0>, <1>LuaUI/Config</1> og <2>uikeys.txt</2> i denne innholdsmappen."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "snow"
+msgstr ""
 
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
@@ -56379,6 +56391,10 @@ msgstr "Skriverotens portabilitet ikke relevant (ikke portabel)"
 msgid "Write sky"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write splats"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56504,6 +56520,10 @@ msgstr "Skrev «{name}» til Chobby"
 #, fuzzy
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "Skrev {modelsWritten} av {modelsFound} modeller inn i {0, plural, one {# ark} other {# ark}}."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
+msgstr ""
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
