@@ -377,8 +377,8 @@ export default function CompilePage() {
   /**
    * Writes the sky the preview shows into the compiled map as
    * `maps/skybox.jpg` (#5089). It is built from the compiled map's own
-   * `mapinfo.lua`, written first when it has not been this session, so its
-   * horizon is the fog colour the engine will draw.
+   * `mapinfo.lua`, written from the form first, so its horizon is the fog
+   * colour the engine will draw.
    */
   async function writeSky() {
     if (!result) return;
@@ -387,12 +387,15 @@ export default function CompilePage() {
     setSkyResult(null);
     setSkyError(null);
     try {
-      if (!mapinfoResult && !(await writeMapinfo())) return;
+      // Always written first, so the sky follows the form as it is now.
+      if (!(await writeMapinfo())) return;
       const info = await mcReadMapinfo({ path: result.outDir });
       const jpeg = await panoramaJpeg(info);
       setSkyResult(
         await mcWriteSkybox({ outDir: result.outDir, jpeg: Array.from(jpeg) }),
       );
+      // mapinfo.lua now names the sky, so its earlier status is out of date.
+      setMapinfoResult(null);
     } catch (e) {
       setSkyError(errorText(e));
     } finally {

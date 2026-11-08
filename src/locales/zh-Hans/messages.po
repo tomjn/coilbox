@@ -15777,7 +15777,7 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox 无法绘制此图片。游戏仍可读取它。"
 
 #: src/mapconv/skyboxNote.ts
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a format the reader does not handle, so the preview draws a sky from the map's colours instead."
+msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
 msgstr ""
 
 #: src/content/buildPicMissing.ts

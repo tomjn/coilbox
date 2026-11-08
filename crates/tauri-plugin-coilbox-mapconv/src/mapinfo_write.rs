@@ -511,7 +511,8 @@ pub fn write_skybox(dir: &Path, jpeg: &[u8]) -> Result<SkyboxWritten, String> {
     let named = mapinfo::eval_appearance(dir, &src)
         .unwrap_or_else(|| mapinfo::parse_appearance(&src))
         .sky_box;
-    if let Some(name) = named.filter(|n| !n.eq_ignore_ascii_case(GENERATED_SKYBOX)) {
+    let own = |n: &String| n.trim().is_empty() || n.eq_ignore_ascii_case(GENERATED_SKYBOX);
+    if let Some(name) = named.filter(|n| !own(n)) {
         return Err(format!(
             "mapinfo.lua already names the skybox {name}, so the generated sky was not written"
         ));
@@ -530,18 +531,30 @@ pub fn write_skybox(dir: &Path, jpeg: &[u8]) -> Result<SkyboxWritten, String> {
     let maps = dir.join("maps");
     std::fs::create_dir_all(&maps)
         .map_err(|e| format!("could not create {}: {e}", maps.display()))?;
+    // Both files are written aside before either replaces anything, so a
+    // failed write leaves the map as it was.
     let path = maps.join(GENERATED_SKYBOX);
-    let tmp = maps.join(format!("{GENERATED_SKYBOX}.tmp"));
-    std::fs::write(&tmp, jpeg).map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, &path)
-        .map_err(|e| format!("could not replace {}: {e}", path.display()))?;
-
+    let sky_tmp = maps.join(format!("{GENERATED_SKYBOX}.tmp"));
+    let info_tmp = dir.join("mapinfo.lua.tmp");
     let mapinfo_changed = after != src;
+    let staged = std::fs::write(&sky_tmp, jpeg)
+        .map_err(|e| format!("could not write {}: {e}", sky_tmp.display()))
+        .and_then(|()| {
+            if mapinfo_changed {
+                std::fs::write(&info_tmp, &after)
+                    .map_err(|e| format!("could not write {}: {e}", info_tmp.display()))?;
+            }
+            Ok(())
+        });
+    if let Err(e) = staged {
+        let _ = std::fs::remove_file(&sky_tmp);
+        let _ = std::fs::remove_file(&info_tmp);
+        return Err(e);
+    }
+    std::fs::rename(&sky_tmp, &path)
+        .map_err(|e| format!("could not replace {}: {e}", path.display()))?;
     if mapinfo_changed {
-        let tmp = dir.join("mapinfo.lua.tmp");
-        std::fs::write(&tmp, &after)
-            .map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
-        std::fs::rename(&tmp, &info)
+        std::fs::rename(&info_tmp, &info)
             .map_err(|e| format!("could not replace {}: {e}", info.display()))?;
     }
     Ok(SkyboxWritten {
@@ -587,6 +600,18 @@ mod tests {
         let err = write_skybox(&dir, &jpeg(64, 32)).unwrap_err();
         assert!(err.contains("mine.dds"), "{err}");
         assert!(!dir.join("maps").exists());
+    }
+
+    #[test]
+    fn an_empty_sky_box_is_no_sky_of_its_own() {
+        let dir = temp_dir("empty-sky");
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { atmosphere = { skyBox = \"\" } }",
+        )
+        .unwrap();
+        write_skybox(&dir, &jpeg(64, 32)).unwrap();
+        assert_eq!(eval(&dir)["atmosphere"]["skyBox"], "skybox.jpg");
     }
 
     #[test]

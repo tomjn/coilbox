@@ -84,7 +84,7 @@ describe("generated sky", () => {
   it("meets the fog colour at the horizon", () => {
     // Far from the sun, so its glow adds almost nothing.
     const back = panoramaPixel([-1, 0, 0], W, H);
-    const [r, g, b] = pixel(px, Math.floor(back[0]), H / 2);
+    const [r, g, b] = pixel(px, Math.floor(back[0]) % W, H / 2);
     expect(Math.abs(r - 0.8 * 255)).toBeLessThanOrEqual(3);
     expect(Math.abs(g - 0.6 * 255)).toBeLessThanOrEqual(3);
     expect(Math.abs(b - 0.4 * 255)).toBeLessThanOrEqual(3);

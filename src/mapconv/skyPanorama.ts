@@ -148,6 +148,8 @@ export function skyColourAt(dir: Vec3, sky: SkyInputs): Rgb {
     }
   }
 
+  // The disc is sunColor lifted halfway to white, so a dim sun still reads
+  // as the brightest thing in its own glow rather than a dark spot in it.
   const disc = 1 - smoothstep(SUN_RADIUS * 0.8, SUN_RADIUS, angle);
   for (let i = 0; i < 3; i++)
     out[i] += (0.5 + 0.5 * sky.sunColor[i] - out[i]) * disc * (1 - cloud);

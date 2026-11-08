@@ -53,7 +53,7 @@ export function skyboxFromDds(data: ParsedDds): SkyboxProblem | null {
  * The word for the preview and the reason for its tooltip, or null when there
  * is nothing to say.
  *
- * Null covers both a map that declares no skybox, where a flat sky is the right
+ * Null covers both a map that declares no skybox, where a generated sky is the right
  * answer, and a skybox that read and is on screen.
  */
 export function skyboxNote(
@@ -63,7 +63,7 @@ export function skyboxNote(
     case "unreadable":
       return {
         label: t`generated sky`,
-        title: t`Coilbox cannot read this map's skybox. The map ships one, in a format the reader does not handle, so the preview draws a sky from the map's colours instead.`,
+        title: t`Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead.`,
       };
     case "not-a-cube-map":
       return {

@@ -69,15 +69,16 @@ fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<String>, St
         {
             continue;
         }
-        if dir.join(&rel).is_file() {
-            out.push(archive_path);
-        } else if dir.join("maps").join(&rel).is_file() {
-            // The engine reads `skyBox` from `maps/<ref>` and falls back to
-            // `maps/` for the other textures (`ISky.cpp`, `FIND_MAP_TEXTURE`).
+        // The engine reads `skyBox` only from `maps/<ref>`, and the other
+        // textures from `<ref>` or else `maps/<ref>` (`ISky.cpp`,
+        // `FIND_MAP_TEXTURE`). So a file under `maps/` is the one to pack.
+        if dir.join("maps").join(&rel).is_file() {
             let in_maps = format!("maps/{archive_path}");
             if !out.contains(&in_maps) {
                 out.push(in_maps);
             }
+        } else if dir.join(&rel).is_file() {
+            out.push(archive_path);
         }
     }
     Ok(out)
