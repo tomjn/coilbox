@@ -315,7 +315,9 @@ export function RosterDrawer({ open, onOpenChange, projects, onSaved }: Props) {
                       ) : (
                         <span className="block aspect-square w-full rounded-t bg-muted" />
                       )}
-                      <span className="block truncate px-2 py-1.5">
+                      {/* Wrapped rather than cut short, so the tier on the
+                          end of the name shows. */}
+                      <span className="block break-all px-2 py-1.5 text-xs">
                         {unit.unitName}
                       </span>
                     </li>
