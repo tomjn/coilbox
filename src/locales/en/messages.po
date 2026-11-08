@@ -16606,10 +16606,6 @@ msgstr "Drop unit {unit}"
 msgid "Dropped a rank"
 msgstr "Dropped a rank"
 
-#: src/lego/pages/BuilderPage.tsx
-msgid "Dropped an anchor outside the new part: {droppedNames}."
-msgstr "Dropped an anchor outside the new part: {droppedNames}."
-
 #: src/multiplayer/debriefing.ts
 msgid "Dropped to {name}"
 msgstr "Dropped to {name}"
@@ -32949,6 +32945,14 @@ msgstr "Requisition their cache"
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
 msgstr "Reroll"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll module"
+msgstr "Reroll module"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll part"
+msgstr "Reroll part"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx

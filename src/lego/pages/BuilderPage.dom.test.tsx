@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BIPED, projectFromPlan } from "../bodyPlans";
 import { type LegoProject, newProject } from "../model";
 import type { RawGeometry } from "../rawGeometry";
+import { rerollPart } from "../rerollPart";
 import { type ShapeKind, type ShapeSwatch, setShapeSwatches } from "../shapes";
 import type { LegoDocumentSession } from "../useLegoDocument";
 
@@ -671,9 +672,22 @@ describe("the reroll action for a selected piece", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reroll part" }));
     const edit = doc.current.edit as ReturnType<typeof vi.fn>;
     const next = edit.mock.calls[0][0](start) as LegoProject;
-    expect(next.pieces.find((p) => p.id === "s")?.rerolled).toEqual({
-      seed: 7,
-    });
+    const piece = next.pieces.find((p) => p.id === "s");
+    expect(piece?.rerolled).toEqual({ seed: 7 });
+    // The part the seed draws, worked out without the page.
+    const expected = rerollPart(
+      start,
+      {
+        parts,
+        byId: new Map(parts.map((part) => [part.id, part])),
+      } as never,
+      "s",
+      { modules: [], seed: 7 },
+    );
+    if (expected.status !== "ok") throw new Error(expected.message);
+    expect(piece?.partId).toBe(
+      expected.project.pieces.find((p) => p.id === "s")?.partId,
+    );
   });
 
   it("shows the seed the piece was last rerolled with", async () => {

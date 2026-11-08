@@ -210,7 +210,7 @@ import {
   rerollUnit,
   setPartLocked,
 } from "../reroll";
-import { rerolledSeed, rerollKind, rerollPart } from "../rerollPart";
+import { rerolledSeed, rerollPart, rerollRefusal } from "../rerollPart";
 import { type Axis, resizePackBlock } from "../resizePackBlock";
 import { resizeShapeFace } from "../resizeShape";
 import { unringPiece } from "../ring";
@@ -1858,7 +1858,6 @@ function Builder({ id }: { id: string | undefined }) {
    */
   function rerollSelected() {
     if (!draft || !pack || !selected) return;
-    const shown = rerolledSeed(draft, selected.id);
     const text = seedEntry?.id === selected.id ? seedEntry.text.trim() : "";
     const typed = text === "" ? undefined : Number(text);
     if (typed !== undefined && !Number.isSafeInteger(typed)) {
@@ -1872,7 +1871,7 @@ function Builder({ id }: { id: string | undefined }) {
     const result = rerollPart(draft, pack, selected.id, {
       modules: compounds,
       symmetry: symmetry.on,
-      ...(typed !== undefined && typed !== shown ? { seed: typed } : {}),
+      ...(typed !== undefined ? { seed: typed } : {}),
     });
     if (result.status === "failed") {
       void notify({
@@ -1885,10 +1884,14 @@ function Builder({ id }: { id: string | undefined }) {
     edit(() => result.project, { alone: true });
     docRef.current.selectMany(result.select);
     setSeedEntry(null);
+    const droppedCount = result.droppedAnchors.length;
     const droppedNames = result.droppedAnchors.join(", ");
     const said = [
-      result.droppedAnchors.length > 0
-        ? t`Dropped an anchor outside the new part: ${droppedNames}.`
+      droppedCount > 0
+        ? plural(droppedCount, {
+            one: `Dropped an anchor outside the new part: ${droppedNames}.`,
+            other: `Dropped # anchors outside the new part: ${droppedNames}.`,
+          })
         : null,
       ...moduleSwapNotes(result, false),
     ].filter(Boolean);
@@ -3601,7 +3604,9 @@ function Builder({ id }: { id: string | undefined }) {
                             </div>
                           ) : null}
 
-                          {pack && rerollKind(draft, selected.id) ? (
+                          {pack &&
+                          rerollRefusal(draft, pack, selected.id, compounds) ===
+                            null ? (
                             <div className="mt-2 flex items-center gap-2">
                               <Button
                                 size="sm"

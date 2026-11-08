@@ -20359,10 +20359,6 @@ msgstr "ユニット {unit} を降ろす"
 msgid "Dropped a rank"
 msgstr "ランクが下がりました"
 
-#: src/lego/pages/BuilderPage.tsx
-msgid "Dropped an anchor outside the new part: {droppedNames}."
-msgstr ""
-
 #: src/multiplayer/debriefing.ts
 #, fuzzy
 msgid "Dropped to {name}"
@@ -40379,6 +40375,14 @@ msgstr "相手の隠し場所を徴発"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Reroll"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll module"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Reroll part"
 msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
