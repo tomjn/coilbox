@@ -83,6 +83,10 @@ for (const name of maps) {
     ab("eval", "window.probeGo(); 1");
     ab("wait", "--fn", "window.__result", "--timeout", "180000");
     const result = JSON.parse(JSON.parse(ab("eval", "window.__result")));
+    if (result.error) {
+      ab("close");
+      throw new Error(`${name} run ${run}: ${result.error}`);
+    }
     result.map = name;
     result.run = run;
     result.loadBefore = loadBefore;

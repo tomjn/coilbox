@@ -168,6 +168,8 @@ function paired(n: number, batches: number) {
     });
     return found;
   });
+  // A map or mode with nothing to hide would read as towns that cost nothing.
+  if (meshes.length === 0) throw new Error("no towns or fields to hide");
   const show = (on: boolean) => {
     for (const m of meshes) m.visible = on;
   };
@@ -294,7 +296,16 @@ const api = {
   }
   const startup = api.startup();
   const spots = await api.settle();
-  const frames = await api.frames();
+  let frames: unknown;
+  try {
+    frames = await api.frames();
+  } catch (e) {
+    // Hand the runner the reason rather than leaving it to time out.
+    (window as unknown as { __result: unknown }).__result = JSON.stringify({
+      error: String(e),
+    });
+    return;
+  }
   (window as unknown as { __result: unknown }).__result = JSON.stringify({
     query: location.search,
     info: api.info(),

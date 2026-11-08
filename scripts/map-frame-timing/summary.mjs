@@ -64,8 +64,11 @@ console.log(
   `view | ${names.map((n) => `${n} ms`).join(" | ")} | headroom to ${BUDGET_MS.toFixed(1)} ms (${names.at(-1)}) | load`,
 );
 for (const map of maps) {
-  for (const pose of townRuns ? TOWN_POSES : POSES) {
+  // A plain run has the three views and a --towns run the six, so print
+  // whichever any file holds for this map.
+  for (const pose of [...POSES, ...TOWN_POSES]) {
     const cells = rows.map((rs) => cell(rs, map, pose));
+    if (!cells.some(Boolean)) continue;
     const last = cells.at(-1);
     const lo = Math.min(...cells.filter(Boolean).map((c) => c.lo));
     const hi = Math.max(...cells.filter(Boolean).map((c) => c.hi));
