@@ -3,6 +3,10 @@ import { createTerrainSurface, type HeightGrid } from "./terrain";
 import type { BiomePixels } from "./terrainMesh";
 import {
   anyTexelNear,
+  BLOCK_BAKE_TEXELS,
+  BLOCK_BAKE_WIDTH,
+  blockBakeLayout,
+  blockSlotTexels,
   buildableAt,
   buildTownIndex,
   CAPITAL_RADIUS,
@@ -28,6 +32,7 @@ import {
   roadEntries,
   STEEP_FIT,
   STEEP_SLOPE,
+  TOWN_BLOCK,
   TOWN_REACH,
   type TownSite,
   townCell,
@@ -201,6 +206,56 @@ describe("townDataTexels", () => {
     expect([...at(3, 0), ...at(4, 0)]).toEqual(
       [0.5, 1, 1.5, 2, 2.5, 0, 0, 0].map(Math.fround),
     );
+  });
+});
+
+describe("blockBakeLayout", () => {
+  it("gives every town a square over all its houses, none overlapping", () => {
+    const { width, height, slots } = blockBakeLayout(towns);
+    expect(width).toBe(BLOCK_BAKE_WIDTH);
+    const squares = slots.map((s, k) => {
+      if (!s) throw new Error(`town ${k} has no slot`);
+      const side = s.cells * BLOCK_BAKE_TEXELS;
+      expect(s.x + side).toBeLessThanOrEqual(width);
+      expect(s.y + side).toBeLessThanOrEqual(height);
+      // The shader's block cells round the town's middle, out past its
+      // furthest house plus a tall roof's lean and the streets' bend.
+      const middle = towns[k].seed * 101;
+      const reach =
+        (towns[k].radius * RIBBON_RADII + 0.35 + 0.175) / TOWN_BLOCK;
+      for (const b of s.base) {
+        expect(b).toBe(Math.floor(b));
+        expect(b).toBeLessThanOrEqual(middle - reach - 1);
+        expect(b + s.cells).toBeGreaterThanOrEqual(middle + reach + 1);
+      }
+      return { ...s, side };
+    });
+    for (const [i, a] of squares.entries()) {
+      for (const b of squares.slice(i + 1)) {
+        const apart =
+          a.x + a.side <= b.x ||
+          b.x + b.side <= a.x ||
+          a.y + a.side <= b.y ||
+          b.y + b.side <= a.y;
+        expect(apart).toBe(true);
+      }
+    }
+  });
+
+  it("leaves out towns that would make the bake too tall", () => {
+    const many = Array.from({ length: 40 }, () => ({
+      ...towns[0],
+      radius: 4,
+    }));
+    const { height, slots } = blockBakeLayout(many);
+    expect(height).toBeLessThanOrEqual(BLOCK_BAKE_WIDTH);
+    expect(slots.some((s) => s === null)).toBe(true);
+    expect(slots.some((s) => s !== null)).toBe(true);
+    const data = blockSlotTexels(slots);
+    const cellsOf = (k: number) => data[(many.length + k) * 4];
+    slots.forEach((s, k) => {
+      expect(cellsOf(k)).toBe(s ? s.cells : 0);
+    });
   });
 });
 

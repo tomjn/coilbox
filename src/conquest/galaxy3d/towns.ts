@@ -831,3 +831,93 @@ export function townDataTexels(towns: Town[]): Float32Array {
   });
   return out;
 }
+
+/** A block of an open town is about this wide, in world units. */
+export const TOWN_BLOCK = 0.3;
+/** Texels along each block of the block bake, a whole number. */
+export const BLOCK_BAKE_TEXELS = 8;
+/** The block bake's width, the most every WebGL2 GPU takes. */
+export const BLOCK_BAKE_WIDTH = 2048;
+/**
+ * How far a house stands from the line it is looked up along, in world
+ * units: a roof is looked up along the line of sight at most a tall block's
+ * height (0.105) over the least slope the shader allows (0.3), so 0.35 away,
+ * and a shadow nearer. Then the most the streets bend a block (0.175).
+ */
+const BLOCK_BAKE_SLACK = 0.35 + 0.175;
+
+/** Where one town's blocks lie in the block bake. */
+export interface BlockSlot {
+  /** The texel of the bake its square starts at. */
+  x: number;
+  y: number;
+  /** The block cell its square starts at, in the shader's block units. */
+  base: [number, number];
+  /** How many cells its square is across. */
+  cells: number;
+}
+
+/**
+ * Where each town's square of the block pattern goes in the block bake, from
+ * the tallest down in rows {@link BLOCK_BAKE_WIDTH} texels wide, and how tall
+ * the bake is. A square covers every house the town can draw, out to
+ * {@link RIBBON_RADII} radii. A town that would take the bake past
+ * {@link BLOCK_BAKE_WIDTH} tall has no slot, and the shader searches for its
+ * blocks as it would without a bake.
+ */
+export function blockBakeLayout(towns: Town[]): {
+  width: number;
+  height: number;
+  slots: (BlockSlot | null)[];
+} {
+  const squares = towns.map((t) => {
+    // The shader's block cells are (q + bend) / TOWN_BLOCK + seed * 101.
+    const half = (t.radius * RIBBON_RADII + BLOCK_BAKE_SLACK) / TOWN_BLOCK + 1;
+    const middle = t.seed * 101;
+    const base: [number, number] = [
+      Math.floor(middle - half),
+      Math.floor(middle - half),
+    ];
+    return { base, cells: Math.ceil(2 * half) + 1 };
+  });
+  const order = squares
+    .map((_, k) => k)
+    .sort((a, b) => squares[b].cells - squares[a].cells);
+  const slots: (BlockSlot | null)[] = towns.map(() => null);
+  let x = 0;
+  let y = 0;
+  let rowHeight = 0;
+  for (const k of order) {
+    const side = squares[k].cells * BLOCK_BAKE_TEXELS;
+    if (x + side > BLOCK_BAKE_WIDTH) {
+      x = 0;
+      y += rowHeight;
+      rowHeight = 0;
+    }
+    if (side > BLOCK_BAKE_WIDTH || y + side > BLOCK_BAKE_WIDTH) continue;
+    slots[k] = { x, y, ...squares[k] };
+    x += side;
+    rowHeight = Math.max(rowHeight, side);
+  }
+  return {
+    width: BLOCK_BAKE_WIDTH,
+    height: Math.max(1, y + rowHeight),
+    slots,
+  };
+}
+
+/**
+ * The slots as two rows of four floats a town, for a texture one column per
+ * town: row 0 holds the slot's first texel and first cell, row 1 how many
+ * cells it is across, 0 for a town with no slot.
+ */
+export function blockSlotTexels(slots: (BlockSlot | null)[]): Float32Array {
+  const columns = Math.max(1, slots.length);
+  const out = new Float32Array(columns * 2 * 4);
+  slots.forEach((s, k) => {
+    if (!s) return;
+    out.set([s.x, s.y, s.base[0], s.base[1]], k * 4);
+    out[(columns + k) * 4] = s.cells;
+  });
+  return out;
+}
