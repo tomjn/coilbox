@@ -263,6 +263,11 @@ export const mcWriteMapinfo = defineCommand<
       minHeight?: number;
       maxHeight?: number;
       info: MapinfoForm;
+      /**
+       * The decompiled map's folder. When `outDir` has no mapinfo.lua the
+       * writer starts from the one beside that folder, so the map keeps its own.
+       */
+      seedFrom?: string;
     };
   },
   { path: string; created: boolean; changed: boolean }
