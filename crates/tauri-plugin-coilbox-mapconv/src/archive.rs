@@ -226,12 +226,86 @@ fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<Referenced>
     Ok(out)
 }
 
+/// Whether `name` is a file or folder the archive leaves out wherever it is
+/// found: a name starting with a dot (`.git`, `.DS_Store`, an editor's folder) or
+/// the thumbnail files Windows and old archivers leave behind. A mapper can keep
+/// a folder out of the package by starting its name with a dot.
+fn is_left_out(name: &str) -> bool {
+    name.starts_with('.')
+        || name.eq_ignore_ascii_case("desktop.ini")
+        || name.eq_ignore_ascii_case("thumbs.db")
+}
+
+/// The files beside a decompiled map's `maps/` folder that the archive carries
+/// whether or not a Lua file names them: every folder (the engine reads
+/// `LuaGaia/`, `features/`, `objects3d/`, `unittextures/` and the rest by
+/// convention, not by name) and the root `mapoptions.lua`, the only root file
+/// besides `mapinfo.lua` that the engine reads from a map. Other loose files at
+/// the root (notes, a readme, source images) stay out, as does `maps/`, which
+/// [`pack_map`] builds itself. Empty when `dir` is not such a `maps/` folder,
+/// because a compile folder of any other name holds loose sources among its
+/// files and nothing says which belong to the map.
+fn beside_maps(dir: &Path) -> Vec<Referenced> {
+    fn walk(disk: &Path, archive: &str, out: &mut Vec<Referenced>) {
+        let Ok(entries) = std::fs::read_dir(disk) else {
+            return;
+        };
+        let mut entries: Vec<_> = entries.flatten().collect();
+        entries.sort_by_key(|e| e.file_name());
+        for e in entries {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if is_left_out(&name) {
+                continue;
+            }
+            // `file_type` does not follow a link, so a linked file or folder is
+            // skipped rather than followed out of the map.
+            let Ok(kind) = e.file_type() else { continue };
+            let archive_path = format!("{archive}/{name}");
+            if kind.is_dir() {
+                walk(&e.path(), &archive_path, out);
+            } else if kind.is_file() {
+                out.push(Referenced {
+                    archive_path,
+                    source: e.path(),
+                });
+            }
+        }
+    }
+    let root = archive_root(dir);
+    if root == dir {
+        return Vec::new();
+    }
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut entries: Vec<_> = entries.flatten().collect();
+    entries.sort_by_key(|e| e.file_name());
+    let mut out = Vec::new();
+    for e in entries {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let Ok(kind) = e.file_type() else { continue };
+        if is_left_out(&name) || name.eq_ignore_ascii_case("maps") {
+            continue;
+        }
+        if kind.is_dir() {
+            walk(&e.path(), &name, &mut out);
+        } else if kind.is_file() && name.eq_ignore_ascii_case("mapoptions.lua") {
+            out.push(Referenced {
+                archive_path: name,
+                source: e.path(),
+            });
+        }
+    }
+    out
+}
+
 /// Write `<dir>/<name>.sdz` from the files a compile left in `dir`.
 ///
 /// The archive holds `mapinfo.lua` at the root, the `.smf` and `.smt` under
 /// `maps/`, and any file the `mapinfo.lua` refers to at the path the engine looks
 /// for it, along with the files those Lua files refer to. When `dir` is a
-/// decompiled map's `maps/` folder, the files beside it are packed too. The
+/// decompiled map's `maps/` folder, the folders beside it and its
+/// `mapoptions.lua` are packed too (see [`beside_maps`]). The
 /// `.smt` is stored, since the compiler already compressed it. In the archive's
 /// copy of `mapinfo.lua`, `mapfile` is `maps/<name>.smf`, because the engine
 /// reads that key as a path inside the archive. The loose file beside the
@@ -267,7 +341,15 @@ pub fn pack_map(dir: &Path, name: &str) -> Result<Packed, String> {
         &Val::Str(format!("maps/{name}.smf")),
         Mode::Set,
     )?;
-    let refs = referenced_files(dir, &archive_info, name)?;
+    let mut refs = referenced_files(dir, &archive_info, name)?;
+    for r in beside_maps(dir) {
+        if !refs
+            .iter()
+            .any(|have| have.archive_path.eq_ignore_ascii_case(&r.archive_path))
+        {
+            refs.push(r);
+        }
+    }
 
     let sdz = dir.join(format!("{name}.sdz"));
     let tmp = dir.join(format!("{name}.sdz.tmp"));
@@ -489,7 +571,8 @@ mod tests {
     /// the archive root is the folder above it. A `skyBox` there goes in under
     /// `maps/`, where the engine reads it, and the files the `mapinfo.lua`
     /// includes from beside `maps/` go in at their own paths, with the files they
-    /// include in turn.
+    /// include in turn. Folders beside `maps/` are packed whole, so a Lua file
+    /// nothing includes is in too.
     #[test]
     fn a_recompiled_map_packs_its_sky_and_includes_at_the_engine_paths() {
         let root = std::env::temp_dir().join(format!("mapconv_pack_{}_sdd", std::process::id()));
@@ -524,36 +607,64 @@ mod tests {
                 "maps/MyMap.smt",
                 "mapconfig/lua/a.lua",
                 "maps/sky.dds",
-                "mapconfig/b.lua"
+                "mapconfig/b.lua",
+                "mapconfig/unused.lua"
             ]
         );
         assert_eq!(packed.path, maps.join("MyMap.sdz"));
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// The map template most maps use includes its `mapconfig/mapinfo/*.lua` with
-    /// `VFS.DirList`, so no string literal names those files. They are packed all
-    /// the same, and a file the pattern does not match is not.
+    /// A decompiled map with a feature set (Starwatcher, AcidicQuarry) keeps its
+    /// `LuaGaia/`, `features/`, `objects3d/`, `unittextures/` and `maphelper/` in
+    /// the package though no `mapinfo.lua` line names them, along with the root
+    /// `mapoptions.lua`. The loose sources in `maps/`, a mapper's notes at the
+    /// root, a folder or file starting with a dot and the thumbnail files stay
+    /// out.
     #[test]
-    fn a_dir_list_in_mapinfo_packs_the_files_it_matches() {
-        let root =
-            std::env::temp_dir().join(format!("mapconv_pack_{}_dirlist", std::process::id()));
+    fn a_recompiled_map_keeps_the_folders_the_decompiled_map_had() {
+        let root = std::env::temp_dir().join(format!("mapconv_pack_{}_extras", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let maps = root.join("maps");
         std::fs::create_dir_all(&maps).unwrap();
-        std::fs::create_dir_all(root.join("mapconfig/mapinfo")).unwrap();
-        std::fs::write(maps.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
-        std::fs::write(maps.join("MyMap.smt"), b"spring tilefile\0".repeat(64)).unwrap();
-        std::fs::write(root.join("mapconfig/mapinfo/0_apply.lua"), "return {}").unwrap();
-        std::fs::write(root.join("mapconfig/mapinfo/1_more.lua"), "return {}").unwrap();
-        std::fs::write(
-            root.join("mapconfig/mapinfo/desktop.ini"),
-            "[.ShellClassInfo]",
-        )
-        .unwrap();
+        for dir in [
+            "LuaGaia/Gadgets",
+            "features",
+            "objects3d",
+            "unittextures",
+            "maphelper",
+            "mapconfig/featureplacer",
+            ".git",
+        ] {
+            std::fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        let write = |p: &str| std::fs::write(root.join(p), p.as_bytes()).unwrap();
+        for p in [
+            "LuaGaia/main.lua",
+            "LuaGaia/Gadgets/FP_featureplacer.lua",
+            "features/rock1.lua",
+            "objects3d/rock1.s3o",
+            "unittextures/rock1a.tga",
+            "maphelper/mapinfo.lua",
+            "mapconfig/featureplacer/config.lua",
+            "mapconfig/desktop.ini",
+            "mapoptions.lua",
+            "mapinfo.lua",
+            "readme.txt",
+            "heightmap.png",
+            ".git/config",
+            ".DS_Store",
+            "maps/heightmap.png",
+            "maps/Makefile",
+            "maps/MyMap.smf",
+            "maps/MyMap.smt",
+            "maps/mapinfo.lua",
+        ] {
+            write(p);
+        }
         std::fs::write(
             maps.join("mapinfo.lua"),
-            "return { mapfile = \"MyMap.smf\" }\n-- local f = VFS.DirList(\"mapconfig/nope/\", \"*.lua\")\nlocal files = VFS.DirList('mapconfig/mapinfo/', \"*.lua\")",
+            "return { mapfile = \"MyMap.smf\", smf = { smtFileName0 = \"MyMap.smt\" } }",
         )
         .unwrap();
 
@@ -564,11 +675,115 @@ mod tests {
                 "mapinfo.lua",
                 "maps/MyMap.smf",
                 "maps/MyMap.smt",
+                "LuaGaia/Gadgets/FP_featureplacer.lua",
+                "LuaGaia/main.lua",
+                "features/rock1.lua",
+                "mapconfig/featureplacer/config.lua",
+                "maphelper/mapinfo.lua",
+                "mapoptions.lua",
+                "objects3d/rock1.s3o",
+                "unittextures/rock1a.tga"
+            ]
+        );
+
+        // The root `mapinfo.lua` is the one Write mapinfo.lua made, not the
+        // decompiled map's own.
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(&packed.path).unwrap()).unwrap();
+        let mut info = String::new();
+        std::io::Read::read_to_string(&mut zip.by_name("mapinfo.lua").unwrap(), &mut info).unwrap();
+        assert!(info.contains("mapfile = \"maps/MyMap.smf\""), "{info}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A file a `mapinfo.lua` names that is also in a folder beside `maps/` goes
+    /// in once. A link in one of those folders is not followed.
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_beside_maps_adds_each_file_once_and_follows_no_link() {
+        let root = std::env::temp_dir().join(format!("mapconv_pack_{}_once", std::process::id()));
+        let outside =
+            std::env::temp_dir().join(format!("mapconv_pack_{}_out2", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&outside);
+        let maps = root.join("maps");
+        std::fs::create_dir_all(&maps).unwrap();
+        std::fs::create_dir_all(root.join("mapconfig")).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("secret.lua"), "return {}").unwrap();
+        std::fs::write(root.join("mapconfig/a.lua"), "return {}").unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("mapconfig/out")).unwrap();
+        std::os::unix::fs::symlink(&root, root.join("mapconfig/up")).unwrap();
+        std::fs::write(maps.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
+        std::fs::write(maps.join("MyMap.smt"), b"spring tilefile\0").unwrap();
+        std::fs::write(
+            maps.join("mapinfo.lua"),
+            "local a = VFS.Include(\"mapconfig/a.lua\")\nreturn { mapfile = \"MyMap.smf\" }",
+        )
+        .unwrap();
+        let packed = pack_map(&maps, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "mapconfig/a.lua"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    /// Outside a decompiled map's `maps/` folder the compile folder is the root
+    /// and holds loose sources among its files, so nothing but what `mapinfo.lua`
+    /// names is added.
+    #[test]
+    fn a_compile_folder_that_is_not_a_maps_folder_packs_no_extra_folders() {
+        let dir = compiled_dir("noextras");
+        std::fs::create_dir_all(dir.join("LuaGaia")).unwrap();
+        std::fs::write(dir.join("LuaGaia/main.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("mapoptions.lua"), "return {}").unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "maps/sky.dds"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The map template most maps use includes its `mapconfig/mapinfo/*.lua` with
+    /// `VFS.DirList`, so no string literal names those files. They are packed all
+    /// the same, and a file the pattern does not match is not.
+    #[test]
+    fn a_dir_list_in_mapinfo_packs_the_files_it_matches() {
+        let dir = compiled_dir("dirlist");
+        std::fs::create_dir_all(dir.join("mapconfig/mapinfo")).unwrap();
+        std::fs::write(dir.join("mapconfig/mapinfo/0_apply.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("mapconfig/mapinfo/1_more.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("mapconfig/mapinfo/notes.txt"), "not matched").unwrap();
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { mapfile = \"MyMap.smf\" }\n-- local f = VFS.DirList(\"mapconfig/nope/\", \"*.lua\")\nlocal files = VFS.DirList('mapconfig/mapinfo/', \"*.lua\")",
+        )
+        .unwrap();
+
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
                 "mapconfig/mapinfo/0_apply.lua",
                 "mapconfig/mapinfo/1_more.lua"
             ]
         );
-        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A recompiled map's `maps/` folder can hold a folder of its own called
