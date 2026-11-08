@@ -1921,7 +1921,7 @@ function Builder({ id }: { id: string | undefined }) {
     generatorStyles.copy({ id: "", name, ...result.style });
     void notify({
       title: t`Created a style`,
-      body: t`It is in the style list under Generate on the Projects page.`,
+      body: t`It is in the style list under Generate on the Models page.`,
       level: "success",
     });
   }

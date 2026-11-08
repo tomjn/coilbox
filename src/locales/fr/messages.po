@@ -26730,7 +26730,7 @@ msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr "Il est copié dans {destDir}. Le fichier ouvert reste où il est."
 
 #: src/lego/pages/BuilderPage.tsx
-msgid "It is in the style list under Generate on the Projects page."
+msgid "It is in the style list under Generate on the Models page."
 msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx

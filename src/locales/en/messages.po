@@ -21815,8 +21815,8 @@ msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr "It is copied to {destDir}. The file you opened stays where it is."
 
 #: src/lego/pages/BuilderPage.tsx
-msgid "It is in the style list under Generate on the Projects page."
-msgstr "It is in the style list under Generate on the Projects page."
+msgid "It is in the style list under Generate on the Models page."
+msgstr "It is in the style list under Generate on the Models page."
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "It is locked, so you were not moved. You join if it is unlocked."
