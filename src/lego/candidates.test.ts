@@ -93,25 +93,26 @@ describe("generateCandidates", () => {
     }
   });
 
+  it("skips a seed that fails the checks and carries on after it", () => {
+    // Seeds 1 and 2 of a medium assault biped fail the checks.
+    const batch = generateCandidates(inputs, 1, 1, options);
+
+    expect(batch.candidates[0].seed).toBe(3);
+    expect(batch.next).toBe(4);
+  });
+
   it("remakes the same unit from a candidate's seed", () => {
-    const [candidate] = generateCandidates(inputs, 5, 1, options).candidates;
+    const same = () => ({ ...options(), id: "unit", rootPieceId: "root" });
+    const [candidate] = generateCandidates(inputs, 5, 1, same).candidates;
     const [again] = generateCandidates(
       inputs,
       candidate.seed,
       1,
-      options,
+      same,
     ).candidates;
 
     expect(again.seed).toBe(candidate.seed);
-    expect(again.unit.pieces.length).toBe(candidate.unit.pieces.length);
-    expect(again.unit.generated).toEqual(
-      JSON.parse(
-        JSON.stringify(candidate.unit.generated).replaceAll(
-          candidate.unit.id,
-          again.unit.id,
-        ),
-      ),
-    );
+    expect(again.unit).toEqual(candidate.unit);
   });
 });
 
