@@ -395,7 +395,7 @@
       "parentId": "unit.1",
       "partId": "2eabb34e1760",
       "position": [
-        0,
+        -0.874964871,
         -1.595723668,
         -11.170065674
       ],
@@ -416,9 +416,9 @@
       "parentId": "unit.1",
       "partId": "2eabb34e1760",
       "position": [
-        0,
+        0.874964871,
         -1.595723668,
-        11.170065674
+        -11.170065674
       ],
       "rotation": [
         1.570796327,
@@ -434,6 +434,48 @@
     {
       "id": "unit.19",
       "name": "bodycover3",
+      "parentId": "unit.1",
+      "partId": "2eabb34e1760",
+      "position": [
+        -0.874964871,
+        -1.595723668,
+        11.170065674
+      ],
+      "rotation": [
+        1.570796327,
+        1.570796327,
+        0
+      ],
+      "scale": [
+        6.382894671,
+        6.382894671,
+        6.382894671
+      ]
+    },
+    {
+      "id": "unit.20",
+      "name": "bodycover4",
+      "parentId": "unit.1",
+      "partId": "2eabb34e1760",
+      "position": [
+        0.874964871,
+        -1.595723668,
+        11.170065674
+      ],
+      "rotation": [
+        1.570796327,
+        1.570796327,
+        0
+      ],
+      "scale": [
+        6.382894671,
+        6.382894671,
+        6.382894671
+      ]
+    },
+    {
+      "id": "unit.21",
+      "name": "bodycover5",
       "parentId": "unit.1",
       "partId": "ea978770747e",
       "position": [
@@ -453,8 +495,8 @@
       ]
     },
     {
-      "id": "unit.20",
-      "name": "bodycover4",
+      "id": "unit.22",
+      "name": "bodycover6",
       "parentId": "unit.1",
       "partId": "ea978770747e",
       "position": [
@@ -474,8 +516,8 @@
       ]
     },
     {
-      "id": "unit.21",
-      "name": "bodycover5",
+      "id": "unit.23",
+      "name": "bodycover7",
       "parentId": "unit.1",
       "partId": "38f5519d0654",
       "position": [
@@ -495,8 +537,8 @@
       ]
     },
     {
-      "id": "unit.22",
-      "name": "bodycover6",
+      "id": "unit.24",
+      "name": "bodycover8",
       "parentId": "unit.1",
       "partId": "f68ccb323088",
       "position": [
@@ -581,6 +623,14 @@
       {
         "bone": "body",
         "piece": "unit.22"
+      },
+      {
+        "bone": "body",
+        "piece": "unit.23"
+      },
+      {
+        "bone": "body",
+        "piece": "unit.24"
       }
     ]
   }

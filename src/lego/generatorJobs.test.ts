@@ -118,6 +118,22 @@ describe("the generator's jobs", () => {
     ).toEqual(["assault size: small below medium below large"]);
   });
 
+  it("reports a covering rule it cannot use", () => {
+    const [job] = GENERATOR_JOBS as [GeneratorJobData];
+    expect(
+      problems({ ...job, covering: { thickness: [0, 0.2], body: true } }),
+    ).toEqual(["assault covering thickness: above zero"]);
+    expect(
+      problems({ ...job, covering: { thickness: [0.2, 0.1], body: true } }),
+    ).toEqual(["assault covering thickness: a minimum below a maximum"]);
+    expect(
+      problems({
+        ...job,
+        covering: { thickness: [0.1, 0.2], body: "yes" as unknown as boolean },
+      }),
+    ).toEqual(["assault covering body: true or false"]);
+  });
+
   it("reports a tag, a proportion and a role nothing has", () => {
     const [job] = GENERATOR_JOBS as [GeneratorJobData];
     const [chassis, weapon] = job.slots as [

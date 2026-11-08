@@ -34,6 +34,7 @@
 
 import * as THREE from "three";
 import { pick } from "../conquest/rng";
+import { pieceOwnBox } from "./connectors";
 import type { CoveringRule } from "./generatorJobs";
 import {
   childrenOf,
@@ -114,13 +115,14 @@ export function boxesOverlap(a: Box, b: Box): boolean {
   return true;
 }
 
-/** A piece's own box in the unit's space, or null for a piece with no part. */
+/** A piece's own box in the unit's space: its part's, its shape's or its
+ *  mesh's. Null for an empty piece. */
 export function pieceWorldBox(
   project: LegoProject,
   pack: LoadedPack,
   piece: LegoPiece,
 ): Box | null {
-  const bbox = piece.partId ? pack.byId.get(piece.partId)?.bbox : undefined;
+  const bbox = pieceOwnBox(pack, piece);
   if (!bbox) return null;
   const pivot = piece.pivot ?? [0, 0, 0];
   const world = worldMatrix(project, piece.id);
@@ -186,9 +188,12 @@ function sortedSizes(part: LegoPartInfo): { size: number; axis: number }[] {
 interface Fit {
   part: LegoPartInfo;
   scale: number;
-  /** Copies along the length and across the width. */
+  /** Copies along the length and across the width, and how long and wide one
+   *  copy is at its scale. */
   along: number;
   across: number;
+  long: number;
+  wide: number;
   /** The part's own axes, longest first. */
   axes: number[];
   /** How deep one copy is, at its scale. */
@@ -217,10 +222,12 @@ function fits(
     const along = Math.max(1, Math.ceil(length / (long.size * MAX_PART_SCALE)));
     const byLength = length / (along * long.size);
     let scale = byLength;
-    let across = 1;
     let widthError: number;
     if (rows) {
-      across = Math.max(1, Math.ceil(width / (mid.size * MAX_PART_SCALE)));
+      const across = Math.max(
+        1,
+        Math.ceil(width / (mid.size * MAX_PART_SCALE)),
+      );
       const byWidth = width / (across * mid.size);
       scale = Math.min(byLength, byWidth);
       widthError = Math.abs(Math.log(byLength / byWidth));
@@ -228,11 +235,17 @@ function fits(
       widthError = Math.abs(Math.log((mid.size * scale) / width));
     }
     const depthError = Math.abs(Math.log((short.size * scale) / depth));
+    // The final scale is the smaller of the two, so the axis that wanted more
+    // takes more copies, with no gap between them.
+    const copies = (extent: number, size: number) =>
+      Math.max(1, Math.ceil(extent / (size * scale) - 1e-9));
     out.push({
       part,
       scale,
-      along,
-      across,
+      along: copies(length, long.size),
+      across: rows ? copies(width, mid.size) : 1,
+      long: long.size * scale,
+      wide: mid.size * scale,
       axes: [long.axis, mid.axis, short.axis],
       depth: short.size * scale,
       error: widthError + depthError,
@@ -274,6 +287,14 @@ function laidAlong(axes: number[], frame: THREE.Vector3[]): THREE.Euler {
     );
   }
   return new THREE.Euler().setFromRotationMatrix(basis);
+}
+
+/** The middle of copy `i` of `count`, each `size` long, laid end to end from
+ *  one end of `extent` to the other. Where they do not fit exactly they
+ *  overlap a little rather than leave a gap. */
+function spaced(i: number, count: number, extent: number, size: number) {
+  if (count === 1) return 0;
+  return -extent / 2 + size / 2 + (i * (extent - size)) / (count - 1);
 }
 
 /** Two directions square to `along`: across it level with the ground where
@@ -461,10 +482,10 @@ export function coverSkeleton(
       for (let j = 0; j < fit.across; j++) {
         const at = plan.centre
           .clone()
-          .addScaledVector(along, ((i + 0.5) / fit.along - 0.5) * plan.length)
+          .addScaledVector(along, spaced(i, fit.along, plan.length, fit.long))
           .addScaledVector(
             across,
-            plan.rows ? ((j + 0.5) / fit.across - 0.5) * plan.width : 0,
+            plan.rows ? spaced(j, fit.across, plan.width, fit.wide) : 0,
           );
         // A deck's parts keep their tops on the deck's top, so one thicker
         // than the deck reaches down rather than up into the chassis.
