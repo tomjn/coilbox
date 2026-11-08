@@ -33,6 +33,10 @@ vi.mock("three", async (orig) => {
     }
     setSize() {}
     render() {}
+    getRenderTarget() {
+      return null;
+    }
+    setRenderTarget() {}
     dispose() {}
   }
   return { ...actual, WebGLRenderer: FakeRenderer };

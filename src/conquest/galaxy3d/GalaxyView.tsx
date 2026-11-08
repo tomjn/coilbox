@@ -1175,6 +1175,7 @@ export function GalaxyView({
         endMarkers?.fitToCamera(distance);
       }
       // One tile of the ground's bake a frame, until it is done.
+      towns?.prepare(renderer);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;
       renderer.render(scene, camera);

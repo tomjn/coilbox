@@ -3,7 +3,7 @@ import type { Settlement, SettlementStyle } from "../planets";
 import type { GroundRivers } from "./groundShader";
 import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
 import { TERRAIN_NOISE } from "./terrainShader";
-import { TOWN_REACH } from "./towns";
+import { BLOCK_BAKE_TEXELS, TOWN_BLOCK, TOWN_REACH } from "./towns";
 
 /**
  * The shader that draws settlements on their patches of ground
@@ -41,6 +41,15 @@ export interface TownShading {
   settlement: Settlement;
   /** What grows between an open town's buildings, linear. */
   garden: THREE.Color;
+  /** The block bake (`townLayer.ts`), for an open town's blocks. */
+  blocks: {
+    /** {@link blockBakeMaterial}'s picture. */
+    bake: THREE.Texture;
+    /** `blockSlotTexels`. */
+    slots: THREE.Texture;
+    /** 1 once the bake is drawn. Until then the shader searches. */
+    ready: { value: number };
+  };
   /** The map's rivers, which nothing is built over. */
   river?: GroundRivers;
 }
@@ -286,7 +295,7 @@ float wStructure(vec2 g, float foot, out vec3 tone, out float high, out vec4 gro
 #else
 // A block of a town is about this wide, and a building's plot this long
 // along its street, in world units.
-const float W_BLOCK = 0.3;
+const float W_BLOCK = ${TOWN_BLOCK};
 const float W_LOT = 0.05;
 // Gardens, trees and yards between the buildings: the planet's own green
 // or scrub, darker, over most of the ground.
@@ -425,6 +434,65 @@ void wBlocks3(vec2 x, vec2 d1, vec2 d2, out vec4 b0, out vec4 b1, out vec4 b2, o
   b2 = vec4(m2, n2, tHash(o2 + ip + mg + 1.7));
   in1 = m1 >= 0.0;
   in2 = m2 >= 0.0;
+}
+
+// The block bake (blockBakeMaterial), and where this town's square of it
+// lies: its first texel and first block cell, and how many cells across.
+uniform sampler2D uBlockBake;
+uniform sampler2D uBlockSlots;
+uniform float uBlockBaked;
+const float W_BAKE_TEXELS = ${BLOCK_BAKE_TEXELS}.0;
+vec4 wSlot;
+float wSlotCells;
+
+// As wBlocks, from the bake: its texel names the block that holds the
+// texel's middle and the blocks across its three nearest edges. Whichever of
+// those four is nearest to x is x's block, and its nearest edge is one it
+// shares with the others. Each sum is as wBlocks works it, so the answer is
+// the same wherever those four hold it, which is all but where four blocks'
+// edges pass within a texel.
+vec4 wBlocksBaked(vec2 x, out vec2 mid, out float cell) {
+  vec2 local = floor((x - wSlot.zw) * W_BAKE_TEXELS);
+  if (min(local.x, local.y) < 0.0 || max(local.x, local.y) >= wSlotCells * W_BAKE_TEXELS) return wBlocks(x, mid, cell);
+  ivec4 k = ivec4(texelFetch(uBlockBake, ivec2(wSlot.xy + local), 0) * 255.0 + 0.5);
+  vec2 ip = wSlot.zw + floor(local / W_BAKE_TEXELS);
+  vec2 fp = x - ip;
+  vec2 g[4];
+  g[0] = vec2(float(k.x % 3), float(k.x / 3)) - 1.0;
+  g[1] = g[0] + vec2(float(k.y % 3), float(k.y / 3)) - 1.0;
+  g[2] = g[0] + vec2(float(k.z % 3), float(k.z / 3)) - 1.0;
+  g[3] = g[0] + vec2(float(k.w % 3), float(k.w / 3)) - 1.0;
+  vec2 r[4];
+  int s = 0;
+  float md = 8.0;
+  for (int n = 0; n < 4; n++) {
+    r[n] = g[n] + 0.2 + tHash2(ip + g[n]) * 0.6 - fp;
+    float d = dot(r[n], r[n]);
+    if (d < md) {
+      md = d;
+      s = n;
+    }
+  }
+  vec2 mr = r[s];
+  vec2 mg = g[s];
+  md = 8.0;
+  vec2 bn = vec2(1.0, 0.0);
+  vec2 other = vec2(0.0);
+  mid = vec2(0.0);
+  for (int n = 0; n < 4; n++) {
+    if (n == s) continue;
+    vec2 nn = normalize(r[n] - mr);
+    vec2 h = 0.5 * (mr + r[n]);
+    float d = dot(h, nn);
+    if (d < md) {
+      md = d;
+      bn = nn;
+      mid = h;
+      other = ip + g[n];
+    }
+  }
+  cell = tHash(ip + mg + 0.37);
+  return vec4(md, bn, tHash(other + ip + mg + 1.7));
 }
 
 // How high a building stands, in world units. More than a house is to its
@@ -617,6 +685,9 @@ void main() {
 #if W_STYLE == 0
   float keepBlock = clamp((W_BLOCK / gFoot - 4.0) / 4.0, 0.0, 1.0);
   if (keepBlock > 0.0 && dens > 0.004) {
+    wSlot = texelFetch(uBlockSlots, ivec2(vTown, 0), 0);
+    wSlotCells = texelFetch(uBlockSlots, ivec2(vTown, 1), 0).x;
+    bool baked = uBlockBaked > 0.5 && wSlotCells > 0.0;
     // Once single roofs are fully drawn the grain is never seen.
     float keepLot = clamp((W_LOT / gFoot - 1.5) / 2.0, 0.0, 1.0);
     vec2 x0 = wBlockAt(q);
@@ -648,17 +719,25 @@ void main() {
       vec4 bS;
       vec2 midT;
       vec2 midS;
-      bool inT;
-      bool inS;
-      wBlocks3(x0, xTop - x0, xShadow - x0, b0, bT, bS, mid0, midT, midS, cell0, inT, inS);
-      float cellT = cell0;
-      float cellS = cell0;
-      if (!inT) bT = wBlocks(xTop, midT, cellT);
-      if (!inS) bS = wBlocks(xShadow, midS, cellS);
+      float cellT;
+      float cellS;
+      if (baked) {
+        b0 = wBlocksBaked(x0, mid0, cell0);
+        bT = wBlocksBaked(xTop, midT, cellT);
+        bS = wBlocksBaked(xShadow, midS, cellS);
+      } else {
+        bool inT;
+        bool inS;
+        wBlocks3(x0, xTop - x0, xShadow - x0, b0, bT, bS, mid0, midT, midS, cell0, inT, inS);
+        cellT = cell0;
+        cellS = cell0;
+        if (!inT) bT = wBlocks(xTop, midT, cellT);
+        if (!inS) bS = wBlocks(xShadow, midS, cellS);
+      }
       top = wLotOf(qTop, bT, midT, cellT, wShedAt(qTop), dens, w1.z, gFoot);
       shadow = wLotOf(qShadow, bS, midS, cellS, wShedAt(qShadow), dens, w1.z, gFoot);
     } else {
-      b0 = wBlocks(x0, mid0, cell0);
+      b0 = baked ? wBlocksBaked(x0, mid0, cell0) : wBlocks(x0, mid0, cell0);
     }
     WLot base = wLotOf(q, b0, mid0, cell0, shed0, dens, w1.z, gFoot);
     float e = base.e;
@@ -936,6 +1015,9 @@ export function townMaterial(
         value: shading.river?.toField ?? new THREE.Vector4(1, 1, 0, 0),
       },
       uFrame: { value: shading.frame },
+      uBlockBake: { value: shading.blocks.bake },
+      uBlockSlots: { value: shading.blocks.slots },
+      uBlockBaked: shading.blocks.ready,
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uAmbient: { value: SHADE_AMBIENT },
     },
@@ -944,5 +1026,88 @@ export function townMaterial(
     polygonOffset: true,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -2,
+  });
+}
+
+const BAKE_VERTEX = /* glsl */ `
+attribute vec4 slot;
+uniform vec2 uSize;
+flat varying vec4 vSlot;
+void main() {
+  vSlot = slot;
+  gl_Position = vec4(position.xy / uSize * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
+
+const BAKE_FRAGMENT = /* glsl */ `
+flat varying vec4 vSlot;
+TERRAIN_NOISE_HERE
+const float W_BAKE_TEXELS = ${BLOCK_BAKE_TEXELS}.0;
+void main() {
+  // The texel's middle in block cells, as the town shader's wBlocks has it.
+  vec2 local = floor(gl_FragCoord.xy) - vSlot.xy;
+  vec2 ip = vSlot.zw + floor(local / W_BAKE_TEXELS);
+  vec2 fp = (local + 0.5) / W_BAKE_TEXELS - floor(local / W_BAKE_TEXELS);
+  vec2 mg = vec2(0.0);
+  vec2 mr = vec2(0.0);
+  float md = 8.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      vec2 r = g + 0.2 + tHash2(ip + g) * 0.6 - fp;
+      float d = dot(r, r);
+      if (d < md) {
+        md = d;
+        mr = r;
+        mg = g;
+      }
+    }
+  }
+  // The block's three nearest edges, by the block across each, numbered 0 to
+  // 8 over the three by three round the block.
+  vec3 near = vec3(8.0);
+  vec3 code = vec3(0.0);
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      if (i == 0 && j == 0) continue;
+      vec2 r = mg + vec2(float(i), float(j)) + 0.2 + tHash2(ip + mg + vec2(float(i), float(j))) * 0.6 - fp;
+      vec2 nn = normalize(r - mr);
+      float d = dot(0.5 * (mr + r), nn);
+      float c = float(i + 1 + 3 * (j + 1));
+      if (d < near.x) {
+        near = vec3(d, near.xy);
+        code = vec3(c, code.xy);
+      } else if (d < near.y) {
+        near = vec3(near.x, d, near.y);
+        code = vec3(code.x, c, code.y);
+      } else if (d < near.z) {
+        near.z = d;
+        code.z = c;
+      }
+    }
+  }
+  gl_FragColor = vec4(mg.x + 1.0 + 3.0 * (mg.y + 1.0), code) / 255.0;
+}
+`;
+
+/**
+ * The material that draws the block bake: for each texel of a town's square
+ * (`blockBakeLayout` in `towns.ts`), the block holding its middle and the
+ * blocks across that block's three nearest edges, which the town shader then
+ * reads in place of searching. Drawn once on the GPU, so its hashes are the
+ * town shader's own. Draw quads whose corners are texels of the bake, each
+ * vertex carrying its town's slot as `slot`: first texel, then first cell.
+ */
+export function blockBakeMaterial(
+  width: number,
+  height: number,
+): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    vertexShader: BAKE_VERTEX,
+    fragmentShader: BAKE_FRAGMENT.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE),
+    uniforms: { uSize: { value: new THREE.Vector2(width, height) } },
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.NoBlending,
   });
 }
