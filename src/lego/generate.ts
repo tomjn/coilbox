@@ -511,6 +511,8 @@ export function generateUnit(
   const keepClear = new Set<string>();
   let scale = 1;
   let chassisTop: string | null = null;
+  // Whether the chassis is held to `MAX_PART_SCALE` short of the unit's width.
+  let chassisCapped = false;
 
   for (const [index, slot] of job.slots.entries()) {
     const candidates = modulesFor(options.modules, slot);
@@ -560,6 +562,7 @@ export function generateUnit(
         // covering fills out the rest of its body. The bulk applies after the
         // bound, so two seeds of a big unit still differ.
         scale = own ? Math.min(width / own, MAX_PART_SCALE) * bulk : 1;
+        chassisCapped = own !== null && width / own > MAX_PART_SCALE;
         chassisTop = top;
       }
       const slotScale = isChassis
@@ -601,7 +604,10 @@ export function generateUnit(
 
   const covered = coverSkeleton(project, {
     pack,
-    rule: job.covering,
+    // A chassis held to the cap is the same size at every size, and on a plan
+    // with no limbs nothing else would grow with it, so the deck fills out the
+    // unit's width even for a job that leaves the deck off.
+    rule: chassisCapped ? { ...job.covering, body: true } : job.covering,
     anchor: anchorBone(project),
     chassis: chassisTop,
     keepClear,
