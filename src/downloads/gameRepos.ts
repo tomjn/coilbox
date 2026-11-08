@@ -80,6 +80,14 @@ export const GAME_REPOS: GameRepo[] = [
     repo: "Recoil-Game-Archive/THIS",
     nameKey: "this(springnecromancyedition)",
   },
+  // The whole modinfo name again. The old XTA releases are named `XTA 9.65` and
+  // the like, which this key does not match (issue #4780).
+  {
+    key: "xta-sne",
+    label: "XTA (Spring Necromancy Edition)",
+    repo: "Recoil-Game-Archive/xta-springrts",
+    nameKey: "xta(springnecromancyedition)",
+  },
 ];
 
 /** The `owner/name` repo for a source key in `repos`, or undefined. */

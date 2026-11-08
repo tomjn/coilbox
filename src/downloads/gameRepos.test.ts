@@ -174,3 +174,38 @@ describe("the THIS source (issue #3740)", () => {
     expect(githubRepoForGame(others, THIS_NAME)).toBeUndefined();
   });
 });
+
+describe("the XTA Necromancy Edition source (issue #4780)", () => {
+  const XTA_REPO = "Recoil-Game-Archive/xta-springrts";
+  // The name in the repo's `modinfo.lua`, with the version a battle adds.
+  const XTA_NAME = "XTA (Spring Necromancy Edition) 10.00";
+  const catalog: GameRepo[] = JSON.parse(
+    readFileSync(new URL("../../catalog.json", import.meta.url), "utf8"),
+  ).githubGameRepos;
+
+  it("is in the built-in list and the catalog, and they agree", () => {
+    const builtIn = GAME_REPOS.find((g) => g.key === "xta-sne");
+    expect(builtIn?.repo).toBe(XTA_REPO);
+    expect(catalog.find((g) => g.key === "xta-sne")).toEqual(builtIn);
+  });
+
+  it("is found from the game's own name", () => {
+    expect(githubRepoForGame(GAME_REPOS, XTA_NAME)).toBe(XTA_REPO);
+  });
+
+  it("does not claim the older XTA versions", () => {
+    for (const name of ["XTA 9.65", "XTA 9.752", "XTA", "XTA 9.729 MT"]) {
+      expect(githubRepoForGame(GAME_REPOS, name), name).toBeUndefined();
+    }
+  });
+
+  it("does not match another game on the list, nor any of them it", () => {
+    const others = GAME_REPOS.filter((g) => g.key !== "xta-sne");
+    for (const other of others) {
+      for (const name of [other.label, other.nameKey].filter(Boolean)) {
+        expect(githubRepoForGame(GAME_REPOS, name), name).not.toBe(XTA_REPO);
+      }
+    }
+    expect(githubRepoForGame(others, XTA_NAME)).toBeUndefined();
+  });
+});
