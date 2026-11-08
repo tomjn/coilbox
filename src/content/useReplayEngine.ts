@@ -3,6 +3,7 @@ import { useWriteRoot } from "../downloads/config";
 import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
 import type { InstalledEngine } from "../play/engineConfirmation";
 import { useContentState } from "./config";
+import { isRealEngineVersion } from "./engineVersion";
 import { replayEngineDecision, replayEngineRequirement } from "./replayEngine";
 import { useResolveContent } from "./useResolveContent";
 
@@ -44,7 +45,9 @@ export function useReplayEngine(recorded: string) {
         r.engines.map((e) => ({
           executable: e.executable,
           folder: e.version,
-          verified: e.syncVersion || undefined,
+          verified: isRealEngineVersion(e.syncVersion)
+            ? e.syncVersion
+            : undefined,
         })),
       ),
     [state],

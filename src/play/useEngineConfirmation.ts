@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { contentVerifyEngine } from "@/content/bindings";
 import { refreshContentState } from "@/content/contentState";
+import { isRealEngineVersion } from "@/content/engineVersion";
 import type {
   ContentRequirement,
   EngineReading,
@@ -51,7 +52,7 @@ export function useEngineConfirmation(
         const reported = verifications.find(
           (v) => v.executable === t.executable,
         )?.reported;
-        return !t.syncVersion && reported
+        return !isRealEngineVersion(t.syncVersion) && reported
           ? { ...t, syncVersion: reported, engineVersion: reported }
           : t;
       }),
@@ -68,7 +69,10 @@ export function useEngineConfirmation(
             targets.map((t) => ({
               executable: t.executable,
               folder: t.engineVersion,
-              verified: t.syncVersion,
+              // An implausible report is no report (issue #1340).
+              verified: isRealEngineVersion(t.syncVersion)
+                ? t.syncVersion
+                : undefined,
             })),
             verifications,
           ),
@@ -85,9 +89,11 @@ export function useEngineConfirmation(
         const { engine } = await contentVerifyEngine({ path: toAsk });
         // The verified version is now stored, so screens holding the state see it.
         refreshContentState().catch(() => {});
-        answer = engine.syncVersion?.trim()
-          ? { executable: toAsk, reported: engine.syncVersion.trim() }
-          : { executable: toAsk, reported: null };
+        const reported = engine.syncVersion;
+        answer =
+          reported && isRealEngineVersion(reported)
+            ? { executable: toAsk, reported: reported.trim() }
+            : { executable: toAsk, reported: null };
       } catch (err) {
         answer = {
           executable: toAsk,
@@ -109,7 +115,9 @@ export function useEngineConfirmation(
       named
         ? {
             versions: confirmed.flatMap((t) =>
-              t.syncVersion ? [t.syncVersion] : [],
+              isRealEngineVersion(t.syncVersion)
+                ? [t.syncVersion as string]
+                : [],
             ),
             unconfirmed,
           }

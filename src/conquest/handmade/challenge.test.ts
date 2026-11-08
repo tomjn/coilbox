@@ -9,7 +9,7 @@ import {
 } from "../../challenge/identity";
 import { checkChallengeMap } from "../../challenge/mapCheck";
 import { conquestRunResult } from "../../challenge/result";
-import { MAX_CODE_LENGTH } from "../../deeplink/parse";
+import { MAX_LINK_CODE_LENGTH } from "../../deeplink/parse";
 import { decodeConquestChallenge, substitutedMapCount } from "../challenge";
 import type { GalaxyDoc } from "../model";
 import type { MapManifest } from "./manifest";
@@ -122,7 +122,7 @@ describe("a challenge code for a conquest on a hand-made map", () => {
   });
 
   it("is short enough for a share link", () => {
-    expect((code ?? "").length).toBeLessThan(MAX_CODE_LENGTH);
+    expect((code ?? "").length).toBeLessThan(MAX_LINK_CODE_LENGTH);
   });
 
   it("is refused as incomplete by the reader a coilbox from before this has", () => {

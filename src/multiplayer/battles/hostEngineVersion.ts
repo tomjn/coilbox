@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 import { contentVerifyEngine } from "../../content/bindings";
 import { refreshContentState } from "../../content/contentState";
+import { isRealEngineVersion } from "../../content/engineVersion";
 import type { PlayTarget } from "../../play/config";
 
 /**
@@ -18,7 +19,9 @@ import type { PlayTarget } from "../../play/config";
 export async function hostEngineVersion(
   target: Pick<PlayTarget, "executable" | "syncVersion">,
 ): Promise<string> {
-  if (target.syncVersion) return target.syncVersion;
+  if (isRealEngineVersion(target.syncVersion)) {
+    return (target.syncVersion as string).trim();
+  }
   let reported: string | undefined;
   try {
     const { engine } = await contentVerifyEngine({ path: target.executable });
@@ -28,8 +31,8 @@ export async function hostEngineVersion(
     const reason = describeError(err);
     throw new Error(t`Could not read the engine's version: ${reason}`);
   }
-  if (!reported) {
+  if (!isRealEngineVersion(reported)) {
     throw new Error(t`Could not read the engine's version.`);
   }
-  return reported;
+  return (reported as string).trim();
 }

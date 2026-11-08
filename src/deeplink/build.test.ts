@@ -9,6 +9,8 @@ import {
 import {
   MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
+  MAX_LINK_CODE_LENGTH,
+  MAX_LINK_LENGTH,
   MAX_URL_LENGTH,
   parseDeepLink,
 } from "./parse";
@@ -260,12 +262,39 @@ describe("buildDeepLink", () => {
       expect(built.ok).toBe(false);
     });
 
-    it("rejects an oversized code", () => {
+    it("builds a link at the link limit that parses back", () => {
+      const code = "a".repeat(MAX_LINK_CODE_LENGTH);
       const built = buildDeepLink({
         kind: "import",
-        source: { type: "code", code: "a".repeat(MAX_CODE_LENGTH + 1) },
+        source: { type: "code", code },
+      });
+      expect(built.ok).toBe(true);
+      if (!built.ok) return;
+      expect(built.url.length).toBe(MAX_LINK_LENGTH);
+      expect(parseDeepLink(built.url)).toEqual({
+        kind: "import",
+        source: { type: "code", code },
+      });
+    });
+
+    it("rejects a code one character over the link limit", () => {
+      const code = "a".repeat(MAX_LINK_CODE_LENGTH + 1);
+      const built = buildDeepLink({
+        kind: "import",
+        source: { type: "code", code },
       });
       expect(built.ok).toBe(false);
+      expect(buildImportCodeLink(code)).toBeNull();
+    });
+
+    it("rejects a code that is within the limit but encodes past it", () => {
+      // Each space becomes `+` and each quote `%22`, so the link grows.
+      const code = '"'.repeat(MAX_LINK_CODE_LENGTH);
+      expect(buildImportCodeLink(code)).toBeNull();
+    });
+
+    it("gives no link for a code at the paste limit", () => {
+      expect(buildImportCodeLink("a".repeat(MAX_CODE_LENGTH))).toBeNull();
     });
 
     it("rejects an oversized url", () => {
