@@ -145,6 +145,7 @@ export function jobProblems(
   };
 
   range("bulk", job.bulk);
+  if (job.bulk[0] <= 0) problems.push(`${job.id} bulk: above zero`);
   if (job.bulk[1] > 1) problems.push(`${job.id} bulk: over the unit's width`);
   for (const size of GENERATOR_SIZE_IDS) {
     const factor = job.size[size];

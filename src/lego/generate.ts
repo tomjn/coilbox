@@ -463,10 +463,12 @@ export function generateUnit(
           : null,
         scale * slotScale,
       );
-      project = resolveConnections(project, pack).project;
+      // Before the joins are resolved, so a joined piece that is stretched is
+      // put where its join says.
       project = applyRoleRules(project, pack, instance, slot, (key) =>
         roll(inputs, `slot:${slot.id}:${n}:${key}`),
       );
+      project = resolveConnections(project, pack).project;
       generated.push({ slot: `${slot.id}.${n}`, module: module.id, instance });
     }
   }

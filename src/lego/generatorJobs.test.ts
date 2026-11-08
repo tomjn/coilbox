@@ -104,6 +104,9 @@ describe("the generator's jobs", () => {
     expect(problems({ ...job, bulk: [0.9, 0.9] })).toEqual([
       "assault bulk: a minimum below a maximum",
     ]);
+    expect(problems({ ...job, bulk: [0, 0.5] })).toEqual([
+      "assault bulk: above zero",
+    ]);
     expect(
       problems({
         ...job,
