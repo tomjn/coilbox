@@ -198,26 +198,50 @@ pub fn string_literals(src: &str) -> Result<Vec<String>, String> {
     Ok(lex(src)?
         .into_iter()
         .filter(|t| t.kind == Kind::Str)
-        .map(|t| {
-            let raw = &src[t.start..t.end];
-            if let Some(after) = raw.strip_prefix('[') {
-                let level = after.bytes().take_while(|&c| c == b'=').count();
-                let body = &raw[level + 2..raw.len() - level - 2];
-                let body = body.strip_prefix("\r\n").unwrap_or(body);
-                body.strip_prefix('\n').unwrap_or(body).to_string()
-            } else {
-                let mut out = String::new();
-                let mut chars = raw[1..raw.len() - 1].chars();
-                while let Some(c) = chars.next() {
-                    match c {
-                        '\\' => out.extend(chars.next()),
-                        c => out.push(c),
-                    }
-                }
-                out
-            }
-        })
+        .map(|t| string_value(&src[t.start..t.end]))
         .collect())
+}
+
+/// The folder and pattern of every `DirList("folder", "pattern")` call in `src`
+/// whose first two arguments are string literals, in file order. A map's
+/// `mapinfo.lua` includes the Lua files of a folder this way. Comments are
+/// skipped.
+pub fn dir_lists(src: &str) -> Result<Vec<(String, String)>, String> {
+    let toks = lex(src)?;
+    let text = |t: &Tok| &src[t.start..t.end];
+    let mut out = Vec::new();
+    for w in toks.windows(5) {
+        if w[0].kind == Kind::Name
+            && text(&w[0]) == "DirList"
+            && text(&w[1]) == "("
+            && w[2].kind == Kind::Str
+            && text(&w[3]) == ","
+            && w[4].kind == Kind::Str
+        {
+            out.push((string_value(text(&w[2])), string_value(text(&w[4]))));
+        }
+    }
+    Ok(out)
+}
+
+/// The value of a string token, as [`string_literals`] reads it.
+fn string_value(raw: &str) -> String {
+    if let Some(after) = raw.strip_prefix('[') {
+        let level = after.bytes().take_while(|&c| c == b'=').count();
+        let body = &raw[level + 2..raw.len() - level - 2];
+        let body = body.strip_prefix("\r\n").unwrap_or(body);
+        body.strip_prefix('\n').unwrap_or(body).to_string()
+    } else {
+        let mut out = String::new();
+        let mut chars = raw[1..raw.len() - 1].chars();
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' => out.extend(chars.next()),
+                c => out.push(c),
+            }
+        }
+        out
+    }
 }
 
 fn lex(src: &str) -> Result<Vec<Tok>, String> {
