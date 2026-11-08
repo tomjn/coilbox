@@ -633,6 +633,55 @@ const DETAIL = /* glsl */ `
     // whatever grows is drawn darker there, so each reads as one line.
     vec2 drain = tSmooth(uTerrainDrainage, vTerrainUv).rg;
     float gully = smoothstep(0.06, 0.15, drain.r) * smoothstep(0.1, 0.5, drain.g) * land * (1.0 - 0.6 * steep);
+    // On a frozen world a gully is a narrow cut in the snow and rock, shaded
+    // by its sides, not a band as wide as the drainage field's blur. The
+    // field's flow peaks along the middle of each course, so the distance to
+    // that ridge line, from the flow's slope and curve across it, sets a
+    // width that widens a little downstream and never falls below about a
+    // pixel, so a gully still shows from far out.
+    float coldGround = clamp(uTerrainFrost, 0.0, 1.0) * land;
+    float gullyCut = 0.0;
+    vec2 gullySlope = vec2(0.0);
+    // Branched on the uniform alone: derivatives and texture reads need every
+    // pixel of a quad to take the same path.
+    if (uTerrainFrost > 0.0) {
+      vec2 dSize = vec2(textureSize(uTerrainDrainage, 0));
+      vec2 dt = 1.0 / dSize;
+      float fxp = tSmooth(uTerrainDrainage, vTerrainUv + vec2(dt.x, 0.0)).r;
+      float fxm = tSmooth(uTerrainDrainage, vTerrainUv - vec2(dt.x, 0.0)).r;
+      float fyp = tSmooth(uTerrainDrainage, vTerrainUv + vec2(0.0, dt.y)).r;
+      float fym = tSmooth(uTerrainDrainage, vTerrainUv - vec2(0.0, dt.y)).r;
+      float fpp = tSmooth(uTerrainDrainage, vTerrainUv + dt).r;
+      float fmm = tSmooth(uTerrainDrainage, vTerrainUv - dt).r;
+      float fpm = tSmooth(uTerrainDrainage, vTerrainUv + vec2(dt.x, -dt.y)).r;
+      float fmp = tSmooth(uTerrainDrainage, vTerrainUv + vec2(-dt.x, dt.y)).r;
+      vec2 g = 0.5 * vec2(fxp - fxm, fyp - fym);
+      float hxx = fxp + fxm - 2.0 * drain.r;
+      float hyy = fyp + fym - 2.0 * drain.r;
+      float hxy = 0.25 * (fpp + fmm - fpm - fmp);
+      // The direction the flow falls away fastest: side the course.
+      float lam = 0.5 * (hxx + hyy) - sqrt(0.25 * (hxx - hyy) * (hxx - hyy) + hxy * hxy);
+      vec2 e1 = vec2(hxy, lam - hxx);
+      vec2 e2 = vec2(lam - hyy, hxy);
+      vec2 side = dot(e1, e1) > dot(e2, e2) ? e1 : e2;
+      side = dot(side, side) > 1e-12 ? normalize(side) : vec2(1.0, 0.0);
+      float ga = dot(g, side);
+      // Texels to the middle of the course, as one Newton step would go.
+      float off = lam < 0.0 ? abs(ga) / max(-lam, 1e-4) : 9.0;
+      // Drainage texels a screen pixel covers.
+      float pxTexel = max(length(dFdx(vTerrainUv * dSize)), length(dFdy(vTerrainUv * dSize)));
+      float halfW = 0.22 + 0.22 * smoothstep(0.15, 0.6, drain.r) + pxTexel * 0.5;
+      off *= 1.0 + 0.35 * fine.x;
+      float core = 1.0 - smoothstep(halfW * 0.4, halfW, off);
+      gullyCut = gully * core * coldGround;
+      // Its banks slope down into the middle, where the flow is most, one lit
+      // by the sun and the other in shade.
+      gullySlope = -sign(ga) * side * gully * coldGround * (1.0 - smoothstep(halfW * 1.8, halfW * 2.4, off)) * 0.45;
+      // Only the bigger courses part the trees. The forest grows across the
+      // small ones.
+      pw[${P.taiga}] *= 1.0 - gully * coldGround * (1.0 - smoothstep(halfW * 1.6, halfW * 2.4, off)) * smoothstep(0.08, 0.25, drain.r);
+      gully *= 1.0 - coldGround;
+    }
     // The trees part along a gully and show the ground beneath.
     albedo = mix(albedo, uBiomeClearing, pw[${P.forest}] * gully * 0.6);
     pw[${P.forest}] *= 1.0 - gully * 0.8;
@@ -1131,6 +1180,11 @@ const DETAIL = /* glsl */ `
     shadeMul = mix(shadeMul, 1.0, gully * 0.5);
     form -= gully * 0.3;
     albedo = mix(albedo, albedo * vec3(0.82, 0.86, 0.92), gully * 0.6);
+    // A cut in the snow: its sides lit and shaded by the sun, its floor in
+    // shade with dark rock showing.
+    bump += gullySlope * (1.0 - liquid);
+    form -= gullyCut * 0.3;
+    albedo = mix(albedo, vec3(0.16, 0.17, 0.19), gullyCut * 0.6);
 
     albedo *= max(shadeMul, 0.2) * pow(clamp(form, 0.3, 1.6), 2.2);
     // Wet ground at the water line: darker and a little bluer, with a ragged
