@@ -1469,6 +1469,15 @@ mod tests {
             read_layers(&first.join("rt.smf")),
             read_layers(&third.join("rt.smf")),
         );
+        // #5115: with -noclamp the compiler keeps the heightmap's own values
+        // rather than stretching them to the full range.
+        let source_heights: Vec<u8> = (0..129 * 129u32)
+            .flat_map(|i| ((i * 3) as u16).to_le_bytes())
+            .collect();
+        assert!(
+            a.heights == source_heights,
+            "mapcompile -noclamp changed the heights"
+        );
         assert_eq!(a.metal, metal, "mapcompile reads the metal north row first");
         assert!(a.heights == b.heights, "the heights moved");
         assert!(a.types == b.types, "the type map moved");
