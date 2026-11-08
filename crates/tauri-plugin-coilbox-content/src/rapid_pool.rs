@@ -60,6 +60,15 @@ fn md5_hex(md5: &[u8; 16]) -> String {
 /// each entry. Byte-exact with pr-downloader: a gzip stream of `u8 name-len | name
 /// | 16-byte md5 | 4-byte crc32 | 4-byte size` records until EOF.
 pub fn parse_sdp_pool_refs(path: &Path) -> Result<Vec<[u8; 16]>, String> {
+    Ok(parse_sdp_entries(path)?
+        .into_iter()
+        .map(|(_, md5)| md5)
+        .collect())
+}
+
+/// Parse a rapid `.sdp` manifest, returning each entry's file name inside the
+/// package and its pool md5. See [`parse_sdp_pool_refs`] for the format.
+pub fn parse_sdp_entries(path: &Path) -> Result<Vec<(String, [u8; 16])>, String> {
     let compressed = std::fs::read(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     // A real `.sdp` is a non-empty gzip stream; an empty file is corrupt, and
     // `GzDecoder` (unlike the lenient multi-member decoder) errors on non-gzip
@@ -73,7 +82,7 @@ pub fn parse_sdp_pool_refs(path: &Path) -> Result<Vec<[u8; 16]>, String> {
         .map_err(|e| format!("inflate {}: {e}", path.display()))?;
 
     // Each record: u8 name-len | name | 16-byte md5 | 4-byte crc32 | 4-byte size.
-    let mut refs = Vec::new();
+    let mut entries = Vec::new();
     let mut pos = 0usize;
     while pos < raw.len() {
         let name_len = raw[pos] as usize;
@@ -82,12 +91,13 @@ pub fn parse_sdp_pool_refs(path: &Path) -> Result<Vec<[u8; 16]>, String> {
             return Err(format!("truncated record in {}", path.display()));
         }
         let md5_start = pos + 1 + name_len;
+        let name = String::from_utf8_lossy(&raw[pos + 1..md5_start]).into_owned();
         let mut md5 = [0u8; 16];
         md5.copy_from_slice(&raw[md5_start..md5_start + 16]);
-        refs.push(md5);
+        entries.push((name, md5));
         pos = record_end;
     }
-    Ok(refs)
+    Ok(entries)
 }
 
 /// True for a `packages/*.sdp` file (not `.sdp.incomplete`).

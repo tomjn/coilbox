@@ -37,6 +37,9 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 
 mod archive;
+// Re-exported so the content plugin's duplicate report can tell which map an
+// archive or a rapid package holds (issue #399).
+pub use archive::member_names;
 // Public so the replay analysis game is written by the same writer the test
 // mutator is (issue #1183).
 pub mod mutator;
