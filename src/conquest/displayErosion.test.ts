@@ -263,5 +263,13 @@ describe("erodeLand", () => {
     };
     expect(most(SIDE - 12)).toBeGreaterThan(most(SIDE / 2));
     expect(most(SIDE / 2)).toBeGreaterThan(most(12));
+    // The slope is steep enough everywhere for a channel's full cut.
+    expect(data[((SIDE / 2) * SIDE + SIDE / 2) * 2 + 1]).toBe(255);
+  });
+
+  it("gives flat land no fall", () => {
+    const flat = new Float32Array(SIDE * SIDE).fill(0.3);
+    const { data } = erodeLand(flat, SIDE, SIDE, 5).drainage;
+    for (let i = 0; i < SIDE * SIDE; i++) expect(data[i * 2 + 1]).toBe(0);
   });
 });
