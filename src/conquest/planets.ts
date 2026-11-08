@@ -50,7 +50,7 @@ export type BiomePattern =
   | "tundra"
   | "cracked"
   | "earth"
-  /** Cold forest: sparse conifers with snow or bare ground between them. */
+  /** Cold forest: a mostly closed canopy of snowy conifers, with patches of bare birch and small snowy clearings. */
   | "taiga";
 
 export interface Biome {
@@ -351,8 +351,8 @@ const ICE: Planet = {
       [78, 68, 62],
     ],
     conifer: [
-      [62, 86, 76],
-      [22, 40, 40],
+      [54, 90, 64],
+      [16, 38, 32],
     ],
     autumn: [
       [196, 168, 88],
