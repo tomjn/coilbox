@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::luapatch::{apply, string_literals, Key, Mode, Val};
+use crate::luapatch::{apply, dir_lists, string_literals, DirList, Key, Mode, Val};
 
 /// What [`pack_map`] wrote.
 #[derive(Debug)]
@@ -43,43 +43,185 @@ pub fn extract_archive(archive: &Path, dest: &Path) -> Result<(), String> {
     }
 }
 
-/// The string literals in a `mapinfo.lua` that name a file in `dir`, as the
-/// forward slash paths the archive will use for them. A map's textures
-/// (`skyBox`, splat textures) are referenced this way and the engine reads them
-/// from the archive by the same path, so a file at `dir/<ref>` goes in at
-/// `<ref>`. The map's own `.smf`, `.smt` and `mapinfo.lua` are not listed,
-/// because [`pack_map`] places those itself.
-fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<String>, String> {
+/// A file [`pack_map`] adds because a Lua file names it: where it is on disk and
+/// the forward slash path it goes in at.
+struct Referenced {
+    archive_path: String,
+    source: PathBuf,
+}
+
+/// The folder the archive is built from. A compile into a decompiled map's own
+/// `maps/` folder sits inside that map's folder, and the map's other files
+/// (`mapconfig/`, a sky, Lua it includes) are beside `maps/`, so the archive root
+/// is the folder above. Any other output folder is the root itself.
+fn archive_root(dir: &Path) -> &Path {
+    let is_maps = dir
+        .file_name()
+        .is_some_and(|n| n.eq_ignore_ascii_case("maps"));
+    match dir.parent() {
+        Some(parent) if is_maps && !parent.as_os_str().is_empty() => parent,
+        _ => dir,
+    }
+}
+
+/// Where a file that `literal` names is on disk, and the path it goes in at.
+///
+/// The engine reads `skyBox` only from `maps/<ref>`, and the other textures from
+/// `<ref>` or else `maps/<ref>` (`ISky.cpp`, `FIND_MAP_TEXTURE`). A file under
+/// `maps/` is therefore the one to pack. `VFS.Include` reads from the archive
+/// root. In the compile folder a `maps/` folder is the compile folder itself
+/// (see [`archive_root`]), and anything else is found from the root.
+fn locate(dir: &Path, root: &Path, literal: &str) -> Option<(String, PathBuf, String)> {
+    let rel = crate::sanitize_rel(literal)?;
+    let rel_text = rel
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/");
+    let nested = root != dir;
+    let mut candidates = Vec::new();
+    if nested {
+        // `dir` is the archive's `maps/` folder.
+        candidates.push((format!("maps/{rel_text}"), dir.join(&rel)));
+        candidates.push((rel_text.clone(), root.join(&rel)));
+    } else {
+        candidates.push((format!("maps/{rel_text}"), dir.join("maps").join(&rel)));
+        candidates.push((rel_text.clone(), dir.join(&rel)));
+    }
+    let (archive_path, source) = candidates.into_iter().find(|(_, p)| p.is_file())?;
+    Some((archive_path, source, rel_text))
+}
+
+/// What a Lua file asks for: a file by name, or the files in a folder that match
+/// a pattern.
+enum Wanted {
+    Literal(String),
+    Found(String, PathBuf, String),
+}
+
+/// Whether `name` matches a `VFS.DirList` pattern, where `*` is any run of
+/// characters and `?` is one. Case is ignored, as the engine's file system does.
+/// It remembers where the last `*` was and tries one later start each time the
+/// rest fails, so the work is at most the pattern's length times the name's.
+fn glob_matches(pattern: &[u8], name: &[u8]) -> bool {
+    let (mut p, mut n) = (0, 0);
+    let mut star: Option<(usize, usize)> = None;
+    while n < name.len() {
+        match pattern.get(p) {
+            Some(b'*') => {
+                star = Some((p, n));
+                p += 1;
+            }
+            Some(&c) if c == b'?' || c.eq_ignore_ascii_case(&name[n]) => {
+                p += 1;
+                n += 1;
+            }
+            _ => match star {
+                Some((sp, sn)) => {
+                    p = sp + 1;
+                    n = sn + 1;
+                    star = Some((sp, sn + 1));
+                }
+                None => return false,
+            },
+        }
+    }
+    pattern[p..].iter().all(|&c| c == b'*')
+}
+
+/// The files in the archive folder `list.folder` that match its pattern, by
+/// name, and with `recursive` the ones in the folders below it too.
+fn listed_files(root: &Path, list: &DirList) -> Vec<Wanted> {
+    fn walk(disk: &Path, archive: &str, list: &DirList, out: &mut Vec<(String, PathBuf)>) {
+        let Ok(entries) = std::fs::read_dir(disk) else {
+            return;
+        };
+        let mut entries: Vec<_> = entries.flatten().collect();
+        entries.sort_by_key(|e| e.file_name());
+        for e in entries {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let path = e.path();
+            if path.is_file() {
+                if glob_matches(list.pattern.as_bytes(), name.as_bytes()) {
+                    out.push((format!("{archive}/{name}"), path));
+                }
+            } else if list.recursive && e.file_type().is_ok_and(|t| t.is_dir()) {
+                // `file_type` does not follow a link, so a linked folder is
+                // skipped rather than walked.
+                walk(&path, &format!("{archive}/{name}"), list, out);
+            }
+        }
+    }
+    let Some(rel) = crate::sanitize_rel(&list.folder) else {
+        return Vec::new();
+    };
+    let rel_text = rel
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/");
+    let mut found = Vec::new();
+    walk(&root.join(&rel), &rel_text, list, &mut found);
+    found
+        .into_iter()
+        .map(|(archive_path, path)| Wanted::Found(archive_path.clone(), path, archive_path))
+        .collect()
+}
+
+/// The files that `src` asks for, by a string literal or a `DirList` of a
+/// folder, and that those files, if they are Lua, ask for in turn (a
+/// `VFS.Include` of a file that includes another). The map's own `.smf`, `.smt`
+/// and `mapinfo.lua` are not listed, because [`pack_map`] places those itself.
+fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<Referenced>, String> {
+    let root = archive_root(dir);
+    // Named as the archive holds them and as a `mapinfo.lua` writes them.
     let own = [
         "mapinfo.lua".to_string(),
+        format!("maps/{name}.smf"),
+        format!("maps/{name}.smt"),
         format!("{name}.smf"),
         format!("{name}.smt"),
     ];
-    let mut out: Vec<String> = Vec::new();
-    for literal in string_literals(src)? {
-        let Some(rel) = crate::sanitize_rel(&literal) else {
+    let asked_by = |text: &str| -> Result<Vec<Wanted>, String> {
+        let mut wanted: Vec<Wanted> = string_literals(text)?
+            .into_iter()
+            .map(Wanted::Literal)
+            .collect();
+        for list in dir_lists(text)? {
+            wanted.extend(listed_files(root, &list));
+        }
+        Ok(wanted)
+    };
+    let mut out: Vec<Referenced> = Vec::new();
+    let mut pending = asked_by(src).map_err(|e| format!("could not scan mapinfo.lua: {e}"))?;
+    let mut next = 0;
+    while next < pending.len() {
+        let found = match &pending[next] {
+            Wanted::Literal(literal) => locate(dir, root, literal),
+            Wanted::Found(a, p, n) => Some((a.clone(), p.clone(), n.clone())),
+        };
+        next += 1;
+        let Some((archive_path, source, named)) = found else {
             continue;
         };
-        let archive_path = rel
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy().into_owned())
-            .collect::<Vec<_>>()
-            .join("/");
-        if own.iter().any(|o| o.eq_ignore_ascii_case(&archive_path)) || out.contains(&archive_path)
+        if [&archive_path, &named]
+            .iter()
+            .any(|p| own.iter().any(|o| o.eq_ignore_ascii_case(p)))
+            || out.iter().any(|r| r.archive_path == archive_path)
         {
             continue;
         }
-        // The engine reads `skyBox` only from `maps/<ref>`, and the other
-        // textures from `<ref>` or else `maps/<ref>` (`ISky.cpp`,
-        // `FIND_MAP_TEXTURE`). So a file under `maps/` is the one to pack.
-        if dir.join("maps").join(&rel).is_file() {
-            let in_maps = format!("maps/{archive_path}");
-            if !out.contains(&in_maps) {
-                out.push(in_maps);
-            }
-        } else if dir.join(&rel).is_file() {
-            out.push(archive_path);
+        if archive_path.to_ascii_lowercase().ends_with(".lua") {
+            let text = std::fs::read_to_string(&source)
+                .map_err(|e| format!("could not read {}: {e}", source.display()))?;
+            pending.extend(
+                asked_by(&text).map_err(|e| format!("could not scan {}: {e}", source.display()))?,
+            );
         }
+        out.push(Referenced {
+            archive_path,
+            source,
+        });
     }
     Ok(out)
 }
@@ -87,7 +229,9 @@ fn referenced_files(dir: &Path, src: &str, name: &str) -> Result<Vec<String>, St
 /// Write `<dir>/<name>.sdz` from the files a compile left in `dir`.
 ///
 /// The archive holds `mapinfo.lua` at the root, the `.smf` and `.smt` under
-/// `maps/`, and any file the `mapinfo.lua` refers to at the path it names. The
+/// `maps/`, and any file the `mapinfo.lua` refers to at the path the engine looks
+/// for it, along with the files those Lua files refer to. When `dir` is a
+/// decompiled map's `maps/` folder, the files beside it are packed too. The
 /// `.smt` is stored, since the compiler already compressed it. In the archive's
 /// copy of `mapinfo.lua`, `mapfile` is `maps/<name>.smf`, because the engine
 /// reads that key as a path inside the archive. The loose file beside the
@@ -146,7 +290,7 @@ fn write_zip(
     mapinfo_text: &str,
     dir: &Path,
     name: &str,
-    refs: &[String],
+    refs: &[Referenced],
 ) -> Result<(), String> {
     use zip::write::SimpleFileOptions;
     let file = std::fs::File::create(tmp)
@@ -184,7 +328,7 @@ fn write_zip(
         stored,
     )?;
     for r in refs {
-        add(r.clone(), &mut open(&dir.join(r))?, deflated)?;
+        add(r.archive_path.clone(), &mut open(&r.source)?, deflated)?;
     }
     zip.finish()
         .map_err(|e| format!("could not finish {}: {e}", tmp.display()))?;
@@ -338,6 +482,224 @@ mod tests {
                 "maps/skybox.jpg"
             ]
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A recompiled map is compiled into the decompiled map's `maps/` folder, so
+    /// the archive root is the folder above it. A `skyBox` there goes in under
+    /// `maps/`, where the engine reads it, and the files the `mapinfo.lua`
+    /// includes from beside `maps/` go in at their own paths, with the files they
+    /// include in turn.
+    #[test]
+    fn a_recompiled_map_packs_its_sky_and_includes_at_the_engine_paths() {
+        let root = std::env::temp_dir().join(format!("mapconv_pack_{}_sdd", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let maps = root.join("maps");
+        std::fs::create_dir_all(&maps).unwrap();
+        std::fs::create_dir_all(root.join("mapconfig/lua")).unwrap();
+        std::fs::write(maps.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
+        std::fs::write(maps.join("MyMap.smt"), b"spring tilefile\0".repeat(64)).unwrap();
+        std::fs::write(maps.join("sky.dds"), b"DDS sky").unwrap();
+        std::fs::write(maps.join("heightmap.png"), b"not in the archive").unwrap();
+        std::fs::write(root.join("mapinfo.lua"), b"the decompiled map's own").unwrap();
+        std::fs::write(
+            root.join("mapconfig/lua/a.lua"),
+            "return VFS.Include(\"mapconfig/b.lua\")",
+        )
+        .unwrap();
+        std::fs::write(root.join("mapconfig/b.lua"), "return {}").unwrap();
+        std::fs::write(root.join("mapconfig/unused.lua"), "return {}").unwrap();
+        std::fs::write(
+            maps.join("mapinfo.lua"),
+            "local a = VFS.Include(\"mapconfig/lua/a.lua\")\nreturn { mapfile = \"MyMap.smf\", smf = { smtFileName0 = \"MyMap.smt\" }, atmosphere = { skyBox = \"sky.dds\" } }",
+        )
+        .unwrap();
+
+        let packed = pack_map(&maps, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "mapconfig/lua/a.lua",
+                "maps/sky.dds",
+                "mapconfig/b.lua"
+            ]
+        );
+        assert_eq!(packed.path, maps.join("MyMap.sdz"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The map template most maps use includes its `mapconfig/mapinfo/*.lua` with
+    /// `VFS.DirList`, so no string literal names those files. They are packed all
+    /// the same, and a file the pattern does not match is not.
+    #[test]
+    fn a_dir_list_in_mapinfo_packs_the_files_it_matches() {
+        let root =
+            std::env::temp_dir().join(format!("mapconv_pack_{}_dirlist", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let maps = root.join("maps");
+        std::fs::create_dir_all(&maps).unwrap();
+        std::fs::create_dir_all(root.join("mapconfig/mapinfo")).unwrap();
+        std::fs::write(maps.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
+        std::fs::write(maps.join("MyMap.smt"), b"spring tilefile\0".repeat(64)).unwrap();
+        std::fs::write(root.join("mapconfig/mapinfo/0_apply.lua"), "return {}").unwrap();
+        std::fs::write(root.join("mapconfig/mapinfo/1_more.lua"), "return {}").unwrap();
+        std::fs::write(
+            root.join("mapconfig/mapinfo/desktop.ini"),
+            "[.ShellClassInfo]",
+        )
+        .unwrap();
+        std::fs::write(
+            maps.join("mapinfo.lua"),
+            "return { mapfile = \"MyMap.smf\" }\n-- local f = VFS.DirList(\"mapconfig/nope/\", \"*.lua\")\nlocal files = VFS.DirList('mapconfig/mapinfo/', \"*.lua\")",
+        )
+        .unwrap();
+
+        let packed = pack_map(&maps, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "mapconfig/mapinfo/0_apply.lua",
+                "mapconfig/mapinfo/1_more.lua"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A recompiled map's `maps/` folder can hold a folder of its own called
+    /// `maps`. The file a reference names directly in the compile folder wins
+    /// over one inside that folder.
+    #[test]
+    fn a_recompiled_map_reads_a_reference_from_its_maps_folder_first() {
+        let root = std::env::temp_dir().join(format!("mapconv_pack_{}_shadow", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let maps = root.join("maps");
+        std::fs::create_dir_all(maps.join("maps")).unwrap();
+        std::fs::write(maps.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
+        std::fs::write(maps.join("MyMap.smt"), b"spring tilefile\0").unwrap();
+        std::fs::write(maps.join("sky.dds"), b"the sky").unwrap();
+        std::fs::write(maps.join("maps/sky.dds"), b"not the sky").unwrap();
+        std::fs::write(
+            maps.join("mapinfo.lua"),
+            "return { mapfile = \"MyMap.smf\", atmosphere = { skyBox = \"sky.dds\" } }",
+        )
+        .unwrap();
+        let packed = pack_map(&maps, "MyMap").unwrap();
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(&packed.path).unwrap()).unwrap();
+        let mut sky = String::new();
+        std::io::Read::read_to_string(&mut zip.by_name("maps/sky.dds").unwrap(), &mut sky).unwrap();
+        assert_eq!(sky, "the sky");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `VFS.DirList` takes its pattern and recursion as optional arguments: no
+    /// pattern lists everything, and a fourth argument of `true` lists the
+    /// folders below as well.
+    #[test]
+    fn a_dir_list_without_a_pattern_or_with_recursion_packs_what_the_engine_lists() {
+        let dir = compiled_dir("dirlist-args");
+        std::fs::create_dir_all(dir.join("cfg/deep")).unwrap();
+        std::fs::create_dir_all(dir.join("flat")).unwrap();
+        std::fs::create_dir_all(dir.join("tree/deep")).unwrap();
+        std::fs::write(dir.join("cfg/a.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("cfg/b.txt"), "b").unwrap();
+        std::fs::write(dir.join("cfg/deep/c.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("flat/x.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("tree/t.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("tree/deep/u.lua"), "return {}").unwrap();
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "local a = VFS.DirList(\"cfg\")\nlocal b = VFS.DirList(\"flat/\", \"*.lua\", nil, false)\nlocal c = VFS.DirList(\"tree\", \"*.lua\", VFS.MAP, true)\nreturn { mapfile = \"MyMap.smf\" }",
+        )
+        .unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "cfg/a.lua",
+                "cfg/b.txt",
+                "flat/x.lua",
+                "tree/deep/u.lua",
+                "tree/t.lua"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A recursive `DirList` does not follow a folder that is a link, so a link
+    /// back up the tree cannot repeat files or loop, and a link out of the map
+    /// does not pull in files from outside it.
+    #[cfg(unix)]
+    #[test]
+    fn a_recursive_dir_list_does_not_follow_a_linked_folder() {
+        let dir = compiled_dir("dirlist-link");
+        let outside =
+            std::env::temp_dir().join(format!("mapconv_pack_{}_outside", std::process::id()));
+        let _ = std::fs::remove_dir_all(&outside);
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("secret.lua"), "return {}").unwrap();
+        std::fs::create_dir_all(dir.join("tree/deep")).unwrap();
+        std::fs::write(dir.join("tree/t.lua"), "return {}").unwrap();
+        std::fs::write(dir.join("tree/deep/u.lua"), "return {}").unwrap();
+        std::os::unix::fs::symlink(&dir, dir.join("tree/up")).unwrap();
+        std::os::unix::fs::symlink(&outside, dir.join("tree/out")).unwrap();
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "local c = VFS.DirList(\"tree\", \"*.lua\", nil, true)\nreturn { mapfile = \"MyMap.smf\" }",
+        )
+        .unwrap();
+        let packed = pack_map(&dir, "MyMap").unwrap();
+        assert_eq!(
+            packed.files,
+            [
+                "mapinfo.lua",
+                "maps/MyMap.smf",
+                "maps/MyMap.smt",
+                "tree/deep/u.lua",
+                "tree/t.lua"
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    /// A pattern with many `*` and a name that nearly matches must not take
+    /// exponential time.
+    #[test]
+    fn a_pattern_with_many_wildcards_matches_in_linear_steps() {
+        let name = format!("{}.lua", "a".repeat(60));
+        assert!(!glob_matches(b"*a*a*a*a*a*a*a*a*a*a*a*b", name.as_bytes()));
+        assert!(glob_matches(b"*a*a*a*.LUA", name.as_bytes()));
+        assert!(glob_matches(b"a?a*", name.as_bytes()));
+    }
+
+    /// A Lua file a `mapinfo.lua` includes that cannot be read fails the package,
+    /// and the message names that file and says the problem is in what it holds.
+    #[test]
+    fn an_included_lua_file_that_cannot_be_scanned_is_named_in_the_error() {
+        let dir = compiled_dir("badinclude");
+        std::fs::create_dir_all(dir.join("mapconfig")).unwrap();
+        std::fs::write(dir.join("mapconfig/bad.lua"), "return \"unterminated").unwrap();
+        std::fs::write(
+            dir.join("mapinfo.lua"),
+            "return { mapfile = \"MyMap.smf\", x = VFS.Include(\"mapconfig/bad.lua\") }",
+        )
+        .unwrap();
+        let err = pack_map(&dir, "MyMap").unwrap_err();
+        assert!(err.contains("bad.lua"), "{err}");
+        assert!(err.contains("could not scan"), "{err}");
+        assert!(err.contains("unterminated string"), "{err}");
+        assert!(!err.contains("in mapinfo.lua"), "{err}");
+        assert!(!dir.join("MyMap.sdz").exists());
+        assert!(!dir.join("MyMap.sdz.tmp").exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

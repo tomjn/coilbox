@@ -186,7 +186,7 @@ fn skip_long(b: &[u8], i: usize, level: usize) -> Result<usize, String> {
                 .position(|w| w == close.as_slice())
         })
         .map(|p| from + p + close.len())
-        .ok_or_else(|| "unterminated long bracket in mapinfo.lua".to_string())
+        .ok_or_else(|| "unterminated long bracket".to_string())
 }
 
 /// The value of every string literal in `src`, in file order: quoted strings
@@ -198,26 +198,108 @@ pub fn string_literals(src: &str) -> Result<Vec<String>, String> {
     Ok(lex(src)?
         .into_iter()
         .filter(|t| t.kind == Kind::Str)
-        .map(|t| {
-            let raw = &src[t.start..t.end];
-            if let Some(after) = raw.strip_prefix('[') {
-                let level = after.bytes().take_while(|&c| c == b'=').count();
-                let body = &raw[level + 2..raw.len() - level - 2];
-                let body = body.strip_prefix("\r\n").unwrap_or(body);
-                body.strip_prefix('\n').unwrap_or(body).to_string()
-            } else {
-                let mut out = String::new();
-                let mut chars = raw[1..raw.len() - 1].chars();
-                while let Some(c) = chars.next() {
-                    match c {
-                        '\\' => out.extend(chars.next()),
-                        c => out.push(c),
-                    }
-                }
-                out
-            }
-        })
+        .map(|t| string_value(&src[t.start..t.end]))
         .collect())
+}
+
+/// One `VFS.DirList(folder, pattern, mode, recursive)` call whose arguments are
+/// written out as literals.
+#[derive(Debug, PartialEq, Eq)]
+pub struct DirList {
+    pub folder: String,
+    /// `*` when the call leaves the pattern out or passes `nil`.
+    pub pattern: String,
+    pub recursive: bool,
+}
+
+/// Every `DirList` call in `src` whose folder is a string literal and whose
+/// pattern is a string literal, `nil` or absent, in file order. A map's
+/// `mapinfo.lua` includes the Lua files of a folder this way. A call that passes
+/// the pattern or recursion as anything else is not listed, because the files it
+/// names are not known without running it. Comments are skipped.
+pub fn dir_lists(src: &str) -> Result<Vec<DirList>, String> {
+    let toks = lex(src)?;
+    let text = |t: &Tok| &src[t.start..t.end];
+    let mut out = Vec::new();
+    for (i, t) in toks.iter().enumerate() {
+        if t.kind != Kind::Name || text(t) != "DirList" {
+            continue;
+        }
+        if toks.get(i + 1).map(text) != Some("(")
+            || toks.get(i + 2).map(|t| t.kind) != Some(Kind::Str)
+        {
+            continue;
+        }
+        let folder = string_value(text(&toks[i + 2]));
+        // The arguments after the folder, each the tokens up to a `,` or the
+        // closing `)`. A nested call or table is not a literal.
+        let mut args: Vec<Vec<&Tok>> = Vec::new();
+        let mut at = i + 3;
+        let closed = loop {
+            match toks.get(at).map(text) {
+                Some(")") => break true,
+                Some(",") => args.push(Vec::new()),
+                _ => break false,
+            }
+            at += 1;
+            while let Some(t) = toks.get(at) {
+                let t_text = text(t);
+                if t_text == "," || t_text == ")" {
+                    break;
+                }
+                if matches!(t_text, "(" | "{" | "[") {
+                    break;
+                }
+                if let Some(last) = args.last_mut() {
+                    last.push(t);
+                }
+                at += 1;
+            }
+        };
+        if !closed || args.len() > 3 {
+            continue;
+        }
+        let pattern = match args.first().map(Vec::as_slice) {
+            None => Some("*".to_string()),
+            Some([t]) if t.kind == Kind::Str => Some(string_value(text(t))),
+            Some([t]) if text(t) == "nil" => Some("*".to_string()),
+            Some(_) => None,
+        };
+        let recursive = match args.get(2).map(Vec::as_slice) {
+            None => Some(false),
+            Some([t]) if text(t) == "true" => Some(true),
+            Some([t]) if matches!(text(t), "false" | "nil") => Some(false),
+            Some(_) => None,
+        };
+        if let (Some(pattern), Some(recursive)) = (pattern, recursive) {
+            out.push(DirList {
+                folder,
+                pattern,
+                recursive,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// The value of a string token, as [`string_literals`] reads it.
+fn string_value(raw: &str) -> String {
+    if let Some(after) = raw.strip_prefix('[') {
+        let level = after.bytes().take_while(|&c| c == b'=').count();
+        let body = &raw[level + 2..raw.len() - level - 2];
+        let body = body.strip_prefix("\r\n").unwrap_or(body);
+        body.strip_prefix('\n').unwrap_or(body).to_string()
+    } else {
+        let mut out = String::new();
+        let mut chars = raw[1..raw.len() - 1].chars();
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' => out.extend(chars.next()),
+                c => out.push(c),
+            }
+        }
+        out
+    }
 }
 
 fn lex(src: &str) -> Result<Vec<Tok>, String> {
@@ -247,7 +329,7 @@ fn lex(src: &str) -> Result<Vec<Tok>, String> {
             i += 1;
             loop {
                 match b.get(i) {
-                    None | Some(b'\n') => return Err("unterminated string in mapinfo.lua".into()),
+                    None | Some(b'\n') => return Err("unterminated string".into()),
                     Some(b'\\') => i += 2,
                     Some(&q) if q == c => {
                         i += 1;
@@ -315,7 +397,7 @@ fn lex(src: &str) -> Result<Vec<Tok>, String> {
             continue;
         }
         if c >= 0x80 {
-            return Err("unexpected non ASCII character outside a string in mapinfo.lua".into());
+            return Err("unexpected non ASCII character outside a string".into());
         }
         let three = b.get(i..i + 3) == Some(b"...");
         let two = matches!(
