@@ -47,9 +47,8 @@ import { worldMatrix } from "./reparent";
 
 /**
  * The most a generated piece is scaled, a module or a covering part. A choice,
- * not a measurement: below it, a part keeps its texture's detail, and every
- * medium walker and wheeled unit's chassis but the heaviest is no bigger than
- * it was before the bound. Above it, a length takes more parts.
+ * not a measurement: below it a part keeps its texture's detail, and a longer
+ * length takes more parts.
  */
 export const MAX_PART_SCALE = 12;
 
