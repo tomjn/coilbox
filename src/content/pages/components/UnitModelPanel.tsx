@@ -1,6 +1,6 @@
 /**
- * One unit's model as the game ships it, beside the build tree rather than over
- * it, so the tree stays visible while comparing units.
+ * One unit's stats and model as the game ships them, beside the build tree
+ * rather than over it, so the tree stays visible while comparing units.
  *
  * Read only, and deliberately not the unit builder's viewport: that one is
  * eleven editing callbacks and a scene of gizmos, anchors and bake caches around
@@ -29,6 +29,7 @@ import { useUnitsyncUnitModel } from "../../config";
 import { countPieces, countTriangles, modelFormatLabel } from "../../unitModel";
 import { ModelReadFailed } from "./ModelReadFailed";
 import { ModelNotes, ModelViewport, Note } from "./ModelViewport";
+import { UnitStatsTable } from "./UnitStatsTable";
 
 interface Props {
   enginePath: string;
@@ -96,6 +97,14 @@ export function UnitModelPanel({
           <X size={16} />
         </Button>
       </header>
+
+      {unit?.stats && (
+        // Above the model: the stats are what the build tree's focus panel is
+        // opened for, and the model's own rows are long.
+        <div className="border-b border-border/50 p-3 empty:hidden">
+          <UnitStatsTable unit={unit} narrow />
+        </div>
+      )}
 
       <Body
         object={object}

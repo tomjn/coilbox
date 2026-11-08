@@ -29920,6 +29920,10 @@ msgstr "Corrisponde al tuo sistema"
 msgid "Matches: {matches}"
 msgstr "Corrispondenze: {matches}"
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Matching units"
+msgstr ""
+
 #: src/multiplayer/debriefing.ts
 #: src/multiplayer/index.tsx
 #: src/multiplayer/pages/MatchmakingPage.tsx
@@ -33690,6 +33694,7 @@ msgid "No units match \"{trimmedQuery}\"."
 msgstr "Nessuna unità corrisponde a «{trimmedQuery}»."
 
 #: src/campaign/pages/components/CampaignUnits.tsx
+#: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/UnitPicker.tsx
 #: src/lego/pages/components/GameUnitBrowser.tsx
 #, fuzzy
@@ -42710,6 +42715,7 @@ msgstr "Cerca in questo log"
 msgid "Search titles and descriptions…"
 msgstr "Cerca in titoli e descrizioni…"
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/UnitPicker.tsx
 #: src/content/pages/GameUnitsPage.tsx
 #: src/workshop/pages/components/UnitList.tsx

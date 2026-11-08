@@ -1,6 +1,6 @@
 import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { cn } from "@picoframe/frame";
+import { cn, Input } from "@picoframe/frame";
 import {
   Background,
   Controls,
@@ -15,7 +15,14 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
@@ -27,6 +34,7 @@ import {
   buildEdgeMap,
   focusNeighbours,
 } from "../../buildTree";
+import { searchUnits } from "../../buildTreeSearch";
 import { useUnitsyncUnitBuildpics } from "../../config";
 import { foldMorphs, groupOf, morphGroups } from "../../morphGraph";
 import { unitIconSrc } from "../../unitIcon";
@@ -216,6 +224,7 @@ export function BuildTreeDrawer({
   // the full tree. One value, not a stack — so each click replaces the focus and
   // a background click always exits to the full tree, never a previous focus.
   const [focusedUnit, setFocusedUnit] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const reduceMotion = usePrefersReducedMotion();
   const active = sides.find((s) => s.name === activeName) ?? sides[0];
 
@@ -225,6 +234,7 @@ export function BuildTreeDrawer({
     setActiveName(name);
     setFocusedUnit(null);
     setHoveredId(null);
+    setQuery("");
   };
 
   // Escape clears the focus (keyboard path back to the full tree).
@@ -458,6 +468,17 @@ export function BuildTreeDrawer({
     ],
   );
 
+  // What the search box looks through: every unit of the active faction's tree,
+  // under the name its node shows (without the "(2 upgrades)" suffix).
+  const searchCandidates = useMemo(
+    () =>
+      laidOut.nodes.map((n) => ({
+        id: n.id,
+        label: buildpics?.units[n.id]?.name ?? (n.data as UnitNodeData).label,
+      })),
+    [laidOut, buildpics],
+  );
+
   // Style edges: solid backbone vs faint dashed extras. On hover, the hovered
   // unit's outgoing edges (what it builds) go green and its incoming edges (what
   // builds it) go orange; everything else fades. All changes ease via a CSS
@@ -581,7 +602,18 @@ export function BuildTreeDrawer({
         </p>
       ) : (
         <>
-          <BuildTreeLegend />
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <BuildTreeLegend />
+            <UnitSearch
+              candidates={searchCandidates}
+              query={query}
+              onQueryChange={setQuery}
+              onPick={(id) => {
+                setHoveredId(null);
+                setFocusedUnit(id);
+              }}
+            />
+          </div>
           <div className="flex min-h-[60vh] w-full min-w-0 flex-1 gap-3">
             <div
               className="min-w-0 flex-1 overflow-hidden rounded-lg border border-border/50 bg-background"
@@ -699,6 +731,129 @@ function FocusRefit({
     return () => cancelAnimationFrame(raf);
   }, [dep]);
   return null;
+}
+
+/**
+ * Search box with a results list under it. Picking a result (click, or Enter on
+ * the highlighted one) focuses that unit, so the tree frames it and the panel
+ * shows its stats. Arrow keys move the highlight. Escape clears the box, and
+ * only once it is empty does Escape reach the drawer's own handler that leaves
+ * focus mode.
+ */
+function UnitSearch({
+  candidates,
+  query,
+  onQueryChange,
+  onPick,
+}: {
+  candidates: { id: string; label: string }[];
+  query: string;
+  onQueryChange: (q: string) => void;
+  onPick: (id: string) => void;
+}) {
+  const { t } = useLingui();
+  const listId = useId();
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const results = useMemo(
+    () => searchUnits(query, candidates),
+    [query, candidates],
+  );
+  const showList = open && query.trim() !== "";
+  const optionId = (i: number) => `${listId}-${i}`;
+
+  const pick = (id: string) => {
+    onPick(id);
+    onQueryChange("");
+    setOpen(false);
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape" && query !== "") {
+      e.stopPropagation();
+      onQueryChange("");
+    } else if (e.key === "ArrowDown" && results.length > 0) {
+      e.preventDefault();
+      setOpen(true);
+      setHighlighted((highlighted + 1) % results.length);
+    } else if (e.key === "ArrowUp" && results.length > 0) {
+      e.preventDefault();
+      setOpen(true);
+      setHighlighted((highlighted - 1 + results.length) % results.length);
+    } else if (e.key === "Enter" && showList && results[highlighted]) {
+      e.preventDefault();
+      pick(results[highlighted].id);
+    }
+  };
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: only closes the list when focus leaves the box and its results, no role of its own
+    <div
+      className="relative w-64 max-w-full"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+      }}
+    >
+      <Input
+        type="search"
+        role="combobox"
+        aria-expanded={showList}
+        aria-controls={listId}
+        aria-activedescendant={
+          showList && results.length > 0 ? optionId(highlighted) : undefined
+        }
+        aria-autocomplete="list"
+        aria-label={t`Search units`}
+        placeholder={t`Search units`}
+        value={query}
+        onChange={(e) => {
+          onQueryChange(e.target.value);
+          setHighlighted(0);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
+      />
+      {showList && (
+        <div
+          id={listId}
+          role="listbox"
+          aria-label={t`Matching units`}
+          className="absolute right-0 left-0 z-20 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border/50 bg-card p-1 text-sm shadow-lg"
+        >
+          {results.length === 0 ? (
+            <p className="px-2 py-1.5 text-muted-foreground">
+              <Trans>No units match.</Trans>
+            </p>
+          ) : (
+            results.map((r, i) => (
+              <div
+                key={r.id}
+                id={optionId(i)}
+                role="option"
+                tabIndex={-1}
+                aria-selected={i === highlighted}
+                className={cn(
+                  "flex cursor-pointer flex-col rounded px-2 py-1.5 hover:bg-accent",
+                  i === highlighted && "bg-accent",
+                )}
+                // mousedown, so the pick lands before the input's blur closes the list
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(r.id);
+                }}
+              >
+                <span className="truncate">{r.label}</span>
+                <span className="truncate font-mono text-xs text-muted-foreground">
+                  {r.id}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Colour/line key for the build graph, shown above the canvas. */
