@@ -5965,6 +5965,7 @@ dependencies = [
  "sevenz-rust2",
  "tauri",
  "tauri-plugin",
+ "texpresso",
  "zip 8.6.0",
 ]
 

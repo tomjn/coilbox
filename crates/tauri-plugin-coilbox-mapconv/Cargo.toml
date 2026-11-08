@@ -28,3 +28,5 @@ sevenz-rust2 = { workspace = true }
 # Decode source images (texture/heightmap/...) to read true dimensions and build
 # small preview thumbnails. default-features off; only the formats mapconv accepts.
 image = { workspace = true, features = ["png", "bmp", "tga", "jpeg", "tiff"] }
+# BC3 (DXT5) encoder for detail_normals.dds. Already in the tree for coilbox-texture's decode.
+texpresso = "2"

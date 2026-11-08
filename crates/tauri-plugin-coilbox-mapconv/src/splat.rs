@@ -20,9 +20,10 @@
 //!   `CMipMapTexture`, which builds its own mips, so PNG is fine for them.
 //! - `CBitmap::Load` hands a `.dds` to nv_dds with `flipImage` true (every
 //!   name not under `unitpics`), and `CreateDDSTexture` only builds mips itself
-//!   when the file has none. An uncompressed 32 bit DDS is accepted when its
-//!   pixel format flags are exactly `DDPF_RGB | DDPF_ALPHAPIXELS` and it is
-//!   uploaded as BGRA.
+//!   when the file has none. nv_dds flips DXT1, DXT3, DXT5, BC4 and BC5 blocks
+//!   but not BC7, so the file is BC3 (DXT5): a quarter of BGRA's size, with
+//!   alpha kept as its own gradient. `CDDSImage::flip` counts whole blocks only,
+//!   so [`dds`] flips each level the way it does.
 //! - In the shader's tangent space red is world +x, green is world +z and blue
 //!   is up (`SMFFragProg.glsl`, `stnMatrix`).
 
@@ -584,54 +585,101 @@ pub fn mip_chain(img: &RgbaImage) -> Vec<RgbaImage> {
     levels
 }
 
-/// An uncompressed BGRA DDS of `img` with every mip level down to 1 by 1.
+/// Flip one 16 byte DXT5 block top to bottom, as nv_dds does it: the four rows
+/// of 12 bit alpha indexes (bytes 2 to 7) in reverse order, and the four colour
+/// index bytes (12 to 15) end for end.
+fn flip_block(block: &mut [u8]) {
+    let mut bytes = [0u8; 8];
+    bytes[..6].copy_from_slice(&block[2..8]);
+    let bits = u64::from_le_bytes(bytes);
+    let row = |i: u32| (bits >> (12 * i)) & 0xfff;
+    let flipped = row(3) | row(2) << 12 | row(1) << 24 | row(0) << 36;
+    block[2..8].copy_from_slice(&flipped.to_le_bytes()[..6]);
+    block.swap(12, 15);
+    block.swap(13, 14);
+}
+
+/// What nv_dds's `CDDSImage::flip` does to one compressed level of `w` by `h`,
+/// which undoes itself when applied twice.
 ///
-/// Recoil uploads the levels a DDS carries without building the rest, and a
-/// texture with a short chain samples black, so the chain is always complete.
-/// It also flips a DDS top to bottom as it loads it, so each level's rows are
-/// stored bottom first and the engine ends up with `img` the right way up.
+/// It counts only whole blocks (`w / 4` by `h / 4`), so it swaps the rows of
+/// blocks pairwise and leaves a level under 8 rows alone, and the middle row
+/// when the count is odd. Applying it to what the engine will apply it to
+/// again gives the engine exactly the blocks that were compressed.
+fn flip_level(level: &mut [u8], w: usize, h: usize) {
+    let (xblocks, yblocks) = (w / 4, h / 4);
+    let line = xblocks * BLOCK;
+    for j in 0..yblocks / 2 {
+        let (top, bottom) = (j * line, (yblocks - j - 1) * line);
+        for at in [top, bottom] {
+            for b in 0..xblocks {
+                flip_block(&mut level[at + b * BLOCK..at + (b + 1) * BLOCK]);
+            }
+        }
+        let (upper, lower) = level.split_at_mut(bottom);
+        upper[top..top + line].swap_with_slice(&mut lower[..line]);
+    }
+}
+
+/// Bytes in one BC3 block of 4 by 4 pixels.
+const BLOCK: usize = 16;
+
+/// A BC3 (DXT5) DDS of `img` with every mip level down to 1 by 1.
+///
+/// BC3 keeps the alpha channel as its own 8 bit gradient, which the shader
+/// needs as the strength of the detail normal, and is a quarter the size of
+/// BGRA. Recoil uploads the levels a DDS carries without building the rest, and
+/// a texture with a short chain samples black, so the chain is always complete.
+/// It also flips a DDS top to bottom as it loads it, so each level is flipped
+/// here first (see [`flip_level`]) and the engine ends up with `img` the right
+/// way up.
+///
+/// Colour is fitted with equal weights on red, green and blue, because they are
+/// the three components of a direction rather than a picture, and alpha does not
+/// weigh the colour, because where it is low the colour is still a real normal.
 pub fn dds(img: &RgbaImage) -> Vec<u8> {
     const CAPS: u32 = 0x1;
     const HEIGHT: u32 = 0x2;
     const WIDTH: u32 = 0x4;
-    const PITCH: u32 = 0x8;
     const PIXELFORMAT: u32 = 0x1000;
     const MIPMAPCOUNT: u32 = 0x2_0000;
-    const RGBA: u32 = 0x41; // DDPF_RGB | DDPF_ALPHAPIXELS
+    const LINEARSIZE: u32 = 0x8_0000;
+    const FOURCC: u32 = 0x4;
     const TEXTURE: u32 = 0x1000;
     const COMPLEX: u32 = 0x8;
     const MIPMAP: u32 = 0x40_0000;
 
+    let format = texpresso::Format::Bc3;
+    let params = texpresso::Params {
+        algorithm: texpresso::Algorithm::ClusterFit,
+        weights: texpresso::COLOUR_WEIGHTS_UNIFORM,
+        weigh_colour_by_alpha: false,
+    };
     let levels = mip_chain(img);
     let mut header = [0u32; 31];
     header[0] = 124;
-    header[1] = CAPS | HEIGHT | WIDTH | PITCH | PIXELFORMAT | MIPMAPCOUNT;
+    header[1] = CAPS | HEIGHT | WIDTH | PIXELFORMAT | MIPMAPCOUNT | LINEARSIZE;
     header[2] = img.height();
     header[3] = img.width();
-    header[4] = img.width() * 4;
+    header[4] = format.compressed_size(img.width() as usize, img.height() as usize) as u32;
     header[6] = levels.len() as u32;
     // Pixel format, at word 18.
     header[18] = 32;
-    header[19] = RGBA;
-    header[21] = 32;
-    header[22] = 0x00ff_0000;
-    header[23] = 0x0000_ff00;
-    header[24] = 0x0000_00ff;
-    header[25] = 0xff00_0000;
+    header[19] = FOURCC;
+    header[20] = u32::from_le_bytes(*b"DXT5");
     header[26] = TEXTURE | COMPLEX | MIPMAP;
 
-    let mut out = Vec::with_capacity(128 + img.as_raw().len() * 4 / 3 + 64);
+    let mut out = Vec::with_capacity(128 + header[4] as usize * 4 / 3 + 64);
     out.extend_from_slice(b"DDS ");
     for word in header {
         out.extend_from_slice(&word.to_le_bytes());
     }
     for level in &levels {
-        for y in (0..level.height()).rev() {
-            for x in 0..level.width() {
-                let [r, g, b, a] = level.get_pixel(x, y).0;
-                out.extend_from_slice(&[b, g, r, a]);
-            }
-        }
+        let (w, h) = (level.width() as usize, level.height() as usize);
+        let mut blocks = vec![0u8; format.compressed_size(w, h)];
+        format.compress(level.as_raw(), w, h, params, &mut blocks);
+        flip_level(&mut blocks, w, h);
+        out.extend_from_slice(&blocks);
     }
     out
 }
@@ -993,28 +1041,75 @@ mod tests {
         assert_eq!(pick_ground([0.4, 0.4, 0.42]), Dnts::Sand);
     }
 
+    /// `CDDSImage::flip_blocks_dxtc5` on one 16 byte DXT5 block, written out the
+    /// way nv_dds does it: alpha indexes unpacked to a 4 by 4 grid and packed
+    /// back bottom row first, then the four colour index bytes swapped end for end.
+    fn nv_dds_flip_block(block: &mut [u8]) {
+        let mut grid = [[0u8; 4]; 4];
+        for (first, rows) in [(2, 0..2), (5, 2..4)] {
+            let mut bits =
+                u32::from_le_bytes([block[first], block[first + 1], block[first + 2], 0]);
+            for row in rows {
+                for cell in &mut grid[row] {
+                    *cell = (bits & 7) as u8;
+                    bits >>= 3;
+                }
+            }
+        }
+        for (first, upper, lower) in [(2, 3, 2), (5, 1, 0)] {
+            let mut bits = 0u32;
+            for c in 0..4 {
+                bits |= u32::from(grid[upper][c]) << (3 * c);
+                bits |= u32::from(grid[lower][c]) << (12 + 3 * c);
+            }
+            block[first..first + 3].copy_from_slice(&bits.to_le_bytes()[..3]);
+        }
+        block.swap(12, 15);
+        block.swap(13, 14);
+    }
+
+    /// `CDDSImage::flip` on one compressed level, with its quirks: only whole
+    /// blocks count (`width / 4` by `height / 4`), so a level under 8 rows is
+    /// left alone, and so is the middle row of blocks when the count is odd.
+    fn nv_dds_flip(level: &mut [u8], w: usize, h: usize) {
+        let (xblocks, yblocks) = (w / 4, h / 4);
+        let line = xblocks * 16;
+        for j in 0..yblocks / 2 {
+            let (top, bottom) = (j * line, (yblocks - j - 1) * line);
+            for at in [top, bottom] {
+                for b in 0..xblocks {
+                    nv_dds_flip_block(&mut level[at + b * 16..at + b * 16 + 16]);
+                }
+            }
+            for i in 0..line {
+                level.swap(top + i, bottom + i);
+            }
+        }
+    }
+
     /// The levels of a DDS this module wrote, read the way nv_dds reads them:
-    /// each level's rows flipped top to bottom as it loads.
+    /// each level's blocks flipped as it loads, then decoded.
     fn load_like_the_engine(bytes: &[u8]) -> (u32, Vec<RgbaImage>) {
         let word = |i: usize| u32::from_le_bytes(bytes[4 + i * 4..8 + i * 4].try_into().unwrap());
         assert_eq!(&bytes[..4], b"DDS ");
         assert_eq!(
             word(19),
-            0x41,
-            "pixel format flags must be exactly RGB | ALPHAPIXELS"
+            0x4,
+            "the pixel format must be a four character code"
         );
-        assert_eq!(word(21), 32);
-        let (mut h, mut w, count) = (word(2), word(3), word(6));
+        assert_eq!(word(20), u32::from_le_bytes(*b"DXT5"));
+        let (mut h, mut w, count) = (word(2) as usize, word(3) as usize, word(6));
         let mut at = 128;
         let mut levels = Vec::new();
         for _ in 0..count {
-            let len = (w * h * 4) as usize;
-            let raw = &bytes[at..at + len];
+            // `size_dxtc`.
+            let len = w.div_ceil(4) * h.div_ceil(4) * 16;
+            let mut raw = bytes[at..at + len].to_vec();
             at += len;
-            levels.push(RgbaImage::from_fn(w, h, |x, y| {
-                let i = (((h - 1 - y) * w + x) * 4) as usize;
-                Rgba([raw[i + 2], raw[i + 1], raw[i], raw[i + 3]])
-            }));
+            nv_dds_flip(&mut raw, w, h);
+            let mut rgba = vec![0u8; w * h * 4];
+            texpresso::Format::Bc3.decompress(&raw, w, h, &mut rgba);
+            levels.push(RgbaImage::from_raw(w as u32, h as u32, rgba).unwrap());
             w = (w / 2).max(1);
             h = (h / 2).max(1);
         }
@@ -1024,6 +1119,51 @@ mod tests {
             "the file holds exactly the levels it declares"
         );
         (count, levels)
+    }
+
+    /// The largest difference in any channel, and the mean difference over
+    /// every channel of every pixel.
+    fn error(a: &RgbaImage, b: &RgbaImage) -> (u8, f64) {
+        assert_eq!(a.dimensions(), b.dimensions());
+        let (mut worst, mut sum) = (0u8, 0u64);
+        for (p, q) in a.pixels().zip(b.pixels()) {
+            for c in 0..4 {
+                let d = p[c].abs_diff(q[c]);
+                worst = worst.max(d);
+                sum += u64::from(d);
+            }
+        }
+        (worst, sum as f64 / (a.as_raw().len() as f64))
+    }
+
+    #[test]
+    fn the_dds_is_dxt5() {
+        let bytes = dds(&RgbaImage::from_pixel(64, 32, Rgba([128, 128, 255, 200])));
+        let word = |i: usize| u32::from_le_bytes(bytes[4 + i * 4..8 + i * 4].try_into().unwrap());
+        assert_eq!(word(0), 124);
+        assert_eq!(
+            word(1) & 0xa_1007,
+            0xa_1007,
+            "caps, height, width, pixel format, mip count, linear size"
+        );
+        assert_eq!((word(2), word(3)), (32, 64));
+        assert_eq!(word(19), 0x4, "DDPF_FOURCC");
+        assert_eq!(&bytes[4 + 20 * 4..8 + 20 * 4], b"DXT5");
+        assert_eq!(word(26) & 0x40_1008, 0x40_1008, "texture, complex, mipmap");
+    }
+
+    #[test]
+    fn the_dds_is_a_quarter_of_the_uncompressed_size() {
+        // BC3 spends 16 bytes on 16 pixels where BGRA spends 64.
+        let img = RgbaImage::from_pixel(256, 128, Rgba([128, 128, 255, 200]));
+        let bytes = dds(&img);
+        let linear = u32::from_le_bytes(bytes[20..24].try_into().unwrap());
+        assert_eq!(linear, 256 * 128);
+        let levels: usize = mip_chain(&img)
+            .iter()
+            .map(|l| (l.width() as usize).div_ceil(4) * (l.height() as usize).div_ceil(4) * 16)
+            .sum();
+        assert_eq!(bytes.len(), 128 + levels);
     }
 
     #[test]
@@ -1045,10 +1185,35 @@ mod tests {
             Rgba([128, if y < 4 { 200 } else { 50 }, 220, 255])
         });
         let bytes = dds(&img);
-        // As stored, the first row is the picture's bottom row.
-        assert_eq!(bytes[128 + 1], 50);
+        // As stored, the first block row is the picture's bottom half.
+        let first = texpresso::Format::Bc3.decompress_block(&bytes[128..144]);
+        assert!(first.iter().all(|p| p[1].abs_diff(50) <= 4), "{first:?}");
         let (_, levels) = load_like_the_engine(&bytes);
-        assert_eq!(levels[0], img);
+        let (worst, _) = error(&levels[0], &img);
+        assert!(worst <= 4, "worst error {worst}");
+    }
+
+    #[test]
+    fn the_engine_flips_every_level_back_whatever_its_size() {
+        // 80 by 80 halves to 40, 20, 10, 5, 2, 1: sizes where nv_dds counts
+        // whole blocks only and leaves some rows alone.
+        let img = RgbaImage::from_fn(80, 80, |_, y| {
+            Rgba([128, (y * 3) as u8, 200, (y * 3) as u8])
+        });
+        let (count, levels) = load_like_the_engine(&dds(&img));
+        let wanted = mip_chain(&img);
+        assert_eq!(count as usize, wanted.len());
+        for (got, want) in levels.iter().zip(&wanted) {
+            let (worst, mean) = error(got, want);
+            // The mean gets more room than on the full size level: a 5 by 5 level
+            // is four blocks, most of their pixels padding, and measured 6.0.
+            assert!(
+                worst <= BOUND_WORST && mean <= 8.0,
+                "{}x{}: worst {worst}, mean {mean}",
+                want.width(),
+                want.height()
+            );
+        }
     }
 
     #[test]
@@ -1058,7 +1223,8 @@ mod tests {
         let rock = RgbaImage::from_pixel(16, 16, Rgba([255, 0, 0, 0]));
         let img = detail_normals(&m, &rock, 2);
         let (_, levels) = load_like_the_engine(&dds(&img));
-        assert_eq!(levels[0], img);
+        let (worst, mean) = error(&levels[0], &img);
+        assert!(worst <= BOUND_WORST && mean <= BOUND_MEAN, "{worst} {mean}");
         // Strata are bands across the rise, so the tilt is all along z: red stays
         // level and green swings to both sides as the bands go up and down.
         let col: Vec<Rgba<u8>> = (0..img.height())
@@ -1069,6 +1235,26 @@ mod tests {
         assert!(red * 2 < green, "{col:?}");
         assert!(col.iter().any(|p| p[1] < 110) && col.iter().any(|p| p[1] > 146));
         assert!(col.iter().all(|p| p[3] > 190));
+    }
+
+    /// The largest and the mean per channel difference, in 8 bit steps, that
+    /// BC3 may leave on a detail normal map. The normal's x and z take 5 and 6
+    /// bit endpoints and one of four palette steps per block, so some error is
+    /// built in. Measured on the ramp above (14 worst, 2.05 mean) and on a steep
+    /// face (17 worst, 2.14 mean), then set a little over. 24 steps is 0.19 of a
+    /// unit vector component, about 11 degrees of tilt, and 4 steps on average is about 2 degrees. A picture flipped the wrong way
+    /// up is off by over 100 steps, so this still tells orientation apart.
+    const BOUND_WORST: u8 = 24;
+    const BOUND_MEAN: f64 = 4.0;
+
+    #[test]
+    fn bc3_keeps_a_steep_rock_face_within_the_bound() {
+        let m = map(48, 48, |x, y| 60.0 * (x * 0.2).sin() * (y * 0.15).cos());
+        let rock = RgbaImage::from_pixel(48, 48, Rgba([255, 0, 0, 0]));
+        let img = detail_normals(&m, &rock, 2);
+        let (_, levels) = load_like_the_engine(&dds(&img));
+        let (worst, mean) = error(&levels[0], &img);
+        assert!(worst <= BOUND_WORST && mean <= BOUND_MEAN, "{worst} {mean}");
     }
 
     #[test]
