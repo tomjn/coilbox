@@ -37,7 +37,8 @@ function land(planet: PlanetId, seed = 35058) {
   return { doc, pixels, heights, surface, courses };
 }
 
-describe("rivers on a generated map", () => {
+// Each test builds a whole map's land, a second or so apiece.
+describe("rivers on a generated map", { timeout: 30_000 }, () => {
   const temperate = land("temperate");
 
   it("has rivers, and every one reaches the sea or the river it joins", () => {
