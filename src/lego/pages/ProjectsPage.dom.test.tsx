@@ -53,6 +53,31 @@ vi.mock("./components/GameModelDrawer", () => ({
   GameModelDrawer: () => null,
 }));
 vi.mock("./components/ImportDrawer", () => ({ ImportDrawer: () => null }));
+const GENERATED = {
+  id: "generated-unit",
+  name: "Assault Biped 7",
+  generated: {
+    seed: 7,
+    plan: "biped",
+    job: "assault",
+    size: "medium",
+    modules: [],
+  },
+};
+vi.mock("./components/GenerateDrawer", () => ({
+  GenerateDrawer: ({
+    open,
+    onOpened,
+  }: {
+    open: boolean;
+    onOpened: (project: unknown) => void;
+  }) =>
+    open ? (
+      <button type="button" onClick={() => onOpened(GENERATED)}>
+        Seed 7
+      </button>
+    ) : null,
+}));
 
 beforeEach(() => {
   saveProject.mockReset();
@@ -110,5 +135,15 @@ describe("ProjectsPage game choice", () => {
 
     await waitFor(() => expect(saveProject).toHaveBeenCalledTimes(1));
     expect(saveProject.mock.calls[0][0].game).toBeNull();
+  });
+
+  it("saves and opens a generated candidate", async () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seed 7" }));
+
+    await waitFor(() => expect(saveProject).toHaveBeenCalledTimes(1));
+    expect(saveProject.mock.calls[0][0]).toEqual(GENERATED);
+    expect(navigate).toHaveBeenCalledWith("/lego/generated-unit");
   });
 });
