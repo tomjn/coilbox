@@ -549,9 +549,13 @@ async fn mc_height_field<R: Runtime>(app: AppHandle<R>, path: String, max: u32) 
     }
 }
 
-/// A compiled map's height words, written to the cache under `<key>-smf.bin`
-/// and reported by file name with the grid and range they are on. Keyed by the
-/// file's size and modification time, so a new compile is read afresh.
+/// A compiled map's height words and metal map, written to the cache under
+/// `<key>-smf.bin` and `<key>-smfm.bin` and reported by file name with the grids
+/// and range they are on. Keyed by the file's size and modification time, so a
+/// new compile is read afresh.
+///
+/// `metalFile` is left out when the metal map does not lie inside the file, so
+/// the panel can say there is none to read.
 fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json::Value, String> {
     // The header first, so a missing or broken map says so rather than
     // anything about the cache.
@@ -570,19 +574,35 @@ fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json
         let _ = std::fs::create_dir_all(dir);
         std::fs::write(&grid, &bytes).map_err(|e| format!("could not write the heights: {e}"))?;
     }
-    let info = at.info;
-    Ok(json!({
+    let mut out = json!({
         "file": name,
-        "width": info.mapx + 1,
-        "height": info.mapy + 1,
-        "minHeight": info.min_height,
-        "maxHeight": info.max_height,
-    }))
+        "width": at.info.mapx + 1,
+        "height": at.info.mapy + 1,
+        "minHeight": at.info.min_height,
+        "maxHeight": at.info.max_height,
+    });
+    if let Some(metal) = &at.metal {
+        let metal_name = format!("{key}-smfm.bin");
+        let metal_file = dir.join(&metal_name);
+        let cached = std::fs::metadata(&metal_file).is_ok_and(|m| m.len() == metal.len as u64);
+        if cached {
+            coilbox_thumb_cache::touch(&metal_file);
+        } else {
+            let bytes = smf::read_smf_metal(Path::new(path), metal)?;
+            let _ = std::fs::create_dir_all(dir);
+            std::fs::write(&metal_file, &bytes)
+                .map_err(|e| format!("could not write the metal map: {e}"))?;
+        }
+        out["metalFile"] = json!(metal_name);
+        out["metalWidth"] = json!(metal.width);
+        out["metalHeight"] = json!(metal.height);
+    }
+    Ok(out)
 }
 
-/// `mc_smf_heights` reads the heights out of a compiled `.smf`, for the
-/// playability panel to measure the map the compile actually wrote (issue
-/// #2169).
+/// `mc_smf_heights` reads the heights and the metal map out of a compiled
+/// `.smf`, for the playability panel to measure the map the compile actually
+/// wrote (issues #2169 and #5098).
 #[tauri::command]
 async fn mc_smf_heights<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
     let cache_dir = thumb_cache_dir(&app);
