@@ -54,7 +54,25 @@ export const OPEN_SCREENS = {
 export type OpenScreen = keyof typeof OPEN_SCREENS;
 
 /** An oversized value is rejected rather than acted on. Deep-link URLs are short
- * by nature, so a very long one is a red flag, not a legitimate payload. */
+ * by nature, so a very long one is a red flag, not a legitimate payload.
+ *
+ * `MAX_CODE_LENGTH` stays below the container's 512 KB inflate ceiling on
+ * purpose (issue #1342), and is not to be raised toward it. A handler is handed
+ * the link by the OS, and two of the three platforms cannot be shown to pass
+ * this much:
+ * - macOS handed a scratch `cbxscratch://import?code=` handler every link
+ *   tried intact, up to the 1,000,025 characters tried.
+ * - Windows launches the handler with the link on its command line, and
+ *   CreateProcess caps a command line at 32,767 characters.
+ * - Linux runs the desktop file's Exec line, and execve(2) caps one argument at
+ *   32 pages (MAX_ARG_STRLEN), 131,072 bytes on 4 KiB pages. A link at this
+ *   limit is 131,094 characters.
+ * Links are base64url, so a link is the code plus the 22 characters of
+ * `coilbox://import?code=`. Today's limit is already above the Windows and
+ * Linux figures, so by those documents a link near it will not open on those
+ * two systems. That has not been run (issue #5150). Pasting a code involves no handler, so most pasted
+ * codes are bound only by the inflate ceiling. `modProjectCode` checks this
+ * limit as well. */
 export const MAX_CODE_LENGTH = 128 * 1024;
 export const MAX_URL_LENGTH = 2048;
 export const MAX_FIELD_LENGTH = 512;
