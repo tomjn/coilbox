@@ -2352,14 +2352,23 @@ function useUnitsyncMapAsset<
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The key the state above belongs to, so a changed map shows nothing of the
+  // old one from the render it changes in (issue #5107).
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && mapName
+      ? `${dataDir}::${enginePath}::${mapName}`
+      : undefined;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
+    setLoadedKey(key);
+    if (!enginePath || !dataDir || !mapName || !key) {
       setData(null);
       setUrl(null);
+      setLoading(false);
+      setError(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
     const apply = (res: T) => {
       setData(res);
       const url = renderedUrl(res, unitsyncThumbUrl);
@@ -2367,6 +2376,8 @@ function useUnitsyncMapAsset<
       if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
     let cancelled = false;
+    setData(null);
+    setUrl(null);
     setLoading(true);
     setError(null);
     (async () => {
@@ -2393,8 +2404,16 @@ function useUnitsyncMapAsset<
     return () => {
       cancelled = true;
     };
-  }, [cache, pending, fetchAsset, enginePath, dataDir, mapName]);
+  }, [cache, pending, fetchAsset, enginePath, dataDir, mapName, key]);
 
+  if (loadedKey !== key) {
+    return {
+      data: null,
+      url: null,
+      loading: !!key,
+      error: null,
+    };
+  }
   return { data, url, loading, error };
 }
 
@@ -2506,14 +2525,21 @@ export function useUnitsyncMapSkybox(
 ) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // The key the state above belongs to, so a changed map shows nothing of the
+  // old one from the render it changes in (issue #5107).
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && mapName
+      ? `${dataDir}::${enginePath}::${mapName}`
+      : undefined;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
+    setLoadedKey(key);
+    if (!enginePath || !dataDir || !mapName || !key) {
       setDataUrl(null);
       setLoading(false);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
     const cached = skyboxCache.get(key);
     if (cached) {
       setDataUrl(cached.dataUrl ?? null);
@@ -2539,8 +2565,9 @@ export function useUnitsyncMapSkybox(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName]);
+  }, [enginePath, dataDir, mapName, key]);
 
+  if (loadedKey !== key) return { dataUrl: null, loading: !!key };
   return { dataUrl, loading };
 }
 

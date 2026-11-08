@@ -140,21 +140,17 @@ export default function MapDetailPage() {
     metalField.data?.width,
     metalField.data?.height,
   );
-  // The hook keeps the last map's answer until the next one arrives, so while
-  // it loads the metal is still being read, not the old map's.
-  const playMetal = metalField.loading
-    ? { grid: null }
-    : {
-        grid: metalGrid.grid,
-        error:
-          metalField.error ??
-          metalGrid.error ??
-          // An answer with no file and no error is a map with no metal map.
-          (metalField.data && !metalField.url
-            ? "the map has no metal map to read"
-            : null),
-        extractorRadius: metalField.data?.extractorRadius,
-      };
+  const playMetal = {
+    grid: metalGrid.grid,
+    error:
+      metalField.error ??
+      metalGrid.error ??
+      // An answer with no file and no error is a map with no metal map.
+      (metalField.data && !metalField.url
+        ? "the map has no metal map to read"
+        : null),
+    extractorRadius: metalField.data?.extractorRadius,
+  };
   const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
     selected?.rootPath,
