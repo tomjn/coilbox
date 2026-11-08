@@ -1,5 +1,7 @@
 import * as THREE from "three";
+import type { Drainage } from "../displayErosion";
 import type { PlanetId } from "../planets";
+import type { RiverField, RiverLine } from "../rivers";
 import type { GroundShading } from "./groundShader";
 import {
   apronHeights,
@@ -131,6 +133,20 @@ export interface TerrainExtension {
    * ground's shape stays `heights`.
    */
   relief?: HeightGrid;
+  /**
+   * Where water runs on `relief`, the same size, for drawing gullies. Left
+   * out for a world with no water courses. See {@link Drainage}.
+   */
+  drainage?: Drainage;
+  /**
+   * The rivers on this picture, in its pixels, and how far each point lies
+   * from one. Left out for a world with none. See `rivers.ts`.
+   */
+  rivers?: {
+    lines: RiverLine[];
+    field: RiverField;
+    look: "water" | "frozen";
+  };
   /** The generator's weights at this picture's size. */
   biomes?: BiomePixels;
 }
@@ -351,6 +367,22 @@ export function buildTerrainMesh(
     cavity.generateMipmaps = true;
     cavity.needsUpdate = true;
   }
+  // The water courses the bake draws gullies along.
+  let drainage: THREE.Texture | null = null;
+  if (cavity && ext?.drainage) {
+    drainage = new THREE.DataTexture(
+      ext.drainage.data,
+      ext.drainage.width,
+      ext.drainage.height,
+      THREE.RGFormat,
+    );
+    drainage.flipY = false;
+    drainage.unpackAlignment = 2;
+    drainage.magFilter = THREE.LinearFilter;
+    drainage.minFilter = THREE.LinearMipmapLinearFilter;
+    drainage.generateMipmaps = true;
+    drainage.needsUpdate = true;
+  }
 
   let frame: TerrainFrame | undefined;
   // The haze's colour, and the background's. An apron round a picture still
@@ -384,6 +416,7 @@ export function buildTerrainMesh(
   const shading: TerrainShading = {
     normals,
     cavity,
+    drainage,
     biomes: biomeTextures,
     detail: detail && isColorPixels(color),
     frame,
@@ -440,6 +473,7 @@ export function buildTerrainMesh(
       biomeTextures.a,
       biomeTextures.b,
       ...(cavity ? [cavity] : []),
+      ...(drainage ? [drainage] : []),
     ]);
     disposables.push(bake);
   } else {

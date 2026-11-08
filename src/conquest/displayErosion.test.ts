@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { channelDepths, erodeRelief, runDrops } from "./displayErosion";
+import {
+  channelDepths,
+  erodeLand,
+  erodeRelief,
+  runDrops,
+} from "./displayErosion";
 import { mulberry32 } from "./rng";
 
 const SIDE = 192;
@@ -217,5 +222,54 @@ describe("channelDepths", () => {
     let cut = 0;
     for (let x = 3; x < 24; x++) cut = Math.max(cut, depth[24 * side + x]);
     expect(cut).toBeGreaterThan(0);
+  });
+});
+
+describe("erodeLand", () => {
+  it("returns erodeRelief's heights", () => {
+    const { relief } = erodeLand(hills(), SIDE, SIDE, 1234);
+    expect(same(relief, erodeRelief(hills(), SIDE, SIDE, 1234))).toBe(true);
+  });
+
+  it("gives the same drainage twice and none in the sea", () => {
+    const input = hills();
+    const a = erodeLand(input, SIDE, SIDE, 7).drainage;
+    const b = erodeLand(input, SIDE, SIDE, 7).drainage;
+    expect(a.data).toHaveLength(SIDE * SIDE * 2);
+    expect(Buffer.from(a.data).equals(Buffer.from(b.data))).toBe(true);
+    for (let i = 0; i < input.length; i++) {
+      if (input[i] === 0) {
+        expect(a.data[i * 2]).toBe(0);
+        expect(a.data[i * 2 + 1]).toBe(0);
+      }
+    }
+  });
+
+  it("carries more water further down a slope", () => {
+    // Ground falling to the sea at the bottom edge.
+    const rng = mulberry32(31);
+    const input = new Float32Array(SIDE * SIDE);
+    for (let y = 0; y < SIDE - 4; y++) {
+      for (let x = 0; x < SIDE; x++) {
+        input[y * SIDE + x] = 0.03 + (SIDE - y) * 0.003 + rng() * 0.004;
+      }
+    }
+    const { data } = erodeLand(input, SIDE, SIDE, 9).drainage;
+    const most = (y: number) => {
+      let top = 0;
+      for (let x = 12; x < SIDE - 12; x++)
+        top = Math.max(top, data[(y * SIDE + x) * 2]);
+      return top;
+    };
+    expect(most(SIDE - 12)).toBeGreaterThan(most(SIDE / 2));
+    expect(most(SIDE / 2)).toBeGreaterThan(most(12));
+    // The slope is steep enough everywhere for a channel's full cut.
+    expect(data[((SIDE / 2) * SIDE + SIDE / 2) * 2 + 1]).toBe(255);
+  });
+
+  it("gives flat land no fall", () => {
+    const flat = new Float32Array(SIDE * SIDE).fill(0.3);
+    const { data } = erodeLand(flat, SIDE, SIDE, 5).drainage;
+    for (let i = 0; i < SIDE * SIDE; i++) expect(data[i * 2 + 1]).toBe(0);
   });
 });

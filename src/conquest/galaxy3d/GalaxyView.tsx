@@ -755,6 +755,9 @@ export function GalaxyView({
         drawTowns,
         crossingPlan?.landLinks,
         terrainBiomes?.planet,
+        // Rivers are drawn with the detail, which performance mode leaves
+        // out, so there no road goes round them and none is bridged.
+        performanceMode ? undefined : terrainExtension,
       );
       if (planned.towns) {
         towns = buildTownLayer(

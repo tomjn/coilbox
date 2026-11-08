@@ -256,6 +256,7 @@ export function buildTownLayer(
     roadDistance: ground.shading.roadDistance,
     roadReach: ground.shading.roadReach,
     frame: ground.shading.frame,
+    river: ground.shading.river,
   };
   disposables.push(indexTexture, data, stateTexture, dry);
   // The fields first, under an owner's tint like the rest of the land, then
