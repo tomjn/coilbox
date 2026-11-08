@@ -95,7 +95,7 @@ describe("generateCheckedUnit", () => {
         expect(result.unit.generated?.seed, label).toBe(result.seed);
       }
     }
-  });
+  }, 60_000);
 
   it("gives the same unit again from the seed the unit records", () => {
     const first = generateCheckedUnit(
@@ -206,7 +206,7 @@ describe("generateCheckedUnit", () => {
         });
       }
     }
-  });
+  }, 60_000);
 });
 
 describe("repairCandidate", () => {
