@@ -36,6 +36,26 @@ export interface GroundShading {
   frame: THREE.Vector4;
   /** The planet's roads (`Settlement.roads` in `planets.ts`). */
   roads: Settlement["roads"];
+  /**
+   * The map's rivers, which the terrain's detail draws and the roads cross
+   * on bridges. Left out where none are drawn, as in performance mode.
+   */
+  river?: GroundRivers;
+}
+
+/** A map's rivers, for every shader that draws on the ground. */
+export interface GroundRivers {
+  /** `RiverField` as a texture, over the terrain's whole picture. */
+  field: THREE.Texture;
+  /** Its reaches into and beside the water, in world units. */
+  span: [number, number];
+  /** Frozen over, as on the ice world. */
+  frozen: boolean;
+  /**
+   * From a point's place on the sheet, 0 to 1 across, to its place on the
+   * field: x and y scale, then x and y offset.
+   */
+  toField: THREE.Vector4;
 }
 
 /**
@@ -140,6 +160,16 @@ vec4 gGlow = vec4(0.0);
       float cover = 1.0 - smoothstep(hwE - soft, hwE + soft, d);
       cover *= mix(1.0, 0.7, smoothstep(hw, hw * 2.5, hwMin)) * gFade;
 
+      // Over a river, and a little past each bank, the road is a bridge: a
+      // flat strip half the road's width with a thin side along each edge.
+      // The road itself stops at the bank, so the water shows either side.
+      float over = 0.0;
+      if (uRiverOn > 0.5) {
+        float bEdge = texture2D(uRiverField, vTerrainUv).r * (uRiverSpan.x + uRiverSpan.y) - uRiverSpan.x;
+        over = 1.0 - smoothstep(0.025, 0.025 + gFoot, bEdge);
+      }
+      cover *= 1.0 - over;
+
       vec3 track = surf < 0.5 ? mix(uRoadTone[0], uRoadTone[1], surf * 2.0) : mix(uRoadTone[1], uRoadTone[2], surf * 2.0 - 1.0);
       track *= 1.0 + grain * 0.35 * (gTube ? 0.0 : 1.0);
       if (gRuts) {
@@ -150,14 +180,26 @@ vec4 gGlow = vec4(0.0);
       }
       // Worn ground beside the track, paler and drier than what grows there.
       // Nothing grows beside a sealed planet's, so it has none.
-      float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover) * (1.0 - uRoadSealed);
+      float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover) * (1.0 - uRoadSealed) * (1.0 - over);
       vec3 worn = mix(albedo, track * 0.85 + albedo * 0.15, 0.35);
       albedo = mix(albedo, worn, verge * 0.55 * tKeep(0.2, gFoot) * gFade);
       albedo = mix(albedo, track, cover * 0.95);
+      if (over > 0.0) {
+        // Never thinner than a pixel, so far off a bridge is a fine pale line.
+        float bw = max(hw * 0.5, 0.5 * gFoot);
+        float bSoft = gFoot * 0.5;
+        float deck = (1.0 - smoothstep(bw - bSoft, bw + bSoft, d)) * over * gFade;
+        // The sides: a pixel wide at most zooms, a little paler than the deck.
+        float sideW = max(bw * 0.2, gFoot * 0.6);
+        float side = (1.0 - smoothstep(sideW * 0.5, sideW * 0.5 + bSoft, abs(d - bw + sideW * 0.5))) * deck;
+        vec3 deckTone = mix(uRoadTone[1], vec3(0.2, 0.19, 0.18), 0.6) * (1.0 + grain * 0.2);
+        albedo = mix(albedo, deckTone, deck);
+        albedo = mix(albedo, vec3(0.62, 0.6, 0.56), side * tKeep(bw * 0.3, gFoot));
+      }
       // A line down the middle of a surfaced road.
       if (uRoadSealed < 0.5) {
         float lineW = hw * 0.1;
-        albedo = mix(albedo, vec3(0.75, 0.72, 0.6), (1.0 - smoothstep(lineW, lineW + gFoot, d)) * smoothstep(0.75, 1.0, surf) * tKeep(hw * 0.6, gFoot) * 0.8);
+        albedo = mix(albedo, vec3(0.75, 0.72, 0.6), (1.0 - smoothstep(lineW, lineW + gFoot, d)) * smoothstep(0.75, 1.0, surf) * tKeep(hw * 0.6, gFoot) * 0.8 * (1.0 - over));
       }
 
       // A slight cut: the ground falls into the track at its edges, so one
@@ -178,7 +220,7 @@ vec4 gGlow = vec4(0.0);
           float away = clamp(-dot(normalize(grad + 1e-5), normalize(uTerrainSun.xz)), 0.0, 1.0);
           albedo *= 1.0 - 0.4 * away * (1.0 - cover) * (1.0 - smoothstep(hwE, hwE * 2.4, d)) * keepCut;
         } else {
-          float edge = smoothstep(hwE * 0.5, hwE, d) * (1.0 - smoothstep(hwE, hwE * 1.8, d));
+          float edge = smoothstep(hwE * 0.5, hwE, d) * (1.0 - smoothstep(hwE, hwE * 1.8, d)) * (1.0 - over);
           n = normalize(n - vec3(grad.x, 0.0, grad.y) * edge * 0.6 * keepCut);
         }
       }
