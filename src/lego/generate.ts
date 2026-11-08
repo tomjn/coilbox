@@ -123,6 +123,10 @@ export interface GeneratorOptions {
    *  keys, so the same seed with and without it makes a unit alike in the
    *  choices the style leaves alone. */
   style?: GeneratorStyle;
+  /** Times the plan's default proportions, in place of the job's factor for
+   *  the size. A roster's tiers between two sizes take one (#3239). It is not
+   *  part of the rolls' keys, which keep the size. */
+  factor?: number;
 }
 
 /** A PRNG for one choice, seeded off the inputs and the choice's key. */
@@ -471,7 +475,13 @@ export function generateUnit(
   let counter = 0;
   const newId = options.newId ?? (() => `${options.id}.${++counter}`);
 
-  const factor = job.size[size.id];
+  if (
+    options.factor !== undefined &&
+    !(Number.isFinite(options.factor) && options.factor > 0)
+  ) {
+    throw new Error(`a size factor is above zero, not ${options.factor}`);
+  }
+  const factor = options.factor ?? job.size[size.id];
   const proportions = options.proportions
     ? planProportions(inputs.plan, options.proportions)
     : rollProportions(inputs, job, factor, options.style);
@@ -616,6 +626,7 @@ export function generateUnit(
       covering: covered.covering,
       ...(running.gear.length > 0 ? { running: running.gear } : {}),
       ...(style ? { style } : {}),
+      ...(options.factor !== undefined ? { factor: options.factor } : {}),
     },
   };
 }
