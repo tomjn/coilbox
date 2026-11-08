@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   GAME_REPOS,
   type GameRepo,
+  githubArchiveMatchesGame,
   githubRepoForGame,
   mergeGameRepos,
   norm,
@@ -60,6 +61,120 @@ describe("githubRepoForGame", () => {
     expect(githubRepoForGame([repo({ nameKey: "a" })], "Something Else")).toBe(
       undefined,
     );
+  });
+});
+
+describe("githubArchiveMatchesGame (issue #5158)", () => {
+  const necro = repo({
+    nameKey: "this(springnecromancyedition)",
+    archiveKey: "this",
+  });
+
+  it("without an archiveKey, needs the whole normalised name to equal the archive's", () => {
+    const plain = repo({ nameKey: "metalfactions" });
+    expect(
+      githubArchiveMatchesGame(
+        plain,
+        "Metal Factions v2.40",
+        "metalfactions-v2.40.sdz",
+      ),
+    ).toBe(true);
+    expect(
+      githubArchiveMatchesGame(
+        plain,
+        "Metal Factions v2.40",
+        "metalfactions-v2.58.sdz",
+      ),
+    ).toBe(false);
+  });
+
+  it("with an archiveKey, compares the version after the name key with the one after the archive key", () => {
+    expect(
+      githubArchiveMatchesGame(
+        necro,
+        "THIS (Spring Necromancy Edition) 0.13.9",
+        "THIS_0.13.9.sdz",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match another version", () => {
+    expect(
+      githubArchiveMatchesGame(
+        necro,
+        "THIS (Spring Necromancy Edition) 0.13.9",
+        "THIS_0.13.8.sdz",
+      ),
+    ).toBe(false);
+  });
+
+  it("does not match a variant archive of the same version, nor another game's archive in the repo", () => {
+    const name = "THIS (Spring Necromancy Edition) 0.13.9";
+    expect(githubArchiveMatchesGame(necro, name, "THIS_0.13.9_mt.sdz")).toBe(
+      false,
+    );
+    expect(githubArchiveMatchesGame(necro, name, "other_0.13.9.sdz")).toBe(
+      false,
+    );
+    expect(githubArchiveMatchesGame(necro, name, "thistle_0.13.9.sdz")).toBe(
+      false,
+    );
+  });
+
+  it("does not match when the name carries no version", () => {
+    expect(
+      githubArchiveMatchesGame(
+        necro,
+        "THIS (Spring Necromancy Edition)",
+        "THIS_.sdz",
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores a leading v on either version", () => {
+    const xta = repo({
+      nameKey: "xta(springnecromancyedition)",
+      archiveKey: "xtasne",
+    });
+    for (const name of [
+      "XTA (Spring Necromancy Edition) v10.00",
+      "XTA (Spring Necromancy Edition) 10.00",
+    ]) {
+      expect(githubArchiveMatchesGame(xta, name, "xta-sne-v10.00.sdz")).toBe(
+        true,
+      );
+      expect(githubArchiveMatchesGame(xta, name, "xta-sne-10.00.sdz")).toBe(
+        true,
+      );
+    }
+  });
+
+  it("leaves every built-in source without an archiveKey on the whole-name rule", () => {
+    for (const g of GAME_REPOS.filter((x) => !x.archiveKey)) {
+      expect(
+        githubArchiveMatchesGame(g, `${g.label} 1.2`, `${g.label} 1.2.sdz`),
+        g.key,
+      ).toBe(true);
+      expect(
+        githubArchiveMatchesGame(g, `${g.label} 1.2`, `${g.label} 1.3.sdz`),
+        g.key,
+      ).toBe(false);
+    }
+  });
+
+  it("is set on the THIS and XTA sources, in the built-in list and the catalog alike", () => {
+    const catalog: GameRepo[] = JSON.parse(
+      readFileSync(new URL("../../catalog.json", import.meta.url), "utf8"),
+    ).githubGameRepos;
+    for (const [key, archiveKey] of [
+      ["this", "this"],
+      ["xta-sne", "xtasne"],
+    ]) {
+      expect(GAME_REPOS.find((g) => g.key === key)?.archiveKey).toBe(
+        archiveKey,
+      );
+      expect(catalog.find((g) => g.key === key)?.archiveKey).toBe(archiveKey);
+    }
   });
 });
 
