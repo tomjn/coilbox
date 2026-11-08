@@ -245,58 +245,58 @@ fn is_left_out(name: &str) -> bool {
 /// [`pack_map`] builds itself. Empty when `dir` is not such a `maps/` folder,
 /// because a compile folder of any other name holds loose sources among its
 /// files and nothing says which belong to the map.
-fn beside_maps(dir: &Path) -> Vec<Referenced> {
-    fn walk(disk: &Path, archive: &str, out: &mut Vec<Referenced>) {
-        let Ok(entries) = std::fs::read_dir(disk) else {
-            return;
-        };
-        let mut entries: Vec<_> = entries.flatten().collect();
-        entries.sort_by_key(|e| e.file_name());
-        for e in entries {
-            let name = e.file_name().to_string_lossy().into_owned();
+fn beside_maps(dir: &Path) -> Result<Vec<Referenced>, String> {
+    /// The entries of `disk` by name. A folder that cannot be read fails the
+    /// package, because it would otherwise succeed with map files missing.
+    fn entries(disk: &Path) -> Result<Vec<(String, std::fs::FileType, PathBuf)>, String> {
+        let mut found = Vec::new();
+        let read = |e: std::io::Error| format!("could not read {}: {e}", disk.display());
+        for e in std::fs::read_dir(disk).map_err(read)? {
+            let e = e.map_err(read)?;
+            // `file_type` does not follow a link, so a linked file or folder is
+            // skipped rather than followed out of the map.
+            let kind = e.file_type().map_err(read)?;
+            found.push((e.file_name().to_string_lossy().into_owned(), kind, e.path()));
+        }
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(found)
+    }
+    fn walk(disk: &Path, archive: &str, out: &mut Vec<Referenced>) -> Result<(), String> {
+        for (name, kind, path) in entries(disk)? {
             if is_left_out(&name) {
                 continue;
             }
-            // `file_type` does not follow a link, so a linked file or folder is
-            // skipped rather than followed out of the map.
-            let Ok(kind) = e.file_type() else { continue };
             let archive_path = format!("{archive}/{name}");
             if kind.is_dir() {
-                walk(&e.path(), &archive_path, out);
+                walk(&path, &archive_path, out)?;
             } else if kind.is_file() {
                 out.push(Referenced {
                     archive_path,
-                    source: e.path(),
+                    source: path,
                 });
             }
         }
+        Ok(())
     }
     let root = archive_root(dir);
     if root == dir {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    let Ok(entries) = std::fs::read_dir(root) else {
-        return Vec::new();
-    };
-    let mut entries: Vec<_> = entries.flatten().collect();
-    entries.sort_by_key(|e| e.file_name());
     let mut out = Vec::new();
-    for e in entries {
-        let name = e.file_name().to_string_lossy().into_owned();
-        let Ok(kind) = e.file_type() else { continue };
+    for (name, kind, path) in entries(root)? {
         if is_left_out(&name) || name.eq_ignore_ascii_case("maps") {
             continue;
         }
         if kind.is_dir() {
-            walk(&e.path(), &name, &mut out);
+            walk(&path, &name, &mut out)?;
         } else if kind.is_file() && name.eq_ignore_ascii_case("mapoptions.lua") {
             out.push(Referenced {
                 archive_path: name,
-                source: e.path(),
+                source: path,
             });
         }
     }
-    out
+    Ok(out)
 }
 
 /// Write `<dir>/<name>.sdz` from the files a compile left in `dir`.
@@ -342,7 +342,7 @@ pub fn pack_map(dir: &Path, name: &str) -> Result<Packed, String> {
         Mode::Set,
     )?;
     let mut refs = referenced_files(dir, &archive_info, name)?;
-    for r in beside_maps(dir) {
+    for r in beside_maps(dir)? {
         if !refs
             .iter()
             .any(|have| have.archive_path.eq_ignore_ascii_case(&r.archive_path))
@@ -732,6 +732,40 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    /// A folder beside `maps/` that cannot be read fails the package and names
+    /// the folder, rather than giving a package with its files missing.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_folder_beside_maps_fails_the_package() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("mapconv_pack_{}_noread", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let maps = root.join("maps");
+        std::fs::create_dir_all(&maps).unwrap();
+        std::fs::create_dir_all(root.join("LuaGaia")).unwrap();
+        std::fs::write(root.join("LuaGaia/main.lua"), "return {}").unwrap();
+        std::fs::write(maps.join("MyMap.smf"), b"spring map file\0dummy").unwrap();
+        std::fs::write(maps.join("MyMap.smt"), b"spring tilefile\0").unwrap();
+        std::fs::write(
+            maps.join("mapinfo.lua"),
+            "return { mapfile = \"MyMap.smf\" }",
+        )
+        .unwrap();
+        let locked = root.join("LuaGaia");
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        // A user who can read it anyway (root) cannot show the failure.
+        let readable = std::fs::read_dir(&locked).is_ok();
+        let result = pack_map(&maps, "MyMap");
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+        if !readable {
+            let err = result.unwrap_err();
+            assert!(err.contains("LuaGaia"), "{err}");
+            assert!(!maps.join("MyMap.sdz").exists());
+            assert!(!maps.join("MyMap.sdz.tmp").exists());
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// Outside a decompiled map's `maps/` folder the compile folder is the root
