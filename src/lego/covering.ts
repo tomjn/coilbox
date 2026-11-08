@@ -653,34 +653,44 @@ export function coverSkeleton(
   const added: LegoPiece[] = [];
   const names = project.pieces.map((p) => p.name);
   for (const plan of plans) {
-    const shapes = preferredShapes(
-      plan.shapes.filter((shape) => parts.some((p) => p.shape === shape)),
-      style,
+    const allowed = plan.shapes.filter((shape) =>
+      parts.some((p) => p.shape === shape),
     );
-    let ranked = fits(
-      parts.filter((p) => shapes.includes(p.shape)),
-      plan.length,
-      plan.width,
-      plan.depth,
-      plan.rows,
-      style?.detail === "dense" ? DENSE_PART_SCALE : MAX_PART_SCALE,
-    );
-    // A deck part thicker than the deck reaches below it, and the unit sitting
-    // on the ground would then lift its wheels off it. With no part thin
-    // enough, there is no deck.
-    if (plan.rows && options.gear?.size) {
-      ranked = ranked.filter((fit) => fit.depth <= plan.depth + TOUCH);
-    }
+    const rank = (shapes: readonly string[]) => {
+      const fitted = fits(
+        parts.filter((p) => shapes.includes(p.shape)),
+        plan.length,
+        plan.width,
+        plan.depth,
+        plan.rows,
+        style?.detail === "dense" ? DENSE_PART_SCALE : MAX_PART_SCALE,
+      );
+      // A deck part thicker than the deck reaches below it, and the unit
+      // sitting on the ground would then lift its wheels off it. With no part
+      // thin enough, there is no deck.
+      return plan.rows && options.gear?.size
+        ? fitted.filter((fit) => fit.depth <= plan.depth + TOUCH)
+        : fitted;
+    };
+    const preferred = preferredShapes(allowed, style);
+    let ranked = rank(preferred);
     // A deck part with no flat underside leaves the unit propped on one edge.
+    // A style's preferred shapes give way to the others when none of them has
+    // a flat part, so the style does not cost the unit its deck.
     if (plan.rows) {
       const up = plan.frame[2] as THREE.Vector3;
-      ranked = ranked.filter((fit) => {
+      const flat = (fit: Fit) => {
         const axis = fit.axes[2] as number;
         const unit = new THREE.Vector3();
         unit.setComponent(axis, 1);
         const turned = applyEuler(unit, laidAlong(fit.axes, plan.frame));
         return hasFlatFloor(pack, fit.part, axis, turned.dot(up) > 0 ? -1 : 1);
-      });
+      };
+      let floored = ranked.filter(flat);
+      if (floored.length === 0 && preferred.length < allowed.length) {
+        floored = rank(allowed).filter(flat);
+      }
+      ranked = floored;
     }
     // A sparse style takes the fewest copies any part needs, the best fits
     // among those first.

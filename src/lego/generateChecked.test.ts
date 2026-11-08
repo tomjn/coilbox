@@ -253,14 +253,20 @@ describe("repairCandidate", () => {
   });
 
   it("removes a buried covering part and its record", () => {
-    // The first seed whose covering has a part another part buries.
-    const raw = Array.from({ length: 20 }, (_, i) => i + 1)
-      .map((seed) =>
-        generateUnit(inputs(seed, "biped", "assault", "small"), options),
-      )
-      .find((unit) =>
-        generatorFaults(unit, pack).some((f) => f.check === "overlap"),
+    // The first seed with an overlap that the repair removes a part for.
+    let raw: ReturnType<typeof generateUnit> | undefined;
+    for (let seed = 1; seed <= 20 && !raw; seed++) {
+      const unit = generateUnit(
+        inputs(seed, "biped", "assault", "small"),
+        options,
       );
+      if (
+        generatorFaults(unit, pack).some((f) => f.check === "overlap") &&
+        repairCandidate(unit, pack).pieces.length < unit.pieces.length
+      ) {
+        raw = unit;
+      }
+    }
     if (!raw) throw new Error("no seed from 1 to 20 buries a covering part");
     const repaired = repairCandidate(raw, pack);
     expect(

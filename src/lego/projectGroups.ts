@@ -14,6 +14,7 @@
 import type { GameItem } from "@/content/bindings";
 import type { LegoProject } from "./model";
 import { gameKey, unitGame } from "./unitGame";
+import { variantRoot, withVariantsTogether } from "./variantFamily";
 
 /** The archive extensions a game's models can arrive from. */
 const ARCHIVE_EXT = /\.(sdd|sdz|sd7|sdp)$/i;
@@ -29,7 +30,7 @@ export interface LegoGameGroup {
    *  under an archive name be carried to this group's key. */
   archives: string[];
   /** Built units first, then opened ones, each in the order they were given
-   *  (newest first). */
+   *  (newest first), with each variant right after the unit it came from. */
   projects: LegoProject[];
 }
 
@@ -90,28 +91,32 @@ export function groupProjects(
     opened: LegoProject[];
   }
   const games = new Map<string, Building>();
+  const byId = new Map(projects.map((p) => [p.id, p]));
   const rosters = new Map<string, LegoRosterGroup>();
 
   for (const project of projects) {
-    if (project.roster) {
-      const { id, name } = project.roster;
+    // A variant is filed where the unit it came from is (#3240), and listed
+    // after it below.
+    const home = variantRoot(project, byId);
+    if (home.roster) {
+      const { id, name } = home.roster;
       const group = rosters.get(id) ?? { key: id, label: name, projects: [] };
       group.projects.push(project);
       rosters.set(id, group);
       continue;
     }
-    let game = unitGame(project);
+    let game = unitGame(home);
     let guessed = false;
-    if (!game && project.imported && project.game === undefined) {
+    if (!game && home.imported && home.game === undefined) {
       // Opened before the picker recorded a game: all that is left is the path.
-      const archive = archiveFromSource(project.imported.source);
+      const archive = archiveFromSource(home.imported.source);
       if (archive) {
         game = { name: archive, archive };
         guessed = true;
       }
     }
     if (!game) {
-      (project.imported ? files : own).push(project);
+      (home.imported ? files : own).push(project);
       continue;
     }
     const key = gameKey(game, installed);
@@ -122,7 +127,7 @@ export function groupProjects(
     }
     group.archives.add(game.archive.toLowerCase());
     group.names.push({ name: (game.base ?? game).name, guessed });
-    (project.imported ? group.opened : group.built).push(project);
+    (home.imported ? group.opened : group.built).push(project);
   }
 
   const newest = (a: string, b: string) =>
@@ -136,7 +141,10 @@ export function groupProjects(
       key: group.key,
       label,
       archives: [...group.archives],
-      projects: [...group.built, ...group.opened],
+      projects: [
+        ...withVariantsTogether(group.built),
+        ...withVariantsTogether(group.opened),
+      ],
     };
   });
 
@@ -150,16 +158,18 @@ export function groupProjects(
     rosters: [...rosters.values()]
       .map((roster) => ({
         ...roster,
-        projects: [...roster.projects].sort((a, b) =>
-          a.unitName.localeCompare(b.unitName),
+        projects: withVariantsTogether(
+          [...roster.projects].sort((a, b) =>
+            a.unitName.localeCompare(b.unitName),
+          ),
         ),
       }))
       .sort(byLabel),
-    own,
+    own: withVariantsTogether(own),
     games: groups.sort((a, b) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
     ),
-    files,
+    files: withVariantsTogether(files),
   };
 }
 
@@ -177,10 +187,21 @@ export function filterGrouped(
 ): GroupedProjects {
   const needle = query.trim().toLowerCase();
   if (!needle) return grouped;
+  // A variant has the game of the unit it came from (#3240).
+  const byId = new Map(
+    [
+      ...grouped.own,
+      ...grouped.files,
+      ...grouped.games.flatMap((game) => game.projects),
+    ].map((p) => [p.id, p]),
+  );
   const matches = (project: LegoProject) =>
     project.name.toLowerCase().includes(needle) ||
     project.unitName.toLowerCase().includes(needle) ||
-    (unitGame(project)?.name.toLowerCase().includes(needle) ?? false);
+    (unitGame(variantRoot(project, byId))
+      ?.name.toLowerCase()
+      .includes(needle) ??
+      false);
 
   return {
     rosters: grouped.rosters

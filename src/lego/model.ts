@@ -938,6 +938,12 @@ export interface LegoProject {
    */
   skeleton?: LegoSkeleton;
   /**
+   * The id of the unit this one is a variant of (#3240). Absent on a unit made
+   * on its own, so no migration is needed. The unit may since have been
+   * deleted, which leaves this one a unit of its own. See `variant.ts`.
+   */
+  variantOf?: string;
+  /**
    * The inputs the generator made this unit from, and the module instances it
    * hung on it (#3231). Absent on a unit somebody built by hand. See
    * `generate.ts`.
@@ -1129,8 +1135,8 @@ export interface LegoSkeleton {
 }
 
 /**
- * What made a generated unit (#3231). The four inputs and the style, when
- * there was one, remake it, given the same module library and parts pack. `modules` names each module instance the generator hung on
+ * What made a generated unit (#3231). The four inputs, the style, factor,
+ * thickness and weapon seed, when there were any, remake it, given the same module library and parts pack. `modules` names each module instance the generator hung on
  * the skeleton, by the slot it filled, so a later reroll can tell its own
  * pieces from ones the game maker added: every piece of an instance carries
  * `LegoModuleRef.instance`.
@@ -1154,6 +1160,15 @@ export interface LegoGenerated {
    * generated before wheels.
    */
   running?: { bone: string; piece: string; kind: "wheel" | "tread" }[];
+  /** Times the covering thickness the job rolls (#3240). A heavier variant has
+   *  more than 1 and a lighter one less. Absent means 1. */
+  thickness?: number;
+  /** The seed the weapon slots' rolls are keyed to, when a variant has a
+   *  different weapon from the unit's seed (#3240). Absent means the seed. */
+  weaponSeed?: number;
+  /** The seed the covering's rolls are keyed to, when a variant moved on from
+   *  the unit's seed to pass the checks (#3240). Absent means the seed. */
+  coveringSeed?: number;
   /**
    * A stamp of each piece as it was generated, by piece id (#3235), so a piece
    * edited by hand since can be told from the generator's own. A piece with no
@@ -1952,6 +1967,9 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       return guides ? { guides } : {};
     })(),
     ...(skeleton ? { skeleton } : {}),
+    ...(typeof d.variantOf === "string" && d.variantOf !== ""
+      ? { variantOf: d.variantOf }
+      : {}),
     ...(() => {
       const generated = parseGenerated(d.generated);
       return generated ? { generated } : {};
@@ -2087,6 +2105,18 @@ function parseGenerated(value: unknown): LegoGenerated | null {
     modules,
     ...(covering ? { covering } : {}),
     ...(running ? { running } : {}),
+    ...(typeof v.thickness === "number" &&
+    Number.isFinite(v.thickness) &&
+    v.thickness > 0
+      ? { thickness: v.thickness }
+      : {}),
+    ...(typeof v.weaponSeed === "number" && Number.isSafeInteger(v.weaponSeed)
+      ? { weaponSeed: v.weaponSeed }
+      : {}),
+    ...(typeof v.coveringSeed === "number" &&
+    Number.isSafeInteger(v.coveringSeed)
+      ? { coveringSeed: v.coveringSeed }
+      : {}),
     ...(stamps ? { stamps } : {}),
     ...(style ? { style } : {}),
     ...(typeof v.factor === "number" &&
