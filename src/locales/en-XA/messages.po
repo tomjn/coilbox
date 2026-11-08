@@ -638,6 +638,11 @@ msgstr ""
 msgid "{0, plural, one {# loss} other {# losses}}"
 msgstr ""
 
+#. placeholder {0}: metal.spotCount
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# metal spot, extractor radius is {radius} elmos} other {# metal spots, extractor radius is {radius} elmos}}"
+msgstr ""
+
 #. placeholder {0}: outcome.alreadyInstalled.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{0, plural, one {# model was already installed.} other {# models were already installed.}}"
@@ -703,6 +708,11 @@ msgstr ""
 #. placeholder {0}: s.blobs
 #: src/content/rapidPool.ts
 msgid "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
+msgstr ""
+
+#. placeholder {0}: metal.closeCount
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# pair of spots is closer together than the extractor radius, {radius} elmos:} other {# pairs of spots are closer together than the extractor radius, {radius} elmos:}}"
 msgstr ""
 
 #. placeholder {0}: s.incompletes
@@ -785,6 +795,11 @@ msgstr ""
 #. placeholder {0}: kinds.length
 #: src/content/libraryMaps.ts
 msgid "{0, plural, one {# source} other {# sources}}"
+msgstr ""
+
+#. placeholder {0}: metal.wide
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# spot has metal farther than the extractor radius from its centre. The widest reaches {widest} elmos.} other {# spots have metal farther than the extractor radius from their centre. The widest reaches {widest} elmos.}}"
 msgstr ""
 
 #. placeholder {0}: dots.length
@@ -9054,6 +9069,7 @@ msgid "and"
 msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 msgid "and {hidden} more"
 msgstr ""
 
@@ -14516,6 +14532,10 @@ msgstr ""
 msgid "Could not read the map's heights: {heightsError}"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Could not read the map's metal: {error}"
+msgstr ""
+
 #: src/lego/pack.ts
 msgid "could not read the parts pack: {status}"
 msgstr ""
@@ -16749,6 +16769,10 @@ msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "east edge"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "east to west"
 msgstr ""
 
 #: src/play/scenarioDifficulty.ts
@@ -24189,6 +24213,7 @@ msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/WorthSection.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/scenario/pages/components/StartConditions.tsx
 msgid "Metal"
@@ -24366,6 +24391,7 @@ msgid "Minutes before away"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 msgid "Mirror"
 msgstr ""
 
@@ -25219,6 +25245,10 @@ msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Nearest multiple of…"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Nearest spots, in elmos"
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -26965,6 +26995,10 @@ msgstr ""
 msgid "no tweak slot left to hold it"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "No two spots are closer together than the extractor radius, {radius} elmos."
+msgstr ""
+
 #: src/content/pages/components/UnitPicker.tsx
 msgid "No unit data available for this game."
 msgstr ""
@@ -27152,6 +27186,10 @@ msgstr ""
 msgid "None"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "none across"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 msgid "None earned yet. {total} to go."
 msgstr ""
@@ -27253,6 +27291,10 @@ msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "north edge"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "north to south"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -36566,6 +36608,14 @@ msgstr ""
 msgid "Splash falloff shape"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Spot with the largest gap"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Spots, largest gap"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
 msgstr ""
@@ -36692,10 +36742,12 @@ msgstr ""
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/lego/pages/components/DescribeUnitForm.tsx
 #: src/lego/pages/components/NewUnitPopover.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/multiplayer/battle/startButtonLabel.ts
 msgid "Start"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "start {number}"
 msgstr ""
@@ -36994,6 +37046,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Starts switched on"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Starts, largest gap"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -39427,6 +39483,10 @@ msgstr ""
 
 #: src/lego/liftIntoUnit.ts
 msgid "The meshes of {name} could not be read: {reason}"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "The metal map has no metal."
 msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
@@ -41966,6 +42026,10 @@ msgstr ""
 msgid "Threshold (-th)"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "through the centre"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 msgid "Throughput"
 msgstr ""
@@ -42708,6 +42772,10 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 msgid "Two sides"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx

@@ -22,7 +22,9 @@ import { readHeightGrid } from "@/placement/terrain";
 import { useSkirmishDraft } from "@/play/drafts";
 import { GamePickerField } from "@/play/pages/components/GamePickerButton";
 import { useUnitDefs } from "@/workshop/config";
-import { mcSmfHeights } from "../../bindings";
+import { mcReadMapinfo, mcSmfHeights } from "../../bindings";
+import { readMetalGrid } from "../../metalGrid";
+import { ENGINE_EXTRACTOR_RADIUS, type MetalGrid } from "../../metalSpots";
 import {
   buildingSpecs,
   type ClassResult,
@@ -34,6 +36,7 @@ import {
   type WayEnd,
 } from "../../playability";
 import { measureOffThread } from "../../playabilityJobs";
+import { MetalFigures } from "./MetalFigures";
 
 /**
  * Whether a map is playable, as numbers and no verdict (issue #2169): for each
@@ -49,6 +52,7 @@ export function PlayabilityPanel({
   heights,
   heightsError,
   starts,
+  metal,
 }: {
   /** The map's corner heights, or null while they are read. */
   heights: Heights | null;
@@ -56,6 +60,17 @@ export function PlayabilityPanel({
   heightsError?: string | null;
   /** Start positions, in elmos. */
   starts: { x: number; z: number }[];
+  /**
+   * The map's metal map, for the metal figures (issue #5098). Left out, the
+   * panel shows none. A null grid with no error means it is still being read.
+   * `extractorRadius` is the map's own, and the engine's default of 500 stands
+   * in when it is null or not positive.
+   */
+  metal?: {
+    grid: MetalGrid | null;
+    error?: string | null;
+    extractorRadius?: number | null;
+  };
 }) {
   const { t } = useLingui();
   const { selected } = useScanTargetSelection();
@@ -103,13 +118,22 @@ export function PlayabilityPanel({
     [startsKey],
   );
 
+  // Measuring waits for the metal map, so it does not run twice for one map.
+  const metalGrid = metal?.grid ?? null;
+  const metalWaiting = !!metal && !metal.grid && !metal.error;
+  const declaredRadius = metal?.extractorRadius;
+  const extractorRadius =
+    declaredRadius != null && declaredRadius > 0
+      ? declaredRadius
+      : ENGINE_EXTRACTOR_RADIUS;
+
   const [result, setResult] = useState<Playability | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [measuring, setMeasuring] = useState(false);
   useEffect(() => {
     setResult(null);
     setError(null);
-    if (!heights || !specs) return;
+    if (!heights || !specs || metalWaiting) return;
     const abort = new AbortController();
     setMeasuring(true);
     // A fresh object, because a caller's grid keeps `words` out of key
@@ -124,6 +148,7 @@ export function PlayabilityPanel({
       },
       ...specs,
       starts: startList,
+      ...(metalGrid ? { metal: { grid: metalGrid, extractorRadius } } : {}),
     };
     measureOffThread(job, abort.signal)
       .then(setResult)
@@ -134,7 +159,7 @@ export function PlayabilityPanel({
         if (!abort.signal.aborted) setMeasuring(false);
       });
     return () => abort.abort();
-  }, [heights, specs, startList]);
+  }, [heights, specs, startList, metalGrid, metalWaiting, extractorRadius]);
 
   const degrees = (value: number) => `${Number(value.toFixed(1))}°`;
   const percent = (share: number) =>
@@ -326,6 +351,7 @@ export function PlayabilityPanel({
               </Table>
             </div>
           )}
+          {metal && <MetalFigures metal={result.metal} error={metal.error} />}
         </div>
       )}
     </section>
@@ -338,16 +364,26 @@ export function PlayabilityPanel({
  */
 export function CompiledPlayability({
   smfPath,
+  outDir,
   starts,
 }: {
   smfPath: string;
+  /** The folder the compile wrote to, whose `mapinfo.lua` holds the map's
+   *  `extractorRadius` when it sets one. */
+  outDir: string;
   starts: { x: number; z: number }[];
 }) {
   const [heights, setHeights] = useState<Heights | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [metalGrid, setMetalGrid] = useState<MetalGrid | null>(null);
+  const [metalError, setMetalError] = useState<string | null>(null);
+  const [extractorRadius, setExtractorRadius] = useState<number | null>(null);
   useEffect(() => {
     setHeights(null);
     setError(null);
+    setMetalGrid(null);
+    setMetalError(null);
+    setExtractorRadius(null);
     let cancelled = false;
     (async () => {
       const smf = await mcSmfHeights({ path: smfPath });
@@ -357,19 +393,45 @@ export function CompiledPlayability({
         smf.height,
       );
       if (!grid) throw new Error("the heights file is not this map's size");
-      return heightsOf(grid, smf.minHeight, smf.maxHeight);
-    })()
-      .then((h) => {
-        if (!cancelled) setHeights(h);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(errorText(e));
-      });
+      if (!cancelled) setHeights(heightsOf(grid, smf.minHeight, smf.maxHeight));
+      // The metal map is its own read, so a map whose metal cannot be read
+      // still gets the rest of the panel.
+      try {
+        if (!smf.metalFile || !smf.metalWidth || !smf.metalHeight) {
+          throw new Error(
+            smf.metalError ?? "the compiled map has no metal map to read",
+          );
+        }
+        // The radius is read before the grid is handed over, so the panel
+        // measures once and not again when the radius arrives.
+        const radius = await mcReadMapinfo({ path: outDir })
+          .then((info) => info.extractorRadius ?? null)
+          .catch(() => null);
+        if (!cancelled) setExtractorRadius(radius);
+        const metal = await readMetalGrid(
+          mapconvThumbUrl(smf.metalFile),
+          smf.metalWidth,
+          smf.metalHeight,
+        );
+        if (!metal)
+          throw new Error("the metal map file is not this map's size");
+        if (!cancelled) setMetalGrid(metal);
+      } catch (e) {
+        if (!cancelled) setMetalError(errorText(e));
+      }
+    })().catch((e: unknown) => {
+      if (!cancelled) setError(errorText(e));
+    });
     return () => {
       cancelled = true;
     };
-  }, [smfPath]);
+  }, [smfPath, outDir]);
   return (
-    <PlayabilityPanel heights={heights} heightsError={error} starts={starts} />
+    <PlayabilityPanel
+      heights={heights}
+      heightsError={error}
+      starts={starts}
+      metal={{ grid: metalGrid, error: metalError, extractorRadius }}
+    />
   );
 }

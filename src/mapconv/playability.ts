@@ -3,9 +3,11 @@
  *
  * Numbers rather than a verdict: how much of the map each movement class can
  * drive on, how the passable ground breaks into areas, the narrowest point on
- * the widest way between start positions, and how much of the map takes a
- * building. Each rule is the engine's own, read out of RecoilEngine rather than
- * guessed at, and each is noted where it is used.
+ * the widest way between start positions, how much of the map takes a
+ * building, and where the metal is. Each of the first four follows the
+ * engine's own rule, read out of RecoilEngine rather than guessed at, and each
+ * is noted where it is used. The metal figures follow a game's spot finder
+ * instead, which `metalSpots.ts` explains.
  *
  * Movement is measured on the engine's slope map, one cell per 16 by 16 elmos,
  * because that is the resolution the engine's movement slope test runs at.
@@ -22,6 +24,7 @@ import {
   type MoveKind,
   moveDefKind,
 } from "@/workshop/moveClasses";
+import { type MetalGrid, type MetalResult, measureMetal } from "./metalSpots";
 
 /** A map's corner heights as the engine reads them. */
 export interface Heights {
@@ -113,6 +116,8 @@ export interface Playability {
   cellsZ: number;
   classes: ClassResult[];
   buildings: BuildResult[];
+  /** The map's metal, or null when the job carried no metal map. */
+  metal: MetalResult | null;
 }
 
 /** Elmos between heightmap corners (`SQUARE_SIZE`). */
@@ -758,6 +763,8 @@ export interface PlayabilityJob {
   buildings: BuildingSpec[];
   /** Start positions in elmos. */
   starts: { x: number; z: number }[];
+  /** The map's metal map and extractor radius, when it could be read. */
+  metal?: { grid: MetalGrid; extractorRadius: number };
 }
 
 /** Every measurement for one map and one game's classes and buildings. */
@@ -810,5 +817,8 @@ export function measurePlayability(job: PlayabilityJob): Playability {
     ...spec,
     ...buildableShare(heights, spec, corners),
   }));
-  return { cellsX, cellsZ, classes, buildings };
+  const metal = job.metal
+    ? measureMetal(job.metal.grid, job.metal.extractorRadius, job.starts)
+    : null;
+  return { cellsX, cellsZ, classes, buildings, metal };
 }

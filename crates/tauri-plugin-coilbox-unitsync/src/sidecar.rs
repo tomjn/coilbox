@@ -536,6 +536,29 @@ pub fn build_height_field_args(
     args
 }
 
+/// Build args for metal-field mode: the map name and the cache directory the
+/// raw metal density grid is written to.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::MetalFieldArgs`,
+/// so this function only has to add `--lib`/`--datadir`, which every mode takes
+/// and `Mode::to_args` does not include.
+pub fn build_metal_field_args(
+    lib: &str,
+    datadir: &str,
+    map: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::MetalField(coilbox_unitsync_worker::MetalFieldArgs {
+            map: map.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
+    args
+}
+
 /// Build args for metalmap mode: the map name, the longest-side pixel cap,
 /// and the optional on-disk PNG cache directory.
 ///
@@ -1094,6 +1117,29 @@ mod tests {
         assert_eq!(
             recovered,
             HeightFieldArgs {
+                map: "Map v1".into(),
+                cache_dir: Some("/cache/thumbs".into()),
+            }
+        );
+    }
+
+    /// What `build_metal_field_args` writes, the worker's own `from_args`
+    /// reads back whole.
+    #[test]
+    fn build_metal_field_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::MetalFieldArgs;
+
+        let a = build_metal_field_args(
+            "/eng/libunitsync.dylib",
+            "/data",
+            "Map v1",
+            Some("/cache/thumbs"),
+        );
+        assert!(a.contains(&"--lib".to_string()) && a.contains(&"--datadir".to_string()));
+        let recovered = MetalFieldArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            MetalFieldArgs {
                 map: "Map v1".into(),
                 cache_dir: Some("/cache/thumbs".into()),
             }

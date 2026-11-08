@@ -70,6 +70,9 @@ export interface MapAppearance {
    * below `voidAlphaMin`. Surfaced for display; the preview can't reproduce it. */
   voidGround?: boolean | null;
   voidAlphaMin?: number | null;
+  /** `extractorRadius`: how far a metal extractor reaches on this map. Absent
+   * when `mapinfo.lua` sets none, which the engine reads as 500. */
+  extractorRadius?: number | null;
   /** Effective water tint (`surfaceColor`, falling back to `planeColor`). */
   waterColor?: [number, number, number] | null;
   waterAlpha?: number | null;
@@ -189,6 +192,13 @@ export const mcSmfHeights = defineCommand<
     height: number;
     minHeight: number;
     maxHeight: number;
+    /** The metal map in the same cache, one byte per 16 by 16 elmo cell. Absent
+     * when the `.smf`'s metal map pointer does not lie inside the file. */
+    metalFile?: string;
+    metalWidth?: number;
+    metalHeight?: number;
+    /** Why the metal map could not be read, when it lies inside the file. */
+    metalError?: string;
   }
 >("coilbox-mapconv", "mc_smf_heights");
 

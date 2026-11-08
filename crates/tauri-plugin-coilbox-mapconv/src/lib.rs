@@ -549,9 +549,34 @@ async fn mc_height_field<R: Runtime>(app: AppHandle<R>, path: String, max: u32) 
     }
 }
 
-/// A compiled map's height words, written to the cache under `<key>-smf.bin`
-/// and reported by file name with the grid and range they are on. Keyed by the
-/// file's size and modification time, so a new compile is read afresh.
+/// The compiled map's metal map in the cache under `<key>-smfm.bin`, by file
+/// name. A cache file of the wrong length is a write that did not finish.
+fn metal_cached(
+    path: &str,
+    metal: &smf::SmfMetal,
+    dir: &Path,
+    key: &str,
+) -> Result<String, String> {
+    let name = format!("{key}-smfm.bin");
+    let file = dir.join(&name);
+    if std::fs::metadata(&file).is_ok_and(|m| m.is_file() && m.len() == metal.len as u64) {
+        coilbox_thumb_cache::touch(&file);
+    } else {
+        let bytes = smf::read_smf_metal(Path::new(path), metal)?;
+        let _ = std::fs::create_dir_all(dir);
+        std::fs::write(&file, &bytes).map_err(|e| format!("could not write the metal map: {e}"))?;
+    }
+    Ok(name)
+}
+
+/// A compiled map's height words and metal map, written to the cache under
+/// `<key>-smf.bin` and `<key>-smfm.bin` and reported by file name with the grids
+/// and range they are on. Keyed by the file's size and modification time, so a
+/// new compile is read afresh.
+///
+/// `metalFile` is left out when the metal map does not lie inside the file or
+/// could not be read, and `metalError` says why in the second case, so the panel
+/// can say there is none to read.
 fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json::Value, String> {
     // The header first, so a missing or broken map says so rather than
     // anything about the cache.
@@ -570,19 +595,31 @@ fn smf_heights_cached(path: &str, cache_dir: Option<&Path>) -> Result<serde_json
         let _ = std::fs::create_dir_all(dir);
         std::fs::write(&grid, &bytes).map_err(|e| format!("could not write the heights: {e}"))?;
     }
-    let info = at.info;
-    Ok(json!({
+    let mut out = json!({
         "file": name,
-        "width": info.mapx + 1,
-        "height": info.mapy + 1,
-        "minHeight": info.min_height,
-        "maxHeight": info.max_height,
-    }))
+        "width": at.info.mapx + 1,
+        "height": at.info.mapy + 1,
+        "minHeight": at.info.min_height,
+        "maxHeight": at.info.max_height,
+    });
+    if let Some(metal) = &at.metal {
+        // The metal map is extra. A read or write that fails is reported beside
+        // the heights, which are still good.
+        match metal_cached(path, metal, dir, &key) {
+            Ok(metal_name) => {
+                out["metalFile"] = json!(metal_name);
+                out["metalWidth"] = json!(metal.width);
+                out["metalHeight"] = json!(metal.height);
+            }
+            Err(e) => out["metalError"] = json!(e),
+        }
+    }
+    Ok(out)
 }
 
-/// `mc_smf_heights` reads the heights out of a compiled `.smf`, for the
-/// playability panel to measure the map the compile actually wrote (issue
-/// #2169).
+/// `mc_smf_heights` reads the heights and the metal map out of a compiled
+/// `.smf`, for the playability panel to measure the map the compile actually
+/// wrote (issues #2169 and #5098).
 #[tauri::command]
 async fn mc_smf_heights<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
     let cache_dir = thumb_cache_dir(&app);
@@ -994,6 +1031,55 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    /// A 4 by 2 square map with a 2 by 1 metal map, as a compiled `.smf`.
+    fn small_smf(dir: &Path) -> String {
+        let mut b = vec![0u8; 80];
+        b[..15].copy_from_slice(b"spring map file");
+        b[24..28].copy_from_slice(&4i32.to_le_bytes());
+        b[28..32].copy_from_slice(&2i32.to_le_bytes());
+        b[32..36].copy_from_slice(&8i32.to_le_bytes());
+        b[52..56].copy_from_slice(&82u32.to_le_bytes());
+        b[68..72].copy_from_slice(&80u32.to_le_bytes());
+        b.extend_from_slice(&[7, 200]);
+        b.extend_from_slice(&[0u8; 30]);
+        let path = dir.join("small.smf");
+        std::fs::write(&path, &b).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
+    /// The metal map is extra: when it cannot be cached the heights still come
+    /// back, with the reason beside them and no metal file named.
+    #[test]
+    fn a_metal_map_that_cannot_be_cached_does_not_take_the_heights_with_it() {
+        let dir = temp_dir("metal-fails");
+        let path = small_smf(&dir);
+        let cache = dir.join("cache");
+        std::fs::create_dir_all(&cache).unwrap();
+        let key = thumb_cache_key(&path, 0).unwrap();
+        // A directory where the metal file belongs, so it is neither a hit
+        // nor writable.
+        std::fs::create_dir_all(cache.join(format!("{key}-smfm.bin"))).unwrap();
+
+        let out = smf_heights_cached(&path, Some(&cache)).unwrap();
+        assert_eq!(out["width"], 5);
+        assert!(out["file"].is_string());
+        assert!(out.get("metalFile").is_none());
+        assert!(out["metalError"].as_str().unwrap().contains("metal map"));
+
+        std::fs::remove_dir_all(cache.join(format!("{key}-smfm.bin"))).unwrap();
+        let out = smf_heights_cached(&path, Some(&cache)).unwrap();
+        assert_eq!(out["metalFile"], format!("{key}-smfm.bin"));
+        assert_eq!(
+            (out["metalWidth"].as_i64(), out["metalHeight"].as_i64()),
+            (Some(2), Some(1))
+        );
+        assert_eq!(
+            std::fs::read(cache.join(format!("{key}-smfm.bin"))).unwrap(),
+            vec![7, 200]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A source image on disk, wider than it is tall so the thumbnail's own

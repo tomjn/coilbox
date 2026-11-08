@@ -779,6 +779,11 @@ msgstr "{0, plural, one {# lenkeikon er ukjent} other {# lenkeikoner er ukjente}
 msgid "{0, plural, one {# loss} other {# losses}}"
 msgstr "{0, plural, one {# tap} other {# tap}}"
 
+#. placeholder {0}: metal.spotCount
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# metal spot, extractor radius is {radius} elmos} other {# metal spots, extractor radius is {radius} elmos}}"
+msgstr ""
+
 #. placeholder {0}: outcome.alreadyInstalled.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -858,6 +863,11 @@ msgstr "{0, plural, one {# ordre ble plassert utenfor kartet og tegnes ikke.} ot
 #, fuzzy
 msgid "{0, plural, one {# orphaned blob} other {# orphaned blobs}}"
 msgstr "{0, plural, one {# foreldreløs blob} other {# foreldreløse blober}}"
+
+#. placeholder {0}: metal.closeCount
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# pair of spots is closer together than the extractor radius, {radius} elmos:} other {# pairs of spots are closer together than the extractor radius, {radius} elmos:}}"
+msgstr ""
 
 #. placeholder {0}: s.incompletes
 #: src/content/rapidPool.ts
@@ -956,6 +966,11 @@ msgstr "{0, plural, one {# ekstra fil av en kamp som allerede er telt} other {# 
 #, fuzzy
 msgid "{0, plural, one {# source} other {# sources}}"
 msgstr "{0, plural, one {# kilde} other {# kilder}}"
+
+#. placeholder {0}: metal.wide
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "{0, plural, one {# spot has metal farther than the extractor radius from its centre. The widest reaches {widest} elmos.} other {# spots have metal farther than the extractor radius from their centre. The widest reaches {widest} elmos.}}"
+msgstr ""
 
 #. placeholder {0}: dots.length
 #: src/content/pages/components/MapAggregate.tsx
@@ -11223,6 +11238,7 @@ msgid "and"
 msgstr "og"
 
 #: src/content/pages/components/MatchStatsChart.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #, fuzzy
 msgid "and {hidden} more"
 msgstr "og {hidden} til"
@@ -17938,6 +17954,10 @@ msgstr ""
 msgid "Could not read the map's heights: {heightsError}"
 msgstr ""
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Could not read the map's metal: {error}"
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "could not read the parts pack: {status}"
@@ -20680,6 +20700,10 @@ msgstr "øst"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "east edge"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "east to west"
 msgstr ""
 
 #: src/play/scenarioDifficulty.ts
@@ -29855,6 +29879,7 @@ msgstr "metall"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/WorthSection.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/scenario/pages/components/StartConditions.tsx
 #, fuzzy
@@ -30067,6 +30092,7 @@ msgid "Minutes before away"
 msgstr "Minutter før borte"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #, fuzzy
 msgid "Mirror"
 msgstr "Speilvend"
@@ -31120,6 +31146,10 @@ msgstr "NØ-SV"
 #, fuzzy
 msgid "Nearest multiple of…"
 msgstr "Nærmeste multiplum av…"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Nearest spots, in elmos"
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -33284,6 +33314,10 @@ msgstr "ingen justeringsplass kan bære ord"
 msgid "no tweak slot left to hold it"
 msgstr "ingen justeringsplass igjen til å holde den"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "No two spots are closer together than the extractor radius, {radius} elmos."
+msgstr ""
+
 #: src/content/pages/components/UnitPicker.tsx
 #, fuzzy
 msgid "No unit data available for this game."
@@ -33514,6 +33548,10 @@ msgstr "ingen"
 msgid "None"
 msgstr "Ingen"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "none across"
+msgstr ""
+
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "None earned yet. {total} to go."
@@ -33639,6 +33677,10 @@ msgstr "nord"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "north edge"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "north to south"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -45137,6 +45179,14 @@ msgstr "Sprutdiameter"
 msgid "Splash falloff shape"
 msgstr "Form på sprutens avtakning"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Spot with the largest gap"
+msgstr ""
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Spots, largest gap"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
@@ -45293,11 +45343,13 @@ msgstr "Stjerneblink, stjernetåker og andre dekorative detaljer. Slå av for et
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/lego/pages/components/DescribeUnitForm.tsx
 #: src/lego/pages/components/NewUnitPopover.tsx
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/multiplayer/battle/startButtonLabel.ts
 #, fuzzy
 msgid "Start"
 msgstr "Start"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "start {number}"
 msgstr ""
@@ -45667,6 +45719,10 @@ msgstr "Starter ved Create og hver gang enheten stopper, og en handling har én 
 #, fuzzy
 msgid "Starts switched on"
 msgstr "Starter påslått"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "Starts, largest gap"
+msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
@@ -48679,6 +48735,10 @@ msgstr "Meshene i {moduleName} kunne ikke leses: {reason}"
 #, fuzzy
 msgid "The meshes of {name} could not be read: {reason}"
 msgstr "Meshene i {name} kunne ikke leses: {reason}"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "The metal map has no metal."
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
@@ -51837,6 +51897,10 @@ msgstr "Trekvart, høyre"
 msgid "Threshold (-th)"
 msgstr "Terskel (-th)"
 
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "through the centre"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 #, fuzzy
 msgid "Throughput"
@@ -52758,6 +52822,10 @@ msgstr "To spillere, én på hver side."
 #, fuzzy
 msgid "Two sides"
 msgstr "To sider"
+
+#: src/mapconv/pages/components/MetalFigures.tsx
+msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy

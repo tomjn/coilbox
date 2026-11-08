@@ -21,6 +21,7 @@ import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
+import { useMetalGrid } from "../../mapconv/metalGrid";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { PlayabilityPanel } from "../../mapconv/pages/components/PlayabilityPanel";
 import { heightsOf } from "../../mapconv/playability";
@@ -42,6 +43,7 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncMapMeta,
   useUnitsyncMapSkybox,
+  useUnitsyncMetalField,
   useUnitsyncMinimap,
   useUnitsyncScan,
   useUnitsyncThumbnails,
@@ -126,6 +128,33 @@ export default function MapDetailPage() {
         : null,
     [heightGrid, fieldMin, fieldMax],
   );
+  // The raw metal map and the map's extractor radius, for the playability
+  // panel's metal figures (issue #5098).
+  const metalField = useUnitsyncMetalField(
+    selected?.enginePath,
+    selected?.rootPath,
+    decoded,
+  );
+  const metalGrid = useMetalGrid(
+    metalField.url ?? undefined,
+    metalField.data?.width,
+    metalField.data?.height,
+  );
+  // The hook keeps the last map's answer until the next one arrives, so while
+  // it loads the metal is still being read, not the old map's.
+  const playMetal = metalField.loading
+    ? { grid: null }
+    : {
+        grid: metalGrid.grid,
+        error:
+          metalField.error ??
+          metalGrid.error ??
+          // An answer with no file and no error is a map with no metal map.
+          (metalField.data && !metalField.url
+            ? "the map has no metal map to read"
+            : null),
+        extractorRadius: metalField.data?.extractorRadius,
+      };
   const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
     selected?.rootPath,
@@ -526,6 +555,7 @@ export default function MapDetailPage() {
         heights={playHeights}
         heightsError={heightField.error ?? heightGridError}
         starts={minimap.startPositions}
+        metal={playMetal}
       />
 
       {insightShown && (

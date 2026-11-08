@@ -30,11 +30,11 @@ use sidecar::{
     build_config_set_args, build_convert_3do_args, build_custom_params_args, build_defs_probe_args,
     build_faction_logos_args, build_game_args, build_game_headers_args, build_height_field_args,
     build_heightmap_args, build_lua_args, build_lua_compat_args, build_lua_repl_args,
-    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metalmap_args,
-    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
-    build_unit_dataset_args, build_unit_defs_args, build_unit_model_args, build_unit_models_args,
-    build_unit_render_args, build_unit_render_keys_args, build_unit_script_args, find_unitsync,
-    resolve_sidecar,
+    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metal_field_args,
+    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
+    build_unit_buildpics_args, build_unit_dataset_args, build_unit_defs_args,
+    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::{BufRead, Read};
@@ -951,6 +951,32 @@ async fn unitsync_height_field<R: Runtime>(
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, MINIMAP_TIMEOUT, "height-field", None).await
+}
+
+/// `unitsync_metal_field`: write one map's raw 8 bit metal density grid to the
+/// thumb cache and report the file, with the extractor radius the map declares.
+/// The radius is absent when the map declares none, and the caller then applies
+/// the engine's default.
+#[tauri::command]
+async fn unitsync_metal_field<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    map_name: String,
+) -> CliResult {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let cache_dir = thumb_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_metal_field_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &map_name,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    run_worker(bin, args, envs, MINIMAP_TIMEOUT, "metal-field", None).await
 }
 
 /// `unitsync_metalmap` — render one map's metal infomap as a downscaled green-on-
@@ -2884,6 +2910,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_minimap,
             unitsync_heightmap,
             unitsync_height_field,
+            unitsync_metal_field,
             unitsync_metalmap,
             unitsync_thumbnails,
             unitsync_map_meta,

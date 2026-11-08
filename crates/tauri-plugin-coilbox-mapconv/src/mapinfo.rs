@@ -45,6 +45,9 @@ pub struct MapAppearance {
     pub void_ground: Option<bool>,
     /// `voidAlphaMin`: the alpha threshold that triggers `voidGround` transparency.
     pub void_alpha_min: Option<f32>,
+    /// `extractorRadius`: how far a metal extractor reaches on this map. The
+    /// engine's default applies when it is absent.
+    pub extractor_radius: Option<f64>,
     /// Effective water tint: `water.surfaceColor`, falling back to
     /// `water.planeColor`. Used by the preview's water plane.
     pub water_color: Option<[f32; 3]>,
@@ -171,6 +174,7 @@ pub fn parse_appearance(src: &str) -> MapAppearance {
         void_water: scan_bool(&lower, "voidwater"),
         void_ground: scan_bool(&lower, "voidground"),
         void_alpha_min: scan_f64(&lower, "voidalphamin").map(|v| v as f32),
+        extractor_radius: scan_f64(&lower, "extractorradius"),
         water_color: scan_vec3(&lower, "surfacecolor").or_else(|| scan_vec3(&lower, "planecolor")),
         water_alpha: scan_f64(&lower, "surfacealpha").map(|v| v as f32),
         water_plane_color: scan_vec3(&lower, "planecolor"),
@@ -205,6 +209,7 @@ struct MapInfoRaw {
     voidwater: Option<bool>,
     voidground: Option<bool>,
     voidalphamin: Option<f32>,
+    extractorradius: Option<f64>,
     smf: Smf,
     water: Water,
     atmosphere: Atmosphere,
@@ -264,6 +269,7 @@ impl From<MapInfoRaw> for MapAppearance {
             void_water: r.voidwater,
             void_ground: r.voidground,
             void_alpha_min: r.voidalphamin,
+            extractor_radius: r.extractorradius,
             // surfaceColor wins over planeColor, matching the scanner.
             water_color: r.water.surfacecolor.or(r.water.planecolor),
             water_alpha: r.water.surfacealpha,
@@ -384,6 +390,7 @@ mod tests {
             voidWater = true,
             voidGround = true,
             voidAlphaMin = 0.75,
+            extractorRadius = 90,
             atmosphere = {
                 skyColor = {0.1, 0.15, 0.7},
                 cloudColor = {0.9, 0.9, 1.0},
@@ -413,6 +420,7 @@ mod tests {
         assert_eq!(a.void_water, Some(true));
         assert_eq!(a.void_ground, Some(true));
         assert_eq!(a.void_alpha_min, Some(0.75));
+        assert_eq!(a.extractor_radius, Some(90.0));
         // surfaceColor wins for the effective tint; planeColor kept separately.
         assert_eq!(a.water_color, Some([0.75, 0.8, 0.85]));
         assert_eq!(a.water_plane_color, Some([0.0, 0.4, 0.0]));

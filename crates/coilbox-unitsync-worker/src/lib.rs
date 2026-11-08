@@ -16,7 +16,8 @@
 //! `parse_args` to call. `--unit-render`, `--unit-models`,
 //! `--unit-render-keys`, `--config`, `--config-set`, `--map-meta`,
 //! `--map-info`, `--map-skybox`, `--map-catalog`, `--map-minimaps`,
-//! `--heightmap`, `--height-field`, `--metalmap`, `--unit-buildpics`,
+//! `--heightmap`, `--height-field`, `--metal-field`, `--metalmap`,
+//! `--unit-buildpics`,
 //! `--faction-logos`, `--unit-dataset`, `--unit-model`, `--unit-script`,
 //! `--skirmish-ais`, `--game-headers`, `--thumbnails`, `--lua`, `--archive`
 //! and the two flagless defaults (a bare `--game` and a bare `--map`) have
@@ -64,6 +65,7 @@ pub enum Mode {
     MapMinimaps(MapMinimapsArgs),
     Heightmap(HeightmapArgs),
     HeightField(HeightFieldArgs),
+    MetalField(MetalFieldArgs),
     Metalmap(MetalmapArgs),
     UnitBuildpics(UnitBuildpicsArgs),
     FactionLogos(FactionLogosArgs),
@@ -107,6 +109,7 @@ impl Mode {
             Mode::MapMinimaps(args) => args.to_args(),
             Mode::Heightmap(args) => args.to_args(),
             Mode::HeightField(args) => args.to_args(),
+            Mode::MetalField(args) => args.to_args(),
             Mode::Metalmap(args) => args.to_args(),
             Mode::UnitBuildpics(args) => args.to_args(),
             Mode::FactionLogos(args) => args.to_args(),
@@ -1100,6 +1103,56 @@ impl HeightFieldArgs {
             return Err("--height-field needs --map <name>".into());
         };
         Ok(HeightFieldArgs { map, cache_dir })
+    }
+}
+
+/// `--metal-field`: write one map's raw 8 bit metal density grid to the cache,
+/// for a reader that wants the engine's own numbers and not the green picture
+/// `--metalmap` draws. `map` is required: there is nothing to read without
+/// one. No `asset_dir`: this mode only writes the cache file.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetalFieldArgs {
+    pub map: String,
+    pub cache_dir: Option<String>,
+}
+
+impl MetalFieldArgs {
+    /// Build the flags for `--metal-field` mode: the flag itself, the map to
+    /// read, and the optional on-disk cache directory.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--metal-field".to_string(),
+            "--map".to_string(),
+            self.map.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--metal-field` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, `args` may be exactly what
+    /// [`MetalFieldArgs::to_args`] returns or a full process argv carrying
+    /// unrelated flags, which are skipped rather than rejected.
+    ///
+    /// `--map` is required: there is nothing to read without one.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut map = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        let Some(map) = map else {
+            return Err("--metal-field needs --map <name>".into());
+        };
+        Ok(MetalFieldArgs { map, cache_dir })
     }
 }
 
@@ -2616,6 +2669,48 @@ mod tests {
         a.remove(at + 1);
         a.remove(at);
         assert!(HeightFieldArgs::from_args(&a).is_err());
+    }
+
+    fn metal_field_args() -> MetalFieldArgs {
+        MetalFieldArgs {
+            map: "Map v1".into(),
+            cache_dir: Some("/cache/metalfield".into()),
+        }
+    }
+
+    /// What `to_args` writes, `from_args` reads back whole. A test on either
+    /// function alone cannot catch the sidecar and the worker disagreeing
+    /// about this mode's fields.
+    #[test]
+    fn metal_field_round_trips_through_to_args_and_from_args() {
+        let original = metal_field_args();
+        let recovered = MetalFieldArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A caller with no cache directory omits `--cache-dir` entirely, and
+    /// that has to round trip as `None` rather than as an empty string.
+    #[test]
+    fn metal_field_with_no_cache_dir_round_trips_none() {
+        let original = MetalFieldArgs {
+            cache_dir: None,
+            ..metal_field_args()
+        };
+        let a = original.to_args();
+        assert!(!a.contains(&"--cache-dir".to_string()));
+        let recovered = MetalFieldArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// There is nothing to read without a map, so a missing one is refused
+    /// rather than treated as a quiet no-op.
+    #[test]
+    fn metal_field_missing_map_is_refused() {
+        let mut a = metal_field_args().to_args();
+        let at = a.iter().position(|x| x == "--map").unwrap();
+        a.remove(at + 1);
+        a.remove(at);
+        assert!(MetalFieldArgs::from_args(&a).is_err());
     }
 
     fn metalmap_args() -> MetalmapArgs {

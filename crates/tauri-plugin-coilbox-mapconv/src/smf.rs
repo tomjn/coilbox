@@ -26,8 +26,9 @@ const OFF_MINH: usize = 44;
 const OFF_MAXH: usize = 48;
 const HEADER_MIN: usize = 52;
 const OFF_HEIGHTMAP_PTR: usize = 52;
-/// The header up to and including `heightmapPtr`.
-const HEIGHTS_HEADER: usize = 56;
+const OFF_METALMAP_PTR: usize = 68;
+/// The header up to and including `metalmapPtr`.
+const HEADER_READ: usize = 72;
 
 /// Parse the leading SMF header fields. Returns an error if the bytes are too
 /// short or the magic doesn't match.
@@ -54,15 +55,30 @@ pub fn parse_smf_header(bytes: &[u8]) -> Result<SmfInfo, String> {
     })
 }
 
+/// Where a compiled map's metal map is: `mapx / 2` by `mapy / 2` bytes at
+/// `metalmapPtr`, one per 16 by 16 elmo cell, as `CSMFMapFile::ReadInfoMap`
+/// reads them.
+pub struct SmfMetal {
+    offset: u64,
+    pub len: usize,
+    pub width: i32,
+    pub height: i32,
+}
+
 /// Where a compiled map's heights are: the header, and the byte offset and
 /// length of the `(mapx + 1) * (mapy + 1)` little endian 16 bit words at
 /// `heightmapPtr`, as the engine reads them in `CSMFMapFile::ReadHeightmap`.
 /// The words must lie inside the file, so a corrupt header cannot ask for more
 /// memory than the file holds.
+///
+/// `metal` is `None` when the metal map does not lie inside the file. The
+/// heights are still good then, so that is the caller's to report rather than a
+/// reason to refuse the map.
 pub struct SmfHeights {
     pub info: SmfInfo,
     offset: u64,
     pub len: usize,
+    pub metal: Option<SmfMetal>,
 }
 
 pub fn locate_smf_heights(path: &std::path::Path) -> Result<SmfHeights, String> {
@@ -73,7 +89,7 @@ pub fn locate_smf_heights(path: &std::path::Path) -> Result<SmfHeights, String> 
         .metadata()
         .map_err(|e| format!("could not read {}: {e}", path.display()))?
         .len();
-    let mut head = [0u8; HEIGHTS_HEADER];
+    let mut head = [0u8; HEADER_READ];
     file.read_exact(&mut head)
         .map_err(|_| "file too small to be an SMF".to_string())?;
     let info = parse_smf_header(&head)?;
@@ -83,20 +99,34 @@ pub fn locate_smf_heights(path: &std::path::Path) -> Result<SmfHeights, String> 
             info.mapx, info.mapy
         ));
     }
-    let offset = u64::from(u32::from_le_bytes([
-        head[OFF_HEIGHTMAP_PTR],
-        head[OFF_HEIGHTMAP_PTR + 1],
-        head[OFF_HEIGHTMAP_PTR + 2],
-        head[OFF_HEIGHTMAP_PTR + 3],
-    ]));
+    let pointer = |at: usize| {
+        u64::from(u32::from_le_bytes([
+            head[at],
+            head[at + 1],
+            head[at + 2],
+            head[at + 3],
+        ]))
+    };
+    let offset = pointer(OFF_HEIGHTMAP_PTR);
     let len = (info.mapx as u64 + 1) * (info.mapy as u64 + 1) * 2;
     if offset + len > size {
         return Err("the SMF ends before its heightmap does".to_string());
     }
+    let metal_offset = pointer(OFF_METALMAP_PTR);
+    let (width, height) = (info.mapx / 2, info.mapy / 2);
+    let metal_len = width as u64 * height as u64;
+    // A zero pointer is a map with no metal block, and would read the header.
+    let metal = (metal_offset != 0 && metal_offset + metal_len <= size).then_some(SmfMetal {
+        offset: metal_offset,
+        len: metal_len as usize,
+        width,
+        height,
+    });
     Ok(SmfHeights {
         info,
         offset,
         len: len as usize,
+        metal,
     })
 }
 
@@ -110,6 +140,18 @@ pub fn read_smf_heights(path: &std::path::Path, at: &SmfHeights) -> Result<Vec<u
         .and_then(|_| file.read_exact(&mut words))
         .map_err(|_| "the SMF ends before its heightmap does".to_string())?;
     Ok(words)
+}
+
+/// The metal map bytes `locate_smf_heights` found.
+pub fn read_smf_metal(path: &std::path::Path, at: &SmfMetal) -> Result<Vec<u8>, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("could not open {}: {e}", path.display()))?;
+    let mut bytes = vec![0u8; at.len];
+    file.seek(SeekFrom::Start(at.offset))
+        .and_then(|_| file.read_exact(&mut bytes))
+        .map_err(|_| "the SMF ends before its metal map does".to_string())?;
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -178,6 +220,37 @@ mod tests {
         huge[OFF_MAPX..OFF_MAPX + 4].copy_from_slice(&i32::MAX.to_le_bytes());
         std::fs::write(&path, &huge).unwrap();
         assert!(locate_smf_heights(&path).is_err());
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn reads_the_metal_map_at_its_pointer() {
+        // 4 by 2 squares: a 2 by 1 metal map and 5 by 3 height words.
+        let mut b = header(4, 2, 8, 0.0, 1.0);
+        b.resize(80, 0);
+        b[OFF_METALMAP_PTR..OFF_METALMAP_PTR + 4].copy_from_slice(&80u32.to_le_bytes());
+        b[OFF_HEIGHTMAP_PTR..OFF_HEIGHTMAP_PTR + 4].copy_from_slice(&82u32.to_le_bytes());
+        b.extend_from_slice(&[7, 200]);
+        b.extend_from_slice(&[0u8; 30]);
+        let path =
+            std::env::temp_dir().join(format!("coilbox-smf-metal-{}.smf", std::process::id()));
+        std::fs::write(&path, &b).unwrap();
+        let at = locate_smf_heights(&path).unwrap();
+        let metal = at.metal.as_ref().expect("the metal map is inside the file");
+        assert_eq!((metal.width, metal.height, metal.len), (2, 1, 2));
+        assert_eq!(read_smf_metal(&path, metal).unwrap(), vec![7, 200]);
+
+        // A null pointer is no metal map, not the header read as one.
+        b[OFF_METALMAP_PTR..OFF_METALMAP_PTR + 4].copy_from_slice(&0u32.to_le_bytes());
+        std::fs::write(&path, &b).unwrap();
+        assert!(locate_smf_heights(&path).unwrap().metal.is_none());
+
+        // The metal map pointing past the end leaves the heights readable.
+        b[OFF_METALMAP_PTR..OFF_METALMAP_PTR + 4].copy_from_slice(&1000u32.to_le_bytes());
+        std::fs::write(&path, &b).unwrap();
+        let at = locate_smf_heights(&path).unwrap();
+        assert!(at.metal.is_none());
+        assert_eq!(read_smf_heights(&path, &at).unwrap().len(), 30);
         let _ = std::fs::remove_file(&path);
     }
 }

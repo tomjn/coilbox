@@ -57,6 +57,7 @@ vi.mock("../config", () => ({
   useUnitsyncMinimap: () => ({ startPositions: STARTS }),
   useUnitsyncHeightmap: () => ({}),
   useUnitsyncHeightField: () => ({}),
+  useUnitsyncMetalField: () => ({}),
   useUnitsyncMapInfo: () => ({}),
   useUnitsyncMapSkybox: () => ({}),
 }));

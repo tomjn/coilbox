@@ -486,6 +486,31 @@ pub struct HeightFieldOutput {
     pub errors: Vec<String>,
 }
 
+/// The map's raw metal density grid, returned by the lazy `metal-field` mode: the
+/// file the grid was written to plus the extractor radius the map declares.
+///
+/// No inline fallback, for the same reason as [`HeightFieldOutput`]: without a
+/// cache directory this mode reports the failure and the caller goes quiet.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MetalFieldOutput {
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. One byte per
+    /// sample as `GetInfoMap "metal"` returned it, row major, `width * height`
+    /// of them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Grid dimensions, `(mapx/2, mapy/2)`, as `GetInfoMapSize "metal"` gives them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// The map's `extractorRadius` in elmos, when it declares one. Absent when
+    /// the map declares none, and the caller then applies the engine's default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extractor_radius: Option<f32>,
+    pub errors: Vec<String>,
+}
+
 /// One map overlay layer encoded as the asset the hub takes, written to disk.
 ///
 /// Like [`UnitBuildpicAsset`], the bytes stay out of the JSON and the file goes
