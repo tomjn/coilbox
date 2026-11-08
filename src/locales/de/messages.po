@@ -24246,6 +24246,10 @@ msgstr "Berechtigung erteilen"
 msgid "Graphics"
 msgstr "Grafik"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "grass"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Gravity"
@@ -41369,6 +41373,10 @@ msgstr "Wie Genauigkeit, aber gilt, während sich die feuernde Einheit bewegt."
 msgid "Same as default"
 msgstr "Wie Standard"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "sand"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -44756,6 +44764,10 @@ msgstr "Snapshot"
 #, fuzzy
 msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
 msgstr "<0>springsettings.cfg</0>, <1>LuaUI/Config</1> und <2>uikeys.txt</2> dieses Inhalte-Ordners sichern und austauschen."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "snow"
+msgstr ""
 
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
@@ -55946,6 +55958,10 @@ msgstr "Portabilität des Schreibordners entfällt (nicht portabel)"
 msgid "Write sky"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write splats"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56070,6 +56086,10 @@ msgstr ""
 #, fuzzy
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "{modelsWritten} von {modelsFound} Modellen in {0, plural, one {# Blatt} other {# Blätter}} geschrieben."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
+msgstr ""
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy

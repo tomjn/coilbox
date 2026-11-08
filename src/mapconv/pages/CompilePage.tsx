@@ -10,6 +10,7 @@ import {
   FileText,
   FolderOpen,
   Hammer,
+  Layers,
   Loader2,
   Package,
   PackageCheck,
@@ -51,6 +52,7 @@ import {
   mcSuggestSources,
   mcWriteMapinfo,
   mcWriteSkybox,
+  mcWriteSplats,
 } from "../bindings";
 import { useMapconvConfig } from "../config";
 import { useCompileDraft } from "../drafts";
@@ -189,6 +191,12 @@ export default function CompilePage() {
   const [writingSky, setWritingSky] = useState(false);
   const [skyResult, setSkyResult] = useState<{ path: string } | null>(null);
   const [skyError, setSkyError] = useState<string | null>(null);
+  const [writingSplats, setWritingSplats] = useState(false);
+  const [splatResult, setSplatResult] = useState<{
+    files: string[];
+    ground: string;
+  } | null>(null);
+  const [splatError, setSplatError] = useState<string | null>(null);
   const [packaging, setPackaging] = useState(false);
   const [packResult, setPackResult] = useState<{
     path: string;
@@ -250,6 +258,7 @@ export default function CompilePage() {
     !running &&
     !writingMapinfo &&
     !writingSky &&
+    !writingSplats &&
     !packaging &&
     !installing &&
     maintexture !== "" &&
@@ -286,6 +295,8 @@ export default function CompilePage() {
     setMapinfoError(null);
     setSkyResult(null);
     setSkyError(null);
+    setSplatResult(null);
+    setSplatError(null);
     clearPackage();
     setLogLines([]);
     const runId = crypto.randomUUID();
@@ -404,6 +415,34 @@ export default function CompilePage() {
       setSkyError(errorText(e));
     } finally {
       setWritingSky(false);
+    }
+  }
+
+  /**
+   * Generates splat detail from the compiled heightmap into `maps/` and names
+   * it in mapinfo.lua (#5090). mapinfo.lua is written from the form first, as
+   * the sky does, so there is a file to name it in.
+   */
+  async function writeSplats() {
+    if (!result) return;
+    clearPackage();
+    setWritingSplats(true);
+    setSplatResult(null);
+    setSplatError(null);
+    try {
+      if (!(await writeMapinfo())) return;
+      setSplatResult(
+        await mcWriteSplats({
+          outDir: result.outDir,
+          outSuffix: result.outSuffix,
+          texture: maintexture || undefined,
+        }),
+      );
+      setMapinfoResult(null);
+    } catch (e) {
+      setSplatError(errorText(e));
+    } finally {
+      setWritingSplats(false);
     }
   }
 
@@ -580,6 +619,18 @@ export default function CompilePage() {
   const textureWidth = textureInfo?.width ?? 0;
   const textureHeight = textureInfo?.height ?? 0;
   const smfPath = result?.smfPath ?? "";
+  const splatCount = splatResult?.files.length ?? 0;
+  const splatFolder = dirname(splatResult?.files[0] ?? "");
+  const splatGround =
+    (
+      {
+        grass: t`grass`,
+        sand: t`sand`,
+        snow: t`snow`,
+      } as Record<string, string>
+    )[splatResult?.ground ?? ""] ??
+    splatResult?.ground ??
+    "";
   const minHeight = advanced.minh;
   const maxHeight = advanced.maxh;
 
@@ -860,9 +911,28 @@ export default function CompilePage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={writeSplats}
+                  disabled={
+                    writingSplats || writingMapinfo || writingSky || packaging
+                  }
+                >
+                  {writingSplats ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Layers />
+                  )}{" "}
+                  <Trans>Write splats</Trans>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={packageMap}
                   disabled={
-                    packaging || writingMapinfo || writingSky || installing
+                    packaging ||
+                    writingMapinfo ||
+                    writingSky ||
+                    writingSplats ||
+                    installing
                   }
                 >
                   {packaging ? (
@@ -1024,6 +1094,19 @@ export default function CompilePage() {
                     Wrote{" "}
                     <span className="font-mono text-xs">{skyResult.path}</span>
                   </Trans>
+                </p>
+              )}
+              {splatResult && (
+                <p className="mt-2 break-all text-sm">
+                  <Trans>
+                    Wrote {splatCount} splat files with {splatGround} ground to{" "}
+                    <span className="font-mono text-xs">{splatFolder}</span>
+                  </Trans>
+                </p>
+              )}
+              {splatError && (
+                <p className="mt-2 break-words text-sm text-destructive">
+                  {splatError}
                 </p>
               )}
               {skyError && (

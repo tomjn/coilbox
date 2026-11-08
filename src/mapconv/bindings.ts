@@ -284,6 +284,18 @@ export const mcWriteSkybox = defineCommand<
 >("coilbox-mapconv", "mc_write_skybox");
 
 /**
+ * Generate splat detail for the map compiled as `<outDir>/<outSuffix>.smf` from
+ * its heightmap: a distribution, four detail textures and a detail normal map
+ * under `<outDir>/maps/`, named in `mapinfo.lua`. `texture` is the diffuse
+ * texture the ground type is picked from. Refused when `mapinfo.lua` already
+ * names splat textures of its own.
+ */
+export const mcWriteSplats = defineCommand<
+  { outDir: string; outSuffix: string; texture?: string },
+  { files: string[]; ground: string; mapinfoChanged: boolean }
+>("coilbox-mapconv", "mc_write_splats");
+
+/**
  * Write `<outDir>/<outSuffix>.sdz` from the compile and the `mapinfo.lua` beside
  * it. `files` lists the archive's entries by their path inside it.
  */
