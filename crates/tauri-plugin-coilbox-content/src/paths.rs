@@ -334,6 +334,32 @@ mod tests {
     }
 
     #[test]
+    fn zerok_is_probed_in_a_flatpak_and_a_snap_steam() {
+        // Issue #1781: both keep Steam's folder under the user's home but outside
+        // `~/.local/share`.
+        let mut b = base();
+        b.include_zerok = true;
+        let zerok: Vec<PathBuf> = candidate_roots(Os::Linux, &b)
+            .into_iter()
+            .filter(|c| c.origin == "zerok")
+            .map(|c| c.path)
+            .collect();
+        let game = |steam: &str| {
+            PathBuf::from(steam)
+                .join("steamapps")
+                .join("common")
+                .join("Zero-K")
+        };
+        for steam in [
+            "/home/u/.var/app/com.valvesoftware.Steam/.local/share/Steam",
+            "/home/u/.var/app/com.valvesoftware.Steam/data/Steam",
+            "/home/u/snap/steam/common/.local/share/Steam",
+        ] {
+            assert!(zerok.contains(&game(steam)), "missing {steam}");
+        }
+    }
+
+    #[test]
     fn standard_root_path_is_prd_default() {
         let b = BaseDirs {
             home: Some(PathBuf::from("/home/u")),
