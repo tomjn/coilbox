@@ -12,10 +12,17 @@ import { buildPicMissing } from "../buildPicMissing";
 import { buildBuildGraph, buildEdgeMap } from "../buildTree";
 import { layoutBuildTree } from "../pages/components/buildTreeLayout";
 import {
+  presentStatKeys,
+  STAT_KEYS,
+  type StatKey,
+  weaponsOf,
+} from "../unitStats";
+import {
   type ExportBranding,
   type ExportFaction,
   type ExportInput,
   type ExportNode,
+  type ExportStats,
   NODE_H,
   NODE_W,
   type UnitKind,
@@ -27,6 +34,37 @@ export interface PicEntry {
   name?: string;
   icon?: string;
   iconSkipped?: UnitDisplay["iconSkipped"];
+}
+
+/** The stat labels of `UnitStatsTable`, in English: the exported page has no
+ * translation catalogue (its legend is English too). */
+const STAT_LABELS: Record<StatKey, string> = {
+  health: "Health",
+  metalCost: "Metal cost",
+  energyCost: "Energy cost",
+  buildTime: "Build time",
+  sightDistance: "Sight distance",
+  maxVelocity: "Speed",
+  range: "Range",
+};
+
+/** One unit's stats as text, or undefined when it has none to show. */
+export function exportStats(unit: UnitDatasetEntry): ExportStats | undefined {
+  const stats = unit.stats;
+  if (!stats) return undefined;
+  const present = new Set(presentStatKeys(stats));
+  const rows = STAT_KEYS.filter((key) => present.has(key)).map((key) => ({
+    label: STAT_LABELS[key],
+    value: String(stats[key]),
+  }));
+  const weapons = weaponsOf(stats).map((w) => ({
+    damage: String(w.damage ?? ""),
+    reload: String(w.reload ?? ""),
+    range: String(w.range ?? ""),
+    projectile: w.projectile ?? "",
+  }));
+  if (rows.length === 0 && weapons.length === 0) return undefined;
+  return { rows, weapons };
 }
 
 /** Classify a unit for its ring colour, matching `BuildTreeDrawer`'s precedence:
@@ -51,6 +89,7 @@ function buildFaction(
   startSet: Set<string>,
   mobileSet: Set<string>,
   pics: Record<string, PicEntry>,
+  statsById: Map<string, ExportStats>,
 ): ExportFaction {
   const graph = buildBuildGraph(side.startUnit, edges);
   const rfNodes: Node[] = graph.order.map((id) => ({
@@ -77,6 +116,7 @@ function buildFaction(
       kind: kindOf(id, startSet, edges, mobileSet),
       icon: pic?.icon,
       noPic: pic?.icon ? undefined : buildPicMissing(pic),
+      stats: statsById.get(id),
     };
   });
 
@@ -135,9 +175,16 @@ export function buildExportInput({
       .map((s) => s.startUnit?.toLowerCase())
       .filter((u): u is string => !!u),
   );
+  const statsById = new Map<string, ExportStats>();
+  for (const u of units) {
+    const stats = exportStats(u);
+    if (stats) statsById.set(u.name.toLowerCase(), stats);
+  }
   // Only factions with a reachable graph produce a canvas/tab.
   const factions = sides
-    .map((s) => buildFaction(s, edges, fullByName, startSet, mobileSet, pics))
+    .map((s) =>
+      buildFaction(s, edges, fullByName, startSet, mobileSet, pics, statsById),
+    )
     .filter((f) => f.nodes.length > 0);
   return { gameName, factions, branding, date };
 }

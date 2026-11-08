@@ -29749,6 +29749,10 @@ msgstr "システムと同じ"
 msgid "Matches: {matches}"
 msgstr "試合数：{matches}"
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Matching units"
+msgstr ""
+
 #: src/multiplayer/debriefing.ts
 #: src/multiplayer/index.tsx
 #: src/multiplayer/pages/MatchmakingPage.tsx
@@ -33503,6 +33507,7 @@ msgid "No units match \"{trimmedQuery}\"."
 msgstr "「{trimmedQuery}」に一致するユニットはありません。"
 
 #: src/campaign/pages/components/CampaignUnits.tsx
+#: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/UnitPicker.tsx
 #: src/lego/pages/components/GameUnitBrowser.tsx
 #, fuzzy
@@ -42464,6 +42469,7 @@ msgstr "このログを検索"
 msgid "Search titles and descriptions…"
 msgstr "タイトルと説明を検索…"
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/UnitPicker.tsx
 #: src/content/pages/GameUnitsPage.tsx
 #: src/workshop/pages/components/UnitList.tsx

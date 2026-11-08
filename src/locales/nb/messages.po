@@ -29927,6 +29927,10 @@ msgstr "Samme som systemet"
 msgid "Matches: {matches}"
 msgstr "Kamper: {matches}"
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Matching units"
+msgstr ""
+
 #: src/multiplayer/debriefing.ts
 #: src/multiplayer/index.tsx
 #: src/multiplayer/pages/MatchmakingPage.tsx
@@ -33695,6 +33699,7 @@ msgid "No units match \"{trimmedQuery}\"."
 msgstr "Ingen enheter passer til «{trimmedQuery}»."
 
 #: src/campaign/pages/components/CampaignUnits.tsx
+#: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/UnitPicker.tsx
 #: src/lego/pages/components/GameUnitBrowser.tsx
 #, fuzzy
@@ -42736,6 +42741,7 @@ msgstr "Søk i denne loggen"
 msgid "Search titles and descriptions…"
 msgstr "Søk i titler og beskrivelser…"
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/UnitPicker.tsx
 #: src/content/pages/GameUnitsPage.tsx
 #: src/workshop/pages/components/UnitList.tsx

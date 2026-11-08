@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Side, UnitDatasetEntry } from "../bindings";
-import { buildExportInput, type PicEntry } from "./buildInput";
+import { buildExportInput, exportStats, type PicEntry } from "./buildInput";
 import { buildExportArtifact } from "./index";
 import type { ExportArtifact, ExportInput } from "./types";
 
@@ -233,6 +233,59 @@ describe("buildExportArtifact zip", () => {
     expect(index).toContain('src="assets/tree.js"');
     expect(index).toContain("images/armcom.png");
     expect(index).not.toContain("data:image/png;base64,QQ==");
+  });
+});
+
+describe("unit stats in the export", () => {
+  const withStats: UnitDatasetEntry[] = units.map((u) =>
+    u.name === "armlab"
+      ? {
+          ...u,
+          stats: {
+            health: 1500,
+            metalCost: 650,
+            range: "long",
+            // Wrong type for the key, so it gets no row.
+            buildTime: { not: "a number" },
+            weapons: [{ damage: 12, reload: 0.5, projectile: "<b>laser</b>" }],
+          },
+        }
+      : u,
+  );
+  const opts = { scope: "all", wrapper: "neutral", format: "html" } as const;
+
+  it("turns the stats into labelled rows in the table's order", () => {
+    const stats = exportStats(withStats[2]);
+    expect(stats?.rows).toEqual([
+      { label: "Health", value: "1500" },
+      { label: "Metal cost", value: "650" },
+      { label: "Range", value: "long" },
+    ]);
+    expect(stats?.weapons).toEqual([
+      { damage: "12", reload: "0.5", range: "", projectile: "<b>laser</b>" },
+    ]);
+  });
+
+  it("has no stats for a unit whose definition gives none", () => {
+    expect(exportStats(units[0])).toBeUndefined();
+    expect(exportStats({ ...units[0], stats: {} })).toBeUndefined();
+  });
+
+  it("carries each unit's stats on its node", () => {
+    const arm = input({ units: withStats }).factions[0];
+    expect(arm.nodes.find((n) => n.id === "armlab")?.stats).toBeDefined();
+    expect(arm.nodes.find((n) => n.id === "armpw")?.stats).toBeUndefined();
+  });
+
+  it("writes one escaped panel template per unit, and the search box", () => {
+    const out = html(buildExportArtifact(input({ units: withStats }), opts));
+    expect(out.match(/<template data-id=/g)).toHaveLength(
+      input().factions.reduce((n, f) => n + f.nodes.length, 0),
+    );
+    expect(out).toContain("&lt;b&gt;laser&lt;/b&gt;");
+    expect(out).not.toContain("<b>laser</b>");
+    expect(out).toContain('id="unit-search"');
+    expect(out).toContain('<aside class="detail"');
   });
 });
 

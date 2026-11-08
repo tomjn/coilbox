@@ -63,6 +63,12 @@ function renderLegend(): string {
 </div>`;
 }
 
+/** The unit search box. Picking a result focuses that unit in the faction on
+ * show, as the app's drawer does. The runtime fills the results list. */
+function renderSearch(): string {
+  return `<div class="search"><input id="unit-search" type="search" role="combobox" aria-expanded="false" aria-controls="unit-search-results" aria-autocomplete="list" aria-label="Search units" placeholder="Search units" autocomplete="off" /><ul id="unit-search-results" role="listbox" aria-label="Matching units" hidden></ul></div>`;
+}
+
 /** The attribution footer. The date is the single isolated non-deterministic
  * line, so re-exports of the same game diff to at most this element. */
 function renderFooter(input: ExportInput): string {
@@ -104,7 +110,10 @@ ${head}
 <div class="wrap">
 ${renderHeader(input, opts)}
 ${renderTabs(input)}
+<div class="toolbar">
 ${renderLegend()}
+${renderSearch()}
+</div>
 ${canvases}
 ${renderFooter(input)}
 </div>

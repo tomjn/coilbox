@@ -17,6 +17,19 @@ export const NODE_H = 112;
  * commander (blue) > builder (yellow) > mobile (rose) > building (slate). */
 export type UnitKind = "commander" | "builder" | "mobile" | "building";
 
+/** A unit's stats as the focus panel shows them, already turned into text so
+ * the page's runtime has nothing to format. Mirrors `UnitStatsTable`: a stat
+ * the unit's definition does not give has no row. */
+export interface ExportStats {
+  rows: { label: string; value: string }[];
+  weapons: {
+    damage: string;
+    reload: string;
+    range: string;
+    projectile: string;
+  }[];
+}
+
 /** One positioned unit in the exported scene. `x`/`y` are the box top-left,
  * straight from `layoutBuildTree`. `icon` is a base64 `data:` URL when a pic
  * resolved (absent → the node renders a "no pic" placeholder, never a broken
@@ -32,6 +45,9 @@ export interface ExportNode {
   /** The placeholder to draw instead of `icon`, and what it means on hover.
    * Set only when there is no `icon`, from `buildPicMissing`. */
   noPic?: { label: string; title?: string };
+  /** Shown in the focus panel when the unit is clicked. Absent when the game
+   * gives the unit no stats. */
+  stats?: ExportStats;
 }
 
 /** One builder→unit edge. `extra` marks the faint dashed "also buildable by"
