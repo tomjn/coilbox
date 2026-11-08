@@ -460,7 +460,7 @@ function LockButton({
       ? t`Edited by hand, so a reroll keeps it`
       : t`Locked, so a reroll keeps it`
     : kept
-      ? t`A reroll keeps it, because a part on it is kept`
+      ? t`A reroll keeps it with a kept part`
       : t`A reroll replaces it`;
   return (
     <Button
@@ -471,7 +471,7 @@ function LockButton({
       } ${own ? "" : "text-muted-foreground"}`}
       onClick={onToggle}
       aria-pressed={own}
-      aria-label={own ? t`Free ${pieceName}` : t`Lock ${pieceName}`}
+      aria-label={t`Lock ${pieceName}`}
       title={title}
     >
       {kept ? <Lock size={14} /> : <LockOpen size={14} />}

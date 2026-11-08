@@ -9259,7 +9259,7 @@ msgid "A replay's unit numbers only mean something against the unit list of the 
 msgstr "I numeri delle unità di un replay hanno senso solo rispetto all’elenco delle unità della build su cui è stato giocato. Una partita senza tale elenco è esclusa per intero, così come una partita i cui ordini non corrispondono al suo elenco."
 
 #: src/lego/pages/components/PieceTree.tsx
-msgid "A reroll keeps it, because a part on it is kept"
+msgid "A reroll keeps it with a kept part"
 msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
@@ -23362,10 +23362,6 @@ msgstr "Inquadra la selezione"
 #, fuzzy
 msgid "Free"
 msgstr "Libero"
-
-#: src/lego/pages/components/PieceTree.tsx
-msgid "Free {pieceName}"
-msgstr ""
 
 #: src/content/mapAggregate.ts
 #, fuzzy

@@ -7469,8 +7469,8 @@ msgid "A replay's unit numbers only mean something against the unit list of the 
 msgstr "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 
 #: src/lego/pages/components/PieceTree.tsx
-msgid "A reroll keeps it, because a part on it is kept"
-msgstr "A reroll keeps it, because a part on it is kept"
+msgid "A reroll keeps it with a kept part"
+msgstr "A reroll keeps it with a kept part"
 
 #: src/lego/pages/components/PieceTree.tsx
 msgid "A reroll replaces it"
@@ -18924,10 +18924,6 @@ msgstr "Frame the selection"
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "Free"
 msgstr "Free"
-
-#: src/lego/pages/components/PieceTree.tsx
-msgid "Free {pieceName}"
-msgstr "Free {pieceName}"
 
 #: src/content/mapAggregate.ts
 msgid "Free for all"

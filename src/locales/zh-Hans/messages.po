@@ -9193,7 +9193,7 @@ msgid "A replay's unit numbers only mean something against the unit list of the 
 msgstr "回放中的单位编号只有对照其所用版本的单位列表才有意义。没有此类列表的对局会被整个排除，自身命令与列表不符的对局也是如此。"
 
 #: src/lego/pages/components/PieceTree.tsx
-msgid "A reroll keeps it, because a part on it is kept"
+msgid "A reroll keeps it with a kept part"
 msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
@@ -23207,10 +23207,6 @@ msgstr "让所选内容适应视图"
 #, fuzzy
 msgid "Free"
 msgstr "自由"
-
-#: src/lego/pages/components/PieceTree.tsx
-msgid "Free {pieceName}"
-msgstr ""
 
 #: src/content/mapAggregate.ts
 #, fuzzy

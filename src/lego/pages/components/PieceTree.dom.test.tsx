@@ -472,11 +472,11 @@ describe("locks on a generated unit (#3235)", () => {
         onToggleLocked={onToggleLocked}
       />,
     );
-    const turret = screen.getByRole("button", { name: "Free turret" });
+    const turret = screen.getByRole("button", { name: "Lock turret" });
     expect(turret.getAttribute("aria-pressed")).toBe("true");
     expect(turret.title).toBe("Locked, so a reroll keeps it");
     expect(screen.getByRole("button", { name: "Lock hull" }).title).toBe(
-      "A reroll keeps it, because a part on it is kept",
+      "A reroll keeps it with a kept part",
     );
     const skirt = screen.getByRole("button", { name: "Lock skirt" });
     expect(skirt.title).toBe("A reroll replaces it");

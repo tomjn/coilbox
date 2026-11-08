@@ -1820,7 +1820,7 @@ function Builder({ id }: { id: string | undefined }) {
     if (!draft?.generated) return null;
     const edited = editedPieces(draft);
     return {
-      kept: keptPieces(draft),
+      kept: keptPieces(draft, edited),
       own: new Set(
         draft.pieces
           .filter((piece) => keptByItself(piece, edited))

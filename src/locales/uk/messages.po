@@ -9193,7 +9193,7 @@ msgid "A replay's unit numbers only mean something against the unit list of the 
 msgstr "Номери юнітів у повторі мають сенс лише щодо списку юнітів збірки, на якій його зіграно. Гру без такого списку не враховано повністю, як і гру, чиї власні накази не відповідають її списку."
 
 #: src/lego/pages/components/PieceTree.tsx
-msgid "A reroll keeps it, because a part on it is kept"
+msgid "A reroll keeps it with a kept part"
 msgstr ""
 
 #: src/lego/pages/components/PieceTree.tsx
@@ -23207,10 +23207,6 @@ msgstr "Вписати виділене"
 #, fuzzy
 msgid "Free"
 msgstr "Вільне"
-
-#: src/lego/pages/components/PieceTree.tsx
-msgid "Free {pieceName}"
-msgstr ""
 
 #: src/content/mapAggregate.ts
 #, fuzzy
