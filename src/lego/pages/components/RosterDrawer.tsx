@@ -67,7 +67,10 @@ export function RosterDrawer({ open, onOpenChange, projects, onSaved }: Props) {
   const style = styleStore.styles.find((s) => s.id === styleId) ?? null;
   const [made, setMade] = useState<Made | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [pictures, setPictures] = useState<string[]>([]);
+  /** The pictures and the roster they were drawn of, so a roster made since
+   *  never shows or saves the last one's. */
+  const [drawn, setDrawn] = useState<{ of: Made; urls: string[] } | null>(null);
+  const pictures = drawn && drawn.of === made ? drawn.urls : [];
   /** Bumped when a texture arrives, so pictures drawn too early are redrawn. */
   const [arrivals, setArrivals] = useState(0);
 
@@ -102,16 +105,19 @@ export function RosterDrawer({ open, onOpenChange, projects, onSaved }: Props) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `arrivals` is only a reason to draw again
   useEffect(() => {
     if (!pack || !made) {
-      setPictures([]);
+      setDrawn(null);
       return;
     }
     const material = partMaterial(baseAtlas(pack));
     if (!materialReady(material)) return;
     try {
-      setPictures(drawUnitPictures(made.units, pack, material));
+      setDrawn({
+        of: made,
+        urls: drawUnitPictures(made.units, pack, material),
+      });
     } catch {
       // A picture is a convenience. Without WebGL the names still show.
-      setPictures([]);
+      setDrawn(null);
     }
   }, [pack, made, arrivals]);
 

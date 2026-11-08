@@ -65,8 +65,10 @@ describe("saveThumbnailPng (#3239)", () => {
   });
 
   it("refuses anything that is not a PNG data URL", async () => {
+    vi.mocked(legoThumbSave).mockClear();
     await expect(
       saveThumbnailPng("unit-1", "data:image/jpeg;base64,AA=="),
     ).rejects.toThrow();
+    expect(vi.mocked(legoThumbSave)).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,7 @@ import type { RosterRequest } from "../../roster";
 import { RosterDrawer } from "./RosterDrawer";
 
 const generateRoster = vi.fn();
+const ready = vi.hoisted(() => ({ material: true }));
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   save: vi.fn(),
@@ -69,7 +70,7 @@ vi.mock("../../pack", () => ({
 vi.mock("../../starterModules", () => ({ starterModules: () => [] }));
 vi.mock("../../geometry", () => ({ partMaterial: () => ({}) }));
 vi.mock("../../candidatePictures", () => ({
-  materialReady: () => true,
+  materialReady: () => ready.material,
   drawUnitPictures: (units: LegoProject[]) =>
     units.map((u) => `data:image/png;base64,${u.id}`),
 }));
@@ -101,6 +102,7 @@ const onSaved = vi.fn();
 
 beforeEach(() => {
   installSettingsStorage(memorySettingsStorage());
+  ready.material = true;
   generateRoster.mockReset();
   generateRoster.mockImplementation((request: RosterRequest) => ({
     status: "ok",
@@ -240,6 +242,22 @@ describe("RosterDrawer", () => {
     view.rerender(closed(false));
     view.rerender(closed(true));
     expect(screen.queryByRole("button", { name: "Save roster" })).toBeNull();
+  });
+
+  it("never saves the last roster's pictures with a rerolled one", async () => {
+    const generate = await show();
+    type("Roster name", "Raiders");
+    type("Seed", "2");
+    fireEvent.click(generate);
+    expect(document.querySelectorAll("img")).toHaveLength(9);
+    // The parts' texture is not ready, so the new roster has no pictures yet.
+    ready.material = false;
+    fireEvent.click(screen.getByRole("button", { name: "Reroll" }));
+    expect(document.querySelectorAll("img")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Save roster" }));
+
+    expect(onSaved.mock.calls[0][0][0].id).toBe(`3-${GENERATOR_JOBS[0].id}-1`);
+    expect(onSaved.mock.calls[0][1]).toEqual([]);
   });
 
   it("hands every unit to the page to save", async () => {
