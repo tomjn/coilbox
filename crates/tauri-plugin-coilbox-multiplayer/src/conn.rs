@@ -130,9 +130,68 @@ pub const LOGIN_TIMEOUT: &str = "multiplayer.login.timeout";
 /// How long [`wait_until_ready`] waits before calling a login failed.
 ///
 /// Generous, because a real server behind a slow link is not a failure, and
-/// bounded because there is no read timeout anywhere below this: a server that
-/// simply never sends `LOGININFOEND` would otherwise be waited on forever.
+/// bounded so a room that never sends `LOGININFOEND` is not waited on forever.
 pub const READY_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// How long a login may go without a line from the server before it is called
+/// stalled, counted from the last line heard or from the phase last changing.
+///
+/// The same 20 seconds as [`READY_TIMEOUT`], so a room and a lobby login give up
+/// at the same point. uberserver sends its `TASSERVER` greeting in
+/// `connectionMade` and drops an unauthenticated socket after 60 seconds
+/// (`setTimeout(60)` in `twistedserver.py`). Teiserver sends its welcome as soon
+/// as the socket's process starts and drops one after 60 seconds too
+/// (`@init_timeout` in `spring_tcp_server.ex`). A server that has said nothing
+/// for a third of that is not going to.
+pub const HANDSHAKE_SILENCE: Duration = READY_TIMEOUT;
+
+/// Whether the server is the one the login is waiting on in `phase`. A phase
+/// parked on the person (the agreement code, the recovery code) is not, and
+/// neither is a connection that is logged in or finished.
+fn server_owes_a_line(phase: LoginPhase) -> bool {
+    matches!(
+        phase,
+        LoginPhase::AwaitGreeting
+            | LoginPhase::TlsUpgrade
+            | LoginPhase::AwaitCompFlags
+            | LoginPhase::AwaitAccepted
+            | LoginPhase::AwaitRegistration
+            | LoginPhase::StreamingState
+            | LoginPhase::AwaitRecoveryRequest
+    )
+}
+
+/// Why a login was dropped for going quiet.
+fn stalled_reason(heard_anything: bool, silence: Duration) -> String {
+    if heard_anything {
+        format!(
+            "the server stopped answering the login for {}s",
+            silence.as_secs()
+        )
+    } else {
+        format!(
+            "the server accepted the connection but sent no greeting within {}s",
+            silence.as_secs()
+        )
+    }
+}
+
+/// Ask a connection whose login has not been answered yet to close, so Cancel
+/// reaches it once the socket is up and `mp_cancel_connect` has no pending
+/// handshake token left to fire. Returns whether there was one to close.
+///
+/// A connection that is ready is left alone: that is a login, and ending it is
+/// `mp_disconnect`'s job.
+pub(crate) fn cancel_unanswered_login(registry: &Registry, server_key: &str) -> bool {
+    let held = lock_or_recover(registry);
+    match held.get(server_key) {
+        Some(conn) if *conn.phase.borrow() != LoginPhase::Ready => {
+            let _ = conn.tx.send(Outbound::Shutdown);
+            true
+        }
+        _ => false,
+    }
+}
 
 /// Wait until the connection under `server_key` has finished logging in.
 ///
@@ -353,6 +412,31 @@ pub fn spawn_connection(
     dm_log: DmLog,
     chan_log: DmLog,
 ) {
+    spawn_connection_within(
+        registry,
+        server_key,
+        stream,
+        login_cfg,
+        on_event,
+        dm_log,
+        chan_log,
+        HANDSHAKE_SILENCE,
+    );
+}
+
+/// [`spawn_connection`] with the silence a login may go through chosen by the
+/// caller, so a test does not have to wait out [`HANDSHAKE_SILENCE`].
+#[allow(clippy::too_many_arguments)]
+fn spawn_connection_within(
+    registry: Registry,
+    server_key: String,
+    stream: Box<dyn AsyncReadWrite>,
+    login_cfg: LoginConfig,
+    on_event: Channel<LobbyEvent>,
+    dm_log: DmLog,
+    chan_log: DmLog,
+    silence_limit: Duration,
+) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
     let mut initial = LobbyState::new();
     initial.dms = dm_log.load();
@@ -400,6 +484,7 @@ pub fn spawn_connection(
             ring: ring.clone(),
             dm_log,
             chan_log,
+            silence_limit,
         },
     ));
 
@@ -473,6 +558,8 @@ struct ConnContext {
     ring: Arc<Mutex<RingHost>>,
     dm_log: DmLog,
     chan_log: DmLog,
+    /// How long the login may go without a line before it is dropped.
+    silence_limit: Duration,
 }
 
 /// The connection event loop. Interleaves inbound lines, queued outbound lines
@@ -494,6 +581,7 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
         ring,
         dm_log,
         chan_log,
+        silence_limit,
     } = ctx;
 
     emit(&sink, LobbyEvent::Connected);
@@ -518,6 +606,10 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
     // 8201 port did after its TLS handshake, and with no line there is no other
     // way for the drop to say so.
     let mut heard_anything = false;
+    // When the server last spoke or the login last changed phase, which is where
+    // its silence is counted from. See [`HANDSHAKE_SILENCE`].
+    let mut quiet_since = tokio::time::Instant::now();
+    let mut quiet_in = login.phase();
 
     // Moderator and admin commands, one on the wire at a time.
     let mut admin = AdminQueue::default();
@@ -528,11 +620,17 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
         let mut outbound: Vec<String> = Vec::new();
         let mut shutdown = false;
         let admin_deadline = admin.deadline();
+        if login.phase() != quiet_in {
+            quiet_in = login.phase();
+            quiet_since = tokio::time::Instant::now();
+        }
+        let stalled_at = server_owes_a_line(quiet_in).then(|| quiet_since + silence_limit);
 
         tokio::select! {
             item = framed.next() => match item {
                 Some(Ok(line)) => {
                     heard_anything = true;
+                    quiet_since = tokio::time::Instant::now();
                     console(&sink, "in", &line);
                     let msg = parse_line(&line);
                     last_server_msg = match &msg {
@@ -886,6 +984,14 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                 }
             },
             _ = ping.tick() => outbound.push(command::ping(None)),
+            // A server that accepted the socket and went quiet in the middle of
+            // the login. Nothing else here ends that: the socket is open, so
+            // there is no read error and no close to report.
+            _ = tokio::time::sleep_until(stalled_at.unwrap_or_else(tokio::time::Instant::now)),
+                if stalled_at.is_some() =>
+            {
+                break 'conn Some(stalled_reason(heard_anything, silence_limit));
+            }
             // The precondition keeps this branch off while nothing is on the
             // wire. The sleep is still built, so it needs some instant.
             _ = tokio::time::sleep_until(admin_deadline.unwrap_or_else(tokio::time::Instant::now)),
@@ -1680,6 +1786,197 @@ mod tests {
     async fn a_server_that_closes_before_saying_anything_is_named_as_the_reason() {
         let seen = drop_from(|sock| Box::pin(async move { drop(sock) })).await;
         assert_eq!(disconnected(&seen)["reason"], SILENT_CLOSE);
+    }
+
+    /// A login against `addr` through the real connection task, with the
+    /// silence it tolerates chosen by the test. Returns without waiting for
+    /// anything, so a test can act while the handshake is stalled.
+    async fn login_within(
+        addr: std::net::SocketAddr,
+        silence: Duration,
+    ) -> (
+        Registry,
+        String,
+        Arc<Mutex<Vec<String>>>,
+        crate::dmlog::ScratchLogs,
+    ) {
+        let stream = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let (seen, events) = recording_channel();
+        let registry = Registry::default();
+        let key = format!("alice@{addr}");
+        let logs = crate::dmlog::ScratchLogs::new();
+        spawn_connection_within(
+            registry.clone(),
+            key.clone(),
+            Box::new(stream),
+            LoginConfig {
+                username: "alice".to_string(),
+                password_hash: password_hash("hunter2"),
+                local_ip: "127.0.0.1".to_string(),
+                agent: "Coilbox test".to_string(),
+                client_id: "1".to_string(),
+                compat_flags: vec!["u".to_string()],
+                use_stls: false,
+                mode: LoginMode::Login,
+            },
+            events,
+            logs.dms(&key),
+            logs.channels(&key),
+            silence,
+        );
+        (registry, key, seen, logs)
+    }
+
+    /// A server that accepts the socket and never sends a byte, which is what
+    /// `lobby.springrts.com:8200` did when issue #1593 was filed. The socket is
+    /// held open until the returned sender is dropped, because a close would be
+    /// the case the test above already covers.
+    async fn silent_server() -> (std::net::SocketAddr, tokio::sync::oneshot::Sender<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let (hang_up, held) = tokio::sync::oneshot::channel::<()>();
+        tokio::spawn(async move {
+            let Ok((sock, _)) = listener.accept().await else {
+                return;
+            };
+            let _ = held.await;
+            drop(sock);
+        });
+        (addr, hang_up)
+    }
+
+    /// Issue #1593: the login form sat on "Connecting…" for good because nothing
+    /// below it ever stopped waiting for the greeting.
+    #[tokio::test]
+    async fn a_server_that_accepts_the_socket_and_never_greets_times_out_with_a_reason() {
+        let (addr, _hang_up) = silent_server().await;
+        let started = std::time::Instant::now();
+        let (registry, key, seen, _logs) = login_within(addr, Duration::from_millis(200)).await;
+
+        wait_until_heard(&seen, "\"disconnected\"").await;
+
+        let reason = disconnected(&seen)["reason"]
+            .as_str()
+            .expect("a reason the login form can show")
+            .to_string();
+        assert!(
+            reason.contains("no greeting"),
+            "the reason should say the greeting never came, got {reason:?}"
+        );
+        assert!(
+            started.elapsed() < PATIENCE,
+            "the attempt took {:?}",
+            started.elapsed()
+        );
+        assert!(
+            !lock_or_recover(&registry).contains_key(&key),
+            "a timed-out login must leave the registry free for a retry"
+        );
+    }
+
+    /// A server that greets and then stops answering is stalled too, and says
+    /// so differently from one that never greeted.
+    #[tokio::test]
+    async fn a_server_that_greets_and_then_goes_quiet_times_out_with_a_reason() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let (_hang_up, held) = tokio::sync::oneshot::channel::<()>();
+        tokio::spawn(async move {
+            let Ok((sock, _)) = listener.accept().await else {
+                return;
+            };
+            let mut framed = Framed::new(sock, LinesCodec::new());
+            let _ = framed.send(line::tas_server("0.38", "*", 8452, 0)).await;
+            let _ = held.await;
+        });
+        let (_registry, _key, seen, _logs) = login_within(addr, Duration::from_millis(200)).await;
+
+        wait_until_heard(&seen, "\"disconnected\"").await;
+
+        let reason = disconnected(&seen)["reason"].as_str().map(str::to_string);
+        assert!(
+            reason
+                .as_deref()
+                .is_some_and(|r| r.contains("stopped answering")),
+            "got {reason:?}"
+        );
+    }
+
+    /// The deadline must not touch a server that behaves. A login that is
+    /// finished is not waiting on anything, so it outlives the silence limit.
+    #[tokio::test]
+    async fn a_server_that_greets_normally_is_not_timed_out() {
+        let silence = Duration::from_millis(200);
+        let addr = lobby_advertising(&["u", "sp"], Arc::default()).await;
+        let (registry, key, seen, _logs) = login_within(addr, silence).await;
+
+        let mut phase = lock_or_recover(&registry)
+            .get(&key)
+            .expect("spawn_connection registered it")
+            .phase
+            .clone();
+        tokio::time::timeout(PATIENCE, phase.wait_for(|p| *p == LoginPhase::Ready))
+            .await
+            .expect("the handshake did not finish in time")
+            .expect("the connection task is still running");
+
+        tokio::time::sleep(silence * 3).await;
+
+        assert!(lock_or_recover(&registry).contains_key(&key));
+        assert!(
+            !lock_or_recover(&seen)
+                .join("\n")
+                .contains("\"disconnected\""),
+            "a logged in connection was dropped for being quiet"
+        );
+        assert!(
+            !cancel_unanswered_login(&registry, &key),
+            "Cancel must not log out a connection that is already logged in"
+        );
+    }
+
+    /// Cancel during the stalled handshake, after the socket is up. The pending
+    /// token is long gone by then, so this is the path `mp_cancel_connect` falls
+    /// back to. The silence limit here is the real one, so a pass cannot come
+    /// from the deadline firing.
+    #[tokio::test]
+    async fn cancel_ends_a_login_stalled_after_the_socket_is_up() {
+        let (addr, _hang_up) = silent_server().await;
+        let (registry, key, seen, _logs) = login_within(addr, HANDSHAKE_SILENCE).await;
+        wait_until_heard(&seen, "\"connected\"").await;
+
+        let started = std::time::Instant::now();
+        assert!(cancel_unanswered_login(&registry, &key));
+        wait_until_heard(&seen, "\"disconnected\"").await;
+
+        assert!(
+            started.elapsed() < HANDSHAKE_SILENCE,
+            "cancel took {:?}, so it waited for the deadline",
+            started.elapsed()
+        );
+        assert_eq!(
+            disconnected(&seen)["reason"],
+            serde_json::Value::Null,
+            "a cancel is not a failure and should carry no reason"
+        );
+        assert!(!lock_or_recover(&registry).contains_key(&key));
+    }
+
+    /// Phases parked on the person, or past the login, are not the server's to
+    /// answer, so silence in them is not a stall.
+    #[test]
+    fn only_phases_the_server_owes_a_line_in_can_stall() {
+        assert!(server_owes_a_line(LoginPhase::AwaitGreeting));
+        assert!(server_owes_a_line(LoginPhase::AwaitAccepted));
+        assert!(server_owes_a_line(LoginPhase::StreamingState));
+        assert!(!server_owes_a_line(LoginPhase::AwaitAgreement));
+        assert!(!server_owes_a_line(LoginPhase::AwaitRecoveryCode));
+        assert!(!server_owes_a_line(LoginPhase::Ready));
+        assert!(!server_owes_a_line(LoginPhase::Denied));
     }
 
     /// A server that has spoken and then closes is not silent, so it keeps the

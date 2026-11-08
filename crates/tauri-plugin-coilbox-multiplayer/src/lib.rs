@@ -136,9 +136,24 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Cancellation tokens for connects still in their TCP/TLS handshake, so not yet in
 /// the live [`Registry`]. Keyed by the same `serverKey`. [`open_and_spawn`] inserts
-/// one on entry and removes it once the handshake resolves; `mp_cancel_connect`
-/// fires it to abandon a stuck connect that `mp_disconnect` can't reach yet.
+/// one on entry and removes it once the connection is registered or the connect
+/// has failed. `mp_cancel_connect` fires it to abandon a stuck connect that
+/// `mp_disconnect` can't reach yet.
 pub(crate) type PendingConnects = Arc<Mutex<HashMap<String, CancellationToken>>>;
+
+/// Take this attempt's token out of `pending` once its connect has resolved. A
+/// cancelled token is left alone, because `mp_cancel_connect` took its entry out
+/// when it fired it and the key may by now hold a retry's token.
+pub(crate) fn retract_pending(
+    pending: &PendingConnects,
+    server_key: &str,
+    token: &CancellationToken,
+) {
+    let mut map = lock_or_recover(pending);
+    if !token.is_cancelled() {
+        map.remove(server_key);
+    }
+}
 
 /// Lock a mutex, recovering the guard if a previous holder panicked and poisoned
 /// it. All 35 `mp_*` commands and the connection task share the registry/state/
@@ -398,17 +413,22 @@ async fn open_and_spawn<R: Runtime>(
         &token,
     )
     .await;
-    lock_or_recover(pending).remove(&server_key);
     let stream = match result {
+        // A cancel can land just as the socket comes up. It has already taken
+        // the entry out, so a retry may be waiting under the same key.
+        Ok(_) if token.is_cancelled() => return CliResult::err("connection cancelled"),
         Ok(s) => s,
-        Err(ConnectError::Cancelled) => return CliResult::err("connection cancelled"),
-        Err(ConnectError::TimedOut) => {
-            return CliResult::err(format!(
-                "connection timed out after {}s",
-                CONNECT_TIMEOUT.as_secs()
-            ))
+        Err(e) => {
+            retract_pending(pending, &server_key, &token);
+            return match e {
+                ConnectError::Cancelled => CliResult::err("connection cancelled"),
+                ConnectError::TimedOut => CliResult::err(format!(
+                    "connection timed out after {}s",
+                    CONNECT_TIMEOUT.as_secs()
+                )),
+                ConnectError::Failed(e) => CliResult::err(e),
+            };
         }
-        Err(ConnectError::Failed(e)) => return CliResult::err(e),
     };
 
     let login_cfg = LoginConfig {
@@ -430,13 +450,20 @@ async fn open_and_spawn<R: Runtime>(
 
     spawn_connection(
         registry.clone(),
-        server_key,
+        server_key.clone(),
         stream,
         login_cfg,
         on_event,
         dm_log,
         chan_log,
     );
+    // The token stays published until the connection is registered, so a Cancel
+    // that lands between the socket coming up and that registration still finds
+    // it. Anything after this reaches the connection through the registry.
+    retract_pending(pending, &server_key, &token);
+    if token.is_cancelled() {
+        conn::cancel_unanswered_login(registry, &server_key);
+    }
     CliResult::ok(json!({ "connected": true }))
 }
 
@@ -641,14 +668,14 @@ async fn mp_connect_tachyon(
     let access = match tachyon_auth::access_token(&base_url, &server_id, &username).await {
         Ok(token) => token,
         Err(e) => {
-            lock_or_recover(&pending).remove(&server_key);
+            retract_pending(&pending, &server_key, &token);
             return Ok(CliResult::err(e.to_string()));
         }
     };
 
     phase(LoginPhase::TachyonOpening);
     let opened = tachyon_ws::connect(&ws_url, &access, CONNECT_TIMEOUT, &token).await;
-    lock_or_recover(&pending).remove(&server_key);
+    retract_pending(&pending, &server_key, &token);
     let socket = match opened {
         Ok(socket) => socket,
         Err(e) => return Ok(CliResult::err(e.to_string())),
@@ -800,7 +827,7 @@ async fn open_zerok<R: Runtime>(
         map.insert(server_key.clone(), token.clone());
     }
     let opened = zerok_conn::connect(&host, port, CONNECT_TIMEOUT, &token).await;
-    lock_or_recover(pending).remove(&server_key);
+    retract_pending(pending, &server_key, &token);
     let stream = match opened {
         Ok(stream) => stream,
         Err(ConnectError::Cancelled) => return CliResult::err("connection cancelled"),
@@ -979,20 +1006,32 @@ fn mp_disconnect(registry: State<'_, Registry>, server_key: String) -> CliResult
     }
 }
 
-/// `mp_cancel_connect` — abort a connect that is still mid-handshake (before it
-/// registers as a live connection, which is when `mp_disconnect` takes over). Fires
-/// the pending cancel token; `open_and_spawn` then unwinds with "connection
-/// cancelled" and never spawns a task, leaving no lingering socket. Idempotent: a
-/// no-op if the connect already completed or was already cancelled.
+/// `mp_cancel_connect` — abort a connect that has not been answered yet. While
+/// the socket is still opening, that fires the pending cancel token;
+/// `open_and_spawn` then unwinds with "connection cancelled" and never spawns a
+/// task, leaving no lingering socket. Once the socket is up and the connection is
+/// registered, the token is gone and the login is the thing that may be stalled,
+/// so a connection that has not reached `ready` is asked to close instead. A
+/// connection that is already logged in is left to `mp_disconnect`. Idempotent: a
+/// no-op if there is nothing left to cancel.
 #[tauri::command]
-fn mp_cancel_connect(pending: State<'_, PendingConnects>, server_key: String) -> CliResult {
-    match lock_or_recover(&pending).remove(&server_key) {
-        Some(token) => {
+fn mp_cancel_connect(
+    pending: State<'_, PendingConnects>,
+    registry: State<'_, Registry>,
+    server_key: String,
+) -> CliResult {
+    // Fired with the lock held, so `retract_pending` never sees the entry gone
+    // while the token still reads as live.
+    let token = {
+        let mut map = lock_or_recover(&pending);
+        let token = map.remove(&server_key);
+        if let Some(token) = &token {
             token.cancel();
-            CliResult::ok(json!({ "cancelled": true }))
         }
-        None => CliResult::ok(json!({ "cancelled": false })),
-    }
+        token
+    };
+    let cancelled = token.is_some() || conn::cancel_unanswered_login(&registry, &server_key);
+    CliResult::ok(json!({ "cancelled": cancelled }))
 }
 
 /// `mp_wait_until_ready`: resolve once a connection has finished logging in.
@@ -3852,6 +3891,27 @@ mod tests {
     use crate::turn::tests::{KEY, NOW};
     use coilbox_lobby_protocol::{Battle, Bot, MemberStatus, StartRect};
     use std::sync::Arc;
+
+    /// A cancelled attempt that finishes after the player has retried must not
+    /// take the retry's token with it, or the retry could not be cancelled.
+    #[test]
+    fn a_cancelled_attempt_leaves_a_retrys_pending_token_alone() {
+        let pending = PendingConnects::default();
+        let first = CancellationToken::new();
+        lock_or_recover(&pending).insert("k".to_string(), first.clone());
+
+        // What mp_cancel_connect does, then the retry publishing its own.
+        let taken = lock_or_recover(&pending).remove("k").expect("a token");
+        taken.cancel();
+        let retry = CancellationToken::new();
+        lock_or_recover(&pending).insert("k".to_string(), retry.clone());
+
+        retract_pending(&pending, "k", &first);
+        assert!(lock_or_recover(&pending).contains_key("k"));
+
+        retract_pending(&pending, "k", &retry);
+        assert!(!lock_or_recover(&pending).contains_key("k"));
+    }
     use tauri::test::{mock_app, mock_builder, mock_context, noop_assets, MockRuntime};
     use tauri::WebviewWindowBuilder;
 
