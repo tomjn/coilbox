@@ -340,7 +340,7 @@ function stretchPiece(
  * stretched, or held to an elevation. Every piece with the role gets the same
  * roll, so a pair of barrels stays a pair. `rolls` makes a PRNG for a key.
  */
-function applyRoleRules(
+export function applyRoleRules(
   project: LegoProject,
   pack: LoadedPack,
   instance: string,
