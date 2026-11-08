@@ -1,6 +1,6 @@
 import { select, t } from "@lingui/core/macro";
 import { generateCities } from "./cities";
-import { erodeRelief } from "./displayErosion";
+import { erodeLand } from "./displayErosion";
 import { terrainMarginPixels } from "./galaxy3d/terrain";
 import type { TerrainPixels } from "./galaxy3d/terrainLoad";
 import { type GenerateOptions, type GenMap, generateGalaxy } from "./generate";
@@ -156,14 +156,10 @@ export function generatedTerrainPixels(
   const wide = extendTerrain(terrain, built.margin);
   // Shading only: the heights above stay the pinned ones. A cratered world is
   // dry, and gullies would cut through the rims.
-  const relief = planetOf(terrain.planet).craters
-    ? wide.relief
-    : erodeRelief(
-        wide.relief,
-        wide.width,
-        wide.height,
-        doc.generated?.seed ?? 0,
-      );
+  const eroded = planetOf(terrain.planet).craters
+    ? undefined
+    : erodeLand(wide.relief, wide.width, wide.height, doc.generated?.seed ?? 0);
+  const relief = eroded?.relief ?? wide.relief;
   return {
     color: { data: terrain.image, width, height },
     height: { data: terrain.heightmap, width, height },
@@ -173,6 +169,7 @@ export function generatedTerrainPixels(
       image: { data: wide.image, width: wide.width, height: wide.height },
       heights: { data: wide.heights, width: wide.width, height: wide.height },
       relief: { data: relief, width: wide.width, height: wide.height },
+      drainage: eroded?.drainage,
       biomes: {
         ...wide.biomes,
         width: wide.width,
