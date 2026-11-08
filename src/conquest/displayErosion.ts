@@ -115,6 +115,31 @@ export function drainedArea(
   width: number,
   height: number,
 ): Float32Array {
+  return drainNetwork(h, width, height).area;
+}
+
+/**
+ * Where water runs over a grid of heights: each land cell's `to`, the cell it
+ * drains into (-1 where it leaves the land), the cells drained through each
+ * one counting itself, and the land cells ordered so every cell comes after
+ * the one it drains into.
+ */
+export interface DrainNetwork {
+  width: number;
+  height: number;
+  to: Int32Array;
+  area: Float32Array;
+  /** Land cells, the first `reached` of them, lowest first. */
+  order: Int32Array;
+  reached: number;
+}
+
+/** {@link drainedArea}, and the tree of where each cell drains. */
+export function drainNetwork(
+  h: Float32Array,
+  width: number,
+  height: number,
+): DrainNetwork {
   const count = h.length;
   // Where each cell's water goes, -1 for the sea and the edge.
   const to = new Int32Array(count).fill(-1);
@@ -221,7 +246,7 @@ export function drainedArea(
     area[i] += 1;
     if (to[i] >= 0) area[to[i]] += area[i];
   }
-  return area;
+  return { width, height, to, area, order, reached };
 }
 
 /** `src` through `passes` box blurs of `radius` pixels, edge pixels repeated. */
@@ -436,13 +461,18 @@ export interface Drainage {
   height: number;
 }
 
-/** {@link erodeRelief}, and the {@link Drainage} its channels follow. */
+/**
+ * {@link erodeRelief}, and the {@link Drainage} its channels follow. `network`
+ * is the half resolution tree the channels were cut along, for tracing
+ * rivers on (`rivers.ts`): cell `x, y` covers pixels `2x` and `2y` to one
+ * more. Left out for a picture too small to erode.
+ */
 export function erodeLand(
   relief: Float32Array,
   width: number,
   height: number,
   seed: number,
-): { relief: Float32Array; drainage: Drainage } {
+): { relief: Float32Array; drainage: Drainage; network?: DrainNetwork } {
   const hw = Math.ceil(width / 2);
   const hh = Math.ceil(height / 2);
   const drainage = { data: new Uint8Array(width * height * 2), width, height };
@@ -492,7 +522,8 @@ export function erodeLand(
     if (routed[i] > 0) routed[i] += jitter() * ROUTE_JITTER;
   }
   // A channel that deep is a valley too, and is cut again wider.
-  const area = drainedArea(routed, hw, hh);
+  const network = drainNetwork(routed, hw, hh);
+  const { area } = network;
   const depths = depthsFromArea(area);
   const gullies = new Float32Array(depths.length);
   const valleys = new Float32Array(depths.length);
@@ -555,5 +586,5 @@ export function erodeLand(
       bytes[o * 2 + 1] = Math.round(at(falls) * 255);
     }
   }
-  return { relief: out, drainage };
+  return { relief: out, drainage, network };
 }
