@@ -234,7 +234,8 @@ pub const RELAY_PING_SAMPLES: usize = 3;
 /// one is a cheap and harmless way to learn a relay's round trip without
 /// spending any TURN traffic on it.
 ///
-/// `None` when nothing could be timed: every attempt timed out, `server` did
+/// `None` when nothing could be timed: every attempt timed out, the whole
+/// measurement ran past `samples` times [`PER_SERVER_TIMEOUT`], `server` did
 /// not resolve in time or at all, or no socket could be bound. That reads the
 /// same whether the relay is unreachable or has simply turned plain STUN off,
 /// and it has to: a relay with `no-stun` set can still be relaying perfectly
@@ -250,7 +251,19 @@ pub async fn ping(server: &str, samples: usize) -> Option<Duration> {
     if samples == 0 {
         return None;
     }
-    for target in resolve(server).await {
+    let targets = resolve(server).await;
+    // The most a single silent address could already take, so a name with
+    // many records that never answer cannot hold the measurement up for longer.
+    let budget = PER_SERVER_TIMEOUT.saturating_mul(u32::try_from(samples).unwrap_or(u32::MAX));
+    tokio::time::timeout(budget, time_first_to_answer(&targets, samples))
+        .await
+        .ok()
+        .flatten()
+}
+
+/// The middle of `samples` round trips to the first of `targets` that answers.
+async fn time_first_to_answer(targets: &[SocketAddr], samples: usize) -> Option<Duration> {
+    for &target in targets {
         let Some(socket) = bind_for(target).await else {
             continue;
         };
