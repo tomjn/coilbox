@@ -609,6 +609,7 @@ const DETAIL = /* glsl */ `
     // The trees part along a gully and show the ground beneath.
     albedo = mix(albedo, uBiomeClearing, pw[${P.forest}] * gully * 0.6);
     pw[${P.forest}] *= 1.0 - gully * 0.8;
+    pw[${P.taiga}] *= 1.0 - gully * 0.8;
     pw[${P.scrub}] *= 1.0 - gully * 0.8;
 
     float shadeMul = 1.0;
