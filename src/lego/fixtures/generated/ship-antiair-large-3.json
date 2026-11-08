@@ -52,7 +52,6 @@
         1,
         1
       ],
-      "role": "turret",
       "bone": "turret"
     },
     {
@@ -75,7 +74,6 @@
         1,
         1
       ],
-      "role": "barrel",
       "bone": "barrel"
     },
     {
@@ -98,7 +96,6 @@
         1,
         1
       ],
-      "role": "flare",
       "bone": "flare"
     },
     {
