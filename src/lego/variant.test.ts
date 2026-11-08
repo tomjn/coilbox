@@ -250,6 +250,45 @@ describe("a different weapon variant", () => {
   });
 });
 
+describe("a variant of a roster tier between two sizes", () => {
+  it("moves to the neighbouring size, and is not in the roster itself", () => {
+    const sizes = job("artillery")?.size;
+    if (!sizes) throw new Error("no artillery job");
+    const between = (sizes.small + sizes.medium) / 2;
+    const plan = bodyPlanById("biped");
+    if (!plan) throw new Error("no biped");
+    for (let seed = 1; seed <= 30; seed++) {
+      const made = generateCheckedUnit(
+        { seed, plan, job: "artillery", size: "small" },
+        {
+          id: "tier",
+          rootPieceId: "tier-root",
+          now: "2026-11-08T00:00:00.000Z",
+          pack,
+          modules,
+          factor: between,
+        },
+        1,
+      );
+      if (made.status !== "ok") continue;
+      const tier = {
+        ...made.unit,
+        roster: { id: "r", name: "R", job: "artillery", tier: 2, tiers: 3 },
+      };
+      const heavy = makeVariant(tier, "heavier", { pack, modules });
+      const light = makeVariant(tier, "lighter", { pack, modules });
+      if (heavy.status !== "ok" || light.status !== "ok") continue;
+      expect(heavy.unit.generated?.factor).toBe(sizes.medium);
+      // The small tier is the job's own factor for the recorded size.
+      expect(light.unit.generated?.factor).toBeUndefined();
+      expect(heavy.unit.roster).toBeUndefined();
+      expect(heavy.unit.variantOf).toBe("tier");
+      return;
+    }
+    throw new Error("no seed made both variants");
+  });
+});
+
 describe("a variant that fails the checks", () => {
   it("is reported with the check, not replaced by another seed", () => {
     let said: string | null = null;

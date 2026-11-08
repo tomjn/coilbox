@@ -4901,6 +4901,10 @@ msgstr "{name}（已锁定）"
 msgid "{name} (you)"
 msgstr "{name}（你）"
 
+#: src/lego/roster.ts
+msgid "{name} {label} {tier}"
+msgstr ""
+
 #: src/lego/movement.ts
 #, fuzzy
 msgid "{name} can climb this: it climbs up to {up}° (default maxSlope {slope})."
@@ -9244,6 +9248,14 @@ msgstr "房间不需要服务器，也不需要账号。好友可以通过链接
 msgid "A room on this computer"
 msgstr "此电脑上的房间"
 
+#: src/lego/roster.ts
+msgid "A roster has from 1 to {max} tiers."
+msgstr ""
+
+#: src/lego/roster.ts
+msgid "A roster needs a name."
+msgstr ""
+
 #: src/lego/importS3o.ts
 #, fuzzy
 msgid "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape."
@@ -9271,6 +9283,7 @@ msgstr "位于 y = 0 的透明海面，用于查看船体在其中的位置。"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "A seed is a whole number."
 msgstr ""
 
@@ -9427,6 +9440,10 @@ msgstr "实际大小的单位，用作比例参照"
 #, fuzzy
 msgid "A unit definition was already there that coilbox has no record of writing, so it has been left alone."
 msgstr "已有一个 coilbox 没有写入记录的单位定义，已保持不变。"
+
+#: src/lego/roster.ts
+msgid "A unit is already called {name} or {unitName}. Choose another roster name."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -13126,6 +13143,10 @@ msgstr "主体长度"
 msgid "Body plan"
 msgstr ""
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Body plans"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Body rocks on starting and stopping"
@@ -15217,6 +15238,14 @@ msgstr ""
 msgid "Choose an engine to host with."
 msgstr "请选择用于创建房间的引擎。"
 
+#: src/lego/roster.ts
+msgid "Choose at least one body plan."
+msgstr ""
+
+#: src/lego/roster.ts
+msgid "Choose at least one job."
+msgstr ""
+
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #, fuzzy
 msgid "Choose audio"
@@ -15631,6 +15660,7 @@ msgstr "移动时隐形消耗"
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #: src/lego/pages/components/SwapPartDrawer.tsx
@@ -17687,6 +17717,10 @@ msgstr "无法创建 {name} 的副本：{reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "无法跟随 {name} 进入其对局"
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Could not generate the roster: {reason}"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Could not generate units: {reason}"
 msgstr ""
@@ -17733,6 +17767,7 @@ msgid "Could not load the module"
 msgstr "无法加载模块"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Could not load the parts: {reason}"
 msgstr ""
 
@@ -18020,6 +18055,10 @@ msgstr "无法保存模型：{reason}"
 #, fuzzy
 msgid "Could not save the module"
 msgstr "无法保存模块"
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Could not save the roster: {reason}"
+msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
@@ -24015,6 +24054,7 @@ msgid "General"
 msgstr "通用"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
@@ -24025,6 +24065,10 @@ msgstr "生成"
 #, fuzzy
 msgid "Generate a map"
 msgstr "生成地图"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Generate a roster"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -27057,6 +27101,10 @@ msgstr "其工坊项目已不存在。"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Job"
+msgstr ""
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Jobs"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -33119,6 +33167,10 @@ msgstr ""
 msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 msgstr ""
 
+#: src/lego/roster.ts
+msgid "No seed from {first} to {last} made {label} bigger than the tier below it."
+msgstr ""
+
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
 msgstr ""
@@ -38441,6 +38493,7 @@ msgstr "加压中"
 
 #: src/hub/preview.ts
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 #, fuzzy
@@ -40543,6 +40596,7 @@ msgstr "征用他们的储藏点"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Reroll"
 msgstr ""
 
@@ -41199,6 +41253,18 @@ msgstr "此网络上的房间不会被列出，但你仍可以按地址加入。
 msgid "Rose"
 msgstr "玫瑰色"
 
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Roster"
+msgstr ""
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Roster name"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Rosters"
+msgstr ""
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -41581,6 +41647,10 @@ msgstr "覆盖保存 {writableName}"
 #, fuzzy
 msgid "Save preset"
 msgstr "保存预设"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Save roster"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -42532,6 +42602,7 @@ msgstr "在玩家统计中查看全部"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Seed"
@@ -51984,6 +52055,10 @@ msgstr "级别权重"
 #, fuzzy
 msgid "Tier weights: {tierText}."
 msgstr "级别权重：{tierText}。"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Tiers"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy

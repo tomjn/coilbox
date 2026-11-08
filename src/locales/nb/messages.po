@@ -4936,6 +4936,10 @@ msgstr "{name} (låst)"
 msgid "{name} (you)"
 msgstr "{name} (deg)"
 
+#: src/lego/roster.ts
+msgid "{name} {label} {tier}"
+msgstr ""
+
 #: src/lego/movement.ts
 #, fuzzy
 msgid "{name} can climb this: it climbs up to {up}° (default maxSlope {slope})."
@@ -9307,6 +9311,14 @@ msgstr "Et rom trenger verken server eller konto. Venner blir med via en lenke e
 msgid "A room on this computer"
 msgstr "Et rom på denne datamaskinen"
 
+#: src/lego/roster.ts
+msgid "A roster has from 1 to {max} tiers."
+msgstr ""
+
+#: src/lego/roster.ts
+msgid "A roster needs a name."
+msgstr ""
+
 #: src/lego/importS3o.ts
 #, fuzzy
 msgid "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape."
@@ -9334,6 +9346,7 @@ msgstr "Et gjennomsiktig hav ved y = 0, for å se hvordan et skrog ligger i det.
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "A seed is a whole number."
 msgstr ""
 
@@ -9491,6 +9504,10 @@ msgstr "En enhet i ekte størrelse, for skala"
 #, fuzzy
 msgid "A unit definition was already there that coilbox has no record of writing, so it has been left alone."
 msgstr "En enhetsdefinisjon som coilbox ikke har registrert at det skrev, fantes allerede, så den er latt være."
+
+#: src/lego/roster.ts
+msgid "A unit is already called {name} or {unitName}. Choose another roster name."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -13204,6 +13221,10 @@ msgstr "Kroppslengde"
 msgid "Body plan"
 msgstr ""
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Body plans"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Body rocks on starting and stopping"
@@ -15312,6 +15333,14 @@ msgstr "Velg en widgetmappe"
 msgid "Choose an engine to host with."
 msgstr "Velg en motor å være vert med."
 
+#: src/lego/roster.ts
+msgid "Choose at least one body plan."
+msgstr ""
+
+#: src/lego/roster.ts
+msgid "Choose at least one job."
+msgstr ""
+
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #, fuzzy
 msgid "Choose audio"
@@ -15728,6 +15757,7 @@ msgstr "Kamuflasjekostnad i bevegelse"
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #: src/lego/pages/components/SwapPartDrawer.tsx
@@ -17807,6 +17837,10 @@ msgstr "Kunne ikke duplisere {name}: {reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "Kunne ikke følge {name} inn i kampen"
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Could not generate the roster: {reason}"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Could not generate units: {reason}"
 msgstr ""
@@ -17853,6 +17887,7 @@ msgid "Could not load the module"
 msgstr "Kunne ikke laste modulen"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Could not load the parts: {reason}"
 msgstr ""
 
@@ -18144,6 +18179,10 @@ msgstr "Kunne ikke lagre modellen: {reason}"
 #, fuzzy
 msgid "Could not save the module"
 msgstr "Kunne ikke lagre modulen"
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Could not save the roster: {reason}"
+msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
@@ -24163,6 +24202,7 @@ msgid "General"
 msgstr "Generelt"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
@@ -24173,6 +24213,10 @@ msgstr "Generer"
 #, fuzzy
 msgid "Generate a map"
 msgstr "Lag et kart"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Generate a roster"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -27219,6 +27263,10 @@ msgstr "Verkstedprosjektet er borte."
 
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Job"
+msgstr ""
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Jobs"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -33311,6 +33359,10 @@ msgstr ""
 msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 msgstr ""
 
+#: src/lego/roster.ts
+msgid "No seed from {first} to {last} made {label} bigger than the tier below it."
+msgstr ""
+
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
 msgstr ""
@@ -38688,6 +38740,7 @@ msgstr "trapper opp"
 
 #: src/hub/preview.ts
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 #, fuzzy
@@ -40801,6 +40854,7 @@ msgstr "Rekvirer lageret deres"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Reroll"
 msgstr ""
 
@@ -41461,6 +41515,18 @@ msgstr "Rom på dette nettverket vises ikke, men du kan fortsatt bli med i et vi
 msgid "Rose"
 msgstr "Rosé"
 
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Roster"
+msgstr ""
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Roster name"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Rosters"
+msgstr ""
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -41845,6 +41911,10 @@ msgstr "Lagre over {writableName}"
 #, fuzzy
 msgid "Save preset"
 msgstr "Lagre forhåndsinnstilling"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Save roster"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -42804,6 +42874,7 @@ msgstr "Se alle under Statistikk"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Seed"
@@ -52326,6 +52397,10 @@ msgstr "Vekting av nivåer"
 #, fuzzy
 msgid "Tier weights: {tierText}."
 msgstr "Vekting av nivåer: {tierText}."
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Tiers"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy

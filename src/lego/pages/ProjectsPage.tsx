@@ -13,6 +13,7 @@ import {
   ImageOff,
   Package,
   Pencil,
+  Rows3,
   Search,
   Trash2,
 } from "lucide-react";
@@ -39,13 +40,19 @@ import {
   type LegoGameGroup,
 } from "../projectGroups";
 import { validateProjectName } from "../projectNames";
-import { deleteProject, saveProject, useLegoProjects } from "../projects";
+import {
+  deleteProject,
+  saveProject,
+  saveThumbnailPng,
+  useLegoProjects,
+} from "../projects";
 import { projectFromTarget } from "../skeletonSize";
 import { gameRecordFor } from "../unitGame";
 import { GameModelDrawer } from "./components/GameModelDrawer";
 import { GenerateDrawer } from "./components/GenerateDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
 import { NewUnitPopover } from "./components/NewUnitPopover";
+import { RosterDrawer } from "./components/RosterDrawer";
 import { useTestGame } from "./components/useTestGame";
 
 /** Radix's select has no empty value, so "No game" needs one of its own. */
@@ -150,6 +157,7 @@ export default function ProjectsPage() {
   const [opening, setOpening] = useState(false);
   const [picking, setPicking] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [rostering, setRostering] = useState(false);
   /** The units whose thumbnail would not load, so the card says so instead. */
   const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
@@ -165,7 +173,10 @@ export default function ProjectsPage() {
   const [collapsedGames, toggleGame] = useCollapsedGames(grouped.games);
   /** Whether anything here came from somebody else's model, which is the only
    *  reason to split the page up at all. */
-  const sectioned = grouped.games.length > 0 || grouped.files.length > 0;
+  const sectioned =
+    grouped.games.length > 0 ||
+    grouped.files.length > 0 ||
+    grouped.rosters.length > 0;
 
   // Only to know whether there is a choice to offer. Creating a unit loads the
   // pack again, which is the same cached promise.
@@ -258,6 +269,24 @@ export default function ProjectsPage() {
     } catch (e) {
       const reason = describeError(e);
       setProblem(t`Could not save the model: ${reason}`);
+    }
+  }
+
+  /** A roster's units, saved together and shown in their group, each with the
+   *  picture the drawer drew of it. The picture goes first, so the card that
+   *  appears when the unit is saved finds it. */
+  async function savedRoster(units: LegoProject[], pictures: string[]) {
+    setProblem(null);
+    try {
+      for (const [index, unit] of units.entries()) {
+        const picture = pictures[index];
+        if (picture) await saveThumbnailPng(unit.id, picture);
+        await saveProject(unit);
+      }
+      setRostering(false);
+    } catch (e) {
+      const reason = describeError(e);
+      setProblem(t`Could not save the roster: ${reason}`);
     }
   }
 
@@ -466,6 +495,15 @@ export default function ProjectsPage() {
             <Button variant="outline" onClick={() => setGenerating(true)}>
               <Dices size={16} /> <Trans>Generate</Trans>
             </Button>
+            {/* A roster's names are checked against the saved units, so not
+                until those have been read. */}
+            <Button
+              variant="outline"
+              disabled={loading || error !== null}
+              onClick={() => setRostering(true)}
+            >
+              <Rows3 size={16} /> <Trans>Roster</Trans>
+            </Button>
             <NewUnitPopover
               plans={BODY_PLANS}
               label={t`New model`}
@@ -491,6 +529,13 @@ export default function ProjectsPage() {
         open={generating}
         onOpenChange={setGenerating}
         onOpened={(project) => void opened(project)}
+      />
+
+      <RosterDrawer
+        open={rostering}
+        onOpenChange={setRostering}
+        projects={projects}
+        onSaved={(units, pictures) => void savedRoster(units, pictures)}
       />
 
       <ImportDrawer
@@ -552,10 +597,50 @@ export default function ProjectsPage() {
           </div>
 
           {searching &&
-          shown.own.length + shown.games.length + shown.files.length === 0 ? (
+          shown.own.length +
+            shown.games.length +
+            shown.files.length +
+            shown.rosters.length ===
+            0 ? (
             <p className="text-sm text-muted-foreground">
               <Trans>No models match "{searchTerm}".</Trans>
             </p>
+          ) : null}
+
+          {shown.rosters.length > 0 ? (
+            <section className="space-y-4">
+              <h2 className={SECTION}>
+                <Trans>Rosters</Trans>
+              </h2>
+              {shown.rosters.map((roster) => {
+                const key = `roster:${roster.key}`;
+                const open = searching || !collapsedGames.has(key);
+                return (
+                  <div key={roster.key} className="space-y-3">
+                    <h3>
+                      <button
+                        type="button"
+                        onClick={() => toggleGame(key)}
+                        aria-expanded={open}
+                        disabled={searching}
+                        className="flex items-center gap-1.5 rounded text-sm font-medium hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {open ? (
+                          <ChevronDown size={14} />
+                        ) : (
+                          <ChevronRight size={14} />
+                        )}
+                        {roster.label}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {roster.projects.length}
+                        </span>
+                      </button>
+                    </h3>
+                    {open ? grid(roster.projects) : null}
+                  </div>
+                );
+              })}
+            </section>
           ) : null}
 
           {shown.games.length > 0 ? (

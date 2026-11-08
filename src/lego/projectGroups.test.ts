@@ -234,6 +234,53 @@ describe("filterGrouped", () => {
   });
 });
 
+describe("rosters (#3239)", () => {
+  const member = (
+    id: string,
+    roster: string,
+    name: string,
+    unitName: string,
+    extra: Partial<LegoProject> = {},
+  ) =>
+    ({
+      ...project(name),
+      id,
+      unitName,
+      roster: { id: roster, name: "Raiders", job: "scout", tier: 1, tiers: 3 },
+      ...extra,
+    }) as LegoProject;
+  const t2 = member("a", "r1", "Raiders Scout 2", "raiders_scout_t2");
+  const t1 = member("b", "r1", "Raiders Scout 1", "raiders_scout_t1", {
+    game: { name: "Splinter Faction 0.1.89", archive: "sf.sdz" },
+  });
+  const other = member("c", "r2", "Raiders Scout 1", "raiders2_scout_t1");
+  const loner = { ...project("Cakebot"), unitName: "cake" } as LegoProject;
+
+  it("gathers a roster's units in one group, by unit name, whatever their game", () => {
+    const grouped = groupProjects([t2, loner, t1]);
+    expect(grouped.rosters).toEqual([
+      { key: "r1", label: "Raiders", projects: [t1, t2] },
+    ]);
+    expect(grouped.own).toEqual([loner]);
+    expect(grouped.games).toEqual([]);
+  });
+
+  it("keeps two rosters of one name apart", () => {
+    const grouped = groupProjects([t1, other]);
+    expect(grouped.rosters.map((r) => r.key)).toEqual(["r1", "r2"]);
+  });
+
+  it("finds a roster by its name, or its units by theirs", () => {
+    const grouped = groupProjects([t2, t1, loner]);
+    expect(filterGrouped(grouped, "raiders").rosters[0].projects).toEqual([
+      t1,
+      t2,
+    ]);
+    expect(filterGrouped(grouped, "scout 2").rosters[0].projects).toEqual([t2]);
+    expect(filterGrouped(grouped, "cake").rosters).toEqual([]);
+  });
+});
+
 describe("one section per game (#4328)", () => {
   const sf88 = {
     name: "Splinter Faction 0.1.88",
@@ -374,6 +421,28 @@ describe("variants listed with their original (#3240)", () => {
     expect(grouped.games[0]?.projects.map((p) => p.name)).toEqual([
       "orig",
       "orig-variant",
+    ]);
+  });
+
+  it("lists a variant of a roster unit in the roster, after its original", () => {
+    const member = {
+      ...unit("m1"),
+      roster: { id: "r", name: "Roster", job: "assault", tier: 1, tiers: 2 },
+    } as LegoProject;
+    const other = {
+      ...unit("m2"),
+      roster: { id: "r", name: "Roster", job: "assault", tier: 2, tiers: 2 },
+    } as LegoProject;
+    const grouped = groupProjects([
+      member,
+      other,
+      unit("m1-heavier", undefined, "m1"),
+    ]);
+    expect(grouped.own).toEqual([]);
+    expect(grouped.rosters[0]?.projects.map((p) => p.name)).toEqual([
+      "m1",
+      "m1-heavier",
+      "m2",
     ]);
   });
 

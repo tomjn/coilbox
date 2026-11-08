@@ -949,6 +949,9 @@ export interface LegoProject {
    * `generate.ts`.
    */
   generated?: LegoGenerated;
+  /** The roster this unit was generated in, with its place there (#3239).
+   *  Absent on a unit made on its own. See `roster.ts`. */
+  roster?: LegoRosterPlace;
   /**
    * The named loadouts of this chassis, in the order the switch lists them
    * (#3281). Absent means a unit with no loadouts, which is every unit saved
@@ -1176,6 +1179,18 @@ export interface LegoGenerated {
   /** The size factor the unit was generated at when it was not the job's own
    *  for its size, as a roster's tiers between two sizes are (#3239). */
   factor?: number;
+}
+
+/** A unit's place in a roster: units generated together in one style, one per
+ *  job and tier. Every unit carries the roster's id and name, so the roster is
+ *  the units that share an id and needs no record of its own. */
+export interface LegoRosterPlace {
+  id: string;
+  name: string;
+  job: string;
+  /** From 1, the smallest, to `tiers`, the largest. */
+  tier: number;
+  tiers: number;
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -1956,6 +1971,10 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       const generated = parseGenerated(d.generated);
       return generated ? { generated } : {};
     })(),
+    ...(() => {
+      const roster = parseRosterPlace(d.roster);
+      return roster ? { roster } : {};
+    })(),
     ...loadouts,
     ...(budget !== null ? { budget } : {}),
     ...(lockedModules.length > 0 ? { lockedModules } : {}),
@@ -1999,6 +2018,27 @@ function parseSkeleton(value: unknown): LegoSkeleton | null {
     ...(target ? { target } : {}),
     ...(v.fitted === true ? { fitted: true as const } : {}),
   };
+}
+
+/** A roster place with its names and a tier inside its count, or null. */
+function parseRosterPlace(value: unknown): LegoRosterPlace | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { id, name, job, tier, tiers } = value as Record<string, unknown>;
+  if (
+    typeof id !== "string" ||
+    id === "" ||
+    typeof name !== "string" ||
+    typeof job !== "string" ||
+    typeof tier !== "number" ||
+    typeof tiers !== "number" ||
+    !Number.isSafeInteger(tier) ||
+    !Number.isSafeInteger(tiers) ||
+    tier < 1 ||
+    tier > tiers
+  ) {
+    return null;
+  }
+  return { id, name, job, tier, tiers };
 }
 
 /** A generator record with a whole seed and named inputs, or null. A module
