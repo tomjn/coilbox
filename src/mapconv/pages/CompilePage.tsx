@@ -179,6 +179,7 @@ export default function CompilePage() {
     smfPath: string;
     outDir: string;
     outSuffix: string;
+    texture: string;
   } | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [writingMapinfo, setWritingMapinfo] = useState(false);
@@ -309,7 +310,12 @@ export default function CompilePage() {
       // The rows are filled before the result shows, so Write mapinfo.lua is
       // never pressed while they still describe an earlier folder.
       await loadTeams(outDir);
-      setResult({ smfPath: res.smfPath, outDir, outSuffix: res.outSuffix });
+      setResult({
+        smfPath: res.smfPath,
+        outDir,
+        outSuffix: res.outSuffix,
+        texture: opts.maintexture,
+      });
       // Record (or refresh) this map as a project, remembering its compile
       // options. The source texture is a reliable preview for compile projects.
       upsertProject({
@@ -435,7 +441,7 @@ export default function CompilePage() {
         await mcWriteSplats({
           outDir: result.outDir,
           outSuffix: result.outSuffix,
-          texture: maintexture || undefined,
+          texture: result.texture || undefined,
         }),
       );
       setMapinfoResult(null);
@@ -884,7 +890,7 @@ export default function CompilePage() {
                   variant="outline"
                   size="sm"
                   onClick={writeMapinfo}
-                  disabled={writingMapinfo}
+                  disabled={writingMapinfo || writingSplats}
                 >
                   {writingMapinfo ? (
                     <Loader2 className="animate-spin" />
@@ -898,7 +904,9 @@ export default function CompilePage() {
                     variant="outline"
                     size="sm"
                     onClick={writeSky}
-                    disabled={writingSky || writingMapinfo || packaging}
+                    disabled={
+                      writingSky || writingMapinfo || writingSplats || packaging
+                    }
                   >
                     {writingSky ? (
                       <Loader2 className="animate-spin" />
