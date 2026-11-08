@@ -105,7 +105,7 @@ describe("opening the replay page with an unverified engine", () => {
 
   // Issue #1340: a report that is not a plausible version is no report.
   it.each([
-    ["blank", ""],
+    ["whitespace", "   "],
     ["a hidden folder", ".spring"],
   ])("treats an engine that reports a version that is %s as unchecked", (_name, syncVersion) => {
     h.engines = [{ ...folderEngine, syncVersion }];
