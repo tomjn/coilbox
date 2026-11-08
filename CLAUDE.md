@@ -20,6 +20,8 @@ Tests marked `#[ignore = "needs ..."]` need a game, an engine or a corpus folder
 
 Both Lua suites need `luajit` on PATH (`brew install luajit`), as do two vitest files that shell out to it to check the Lua they generate compiles. Without the binary they fail on the missing dependency rather than on a real error.
 
+`scripts/check.sh` also runs the generator's golden units under Node with `scripts/vitest-v8.sh`, because `bun run test` is JavaScriptCore and Windows' webview is V8. It needs `node` on PATH and fails with a message saying so if there is none.
+
 Let rustfmt own formatting. Run `cargo fmt --all` rather than hand-formatting. CI's clippy compiles the Tauri app crate, so the externalBin sidecars must exist. CI builds the unitsync worker and the relay agent before clippy, and `bun run sidecar:all` does the same locally.
 
 Both `apt-get install` steps in CI fail from time to time on the runner rather than on your diff. A red job whose failing step is `Install LuaJIT` or `Linux build dependencies` is an infrastructure flake, so re-run the job rather than changing code.

@@ -95,6 +95,17 @@ describe("portableSin and portableCos", () => {
     expect(portableSin(Number.NEGATIVE_INFINITY)).toBeNaN();
   });
 
+  it("stay between -1 and 1 for an angle too large to reduce exactly", () => {
+    for (const x of [1e7, -1e7, 1e20, -1e20, 1e300, Number.MAX_VALUE]) {
+      for (const value of [portableSin(x), portableCos(x)]) {
+        expect(Math.abs(value), `${x}`).toBeLessThanOrEqual(1);
+      }
+    }
+    // A multiple of 2pi folds to nothing, and keeps its sign.
+    expect(portableSin(2 * Math.PI * 2 ** 30)).toBeCloseTo(0, 5);
+    expect(portableCos(2 * Math.PI * 2 ** 30)).toBeCloseTo(1, 5);
+  });
+
   it("agree with each other and with the engine to well under a step of the angle", () => {
     for (let k = -64; k <= 64; k++) {
       const x = (k * Math.PI) / 8;

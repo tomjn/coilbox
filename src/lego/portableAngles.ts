@@ -211,14 +211,23 @@ function kernelCos(x: number, y: number): number {
   return 1 - qx - (hz - (z * r - x * y));
 }
 
+const TWO_PI = 2 * Math.PI;
+
 /**
  * fdlibm's `__ieee754_rem_pio2` for an `x` beyond pi/4: the quadrant count `n`
  * and `x - n * pi / 2` as the two doubles `y0 + y1`. It is fdlibm's medium
- * path, exact to about 1.6e6 radians, and past that still the same on every
- * engine though no longer rounded as fdlibm's large path would.
+ * path, exact to about 1.6e6 radians. Past that the angle is first taken
+ * modulo 2pi as a double (`%` is exact in every engine), so the answer is in
+ * range and the same everywhere, but is off by about the angle times 2e-16.
  */
-function remPio2(x: number): [number, number, number] {
-  const ix = highWord(x) & 0x7fffffff;
+function remPio2(input: number): [number, number, number] {
+  let x = input;
+  let ix = highWord(x) & 0x7fffffff;
+  if (ix > 0x413921fb) {
+    x = input % TWO_PI;
+    ix = highWord(x) & 0x7fffffff;
+    if (ix <= 0x3fe921fb) return [0, x, 0];
+  }
   if (ix < 0x4002d97c) {
     // Under 3pi/4, so the quadrant is 1 or -1.
     const sign = x > 0 ? 1 : -1;

@@ -107,11 +107,7 @@ jobs:
       # is V8. One shard runs them, as they are quick and need no second copy.
       - name: Generator under V8
         if: matrix.shard == 1
-        run: >-
-          node node_modules/vitest/vitest.mjs run
-          src/lego/generate.test.ts
-          src/lego/portableAngles.test.ts
-          src/lego/portableRotation.test.ts
+        run: scripts/vitest-v8.sh
 
   # The conquest map generators must build the same map from a seed on every
   # platform. The Linux vitest job above already runs their fixture tests, so
