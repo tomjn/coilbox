@@ -87,6 +87,7 @@ permissions = [
   "allow-content-prune-rapid-pool",
   "allow-content-reclaim-caches",
   "allow-content-storage-overview",
+  "allow-content-duplicate-report",
   "allow-content-delete-engine",
   "allow-content-export-build-tree-html",
   "allow-content-export-build-tree-zip",
