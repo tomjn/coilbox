@@ -570,6 +570,7 @@ export function rerollUnit(
         modules: options.modules,
         newId,
         ...(kept.size > 0 ? { proportions: project.skeleton.proportions } : {}),
+        ...(generated.style ? { style: generated.style } : {}),
       },
     );
     const merged = resolveConnections(

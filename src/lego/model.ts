@@ -27,6 +27,7 @@
 
 import { plural, t } from "@lingui/core/macro";
 import { comparablePath } from "./exportRecord";
+import { type GeneratorStyle, parseStyle } from "./generatorStyle";
 import { type Problem, type ProblemSeverity, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
 import { ringMembers, validRingCount } from "./ringSet";
@@ -1151,6 +1152,9 @@ export interface LegoGenerated {
    * the lists above say which pieces are the generator's. See `reroll.ts`.
    */
   stamps?: Record<string, string>;
+  /** The style the unit was generated in (#3237), as it was then, so a
+   *  reroll applies it again. Absent when it had none. */
+  style?: GeneratorStyle;
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -2017,6 +2021,7 @@ function parseGenerated(value: unknown): LegoGenerated | null {
           : [];
       })
     : undefined;
+  const style = v.style === undefined ? null : parseStyle(v.style);
   const stamps =
     typeof v.stamps === "object" && v.stamps !== null
       ? Object.fromEntries(
@@ -2034,6 +2039,7 @@ function parseGenerated(value: unknown): LegoGenerated | null {
     ...(covering ? { covering } : {}),
     ...(running ? { running } : {}),
     ...(stamps ? { stamps } : {}),
+    ...(style ? { style } : {}),
   };
 }
 

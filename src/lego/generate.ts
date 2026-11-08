@@ -36,6 +36,13 @@ import {
   type JobSlot,
   type Range,
 } from "./generatorJobs";
+import {
+  countLean,
+  type GeneratorStyle,
+  girthLean,
+  proportionLean,
+  skewed,
+} from "./generatorStyle";
 import { withLimits } from "./jointLimits";
 import {
   type LegoGenerated,
@@ -45,6 +52,7 @@ import {
 } from "./model";
 import { insertModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
+import { shapeColourways } from "./partOrder";
 import { applyEuler } from "./portableRotation";
 import { worldMatrix } from "./reparent";
 import { addRunningGear } from "./runningGear";
@@ -111,6 +119,10 @@ export interface GeneratorOptions {
   /** The skeleton's proportions as they are, rather than rolled. A reroll that
    *  keeps parts passes the unit's own, so the parts still fit (#3235). */
   proportions?: Record<string, number>;
+  /** A look to bias the choices towards (#3237). It is not part of the rolls'
+   *  keys, so the same seed with and without it makes a unit alike in the
+   *  choices the style leaves alone. */
+  style?: GeneratorStyle;
 }
 
 /** A PRNG for one choice, seeded off the inputs and the choice's key. */
@@ -135,6 +147,7 @@ function rollProportions(
   inputs: GeneratorInputs,
   job: GeneratorJobDef,
   factor: number,
+  style: GeneratorStyle | undefined,
 ): Record<string, number> {
   const values: Record<string, number> = {};
   const rules = job.proportions.filter((rule) =>
@@ -143,7 +156,10 @@ function rollProportions(
   const rule = (id: string) =>
     rules.find((r) => r.id === id && r.against === undefined);
   for (const { id, unit, min, max, fallback } of inputs.plan.proportions) {
-    const rng = roll(inputs, `proportion:${id}`);
+    const rng = skewed(
+      roll(inputs, `proportion:${id}`),
+      proportionLean(style, id),
+    );
     values[id] =
       unit === "count"
         ? randInt(rng, min, max)
@@ -399,6 +415,31 @@ function yieldPlanGun(project: LegoProject, instance: string): LegoProject {
   };
 }
 
+/**
+ * Every part piece of one instance in the style's colourway: the same shape in
+ * that colourway, where the pack has one. The same shape has the same
+ * connectors, so no join moves.
+ */
+function recolourInstance(
+  project: LegoProject,
+  pack: LoadedPack,
+  instance: string,
+  colourway: string,
+): LegoProject {
+  return {
+    ...project,
+    pieces: project.pieces.map((piece) => {
+      if (piece.module?.instance !== instance || !piece.partId) return piece;
+      const part = pack.byId.get(piece.partId);
+      if (!part || part.colourway === colourway) return piece;
+      const same = shapeColourways(pack, part).find(
+        (p) => p.colourway === colourway,
+      );
+      return same ? { ...piece, partId: same.id } : piece;
+    }),
+  };
+}
+
 /** The inputs in words, for the unit's notes. */
 export function describeInputs(inputs: GeneratorInputs): string {
   const seed = inputs.seed;
@@ -433,7 +474,7 @@ export function generateUnit(
   const factor = job.size[size.id];
   const proportions = options.proportions
     ? planProportions(inputs.plan, options.proportions)
-    : rollProportions(inputs, job, factor);
+    : rollProportions(inputs, job, factor, options.style);
   const jobLabel = job.label;
   const planLabel = inputs.plan.label;
   const seed = inputs.seed;
@@ -450,7 +491,11 @@ export function generateUnit(
   });
 
   const generated: LegoGenerated["modules"] = [];
-  const bulk = between(roll(inputs, "bulk"), job.bulk);
+  const { style } = options;
+  const bulk = between(
+    skewed(roll(inputs, "bulk"), girthLean(style)),
+    job.bulk,
+  );
   const extent = unitSize(inputs.plan, proportions, factor);
   const width = extent.x;
   const keepClear = new Set<string>();
@@ -460,7 +505,10 @@ export function generateUnit(
   for (const [index, slot] of job.slots.entries()) {
     const candidates = modulesFor(options.modules, slot);
     if (candidates.length === 0) continue;
-    const count = randInt(roll(inputs, `slot:${slot.id}:count`), ...slot.count);
+    const count = randInt(
+      skewed(roll(inputs, `slot:${slot.id}:count`), countLean(style)),
+      ...slot.count,
+    );
     for (let n = 1; n <= count; n++) {
       const module = pick(
         roll(inputs, `slot:${slot.id}:${n}:module`),
@@ -473,7 +521,7 @@ export function generateUnit(
         !isChassis && chassisTop !== null
           ? { to: "+y", cycle: 0, twist: 0 }
           : undefined;
-      const inserted = insertModule(
+      const placed = insertModule(
         project,
         module,
         parent,
@@ -482,10 +530,20 @@ export function generateUnit(
         placement,
         true,
       );
-      const top = inserted.rootPieceIds[0];
-      const instance =
-        top && pieceById(inserted.project, top)?.module?.instance;
+      const top = placed.rootPieceIds[0];
+      const instance = top && pieceById(placed.project, top)?.module?.instance;
       if (!top || !instance) continue;
+      const inserted = style?.colourway
+        ? {
+            ...placed,
+            project: recolourInstance(
+              placed.project,
+              pack,
+              instance,
+              style.colourway,
+            ),
+          }
+        : placed;
       if (isChassis) {
         const own = moduleWidth(module, pack);
         // Bounded, so a big unit's chassis is not one part blown up: the
@@ -542,6 +600,7 @@ export function generateUnit(
     width,
     newId,
     roll: (key) => roll(inputs, key),
+    style,
   });
   project = resolveConnections(covered.project, pack).project;
 
@@ -556,6 +615,7 @@ export function generateUnit(
       modules: generated,
       covering: covered.covering,
       ...(running.gear.length > 0 ? { running: running.gear } : {}),
+      ...(style ? { style } : {}),
     },
   };
 }
