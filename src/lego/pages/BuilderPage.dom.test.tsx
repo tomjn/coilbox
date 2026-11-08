@@ -184,6 +184,14 @@ vi.mock("@/workshop/project", async (importOriginal) => ({
   useModProjects: () => ({ projects: [] }),
 }));
 
+// The saved styles are app settings, which need the frame's store.
+const copyStyle = vi.fn();
+vi.mock("../generatorStyles", () => ({
+  useGeneratorStyles: () => ({ copy: copyStyle }),
+}));
+const notice = vi.fn();
+vi.mock("@/notify/notify", () => ({ notify: (n: unknown) => notice(n) }));
+
 import BuilderPage from "./BuilderPage";
 
 function unit(over: Partial<LegoProject> = {}): LegoProject {
@@ -478,6 +486,91 @@ describe("the build arm button", () => {
     expect(
       next.animations.map((a: { presetId: string }) => a.presetId),
     ).toEqual(["turret.track", "recoil"]);
+  });
+});
+
+describe("the create a style button (#3238)", () => {
+  const grey = {
+    id: "blk",
+    name: "blk",
+    shape: "block",
+    shapeId: "blk",
+    category: "grey",
+    colourway: "grey",
+    material: "",
+    tags: [],
+    packId: "lego",
+    bbox: { min: [-0.25, -0.25, -0.25], max: [0.25, 0.25, 0.25] },
+  };
+  const click = async () =>
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Create a style from this unit",
+      }),
+    );
+
+  beforeEach(() => {
+    copyStyle.mockClear();
+    notice.mockClear();
+  });
+
+  it("keeps a style from a unit built of parts, under the unit's name", async () => {
+    packLoad = loadedPack().then((pack) => ({
+      ...(pack as object),
+      manifest: { categories: [{ id: "grey", label: "Grey" }], swatches: [] },
+      parts: [grey],
+      byId: new Map([[grey.id, grey]]),
+    }));
+    const base = unit();
+    show({
+      ...base,
+      pieces: [
+        ...base.pieces,
+        {
+          id: "a",
+          name: "a",
+          parentId: base.rootPieceId,
+          partId: "blk",
+          position: [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        },
+      ],
+    });
+    await click();
+    expect(copyStyle).toHaveBeenCalledTimes(1);
+    expect(copyStyle.mock.calls[0][0]).toMatchObject({
+      name: "walker style",
+      colourway: "grey",
+      shapes: ["block"],
+    });
+    expect(notice).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "success" }),
+    );
+  });
+
+  it("says a unit with no parts cannot give a style", async () => {
+    show(unit());
+    await click();
+    expect(copyStyle).not.toHaveBeenCalled();
+    expect(notice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        body: expect.stringContaining("no parts"),
+      }),
+    );
+  });
+
+  it("says a unit imported from a game model cannot give a style", async () => {
+    show(unit({ imported: { source: "/tmp/unit.s3o" } }));
+    await click();
+    expect(copyStyle).not.toHaveBeenCalled();
+    expect(notice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        body: expect.stringContaining("imported"),
+      }),
+    );
   });
 });
 
