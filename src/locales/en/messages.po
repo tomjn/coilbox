@@ -9527,6 +9527,10 @@ msgstr "As {account} on {serverName}. You join the battles they join and leave w
 msgid "As a copy"
 msgstr "As a copy"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As generated"
+msgstr "As generated"
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "as it dies"
 msgstr "as it dies"
@@ -9542,6 +9546,14 @@ msgstr "As team 2"
 #: src/lego/pages/components/GameFitSection.tsx
 msgid "As the builder would write it"
 msgstr "As the builder would write it"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As the job rolls it"
+msgstr "As the job rolls it"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As the job rolls them"
+msgstr "As the job rolls them"
 
 #: src/hub/preview.ts
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -10387,6 +10399,10 @@ msgstr "BeamLaser only. The lowest fraction of full damage the beam can fall off
 msgid "BeamLaser only. Uses burst mechanics, with beamtime forced to the length of one sim frame."
 msgstr "BeamLaser only. Uses burst mechanics, with beamtime forced to the length of one sim frame."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Beams"
+msgstr "Beams"
+
 #: src/content/achievements.ts
 msgid "Beat 3 different AIs."
 msgstr "Beat 3 different AIs."
@@ -10547,6 +10563,10 @@ msgstr "Blocker"
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "Blockers"
 msgstr "Blockers"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Blocks"
+msgstr "Blocks"
 
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 msgid "Blocks a domain from being used to register a new account."
@@ -13272,6 +13292,10 @@ msgstr "Coilbox reports an error."
 msgid "Coilbox scenario"
 msgstr "Coilbox scenario"
 
+#: src/lego/generatorStyles.ts
+msgid "Coilbox style"
+msgstr "Coilbox style"
+
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 msgid "Coilbox tells you once when a battle matching this appears on any server you are connected to."
 msgstr "Coilbox tells you once when a battle matching this appears on any server you are connected to."
@@ -13427,6 +13451,7 @@ msgstr "Collision volume size (flat spelling)"
 msgid "colormap, held as one constant colour."
 msgstr "colormap, held as one constant colour."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/workshop/explosionGenerators.ts
 msgid "Colour"
 msgstr "Colour"
@@ -14122,6 +14147,7 @@ msgstr "Copies this unit's own {placeCount, plural, one {texture} other {texture
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/direct/ReachablePorts.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
@@ -14409,6 +14435,10 @@ msgstr "Could not load the module"
 msgid "Could not load the parts: {reason}"
 msgstr "Could not load the parts: {reason}"
 
+#: src/lego/generatorStyles.ts
+msgid "Could not load the style"
+msgstr "Could not load the style"
+
 #: src/lego/pack.ts
 msgid "Could not look for extension packs: {reason}"
 msgstr "Could not look for extension packs: {reason}"
@@ -14648,6 +14678,10 @@ msgstr "Could not save the module"
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr "Could not save the setting for {line}"
+
+#: src/lego/generatorStyles.ts
+msgid "Could not save the style"
+msgstr "Could not save the style"
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 msgid "Could not save the unit: {reason}"
@@ -15426,6 +15460,7 @@ msgstr "Delay between shots in a burst"
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
@@ -15737,6 +15772,10 @@ msgstr "Delivery routes"
 msgid "Demo files in your content folder."
 msgstr "Demo files in your content folder."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Dense"
+msgstr "Dense"
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Density layer"
 msgstr "Density layer"
@@ -15847,6 +15886,10 @@ msgstr "Detached: moved off its face."
 #: src/lego/pages/BuilderPage.tsx
 msgid "Detached: turned off its face."
 msgstr "Detached: turned off its face."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Detail"
+msgstr "Detail"
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
@@ -22587,6 +22630,10 @@ msgstr "Layout \"{layoutName}\""
 msgid "Leading accuracy"
 msgstr "Leading accuracy"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Lean"
+msgstr "Lean"
+
 #: src/lego/animPresets.ts
 msgid "Lean at full power"
 msgstr "Lean at full power"
@@ -23076,6 +23123,10 @@ msgstr "Load a module"
 msgid "Load a rapid master to list its repositories."
 msgstr "Load a rapid master to list its repositories."
 
+#: src/lego/generatorStyles.ts
+msgid "Load a style"
+msgstr "Load a style"
+
 #: src/lego/pages/components/Inventory.tsx
 #: src/lego/pages/PartsPage.tsx
 msgid "Load from file"
@@ -23092,6 +23143,10 @@ msgstr "Load onto {game}"
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Load repos"
 msgstr "Load repos"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Load style"
+msgstr "Load style"
 
 #: src/play/PresetLoadGate.tsx
 msgid "Load this preset"
@@ -25084,6 +25139,7 @@ msgstr "mysql binary"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -25576,6 +25632,11 @@ msgstr "New set"
 #: src/content/pages/components/ReplaySetPicker.tsx
 msgid "New set name"
 msgstr "New set name"
+
+#: src/lego/generatorStyles.ts
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "New style"
+msgstr "New style"
 
 #: src/content/pages/components/RemixPanel.tsx
 msgid "New target game"
@@ -26988,6 +27049,10 @@ msgstr "No stored password for this login (set one in Settings)."
 #: src/campaign/pages/components/MissionScenarioField.tsx
 msgid "No stored scenario has this id any more, so there is nothing to compare against. The mission plays its own copy."
 msgstr "No stored scenario has this id any more, so there is nothing to compare against. The mission plays its own copy."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "No style"
+msgstr "No style"
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "No such field"
@@ -30131,6 +30196,10 @@ msgstr "Planet"
 msgid "Planet Wars"
 msgstr "Planet Wars"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Plates"
+msgstr "Plates"
+
 #: src/campaign/index.ts
 #: src/conquest/index.ts
 #: src/content/pages/components/GameCard.tsx
@@ -30595,6 +30664,10 @@ msgstr "Pre-seed accounts so a load test can run with registration off."
 msgid "Preferred"
 msgstr "Preferred"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Preferred shapes"
+msgstr "Preferred shapes"
+
 #: src/content/unitFieldNotes.ts
 msgid "Prefers targets it already faces"
 msgstr "Prefers targets it already faces"
@@ -30889,6 +30962,10 @@ msgstr "Promoted"
 #: src/multiplayer/debriefing.ts
 msgid "Promoted to {name}"
 msgstr "Promoted to {name}"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Proportions"
+msgstr "Proportions"
 
 #: src/multiplayer/ConsoleDrawer.tsx
 msgid "Protocol console"
@@ -33789,6 +33866,10 @@ msgstr "Save the rebuilt .bos"
 msgid "Save the selection as a module"
 msgstr "Save the selection as a module"
 
+#: src/lego/generatorStyles.ts
+msgid "Save the style"
+msgstr "Save the style"
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Save these boxes for {mapName}"
 msgstr "Save these boxes for {mapName}"
@@ -33802,6 +33883,7 @@ msgid "Save to a chosen file"
 msgstr "Save to a chosen file"
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Save to file"
 msgstr "Save to file"
 
@@ -33841,6 +33923,7 @@ msgstr "Saved {0}"
 msgid "Saved {dest}."
 msgstr "Saved {dest}."
 
+#: src/lego/generatorStyles.ts
 #: src/lego/moduleFileIo.ts
 msgid "Saved {name}"
 msgstr "Saved {name}"
@@ -36569,6 +36652,10 @@ msgstr "Space separated category names."
 msgid "Space separated category names. Empty means anything."
 msgstr "Space separated category names. Empty means anything."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Sparse"
+msgstr "Sparse"
+
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Spawn {spawnNumber}"
 msgstr "Spawn {spawnNumber}"
@@ -37246,6 +37333,10 @@ msgstr "Stockpile round time"
 msgid "Stockpile round time (old name)"
 msgstr "Stockpile round time (old name)"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Stocky"
+msgstr "Stocky"
+
 #: src/i18n/frameStrings.ts
 msgid "Stone"
 msgstr "Stone"
@@ -37397,6 +37488,10 @@ msgstr "Stun duration"
 #: src/content/unitFieldNotes.ts
 msgid "Stuns instead of damaging"
 msgstr "Stuns instead of damaging"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Style"
+msgstr "Style"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "Subtitle"
@@ -41036,6 +41131,10 @@ msgstr "This file does not read as a replay."
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "This file is empty and nothing in it can be played. A game that was closed, killed or crashed before it ended leaves a file like this."
 msgstr "This file is empty and nothing in it can be played. A game that was closed, killed or crashed before it ended leaves a file like this."
+
+#: src/lego/generatorStyles.ts
+msgid "This file is not a coilbox style."
+msgstr "This file is not a coilbox style."
 
 #: src/content/pages/KeybindsSection.tsx
 msgid "This file loads {includedFiles} with keyload, which coilbox does not follow, so bindings from there are not shown. Saving keeps the keyload line."

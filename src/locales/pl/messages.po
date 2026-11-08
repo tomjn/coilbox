@@ -11725,6 +11725,10 @@ msgstr "Jako {account} na {serverName}. Dołączasz do meczów, do których ta o
 msgid "As a copy"
 msgstr "Jako kopia"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As generated"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
 msgid "as it dies"
@@ -11744,6 +11748,14 @@ msgstr "Jako drużyna 2"
 #, fuzzy
 msgid "As the builder would write it"
 msgstr "Tak, jak zapisałby to kreator"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As the job rolls it"
+msgstr ""
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "As the job rolls them"
+msgstr ""
 
 #: src/hub/preview.ts
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -12781,6 +12793,10 @@ msgstr "Tylko BeamLaser. Najniższy ułamek pełnych obrażeń, do którego prom
 msgid "BeamLaser only. Uses burst mechanics, with beamtime forced to the length of one sim frame."
 msgstr "Tylko BeamLaser. Używa mechaniki serii, z beamtime wymuszonym na długość jednej klatki symulacji."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Beams"
+msgstr ""
+
 #: src/content/achievements.ts
 #, fuzzy
 msgid "Beat 3 different AIs."
@@ -12981,6 +12997,10 @@ msgstr "Problem blokujący"
 #, fuzzy
 msgid "Blockers"
 msgstr "Problemy blokujące"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Blocks"
+msgstr ""
 
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 #, fuzzy
@@ -16283,6 +16303,10 @@ msgstr ""
 msgid "Coilbox scenario"
 msgstr "Scenariusz coilbox"
 
+#: src/lego/generatorStyles.ts
+msgid "Coilbox style"
+msgstr ""
+
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
 msgid "Coilbox tells you once when a battle matching this appears on any server you are connected to."
@@ -16475,6 +16499,7 @@ msgstr "Rozmiar bryły kolizji (zapis płaski)"
 msgid "colormap, held as one constant colour."
 msgstr "colormap, utrzymywane jako jeden stały kolor."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Colour"
@@ -17326,6 +17351,7 @@ msgstr "Kopiuje {placeCount, plural, one {własną teksturę} few {własne tekst
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/direct/ReachablePorts.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
@@ -17677,6 +17703,10 @@ msgstr "Nie udało się wczytać modułu"
 msgid "Could not load the parts: {reason}"
 msgstr ""
 
+#: src/lego/generatorStyles.ts
+msgid "Could not load the style"
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "Could not look for extension packs: {reason}"
@@ -17961,6 +17991,10 @@ msgstr "Nie udało się zapisać modułu"
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
+msgstr ""
+
+#: src/lego/generatorStyles.ts
+msgid "Could not save the style"
 msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
@@ -18914,6 +18948,7 @@ msgstr "Opóźnienie między strzałami w serii"
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
@@ -19298,6 +19333,10 @@ msgstr "Ścieżki dostarczenia"
 msgid "Demo files in your content folder."
 msgstr "Pliki demo w twoim folderze zawartości."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Dense"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Density layer"
@@ -19432,6 +19471,10 @@ msgstr "Odłączono: przesunięto poza ścianę."
 #, fuzzy
 msgid "Detached: turned off its face."
 msgstr "Odłączono: obrócono poza ścianę."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Detail"
+msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
@@ -27698,6 +27741,10 @@ msgstr "Układ \"{layoutName}\""
 msgid "Leading accuracy"
 msgstr "Celność wyprzedzenia"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Lean"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Lean at full power"
@@ -28299,6 +28346,10 @@ msgstr "Wczytaj moduł"
 msgid "Load a rapid master to list its repositories."
 msgstr "Wczytaj master rapid, aby wyświetlić jego repozytoria."
 
+#: src/lego/generatorStyles.ts
+msgid "Load a style"
+msgstr ""
+
 #: src/lego/pages/components/Inventory.tsx
 #: src/lego/pages/PartsPage.tsx
 #, fuzzy
@@ -28318,6 +28369,10 @@ msgstr ""
 #, fuzzy
 msgid "Load repos"
 msgstr "Wczytaj repozytoria"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Load style"
+msgstr ""
 
 #: src/play/PresetLoadGate.tsx
 msgid "Load this preset"
@@ -30751,6 +30806,7 @@ msgstr "plik binarny mysql"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -31354,6 +31410,11 @@ msgstr "Nowy zestaw"
 #, fuzzy
 msgid "New set name"
 msgstr "Nazwa nowego zestawu"
+
+#: src/lego/generatorStyles.ts
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "New style"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
@@ -33096,6 +33157,10 @@ msgstr "Brak zapisanego hasła dla tych danych logowania (ustaw je w ustawieniac
 #, fuzzy
 msgid "No stored scenario has this id any more, so there is nothing to compare against. The mission plays its own copy."
 msgstr "Żaden zapisany scenariusz nie ma już tego id, więc nie ma z czym porównać. Misja odtwarza własną kopię."
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "No style"
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -36951,6 +37016,10 @@ msgstr "Planeta"
 msgid "Planet Wars"
 msgstr "Planet Wars"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Plates"
+msgstr ""
+
 #: src/campaign/index.ts
 #: src/conquest/index.ts
 #: src/content/pages/components/GameCard.tsx
@@ -37512,6 +37581,10 @@ msgstr "Utwórz konta z wyprzedzeniem, aby test obciążenia mógł działać pr
 msgid "Preferred"
 msgstr "Preferowany"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Preferred shapes"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Prefers targets it already faces"
@@ -37871,6 +37944,10 @@ msgstr "Awans"
 #, fuzzy
 msgid "Promoted to {name}"
 msgstr "Awans na: {name}"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Proportions"
+msgstr ""
 
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -41415,6 +41492,10 @@ msgstr "Zapisz przebudowany .bos"
 msgid "Save the selection as a module"
 msgstr "Zapisz zaznaczenie jako moduł"
 
+#: src/lego/generatorStyles.ts
+msgid "Save the style"
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
 msgid "Save these boxes for {mapName}"
@@ -41431,6 +41512,7 @@ msgid "Save to a chosen file"
 msgstr "Zapisz do wybranego pliku"
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/GeneratorStyleSection.tsx
 #, fuzzy
 msgid "Save to file"
 msgstr "Zapisz do pliku"
@@ -41478,6 +41560,7 @@ msgstr "Zapis {0}"
 msgid "Saved {dest}."
 msgstr "Zapisano {dest}."
 
+#: src/lego/generatorStyles.ts
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Saved {name}"
@@ -44822,6 +44905,10 @@ msgstr "Oddzielone spacjami nazwy kategorii."
 msgid "Space separated category names. Empty means anything."
 msgstr "Oddzielone spacjami nazwy kategorii. Puste oznacza cokolwiek."
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Sparse"
+msgstr ""
+
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
 msgid "Spawn {spawnNumber}"
@@ -45651,6 +45738,10 @@ msgstr "Czas uzupełnienia zapasu amunicji"
 msgid "Stockpile round time (old name)"
 msgstr "Czas uzupełnienia zapasu amunicji (stara nazwa)"
 
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Stocky"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Stone"
@@ -45838,6 +45929,10 @@ msgstr "Czas ogłuszenia"
 #, fuzzy
 msgid "Stuns instead of damaging"
 msgstr "Ogłusza zamiast zadawać obrażenia"
+
+#: src/lego/pages/components/GeneratorStyleSection.tsx
+msgid "Style"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -50310,6 +50405,10 @@ msgstr "Tego pliku nie da się odczytać jako powtórki."
 #, fuzzy
 msgid "This file is empty and nothing in it can be played. A game that was closed, killed or crashed before it ended leaves a file like this."
 msgstr "Ten plik jest pusty i nie ma w nim nic do odtworzenia. Taki plik zostawia gra zamknięta, zabita lub zakończona awarią przed końcem."
+
+#: src/lego/generatorStyles.ts
+msgid "This file is not a coilbox style."
+msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 #, fuzzy
