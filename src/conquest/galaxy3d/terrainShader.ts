@@ -642,7 +642,9 @@ const DETAIL = /* glsl */ `
     float coldGround = clamp(uTerrainFrost, 0.0, 1.0) * land;
     float gullyCut = 0.0;
     vec2 gullySlope = vec2(0.0);
-    if (coldGround > 0.01 && gully > 0.001) {
+    // Branched on the uniform alone: derivatives and texture reads need every
+    // pixel of a quad to take the same path.
+    if (uTerrainFrost > 0.0) {
       vec2 dSize = vec2(textureSize(uTerrainDrainage, 0));
       vec2 dt = 1.0 / dSize;
       float fxp = tSmooth(uTerrainDrainage, vTerrainUv + vec2(dt.x, 0.0)).r;
