@@ -549,6 +549,11 @@ msgstr "{0, plural, one {# death was off the map and is not drawn.} other {# dea
 msgid "{0, plural, one {# def override} other {# def overrides}}"
 msgstr "{0, plural, one {# def override} other {# def overrides}}"
 
+#. placeholder {0}: state.report.groups.length
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "{0, plural, one {# duplicate} other {# duplicates}}"
+msgstr "{0, plural, one {# duplicate} other {# duplicates}}"
+
 #. placeholder {0}: model.paletteFaces
 #: src/content/pages/components/ModelViewport.tsx
 msgid "{0, plural, one {# face names a Total Annihilation palette entry this could not resolve to a colour, so it is drawn plain grey.} other {# faces name a Total Annihilation palette entry this could not resolve to a colour, so they are drawn plain grey.}}"
@@ -1170,6 +1175,11 @@ msgstr "{0} from the newest release"
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "{0} has no folder for RmlUi widgets."
 msgstr "{0} has no folder for RmlUi widgets."
+
+#. placeholder {0}: formatBytes(state.report.wastedBytes)
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "{0} in extra copies"
+msgstr "{0} in extra copies"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
@@ -16798,6 +16808,10 @@ msgstr "Duplicate {missionTitle}"
 msgid "Duplicate {poseName}"
 msgstr "Duplicate {poseName}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Duplicate content"
+msgstr "Duplicate content"
+
 #: src/scenario/pages/components/shortcuts.ts
 msgid "Duplicate the selected placement, or the trigger you are editing"
 msgstr "Duplicate the selected placement, or the trigger you are editing"
@@ -23682,6 +23696,10 @@ msgstr "Loops back to attack"
 msgid "Loose .sdd directory (uncompressed)"
 msgstr "Loose .sdd directory (uncompressed)"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Loose map and rapid package"
+msgstr "Loose map and rapid package"
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "Lose this defence and the system falls — it is your homeworld."
 msgstr "Lose this defence and the system falls — it is your homeworld."
@@ -26147,6 +26165,10 @@ msgstr "No download write root set"
 #: src/downloads/pages/ActivityPage.tsx
 msgid "No downloads match \"{query}\"."
 msgstr "No downloads match \"{query}\"."
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "No duplicates found."
+msgstr "No duplicates found."
 
 #: src/multiplayer/chat/EmojiPicker.tsx
 msgid "No emoji match \"{query}\"."
@@ -31528,6 +31550,10 @@ msgstr "Rapid"
 msgid "Rapid index {refreshed} from {hosts}"
 msgstr "Rapid index {refreshed} from {hosts}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Rapid package"
+msgstr "Rapid package"
+
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
@@ -33533,6 +33559,10 @@ msgstr "Reveal {enginePath}"
 msgid "Reveal {firstPath}"
 msgstr "Reveal {firstPath}"
 
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Reveal {folder}"
+msgstr "Reveal {folder}"
+
 #: src/content/pages/StorageSection.tsx
 msgid "Reveal in file manager"
 msgstr "Reveal in file manager"
@@ -33548,6 +33578,11 @@ msgstr "Reveal sidebar"
 #: src/content/pages/StorageSection.tsx
 msgid "Reveal the {engineVersion} folder"
 msgstr "Reveal the {engineVersion} folder"
+
+#. placeholder {0}: copy.path
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Reveal the folder holding {0}"
+msgstr "Reveal the folder holding {0}"
 
 #: src/content/unitFieldNotes.ts
 msgid "Reverse speed"
@@ -33921,6 +33956,14 @@ msgstr "Same as accuracy, but used while the firing unit is moving."
 #: src/content/pages/components/DownloadFolders.tsx
 msgid "Same as default"
 msgstr "Same as default"
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Same name and size"
+msgstr "Same name and size"
+
+#: src/content/pages/components/DuplicateContent.tsx
+msgid "Same name, different sizes"
+msgstr "Same name, different sizes"
 
 #: src/mapconv/pages/CompilePage.tsx
 msgid "sand"

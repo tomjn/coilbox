@@ -294,6 +294,47 @@ export const contentStorageOverview = defineCommand<
   { overview: StorageOverview }
 >("coilbox-content", "content_storage_overview");
 
+/** One place a duplicated item is stored. */
+export interface DuplicateCopy {
+  path: string;
+  /** The content folder this copy is in. */
+  root: string;
+  /** What the copy occupies. A rapid package's figure is its pool files. */
+  bytes: number;
+  /** `file` is a loose archive, `rapid` is a rapid package. */
+  source: "file" | "rapid";
+}
+
+/** Two or more copies of one item (issue #399). */
+export interface DuplicateGroup {
+  /**
+   * `sameName` is one file name in two or more content folders. `mapInRapid` is
+   * a map that is a loose archive and also inside a rapid package.
+   */
+  kind: "sameName" | "mapInRapid";
+  category: "maps" | "games";
+  name: string;
+  copies: DuplicateCopy[];
+  /** For `sameName`, false means the copies differ. Null for `mapInRapid`. */
+  sizesMatch: boolean | null;
+  /** What deleting every copy but the largest would free. */
+  wastedBytes: number;
+}
+
+export interface DuplicateReport {
+  groups: DuplicateGroup[];
+  wastedBytes: number;
+}
+
+/**
+ * Content stored twice across the given content folders. Read only. Compares
+ * names and sizes, and never reads file contents.
+ */
+export const contentDuplicateReport = defineCommand<
+  { roots: string[] },
+  { report: DuplicateReport }
+>("coilbox-content", "content_duplicate_report");
+
 /**
  * Delete one installed engine folder, returning the bytes freed. Rust only
  * accepts a real directory inside a folder named `engine`, so this cannot be
