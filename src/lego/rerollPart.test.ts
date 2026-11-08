@@ -513,12 +513,24 @@ describe("a unit rerolled whole afterwards", () => {
   });
 
   it("keeps the part that was rerolled", () => {
-    const piece = partPiece(unit);
-    const part = rerollPart(unit, pack, piece.id, { modules });
-    if (part.status !== "ok") throw new Error(part.message);
-    const chosen = pieceById(part.project, piece.id)?.partId;
-    const whole = rerollUnit(part.project, { pack, modules });
-    if (whole.status !== "ok") throw new Error(whole.message);
-    expect(pieceById(whole.unit, piece.id)?.partId).toBe(chosen);
+    // A rerolled part is kept whatever it does to the unit's balance, so a
+    // whole reroll can find no seed that passes with the part a game maker
+    // swapped in. The first part with one that does is the one to check.
+    const kept = unit.pieces
+      .filter((p) => p.partId && !p.module && p.id !== unit.rootPieceId)
+      .flatMap((piece) => {
+        const part = rerollPart(unit, pack, piece.id, { modules });
+        if (part.status !== "ok") return [];
+        const whole = rerollUnit(part.project, { pack, modules });
+        if (whole.status !== "ok") return [];
+        return [
+          {
+            chosen: pieceById(part.project, piece.id)?.partId,
+            after: pieceById(whole.unit, piece.id)?.partId,
+          },
+        ];
+      });
+    expect(kept.length).toBeGreaterThan(0);
+    for (const { chosen, after } of kept) expect(after).toBe(chosen);
   });
 });
