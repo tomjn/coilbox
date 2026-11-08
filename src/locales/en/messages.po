@@ -12849,8 +12849,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox cannot draw this picture. The game can still read it."
 
 #: src/mapconv/skyboxNote.ts
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
+msgid "Coilbox cannot read this map's skybox. The map ships one, in a format the reader does not handle, so the preview draws a sky from the map's colours instead."
+msgstr "Coilbox cannot read this map's skybox. The map ships one, in a format the reader does not handle, so the preview draws a sky from the map's colours instead."
 
 #: src/content/buildPicMissing.ts
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
@@ -18545,10 +18545,6 @@ msgstr "Flat addition to cratering strength, applied after altitude reduction bu
 msgid "Flat impulse bonus"
 msgstr "Flat impulse bonus"
 
-#: src/mapconv/skyboxNote.ts
-msgid "flat sky"
-msgstr "flat sky"
-
 #: src/content/unitFieldNotes.ts
 msgid "Flattens the ground"
 msgstr "Flattens the ground"
@@ -19495,6 +19491,10 @@ msgstr "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "Generated Lua"
 msgstr "Generated Lua"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr "generated sky"
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Generated test game"
@@ -41256,8 +41256,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "This map's heights could not be read. Nothing here has been checked against the ground, so every square is dashed rather than clean."
 
 #: src/mapconv/skyboxNote.ts
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
 
 #: src/content/replayAnalysis.ts
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
@@ -45400,6 +45400,10 @@ msgstr "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Do
 msgid "Write root portability n/a (not portable)"
 msgstr "Write root portability n/a (not portable)"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr "Write sky"
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Write stats to the server log"
 msgstr "Write stats to the server log"
@@ -45504,6 +45508,11 @@ msgstr "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sh
 #: src/profile/SettingsSection.tsx
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "Wrote <0/>. Restart Coilbox to load it."
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr "Wrote <0>{0}</0>"
 
 #: src/blueprint/pack.ts
 msgid "Wrote into {dest}: {done}."

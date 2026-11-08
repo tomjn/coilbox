@@ -15878,9 +15878,8 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Το Coilbox δεν μπορεί να σχεδιάσει αυτή την εικόνα. Το παιχνίδι μπορεί ακόμη να τη διαβάσει."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
-msgstr "Το Coilbox δεν μπορεί να διαβάσει το skybox αυτού του χάρτη. Ο χάρτης περιέχει ένα, σε μορφή DDS που ο αναγνώστης δεν υποστηρίζει, οπότε η προεπισκόπηση σχεδιάζει το χρώμα ουρανού του χάρτη."
+msgid "Coilbox cannot read this map's skybox. The map ships one, in a format the reader does not handle, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -22896,11 +22895,6 @@ msgstr "Σταθερή προσθήκη στην ισχύ κρατήρων, πο
 msgid "Flat impulse bonus"
 msgstr "Σταθερό μπόνους ώθησης"
 
-#: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "flat sky"
-msgstr "επίπεδος ουρανός"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Flattens the ground"
@@ -24062,6 +24056,10 @@ msgstr ""
 #, fuzzy
 msgid "Generated Lua"
 msgstr "Lua που δημιουργήθηκε"
+
+#: src/mapconv/skyboxNote.ts
+msgid "generated sky"
+msgstr ""
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -50956,9 +50954,8 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "Δεν ήταν δυνατή η ανάγνωση των υψών αυτού του χάρτη. Τίποτα εδώ δεν έχει ελεγχθεί σε σχέση με το έδαφος, οπότε κάθε τετράγωνο είναι διακεκομμένο και όχι συμπαγές."
 
 #: src/mapconv/skyboxNote.ts
-#, fuzzy
-msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
-msgstr "Το skybox αυτού του χάρτη είναι DDS, αλλά όχι cube map, οπότε η προεπισκόπηση σχεδιάζει το χρώμα ουρανού του χάρτη."
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -56075,6 +56072,10 @@ msgstr "Ο ριζικός φάκελος εγγραφής «{writeRootPath}» ε
 msgid "Write root portability n/a (not portable)"
 msgstr "Φορητότητα ριζικού φακέλου εγγραφής: δεν ισχύει (μη φορητό)"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write sky"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56205,6 +56206,11 @@ msgstr "Γράφτηκαν {modelsWritten} από {modelsFound} μοντέλα �
 #, fuzzy
 msgid "Wrote <0/>. Restart Coilbox to load it."
 msgstr "Γράφτηκε το <0/>. Επανεκκινήστε το Coilbox για να φορτωθεί."
+
+#. placeholder {0}: skyResult.path
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote <0>{0}</0>"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy

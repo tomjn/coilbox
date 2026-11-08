@@ -56,7 +56,7 @@ describe("skyboxNote", () => {
 
   it("says a skybox coilbox could not read is why the sky is flat", () => {
     const note = skyboxNote("unreadable");
-    expect(note?.label).toBe("flat sky");
+    expect(note?.label).toBe("generated sky");
     expect(note?.title).toMatch(/cannot read/i);
   });
 
