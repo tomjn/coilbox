@@ -21,6 +21,11 @@ const bindings = vi.hoisted(() => ({
   unitsyncArchiveTree: vi.fn(),
   unitsyncArchiveFile: vi.fn(),
   unitsyncMinimap: vi.fn(),
+  unitsyncHeightmap: vi.fn(),
+  unitsyncHeightField: vi.fn(),
+  unitsyncMetalField: vi.fn(),
+  unitsyncMetalmap: vi.fn(),
+  unitsyncMapSkybox: vi.fn(),
 }));
 
 vi.mock("./bindings", async (importOriginal) => ({
@@ -44,7 +49,12 @@ const {
   useUnitsyncArchiveFile,
   useUnitsyncArchiveTree,
   useUnitsyncGameInfo,
+  useUnitsyncHeightField,
+  useUnitsyncHeightmap,
   useUnitsyncMapInfo,
+  useUnitsyncMapSkybox,
+  useUnitsyncMetalField,
+  useUnitsyncMetalmap,
   useUnitsyncMinimap,
   useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
@@ -261,6 +271,101 @@ describe("useUnitsyncMinimap", () => {
     expect(renders[before].startPositions).toEqual([]);
     expect(renders[before].appearance).toBeNull();
     expect(renders[before].loading).toBe(true);
+  });
+});
+
+describe.each([
+  ["useUnitsyncHeightmap", useUnitsyncHeightmap, bindings.unitsyncHeightmap],
+  [
+    "useUnitsyncHeightField",
+    useUnitsyncHeightField,
+    bindings.unitsyncHeightField,
+  ],
+  ["useUnitsyncMetalField", useUnitsyncMetalField, bindings.unitsyncMetalField],
+  ["useUnitsyncMetalmap", useUnitsyncMetalmap, bindings.unitsyncMetalmap],
+])("%s", (_name, useAsset, binding) => {
+  it("returns no data, no url and loading on the first render for a new map", async () => {
+    const answerA = { dataUrl: "data:image/png;base64,AAAA", errors: [] };
+    binding.mockResolvedValueOnce(answerA);
+    binding.mockReturnValueOnce(never());
+    const { result, rerender, renders } = recorded(
+      ({ map }: { map: string }) => useAsset("/engine", dir, map),
+      { map: "A" },
+    );
+    await waitFor(() => expect(result.current.url).not.toBeNull());
+    expect(result.current.data).toBe(answerA);
+    const before = renders.length;
+    rerender({ map: "B" });
+    for (const render of renders.slice(before)) {
+      expect(render.data).toBeNull();
+      expect(render.url).toBeNull();
+      expect(render.error).toBeNull();
+    }
+    expect(renders[before].loading).toBe(true);
+  });
+
+  it("returns nothing and not loading on the first render when the map goes away", async () => {
+    binding.mockResolvedValue({ dataUrl: "data:image/png;base64,AAAA" });
+    const { result, rerender, renders } = recorded(
+      ({ map }: { map?: string }) => useAsset("/engine", dir, map),
+      { map: "A" } as { map?: string },
+    );
+    await waitFor(() => expect(result.current.url).not.toBeNull());
+    const before = renders.length;
+    rerender({ map: undefined });
+    expect(renders[before].data).toBeNull();
+    expect(renders[before].url).toBeNull();
+    expect(renders[before].loading).toBe(false);
+  });
+
+  it("drops the old map's error on the first render for a new map", async () => {
+    binding.mockResolvedValueOnce({ errors: ["no such map"] });
+    binding.mockReturnValueOnce(never());
+    const { result, rerender, renders } = recorded(
+      ({ map }: { map: string }) => useAsset("/engine", dir, map),
+      { map: "A" },
+    );
+    await waitFor(() => expect(result.current.error).toBe("no such map"));
+    const before = renders.length;
+    rerender({ map: "B" });
+    expect(renders[before].error).toBeNull();
+    expect(renders[before].data).toBeNull();
+  });
+});
+
+describe("useUnitsyncMapSkybox", () => {
+  it("returns no skybox and loading on the first render for a new map", async () => {
+    bindings.unitsyncMapSkybox.mockResolvedValueOnce({
+      dataUrl: "data:application/octet-stream;base64,AAAA",
+    });
+    bindings.unitsyncMapSkybox.mockReturnValueOnce(never());
+    const { result, rerender, renders } = recorded(
+      ({ map }: { map: string }) => useUnitsyncMapSkybox("/engine", dir, map),
+      { map: "A" },
+    );
+    await waitFor(() => expect(result.current.dataUrl).not.toBeNull());
+    const before = renders.length;
+    rerender({ map: "B" });
+    for (const render of renders.slice(before)) {
+      expect(render.dataUrl).toBeNull();
+    }
+    expect(renders[before].loading).toBe(true);
+  });
+
+  it("returns a cached skybox for a map seen before without showing the old one first", async () => {
+    bindings.unitsyncMapSkybox.mockResolvedValueOnce({ dataUrl: "data:A" });
+    bindings.unitsyncMapSkybox.mockResolvedValueOnce({ dataUrl: "data:B" });
+    const { result, rerender, renders } = recorded(
+      ({ map }: { map: string }) => useUnitsyncMapSkybox("/engine", dir, map),
+      { map: "A" },
+    );
+    await waitFor(() => expect(result.current.dataUrl).toBe("data:A"));
+    rerender({ map: "B" });
+    await waitFor(() => expect(result.current.dataUrl).toBe("data:B"));
+    const before = renders.length;
+    rerender({ map: "A" });
+    expect(renders[before].dataUrl).toBeNull();
+    await waitFor(() => expect(result.current.dataUrl).toBe("data:A"));
   });
 });
 
