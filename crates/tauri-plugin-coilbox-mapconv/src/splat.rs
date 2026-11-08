@@ -493,12 +493,22 @@ pub fn detail_density(map: &Heights) -> usize {
 /// running toward world +z, before the flip the DDS needs.
 pub fn detail_normals(map: &Heights, dist: &RgbaImage, per: usize) -> RgbaImage {
     let (w, h) = ((map.w - 1) * per, (map.h - 1) * per);
-    let step = SQUARE / per as f64; // elmos per pixel
-                                    // Weight of channel `c` of the distribution at (x, y) in squares.
+    // Elmos per pixel.
+    let step = SQUARE / per as f64;
+    // Weight of channel `c` of the distribution at (x, y) in squares, bilinear
+    // between pixel centres, which sit at the middle of each square.
     let weight = |x: f64, y: f64, c: usize| {
-        let px = (x - 0.5).floor().clamp(0.0, f64::from(dist.width() - 1)) as u32;
-        let py = (y - 0.5).floor().clamp(0.0, f64::from(dist.height() - 1)) as u32;
-        f64::from(dist.get_pixel(px, py)[c]) / 255.0
+        let (fx, fy) = (x - 0.5, y - 0.5);
+        let (x0, y0) = (fx.floor(), fy.floor());
+        let (tx, ty) = (fx - x0, fy - y0);
+        let at = |i: f64, j: f64| {
+            let px = i.clamp(0.0, f64::from(dist.width() - 1)) as u32;
+            let py = j.clamp(0.0, f64::from(dist.height() - 1)) as u32;
+            f64::from(dist.get_pixel(px, py)[c]) / 255.0
+        };
+        let top = at(x0, y0) * (1.0 - tx) + at(x0 + 1.0, y0) * tx;
+        let bottom = at(x0, y0 + 1.0) * (1.0 - tx) + at(x0 + 1.0, y0 + 1.0) * tx;
+        top * (1.0 - ty) + bottom * ty
     };
     let mut bump = vec![0.0; w * h];
     let mut alpha = vec![0.0; w * h];
@@ -1067,6 +1077,27 @@ mod tests {
         let pebbles = RgbaImage::from_pixel(16, 16, Rgba([0, 255, 0, 0]));
         let img = detail_normals(&m, &pebbles, 2);
         assert!(img.pixels().all(|p| p.0 == [128, 128, 255, 0]));
+    }
+
+    #[test]
+    fn the_detail_strength_changes_evenly_across_a_square_edge() {
+        // Rock in the western half, ground in the eastern. The two pixels either
+        // side of the edge between squares 7 and 8 are a quarter of a square from
+        // it, so their strengths sit evenly either side of the halfway mark.
+        let m = map(16, 16, |_, _| 50.0);
+        let dist = RgbaImage::from_fn(16, 16, |x, _| {
+            if x < 8 {
+                Rgba([255, 0, 0, 0])
+            } else {
+                Rgba([0, 0, 255, 0])
+            }
+        });
+        let img = detail_normals(&m, &dist, 2);
+        let (rock, ground) = (img.get_pixel(2, 4)[3], img.get_pixel(29, 4)[3]);
+        let (west, east) = (img.get_pixel(15, 4)[3], img.get_pixel(16, 4)[3]);
+        assert!(west > east, "{west} {east}");
+        let mid = (u32::from(rock) + u32::from(ground)) as i32;
+        assert!(((u32::from(west) + u32::from(east)) as i32 - mid).abs() <= 2);
     }
 
     #[test]
