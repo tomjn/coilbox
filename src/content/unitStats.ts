@@ -44,7 +44,10 @@ export function weaponsOf(
   stats: Record<string, unknown> | undefined,
 ): WeaponStat[] {
   const weapons = stats?.weapons;
-  return Array.isArray(weapons) && weapons.length > 0
-    ? (weapons as WeaponStat[])
-    : [];
+  // The map is schemaless, so an entry that is not an object is dropped
+  // rather than read.
+  if (!Array.isArray(weapons)) return [];
+  return weapons.filter(
+    (w): w is WeaponStat => typeof w === "object" && w !== null,
+  );
 }

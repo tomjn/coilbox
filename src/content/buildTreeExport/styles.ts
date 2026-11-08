@@ -86,7 +86,7 @@ header.brand .links a:hover { text-decoration: underline; opacity: 1; }
 }
 .detail-close {
   position: absolute; top: 6px; right: 6px; appearance: none; cursor: pointer;
-  font: 18px/1 inherit; color: var(--muted); background: none; border: 0;
+  font-family: inherit; font-size: 18px; line-height: 1; color: var(--muted); background: none; border: 0;
   border-radius: 6px; min-width: 28px; min-height: 28px;
 }
 .detail-close:hover { color: var(--text); background: #27272a; }

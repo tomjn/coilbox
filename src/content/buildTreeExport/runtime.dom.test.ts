@@ -64,6 +64,17 @@ const sides = [
 /** Units in the Arm tree: the commander and everything it reaches. */
 const TOTAL = 8;
 
+// The script adds listeners to the document and window, which outlive the
+// page's elements. Each is recorded so a test can take them off again.
+const added: [EventTarget, string, EventListenerOrEventListenerObject][] = [];
+for (const target of [document, window] as EventTarget[]) {
+  const original = target.addEventListener.bind(target);
+  target.addEventListener = (type, listener, options) => {
+    if (listener) added.push([target, type, listener]);
+    original(type, listener, options);
+  };
+}
+
 /** Put the exported page in the DOM and run its script. */
 function load(): void {
   const out = buildExportArtifact(
@@ -111,6 +122,8 @@ const detail = () =>
 
 afterEach(() => {
   document.body.innerHTML = "";
+  for (const [target, type, listener] of added.splice(0))
+    target.removeEventListener(type, listener);
 });
 
 describe("click to focus", () => {

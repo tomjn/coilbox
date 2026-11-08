@@ -194,8 +194,10 @@ export const TREE_JS = `(function () {
         drag = null;
         moved = false;
       }
-      svg.addEventListener("pointerup", endDrag);
-      svg.addEventListener("pointercancel", endDrag);
+      // On the window, because a press that never moved was not captured, and
+      // its release can land outside the svg.
+      window.addEventListener("pointerup", endDrag);
+      window.addEventListener("pointercancel", endDrag);
 
       // Click the minimap to centre the viewport there.
       var mini = wrap.querySelector(".minimap");

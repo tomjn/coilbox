@@ -61,4 +61,28 @@ describe("UnitStatsTable", () => {
       "lg:grid-cols-[minmax(8rem,auto)_1fr_minmax(8rem,auto)_1fr]",
     );
   });
+
+  it("stays one pair wide at every size when narrow", () => {
+    const { container } = render(
+      <UnitStatsTable
+        narrow
+        unit={{ name: "armsolar", stats: { metalCost: 155 } }}
+      />,
+    );
+    const className = container.querySelector("dl")?.className ?? "";
+    expect(className).toContain("grid-cols-[minmax(6rem,auto)_1fr]");
+    expect(className).not.toContain("lg:");
+  });
+
+  it("skips a weapon entry that is not an object", () => {
+    const { container } = render(
+      <UnitStatsTable
+        unit={{
+          name: "armflash",
+          stats: { weapons: [null, "x", { damage: 32 }] },
+        }}
+      />,
+    );
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
+  });
 });

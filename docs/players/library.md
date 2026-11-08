@@ -131,7 +131,7 @@ Links has buttons for the game's own website and other pages, when coilbox knows
 
 Sides lists each faction in the game, with how many units it has and its starting unit.
 
-- Build tree opens a chart of everything that faction's starting unit can build, directly or through what it builds. Point at a unit to light up what it builds and what builds it. Click a unit to show only it, what it builds and what builds it, beside a panel with its model and stats. Type in the search box to jump to a unit by name. Export HTML saves the chart as a page that does the same without coilbox.
+- Build tree opens a chart of everything that faction's starting unit can build, directly or through what it builds. Point at a unit to light up what it builds and what builds it. Click a unit to show only it, what it builds and what builds it, beside a panel with its model and stats. Type a unit name or def key in the search box to jump to it. Export HTML saves the chart as a page with the same click to focus and search, and a stats panel in place of the model.
 - Browse units opens the unit list showing only that faction.
 - All units opens the list of every unit in the game.
 
