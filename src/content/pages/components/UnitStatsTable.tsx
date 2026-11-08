@@ -85,7 +85,7 @@ export function UnitStatsTable({
       )}
 
       {weapons.length > 0 && (
-        <Table>
+        <Table className={narrow ? "text-xs" : undefined}>
           <TableHeader>
             <TableRow>
               <TableHead>

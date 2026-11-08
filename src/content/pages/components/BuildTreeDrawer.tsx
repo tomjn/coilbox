@@ -789,7 +789,7 @@ function UnitSearch({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: only closes the list when focus leaves the box and its results, no role of its own
     <div
-      className="relative w-64 max-w-full"
+      className="relative ml-auto w-64 max-w-full"
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
       }}
