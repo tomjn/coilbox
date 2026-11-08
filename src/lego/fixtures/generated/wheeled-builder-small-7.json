@@ -267,45 +267,14 @@
         7.367476909525922
       ],
       "module": {
-        "id": "builtin.hull-long",
-        "instance": "unit.12",
-        "rev": "1260d1beaa4a66",
+        "id": "builtin.hull",
+        "instance": "unit.11",
+        "rev": "136160dce45c06",
         "fp": "0f93623723cd16"
       }
     },
     {
-      "id": "unit.11",
-      "name": "hullfront",
-      "parentId": "unit.10",
-      "partId": "d2c111537495",
-      "position": [
-        0,
-        0,
-        3
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        7.367476909525922,
-        7.367476909525922,
-        7.367476909525922
-      ],
-      "connection": {
-        "connector": "-z",
-        "to": "+z"
-      },
-      "module": {
-        "id": "builtin.hull-long",
-        "instance": "unit.12",
-        "rev": "1260d1beaa4a66",
-        "fp": "084bb5519eb84e"
-      }
-    },
-    {
-      "id": "unit.13",
+      "id": "unit.12",
       "name": "buildbase",
       "parentId": "unit.10",
       "partId": "17ddbb403e05",
@@ -327,7 +296,7 @@
       "role": "buildarm.base",
       "module": {
         "id": "builtin.buildarm",
-        "instance": "unit.17",
+        "instance": "unit.16",
         "rev": "199e56fc605b19",
         "fp": "035186b079359e"
       },
@@ -337,9 +306,9 @@
       }
     },
     {
-      "id": "unit.14",
+      "id": "unit.13",
       "name": "buildarm",
-      "parentId": "unit.13",
+      "parentId": "unit.12",
       "partId": "1fdca59c9339",
       "position": [
         0,
@@ -359,15 +328,15 @@
       "role": "buildarm.arm",
       "module": {
         "id": "builtin.buildarm",
-        "instance": "unit.17",
+        "instance": "unit.16",
         "rev": "199e56fc605b19",
         "fp": "167fec9a1bf4b3"
       }
     },
     {
-      "id": "unit.15",
+      "id": "unit.14",
       "name": "nozzle",
-      "parentId": "unit.14",
+      "parentId": "unit.13",
       "partId": "6e310414fda4",
       "position": [
         0,
@@ -387,15 +356,15 @@
       "role": "buildarm.nozzle",
       "module": {
         "id": "builtin.buildarm",
-        "instance": "unit.17",
+        "instance": "unit.16",
         "rev": "199e56fc605b19",
         "fp": "0f859623b3ef9e"
       }
     },
     {
-      "id": "unit.16",
+      "id": "unit.15",
       "name": "nano1",
-      "parentId": "unit.15",
+      "parentId": "unit.14",
       "partId": null,
       "position": [
         0,
@@ -415,7 +384,7 @@
       "role": "buildarm.nano",
       "module": {
         "id": "builtin.buildarm",
-        "instance": "unit.17",
+        "instance": "unit.16",
         "rev": "199e56fc605b19",
         "fp": "110aa111fa7439"
       }
@@ -453,13 +422,13 @@
     "modules": [
       {
         "slot": "chassis.1",
-        "module": "builtin.hull-long",
-        "instance": "unit.12"
+        "module": "builtin.hull",
+        "instance": "unit.11"
       },
       {
         "slot": "buildarm.1",
         "module": "builtin.buildarm",
-        "instance": "unit.17"
+        "instance": "unit.16"
       }
     ]
   }
