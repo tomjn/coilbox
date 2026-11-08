@@ -142,13 +142,15 @@ pub const READY_TIMEOUT: Duration = Duration::from_secs(20);
 /// (`setTimeout(60)` in `twistedserver.py`). Teiserver sends its welcome as soon
 /// as the socket's process starts and drops one after 60 seconds too
 /// (`@init_timeout` in `spring_tcp_server.ex`). A server that has said nothing
-/// for a third of that is not going to.
+/// for a third of that is not going to. The Zero-K connection uses the same
+/// limit: its server sends `Welcome` from `ClientConnection.OnConnected`, as the
+/// socket is accepted.
 pub const HANDSHAKE_SILENCE: Duration = READY_TIMEOUT;
 
 /// Whether the server is the one the login is waiting on in `phase`. A phase
 /// parked on the person (the agreement code, the recovery code) is not, and
 /// neither is a connection that is logged in or finished.
-fn server_owes_a_line(phase: LoginPhase) -> bool {
+pub(crate) fn server_owes_a_line(phase: LoginPhase) -> bool {
     matches!(
         phase,
         LoginPhase::AwaitGreeting
@@ -162,7 +164,7 @@ fn server_owes_a_line(phase: LoginPhase) -> bool {
 }
 
 /// Why a login was dropped for going quiet.
-fn stalled_reason(heard_anything: bool, silence: Duration) -> String {
+pub(crate) fn stalled_reason(heard_anything: bool, silence: Duration) -> String {
     if heard_anything {
         format!(
             "the server stopped answering the login for {}s",
