@@ -60,6 +60,12 @@ import {
 } from "../mapinfoForm";
 import { mapNameFromDir } from "../mapName";
 import { useMapProjects } from "../projects";
+import {
+  clearedForRecompile,
+  fillSources,
+  SOURCE_KEYS,
+  settleNoclamp,
+} from "../recompile";
 import AdvancedOptions, {
   type AdvancedCompileOpts,
   defaultAdvanced,
@@ -196,6 +202,14 @@ export default function CompilePage() {
     compile: boolean;
     decompile: boolean;
   } | null>(null);
+
+  // The decompiled heightmap that Recompile turned no-clamp on for.
+  const autoNoclampFor = useRef<string | null>(null);
+  function changeAdvanced(next: AdvancedCompileOpts) {
+    const r = settleNoclamp(advanced, next, autoNoclampFor.current);
+    autoNoclampFor.current = r.autoFor;
+    setAdvanced(r.opts);
+  }
 
   const runIdRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -412,11 +426,17 @@ export default function CompilePage() {
   // On texture pick, auto-prefill any empty optional fields from conventional
   // siblings in the same folder (heightmap.png, metalmap.png, …). Never
   // overwrites a field the user already set; reveals Advanced if it found any.
-  async function pickTexture(path: string) {
+  // `fromDecompile` (Recompile) replaces the sources and height range instead,
+  // and leaves clamping off for the decompiled heightmap.
+  async function pickTexture(path: string, fromDecompile = false) {
     setMaintexture(path);
     setTextureInfo(null);
     setAppearance(null);
     setSkyboxSrc(null);
+    if (fromDecompile) {
+      autoNoclampFor.current = null;
+      setAdvanced(clearedForRecompile);
+    }
     if (!path) return;
     // A map may ship a skybox DDS next to mapinfo.lua; load it for the preview.
     mcReadSkybox({ path })
@@ -446,25 +466,11 @@ export default function CompilePage() {
       .catch(() => {});
     try {
       const s = await mcSuggestSources({ texturePath: path });
-      let found = false;
-      setAdvanced((a) => {
-        const merged = { ...a };
-        for (const k of [
-          "heightmap",
-          "metalmap",
-          "typemap",
-          "minimap",
-          "vegmap",
-          "features",
-        ] as const) {
-          if (!merged[k] && s[k]) {
-            merged[k] = s[k] as string;
-            found = true;
-          }
-        }
-        return merged;
-      });
-      if (found) setShowAdvanced(true);
+      if (fromDecompile && s.heightmap) autoNoclampFor.current = s.heightmap;
+      setAdvanced((a) => fillSources(a, s, fromDecompile));
+      // Not read back from the updater: React runs that later when other
+      // updates are queued ahead of it, as Recompile's clearing is.
+      if (SOURCE_KEYS.some((k) => s[k])) setShowAdvanced(true);
     } catch {
       // best-effort; leave fields as-is
     }
@@ -512,7 +518,7 @@ export default function CompilePage() {
     const sep = dir.includes("\\") ? "\\" : "/";
     setOutDir(dir);
     setOutSuffix(mapNameFromDir(dir));
-    void pickTexture(`${dir}${sep}texture.png`);
+    void pickTexture(`${dir}${sep}texture.png`, true);
     // run once on mount for the incoming navigation state
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -669,7 +675,7 @@ export default function CompilePage() {
               <div className="mt-4">
                 <AdvancedOptions
                   value={advanced}
-                  onChange={setAdvanced}
+                  onChange={changeAdvanced}
                   defaultPath={cfg.lastTextureDir}
                   disabled={running}
                 />
