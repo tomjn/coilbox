@@ -210,6 +210,9 @@ export default function CompilePage() {
     decompile: boolean;
   } | null>(null);
 
+  // The decompiled folder Recompile came from. Write mapinfo.lua starts from
+  // that map's own mapinfo.lua, so its sky, fog and water survive the recompile.
+  const [mapinfoSeed, setMapinfoSeed] = useState<string | null>(null);
   // The decompiled heightmap that Recompile turned no-clamp on for.
   const autoNoclampFor = useRef<string | null>(null);
   const pickCount = useRef(0);
@@ -362,6 +365,7 @@ export default function CompilePage() {
             outDir: result.outDir,
             outSuffix: result.outSuffix,
             info: toMapinfoForm(mapinfo),
+            seedFrom: mapinfoSeed ?? undefined,
           },
         }),
       );
@@ -476,6 +480,7 @@ export default function CompilePage() {
     setTextureInfo(null);
     setAppearance(null);
     setSkyboxSrc(null);
+    setMapinfoSeed(fromDecompile ? dirname(path) : null);
     if (fromDecompile) {
       autoNoclampFor.current = null;
       setAdvanced(clearedForRecompile);

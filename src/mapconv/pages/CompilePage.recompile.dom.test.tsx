@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 /**
  * Recompile from the Decompile page fills the Compile page from the decompiled
- * folder alone (issue #5111), and turns clamping off for the heightmap it
- * brought (issue #5110). The Compile page keeps its fields between visits, so
+ * folder alone (issue #5111), turns clamping off for the heightmap it
+ * brought (issue #5110), and writes a mapinfo.lua that starts from the
+ * decompiled map's own (issue #5119). The Compile page keeps its fields between visits, so
  * these start with another map's sources already in the draft.
  */
 import {
@@ -21,6 +22,8 @@ import { defaultAdvanced } from "./components/AdvancedOptions";
 const m = vi.hoisted(() => ({
   suggest: vi.fn(),
   mapinfo: vi.fn(),
+  compile: vi.fn(),
+  writeMapinfo: vi.fn(),
   draft: {} as Record<string, unknown>,
 }));
 
@@ -30,12 +33,18 @@ vi.mock("../bindings", () => ({
   mcReadSkybox: async () => ({ dataUrl: null }),
   mcSuggestSources: m.suggest,
   mcCancel: async () => {},
-  mcCompile: async () => {},
+  mcCompile: m.compile,
   mcInstallMap: async () => {},
   mcOpenPath: async () => {},
   mcPackMap: async () => {},
-  mcReadTeams: async () => [],
-  mcWriteMapinfo: async () => {},
+  mcReadTeams: async () => ({ teams: [] }),
+  mcWriteMapinfo: m.writeMapinfo,
+}));
+// The compile streams its log over a channel, which needs the Tauri runtime.
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage = () => {};
+  },
 }));
 vi.mock("../config", () => ({
   useMapconvConfig: () => [
@@ -204,5 +213,57 @@ describe("Recompile over a draft holding another map", () => {
     });
     expect(field("Heightmap (-h)").value).toBe("/drawn/mine.png");
     expect(noclampOn()).toBe(false);
+  });
+
+  it("writes mapinfo.lua starting from the decompiled map's own", async () => {
+    m.suggest.mockResolvedValue({ heightmap: "/hbh/heightmap.png" });
+    m.mapinfo.mockResolvedValue({});
+    m.compile.mockResolvedValue({
+      smfPath: "/hbh/hbh.smf",
+      outSuffix: "hbh",
+    });
+    m.writeMapinfo.mockResolvedValue({
+      path: "/hbh/mapinfo.lua",
+      created: true,
+      changed: true,
+    });
+    setup("/hbh");
+    await waitFor(() => {
+      expect(field("Heightmap (-h)").value).toBe("/hbh/heightmap.png");
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Compile$/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Write mapinfo.lua/ }),
+    );
+    await waitFor(() => {
+      expect(m.writeMapinfo).toHaveBeenCalledTimes(1);
+    });
+    expect(m.writeMapinfo.mock.calls[0][0].opts.seedFrom).toBe("/hbh");
+  });
+
+  it("starts from no map's mapinfo.lua once another texture is picked", async () => {
+    m.suggest.mockResolvedValue({});
+    m.mapinfo.mockResolvedValue({});
+    m.compile.mockResolvedValue({
+      smfPath: "/next/hbh.smf",
+      outSuffix: "hbh",
+    });
+    m.writeMapinfo.mockResolvedValue({
+      path: "/hbh/mapinfo.lua",
+      created: true,
+      changed: true,
+    });
+    setup("/hbh");
+    fireEvent.change(field("Main texture (-t)"), {
+      target: { value: "/next/texture.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Compile$/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Write mapinfo.lua/ }),
+    );
+    await waitFor(() => {
+      expect(m.writeMapinfo).toHaveBeenCalledTimes(1);
+    });
+    expect(m.writeMapinfo.mock.calls[0][0].opts.seedFrom).toBeUndefined();
   });
 });

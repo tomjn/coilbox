@@ -14,7 +14,8 @@
 //!   past its end). `name` and `shortname` fall back to the output name when the
 //!   file has none.
 //! - Written only when the file is new: the atmosphere, lighting, water and
-//!   terrain type defaults, plus the engine's global defaults.
+//!   terrain type defaults, plus the engine's global defaults. A file started
+//!   from the decompiled map's own `mapinfo.lua` is not new in this sense.
 //! - Everything else in an existing file is left exactly as it was.
 
 use std::path::{Path, PathBuf};
@@ -66,6 +67,12 @@ pub struct WriteOpts {
     pub max_height: Option<f64>,
     #[serde(default)]
     pub info: MapinfoForm,
+    /// The folder of the map this one was decompiled from. When `out_dir` has no
+    /// `mapinfo.lua`, the writer starts from the one in this folder or its
+    /// parent, where mapdecompile leaves it, so the map keeps its own atmosphere,
+    /// lighting and water.
+    #[serde(default)]
+    pub seed_from: Option<String>,
 }
 
 #[derive(Debug)]
@@ -413,6 +420,22 @@ fn teams_in(dir: &Path, src: &str) -> Result<Vec<Option<StartPos>>, String> {
     Ok(teams)
 }
 
+/// The `mapinfo.lua` of the map in `from`, found in that folder or its parent,
+/// with the folder it was found in. mapdecompile leaves it a folder above the
+/// `maps/` folder that holds the `.smf`. `None` when neither has one.
+fn seed_mapinfo(from: &str) -> Result<Option<(PathBuf, String)>, String> {
+    let from = Path::new(from);
+    for dir in [Some(from), from.parent()].into_iter().flatten() {
+        let path = dir.join("mapinfo.lua");
+        match std::fs::read_to_string(&path) {
+            Ok(src) => return Ok(Some((dir.to_path_buf(), src))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("could not read {}: {e}", path.display())),
+        }
+    }
+    Ok(None)
+}
+
 /// Write `<out_dir>/mapinfo.lua`, creating it or patching the one there.
 pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     let suffix = opts.out_suffix.trim();
@@ -421,11 +444,20 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     }
     let dir = PathBuf::from(&opts.out_dir);
     let path = dir.join("mapinfo.lua");
-    let existing = match std::fs::read_to_string(&path) {
+    let mut existing = match std::fs::read_to_string(&path) {
         Ok(s) => Some(s),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => return Err(format!("could not read {}: {e}", path.display())),
     };
+    let created = existing.is_none();
+    // Where the text came from, so a file it includes is found from there.
+    let mut root = dir.clone();
+    if let (true, Some(seed)) = (created, opts.seed_from.as_deref()) {
+        if let Some((from, src)) = seed_mapinfo(seed)? {
+            root = from;
+            existing = Some(src);
+        }
+    }
     let smf_path = dir.join(format!("{suffix}.smf"));
     if !smf_path.is_file() {
         return Err(format!(
@@ -437,7 +469,7 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     let before = existing.as_deref().unwrap_or(SKELETON);
     // From the text the patch starts from, so the two cannot disagree.
     let teams = match existing.as_deref() {
-        Some(src) => teams_in(&dir, src).ok(),
+        Some(src) => teams_in(&root, src).ok(),
         None => Some(Vec::new()),
     };
     let after = patch(
@@ -451,13 +483,14 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
         ),
     )?;
 
-    if existing.as_deref().is_some_and(|e| evaluates(&dir, e)) && !evaluates(&dir, &after) {
+    if existing.as_deref().is_some_and(|e| evaluates(&root, e)) && !evaluates(&root, &after) {
         return Err(format!(
             "the edited {} no longer evaluates, so nothing was written",
             path.display()
         ));
     }
-    let changed = existing.as_deref() != Some(after.as_str());
+    // A file started from the seed is new in `dir` even though its text is not.
+    let changed = created || existing.as_deref() != Some(after.as_str());
     if changed {
         let tmp = dir.join("mapinfo.lua.tmp");
         std::fs::write(&tmp, &after)
@@ -467,7 +500,7 @@ pub fn write(opts: &WriteOpts) -> Result<Written, String> {
     }
     Ok(Written {
         path,
-        created: existing.is_none(),
+        created,
         changed,
     })
 }
@@ -645,6 +678,7 @@ mod tests {
             min_height: Some(-20.0),
             max_height: Some(480.0),
             info: MapinfoForm::default(),
+            seed_from: None,
         }
     }
 
@@ -700,6 +734,68 @@ mod tests {
         assert_eq!(v["terrainTypes"]["0"]["name"], "Default");
         assert_eq!(v["atmosphere"]["skyColor"][1], 0.15);
         assert_eq!(v["water"]["surfaceAlpha"], 0.55);
+    }
+
+    const OWN_INFO: &str = "-- AcidicQuarry\nlocal mapinfo = {\n  name = \"Acidic Quarry\",\n  gravity = 90,\n  atmosphere = { fogColor = {0.62, 0.70, 0.18}, skyColor = {0.5, 0.5, 0.45} },\n  mapfile = \"maps/old.smf\",\n}\nreturn mapinfo\n";
+
+    /// A decompiled map: its own `mapinfo.lua` in `dir`, the images and the
+    /// recompile in `dir/maps`, which is what `out_dir` is.
+    fn decompiled(tag: &str) -> (PathBuf, PathBuf) {
+        let dir = temp_dir(tag);
+        let maps = dir.join("maps");
+        std::fs::create_dir_all(&maps).unwrap();
+        std::fs::write(dir.join("mapinfo.lua"), OWN_INFO).unwrap();
+        (dir, maps)
+    }
+
+    #[test]
+    fn a_recompile_starts_from_the_decompiled_maps_own_mapinfo() {
+        let (dir, maps) = decompiled("seed");
+        let mut o = opts(&maps);
+        o.seed_from = Some(maps.to_string_lossy().into());
+        let w = write(&o).unwrap();
+        assert!(w.created && w.changed);
+        let v = eval(&maps);
+        assert_eq!(v["atmosphere"]["fogColor"][0], 0.62);
+        assert_eq!(v["atmosphere"]["skyColor"][2], 0.45);
+        assert_eq!(v["gravity"], 90);
+        assert_eq!(v["name"], "Acidic Quarry");
+        assert_eq!(v["mapfile"], "mymap.smf");
+        assert_eq!(v["smf"]["maxheight"], 480);
+        assert!(!v.as_object().unwrap().contains_key("lighting"));
+        assert_eq!(std::fs::read_to_string(dir.join("mapinfo.lua")).unwrap(), OWN_INFO);
+    }
+
+    #[test]
+    fn the_form_still_overrides_the_seeded_file() {
+        let (_dir, maps) = decompiled("seed-form");
+        let mut o = opts(&maps);
+        o.seed_from = Some(maps.to_string_lossy().into());
+        o.info.fog_color = Some([0.1, 0.2, 0.3]);
+        write(&o).unwrap();
+        let v = eval(&maps);
+        assert_eq!(v["atmosphere"]["fogColor"][1], 0.2);
+        assert_eq!(v["atmosphere"]["skyColor"][0], 0.5);
+    }
+
+    #[test]
+    fn a_file_in_the_out_dir_wins_over_the_seed() {
+        let (_dir, maps) = decompiled("seed-own");
+        let mut o = opts(&maps);
+        write(&o).unwrap();
+        o.seed_from = Some(maps.to_string_lossy().into());
+        let w = write(&o).unwrap();
+        assert!(!w.created && !w.changed);
+        assert_eq!(eval(&maps)["atmosphere"]["fogColor"][0], 0.7);
+    }
+
+    #[test]
+    fn a_seed_with_no_mapinfo_falls_back_to_the_defaults() {
+        let dir = temp_dir("seed-none");
+        let mut o = opts(&dir);
+        o.seed_from = Some(dir.join("elsewhere").to_string_lossy().into());
+        assert!(write(&o).unwrap().created);
+        assert_eq!(eval(&dir)["atmosphere"]["fogColor"][0], 0.7);
     }
 
     #[test]
