@@ -218,17 +218,51 @@ describe("rerollUnit", () => {
     expect(freed.pieces.some((p) => p.id === covering)).toBe(false);
   });
 
-  it("leaves a deleted covering part deleted", () => {
+  it("leaves a deleted part deleted, through a second reroll too", () => {
     const entry = unit.generated?.covering?.[0];
     if (!entry) throw new Error("no covering");
+    const bone = entry.bone;
+    const doomed = new Set([
+      ...(unit.generated?.covering ?? [])
+        .filter((c) => c.bone === bone)
+        .map((c) => c.piece),
+      ...instancePieces(unit, slot(unit, "weapon.1")).map((p) => p.id),
+    ]);
     const deleted = {
       ...unit,
-      pieces: unit.pieces.filter((p) => p.id !== entry.piece),
+      pieces: unit.pieces.filter((p) => !doomed.has(p.id)),
     };
-    const after = reroll(deleted);
-    expect(after.generated?.covering?.some((c) => c.bone === entry.bone)).toBe(
-      false,
+    const coveringOn = (project: LegoProject) => {
+      const ids = new Set(project.pieces.map((p) => p.id));
+      return (project.generated?.covering ?? []).filter(
+        (c) => c.bone === bone && ids.has(c.piece),
+      );
+    };
+    const once = reroll(deleted);
+    const twice = reroll(once);
+    for (const after of [once, twice]) {
+      expect(coveringOn(after)).toEqual([]);
+      expect(instancePieces(after, slot(after, "weapon.1"))).toEqual([]);
+    }
+  });
+
+  it("treats a bone's covering as one part", () => {
+    const covering = unit.generated?.covering ?? [];
+    const bone = covering.find(
+      (c) => covering.filter((d) => d.bone === c.bone).length > 1,
+    )?.bone;
+    if (!bone) throw new Error("no bone with two covering parts");
+    const tiles = covering.filter((c) => c.bone === bone).map((c) => c.piece);
+    const locked = setPartLocked(unit, tiles[0] as string, true);
+    expect(partPieces(unit, tiles[0] as string).sort()).toEqual(
+      [...tiles].sort(),
     );
+    const after = reroll(locked);
+    for (const id of tiles) {
+      expect(placed(after.pieces.find((p) => p.id === id))).toEqual(
+        placed(unit.pieces.find((p) => p.id === id)),
+      );
+    }
   });
 
   it("records the seed, and the same reroll gives the same unit", () => {

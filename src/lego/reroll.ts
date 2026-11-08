@@ -13,6 +13,8 @@
  * by hand and not freed with `locked: false`. Hand edits are told by the stamps
  * a checked unit records (`generatedStamps.ts`). Keeping a piece keeps:
  * - every piece of its module instance, because a module rerolls whole
+ * - the rest of its bone's covering, or its bone's wheels or treads, which
+ *   were fitted to the bone as a set
  * - what it hangs on, short of a bone, so it stays joined to the same thing
  * - for a bone, the covering and wheels on it, which were sized to it.
  * While anything is kept the skeleton keeps its proportions, so the parts the
@@ -27,6 +29,7 @@ import { t } from "@lingui/core/macro";
 import { bodyPlanById, planProportions } from "./bodyPlans";
 import { resolveConnections } from "./connectors";
 import {
+  GENERATOR_JOBS,
   type GeneratorJob,
   type GeneratorSize,
   generateUnit,
@@ -91,14 +94,36 @@ export function editedPieces(project: LegoProject): Set<string> {
   return out;
 }
 
-/** The pieces locked or kept with `pieceId`: its whole module instance, or the
- *  piece alone. What the lock toggle acts on. */
+/**
+ * The generator's parts on bones, by piece id: the covering of one bone is one
+ * part, and so are the wheels or treads of one bone, because each was fitted
+ * to the bone as a set. Pieces listed but deleted are included.
+ */
+function boneParts(generated: LegoGenerated): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const c of generated.covering ?? []) out.set(c.piece, `c|${c.bone}`);
+  for (const r of generated.running ?? [])
+    out.set(r.piece, `r|${r.bone}|${r.kind}`);
+  return out;
+}
+
+/** The pieces locked or kept with `pieceId`: its whole module instance, the
+ *  covering or running gear of its bone, or the piece alone. What the lock
+ *  toggle acts on. */
 export function partPieces(project: LegoProject, pieceId: string): string[] {
   const piece = project.pieces.find((p) => p.id === pieceId);
-  const instance = piece?.module?.instance;
-  if (!piece || !instance) return piece ? [piece.id] : [];
+  if (!piece) return [];
+  const instance = piece.module?.instance;
+  if (instance) {
+    return project.pieces
+      .filter((p) => p.module?.instance === instance)
+      .map((p) => p.id);
+  }
+  const parts = project.generated ? boneParts(project.generated) : new Map();
+  const part = parts.get(piece.id);
+  if (part === undefined) return [piece.id];
   return project.pieces
-    .filter((p) => p.module?.instance === instance)
+    .filter((p) => parts.get(p.id) === part)
     .map((p) => p.id);
 }
 
@@ -131,12 +156,15 @@ export function setPartLocked(
   };
 }
 
-/** Every piece a reroll keeps, by the rules at the top of this file. */
-export function keptPieces(project: LegoProject): Set<string> {
+/** Every piece a reroll keeps, by the rules at the top of this file. `edited`
+ *  is `editedPieces(project)`, when the caller has it already. */
+export function keptPieces(
+  project: LegoProject,
+  edited: Set<string> = editedPieces(project),
+): Set<string> {
   const generated = project.generated;
   const kept = new Set<string>();
   if (!generated) return kept;
-  const edited = editedPieces(project);
   const byId = new Map(project.pieces.map((p) => [p.id, p]));
   const byInstance = new Map<string, string[]>();
   const children = new Map<string, string[]>();
@@ -152,11 +180,15 @@ export function keptPieces(project: LegoProject): Set<string> {
       children.set(piece.parentId, list);
     }
   }
-  const onBones = new Set(
-    [...(generated.covering ?? []), ...(generated.running ?? [])].map(
-      (entry) => entry.piece,
-    ),
-  );
+  const parts = boneParts(generated);
+  const byPart = new Map<string, string[]>();
+  for (const piece of project.pieces) {
+    const part = parts.get(piece.id);
+    if (part === undefined) continue;
+    const list = byPart.get(part) ?? [];
+    list.push(piece.id);
+    byPart.set(part, list);
+  }
 
   const queue: string[] = [];
   const keep = (id: string) => {
@@ -171,15 +203,23 @@ export function keptPieces(project: LegoProject): Set<string> {
   for (const instance of deletedInstances(project)) {
     for (const id of byInstance.get(instance) ?? []) keep(id);
   }
+  // So does deleting some of a bone's covering or running gear.
+  for (const [id, part] of parts) {
+    if (!byId.has(id)) for (const other of byPart.get(part) ?? []) keep(other);
+  }
   for (let id = queue.pop(); id !== undefined; id = queue.pop()) {
     const piece = byId.get(id) as LegoPiece;
     if (piece.module) {
       for (const other of byInstance.get(piece.module.instance) ?? [])
         keep(other);
     }
+    const part = parts.get(piece.id);
+    if (part !== undefined) {
+      for (const other of byPart.get(part) ?? []) keep(other);
+    }
     if (piece.bone !== undefined) {
       for (const child of children.get(piece.id) ?? []) {
-        if (onBones.has(child)) keep(child);
+        if (parts.has(child)) keep(child);
       }
     }
     const parent = piece.parentId ? byId.get(piece.parentId) : undefined;
@@ -204,9 +244,9 @@ function deletedInstances(project: LegoProject): Set<string> {
 /** The parts the game maker deleted whole, so the reroll leaves them out. */
 interface Gone {
   slots: Set<string>;
-  /** Bones with no covering left. */
+  /** Bones whose covering is all deleted. */
   covering: Set<string>;
-  /** `bone|kind` with no wheel or tread left. */
+  /** `bone|kind` whose wheels or treads are all deleted. */
   running: Set<string>;
   bones: Set<string>;
 }
@@ -222,18 +262,24 @@ function goneParts(project: LegoProject, boneIds: string[]): Gone {
         .filter((m) => !instances.has(m.instance))
         .map((m) => m.slot),
     ),
-    covering: new Set(
-      (generated.covering ?? [])
-        .filter((c) => !ids.has(c.piece))
-        .map((c) => c.bone),
-    ),
-    running: new Set(
-      (generated.running ?? [])
-        .filter((r) => !ids.has(r.piece))
-        .map((r) => `${r.bone}|${r.kind}`),
+    covering: allGone(generated.covering ?? [], (c) => c.bone, ids),
+    running: allGone(
+      generated.running ?? [],
+      (r) => `${r.bone}|${r.kind}`,
+      ids,
     ),
     bones: new Set(boneIds.filter((bone) => !bones.has(bone))),
   };
+}
+
+/** The keys of `entries` none of whose pieces are left. */
+function allGone<T extends { piece: string }>(
+  entries: readonly T[],
+  key: (entry: T) => string,
+  ids: Set<string>,
+): Set<string> {
+  const left = new Set(entries.filter((e) => ids.has(e.piece)).map(key));
+  return new Set(entries.map(key).filter((k) => !left.has(k)));
 }
 
 /** The top piece of a module instance: the one whose parent is not in it. */
@@ -304,7 +350,15 @@ export function mergeReroll(
     const oldTop = before && replaced ? instanceTop(old, before) : undefined;
     if (top && oldTop) rename.set(top.id, oldTop.id);
   }
-  modules.push(...was.modules.filter((m) => keptInstances.has(m.instance)));
+  // A deleted part stays in the record with no pieces, so the next reroll
+  // still sees it deleted.
+  const oldInstances = new Set(old.pieces.map((p) => p.module?.instance));
+  modules.push(
+    ...was.modules.filter(
+      (m) => keptInstances.has(m.instance) || !oldInstances.has(m.instance),
+    ),
+  );
+  const oldIds = new Set(old.pieces.map((p) => p.id));
 
   const keptCovering = (was.covering ?? []).filter((c) => kept.has(c.piece));
   const coveredBones = new Set([
@@ -316,7 +370,12 @@ export function mergeReroll(
     removed.add(c.piece);
     return false;
   });
-  covering.push(...keptCovering);
+  covering.push(
+    ...keptCovering,
+    ...(was.covering ?? []).filter(
+      (c) => !oldIds.has(c.piece) && coveredBones.has(c.bone),
+    ),
+  );
 
   const keptRunning = (was.running ?? []).filter((r) => kept.has(r.piece));
   const runningKeys = new Set([
@@ -328,7 +387,12 @@ export function mergeReroll(
     removed.add(r.piece);
     return false;
   });
-  running.push(...keptRunning);
+  running.push(
+    ...keptRunning,
+    ...(was.running ?? []).filter(
+      (r) => !oldIds.has(r.piece) && runningKeys.has(`${r.bone}|${r.kind}`),
+    ),
+  );
 
   /** Where a fresh piece's parent is in the result: up past anything removed
    *  that nothing replaced. */
@@ -413,6 +477,24 @@ function repairKeeping(
   };
 }
 
+/** The stamps of pieces deleted before the reroll carried into its result, so
+ *  a module with a piece deleted stays edited on the next reroll too. */
+function withDeletedStamps(unit: LegoProject, old: LegoProject): LegoProject {
+  const generated = unit.generated as LegoGenerated;
+  const before = new Set(old.pieces.map((p) => p.id));
+  const carried = Object.entries(old.generated?.stamps ?? {}).filter(
+    ([id]) => !before.has(id),
+  );
+  if (carried.length === 0) return unit;
+  return {
+    ...unit,
+    generated: {
+      ...generated,
+      stamps: { ...generated.stamps, ...Object.fromEntries(carried) },
+    },
+  };
+}
+
 /**
  * A new unit from `project`'s record and the seed after the one it records,
  * with its kept parts, that passes the construction checks. Moves on a seed at
@@ -434,6 +516,15 @@ export function rerollUnit(
       message: t`This unit no longer has the skeleton it was generated on, so it cannot be rerolled.`,
     };
   }
+  const jobDef = GENERATOR_JOBS.find((j) => j.id === generated.job);
+  if (!jobDef || !(generated.size in jobDef.size)) {
+    const job = generated.job;
+    const size = generated.size;
+    return {
+      status: "failed",
+      message: t`This version cannot generate the job ${job} at size ${size}, so the unit cannot be rerolled.`,
+    };
+  }
   const tries = options.tries ?? GENERATOR_TRIES;
   const kept = keptPieces(project);
   const edited = editedPieces(project);
@@ -441,7 +532,11 @@ export function rerollUnit(
     .bones(planProportions(plan, project.skeleton.proportions))
     .map((bone) => bone.id);
   const gone = goneParts(project, boneIds);
-  const taken = new Set(project.pieces.map((p) => p.id));
+  // Deleted pieces' ids too, since their stamps are carried over below.
+  const taken = new Set([
+    ...project.pieces.map((p) => p.id),
+    ...Object.keys(generated.stamps ?? {}),
+  ]);
   // A kept piece edited by hand keeps the stamp it had, so it stays edited.
   const stamps = new Map<string, string | undefined>();
   for (const id of kept) {
@@ -460,42 +555,35 @@ export function rerollUnit(
       while (taken.has(id)) id = `${prefix}.${++counter}`;
       return id;
     };
-    let fresh: LegoProject;
-    try {
-      fresh = generateUnit(
-        {
-          seed,
-          plan,
-          job: generated.job as GeneratorJob,
-          size: generated.size as GeneratorSize,
-        },
-        {
-          id: project.id,
-          rootPieceId: project.rootPieceId,
-          now: project.updatedAt,
-          pack: options.pack,
-          modules: options.modules,
-          newId,
-          ...(kept.size > 0
-            ? { proportions: project.skeleton.proportions }
-            : {}),
-        },
-      );
-    } catch {
-      const job = generated.job;
-      const size = generated.size;
-      return {
-        status: "failed",
-        message: t`This version cannot generate the job ${job} at size ${size}, so the unit cannot be rerolled.`,
-      };
-    }
+    const fresh = generateUnit(
+      {
+        seed,
+        plan,
+        job: generated.job as GeneratorJob,
+        size: generated.size as GeneratorSize,
+      },
+      {
+        id: project.id,
+        rootPieceId: project.rootPieceId,
+        now: project.updatedAt,
+        pack: options.pack,
+        modules: options.modules,
+        newId,
+        ...(kept.size > 0 ? { proportions: project.skeleton.proportions } : {}),
+      },
+    );
     const merged = resolveConnections(
       mergeReroll(project, fresh, kept, gone),
       options.pack,
     ).project;
     const unit = repairKeeping(merged, options.pack, kept);
     if (generatorFaults(unit, options.pack).length === 0) {
-      return { status: "ok", unit: withStamps(unit, stamps), seed, tries: n };
+      return {
+        status: "ok",
+        unit: withDeletedStamps(withStamps(unit, stamps), project),
+        seed,
+        tries: n,
+      };
     }
     seed = nextSeed(seed);
   }
