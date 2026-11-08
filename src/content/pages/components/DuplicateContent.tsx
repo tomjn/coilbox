@@ -33,9 +33,12 @@ function parentFolder(path: string): string {
  * {@link clearDuplicateReportCache}.
  */
 const reportCache = new Map<string, DuplicateReport>();
+/** Bumped by a clear, so a read that started before it is not stored after. */
+let generation = 0;
 
 /** Forget every report, so the next read goes to the disk. */
 export function clearDuplicateReportCache(): void {
+  generation += 1;
   reportCache.clear();
 }
 
@@ -67,13 +70,13 @@ export function DuplicateContent({
       return;
     }
     let live = true;
+    const started = generation;
     setState({ status: "loading" });
     contentDuplicateReport({ roots: JSON.parse(rootKey) as string[] })
       .then(({ report }) => {
-        // A read that a refresh has replaced must not be stored.
-        if (!live) return;
-        reportCache.set(rootKey, report);
-        setState({ status: "ready", report });
+        // A read that started before a clear must not be stored after it.
+        if (started === generation) reportCache.set(rootKey, report);
+        if (live) setState({ status: "ready", report });
       })
       .catch((e) => {
         if (live) setState({ status: "error", message: describeError(e) });

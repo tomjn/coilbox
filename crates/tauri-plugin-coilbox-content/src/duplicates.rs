@@ -194,8 +194,12 @@ fn same_name_groups(loose: &[Loose]) -> Vec<DuplicateGroup> {
         .collect()
 }
 
-/// What a rapid package lists: each file's name and its pool md5.
-type Manifest = Vec<(String, [u8; 16])>;
+/// A rapid package that holds a map, and the pool files it lists.
+struct MapPackage {
+    path: PathBuf,
+    stem: String,
+    md5s: HashSet<[u8; 16]>,
+}
 
 /// A rapid package's map file stems, or none when it holds no map.
 fn map_stems(entries: &[(String, [u8; 16])]) -> Vec<String> {
@@ -231,7 +235,10 @@ fn rapid_maps(roots: &[PathBuf]) -> Vec<RapidMap> {
         let Ok(rd) = std::fs::read_dir(root.join("packages")) else {
             continue;
         };
-        let mut packages: Vec<(PathBuf, Manifest)> = Vec::new();
+        // Only what a map package needs is kept past its own manifest. The count
+        // of packages using each pool file covers every package, and a pool can
+        // hold a great many.
+        let mut map_packages: Vec<MapPackage> = Vec::new();
         let mut users: HashMap<[u8; 16], usize> = HashMap::new();
         for entry in rd.flatten() {
             let path = entry.path();
@@ -241,25 +248,20 @@ fn rapid_maps(roots: &[PathBuf]) -> Vec<RapidMap> {
             let Ok(entries) = parse_sdp_entries(&path) else {
                 continue;
             };
-            let unique: HashSet<[u8; 16]> = entries.iter().map(|(_, md5)| *md5).collect();
-            for md5 in unique {
-                *users.entry(md5).or_default() += 1;
+            let md5s: HashSet<[u8; 16]> = entries.iter().map(|(_, md5)| *md5).collect();
+            for md5 in &md5s {
+                *users.entry(*md5).or_default() += 1;
             }
-            packages.push((path, entries));
-        }
-        for (path, entries) in packages {
             // A package holds one map. Naming it by its first map file keeps a
             // package from landing in two groups.
-            let Some(stem) = map_stems(&entries).into_iter().next() else {
-                continue;
-            };
-            let only_this: HashSet<[u8; 16]> = entries
+            if let Some(stem) = map_stems(&entries).into_iter().next() {
+                map_packages.push(MapPackage { path, stem, md5s });
+            }
+        }
+        for MapPackage { path, stem, md5s } in map_packages {
+            let bytes = md5s
                 .iter()
-                .map(|(_, md5)| *md5)
-                .filter(|md5| users.get(md5) == Some(&1))
-                .collect();
-            let bytes = only_this
-                .iter()
+                .filter(|md5| users.get(*md5) == Some(&1))
                 .filter_map(|md5| {
                     let h = hex(md5);
                     std::fs::metadata(

@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
   report: null as unknown,
   fail: null as string | null,
   calls: [] as string[][],
+  /** When set, a read waits for it before it answers. */
+  gate: null as Promise<void> | null,
 }));
 
 vi.mock("../../bindings", async () => {
@@ -18,6 +20,7 @@ vi.mock("../../bindings", async () => {
     contentOpenPath: async () => ({}),
     contentDuplicateReport: async ({ roots }: { roots: string[] }) => {
       h.calls.push(roots);
+      await h.gate;
       if (h.fail) throw new Error(h.fail);
       return { report: h.report };
     },
@@ -135,6 +138,24 @@ describe("DuplicateContent", () => {
     render(<DuplicateContent roots={["/a"]} version={0} />);
     await screen.findByText("No duplicates found.");
     expect(h.calls).toHaveLength(1);
+  });
+
+  it("does not keep a read that was in flight when the cache was cleared", async () => {
+    h.report = { groups: [], wastedBytes: 0 };
+    let release = () => {};
+    h.gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = render(<DuplicateContent roots={["/a"]} version={0} />);
+    clearDuplicateReportCache();
+    release();
+    await screen.findByText("No duplicates found.");
+    first.unmount();
+    h.gate = null;
+
+    render(<DuplicateContent roots={["/a"]} version={0} />);
+    await screen.findByText("No duplicates found.");
+    expect(h.calls).toHaveLength(2);
   });
 
   it("reads a path with a newline in it as one folder", async () => {
