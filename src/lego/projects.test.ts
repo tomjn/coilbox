@@ -8,9 +8,9 @@ vi.mock("./bindings", () => ({
   legoThumbSave: vi.fn(),
 }));
 
-import { legoDelete, legoSave } from "./bindings";
+import { legoDelete, legoSave, legoThumbSave } from "./bindings";
 import { newProject } from "./model";
-import { deleteCompound, saveCompound } from "./projects";
+import { deleteCompound, saveCompound, saveThumbnailPng } from "./projects";
 
 const builtIn = {
   ...newProject({
@@ -51,5 +51,24 @@ describe("built in modules in the store", () => {
       "cannot be deleted",
     );
     expect(legoDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("saveThumbnailPng (#3239)", () => {
+  it("stores the bytes of a PNG data URL as the unit's thumbnail", async () => {
+    // The PNG signature's first four bytes.
+    await saveThumbnailPng("unit-1", "data:image/png;base64,iVBORw==");
+    expect(vi.mocked(legoThumbSave)).toHaveBeenCalledWith({
+      id: "unit-1",
+      png: [0x89, 0x50, 0x4e, 0x47],
+    });
+  });
+
+  it("refuses anything that is not a PNG data URL", async () => {
+    vi.mocked(legoThumbSave).mockClear();
+    await expect(
+      saveThumbnailPng("unit-1", "data:image/jpeg;base64,AA=="),
+    ).rejects.toThrow();
+    expect(vi.mocked(legoThumbSave)).not.toHaveBeenCalled();
   });
 });

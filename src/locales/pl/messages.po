@@ -4901,6 +4901,10 @@ msgstr "{name} (zablokowane)"
 msgid "{name} (you)"
 msgstr "{name} (ty)"
 
+#: src/lego/roster.ts
+msgid "{name} {label} {tier}"
+msgstr ""
+
 #: src/lego/movement.ts
 #, fuzzy
 msgid "{name} can climb this: it climbs up to {up}° (default maxSlope {slope})."
@@ -9224,6 +9228,14 @@ msgstr "Pokój nie wymaga serwera ani konta. Znajomi dołączają przez link lub
 msgid "A room on this computer"
 msgstr "Pokój na tym komputerze"
 
+#: src/lego/roster.ts
+msgid "A roster has from 1 to {max} tiers."
+msgstr ""
+
+#: src/lego/roster.ts
+msgid "A roster needs a name."
+msgstr ""
+
 #: src/lego/importS3o.ts
 #, fuzzy
 msgid "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape."
@@ -9251,6 +9263,7 @@ msgstr "Przezroczyste morze na y = 0, aby było widać, jak kadłub w nim siedzi
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "A seed is a whole number."
 msgstr ""
 
@@ -9407,6 +9420,10 @@ msgstr "Jednostka w prawdziwym rozmiarze, dla skali"
 #, fuzzy
 msgid "A unit definition was already there that coilbox has no record of writing, so it has been left alone."
 msgstr "Była już tam definicja jednostki, której zapisu coilbox nie ma w rejestrze, więc pozostawiono ją bez zmian."
+
+#: src/lego/roster.ts
+msgid "A unit is already called {name} or {unitName}. Choose another roster name."
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -13098,6 +13115,10 @@ msgstr "Długość kadłuba"
 msgid "Body plan"
 msgstr ""
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Body plans"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Body rocks on starting and stopping"
@@ -15189,6 +15210,14 @@ msgstr ""
 msgid "Choose an engine to host with."
 msgstr "Wybierz silnik do hostowania."
 
+#: src/lego/roster.ts
+msgid "Choose at least one body plan."
+msgstr ""
+
+#: src/lego/roster.ts
+msgid "Choose at least one job."
+msgstr ""
+
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #, fuzzy
 msgid "Choose audio"
@@ -15603,6 +15632,7 @@ msgstr "Koszt maskowania w ruchu"
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #: src/lego/pages/components/SwapPartDrawer.tsx
@@ -17659,6 +17689,10 @@ msgstr "Nie udało się zduplikować {name}: {reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "Nie udało się dołączyć do meczu, w którym jest {name}"
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Could not generate the roster: {reason}"
+msgstr ""
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Could not generate units: {reason}"
 msgstr ""
@@ -17705,6 +17739,7 @@ msgid "Could not load the module"
 msgstr "Nie udało się wczytać modułu"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Could not load the parts: {reason}"
 msgstr ""
 
@@ -17992,6 +18027,10 @@ msgstr "Nie udało się zapisać modelu: {reason}"
 #, fuzzy
 msgid "Could not save the module"
 msgstr "Nie udało się zapisać modułu"
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Could not save the roster: {reason}"
+msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
@@ -23979,6 +24018,7 @@ msgid "General"
 msgstr "Ogólne"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #, fuzzy
@@ -23989,6 +24029,10 @@ msgstr "Generuj"
 #, fuzzy
 msgid "Generate a map"
 msgstr "Wygeneruj mapę"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Generate a roster"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -27017,6 +27061,10 @@ msgstr "Jej projekt warsztatu już nie istnieje."
 
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Job"
+msgstr ""
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Jobs"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -33067,6 +33115,10 @@ msgstr ""
 msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 msgstr ""
 
+#: src/lego/roster.ts
+msgid "No seed from {first} to {last} made {label} bigger than the tier below it."
+msgstr ""
+
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
 msgstr ""
@@ -38385,6 +38437,7 @@ msgstr "narastanie"
 
 #: src/hub/preview.ts
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 #, fuzzy
@@ -40487,6 +40540,7 @@ msgstr "Zarekwiruj ich skrytkę"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Reroll"
 msgstr ""
 
@@ -41143,6 +41197,18 @@ msgstr "Pokoje w tej sieci nie będą wyświetlane, ale nadal możesz dołączy�
 msgid "Rose"
 msgstr "Różany"
 
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Roster"
+msgstr ""
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Roster name"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Rosters"
+msgstr ""
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -41525,6 +41591,10 @@ msgstr "Nadpisz {writableName}"
 #, fuzzy
 msgid "Save preset"
 msgstr "Zapisz szablon"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Save roster"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -42472,6 +42542,7 @@ msgstr "Zobacz wszystkie w statystykach"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Seed"
@@ -51911,6 +51982,10 @@ msgstr "Wagi poziomów"
 #, fuzzy
 msgid "Tier weights: {tierText}."
 msgstr "Wagi poziomów: {tierText}."
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Tiers"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy

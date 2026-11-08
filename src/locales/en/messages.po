@@ -4003,6 +4003,10 @@ msgstr "{name} (locked)"
 msgid "{name} (you)"
 msgstr "{name} (you)"
 
+#: src/lego/roster.ts
+msgid "{name} {label} {tier}"
+msgstr "{name} {label} {tier}"
+
 #: src/lego/movement.ts
 msgid "{name} can climb this: it climbs up to {up}° (default maxSlope {slope})."
 msgstr "{name} can climb this: it climbs up to {up}° (default maxSlope {slope})."
@@ -7496,6 +7500,14 @@ msgstr "A room needs no server and no account. Friends join with a link or an ad
 msgid "A room on this computer"
 msgstr "A room on this computer"
 
+#: src/lego/roster.ts
+msgid "A roster has from 1 to {max} tiers."
+msgstr "A roster has from 1 to {max} tiers."
+
+#: src/lego/roster.ts
+msgid "A roster needs a name."
+msgstr "A roster needs a name."
+
 #: src/lego/importS3o.ts
 msgid "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape."
 msgstr "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape."
@@ -7518,6 +7530,7 @@ msgstr "A see-through sea at y = 0, for how a hull sits in it."
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "A seed is a whole number."
 msgstr "A seed is a whole number."
 
@@ -7644,6 +7657,10 @@ msgstr "A unit at its real size, for scale"
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "A unit definition was already there that coilbox has no record of writing, so it has been left alone."
 msgstr "A unit definition was already there that coilbox has no record of writing, so it has been left alone."
+
+#: src/lego/roster.ts
+msgid "A unit is already called {name} or {unitName}. Choose another roster name."
+msgstr "A unit is already called {name} or {unitName}. Choose another roster name."
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "A unit render or emblem, for example. Image transparency is kept; a video loops muted."
@@ -10648,6 +10665,10 @@ msgstr "Body length"
 msgid "Body plan"
 msgstr "Body plan"
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Body plans"
+msgstr "Body plans"
+
 #: src/lego/animPresets.ts
 msgid "Body rocks on starting and stopping"
 msgstr "Body rocks on starting and stopping"
@@ -12370,6 +12391,14 @@ msgstr "Choose a widget folder"
 msgid "Choose an engine to host with."
 msgstr "Choose an engine to host with."
 
+#: src/lego/roster.ts
+msgid "Choose at least one body plan."
+msgstr "Choose at least one body plan."
+
+#: src/lego/roster.ts
+msgid "Choose at least one job."
+msgstr "Choose at least one job."
+
 #: src/campaign/pages/components/MissionMediaFields.tsx
 msgid "Choose audio"
 msgstr "Choose audio"
@@ -12711,6 +12740,7 @@ msgstr "Cloak cost moving"
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #: src/lego/pages/components/SwapPartDrawer.tsx
@@ -14399,6 +14429,10 @@ msgstr "Could not duplicate {name}: {reason}"
 msgid "Could not follow {name} into their battle"
 msgstr "Could not follow {name} into their battle"
 
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Could not generate the roster: {reason}"
+msgstr "Could not generate the roster: {reason}"
+
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Could not generate units: {reason}"
 msgstr "Could not generate units: {reason}"
@@ -14437,6 +14471,7 @@ msgid "Could not load the module"
 msgstr "Could not load the module"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Could not load the parts: {reason}"
 msgstr "Could not load the parts: {reason}"
 
@@ -14678,6 +14713,10 @@ msgstr "Could not save the model: {reason}"
 #: src/lego/moduleFileIo.ts
 msgid "Could not save the module"
 msgstr "Could not save the module"
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Could not save the roster: {reason}"
+msgstr "Could not save the roster: {reason}"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
@@ -19576,6 +19615,7 @@ msgid "General"
 msgstr "General"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/lego/pages/ProjectsPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 msgid "Generate"
@@ -19584,6 +19624,10 @@ msgstr "Generate"
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Generate a map"
 msgstr "Generate a map"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Generate a roster"
+msgstr "Generate a roster"
 
 #: src/uberstress/pages/RunPage.tsx
 msgid "Generate seed SQL"
@@ -22049,6 +22093,10 @@ msgstr "Its workshop project is gone."
 #: src/lego/pages/components/GenerateDrawer.tsx
 msgid "Job"
 msgstr "Job"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Jobs"
+msgstr "Jobs"
 
 #: src/direct/LanRooms.tsx
 #: src/multiplayer/battles/battleFilters.ts
@@ -26986,6 +27034,10 @@ msgstr "No seed from {first} to {last} found another module that fits. Try again
 msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 msgstr "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
 
+#: src/lego/roster.ts
+msgid "No seed from {first} to {last} made {label} bigger than the tier below it."
+msgstr "No seed from {first} to {last} made {label} bigger than the tier below it."
+
 #: src/lego/generateChecked.ts
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
 msgstr "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
@@ -31337,6 +31389,7 @@ msgstr "ramping up"
 
 #: src/hub/preview.ts
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 msgid "Random"
@@ -33056,6 +33109,7 @@ msgstr "Requisition their cache"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 msgid "Reroll"
 msgstr "Reroll"
 
@@ -33595,6 +33649,18 @@ msgstr "Rooms on this network will not be listed, but you can still join one by 
 msgid "Rose"
 msgstr "Rose"
 
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Roster"
+msgstr "Roster"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Roster name"
+msgstr "Roster name"
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Rosters"
+msgstr "Rosters"
+
 #: src/lego/pages/components/TransformFields.tsx
 msgid "Rotation"
 msgstr "Rotation"
@@ -33906,6 +33972,10 @@ msgstr "Save over {writableName}"
 #: src/play/PresetLibraryToolbar.tsx
 msgid "Save preset"
 msgstr "Save preset"
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Save roster"
+msgstr "Save roster"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 msgid "Save search"
@@ -34682,6 +34752,7 @@ msgstr "See them all on Player stats"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
+#: src/lego/pages/components/RosterDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Seed"
 msgstr "Seed"
@@ -42374,6 +42445,10 @@ msgstr "Tier weights"
 #: src/workshop/randomMod.ts
 msgid "Tier weights: {tierText}."
 msgstr "Tier weights: {tierText}."
+
+#: src/lego/pages/components/RosterDrawer.tsx
+msgid "Tiers"
+msgstr "Tiers"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "tile match tolerance; default 0.8"

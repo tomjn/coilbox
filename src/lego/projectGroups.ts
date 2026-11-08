@@ -33,7 +33,19 @@ export interface LegoGameGroup {
   projects: LegoProject[];
 }
 
+/** The units of one roster (#3239), which the game maker asked for together. */
+export interface LegoRosterGroup {
+  /** The roster's id. What a folded section is remembered by. */
+  key: string;
+  label: string;
+  /** By unit name, which is by job and then tier. */
+  projects: LegoProject[];
+}
+
 export interface GroupedProjects {
+  /** Units generated as a roster, one group per roster, by label. A roster's
+   *  units sit here rather than with their game, so a roster stays whole. */
+  rosters: LegoRosterGroup[];
   /** Units built from parts that are for no game. */
   own: LegoProject[];
   /** Units for a game, one group per game, by label. */
@@ -78,8 +90,16 @@ export function groupProjects(
     opened: LegoProject[];
   }
   const games = new Map<string, Building>();
+  const rosters = new Map<string, LegoRosterGroup>();
 
   for (const project of projects) {
+    if (project.roster) {
+      const { id, name } = project.roster;
+      const group = rosters.get(id) ?? { key: id, label: name, projects: [] };
+      group.projects.push(project);
+      rosters.set(id, group);
+      continue;
+    }
     let game = unitGame(project);
     let guessed = false;
     if (!game && project.imported && project.game === undefined) {
@@ -120,7 +140,21 @@ export function groupProjects(
     };
   });
 
+  const byLabel = (
+    a: { label: string; key: string },
+    b: { label: string; key: string },
+  ) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }) ||
+    a.key.localeCompare(b.key);
   return {
+    rosters: [...rosters.values()]
+      .map((roster) => ({
+        ...roster,
+        projects: [...roster.projects].sort((a, b) =>
+          a.unitName.localeCompare(b.unitName),
+        ),
+      }))
+      .sort(byLabel),
     own,
     games: groups.sort((a, b) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
@@ -149,6 +183,13 @@ export function filterGrouped(
     (unitGame(project)?.name.toLowerCase().includes(needle) ?? false);
 
   return {
+    rosters: grouped.rosters
+      .map((roster) =>
+        roster.label.toLowerCase().includes(needle)
+          ? roster
+          : { ...roster, projects: roster.projects.filter(matches) },
+      )
+      .filter((roster) => roster.projects.length > 0),
     own: grouped.own.filter(matches),
     games: grouped.games
       .map((game) =>
