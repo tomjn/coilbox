@@ -348,9 +348,11 @@ export function battleRouteLabel(
  * battle it did not name could be direct or could be on a lobby too old to
  * say, and a word for that would be a guess.
  *
- * No ping figure. Timing the relay needs a TURN credential, which the lobby
- * rations per account, and spending a joiner's on a number would leave them
- * fewer to host with.
+ * No ping figure here. A figure needs the relay's address, which the lobby
+ * sends separately with `BATTLERELAYADDRESS` (issue #2869) and only some lobbies
+ * do, so `BattleRoomHeader` adds it to the detail when it has one. It is timed
+ * with a plain STUN request rather than a TURN credential, which the lobby
+ * rations per account.
  */
 export function joinedBattleRouteLabel(
   relayed: boolean,

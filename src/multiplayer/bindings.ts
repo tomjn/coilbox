@@ -152,6 +152,12 @@ export interface Battle {
    * not, not that the battle is direct.
    */
   relayed: boolean;
+  /**
+   * The `host:port` of the relay a relayed battle goes through, as the lobby
+   * wrote it (issue #2869). `null` when the lobby sent no `BATTLERELAYADDRESS`,
+   * which a lobby that does not know the line never does.
+   */
+  relayAddress: string | null;
   map: string;
   maphash: string;
   modname: string;
@@ -460,6 +466,7 @@ export type Delta =
   | { kind: "battleHostMoved"; id: number }
   /** A battle goes through the lobby's relay, and the snapshot says so. */
   | { kind: "battleIsRelayed"; id: number }
+  | { kind: "battleRelayAddress"; id: number }
   /**
    * The lobby would not move our battle to the address its relay came back at,
    * so the battle is still advertised where the allocation used to be. Worse
@@ -1740,6 +1747,18 @@ export const mpRelayPing = defineCommand<
   { serverKey: string },
   { milliseconds: number | null }
 >("coilbox-multiplayer", "mp_relay_ping");
+
+/**
+ * The round trip from a joiner to the relay their battle goes through (issue
+ * #2869), timed against the address the lobby sent for that battle. No
+ * credential is spent. `milliseconds` is null when the lobby named no address
+ * or the relay's STUN did not answer, which says nothing about whether the
+ * relay is working.
+ */
+export const mpBattleRelayPing = defineCommand<
+  { serverKey: string; battleId: number },
+  { milliseconds: number | null }
+>("coilbox-multiplayer", "mp_battle_relay_ping");
 
 export const mpRelayTraffic = defineCommand<
   Record<string, never>,

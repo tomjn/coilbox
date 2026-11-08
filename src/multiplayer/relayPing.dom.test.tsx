@@ -14,16 +14,25 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ping = vi.fn();
+const battlePing = vi.fn();
 
 vi.mock("./bindings", () => ({
   mpRelayPing: (args: { serverKey: string }) => ping(args),
+  mpBattleRelayPing: (args: { serverKey: string; battleId: number }) =>
+    battlePing(args),
 }));
 
-import { RELAY_PING_EVERY_MS, relayPingLabel, useRelayPing } from "./relayPing";
+import {
+  RELAY_PING_EVERY_MS,
+  relayPingLabel,
+  useBattleRelayPing,
+  useRelayPing,
+} from "./relayPing";
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   ping.mockReset();
+  battlePing.mockReset();
 });
 
 afterEach(() => {
@@ -87,6 +96,76 @@ describe("useRelayPing", () => {
     rerender({ enabled: false });
     await vi.advanceTimersByTimeAsync(RELAY_PING_EVERY_MS * 3);
     expect(ping).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Issue #2869. The joiner's half, timed against the address the lobby sent for
+// their battle.
+describe("useBattleRelayPing", () => {
+  it("asks nothing for a battle the lobby gave no address for", async () => {
+    const { result } = renderHook(() =>
+      useBattleRelayPing("alice@bar:8200", 9, false),
+    );
+    await vi.advanceTimersByTimeAsync(RELAY_PING_EVERY_MS * 3);
+    expect(battlePing).not.toHaveBeenCalled();
+    expect(ping).not.toHaveBeenCalled();
+    expect(result.current).toBeUndefined();
+  });
+
+  it("names the battle, never an address, and reports the figure", async () => {
+    battlePing.mockResolvedValue({ milliseconds: 37 });
+    const { result } = renderHook(() =>
+      useBattleRelayPing("alice@bar:8200", 9, true),
+    );
+
+    await waitFor(() => expect(result.current).toBe(37));
+    expect(battlePing).toHaveBeenCalledWith({
+      serverKey: "alice@bar:8200",
+      battleId: 9,
+    });
+  });
+
+  // A failed measurement is not the last: a dropped packet is the likelier
+  // reason, and the next try replaces it.
+  it("measures again after a failure", async () => {
+    battlePing.mockResolvedValueOnce({ milliseconds: null });
+    battlePing.mockResolvedValue({ milliseconds: 25 });
+    const { result } = renderHook(() =>
+      useBattleRelayPing("alice@bar:8200", 9, true),
+    );
+    await waitFor(() => expect(result.current).toBeNull());
+
+    await vi.advanceTimersByTimeAsync(RELAY_PING_EVERY_MS);
+    await waitFor(() => expect(result.current).toBe(25));
+  });
+
+  it("reports null when the command itself fails", async () => {
+    battlePing.mockRejectedValue(new Error("not connected"));
+    const { result } = renderHook(() =>
+      useBattleRelayPing("alice@bar:8200", 9, true),
+    );
+    await waitFor(() => expect(result.current).toBeNull());
+  });
+
+  it("starts again for another battle and stops once disabled", async () => {
+    battlePing.mockResolvedValue({ milliseconds: 10 });
+    const { rerender } = renderHook(
+      ({ id, enabled }: { id: number; enabled: boolean }) =>
+        useBattleRelayPing("alice@bar:8200", id, enabled),
+      { initialProps: { id: 9, enabled: true } },
+    );
+    await waitFor(() => expect(battlePing).toHaveBeenCalledTimes(1));
+
+    rerender({ id: 10, enabled: true });
+    await waitFor(() => expect(battlePing).toHaveBeenCalledTimes(2));
+    expect(battlePing).toHaveBeenLastCalledWith({
+      serverKey: "alice@bar:8200",
+      battleId: 10,
+    });
+
+    rerender({ id: 10, enabled: false });
+    await vi.advanceTimersByTimeAsync(RELAY_PING_EVERY_MS * 3);
+    expect(battlePing).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useEffect, useState } from "react";
-import { mpRelayPing } from "./bindings";
+import { mpBattleRelayPing, mpRelayPing } from "./bindings";
 
 /**
  * How often the relay's ping is re-measured while it is worth knowing (issue
@@ -44,27 +44,68 @@ export function useRelayPing(
       setPing(undefined);
       return;
     }
-    let live = true;
-    let asking: ReturnType<typeof setTimeout> | undefined;
-    const ask = async () => {
-      let answer: Awaited<ReturnType<typeof mpRelayPing>> | null = null;
-      try {
-        answer = await mpRelayPing({ serverKey });
-      } catch {
-        // Not knowing is the same "could not measure" as a null answer.
-        answer = null;
-      }
-      if (!live) return;
-      setPing(answer?.milliseconds ?? null);
-      asking = setTimeout(ask, RELAY_PING_EVERY_MS);
-    };
-    void ask();
-    return () => {
-      live = false;
-      clearTimeout(asking);
-    };
+    return pingEvery(() => mpRelayPing({ serverKey }), setPing);
   }, [serverKey, enabled]);
   return ping;
+}
+
+/**
+ * The joiner's half of the ping to the relay their battle goes through (issue
+ * #2869), timed against the address the lobby sent for `battleId`.
+ *
+ * Measured when the room opens and then every {@link RELAY_PING_EVERY_MS}, the
+ * same as the host's figure, so a relay that is slow now is not described by
+ * a number from when the player joined. A measurement that fails does not
+ * stop the ones after it: a dropped packet or two is the likeliest reason, and
+ * the next try replaces the failure.
+ *
+ * `enabled` is false for a battle the lobby gave no address for, so a lobby
+ * that never sends one is never asked.
+ */
+export function useBattleRelayPing(
+  serverKey: string | null,
+  battleId: number,
+  enabled: boolean,
+): RelayPing {
+  const [ping, setPing] = useState<RelayPing>(undefined);
+  useEffect(() => {
+    if (!serverKey || !enabled) {
+      setPing(undefined);
+      return;
+    }
+    return pingEvery(() => mpBattleRelayPing({ serverKey, battleId }), setPing);
+  }, [serverKey, battleId, enabled]);
+  return ping;
+}
+
+/**
+ * Measure now and then every {@link RELAY_PING_EVERY_MS} until the returned
+ * function is called, handing each answer to `report`. A command that throws
+ * is a measurement that failed, not one that stops the loop.
+ */
+function pingEvery(
+  measure: () => Promise<{ milliseconds: number | null }>,
+  report: (ping: number | null) => void,
+): () => void {
+  let live = true;
+  let asking: ReturnType<typeof setTimeout> | undefined;
+  const ask = async () => {
+    let answer: { milliseconds: number | null } | null = null;
+    try {
+      answer = await measure();
+    } catch {
+      // Not knowing is the same "could not measure" as a null answer.
+      answer = null;
+    }
+    if (!live) return;
+    report(answer?.milliseconds ?? null);
+    asking = setTimeout(ask, RELAY_PING_EVERY_MS);
+  };
+  void ask();
+  return () => {
+    live = false;
+    clearTimeout(asking);
+  };
 }
 
 /** The figure or its absence, in one sentence. Pure. */

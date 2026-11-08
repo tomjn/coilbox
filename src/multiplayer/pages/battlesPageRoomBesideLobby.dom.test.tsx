@@ -226,6 +226,7 @@ function battle(id: number, title: string): Battle {
     port: "",
     natType: "0",
     relayed: false,
+    relayAddress: null,
     map: "Map",
     maphash: "",
     modname: "Game",

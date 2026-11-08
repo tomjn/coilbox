@@ -31,6 +31,14 @@ import {
 import type { Battle } from "../bindings";
 import { BattleRoomHeader } from "./BattleRoomHeader";
 
+// The IPC seam for the joiner's ping (issue #2869).
+const battlePing = vi.hoisted(() => vi.fn());
+vi.mock("../bindings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../bindings")>()),
+  mpBattleRelayPing: (args: { serverKey: string; battleId: number }) =>
+    battlePing(args),
+}));
+
 vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   PopoverTrigger: ({ children }: { children: ReactNode }) => (
@@ -41,7 +49,7 @@ vi.mock("@/components/ui/popover", () => ({
   ),
 }));
 
-function battle(relayed = false): Battle {
+function battle(relayed = false, relayAddress: string | null = null): Battle {
   return {
     id: 7,
     tachyonId: null,
@@ -50,6 +58,7 @@ function battle(relayed = false): Battle {
     port: "",
     natType: "0",
     relayed,
+    relayAddress,
     map: "Comet Catcher Remake 1.8",
     maphash: "",
     modname: "Beyond All Reason test-1234",
@@ -90,6 +99,8 @@ function drawHeader(
     directRoom?: boolean;
     route?: HostingRoute;
     relayed?: boolean;
+    /** The relay's address, as the lobby sent it with `BATTLERELAYADDRESS`. */
+    relayAddress?: string | null;
     /** The connection the route is recorded against, when not this room's. */
     routeKey?: string;
   } = {},
@@ -97,7 +108,7 @@ function drawHeader(
   if (over.route) recordHostingRoute(over.routeKey ?? KEY, over.route);
   render(
     <BattleRoomHeader
-      battle={battle(over.relayed)}
+      battle={battle(over.relayed, over.relayAddress)}
       myStatus={undefined}
       sync="synced"
       blockShort={null}
@@ -142,7 +153,10 @@ afterEach(() => {
   forget();
 });
 
-beforeEach(forget);
+beforeEach(() => {
+  forget();
+  battlePing.mockReset();
+});
 
 describe("the battle room's route word", () => {
   // The top bar says a battle is relayed, on every page and with the way back
@@ -215,6 +229,57 @@ describe("the battle room's route word", () => {
     expect(
       await screen.findByText(/Your ping to the host is higher/),
     ).toBeTruthy();
+  });
+
+  // Issue #2869. A lobby that names the relay's address lets the joiner see
+  // their own half of the ping in the same detail.
+  it("gives a joiner their ping to the relay when the lobby names it", async () => {
+    battlePing.mockResolvedValue({ milliseconds: 41.6 });
+    drawHeader({
+      selfHost: false,
+      relayed: true,
+      relayAddress: "relay.example.org:3478",
+    });
+    fireEvent.focus(screen.getByText("Relayed"));
+    expect(await screen.findAllByText(/About 42 ms to the relay/)).toBeTruthy();
+    expect(battlePing).toHaveBeenCalledWith({ serverKey: KEY, battleId: 7 });
+  });
+
+  it("says the ping could not be measured when the relay does not answer", async () => {
+    battlePing.mockResolvedValue({ milliseconds: null });
+    drawHeader({
+      selfHost: false,
+      relayed: true,
+      relayAddress: "relay.example.org:3478",
+    });
+    fireEvent.focus(screen.getByText("Relayed"));
+    expect(
+      await screen.findAllByText(/relay's ping could not be measured/),
+    ).toBeTruthy();
+  });
+
+  // A lobby that sends only `BATTLEISRELAYED` names no address. Nothing is
+  // timed and the detail has no figure, as before.
+  it("shows a joiner no figure, and times nothing, when the lobby names no relay address", async () => {
+    drawHeader({ selfHost: false, relayed: true });
+    fireEvent.focus(screen.getByText("Relayed"));
+    expect(
+      await screen.findByText(/Your ping to the host is higher/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/to the relay/)).toBe(null);
+    expect(battlePing).not.toHaveBeenCalled();
+  });
+
+  // The host's own figure comes from the top bar, and a host has no use for a
+  // second one measured against the joiner's address.
+  it("does not time the relay for the host of the battle", () => {
+    drawHeader({
+      selfHost: true,
+      relayed: true,
+      route: "relay",
+      relayAddress: "relay.example.org:3478",
+    });
+    expect(battlePing).not.toHaveBeenCalled();
   });
 
   // The relay word is the joiner's, and the host keeps the top bar for it.
