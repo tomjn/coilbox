@@ -66,6 +66,15 @@ export interface ProportionRule {
   range: Range;
 }
 
+/** What a job asks of the structural parts covering the skeleton (#3233). */
+export interface CoveringRule {
+  /** How thick the covering is, as a share of the unit's width. Rolled
+   *  between the two. */
+  thickness: Range;
+  /** Whether the unit gets a deck under its chassis. */
+  body: boolean;
+}
+
 export interface GeneratorJobData {
   id: GeneratorJob;
   /** In English, as the file's author wrote it. The five built in jobs are
@@ -75,6 +84,8 @@ export interface GeneratorJobData {
   bulk: Range;
   /** Times the plan's default proportions, for each size. */
   size: Record<GeneratorSize, number>;
+  /** How heavily the skeleton is covered. A heavy job's is thicker. */
+  covering: CoveringRule;
   /** A proportion with no rule is rolled about its default by `DEFAULT_SPREAD`. */
   proportions: ProportionRule[];
   /** Filled in order. The first slot is the chassis the others go on. */
@@ -145,6 +156,13 @@ export function jobProblems(
   };
 
   range("bulk", job.bulk);
+  range("covering thickness", job.covering?.thickness);
+  if (!((job.covering?.thickness?.[0] ?? 0) > 0)) {
+    problems.push(`${job.id} covering thickness: above zero`);
+  }
+  if (typeof job.covering?.body !== "boolean") {
+    problems.push(`${job.id} covering body: true or false`);
+  }
   if (job.bulk[0] <= 0) problems.push(`${job.id} bulk: above zero`);
   if (job.bulk[1] > 1) problems.push(`${job.id} bulk: over the unit's width`);
   for (const size of GENERATOR_SIZE_IDS) {

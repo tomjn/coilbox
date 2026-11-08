@@ -12,6 +12,7 @@
         { "id": "hullLength", "range": [0.9, 1.1] },
         { "id": "trackLength", "range": [0.9, 1.1] }
       ],
+      "covering": { "thickness": [0.16, 0.2], "body": true },
       "slots": [
         {
           "id": "chassis",
@@ -34,6 +35,7 @@
         { "id": "hullLength", "range": [1.1, 1.4] },
         { "id": "trackLength", "range": [1.1, 1.4] }
       ],
+      "covering": { "thickness": [0.14, 0.18], "body": true },
       "slots": [
         {
           "id": "chassis",
@@ -62,6 +64,7 @@
         { "id": "hullLength", "range": [0.8, 1] },
         { "id": "trackLength", "range": [0.8, 1] }
       ],
+      "covering": { "thickness": [0.06, 0.09], "body": false },
       "slots": [
         {
           "id": "chassis",
@@ -89,6 +92,7 @@
         { "id": "hullLength", "range": [1, 1.2] },
         { "id": "trackLength", "range": [1, 1.2] }
       ],
+      "covering": { "thickness": [0.12, 0.16], "body": true },
       "slots": [
         {
           "id": "chassis",
@@ -111,6 +115,7 @@
         { "id": "hullLength", "range": [0.9, 1.1] },
         { "id": "trackLength", "range": [0.9, 1.1] }
       ],
+      "covering": { "thickness": [0.12, 0.16], "body": true },
       "slots": [
         {
           "id": "chassis",

@@ -1,879 +1,943 @@
 {
   "biped assault small": {
-    "pieces": 13,
+    "pieces": 21,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 8,
     "proportions": {
       "legLength": 12.761743274652401,
       "stance": 28.224323896461865,
       "bodyHeight": 3.892263590275543
     },
-    "hash": 17657973
+    "hash": 3284229369
   },
   "biped assault large": {
-    "pieces": 14,
+    "pieces": 25,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 11,
     "proportions": {
       "legLength": 26.00331201187335,
       "stance": 55.09591408346314,
       "bodyHeight": 9.22153893613955
     },
-    "hash": 2922065922
+    "hash": 4174817924
   },
   "biped artillery small": {
-    "pieces": 14,
+    "pieces": 22,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 8,
     "proportions": {
       "legLength": 16.338863186884673,
       "stance": 29.6042675780654,
       "bodyHeight": 5.262571504082065
     },
-    "hash": 441274467
+    "hash": 1889379221
   },
   "biped artillery large": {
-    "pieces": 13,
+    "pieces": 24,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 11,
     "proportions": {
       "legLength": 30.37273986511305,
       "stance": 60,
       "bodyHeight": 9.57031382656563
     },
-    "hash": 3986111405
+    "hash": 4123876473
   },
   "biped scout small": {
-    "pieces": 13,
+    "pieces": 20,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 7,
     "proportions": {
       "legLength": 12.533627648297697,
       "stance": 12.243661172720604,
       "bodyHeight": 2.9587509098136793
     },
-    "hash": 2829459803
+    "hash": 3675677006
   },
   "biped scout large": {
-    "pieces": 10,
+    "pieces": 17,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 7,
     "proportions": {
       "legLength": 20.38793276043376,
       "stance": 18.063976534166837,
       "bodyHeight": 4.097430137211923
     },
-    "hash": 972688550
+    "hash": 2971859361
   },
   "biped builder small": {
-    "pieces": 14,
+    "pieces": 22,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 8,
     "proportions": {
       "legLength": 15.448919608010915,
       "stance": 25.580492186082996,
       "bodyHeight": 4.3479711031238555
     },
-    "hash": 2331678432
+    "hash": 2997350411
   },
   "biped builder large": {
-    "pieces": 14,
+    "pieces": 25,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 11,
     "proportions": {
       "legLength": 28.263166691061116,
       "stance": 45.78912555110268,
       "bodyHeight": 7.248107216164469
     },
-    "hash": 874761702
+    "hash": 2206830831
   },
   "biped antiair small": {
-    "pieces": 14,
+    "pieces": 22,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 8,
     "proportions": {
       "legLength": 15.315304399752058,
       "stance": 22.759575653616345,
       "bodyHeight": 4.196348100568867
     },
-    "hash": 1596335664
+    "hash": 2429871122
   },
   "biped antiair large": {
-    "pieces": 14,
+    "pieces": 22,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 8,
     "proportions": {
       "legLength": 29.90589903696626,
       "stance": 42.2717581310235,
       "bodyHeight": 8.197200047565623
     },
-    "hash": 774452347
+    "hash": 2659101948
   },
   "quadruped assault small": {
-    "pieces": 19,
+    "pieces": 34,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 15,
     "proportions": {
       "legLength": 13.086097816270778,
       "stance": 28.04727555588819,
       "bodyHeight": 3.7960260028322232,
       "bodyLength": 15.719619041254031
     },
-    "hash": 3353071849
+    "hash": 1290257457
   },
   "quadruped assault large": {
-    "pieces": 19,
+    "pieces": 38,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 19,
     "proportions": {
       "legLength": 28.11891268629581,
       "stance": 47.2193073947914,
       "bodyHeight": 7.851946090289859,
       "bodyLength": 43.40975081820219
     },
-    "hash": 2660156377
+    "hash": 2467437839
   },
   "quadruped artillery small": {
-    "pieces": 19,
+    "pieces": 34,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 15,
     "proportions": {
       "legLength": 16.799997611738743,
       "stance": 35.88489568362152,
       "bodyHeight": 4.4407361908634195,
       "bodyLength": 27.69049433015547
     },
-    "hash": 3568982451
+    "hash": 1327768439
   },
   "quadruped artillery large": {
-    "pieces": 20,
+    "pieces": 36,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 16,
     "proportions": {
       "legLength": 28.328873744834215,
       "stance": 60,
       "bodyHeight": 9.809760426746216,
       "bodyLength": 61.017433208773554
     },
-    "hash": 1595843472
+    "hash": 2360907320
   },
   "quadruped scout small": {
-    "pieces": 19,
+    "pieces": 32,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 13,
     "proportions": {
       "legLength": 10.94246784121264,
       "stance": 11.690393774062395,
       "bodyHeight": 2.588721642731689,
       "bodyLength": 13.318445027639909
     },
-    "hash": 517683545
+    "hash": 513619387
   },
   "quadruped scout large": {
-    "pieces": 19,
+    "pieces": 32,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 13,
     "proportions": {
       "legLength": 19.97168963240553,
       "stance": 19.982765546950045,
       "bodyHeight": 4.627266211735317,
       "bodyLength": 21.123858054772555
     },
-    "hash": 2425727022
+    "hash": 3831045816
   },
   "quadruped builder small": {
-    "pieces": 20,
+    "pieces": 35,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 15,
     "proportions": {
       "legLength": 14.522826980422254,
       "stance": 24.684423712645657,
       "bodyHeight": 4.033446322154488,
       "bodyLength": 20.827525493388798
     },
-    "hash": 4061799590
+    "hash": 3686748598
   },
   "quadruped builder large": {
-    "pieces": 20,
+    "pieces": 35,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 15,
     "proportions": {
       "legLength": 25.266639574237168,
       "stance": 45.8261109925285,
       "bodyHeight": 6.505320593071169,
       "bodyLength": 31.97632366127855
     },
-    "hash": 819206100
+    "hash": 1877038128
   },
   "quadruped antiair small": {
-    "pieces": 20,
+    "pieces": 35,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 15,
     "proportions": {
       "legLength": 15.79616452590097,
       "stance": 20.591750340568836,
       "bodyHeight": 4.445930070695467,
       "bodyLength": 23.315924380477245
     },
-    "hash": 1831417518
+    "hash": 2695452857
   },
   "quadruped antiair large": {
-    "pieces": 20,
+    "pieces": 35,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 15,
     "proportions": {
       "legLength": 30.786415739811954,
       "stance": 43.513716752305626,
       "bodyHeight": 8.079970597199164,
       "bodyLength": 38.00335354685054
     },
-    "hash": 356954321
+    "hash": 3032531225
   },
   "hexapod assault small": {
-    "pieces": 26,
+    "pieces": 47,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 21,
     "proportions": {
       "legLength": 13.842140472815373,
       "stance": 23.393939427105945,
       "bodyHeight": 3.6211995629360905,
       "legGap": 21.043188422405507
     },
-    "hash": 1465321418
+    "hash": 92374871
   },
   "hexapod assault large": {
-    "pieces": 25,
+    "pieces": 50,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 25,
     "proportions": {
       "legLength": 29.574828205006202,
       "stance": 57.582666998847856,
       "bodyHeight": 9.122892946042121,
       "legGap": 38.726077482118264
     },
-    "hash": 3617400259
+    "hash": 3245273655
   },
   "hexapod artillery small": {
-    "pieces": 25,
+    "pieces": 46,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 21,
     "proportions": {
       "legLength": 16.070898390289397,
       "stance": 35.2403029056103,
       "bodyHeight": 5.392230466541369,
       "legGap": 24.14551677994081
     },
-    "hash": 3947767530
+    "hash": 1580178040
   },
   "hexapod artillery large": {
-    "pieces": 26,
+    "pieces": 53,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 27,
     "proportions": {
       "legLength": 27.14357180434652,
       "stance": 60,
       "bodyHeight": 8.88880423584301,
       "legGap": 46.17492770820157
     },
-    "hash": 1804658753
+    "hash": 4069220546
   },
   "hexapod scout small": {
-    "pieces": 25,
+    "pieces": 44,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 19,
     "proportions": {
       "legLength": 11.629400982651859,
       "stance": 10.867583200177178,
       "bodyHeight": 2.9643420697026888,
       "legGap": 13.702919600916792
     },
-    "hash": 481062540
+    "hash": 2478892088
   },
   "hexapod scout large": {
-    "pieces": 22,
+    "pieces": 45,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 23,
     "proportions": {
       "legLength": 20.081207713122012,
       "stance": 19.242318372400476,
       "bodyHeight": 4.131630534009542,
       "legGap": 26.194732169769
     },
-    "hash": 3344479668
+    "hash": 4196015442
   },
   "hexapod builder small": {
-    "pieces": 26,
+    "pieces": 47,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 21,
     "proportions": {
       "legLength": 13.239523002379576,
       "stance": 22.44581779394997,
       "bodyHeight": 4.308400826939614,
       "legGap": 19.85676765814307
     },
-    "hash": 2837759662
+    "hash": 525420368
   },
   "hexapod builder large": {
-    "pieces": 26,
+    "pieces": 51,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 25,
     "proportions": {
       "legLength": 26.018011455282572,
       "stance": 48.48710058753751,
       "bodyHeight": 7.822454215994104,
       "legGap": 41.52700991694907
     },
-    "hash": 2337792948
+    "hash": 1929473637
   },
   "hexapod antiair small": {
-    "pieces": 25,
+    "pieces": 46,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 21,
     "proportions": {
       "legLength": 15.954943005717361,
       "stance": 24.195553712071856,
       "bodyHeight": 4.225749475210906,
       "legGap": 18.607726173594124
     },
-    "hash": 3670282980
+    "hash": 2533479216
   },
   "hexapod antiair large": {
-    "pieces": 25,
+    "pieces": 48,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 23,
     "proportions": {
       "legLength": 27.139929399479183,
       "stance": 44.15608069328964,
       "bodyHeight": 7.39873334544897,
       "legGap": 44.15564148187683
     },
-    "hash": 3563961824
+    "hash": 3728877920
   },
   "octopod assault small": {
-    "pieces": 31,
+    "pieces": 59,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 28,
     "proportions": {
       "legLength": 13.46102037888486,
       "stance": 26.24032027862035,
       "bodyHeight": 4.46419756025076,
       "legGap": 18.04800090580713
     },
-    "hash": 4182444418
+    "hash": 2377309443
   },
   "octopod assault large": {
-    "pieces": 32,
+    "pieces": 69,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 37,
     "proportions": {
       "legLength": 26.235481226826092,
       "stance": 49.20208470640937,
       "bodyHeight": 8.485686824165752,
       "legGap": 41.4922946642444
     },
-    "hash": 1924560048
+    "hash": 2900956054
   },
   "octopod artillery small": {
-    "pieces": 32,
+    "pieces": 61,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 29,
     "proportions": {
       "legLength": 14.802632089622321,
       "stance": 32.955360567047265,
       "bodyHeight": 4.738899126833305,
       "legGap": 26.029664143925295
     },
-    "hash": 3957275026
+    "hash": 3744113421
   },
   "octopod artillery large": {
-    "pieces": 32,
+    "pieces": 73,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 41,
     "proportions": {
       "legLength": 30.04010268401541,
       "stance": 60,
       "bodyHeight": 9.515041584949941,
       "legGap": 46.18275436919601
     },
-    "hash": 3023999472
+    "hash": 3948389257
   },
   "octopod scout small": {
-    "pieces": 28,
+    "pieces": 53,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 25,
     "proportions": {
       "legLength": 11.882525847423821,
       "stance": 12.19758891524747,
       "bodyHeight": 2.817089068999048,
       "legGap": 11.92842729051248
     },
-    "hash": 1008221063
+    "hash": 771237646
   },
   "octopod scout large": {
-    "pieces": 31,
+    "pieces": 58,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 27,
     "proportions": {
       "legLength": 21.59478705159202,
       "stance": 17.975609649252146,
       "bodyHeight": 4.978971559064928,
       "legGap": 22.724537934357066
     },
-    "hash": 3319732121
+    "hash": 699542062
   },
   "octopod builder small": {
-    "pieces": 32,
+    "pieces": 60,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 28,
     "proportions": {
       "legLength": 13.145314642866143,
       "stance": 23.722039810402784,
       "bodyHeight": 4.413703473089264,
       "legGap": 21.68048585068958
     },
-    "hash": 4015213472
+    "hash": 2877862510
   },
   "octopod builder large": {
-    "pieces": 32,
+    "pieces": 65,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 33,
     "proportions": {
       "legLength": 27.527172041788702,
       "stance": 48.81553031846694,
       "bodyHeight": 7.535459345541894,
       "legGap": 38.047120955853714
     },
-    "hash": 854493614
+    "hash": 2338302816
   },
   "octopod antiair small": {
-    "pieces": 31,
+    "pieces": 61,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 30,
     "proportions": {
       "legLength": 14.937576869130137,
       "stance": 20.4171035994147,
       "bodyHeight": 3.9839443730749196,
       "legGap": 23.095421018624904
     },
-    "hash": 2634614247
+    "hash": 1665410064
   },
   "octopod antiair large": {
-    "pieces": 32,
+    "pieces": 61,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 29,
     "proportions": {
       "legLength": 30.88044240861386,
       "stance": 40.72174948083796,
       "bodyHeight": 7.8352802713494745,
       "legGap": 33.03522535105002
     },
-    "hash": 1693868025
+    "hash": 4115366407
   },
   "wheeled assault small": {
-    "pieces": 12,
+    "pieces": 17,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "axles": 3,
       "axleSpacing": 16.452165207804644,
       "trackWidth": 19.171796979568896,
       "wheelHeight": 3.4669829521147766
     },
-    "hash": 3490153679
+    "hash": 2771149444
   },
   "wheeled assault large": {
-    "pieces": 15,
+    "pieces": 23,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 8,
     "proportions": {
       "axles": 4,
       "axleSpacing": 33.092130402890035,
       "trackWidth": 41.340437390282744,
       "wheelHeight": 7.165181722120614
     },
-    "hash": 1254432917
+    "hash": 2659552971
   },
   "wheeled artillery small": {
-    "pieces": 13,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "axles": 3,
       "axleSpacing": 17.98741492321249,
       "trackWidth": 25.349175847973672,
       "wheelHeight": 4.462768442497356
     },
-    "hash": 2247287331
+    "hash": 186185332
   },
   "wheeled artillery large": {
-    "pieces": 13,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "axles": 3,
       "axleSpacing": 34.17423703414574,
       "trackWidth": 46.37334102361463,
       "wheelHeight": 7.808303394014248
     },
-    "hash": 2272756641
+    "hash": 2148571341
   },
   "wheeled scout small": {
-    "pieces": 13,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 5,
     "proportions": {
       "axles": 5,
       "axleSpacing": 8.829186684414744,
       "trackWidth": 13.366805543098597,
       "wheelHeight": 1.9981918589468115
     },
-    "hash": 481248666
+    "hash": 4122598662
   },
   "wheeled scout large": {
-    "pieces": 16,
+    "pieces": 20,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "axles": 5,
       "axleSpacing": 18.32803375657275,
       "trackWidth": 20.78907890958246,
       "wheelHeight": 3.8438142965186852
     },
-    "hash": 3360407168
+    "hash": 3333199286
   },
   "wheeled builder small": {
-    "pieces": 13,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 5,
     "proportions": {
       "axles": 3,
       "axleSpacing": 13.145324764007237,
       "trackWidth": 20.604339359002186,
       "wheelHeight": 3.9332400271279035
     },
-    "hash": 376287976
+    "hash": 570184998
   },
   "wheeled builder large": {
-    "pieces": 11,
+    "pieces": 15,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 4,
     "proportions": {
       "axles": 2,
       "axleSpacing": 23.42624103210308,
       "trackWidth": 42.05167684823274,
       "wheelHeight": 5.86031011432968
     },
-    "hash": 2058673959
+    "hash": 444956705
   },
   "wheeled antiair small": {
-    "pieces": 13,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "axles": 3,
       "axleSpacing": 14.434862483914477,
       "trackWidth": 19.76221791228745,
       "wheelHeight": 3.803954693134292
     },
-    "hash": 2936953142
+    "hash": 1693368196
   },
   "wheeled antiair large": {
-    "pieces": 15,
+    "pieces": 22,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 7,
     "proportions": {
       "axles": 4,
       "axleSpacing": 26.613067614596336,
       "trackWidth": 42.244517909474666,
       "wheelHeight": 5.87271835457161
     },
-    "hash": 744517526
+    "hash": 1630876259
   },
   "tracked assault small": {
-    "pieces": 25,
+    "pieces": 28,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 34.95692736722063,
       "trackWidth": 14.94654593743442,
       "trackHeight": 7.309132867986337,
       "roadWheels": 8
     },
-    "hash": 3285914213
+    "hash": 3413641105
   },
   "tracked assault large": {
-    "pieces": 23,
+    "pieces": 27,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "trackLength": 64.98948277776594,
       "trackWidth": 25,
       "trackHeight": 14.052821901943533,
       "roadWheels": 7
     },
-    "hash": 1420113731
+    "hash": 953262916
   },
   "tracked artillery small": {
-    "pieces": 28,
+    "pieces": 31,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 48.1238546145726,
       "trackWidth": 16.507619238203855,
       "trackHeight": 8.40548383492604,
       "roadWheels": 10
     },
-    "hash": 3110954237
+    "hash": 2449803748
   },
   "tracked artillery large": {
-    "pieces": 22,
+    "pieces": 25,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 65,
       "trackWidth": 25,
       "trackHeight": 15,
       "roadWheels": 7
     },
-    "hash": 2917410360
+    "hash": 18165733
   },
   "tracked scout small": {
     "pieces": 19,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {
       "trackLength": 25,
       "trackWidth": 10,
       "trackHeight": 5,
       "roadWheels": 7
     },
-    "hash": 2541401104
+    "hash": 2247207655
   },
   "tracked scout large": {
     "pieces": 15,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {
       "trackLength": 33.96858105285047,
       "trackWidth": 17.351263180436217,
       "trackHeight": 7.5088915747469285,
       "roadWheels": 5
     },
-    "hash": 1424005468
+    "hash": 574732043
   },
   "tracked builder small": {
-    "pieces": 23,
+    "pieces": 26,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 39.3962685244577,
       "trackWidth": 11.769454818955275,
       "trackHeight": 6.358709253980779,
       "roadWheels": 7
     },
-    "hash": 1731729615
+    "hash": 1765762926
   },
   "tracked builder large": {
-    "pieces": 21,
+    "pieces": 24,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 65,
       "trackWidth": 23.983612776929977,
       "trackHeight": 12.388028231739996,
       "roadWheels": 6
     },
-    "hash": 4095558998
+    "hash": 4002442055
   },
   "tracked antiair small": {
-    "pieces": 31,
+    "pieces": 34,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 35.300082384995186,
       "trackWidth": 14.356666210059192,
       "trackHeight": 6.5965599434729665,
       "roadWheels": 11
     },
-    "hash": 1453028816
+    "hash": 1494314195
   },
   "tracked antiair large": {
-    "pieces": 31,
+    "pieces": 34,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 3,
     "proportions": {
       "trackLength": 65,
       "trackWidth": 25,
       "trackHeight": 12.782799019325525,
       "roadWheels": 11
     },
-    "hash": 4093728832
+    "hash": 3093864400
   },
   "turret.building assault small": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "baseHeight": 32.81973594154115,
       "turretHeight": 11.02047788835014,
       "barrelLength": 26.615566647313535
     },
-    "hash": 1198390173
+    "hash": 3712178853
   },
   "turret.building assault large": {
-    "pieces": 9,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {
       "baseHeight": 54.49409041085746,
       "turretHeight": 20.609084123309,
       "barrelLength": 63.989922779873005
     },
-    "hash": 3744479934
+    "hash": 498968956
   },
   "turret.building artillery small": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "baseHeight": 40.71690510515821,
       "turretHeight": 11.421854336291318,
       "barrelLength": 39.681486574441195
     },
-    "hash": 191756857
+    "hash": 418107952
   },
   "turret.building artillery large": {
-    "pieces": 8,
+    "pieces": 17,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {
       "baseHeight": 75.28624798253644,
       "turretHeight": 21.0761005032463,
       "barrelLength": 72.43621320007229
     },
-    "hash": 3621999956
+    "hash": 488812674
   },
   "turret.building scout small": {
     "pieces": 8,
@@ -881,372 +945,403 @@
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 0,
     "proportions": {
       "baseHeight": 22.754037070390766,
       "turretHeight": 6.250048959576524,
       "barrelLength": 19.130184541598428
     },
-    "hash": 1433948941
+    "hash": 3700446975
   },
   "turret.building scout large": {
     "pieces": 5,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {
       "baseHeight": 29.880758613647195,
       "turretHeight": 11.742305510394157,
       "barrelLength": 30.94509302403429
     },
-    "hash": 3254828763
+    "hash": 4209791689
   },
   "turret.building builder small": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 4,
     "proportions": {
       "baseHeight": 34.01987144415616,
       "turretHeight": 9.546847811974,
       "barrelLength": 30.53237373583834
     },
-    "hash": 3470373468
+    "hash": 979951743
   },
   "turret.building builder large": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 4,
     "proportions": {
       "baseHeight": 57.945572724752125,
       "turretHeight": 16.95832653206447,
       "barrelLength": 50.351713558342766
     },
-    "hash": 262630922
+    "hash": 1234721408
   },
   "turret.building antiair small": {
-    "pieces": 9,
+    "pieces": 10,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 1,
     "proportions": {
       "baseHeight": 34.38526380197145,
       "turretHeight": 10.186079557130578,
       "barrelLength": 31.380708125529925
     },
-    "hash": 1370640333
+    "hash": 1840465800
   },
   "turret.building antiair large": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "baseHeight": 59.57347690619993,
       "turretHeight": 21.691597463075063,
       "barrelLength": 60.99070161847584
     },
-    "hash": 302065022
+    "hash": 3764961853
   },
   "building assault small": {
-    "pieces": 5,
+    "pieces": 14,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {},
-    "hash": 1712877119
+    "hash": 2669204119
   },
   "building assault large": {
-    "pieces": 6,
+    "pieces": 42,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 36,
     "proportions": {},
-    "hash": 822712426
+    "hash": 1055547042
   },
   "building artillery small": {
-    "pieces": 5,
+    "pieces": 14,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {},
-    "hash": 971473693
+    "hash": 4218181494
   },
   "building artillery large": {
-    "pieces": 6,
+    "pieces": 42,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 36,
     "proportions": {},
-    "hash": 3474337727
+    "hash": 3815706347
   },
   "building scout small": {
     "pieces": 2,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {},
-    "hash": 2560863859
+    "hash": 4138899422
   },
   "building scout large": {
     "pieces": 2,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {},
-    "hash": 698101433
+    "hash": 3686308693
   },
   "building builder small": {
-    "pieces": 6,
+    "pieces": 15,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 9,
     "proportions": {},
-    "hash": 1739581906
+    "hash": 995481679
   },
   "building builder large": {
-    "pieces": 6,
+    "pieces": 31,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 25,
     "proportions": {},
-    "hash": 915449367
+    "hash": 3320552845
   },
   "building antiair small": {
-    "pieces": 6,
+    "pieces": 15,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {},
-    "hash": 3120773902
+    "hash": 981776649
   },
   "building antiair large": {
-    "pieces": 6,
+    "pieces": 42,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 36,
     "proportions": {},
-    "hash": 853288325
+    "hash": 2293208380
   },
   "hover assault small": {
-    "pieces": 10,
+    "pieces": 15,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "hullLength": 31.089319509076894,
       "hullWidth": 22.301483697969235,
       "hullHeight": 9.572366055175081,
       "gap": 0.08272785635723266
     },
-    "hash": 3351466264
+    "hash": 1190542730
   },
   "hover assault large": {
-    "pieces": 10,
+    "pieces": 17,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 7,
     "proportions": {
       "hullLength": 65,
       "hullWidth": 42.32831443596399,
       "hullHeight": 21.22491839452414,
       "gap": 0.16866475501097739
     },
-    "hash": 14919844
+    "hash": 3988740556
   },
   "hover artillery small": {
-    "pieces": 11,
+    "pieces": 16,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "hullLength": 40.22739253603249,
       "hullWidth": 30.15891771607613,
       "hullHeight": 12.434596237111602,
       "gap": 0.10267847109376453
     },
-    "hash": 1615667751
+    "hash": 1681780638
   },
   "hover artillery large": {
-    "pieces": 10,
+    "pieces": 19,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {
       "hullLength": 65,
       "hullWidth": 47.36889181393734,
       "hullHeight": 25,
       "gap": 0.1509567818834912
     },
-    "hash": 1487247920
+    "hash": 148840062
   },
   "hover scout small": {
-    "pieces": 7,
+    "pieces": 10,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 3,
     "proportions": {
       "hullLength": 20,
       "hullWidth": 15,
       "hullHeight": 7.065567220028024,
       "gap": 0.05589497697656043
     },
-    "hash": 1179821287
+    "hash": 309633063
   },
   "hover scout large": {
-    "pieces": 10,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 3,
     "proportions": {
       "hullLength": 28.270552763911436,
       "hullWidth": 30.169879200619874,
       "hullHeight": 13.177194426280446,
       "gap": 0.08197623873571865
     },
-    "hash": 3317330594
+    "hash": 4252685021
   },
   "hover builder small": {
-    "pieces": 11,
+    "pieces": 16,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 5,
     "proportions": {
       "hullLength": 31.658413730962206,
       "hullWidth": 20.40864627311763,
       "hullHeight": 10.356718187240185,
       "gap": 0.06557010788354092
     },
-    "hash": 2527405565
+    "hash": 405797429
   },
   "hover builder large": {
-    "pieces": 11,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 7,
     "proportions": {
       "hullLength": 65,
       "hullWidth": 44.71923128214618,
       "hullHeight": 21.193363928304983,
       "gap": 0.12291709235263987
     },
-    "hash": 1724968872
+    "hash": 3521583966
   },
   "hover antiair small": {
-    "pieces": 11,
+    "pieces": 16,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 5,
     "proportions": {
       "hullLength": 32.99173888024875,
       "hullWidth": 22.600272927774352,
       "hullHeight": 10.438414959194489,
       "gap": 0.07919698129640892
     },
-    "hash": 765048065
+    "hash": 3012625683
   },
   "hover antiair large": {
-    "pieces": 10,
+    "pieces": 19,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {
       "hullLength": 59.44432320268639,
       "hullWidth": 47.37587604596372,
       "hullHeight": 19.3320243265219,
       "gap": 0.13282327931420876
     },
-    "hash": 3681110839
+    "hash": 3594166044
   },
   "ship assault small": {
-    "pieces": 10,
+    "pieces": 16,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 6,
     "proportions": {
       "hullLength": 67.41766650315374,
       "deckHeight": 6.87925895583001,
       "turretHeight": 4.253254053335404,
       "barrelLength": 10
     },
-    "hash": 3132236199
+    "hash": 569050081
   },
   "ship assault large": {
-    "pieces": 11,
+    "pieces": 23,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 12,
     "proportions": {
       "hullLength": 135,
       "deckHeight": 12.792352353088791,
       "turretHeight": 7.895657339897006,
       "barrelLength": 21.579507187495476
     },
-    "hash": 646890470
+    "hash": 3814510502
   },
   "ship artillery small": {
-    "pieces": 10,
+    "pieces": 19,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {
       "hullLength": 112.16607308874651,
       "deckHeight": 8.148890805919889,
       "turretHeight": 4.985364872011821,
       "barrelLength": 13.359116337923565
     },
-    "hash": 1836533643
+    "hash": 2489521689
   },
   "ship artillery large": {
-    "pieces": 11,
+    "pieces": 27,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 16,
     "proportions": {
       "hullLength": 135,
       "deckHeight": 14.630595492125256,
       "turretHeight": 10.027974563864523,
       "barrelLength": 23.46429911432788
     },
-    "hash": 677700861
+    "hash": 2962859053
   },
   "ship scout small": {
     "pieces": 7,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {
       "hullLength": 45,
       "deckHeight": 5,
       "turretHeight": 2.949789529107511,
       "barrelLength": 10
     },
-    "hash": 3797339480
+    "hash": 2620961162
   },
   "ship scout large": {
     "pieces": 10,
@@ -1254,196 +1349,211 @@
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
     ],
+    "covering": 0,
     "proportions": {
       "hullLength": 73.11722138372065,
       "deckHeight": 7.042384257437778,
       "turretHeight": 5.535475150658981,
       "barrelLength": 12.674003382576396
     },
-    "hash": 1491720177
+    "hash": 3907307407
   },
   "ship builder small": {
-    "pieces": 11,
+    "pieces": 14,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 3,
     "proportions": {
       "hullLength": 73.91426059775054,
       "deckHeight": 7.182788090124959,
       "turretHeight": 3.8190981375100086,
       "barrelLength": 10.563200832423174
     },
-    "hash": 4152471900
+    "hash": 1001022053
   },
   "ship builder large": {
-    "pieces": 11,
+    "pieces": 23,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 12,
     "proportions": {
       "hullLength": 135,
       "deckHeight": 13.810674731116274,
       "turretHeight": 8.125485386298969,
       "barrelLength": 19.659494094005318
     },
-    "hash": 2775653055
+    "hash": 1747442226
   },
   "ship antiair small": {
-    "pieces": 10,
+    "pieces": 16,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 6,
     "proportions": {
       "hullLength": 68.58667647495402,
       "deckHeight": 7.663839925575885,
       "turretHeight": 4.7303577340662,
       "barrelLength": 10.445614218109986
     },
-    "hash": 2606124483
+    "hash": 3362217151
   },
   "ship antiair large": {
-    "pieces": 10,
+    "pieces": 22,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 12,
     "proportions": {
       "hullLength": 123.1942787687853,
       "deckHeight": 12.790388758851215,
       "turretHeight": 7.503929972575045,
       "barrelLength": 21.443540182546243
     },
-    "hash": 3365334748
+    "hash": 1589278642
   },
   "aircraft assault small": {
-    "pieces": 8,
+    "pieces": 12,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "gunForward": 3.4580692610470574,
       "gunHeight": 1.2185101512208347,
       "barrelLength": 3.563446587834042
     },
-    "hash": 3650552597
+    "hash": 2449285253
   },
   "aircraft assault large": {
-    "pieces": 8,
+    "pieces": 12,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "gunForward": 8.45472532721702,
       "gunHeight": 2.4943734426121225,
       "barrelLength": 7.66534447719343
     },
-    "hash": 2863537770
+    "hash": 1847252380
   },
   "aircraft artillery small": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "gunForward": 4.336714818592881,
       "gunHeight": 1.8836111042029222,
       "barrelLength": 4.462301206684671
     },
-    "hash": 2111340283
+    "hash": 1549010493
   },
   "aircraft artillery large": {
-    "pieces": 9,
+    "pieces": 18,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 9,
     "proportions": {
       "gunForward": 8.714199965269072,
       "gunHeight": 3.6653760096365584,
       "barrelLength": 9.290498082464559
     },
-    "hash": 3256021586
+    "hash": 1862849268
   },
   "aircraft scout small": {
     "pieces": 5,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {
       "gunForward": 2.6322976733953687,
       "gunHeight": 0.9881179854483343,
       "barrelLength": 2.5076534295035526
     },
-    "hash": 811252905
+    "hash": 4111503116
   },
   "aircraft scout large": {
     "pieces": 5,
     "modules": [
       "chassis.1=builtin.deck"
     ],
+    "covering": 0,
     "proportions": {
       "gunForward": 3.871542377814883,
       "gunHeight": 1.519276239612256,
       "barrelLength": 5.002902842960785
     },
-    "hash": 1008927505
+    "hash": 409793586
   },
   "aircraft builder small": {
-    "pieces": 9,
+    "pieces": 10,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 1,
     "proportions": {
       "gunForward": 3.5349517546797866,
       "gunHeight": 1.4396357041335428,
       "barrelLength": 4.284394727493636
     },
-    "hash": 115886357
+    "hash": 4082355109
   },
   "aircraft builder large": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
+    "covering": 4,
     "proportions": {
       "gunForward": 6.907970170229672,
       "gunHeight": 2.3430414428859945,
       "barrelLength": 6.603747385926544
     },
-    "hash": 166367276
+    "hash": 2812821124
   },
   "aircraft antiair small": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "gunForward": 3.356976187766413,
       "gunHeight": 1.293635368926334,
       "barrelLength": 3.3588794477772903
     },
-    "hash": 49322609
+    "hash": 775400065
   },
   "aircraft antiair large": {
-    "pieces": 9,
+    "pieces": 13,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
+    "covering": 4,
     "proportions": {
       "gunForward": 7.451527924896217,
       "gunHeight": 2.486325372894294,
       "barrelLength": 6.732333110708742
     },
-    "hash": 3540129673
+    "hash": 3564190105
   }
 }

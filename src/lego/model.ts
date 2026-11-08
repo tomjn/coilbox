@@ -1114,7 +1114,7 @@ export interface LegoSkeleton {
 
 /**
  * What made a generated unit (#3231). The four inputs remake it, given the same
- * module library. `modules` names each module instance the generator hung on
+ * module library and parts pack. `modules` names each module instance the generator hung on
  * the skeleton, by the slot it filled, so a later reroll can tell its own
  * pieces from ones the game maker added: every piece of an instance carries
  * `LegoModuleRef.instance`.
@@ -1125,6 +1125,12 @@ export interface LegoGenerated {
   job: string;
   size: string;
   modules: { slot: string; module: string; instance: string }[];
+  /**
+   * The structural parts the generator covered the skeleton in (#3233), by
+   * piece id, each with the id in the body plan of the bone it covers. The
+   * piece is that bone's child. Absent on a unit generated before covering.
+   */
+  covering?: { bone: string; piece: string }[];
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -1972,7 +1978,23 @@ function parseGenerated(value: unknown): LegoGenerated | null {
           : [];
       })
     : [];
-  return { seed: v.seed, plan: v.plan, job: v.job, size: v.size, modules };
+  const covering = Array.isArray(v.covering)
+    ? v.covering.flatMap((entry) => {
+        if (typeof entry !== "object" || entry === null) return [];
+        const { bone, piece } = entry as Record<string, unknown>;
+        return typeof bone === "string" && typeof piece === "string"
+          ? [{ bone, piece }]
+          : [];
+      })
+    : undefined;
+  return {
+    seed: v.seed,
+    plan: v.plan,
+    job: v.job,
+    size: v.size,
+    modules,
+    ...(covering ? { covering } : {}),
+  };
 }
 
 /** A target with whole footprint steps of 1 or more and a positive height, or

@@ -26,6 +26,7 @@ import * as THREE from "three";
 import { hashString, mulberry32, pick, randInt } from "../conquest/rng";
 import { type BodyPlan, planProportions, projectFromPlan } from "./bodyPlans";
 import { pieceConnectors, pieceOwnBox, resolveConnections } from "./connectors";
+import { coverSkeleton, MAX_PART_SCALE } from "./covering";
 import {
   DEFAULT_SPREAD,
   GENERATOR_JOBS,
@@ -153,17 +154,19 @@ function rollProportions(
   return planProportions(inputs.plan, values);
 }
 
-/** The unit's width in elmos: what its proportions measure, or the plan's
- *  default footprint times the size for a plan they do not set. */
-function unitWidth(
+/** The unit's width and length in elmos: what its proportions measure, or
+ *  the plan's default footprint times the size for an axis they do not set. */
+function unitSize(
   plan: BodyPlan,
   proportions: Record<string, number>,
   factor: number,
-): number {
-  return (
-    skeletonSize(plan, proportions).x ??
-    defaultTarget(plan).footprint.x * ELMOS_PER_FOOTPRINT * factor
-  );
+): { x: number; z: number } {
+  const measured = skeletonSize(plan, proportions);
+  const { footprint } = defaultTarget(plan);
+  return {
+    x: measured.x ?? footprint.x * ELMOS_PER_FOOTPRINT * factor,
+    z: measured.z ?? footprint.z * ELMOS_PER_FOOTPRINT * factor,
+  };
 }
 
 /** The bone a chassis goes on. */
@@ -440,7 +443,9 @@ export function generateUnit(
 
   const generated: LegoGenerated["modules"] = [];
   const bulk = between(roll(inputs, "bulk"), job.bulk);
-  const width = unitWidth(inputs.plan, proportions, factor);
+  const extent = unitSize(inputs.plan, proportions, factor);
+  const width = extent.x;
+  const keepClear = new Set<string>();
   let scale = 1;
   let chassisTop: string | null = null;
 
@@ -475,7 +480,10 @@ export function generateUnit(
       if (!top || !instance) continue;
       if (isChassis) {
         const own = moduleWidth(module, pack);
-        scale = own ? (width * bulk) / own : 1;
+        // Bounded, so a big unit's chassis is not one part blown up: the
+        // covering fills out the rest of its body. The bulk applies after the
+        // bound, so two seeds of a big unit still differ.
+        scale = own ? Math.min(width / own, MAX_PART_SCALE) * bulk : 1;
         chassisTop = top;
       }
       const slotScale = isChassis
@@ -493,7 +501,7 @@ export function generateUnit(
         mountId && module.mount
           ? { piece: mountId, connector: module.mount.connector }
           : null,
-        scale * slotScale,
+        Math.min(scale * slotScale, MAX_PART_SCALE),
       );
       // Before the joins are resolved, so a joined piece that is stretched is
       // put where its join says.
@@ -502,9 +510,23 @@ export function generateUnit(
       );
       project = resolveConnections(project, pack).project;
       project = yieldPlanGun(project, instance);
+      if (!isChassis) keepClear.add(instance);
       generated.push({ slot: `${slot.id}.${n}`, module: module.id, instance });
     }
   }
+
+  const covered = coverSkeleton(project, {
+    pack,
+    rule: job.covering,
+    anchor: anchorBone(project),
+    chassis: chassisTop,
+    keepClear,
+    size: extent,
+    width,
+    newId,
+    roll: (key) => roll(inputs, key),
+  });
+  project = resolveConnections(covered.project, pack).project;
 
   return {
     ...project,
@@ -515,6 +537,7 @@ export function generateUnit(
       job: inputs.job,
       size: inputs.size,
       modules: generated,
+      covering: covered.covering,
     },
   };
 }
