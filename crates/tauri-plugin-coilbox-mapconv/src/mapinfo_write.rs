@@ -532,7 +532,7 @@ pub fn write_skybox(dir: &Path, jpeg: &[u8]) -> Result<SkyboxWritten, String> {
     std::fs::create_dir_all(&maps)
         .map_err(|e| format!("could not create {}: {e}", maps.display()))?;
     // Both files are written aside before either replaces anything, so a
-    // failed write leaves the map as it was.
+    // failed write or a failed sky rename leaves the map as it was.
     let path = maps.join(GENERATED_SKYBOX);
     let sky_tmp = maps.join(format!("{GENERATED_SKYBOX}.tmp"));
     let info_tmp = dir.join("mapinfo.lua.tmp");
@@ -551,8 +551,11 @@ pub fn write_skybox(dir: &Path, jpeg: &[u8]) -> Result<SkyboxWritten, String> {
         let _ = std::fs::remove_file(&info_tmp);
         return Err(e);
     }
-    std::fs::rename(&sky_tmp, &path)
-        .map_err(|e| format!("could not replace {}: {e}", path.display()))?;
+    if let Err(e) = std::fs::rename(&sky_tmp, &path) {
+        let _ = std::fs::remove_file(&sky_tmp);
+        let _ = std::fs::remove_file(&info_tmp);
+        return Err(format!("could not replace {}: {e}", path.display()));
+    }
     if mapinfo_changed {
         std::fs::rename(&info_tmp, &info)
             .map_err(|e| format!("could not replace {}: {e}", info.display()))?;
