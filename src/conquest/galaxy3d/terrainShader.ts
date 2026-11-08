@@ -6,6 +6,7 @@ import {
   planetOf,
   type SeaLook,
 } from "../planets";
+import { RIVER_EDGE_INSIDE, RIVER_EDGE_OUTSIDE } from "../rivers";
 import {
   GROUND_BODY,
   GROUND_HEAD,
@@ -64,6 +65,13 @@ export interface TerrainShading {
   frame?: TerrainFrame;
   /** Roads painted into the ground. See `groundShader.ts`. */
   ground?: GroundShading;
+  /**
+   * A generated map's rivers: their edge field (`riverEdgePixels` in
+   * `rivers.ts`) over the same picture coordinates as the normals, and the
+   * world units a pixel of that picture covers. The bake paints the water
+   * and the roads read it for their bridges. Drawn only with the detail.
+   */
+  rivers?: { edge: THREE.Texture; pixel: number };
   /**
    * The detail drawn once into a picture and read from it (`terrainBake.ts`).
    * Left out, the detail is worked out for every pixel of every frame.
@@ -137,8 +145,17 @@ uniform vec4 uTerrainFrame;
 uniform float uTerrainHaze;
 uniform vec3 uTerrainFar;
 uniform float uTerrainGreyBeyond;
+uniform sampler2D uRiverEdge;
+uniform float uRiverOn;
+uniform float uRiverPixel;
+uniform vec3 uRiverColour;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
+// How far a point lies outside the nearest river's edge in world units,
+// below 0 inside one. Only where uRiverOn is 1.
+float tRiverEdge(vec2 uv) {
+  return (texture2D(uRiverEdge, uv).r * ${(RIVER_EDGE_INSIDE + RIVER_EDGE_OUTSIDE).toFixed(1)} - ${RIVER_EDGE_INSIDE.toFixed(1)}) * uRiverPixel;
+}
 TERRAIN_NOISE_HERE`;
 
 /**
@@ -492,6 +509,23 @@ const DETAIL = /* glsl */ `
       }
       vec3 change = clamp(crisp / max(soft / sum, vec3(1e-3)), 0.5, 2.0);
       albedo *= mix(vec3(1.0), change, smoothstep(0.5, 0.95, sum));
+    }
+
+    // Rivers (rivers.ts) are the sea laid along their courses: water that
+    // ripples and glints, or whatever else this planet's sea is, on level
+    // ground.
+    float riverEdge = 1.0;
+    if (uRiverOn > 0.5) {
+      riverEdge = tRiverEdge(vTerrainUv);
+      float rSoft = max(footprint * 0.75, 0.004);
+      float river = (1.0 - smoothstep(-rSoft, rSoft, riverEdge)) * land;
+      if (river > 0.0) {
+        albedo = mix(albedo, uRiverColour, river);
+        n = normalize(mix(n, vec3(0.0, 1.0, 0.0), river * 0.85));
+        sea += river;
+        land = 1.0 - sea;
+        liquid = sea * uSeaLiquid;
+      }
     }
 
     // Each slot adds its share to the pattern it draws with. A sea that is
@@ -916,6 +950,9 @@ const DETAIL = /* glsl */ `
     // upper edge.
     float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
     albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), wet * 0.85);
+    // A river's banks are wet too, in a narrower band.
+    float bank = (1.0 - smoothstep(0.0, 0.05 + 0.03 * fine.x, riverEdge)) * land * uSeaLiquid * (1.0 - 0.5 * steep);
+    albedo = mix(albedo, albedo * vec3(0.45, 0.47, 0.5), bank * 0.7);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
     n = normalize(n + vec3(-bump.x, 0.0, -bump.y) - (bump3 - n * dot(bump3, n)));
 
@@ -1102,6 +1139,17 @@ export function applyTerrainShader(
       value: new THREE.Vector3(...TERRAIN_SUN),
     };
     shader.uniforms.uTerrainAmbient = { value: SHADE_AMBIENT };
+    const rivers = detail ? shading.rivers : undefined;
+    shader.uniforms.uRiverEdge = { value: rivers?.edge ?? placeholder };
+    shader.uniforms.uRiverOn = { value: rivers ? 1 : 0 };
+    shader.uniforms.uRiverPixel = { value: rivers?.pixel ?? 0 };
+    // Between the sea's shallows and its deeps: a river is not as deep as
+    // the open sea, and not as pale as a sandbar.
+    shader.uniforms.uRiverColour = {
+      value: planet
+        ? colour(planet.sea.shallow).lerp(colour(planet.sea.deep), 0.6)
+        : new THREE.Color(),
+    };
     // Roads (groundShader.ts).
     if (shading.ground) {
       Object.assign(shader.uniforms, groundUniforms(shading.ground));

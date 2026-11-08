@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { PlanetId } from "../planets";
+import type { RiverEdge } from "../rivers";
 import type { GroundShading } from "./groundShader";
 import {
   apronHeights,
@@ -133,6 +134,8 @@ export interface TerrainExtension {
   relief?: HeightGrid;
   /** The generator's weights at this picture's size. */
   biomes?: BiomePixels;
+  /** How far each point lies from a river's edge: `riverEdgePixels` in `rivers.ts`. */
+  rivers?: RiverEdge;
 }
 
 /**
@@ -381,6 +384,25 @@ export function buildTerrainMesh(
   const ring = margin
     ? buildMargin(scene, disposables, surface, margin, mat)
     : undefined;
+  // The rivers' edge field, which the bake paints them from and the roads
+  // read for their bridges. Only with the detail, since only the bake draws
+  // the water.
+  let rivers: TerrainShading["rivers"];
+  if (ext?.rivers && cavity && grid && span) {
+    const edge = new THREE.DataTexture(
+      ext.rivers.data,
+      ext.rivers.width,
+      ext.rivers.height,
+      THREE.RedFormat,
+    );
+    edge.flipY = false;
+    edge.magFilter = THREE.LinearFilter;
+    edge.minFilter = THREE.LinearMipmapLinearFilter;
+    edge.generateMipmaps = true;
+    edge.needsUpdate = true;
+    disposables.push(edge);
+    rivers = { edge, pixel: span.width / grid.width };
+  }
   const shading: TerrainShading = {
     normals,
     cavity,
@@ -388,6 +410,7 @@ export function buildTerrainMesh(
     detail: detail && isColorPixels(color),
     frame,
     ground,
+    rivers,
   };
   // Every material that shows the map picture.
   const pictured: THREE.MeshBasicMaterial[] = [mat];

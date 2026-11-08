@@ -35,6 +35,12 @@ export interface TerrainPixels {
   biomes?: BiomePixels;
   /** A generated map's land drawn on past its edge, for the view alone. */
   extension?: TerrainExtension;
+  /**
+   * A generated map's rivers (`rivers.ts`), each as x, y and half width
+   * triples in pixels of `height`. Past the map's edge they run below 0 and
+   * above its size. Roads are routed across them.
+   */
+  rivers?: Float32Array[];
 }
 
 /**

@@ -7,6 +7,7 @@ import { type GenerateOptions, type GenMap, generateGalaxy } from "./generate";
 import type { GalaxyDoc, MapSkin } from "./model";
 import type { ConquestNames } from "./names";
 import { planetOf } from "./planets";
+import { desertShare, findRivers, riverEdgePixels } from "./rivers";
 import { extendTerrain, TERRAIN_PIXELS } from "./terrainGen";
 import { generatedTerrainWithMargin, generateTerritories } from "./territories";
 
@@ -156,7 +157,8 @@ export function generatedTerrainPixels(
   const wide = extendTerrain(terrain, built.margin);
   // Shading only: the heights above stay the pinned ones. A cratered world is
   // dry, and gullies would cut through the rims.
-  const relief = planetOf(terrain.planet).craters
+  const planet = planetOf(terrain.planet);
+  const relief = planet.craters
     ? wide.relief
     : erodeRelief(
         wide.relief,
@@ -164,15 +166,39 @@ export function generatedTerrainPixels(
         wide.height,
         doc.generated?.seed ?? 0,
       );
+  // Rivers run on the eroded heights, so they lie in the valleys the light
+  // shows. The water is the pinned heights' alone, since a gully can be cut
+  // to 0 where the view still draws land. A cratered world has none.
+  const rivers = planet.craters
+    ? []
+    : findRivers(
+        relief.map((v, i) => (wide.relief[i] > 0 ? Math.max(v, 1e-6) : 0)),
+        wide.width,
+        wide.height,
+        desertShare(wide.biomes.a, wide.biomes.b, planet),
+      );
   return {
     color: { data: terrain.image, width, height },
     height: { data: terrain.heightmap, width, height },
     biomes: { ...terrain.biomes, width, height, planet: terrain.planet },
+    // In the map's own pixels, so less the margin.
+    rivers: rivers.map(({ points }) => {
+      const course = points.slice();
+      for (let k = 0; k < course.length; k += 3) {
+        course[k] -= wide.margin;
+        course[k + 1] -= wide.margin;
+      }
+      return course;
+    }),
     extension: {
       margin: wide.margin,
       image: { data: wide.image, width: wide.width, height: wide.height },
       heights: { data: wide.heights, width: wide.width, height: wide.height },
       relief: { data: relief, width: wide.width, height: wide.height },
+      rivers:
+        rivers.length > 0
+          ? riverEdgePixels(rivers, wide.width, wide.height)
+          : undefined,
       biomes: {
         ...wide.biomes,
         width: wide.width,
