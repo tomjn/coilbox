@@ -334,6 +334,42 @@ async fn relay_ping(registry: &Registry, server_key: &str) -> Option<u64> {
     Some(measured.as_millis() as u64)
 }
 
+/// `mp_battle_relay_ping`: how long a STUN round trip to the relay that
+/// battle `battle_id` goes through takes, for a joiner (issue #2869).
+///
+/// The address is the one the lobby sent with `BATTLERELAYADDRESS` and the
+/// reducer holds on the battle, so the frontend names a battle and never an
+/// address, and this cannot be asked to send packets to a place the lobby did
+/// not name. No credential is asked for, which is what [`mp_relay_ping`] has to
+/// do and a joiner must not: the lobby rations credentials per account.
+///
+/// `milliseconds` is null when there is nothing to report: the connection or
+/// the battle is not held, the lobby named no address for it, or the relay's
+/// STUN said nothing back. The last reads the same as the others for the reason
+/// given on [`mp_relay_ping`].
+#[tauri::command]
+pub(crate) async fn mp_battle_relay_ping(
+    registry: State<'_, Registry>,
+    server_key: String,
+    battle_id: u32,
+) -> Result<CliResult, ()> {
+    let milliseconds = battle_relay_ping(registry.inner(), &server_key, battle_id).await;
+    Ok(CliResult::ok(json!({ "milliseconds": milliseconds })))
+}
+
+/// The body of [`mp_battle_relay_ping`], with the `State` taken out so it can be
+/// driven directly in tests.
+async fn battle_relay_ping(registry: &Registry, server_key: &str, battle_id: u32) -> Option<u64> {
+    let address = {
+        let map = lock_or_recover(registry);
+        let conn = map.get(server_key)?;
+        let held = lock_or_recover(&conn.state);
+        held.battles.get(&battle_id)?.relay_address.clone()?
+    };
+    let measured = stun::ping(&address, stun::RELAY_PING_SAMPLES).await?;
+    Some(measured.as_millis() as u64)
+}
+
 /// A credential to replace the one a relay is already running on, whatever the
 /// lobby last minted.
 ///
@@ -955,6 +991,94 @@ pub(crate) mod tests {
         assert_eq!(
             got, None,
             "a relay that never answers must not be reported as a number"
+        );
+    }
+
+    /// A relay's STUN, as far as [`stun::ping`] needs one: it answers every
+    /// 20 byte binding request with the same header as a binding success. That
+    /// is a valid response with no attributes, and it spares this crate a STUN
+    /// dependency of its own.
+    async fn answering_relay() -> std::net::SocketAddr {
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0")
+            .await
+            .expect("a free port");
+        let addr = socket.local_addr().expect("a bound address");
+        tokio::spawn(async move {
+            let mut buf = [0u8; 1024];
+            while let Ok((len, from)) = socket.recv_from(&mut buf).await {
+                if len != 20 {
+                    continue;
+                }
+                let mut answer = buf[..len].to_vec();
+                // Binding request 0x0001 becomes binding success 0x0101.
+                answer[0] = 0x01;
+                answer[1] = 0x01;
+                if socket.send_to(&answer, from).await.is_err() {
+                    return;
+                }
+            }
+        });
+        addr
+    }
+
+    /// A relayed battle open on the connection, and what the lobby then said
+    /// about its relay's address, folded through the real parser and reducer.
+    fn relayed_battle(state: &Arc<Mutex<LobbyState>>, address_line: Option<&str>) {
+        let mut lines = vec![
+            "BATTLEOPENED 9 0 0 bob 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet Catcher\tTheirs\tBAR"
+                .to_string(),
+            "BATTLEISRELAYED 9".to_string(),
+        ];
+        lines.extend(address_line.map(str::to_string));
+        for line in lines {
+            reduce_at(&mut lock_or_recover(state), parse_line(&line), NOW);
+        }
+    }
+
+    /// Issue #2869. A joiner times the relay the lobby named for the battle,
+    /// with no credential asked for and nothing sent to the lobby.
+    #[tokio::test]
+    async fn a_joiner_times_the_relay_the_lobby_named_for_their_battle() {
+        let mut w = wired(ConnProtocol::TasServer);
+        let relay = answering_relay().await;
+        relayed_battle(&w.state, Some(&format!("BATTLERELAYADDRESS 9 {relay}")));
+
+        let got = battle_relay_ping(&w.registry, KEY, 9).await;
+        assert!(got.is_some(), "a relay that answered should be timed");
+        assert!(
+            w.sent.try_recv().is_err(),
+            "timing the relay must not spend a credential or send anything to the lobby"
+        );
+    }
+
+    /// Issue #2869. A relay that never answers is unmeasured, never a number.
+    #[tokio::test]
+    async fn a_relay_that_is_silent_to_a_joiner_is_unmeasured() {
+        let w = wired(ConnProtocol::TasServer);
+        let silent = {
+            let socket = tokio::net::UdpSocket::bind("127.0.0.1:0")
+                .await
+                .expect("a free port");
+            socket.local_addr().expect("a bound address")
+        };
+        relayed_battle(&w.state, Some(&format!("BATTLERELAYADDRESS 9 {silent}")));
+
+        assert_eq!(battle_relay_ping(&w.registry, KEY, 9).await, None);
+    }
+
+    /// Issue #2869. A lobby that sends only `BATTLEISRELAYED` names no address,
+    /// so there is nothing to time. So does a battle the client does not hold
+    /// and a connection that is not there.
+    #[tokio::test]
+    async fn with_no_address_named_there_is_nothing_to_time() {
+        let w = wired(ConnProtocol::TasServer);
+        relayed_battle(&w.state, None);
+
+        assert_eq!(battle_relay_ping(&w.registry, KEY, 9).await, None);
+        assert_eq!(battle_relay_ping(&w.registry, KEY, 10).await, None);
+        assert_eq!(
+            battle_relay_ping(&w.registry, "bob@bar:8200", 9).await,
+            None
         );
     }
 

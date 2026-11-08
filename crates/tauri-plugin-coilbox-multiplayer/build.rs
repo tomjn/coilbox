@@ -85,6 +85,7 @@ const COMMANDS: &[&str] = &[
     "mp_probe_host",
     "mp_turn_credentials",
     "mp_relay_ping",
+    "mp_battle_relay_ping",
     "mp_relay_traffic",
     "mp_leftover_relay_agent",
     "mp_relay_left_running",

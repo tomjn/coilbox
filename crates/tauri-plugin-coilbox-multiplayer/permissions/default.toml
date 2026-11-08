@@ -85,6 +85,7 @@ permissions = [
   "allow-mp-probe-host",
   "allow-mp-turn-credentials",
   "allow-mp-relay-ping",
+  "allow-mp-battle-relay-ping",
   "allow-mp-relay-traffic",
   "allow-mp-leftover-relay-agent",
   "allow-mp-relay-left-running",
