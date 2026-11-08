@@ -5400,6 +5400,18 @@ msgstr "{paletteFaces, plural, one {# cara nombra una entrada de la paleta de To
 msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr "{paletteFaces} caras tomaron un color de paleta que nada pudo resolver"
 
+#: src/lego/variant.ts
+msgid "{parent} (different weapon)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (heavier)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (lighter)"
+msgstr ""
+
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "{parentName} ({toName}) by its {connectorName}"
@@ -8847,6 +8859,10 @@ msgstr "Una torreta de armas sobre una base que no se mueve."
 msgid "A gunship circling or attacking keeps picking new points around the circle rather than holding one spot."
 msgstr "Una cañonera que da vueltas o ataca sigue eligiendo nuevos puntos del círculo en lugar de quedarse en uno."
 
+#: src/lego/variant.ts
+msgid "A heavier variant of {parent}."
+msgstr ""
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "A hill rising ahead of the unit."
@@ -8896,6 +8912,10 @@ msgstr ""
 #, fuzzy
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
 msgstr "Una distribución nombra sus edificios con los nombres de unidad del propio juego, así que se dibuja con las unidades de un juego."
+
+#: src/lego/variant.ts
+msgid "A lighter variant of {parent}."
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -9459,6 +9479,14 @@ msgstr "Una variable es un número con el que cuenta la misión: oleadas enviada
 #, fuzzy
 msgid "A variable needs a name"
 msgstr "Una variable necesita un nombre"
+
+#: src/lego/variant.ts
+msgid "A variant at seed {seed} fails the {check} check, and a variant keeps its seed. It said: {said}"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A variant of {parent} with a different weapon."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -18046,6 +18074,10 @@ msgstr ""
 msgid "Could not save the unit: {reason}"
 msgstr "No se pudo guardar la unidad: {reason}"
 
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Could not save the variant: {reason}"
+msgstr ""
+
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
 msgid "Could not set up engine {engineVersion} from this package. {failureReason}"
@@ -19628,6 +19660,10 @@ msgstr "Muere tras perder una quinta parte de su vida en los últimos segundos, 
 #, fuzzy
 msgid "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has."
 msgstr "Muere tras perder una vez y media su vida en los últimos segundos, el grado de muerte más fuerte que tiene un script."
+
+#: src/lego/variant.ts
+msgid "Different weapon"
+msgstr ""
 
 #: src/campaign/pages/components/RunDifficulty.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -24668,6 +24704,10 @@ msgstr "bitmap de nube de calor"
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr "heatfalloff: lo rápido que se agota el calor de la nube, no un número fijo de frames. Esta clase no tiene color propio."
 
+#: src/lego/variant.ts
+msgid "Heavier"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "height"
@@ -28347,6 +28387,10 @@ msgstr "Claro"
 msgid "Light hit up to"
 msgstr "Impacto leve hasta"
 
+#: src/lego/variant.ts
+msgid "Lighter"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Lightly hit and destroyed"
@@ -29112,6 +29156,14 @@ msgstr "Hacer de {rowLabel} un número fijo"
 #, fuzzy
 msgid "Make {rowLabel} follow the game"
 msgstr "Hacer que {rowLabel} siga al juego"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant of this unit as a new unit"
+msgstr ""
 
 #: src/multiplayer/battle/MemberRow.tsx
 #, fuzzy
@@ -33499,6 +33551,10 @@ msgstr "Ningún arma de {gameName} coincide."
 #, fuzzy
 msgid "No weapon matches that."
 msgstr "Ningún arma coincide."
+
+#: src/lego/variant.ts
+msgid "No weapon seed from {first} to {last} made a different weapon that passes the checks."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -41685,6 +41741,10 @@ msgstr "Guardado"
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Saved \"{copyName}\" to your presets."
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Saved \"{name}\" beside this unit."
 msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -51736,6 +51796,10 @@ msgstr "Esta unidad no tiene ninguna parte llamada \"{name}\". El motor no carga
 msgid "This unit has no root piece."
 msgstr "Esta unidad no tiene parte raíz."
 
+#: src/lego/variant.ts
+msgid "This unit has no weapon module to change."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
 msgid "This unit has no weapons."
@@ -51781,6 +51845,7 @@ msgid "This unit was imported from a game model, so it has no parts to make a st
 msgstr ""
 
 #: src/lego/reroll.ts
+#: src/lego/variant.ts
 msgid "This unit was not generated."
 msgstr ""
 
@@ -51825,6 +51890,10 @@ msgstr "no se pudo leer el archivo de geometría de esta unidad ({status}). Es l
 msgid "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes."
 msgstr "falta el archivo de geometría de esta unidad (404). Se escribió al importar el modelo, y es la única copia de las mallas."
 
+#: src/lego/variant.ts
+msgid "This unit's job fixes its weapon's size and shape, and the module library has no other weapon of its kind, so there is nothing to change."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "This unit's name"
@@ -51859,6 +51928,10 @@ msgstr "Este valor se ha cambiado respecto al valor por defecto del juego."
 
 #: src/lego/reroll.ts
 msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "This version cannot generate the job {name} at size {sized}, so a variant cannot be made."
 msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
@@ -54158,6 +54231,14 @@ msgstr "estrella variable"
 #, fuzzy
 msgid "Variables"
 msgstr "Variables"
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Variant"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Variant of {parentName}"
+msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy

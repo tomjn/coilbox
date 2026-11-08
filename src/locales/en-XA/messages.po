@@ -4406,6 +4406,18 @@ msgstr ""
 msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr ""
 
+#: src/lego/variant.ts
+msgid "{parent} (different weapon)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (heavier)"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "{parent} (lighter)"
+msgstr ""
+
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "{parentName} ({toName}) by its {connectorName}"
 msgstr ""
@@ -7189,6 +7201,10 @@ msgstr ""
 msgid "A gunship circling or attacking keeps picking new points around the circle rather than holding one spot."
 msgstr ""
 
+#: src/lego/variant.ts
+msgid "A heavier variant of {parent}."
+msgstr ""
+
 #: src/lego/environment.ts
 msgid "A hill rising ahead of the unit."
 msgstr ""
@@ -7228,6 +7244,10 @@ msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 msgid "A layout names its buildings by the game's own unit names, so it is drawn from one game's units."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A lighter variant of {parent}."
 msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
@@ -7687,6 +7707,14 @@ msgstr ""
 
 #: src/scenario/pages/components/VarPanel.tsx
 msgid "A variable needs a name"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A variant at seed {seed} fails the {check} check, and a variant keeps its seed. It said: {said}"
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "A variant of {parent} with a different weapon."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -14730,6 +14758,10 @@ msgstr ""
 msgid "Could not save the unit: {reason}"
 msgstr ""
 
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Could not save the variant: {reason}"
+msgstr ""
+
 #: src/content/pages/components/SetupCard.tsx
 msgid "Could not set up engine {engineVersion} from this package. {failureReason}"
 msgstr ""
@@ -16025,6 +16057,10 @@ msgstr ""
 
 #: src/lego/scriptPlayback.ts
 msgid "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "Different weapon"
 msgstr ""
 
 #: src/campaign/pages/components/RunDifficulty.tsx
@@ -20147,6 +20183,10 @@ msgstr ""
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr ""
 
+#: src/lego/variant.ts
+msgid "Heavier"
+msgstr ""
+
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "height"
 msgstr ""
@@ -23139,6 +23179,10 @@ msgstr ""
 msgid "Light hit up to"
 msgstr ""
 
+#: src/lego/variant.ts
+msgid "Lighter"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 msgid "Lightly hit and destroyed"
 msgstr ""
@@ -23764,6 +23808,14 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Make {rowLabel} follow the game"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Make a variant of this unit as a new unit"
 msgstr ""
 
 #: src/multiplayer/battle/MemberRow.tsx
@@ -27344,6 +27396,10 @@ msgstr ""
 
 #: src/lego/pages/components/WeaponsSection.tsx
 msgid "No weapon matches that."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "No weapon seed from {first} to {last} made a different weapon that passes the checks."
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -34050,6 +34106,10 @@ msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Saved \"{copyName}\" to your presets."
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Saved \"{name}\" beside this unit."
 msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -42241,6 +42301,10 @@ msgstr ""
 msgid "This unit has no root piece."
 msgstr ""
 
+#: src/lego/variant.ts
+msgid "This unit has no weapon module to change."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "This unit has no weapons."
 msgstr ""
@@ -42279,6 +42343,7 @@ msgid "This unit was imported from a game model, so it has no parts to make a st
 msgstr ""
 
 #: src/lego/reroll.ts
+#: src/lego/variant.ts
 msgid "This unit was not generated."
 msgstr ""
 
@@ -42315,6 +42380,10 @@ msgstr ""
 msgid "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes."
 msgstr ""
 
+#: src/lego/variant.ts
+msgid "This unit's job fixes its weapon's size and shape, and the module library has no other weapon of its kind, so there is nothing to change."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "This unit's name"
 msgstr ""
@@ -42343,6 +42412,10 @@ msgstr ""
 
 #: src/lego/reroll.ts
 msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
+msgstr ""
+
+#: src/lego/variant.ts
+msgid "This version cannot generate the job {name} at size {sized}, so a variant cannot be made."
 msgstr ""
 
 #: src/runlite/pages/components/RunContentNotice.tsx
@@ -44221,6 +44294,14 @@ msgstr ""
 #: src/scenario/pages/components/VarPanel.tsx
 #: src/scenario/triggerTypes.ts
 msgid "Variables"
+msgstr ""
+
+#: src/lego/pages/components/VariantMenu.tsx
+msgid "Variant"
+msgstr ""
+
+#: src/lego/pages/ProjectsPage.tsx
+msgid "Variant of {parentName}"
 msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx

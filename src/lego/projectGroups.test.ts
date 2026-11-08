@@ -385,6 +385,90 @@ describe("one section per game (#4328)", () => {
   });
 });
 
+describe("variants listed with their original (#3240)", () => {
+  const unit = (id: string, imported?: LegoImported, variantOf?: string) =>
+    ({
+      ...project(id, imported),
+      id,
+      unitName: id,
+      ...(variantOf ? { variantOf } : {}),
+    }) as LegoProject;
+  const opened: LegoImported = {
+    source: "/games/Game.sdd/objects3d/armcom.s3o",
+    game: { name: "Some Game", archive: "Game.sdd", member: "x.s3o" },
+  };
+
+  it("lists each variant right after its original", () => {
+    const grouped = groupProjects([
+      unit("a"),
+      unit("b"),
+      unit("a-heavier", undefined, "a"),
+      unit("a-lighter", undefined, "a"),
+    ]);
+    expect(grouped.own.map((p) => p.name)).toEqual([
+      "a",
+      "a-heavier",
+      "a-lighter",
+      "b",
+    ]);
+  });
+
+  it("files a variant in its original's section", () => {
+    const original = unit("orig", opened);
+    const variant = unit("orig-variant", undefined, "orig");
+    const grouped = groupProjects([variant, original]);
+    expect(grouped.own).toEqual([]);
+    expect(grouped.games[0]?.projects.map((p) => p.name)).toEqual([
+      "orig",
+      "orig-variant",
+    ]);
+  });
+
+  it("lists a variant of a roster unit in the roster, after its original", () => {
+    const member = {
+      ...unit("m1"),
+      roster: { id: "r", name: "Roster", job: "assault", tier: 1, tiers: 2 },
+    } as LegoProject;
+    const other = {
+      ...unit("m2"),
+      roster: { id: "r", name: "Roster", job: "assault", tier: 2, tiers: 2 },
+    } as LegoProject;
+    const grouped = groupProjects([
+      member,
+      other,
+      unit("m1-heavier", undefined, "m1"),
+    ]);
+    expect(grouped.own).toEqual([]);
+    expect(grouped.rosters[0]?.projects.map((p) => p.name)).toEqual([
+      "m1",
+      "m1-heavier",
+      "m2",
+    ]);
+  });
+
+  it("finds a variant by the game of its original", () => {
+    const grouped = groupProjects([
+      unit("orig", opened),
+      unit("orig-variant", undefined, "orig"),
+    ]);
+    const found = filterGrouped(grouped, "some game");
+    expect(found.games[0]?.projects).toHaveLength(2);
+    const byUnit = filterGrouped(
+      { ...grouped, games: [{ ...grouped.games[0], label: "Other" }] },
+      "some game",
+    );
+    expect(byUnit.games[0]?.projects.map((p) => p.name)).toEqual([
+      "orig",
+      "orig-variant",
+    ]);
+  });
+
+  it("treats a variant whose original was deleted as a unit of its own", () => {
+    const grouped = groupProjects([unit("v", undefined, "deleted")]);
+    expect(grouped.own.map((p) => p.name)).toEqual(["v"]);
+  });
+});
+
 describe("carryFoldedKeys (#4328)", () => {
   const group = {
     key: "short:sf",

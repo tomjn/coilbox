@@ -6,8 +6,9 @@
  * body bone, and the job's weapon or build arm on top of the chassis. The
  * result is an ordinary unit, which the game maker then edits like any other.
  *
- * The same four inputs and the same module library always give the same
- * document. Every choice rolls its own PRNG, seeded off the inputs and the
+ * The same four inputs, the same options that change the unit (style, factor,
+ * thickness, weapon seed and covering seed) and the same module library always
+ * give the same document. Every choice rolls its own PRNG, seeded off the inputs and the
  * choice's own key (`hashString`, `mulberry32` from `src/conquest/rng.ts`, the
  * pattern `src/workshop/randomMod.ts` follows), never off one stream that every
  * choice draws from in turn. Adding a choice later then leaves every other
@@ -127,6 +128,18 @@ export interface GeneratorOptions {
    *  the size. A roster's tiers between two sizes take one (#3239). It is not
    *  part of the rolls' keys, which keep the size. */
   factor?: number;
+  /** Times the covering thickness the job rolls (#3240). Not part of the
+   *  rolls' keys, so the covering is the same parts a little thicker. */
+  thickness?: number;
+  /** The seed the weapon slots' module, size and role rolls are keyed to, in
+   *  place of the unit's own (#3240). Everything else keeps the unit's seed, so
+   *  only the weapon differs. */
+  weaponSeed?: number;
+  /** The seed the covering's rolls are keyed to, in place of the unit's own
+   *  (#3240). A heavier or lighter variant that fails a check at the unit's
+   *  covering moves on a covering seed at a time, so the skeleton, chassis and
+   *  weapon stay the unit's. */
+  coveringSeed?: number;
 }
 
 /** A PRNG for one choice, seeded off the inputs and the choice's key. */
@@ -208,7 +221,7 @@ function anchorBone(project: LegoProject): LegoPiece {
  * all its tags, or all of the category when none does. In id order, so the
  * order the library lists them in cannot change a roll.
  */
-function modulesFor(
+export function modulesFor(
   modules: readonly LegoProject[],
   slot: JobSlot,
 ): LegoProject[] {
@@ -390,6 +403,11 @@ export function applyRoleRules(
 /** The roles that make a piece part of a weapon. */
 const GUN_ROLES: readonly string[] = ["turret", "aim", "barrel", "flare"];
 
+/** Whether a module carries a weapon: any of its pieces has a gun role. */
+export function holdsGun(module: LegoProject): boolean {
+  return module.pieces.some((p) => p.role && GUN_ROLES.includes(p.role));
+}
+
 /**
  * The plan's own gun joints made plain, for each gun role the module brings.
  *
@@ -481,6 +499,30 @@ export function generateUnit(
   ) {
     throw new Error(`a size factor is above zero, not ${options.factor}`);
   }
+  if (
+    options.thickness !== undefined &&
+    !(Number.isFinite(options.thickness) && options.thickness > 0)
+  ) {
+    throw new Error(
+      `a covering thickness is above zero, not ${options.thickness}`,
+    );
+  }
+  if (
+    options.weaponSeed !== undefined &&
+    !Number.isSafeInteger(options.weaponSeed)
+  ) {
+    throw new Error(
+      `a weapon seed is a whole number, not ${options.weaponSeed}`,
+    );
+  }
+  if (
+    options.coveringSeed !== undefined &&
+    !Number.isSafeInteger(options.coveringSeed)
+  ) {
+    throw new Error(
+      `a covering seed is a whole number, not ${options.coveringSeed}`,
+    );
+  }
   const factor = options.factor ?? job.size[size.id];
   const proportions = options.proportions
     ? planProportions(inputs.plan, options.proportions)
@@ -515,13 +557,18 @@ export function generateUnit(
   for (const [index, slot] of job.slots.entries()) {
     const candidates = modulesFor(options.modules, slot);
     if (candidates.length === 0) continue;
+    // A weapon slot rolls its module, size and roles off the weapon seed.
+    const slotInputs =
+      options.weaponSeed !== undefined && index > 0 && candidates.some(holdsGun)
+        ? { ...inputs, seed: options.weaponSeed }
+        : inputs;
     const count = randInt(
       skewed(roll(inputs, `slot:${slot.id}:count`), countLean(style)),
       ...slot.count,
     );
     for (let n = 1; n <= count; n++) {
       const module = pick(
-        roll(inputs, `slot:${slot.id}:${n}:module`),
+        roll(slotInputs, `slot:${slot.id}:${n}:module`),
         candidates,
       );
       const isChassis = index === 0;
@@ -565,7 +612,7 @@ export function generateUnit(
       const slotScale = isChassis
         ? 1
         : between(
-            roll(inputs, `slot:${slot.id}:${n}:scale`),
+            roll(slotInputs, `slot:${slot.id}:${n}:scale`),
             slot.scale ?? [1, 1],
           );
       const mountId = module.mount && inserted.idMap.get(module.mount.piece);
@@ -582,7 +629,7 @@ export function generateUnit(
       // Before the joins are resolved, so a joined piece that is stretched is
       // put where its join says.
       project = applyRoleRules(project, pack, instance, slot, (key) =>
-        roll(inputs, `slot:${slot.id}:${n}:${key}`),
+        roll(slotInputs, `slot:${slot.id}:${n}:${key}`),
       );
       project = resolveConnections(project, pack).project;
       project = yieldPlanGun(project, instance);
@@ -601,7 +648,16 @@ export function generateUnit(
 
   const covered = coverSkeleton(project, {
     pack,
-    rule: job.covering,
+    rule:
+      options.thickness === undefined
+        ? job.covering
+        : {
+            ...job.covering,
+            thickness: [
+              job.covering.thickness[0] * options.thickness,
+              job.covering.thickness[1] * options.thickness,
+            ],
+          },
     anchor: anchorBone(project),
     chassis: chassisTop,
     keepClear,
@@ -609,7 +665,13 @@ export function generateUnit(
     size: extent,
     width,
     newId,
-    roll: (key) => roll(inputs, key),
+    roll: (key) =>
+      roll(
+        options.coveringSeed === undefined
+          ? inputs
+          : { ...inputs, seed: options.coveringSeed },
+        key,
+      ),
     style,
   });
   project = resolveConnections(covered.project, pack).project;
@@ -625,6 +687,15 @@ export function generateUnit(
       modules: generated,
       covering: covered.covering,
       ...(running.gear.length > 0 ? { running: running.gear } : {}),
+      ...(options.thickness !== undefined
+        ? { thickness: options.thickness }
+        : {}),
+      ...(options.weaponSeed !== undefined
+        ? { weaponSeed: options.weaponSeed }
+        : {}),
+      ...(options.coveringSeed !== undefined
+        ? { coveringSeed: options.coveringSeed }
+        : {}),
       ...(style ? { style } : {}),
       ...(options.factor !== undefined ? { factor: options.factor } : {}),
     },
