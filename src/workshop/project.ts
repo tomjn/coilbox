@@ -1030,9 +1030,9 @@ export type ModProjectCode =
 /**
  * A project as a pasteable code, when one would survive the trip.
  *
- * Checked against {@link MAX_CODE_LENGTH}, the ceiling the deep-link parser
- * refuses above, rather than against the container's own inflate guard: a code
- * that inflates fine but is rejected on arrival is no use to whoever copied it.
+ * Checked against {@link MAX_CODE_LENGTH}, the longest code that may be pasted,
+ * rather than against the container's own inflate guard: a code that inflates
+ * fine but is rejected on arrival is no use to whoever copied it.
  * A project holds whole unit definitions once it has copies in it, so this is a
  * payload that really can grow past the limit, and the only place the author
  * can still do something about it is here.

@@ -53,26 +53,51 @@ export const OPEN_SCREENS = {
 
 export type OpenScreen = keyof typeof OPEN_SCREENS;
 
+/** The start of every import link that carries a code. */
+export const IMPORT_CODE_LINK_PREFIX = `${DEEP_LINK_SCHEME}://import?code=`;
+
+/**
+ * The longest `coilbox://import?code=` link the operating system can hand to
+ * Coilbox (issue #5150). The OS passes the link to the handler on its command
+ * line, so the smallest documented limit wins. Each figure is a documented
+ * limit, not a measurement: Windows and Linux have not been run.
+ * - macOS handed a scratch handler every link tried, up to 1,000,025
+ *   characters, so it is not a constraint.
+ * - Windows registers the handler as `"<exe>" "%1"` (the deep link plugin's
+ *   registry value, and the Windows documentation for URI scheme handlers).
+ *   CreateProcess caps a command line at 32,767 characters including the
+ *   terminating null, so 32,766 are usable. The executable path is at most
+ *   MAX_PATH, which is 260 characters, and the quoting adds five characters:
+ *   two quote marks around the path, the space, and two around the link.
+ * - Linux runs the desktop file's `"<exe>" %u`. execve(2) caps one argument at
+ *   32 pages (MAX_ARG_STRLEN), 131,072 bytes on 4 KiB pages including the
+ *   terminating null, so 131,071 are usable. `%u` is its own argument, so
+ *   nothing else counts against it.
+ */
+const WINDOWS_COMMAND_LINE_CHARS = 32_767 - 1;
+const WINDOWS_EXECUTABLE_PATH_CHARS = 260;
+const WINDOWS_COMMAND_LINE_QUOTING_CHARS = 5;
+const LINUX_ARGUMENT_CHARS = 131_072 - 1;
+export const MAX_LINK_LENGTH = Math.min(
+  WINDOWS_COMMAND_LINE_CHARS -
+    WINDOWS_EXECUTABLE_PATH_CHARS -
+    WINDOWS_COMMAND_LINE_QUOTING_CHARS,
+  LINUX_ARGUMENT_CHARS,
+);
+
+/** The longest code a link may carry, which is {@link MAX_LINK_LENGTH} less the
+ * link's own prefix. A longer code is shared by pasting it or as a file. */
+export const MAX_LINK_CODE_LENGTH =
+  MAX_LINK_LENGTH - IMPORT_CODE_LINK_PREFIX.length;
+
 /** An oversized value is rejected rather than acted on. Deep-link URLs are short
  * by nature, so a very long one is a red flag, not a legitimate payload.
  *
- * `MAX_CODE_LENGTH` stays below the container's 512 KB inflate ceiling on
- * purpose (issue #1342), and is not to be raised toward it. A handler is handed
- * the link by the OS, and two of the three platforms cannot be shown to pass
- * this much:
- * - macOS handed a scratch `cbxscratch://import?code=` handler every link
- *   tried intact, up to the 1,000,025 characters tried.
- * - Windows launches the handler with the link on its command line, and
- *   CreateProcess caps a command line at 32,767 characters.
- * - Linux runs the desktop file's Exec line, and execve(2) caps one argument at
- *   32 pages (MAX_ARG_STRLEN), 131,072 bytes on 4 KiB pages. A link at this
- *   limit is 131,094 characters.
- * Links are base64url, so a link is the code plus the 22 characters of
- * `coilbox://import?code=`. Today's limit is already above the Windows and
- * Linux figures, so by those documents a link near it will not open on those
- * two systems. That has not been run (issue #5150). Pasting a code involves no handler, so most pasted
- * codes are bound only by the inflate ceiling. `modProjectCode` checks this
- * limit as well. */
+ * `MAX_CODE_LENGTH` is the longest code that may be pasted. It stays below the
+ * container's 512 KB inflate ceiling on purpose (issue #1342), and is not to be
+ * raised toward it. Pasting involves no handler, so it is not bound by the
+ * command line limits that {@link MAX_LINK_CODE_LENGTH} is. `modProjectCode`
+ * checks this limit. */
 export const MAX_CODE_LENGTH = 128 * 1024;
 export const MAX_URL_LENGTH = 2048;
 export const MAX_FIELD_LENGTH = 512;
@@ -128,7 +153,7 @@ export function parseDeepLink(raw: string): DeepLinkParseResult {
     case "room":
       return parseRoom(params);
     case "import":
-      return parseImport(params);
+      return parseImport(params, raw.trim().length);
     case "open":
       return parseOpen(params);
     default: {
@@ -273,7 +298,10 @@ function parseRoom(params: URLSearchParams): DeepLinkParseResult {
   return { kind: "room", address: normal.host, port: normal.port };
 }
 
-function parseImport(params: URLSearchParams): DeepLinkParseResult {
+function parseImport(
+  params: URLSearchParams,
+  linkLength: number,
+): DeepLinkParseResult {
   const code = params.get("code")?.trim() || null;
   const rawUrl = params.get("url")?.trim() || null;
 
@@ -281,7 +309,9 @@ function parseImport(params: URLSearchParams): DeepLinkParseResult {
     return invalid(t`This import link has both a code and a URL.`);
   }
   if (code) {
-    if (code.length > MAX_CODE_LENGTH) {
+    // The link as written, not the code decoded from it: percent-escapes make
+    // the link longer than the code, and the link is what the OS passes on.
+    if (code.length > MAX_LINK_CODE_LENGTH || linkLength > MAX_LINK_LENGTH) {
       return invalid(t`This import link is too large.`);
     }
     return { kind: "import", source: { type: "code", code } };

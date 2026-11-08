@@ -19,8 +19,9 @@ import {
   battleIdFrom,
   DEEP_LINK_SCHEME,
   type DeepLinkAction,
-  MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
+  MAX_LINK_CODE_LENGTH,
+  MAX_LINK_LENGTH,
   MAX_URL_LENGTH,
   OPEN_SCREENS,
   validLinkBattlePassword,
@@ -112,14 +113,16 @@ function buildImport(
   if (source.type === "code") {
     const trimmed = source.code.trim();
     if (trimmed === "") return invalid(t`There is nothing to share yet.`);
-    if (trimmed.length > MAX_CODE_LENGTH) {
+    if (trimmed.length > MAX_LINK_CODE_LENGTH) {
       return invalid(t`This is too large to share as a link.`);
     }
     const params = new URLSearchParams({ code: trimmed });
-    return {
-      ok: true,
-      url: `${DEEP_LINK_SCHEME}://import?${params.toString()}`,
-    };
+    const url = `${DEEP_LINK_SCHEME}://import?${params.toString()}`;
+    // Percent-encoding makes a code with spaces or quotes longer in a link.
+    if (url.length > MAX_LINK_LENGTH) {
+      return invalid(t`This is too large to share as a link.`);
+    }
+    return { ok: true, url };
   }
 
   const trimmedUrl = source.url.trim();
