@@ -809,6 +809,22 @@ async fn mc_install_map(sdz_path: String, root_path: String, replace: bool) -> C
     }
 }
 
+/// Write `metalmap.png` in `directory` from the `.smf`'s own metal map, north
+/// row first, which is the way round `mapcompile` reads it back. Up to at least
+/// SpringMapConvNG 1.3.0, `mapdecompile` writes the metal map flipped north to
+/// south while every other layer comes out the right way round, so compiling
+/// what it wrote moved the metal (#5106).
+fn write_metal_png(directory: &Path, mapfile: &str) -> Result<(), String> {
+    let smf_path = directory.join(mapfile);
+    let at = smf::locate_smf_heights(&smf_path)?;
+    let metal = at.metal.ok_or("the SMF has no metal map inside it")?;
+    let bytes = smf::read_smf_metal(&smf_path, &metal)?;
+    image::GrayImage::from_raw(metal.width as u32, metal.height as u32, bytes)
+        .ok_or("the metal map is the wrong size")?
+        .save(directory.join("metalmap.png"))
+        .map_err(|e| format!("could not write metalmap.png: {e}"))
+}
+
 /// Resolve the decompile target into a `(directory, mapfile)` pair, extracting a
 /// `.sdz`/`.sd7` archive next to itself first. Runs on the blocking thread.
 fn prepare_decompile(input: &Path, on_log: &Channel<LogLine>) -> Result<(PathBuf, String), String> {
@@ -909,6 +925,11 @@ async fn mc_decompile<R: Runtime>(
             if !status.success() {
                 return Ok(CliResult::err(format!(
                     "mapdecompile exited with code {code}"
+                )));
+            }
+            if let Err(e) = write_metal_png(&directory, &mapfile) {
+                return Ok(CliResult::err(format!(
+                    "could not write the metal map the right way round: {e}"
                 )));
             }
             let map_info = std::fs::read(directory.join(&mapfile))
@@ -1152,5 +1173,255 @@ mod tests {
         std::fs::write(&path, b"nonsense").unwrap();
         assert!(image_info_cached(&path.to_string_lossy(), 16, None).is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A 4 by 4 square map whose 2 by 2 metal map reads 1, 2 on its north row
+    /// and 3, 4 on its south row.
+    fn square_smf(dir: &Path) -> String {
+        let mut b = vec![0u8; 80];
+        b[..15].copy_from_slice(b"spring map file");
+        b[24..28].copy_from_slice(&4i32.to_le_bytes());
+        b[28..32].copy_from_slice(&4i32.to_le_bytes());
+        b[32..36].copy_from_slice(&8i32.to_le_bytes());
+        b[52..56].copy_from_slice(&80u32.to_le_bytes());
+        b[68..72].copy_from_slice(&130u32.to_le_bytes());
+        b.extend_from_slice(&[0u8; 50]);
+        b.extend_from_slice(&[1, 2, 3, 4]);
+        let path = dir.join("square.smf");
+        std::fs::write(&path, &b).unwrap();
+        "square.smf".into()
+    }
+
+    /// #5106: the metal map mapdecompile wrote was upside down. Whatever it
+    /// wrote, the decompiled folder ends up with the `.smf`'s own metal map,
+    /// north row at the top of the picture.
+    #[test]
+    fn the_decompiled_metal_map_has_north_at_the_top() {
+        let dir = temp_dir("metal-png");
+        let mapfile = square_smf(&dir);
+        // What mapdecompile 1.3.0 leaves behind: the same map flipped.
+        image::GrayImage::from_raw(2, 2, vec![3, 4, 1, 2])
+            .unwrap()
+            .save(dir.join("metalmap.png"))
+            .unwrap();
+
+        write_metal_png(&dir, &mapfile).unwrap();
+
+        let png = image::open(dir.join("metalmap.png")).unwrap().into_luma8();
+        assert_eq!(png.dimensions(), (2, 2));
+        assert_eq!(png.into_raw(), vec![1, 2, 3, 4]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_map_with_no_metal_map_inside_it_is_an_error() {
+        let dir = temp_dir("metal-missing");
+        let mapfile = square_smf(&dir);
+        let mut b = std::fs::read(dir.join(&mapfile)).unwrap();
+        b.truncate(131);
+        std::fs::write(dir.join(&mapfile), &b).unwrap();
+        assert!(write_metal_png(&dir, &mapfile)
+            .unwrap_err()
+            .contains("no metal map"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Byte layers of a compiled `.smf` read straight from its pointers: the
+    /// heights, the type map, the metal map and the features as
+    /// `(name, x, z, heading)`.
+    struct Layers {
+        heights: Vec<u8>,
+        types: Vec<u8>,
+        metal: Vec<u8>,
+        features: Vec<(String, f32, f32, f32)>,
+    }
+
+    fn read_layers(path: &Path) -> Layers {
+        let b = std::fs::read(path).unwrap();
+        let int = |at: usize| i32::from_le_bytes(b[at..at + 4].try_into().unwrap());
+        let float = |at: usize| f32::from_le_bytes(b[at..at + 4].try_into().unwrap());
+        let (mapx, mapy) = (int(24) as usize, int(28) as usize);
+        let cells = mapx / 2 * mapy / 2;
+        let slice = |ptr: usize, len: usize| b[int(ptr) as usize..int(ptr) as usize + len].to_vec();
+        let mut at = int(72) as usize;
+        let (types, count) = (int(at), int(at + 4));
+        at += 8;
+        let mut names = Vec::new();
+        for _ in 0..types {
+            let end = at + b[at..].iter().position(|&c| c == 0).unwrap();
+            names.push(String::from_utf8(b[at..end].to_vec()).unwrap());
+            at = end + 1;
+        }
+        let features = (0..count as usize)
+            .map(|i| {
+                let f = at + 24 * i;
+                (
+                    names[int(f) as usize].clone(),
+                    float(f + 4),
+                    float(f + 12),
+                    float(f + 16),
+                )
+            })
+            .collect();
+        Layers {
+            heights: slice(52, (mapx + 1) * (mapy + 1) * 2),
+            types: slice(56, cells),
+            metal: slice(68, cells),
+            features,
+        }
+    }
+
+    /// Mean difference per channel between two pictures of one size, and
+    /// between the first and the second turned upside down.
+    fn difference_in_place_and_flipped(a: &image::RgbImage, b: &image::RgbImage) -> (f64, f64) {
+        let flipped = image::imageops::flip_vertical(b);
+        let mean = |other: &image::RgbImage| {
+            let total: u64 = a
+                .as_raw()
+                .iter()
+                .zip(other.as_raw())
+                .map(|(x, y)| u64::from(x.abs_diff(*y)))
+                .sum();
+            total as f64 / a.as_raw().len() as f64
+        };
+        (mean(b), mean(&flipped))
+    }
+
+    fn run(bin: &Path, dir: &Path, args: &[&str]) {
+        let out = std::process::Command::new(bin)
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{} failed: {}",
+            bin.display(),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    /// #5106 end to end: compile a map from made-up sources, decompile it the
+    /// way the Decompile page does, compile what that wrote, and check every
+    /// layer of the second map is where it was in the first.
+    #[test]
+    #[ignore = "needs the SpringMapConvNG release folder holding mapcompile and mapdecompile in COILBOX_MAPCONV_DIR"]
+    fn a_decompiled_map_compiles_back_with_every_layer_in_place() {
+        let tools = PathBuf::from(std::env::var("COILBOX_MAPCONV_DIR").unwrap());
+        let (compile, decompile) = (tools.join("mapcompile"), tools.join("mapdecompile"));
+        let root = temp_dir("round-trip");
+        let (src, first, second) = (root.join("src"), root.join("first"), root.join("second"));
+        for d in [&src, &first, &second] {
+            std::fs::create_dir_all(d).unwrap();
+        }
+
+        // A 128 by 128 square map. Every source differs from itself upside
+        // down, so a flip in any layer shows.
+        let texture = image::RgbImage::from_fn(1024, 1024, |x, y| {
+            image::Rgb([(x / 4) as u8, (y / 4) as u8, 0])
+        });
+        texture.save(src.join("texture.png")).unwrap();
+        texture.save(src.join("minimap.png")).unwrap();
+        image::ImageBuffer::<image::Luma<u16>, _>::from_fn(129, 129, |x, y| {
+            image::Luma([((y * 129 + x) * 3) as u16])
+        })
+        .save(src.join("heightmap.png"))
+        .unwrap();
+        // mapcompile turns grey 91, 182 and 203 into one less, so the metal
+        // here keeps to the levels it reads back exactly.
+        let metal: Vec<u8> = (0..64 * 64u32)
+            .map(|i| match (i % 64 * 3 + i / 64) as u8 {
+                v @ (91 | 182 | 203) => v + 1,
+                v => v,
+            })
+            .collect();
+        assert!(!metal.iter().any(|v| [91, 182, 203].contains(v)));
+        image::GrayImage::from_raw(64, 64, metal.clone())
+            .unwrap()
+            .save(src.join("metalmap.png"))
+            .unwrap();
+        image::GrayImage::from_fn(64, 64, |x, y| image::Luma([((x + 2 * y) % 8) as u8]))
+            .save(src.join("typemap.png"))
+            .unwrap();
+        std::fs::write(src.join("features.txt"), "rock1 100 50 900 90\n").unwrap();
+
+        let compile_from = |from: &Path, out: &Path| {
+            let file = |name: &str| from.join(name).to_string_lossy().into_owned();
+            run(
+                &compile,
+                out,
+                &[
+                    "-t",
+                    &file("texture.png"),
+                    "-h",
+                    &file("heightmap.png"),
+                    "-m",
+                    &file("metalmap.png"),
+                    "-z",
+                    &file("typemap.png"),
+                    "-minimap",
+                    &file("minimap.png"),
+                    "-features",
+                    &file("features.txt"),
+                    "-minh",
+                    "0",
+                    "-maxh",
+                    "100",
+                    "-noclamp",
+                    "-ct",
+                    "1",
+                    "-o",
+                    "rt",
+                ],
+            );
+        };
+        compile_from(&src, &first);
+        for name in ["rt.smf", "rt.smt"] {
+            std::fs::copy(first.join(name), second.join(name)).unwrap();
+        }
+        run(
+            &decompile,
+            &second,
+            &[
+                "-directory",
+                &second.to_string_lossy(),
+                "-mapfile",
+                "rt.smf",
+            ],
+        );
+        write_metal_png(&second, "rt.smf").unwrap();
+        let third = root.join("third");
+        std::fs::create_dir_all(&third).unwrap();
+        compile_from(&second, &third);
+
+        let (a, b) = (
+            read_layers(&first.join("rt.smf")),
+            read_layers(&third.join("rt.smf")),
+        );
+        assert_eq!(a.metal, metal, "mapcompile reads the metal north row first");
+        assert!(a.heights == b.heights, "the heights moved");
+        assert!(a.types == b.types, "the type map moved");
+        assert!(a.metal == b.metal, "the metal moved");
+        assert_eq!(a.features.len(), 1);
+        assert_eq!(b.features.len(), 1);
+        let ((an, ax, az, ah), (bn, bx, bz, bh)) = (&a.features[0], &b.features[0]);
+        assert_eq!((an, ax, az), (bn, bx, bz), "the feature moved");
+        // The headings pass through features.txt as degrees printed with %f.
+        assert!(
+            (ah - bh).abs() < 1.0,
+            "the feature turned from {ah} to {bh}"
+        );
+
+        // The texture and minimap are DXT1 compressed, so they come back close
+        // rather than exact. Each must be closer the way round it went in.
+        for name in ["texture.png", "minimap.png"] {
+            let back = image::open(second.join(name)).unwrap().into_rgb8();
+            let (in_place, flipped) = difference_in_place_and_flipped(&texture, &back);
+            assert!(
+                in_place < flipped,
+                "{name} came back upside down: {in_place} against {flipped}"
+            );
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
