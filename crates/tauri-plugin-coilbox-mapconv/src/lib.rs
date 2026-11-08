@@ -11,6 +11,7 @@ mod mapinfo;
 mod mapinfo_write;
 mod sidecar;
 mod smf;
+mod splat;
 
 use image::GenericImageView;
 use picoframe_core::CliResult;
@@ -785,6 +786,48 @@ async fn mc_write_skybox(out_dir: String, jpeg: Vec<u8>) -> CliResult {
     }
 }
 
+/// Where the DNTS textures are kept between runs, under the app data folder.
+const DNTS_CACHE_SUBDIR: &str = "mapconv-dnts";
+
+/// `mc_write_splats` generates splat detail for the map compiled as
+/// `<outDir>/<outSuffix>.smf` from its heightmap (#5090), writes it under
+/// `<outDir>/maps/` and names it in `mapinfo.lua`. `texture` is the diffuse
+/// texture the ground type is picked from. Returns `{ files, ground,
+/// mapinfoChanged }`.
+#[tauri::command]
+async fn mc_write_splats<R: Runtime>(
+    app: AppHandle<R>,
+    out_dir: String,
+    out_suffix: String,
+    texture: Option<String>,
+) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&out_dir)) {
+        return CliResult::err(e);
+    }
+    let cache = match coilbox_portable::data_dir(&app) {
+        Ok(d) => d.join(DNTS_CACHE_SUBDIR),
+        Err(e) => return CliResult::err(e),
+    };
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        splat::write_splats(
+            Path::new(&out_dir),
+            &out_suffix,
+            texture.as_deref().filter(|t| !t.is_empty()).map(Path::new),
+            &cache,
+        )
+    })
+    .await;
+    match result {
+        Ok(Ok(w)) => CliResult::ok(json!({
+            "files": w.files.iter().map(|f| f.to_string_lossy()).collect::<Vec<_>>(),
+            "ground": w.ground.name(),
+            "mapinfoChanged": w.mapinfo_changed,
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("splat task failed: {e}")),
+    }
+}
+
 /// `mc_package_map` writes `<outDir>/<outSuffix>.sdz` from a finished compile and
 /// the `mapinfo.lua` beside it. Returns `{ path, files }`.
 #[tauri::command]
@@ -1057,6 +1100,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_read_teams,
             mc_write_mapinfo,
             mc_write_skybox,
+            mc_write_splats,
             mc_package_map,
             mc_install_map,
             mc_decompile,

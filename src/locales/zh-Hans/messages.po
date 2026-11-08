@@ -24246,6 +24246,10 @@ msgstr "授予权限"
 msgid "Graphics"
 msgstr "图形"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "grass"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Gravity"
@@ -41369,6 +41373,10 @@ msgstr "与 accuracy 相同，但在开火单位移动时使用。"
 msgid "Same as default"
 msgstr "与默认相同"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "sand"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -44756,6 +44764,10 @@ msgstr "快照"
 #, fuzzy
 msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
 msgstr "为此内容文件夹的 <0>springsettings.cfg</0>、<1>LuaUI/Config</1> 和 <2>uikeys.txt</2> 创建快照并切换。"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "snow"
+msgstr ""
 
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
@@ -55946,6 +55958,10 @@ msgstr "写入文件夹便携性：不适用（非便携）"
 msgid "Write sky"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write splats"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56070,6 +56086,10 @@ msgstr ""
 #, fuzzy
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "已将 {modelsFound} 个模型中的 {modelsWritten} 个写入 {0, plural, other {# 张图集}}。"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
+msgstr ""
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
