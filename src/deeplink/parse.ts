@@ -68,7 +68,9 @@ export type OpenScreen = keyof typeof OPEN_SCREENS;
  *   32 pages (MAX_ARG_STRLEN), 131,072 bytes on 4 KiB pages. A link at this
  *   limit is 131,094 characters.
  * Links are base64url, so a link is the code plus the 22 characters of
- * `coilbox://import?code=`. Pasting a code involves no handler, so most pasted
+ * `coilbox://import?code=`. Today's limit is already above the Windows and
+ * Linux figures, so by those documents a link near it will not open on those
+ * two systems. That has not been run (issue #5150). Pasting a code involves no handler, so most pasted
  * codes are bound only by the inflate ceiling. `modProjectCode` checks this
  * limit as well. */
 export const MAX_CODE_LENGTH = 128 * 1024;
