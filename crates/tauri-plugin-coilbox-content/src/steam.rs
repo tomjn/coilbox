@@ -5,7 +5,8 @@
 //! lists them all in `libraryfolders.vdf`, which it keeps under both `steamapps/`
 //! and `config/`. On Windows even the install folder is a user choice, recorded in
 //! the registry at `HKCU\Software\Valve\Steam\SteamPath`, so the Program Files
-//! (x86) default is only a guess (issue #1695).
+//! (x86) default is only a guess (issue #1695). On Linux, a Flatpak or Snap Steam
+//! keeps its own copy of Steam's folder under the user's home (issue #1781).
 //!
 //! Everything here except [`library_dirs`] is pure, so `paths::candidate_roots`
 //! stays a pure function: the command layer does the reading and hands the result
@@ -32,9 +33,22 @@ pub fn default_install_dirs(os: Os, b: &BaseDirs) -> Vec<PathBuf> {
             .home
             .iter()
             .flat_map(|h| {
+                let flatpak = h.join(".var").join("app").join("com.valvesoftware.Steam");
                 [
                     h.join(".steam").join("steam"),
                     h.join(".local").join("share").join("Steam"),
+                    // Flatpak Steam: the wrapper keeps Steam in `.local/share`
+                    // under the app's folder, and before it moved it there Steam
+                    // was in Flatpak's own `data` folder (issue #1781).
+                    flatpak.join(".local").join("share").join("Steam"),
+                    flatpak.join("data").join("Steam"),
+                    // Snap Steam runs with HOME set to the snap's common folder.
+                    h.join("snap")
+                        .join("steam")
+                        .join("common")
+                        .join(".local")
+                        .join("share")
+                        .join("Steam"),
                 ]
             })
             .collect(),
@@ -179,6 +193,7 @@ fn push_unique(out: &mut Vec<PathBuf>, path: PathBuf) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     /// The shape Steam writes today, with a second library on another drive. The
     /// `apps` block is included because its numbered keys must not be read as
@@ -314,5 +329,136 @@ mod tests {
             ..BaseDirs::default()
         };
         assert!(library_dirs(Os::Mac, &b).is_empty());
+    }
+
+    /// A fresh home under the temp folder, so a test builds only the layout it
+    /// is about.
+    fn fake_home(name: &str) -> (PathBuf, BaseDirs) {
+        let home = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        let b = BaseDirs {
+            home: Some(home.clone()),
+            ..BaseDirs::default()
+        };
+        (home, b)
+    }
+
+    fn flatpak_steam(home: &Path) -> PathBuf {
+        home.join(".var")
+            .join("app")
+            .join("com.valvesoftware.Steam")
+    }
+
+    fn write_vdf(install: &Path, library: &str) {
+        std::fs::create_dir_all(install.join("config")).unwrap();
+        std::fs::write(
+            install.join("config").join("libraryfolders.vdf"),
+            format!("\t\"path\"\t\"{library}\"\n"),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_flatpak_steam_is_found() {
+        let (home, b) = fake_home("content_steam_test_flatpak");
+        let install = flatpak_steam(&home)
+            .join(".local")
+            .join("share")
+            .join("Steam");
+        std::fs::create_dir_all(&install).unwrap();
+        assert_eq!(library_dirs(Os::Linux, &b), vec![install]);
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn a_flatpak_steam_from_before_the_wrapper_moved_its_data_is_found() {
+        // Flatpak's own XDG data folder, where Steam lived until the wrapper
+        // moved it to `.local/share`.
+        let (home, b) = fake_home("content_steam_test_flatpak_legacy");
+        let install = flatpak_steam(&home).join("data").join("Steam");
+        std::fs::create_dir_all(&install).unwrap();
+        assert_eq!(library_dirs(Os::Linux, &b), vec![install]);
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn a_library_listed_by_a_flatpak_steam_is_followed() {
+        let (home, b) = fake_home("content_steam_test_flatpak_library");
+        let install = flatpak_steam(&home)
+            .join(".local")
+            .join("share")
+            .join("Steam");
+        write_vdf(&install, "/mnt/games/SteamLibrary");
+        assert_eq!(
+            library_dirs(Os::Linux, &b),
+            vec![install, PathBuf::from("/mnt/games/SteamLibrary")]
+        );
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn a_snap_steam_is_found() {
+        let (home, b) = fake_home("content_steam_test_snap");
+        let install = home
+            .join("snap")
+            .join("steam")
+            .join("common")
+            .join(".local")
+            .join("share")
+            .join("Steam");
+        std::fs::create_dir_all(&install).unwrap();
+        assert_eq!(library_dirs(Os::Linux, &b), vec![install]);
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_library_list_the_snap_links_in_is_followed() {
+        // The snap's launcher links the vdf of an existing Steam into its own
+        // config folder instead of writing one. The target sits outside every
+        // folder probed, so only the link can lead to the library.
+        let (home, b) = fake_home("content_steam_test_snap_library");
+        let target = home.join("existing-steam");
+        write_vdf(&target, "/mnt/games/SteamLibrary");
+        let install = home
+            .join("snap")
+            .join("steam")
+            .join("common")
+            .join(".local")
+            .join("share")
+            .join("Steam");
+        std::fs::create_dir_all(install.join("config")).unwrap();
+        std::os::unix::fs::symlink(
+            target.join("config").join("libraryfolders.vdf"),
+            install.join("config").join("libraryfolders.vdf"),
+        )
+        .unwrap();
+        assert_eq!(
+            library_dirs(Os::Linux, &b),
+            vec![install, PathBuf::from("/mnt/games/SteamLibrary")]
+        );
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn a_linux_home_without_steam_has_no_libraries() {
+        let (home, b) = fake_home("content_steam_test_linux_absent");
+        assert!(library_dirs(Os::Linux, &b).is_empty());
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn a_plain_linux_steam_is_still_found_first() {
+        let (home, b) = fake_home("content_steam_test_linux_plain");
+        let plain = home.join(".local").join("share").join("Steam");
+        let flatpak = flatpak_steam(&home)
+            .join(".local")
+            .join("share")
+            .join("Steam");
+        std::fs::create_dir_all(&plain).unwrap();
+        std::fs::create_dir_all(&flatpak).unwrap();
+        assert_eq!(library_dirs(Os::Linux, &b), vec![plain, flatpak]);
+        let _ = std::fs::remove_dir_all(&home);
     }
 }
