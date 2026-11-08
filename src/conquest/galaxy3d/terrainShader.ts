@@ -130,6 +130,7 @@ uniform vec3 uBiomeSteep[2];
 uniform vec3 uBiomeClearing;
 uniform vec3 uBiomeColour[8];
 uniform float uSeaLiquid;
+uniform float uTerrainFrost;
 uniform float uSeaPattern;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
@@ -799,10 +800,14 @@ const DETAIL = /* glsl */ `
       // they read as layers and not as contour lines.
       float tilt = smoothstep(0.012, 0.07, 1.0 - n.y);
       float strata = max(steep, (pw[${P.rock}] + pw[${P.mesa}]) * tilt) * (1.0 - pw[${P.snow}]);
-      float warp = broad.x * 1.1 + stone.x * 0.45 + fine.x * 0.1;
+      float warp = broad.x * 1.4 + stone.x * 0.45 + fine.x * 0.25;
+      // The beds thicken and thin from place to place, and dip a little
+      // across the map, so they never follow one height all the way round.
+      vec3 vary = tSimplex(p / 9.0 + 41.0);
+      float dip = dot(p, vec2(0.6, -0.8)) * 0.05;
       for (int k = 0; k < 2; k++) {
-        float rate = k == 0 ? 3.0 : 10.0;
-        float depth = vTerrainPos.y * rate + warp * (k == 0 ? 1.0 : 0.6) + float(k) * 5.3;
+        float rate = (k == 0 ? 3.0 : 10.0) * (1.0 + 0.3 * vary.x);
+        float depth = (vTerrainPos.y + dip) * rate + warp * (k == 0 ? 1.0 : 0.6) + float(k) * 5.3;
         float keepBed = 1.0 - smoothstep(0.5, 1.4, fwidth(depth));
         if (keepBed <= 0.0) break;
         float bed = floor(depth);
@@ -811,12 +816,14 @@ const DETAIL = /* glsl */ `
         float within = fract(depth);
         float seam = 1.0 - smoothstep(0.0, 0.09 + fwidth(depth), within);
         float lip = smoothstep(0.82, 1.0, within) * (1.0 - seam);
-        float weight = strata * keepBed * (k == 0 ? 1.0 : 0.45);
+        // Each bed pinches out in places along the slope.
+        float lens = smoothstep(-0.45, 0.1, tSimplex(p / 2.5 + bed * 3.1 + float(k) * 11.0).x);
+        float weight = strata * keepBed * lens * (k == 0 ? 1.0 : 0.45);
         // Hard and soft beds alternate, so neighbours differ in tone.
         float hard = mod(bed, 2.0) * 2.0 - 1.0;
-        form += weight * (hard * (0.1 + 0.12 * pick.x) - seam * 0.15 + lip * 0.12);
-        vec3 tint = mix(vec3(1.12, 1.0, 0.8), vec3(0.84, 0.88, 1.0), pick.y);
-        albedo = mix(albedo, albedo * tint, weight * 0.75);
+        form += weight * (hard * (0.1 + 0.12 * pick.x) - seam * 0.12 + lip * 0.05);
+        vec3 tint = mix(vec3(1.08, 1.0, 0.9), vec3(0.94, 0.95, 0.97), pick.y);
+        albedo = mix(albedo, albedo * tint, weight * 0.6);
       }
       shadeMul += pw[${P.mesa}] * fine.x * 0.12;
       // Edges and ridges weather pale, and the crevices between fill dark.
@@ -825,6 +832,15 @@ const DETAIL = /* glsl */ `
       float crevice = smoothstep(-0.03, -0.35, cavFine);
       form += rock * rim * 0.3;
       form -= rock * (1.0 - min(talus, 1.0)) * (crevice * 0.35 + smoothstep(0.0, -0.5, cavCoarse) * 0.1);
+      // Frost on a cold world: rime on the ledges and in the cracks, and a
+      // fine pale grain over the rest, so the stone reads matte.
+      if (uTerrainFrost > 0.0) {
+        float rime = smoothstep(0.4, 0.85, (1.0 - tilt) * 0.6 + crevice * 0.45 + broad.x * 0.25 + fine.x * 0.15);
+        vec3 grey = vec3(dot(albedo, vec3(0.2126, 0.7152, 0.0722)));
+        albedo = mix(albedo, grey, rock * uTerrainFrost * 0.5);
+        albedo = mix(albedo, vec3(0.8, 0.84, 0.88), rock * uTerrainFrost * rime * 0.4);
+        form += rock * uTerrainFrost * (fine.x * 0.05 - rim * 0.08);
+      }
       // Talus is loose stone, greyer than the face it broke from.
       albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.45 + broad.x * 0.4), talus * 0.85);
       form += talus * 0.1;
@@ -1090,6 +1106,10 @@ export function applyTerrainShader(
     };
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
+    };
+    // Frost on the rock of a cold world.
+    shader.uniforms.uTerrainFrost = {
+      value: Math.min(1, Math.max(0, (planet?.climate.cold ?? 0) / 0.6)),
     };
     shader.uniforms.uSeaPattern = {
       value: (planet && SEA_PATTERN[planet.sea.look]) ?? -1,
