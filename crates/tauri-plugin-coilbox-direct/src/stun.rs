@@ -234,41 +234,53 @@ pub const RELAY_PING_SAMPLES: usize = 3;
 /// one is a cheap and harmless way to learn a relay's round trip without
 /// spending any TURN traffic on it.
 ///
-/// `None` only when every attempt timed out. That reads the same whether the
-/// relay is unreachable or has simply turned plain STUN off, and it has to:
-/// a relay with `no-stun` set can still be relaying perfectly well, so this
-/// is "could not measure", never "the relay is down".
+/// `None` when nothing could be timed: every attempt timed out, `server` did
+/// not resolve in time or at all, or no socket could be bound. That reads the
+/// same whether the relay is unreachable or has simply turned plain STUN off,
+/// and it has to: a relay with `no-stun` set can still be relaying perfectly
+/// well, so this is "could not measure", never "the relay is down".
 ///
 /// `server` may be a name, an IPv4 address or a bracketed IPv6 address with
-/// its port, as a lobby writes a relay's address (issue #2869). It is resolved
-/// once, preferring an IPv4 answer, and the socket is bound in the family of
-/// the address it will talk to, because an IPv4 socket cannot send to an IPv6
-/// address.
+/// its port, as a lobby writes a relay's address (issue #2869). A name that
+/// resolves to several addresses is tried one at a time, IPv4 first, until
+/// one answers, so a machine with only IPv6 still reaches a relay that has an
+/// AAAA record. Each socket is bound in the family of the address it talks
+/// to, because an IPv4 socket cannot send to an IPv6 address.
 pub async fn ping(server: &str, samples: usize) -> Option<Duration> {
-    let target = resolve(server).await?;
-    let socket = bind_for(target).await?;
-    let mut times = Vec::with_capacity(samples);
-    for _ in 0..samples {
-        let started = Instant::now();
-        if ask_with(&socket, target, answered).await.is_some() {
-            times.push(started.elapsed());
-        }
-    }
-    if times.is_empty() {
+    if samples == 0 {
         return None;
     }
-    Some(median(times))
+    for target in resolve(server).await {
+        let Some(socket) = bind_for(target).await else {
+            continue;
+        };
+        let mut times = Vec::with_capacity(samples);
+        for _ in 0..samples {
+            let started = Instant::now();
+            if ask_with(&socket, target, answered).await.is_some() {
+                times.push(started.elapsed());
+            } else if times.is_empty() {
+                // The first try got nothing, so this address is not the one.
+                break;
+            }
+        }
+        if !times.is_empty() {
+            return Some(median(times));
+        }
+    }
+    None
 }
 
-/// The address `server` names, an IPv4 one when it has both kinds because a
-/// machine with no IPv6 route is the likelier one.
-async fn resolve(server: &str) -> Option<SocketAddr> {
-    let found: Vec<SocketAddr> = lookup_host(server).await.ok()?.collect();
-    found
-        .iter()
-        .find(|addr| addr.is_ipv4())
-        .or_else(|| found.first())
-        .copied()
+/// The addresses `server` names, IPv4 ones first because a machine with no
+/// IPv6 route is the likelier one. Empty when the name does not resolve within
+/// [`PER_SERVER_TIMEOUT`], so a hung lookup cannot hold the measurement up.
+async fn resolve(server: &str) -> Vec<SocketAddr> {
+    let Ok(Ok(found)) = tokio::time::timeout(PER_SERVER_TIMEOUT, lookup_host(server)).await else {
+        return Vec::new();
+    };
+    let (mut v4, v6): (Vec<_>, Vec<_>) = found.partition(SocketAddr::is_ipv4);
+    v4.extend(v6);
+    v4
 }
 
 /// An ephemeral socket in the same family as `target`.
@@ -572,6 +584,27 @@ mod tests {
         let addr = answering_stun_server().await;
         let got = ping(&format!("localhost:{}", addr.port()), RELAY_PING_SAMPLES).await;
         assert!(got.is_some(), "a name that resolves should be timed");
+    }
+
+    /// A name with both kinds of address, where only the IPv6 one has a relay
+    /// behind it, is still timed: the IPv4 address is tried first and given up
+    /// on.
+    #[tokio::test]
+    async fn a_name_whose_only_working_address_is_ipv6_is_still_timed() {
+        let Some(addr) = answering_stun_server_on("[::1]:0").await else {
+            return;
+        };
+        let both = lookup_host(format!("localhost:{}", addr.port()))
+            .await
+            .map(|found| found.collect::<Vec<_>>())
+            .unwrap_or_default();
+        if !both.iter().any(SocketAddr::is_ipv4) || !both.iter().any(SocketAddr::is_ipv6) {
+            // This machine's `localhost` is not both, so there is no second
+            // address to fall back to.
+            return;
+        }
+        let got = ping(&format!("localhost:{}", addr.port()), 1).await;
+        assert!(got.is_some(), "the IPv6 address should have been tried");
     }
 
     /// An address that is not one gives nothing back, rather than a number or

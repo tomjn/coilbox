@@ -147,6 +147,27 @@ describe("useBattleRelayPing", () => {
     await waitFor(() => expect(result.current).toBeNull());
   });
 
+  it("drops the last battle's figure while the next one is measured", async () => {
+    battlePing.mockResolvedValueOnce({ milliseconds: 10 });
+    let release: (answer: { milliseconds: number | null }) => void = () => {};
+    battlePing.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    const { result, rerender } = renderHook(
+      ({ id }: { id: number }) =>
+        useBattleRelayPing("alice@bar:8200", id, true),
+      { initialProps: { id: 9 } },
+    );
+    await waitFor(() => expect(result.current).toBe(10));
+
+    rerender({ id: 10 });
+    await waitFor(() => expect(result.current).toBeUndefined());
+    release({ milliseconds: 55 });
+    await waitFor(() => expect(result.current).toBe(55));
+  });
+
   it("starts again for another battle and stops once disabled", async () => {
     battlePing.mockResolvedValue({ milliseconds: 10 });
     const { rerender } = renderHook(

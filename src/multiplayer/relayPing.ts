@@ -69,10 +69,10 @@ export function useBattleRelayPing(
 ): RelayPing {
   const [ping, setPing] = useState<RelayPing>(undefined);
   useEffect(() => {
-    if (!serverKey || !enabled) {
-      setPing(undefined);
-      return;
-    }
+    // Cleared first, so another battle never shows this one's figure while its
+    // own is being measured.
+    setPing(undefined);
+    if (!serverKey || !enabled) return;
     return pingEvery(() => mpBattleRelayPing({ serverKey, battleId }), setPing);
   }, [serverKey, battleId, enabled]);
   return ping;

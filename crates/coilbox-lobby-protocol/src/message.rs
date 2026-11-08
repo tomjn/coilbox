@@ -459,8 +459,12 @@ pub(crate) fn fields<const N: usize>(rest: &str) -> Option<[&str; N]> {
 }
 
 /// Whether `s` is `host:port` with a port in 1..=65535, where an IPv6 host is
-/// in brackets and any other host has no colon in it.
+/// in brackets and any other host has no colon in it. Nothing in it may be
+/// whitespace or a control character.
 fn is_host_and_port(s: &str) -> bool {
+    if s.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
     let Some((host, port)) = s.rsplit_once(':') else {
         return false;
     };
@@ -1662,6 +1666,8 @@ mod tests {
             "BATTLERELAYADDRESS 9 [2606:4700:4700::1111]",
             "BATTLERELAYADDRESS 9 2606:4700:4700::1111:3478",
             "BATTLERELAYADDRESS 9 []:3478",
+            "BATTLERELAYADDRESS 9 relay example.org:3478",
+            "BATTLERELAYADDRESS 9 relay.example.org:3478 extra",
             "BATTLERELAYADDRESS 9 :3478",
             "BATTLERELAYADDRESS nine relay.example.org:3478",
             "BATTLERELAYADDRESS 9",
