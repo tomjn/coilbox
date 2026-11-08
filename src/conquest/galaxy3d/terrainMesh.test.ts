@@ -251,8 +251,8 @@ describe("the sheet's biome weights", () => {
     // Dust for the dry basin and regolith for the maria, as their land has.
     expect(build(weights("red")).uSeaPattern.value).toBe(5);
     expect(build(weights("moon")).uSeaPattern.value).toBe(6);
-    expect(build(weights("volcanic")).uSeaPattern.value).toBe(19);
-    expect(build(weights("ice")).uSeaPattern.value).toBe(20);
+    expect(build(weights("volcanic")).uSeaPattern.value).toBe(20);
+    expect(build(weights("ice")).uSeaPattern.value).toBe(21);
     expect(build(weights("temperate")).uSeaPattern.value).toBe(-1);
     expect(build(weights("acid")).uSeaPattern.value).toBe(-1);
   });

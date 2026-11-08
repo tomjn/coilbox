@@ -47,7 +47,7 @@ landlocked-80-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159
 landlocked-120-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=661fc935
 landlocked-160-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=f07c362f
 continent-12-seed1-desert land=8caa1720 heightmap=41c51516 image=d3b3dcc3 biomesA=a10707cf biomesB=022d53e0 doc=997fbf86
-continent-12-seed1-ice land=8caa1720 heightmap=41c51516 image=6495b7a3 biomesA=9a3b0ffe biomesB=545c9dc5 doc=3c0b115a
+continent-12-seed1-ice land=8caa1720 heightmap=41c51516 image=4a01a038 biomesA=359b3735 biomesB=19b38e84 doc=3c0b115a
 continent-12-seed1-red land=8caa1720 heightmap=41c51516 image=1f6797f0 biomesA=2ace37c0 biomesB=545c9dc5 doc=d16685e7
 continent-12-seed1-moon land=8caa1720 heightmap=b8fac646 image=d771937d biomesA=27997768 biomesB=545c9dc5 doc=20b0dbc6
 continent-12-seed1-volcanic land=8caa1720 heightmap=41c51516 image=07c99251 biomesA=17f46a96 biomesB=545c9dc5 doc=38e23dfe
