@@ -53,10 +53,60 @@ header.brand .links a:hover { text-decoration: underline; opacity: 1; }
 .legend .swatch { width: 12px; height: 12px; border-radius: 3px; border: 2px solid; }
 .legend .line { width: 16px; height: 2px; border-radius: 2px; }
 .legend .dash { width: 16px; border-top: 2px dashed var(--muted); }
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 8px 16px; padding-right: 24px;
+}
+.search { position: relative; width: 256px; max-width: 100%; }
+.search input {
+  width: 100%; font: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px;
+}
+.search input:focus-visible { outline: 2px solid var(--builds); outline-offset: 2px; }
+.search ul {
+  position: absolute; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px;
+  list-style: none; max-height: 288px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.search li { display: flex; flex-direction: column; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
+.search li[aria-selected="true"], .search li:hover { background: #27272a; }
+.search li.none { color: var(--muted); cursor: default; }
+.search .name, .search .key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search .key { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+[hidden] { display: none !important; }
 .faction { flex: 1; padding: 0 24px 24px; display: none; min-height: 0; }
 .faction.active { display: flex; flex-direction: column; }
+.stage { flex: 1; display: flex; gap: 12px; min-height: 0; }
+.detail {
+  position: relative; width: 288px; flex-shrink: 0; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px;
+}
+.detail-close {
+  position: absolute; top: 6px; right: 6px; appearance: none; cursor: pointer;
+  font: 18px/1 inherit; color: var(--muted); background: none; border: 0;
+  border-radius: 6px; min-width: 28px; min-height: 28px;
+}
+.detail-close:hover { color: var(--text); background: #27272a; }
+.detail-close:focus-visible { outline: 2px solid var(--builds); outline-offset: 2px; }
+.detail-title { margin: 0 32px 0 0; font-size: 15px; line-height: 1.3; }
+.detail-id { margin: 2px 0 12px; color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.detail-none { color: var(--muted); font-size: 13px; }
+.detail-stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; font-size: 13px; }
+.detail-stats div { display: contents; }
+.detail-stats dt { color: var(--muted); }
+.detail-stats dd { margin: 0; }
+.detail-weapons { width: 100%; border-collapse: collapse; font-size: 12px; }
+.detail-weapons th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 6px 4px 0; border-bottom: 1px solid var(--border); }
+.detail-weapons td { padding: 4px 6px 4px 0; border-bottom: 1px solid #27272a; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .stage { flex-direction: column; }
+  .detail { width: auto; }
+}
 .scene-wrap {
-  position: relative; flex: 1; min-height: 60vh;
+  position: relative; flex: 1; min-width: 0; min-height: 60vh;
   border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
   background: var(--bg); touch-action: none;
 }
@@ -66,6 +116,7 @@ svg.scene.grabbing { cursor: grabbing; }
   position: absolute; right: 10px; bottom: 10px;
   border: 1px solid var(--border); border-radius: 4px; background: var(--bg);
 }
+.scene-wrap.focus .minimap { display: none; }
 .minimap-bg { fill: #050505; }
 .minimap-view { fill: rgba(147,197,253,0.15); stroke: #93c5fd; stroke-width: 3; }
 /* Nodes */
@@ -74,6 +125,7 @@ svg.scene.grabbing { cursor: grabbing; }
 .node .nopic { fill: #27272a; }
 .node .nopic-label { fill: var(--muted); font-size: 11px; text-anchor: middle; dominant-baseline: middle; }
 .node .label { fill: var(--text); font-size: 11px; text-anchor: middle; }
+.node { cursor: pointer; }
 .node:focus-visible { outline: none; }
 .node:focus-visible .ring { stroke: var(--builds) !important; stroke-width: 3; }
 /* Edges */
@@ -83,6 +135,9 @@ svg.scene.grabbing { cursor: grabbing; }
 .scene.hi .node { opacity: 0.18; }
 .scene.hi .edge { opacity: 0.05; }
 .scene.hi .node.on { opacity: 1; }
+/* Units outside the focus are faded out and out of reach. These selectors outrank the highlight rules, so a hover cannot bring one back. */
+.scene .node.off, .scene.hi .node.off { opacity: 0; pointer-events: none; }
+.scene .edge.off { opacity: 0; }
 .edge.builds { stroke: var(--builds); stroke-width: 2.5; opacity: 1; }
 .edge.builtby { stroke: var(--builtby); stroke-width: 2.5; opacity: 1; }
 .edge.builds.edge-extra, .edge.builtby.edge-extra { stroke-dasharray: 6 4; }
