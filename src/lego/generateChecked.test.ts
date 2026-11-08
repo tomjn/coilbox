@@ -143,10 +143,16 @@ describe("generateCheckedUnit", () => {
     expect(result).toMatchObject({ status: "failed", first: 1, last: 3 });
   });
 
-  it("refuses fewer than one try", () => {
-    expect(() =>
-      generateCheckedUnit(inputs(1, "biped", "scout", "small"), options, 0),
-    ).toThrow();
+  it("refuses fewer than one try, or a count that is not whole", () => {
+    for (const tries of [0, 1.5, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() =>
+        generateCheckedUnit(
+          inputs(1, "biped", "scout", "small"),
+          options,
+          tries,
+        ),
+      ).toThrow();
+    }
   });
 
   // The same reason as the generator's own test (#5113): a check that came out

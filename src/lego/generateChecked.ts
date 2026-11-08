@@ -236,7 +236,9 @@ export function generateCheckedUnit(
   options: GeneratorOptions,
   tries: number = GENERATOR_TRIES,
 ): CheckedGeneration {
-  if (!(tries >= 1)) throw new Error(`at least one try, not ${tries}`);
+  if (!Number.isSafeInteger(tries) || tries < 1) {
+    throw new Error(`a whole number of tries, at least one, not ${tries}`);
+  }
   const counts: Record<GeneratorCheck, number> = {
     ground: 0,
     balance: 0,
