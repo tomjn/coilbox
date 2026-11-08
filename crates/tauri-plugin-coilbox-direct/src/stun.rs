@@ -36,7 +36,7 @@ use serde::Serialize;
 use stun::agent::TransactionId;
 use stun::message::{Getter, Message, BINDING_REQUEST, BINDING_SUCCESS};
 use stun::xoraddr::XorMappedAddress;
-use tokio::net::UdpSocket;
+use tokio::net::{lookup_host, ToSocketAddrs, UdpSocket};
 
 /// The largest reply this will read. A binding response is under a hundred bytes
 /// and anything near this is somebody else's protocol.
@@ -178,6 +178,16 @@ async fn bind(from_port: Option<u16>) -> Option<UdpSocket> {
 /// Datagrams that are not the reply we asked for are read past rather than
 /// treated as a failure, until the timeout covering the whole exchange runs out.
 async fn ask(socket: &UdpSocket, server: &str) -> Option<Reflexive> {
+    ask_with(socket, server, decode_response).await
+}
+
+/// [`ask`] with the judgement of a reply left to `decode`, which is given each
+/// datagram read and the transaction it is a reply to.
+async fn ask_with<T>(
+    socket: &UdpSocket,
+    server: impl ToSocketAddrs,
+    decode: impl Fn(&[u8], TransactionId) -> Option<T>,
+) -> Option<T> {
     let transaction = TransactionId::new();
     let request = encode_request(transaction);
     tokio::time::timeout(PER_SERVER_TIMEOUT, async {
@@ -185,7 +195,7 @@ async fn ask(socket: &UdpSocket, server: &str) -> Option<Reflexive> {
         let mut buf = vec![0u8; MAX_REPLY];
         loop {
             let (len, _) = socket.recv_from(&mut buf).await.ok()?;
-            if let Some(found) = decode_response(&buf[..len], transaction) {
+            if let Some(found) = decode(&buf[..len], transaction) {
                 return Some(found);
             }
         }
@@ -193,6 +203,18 @@ async fn ask(socket: &UdpSocket, server: &str) -> Option<Reflexive> {
     .await
     .ok()
     .flatten()
+}
+
+/// Whether `bytes` is a binding success for `transaction`, whatever address it
+/// carries.
+///
+/// [`ping`] times the round trip and has no use for the address, so an IPv6
+/// relay, which reports an IPv6 address [`decode_response`] refuses, still
+/// answers.
+fn answered(bytes: &[u8], transaction: TransactionId) -> Option<()> {
+    let mut message = Message::new();
+    message.unmarshal_binary(bytes).ok()?;
+    (message.typ == BINDING_SUCCESS && message.transaction_id == transaction).then_some(())
 }
 
 /// How many STUN round trips [`ping`] times against one relay, so a single
@@ -216,12 +238,19 @@ pub const RELAY_PING_SAMPLES: usize = 3;
 /// relay is unreachable or has simply turned plain STUN off, and it has to:
 /// a relay with `no-stun` set can still be relaying perfectly well, so this
 /// is "could not measure", never "the relay is down".
+///
+/// `server` may be a name, an IPv4 address or a bracketed IPv6 address with
+/// its port, as a lobby writes a relay's address (issue #2869). It is resolved
+/// once, preferring an IPv4 answer, and the socket is bound in the family of
+/// the address it will talk to, because an IPv4 socket cannot send to an IPv6
+/// address.
 pub async fn ping(server: &str, samples: usize) -> Option<Duration> {
-    let socket = bind(None).await?;
+    let target = resolve(server).await?;
+    let socket = bind_for(target).await?;
     let mut times = Vec::with_capacity(samples);
     for _ in 0..samples {
         let started = Instant::now();
-        if ask(&socket, server).await.is_some() {
+        if ask_with(&socket, target, answered).await.is_some() {
             times.push(started.elapsed());
         }
     }
@@ -229,6 +258,26 @@ pub async fn ping(server: &str, samples: usize) -> Option<Duration> {
         return None;
     }
     Some(median(times))
+}
+
+/// The address `server` names, an IPv4 one when it has both kinds because a
+/// machine with no IPv6 route is the likelier one.
+async fn resolve(server: &str) -> Option<SocketAddr> {
+    let found: Vec<SocketAddr> = lookup_host(server).await.ok()?.collect();
+    found
+        .iter()
+        .find(|addr| addr.is_ipv4())
+        .or_else(|| found.first())
+        .copied()
+}
+
+/// An ephemeral socket in the same family as `target`.
+async fn bind_for(target: SocketAddr) -> Option<UdpSocket> {
+    let any = match target {
+        SocketAddr::V4(_) => SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
+        SocketAddr::V6(_) => SocketAddr::from((std::net::Ipv6Addr::UNSPECIFIED, 0)),
+    };
+    UdpSocket::bind(any).await.ok()
 }
 
 /// The middle of `times`, so one slow packet among several does not decide
@@ -457,7 +506,14 @@ mod tests {
     /// reply, so the timing path can be tested without a real relay to send
     /// to.
     async fn answering_stun_server() -> SocketAddr {
-        let socket = UdpSocket::bind("127.0.0.1:0").await.expect("a free port");
+        answering_stun_server_on("127.0.0.1:0")
+            .await
+            .expect("a free port")
+    }
+
+    /// The same, on `bind`, or `None` where this machine cannot bind it.
+    async fn answering_stun_server_on(bind: &str) -> Option<SocketAddr> {
+        let socket = UdpSocket::bind(bind).await.ok()?;
         let addr = socket.local_addr().expect("a bound address");
         tokio::spawn(async move {
             let mut buf = vec![0u8; MAX_REPLY];
@@ -469,18 +525,20 @@ mod tests {
                 if request.unmarshal_binary(&buf[..len]).is_err() {
                     continue;
                 }
+                // The sender's own address, so an IPv6 caller is told an IPv6
+                // one, as a real server would.
                 let answer = reply(
                     BINDING_SUCCESS,
                     request.transaction_id,
-                    v4(203, 0, 113, 9),
-                    40000,
+                    from.ip(),
+                    from.port(),
                 );
                 if socket.send_to(&answer, from).await.is_err() {
                     return;
                 }
             }
         });
-        addr
+        Some(addr)
     }
 
     /// A relay whose STUN answers gets back a measured duration, over a real
@@ -493,6 +551,35 @@ mod tests {
             got.is_some(),
             "a server that answered should produce a duration"
         );
+    }
+
+    /// Issue #2869. A lobby writes an IPv6 relay as `[addr]:port`, and a relay
+    /// there answers with an IPv6 reflexive address, which [`decode_response`]
+    /// refuses. The ping still has to count it.
+    #[tokio::test]
+    async fn a_relay_at_an_ipv6_address_gets_a_measured_ping() {
+        let Some(addr) = answering_stun_server_on("[::1]:0").await else {
+            // No IPv6 loopback on this machine, so there is nothing to talk to.
+            return;
+        };
+        let got = ping(&addr.to_string(), RELAY_PING_SAMPLES).await;
+        assert!(got.is_some(), "an IPv6 relay that answered should be timed");
+    }
+
+    /// A relay named rather than numbered is resolved, not refused.
+    #[tokio::test]
+    async fn a_relay_named_by_host_gets_a_measured_ping() {
+        let addr = answering_stun_server().await;
+        let got = ping(&format!("localhost:{}", addr.port()), RELAY_PING_SAMPLES).await;
+        assert!(got.is_some(), "a name that resolves should be timed");
+    }
+
+    /// An address that is not one gives nothing back, rather than a number or
+    /// a wait.
+    #[tokio::test]
+    async fn an_address_that_does_not_resolve_is_unmeasured() {
+        assert_eq!(ping("no-port-here", 1).await, None);
+        assert_eq!(ping("", 1).await, None);
     }
 
     /// A relay that never answers, the way one with `no-stun` set would leave
