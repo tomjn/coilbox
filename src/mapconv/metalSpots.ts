@@ -280,7 +280,7 @@ export function measureMetal(
     Math.max(16, extractorRadius),
     Math.max(worldX, worldZ),
   );
-  const order = new Map(spots.map((s, i) => [s, i]));
+  const order = new Map<Point, number>(spots.map((s, i) => [s, i]));
   for (let a = 0; a < spots.length; a++) {
     for (const other of pairGrid.near(
       spots[a].x,

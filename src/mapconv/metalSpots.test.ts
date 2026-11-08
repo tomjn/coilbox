@@ -235,7 +235,10 @@ describe("measuring a map's metal", () => {
   it("agrees with a scan of every pair on a scattered map", () => {
     const g = grid(64, 64, []);
     let seed = 7;
-    const next = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const next = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
     for (let i = 0; i < 120; i++) {
       g.bytes[Math.floor(next() * 64) * 64 + Math.floor(next() * 64)] = 100;
     }
