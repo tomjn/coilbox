@@ -43,6 +43,12 @@ export interface GameRepo {
   /** Normalised game-name prefix for auto-download matching (see {@link norm}).
    * Empty disables auto-download matching for this source (browse-only). */
   nameKey: string;
+  /** Normalised name that opens this game's release archives, for a game whose
+   * archive name differs from its game name (`THIS_0.13.9.sdz` for `THIS (Spring
+   * Necromancy Edition) 0.13.9`). With it, a download matches the version after
+   * `nameKey` in the game name to the version after `archiveKey` in the archive
+   * name. Without it, the whole normalised names must be equal (issue #5158). */
+  archiveKey?: string;
 }
 
 export const GAME_REPOS: GameRepo[] = [
@@ -79,6 +85,7 @@ export const GAME_REPOS: GameRepo[] = [
     label: "THIS",
     repo: "Recoil-Game-Archive/THIS",
     nameKey: "this(springnecromancyedition)",
+    archiveKey: "this",
   },
   // The whole modinfo name again. The old XTA releases are named `XTA 9.65` and
   // the like, which this key does not match (issue #4780).
@@ -87,6 +94,7 @@ export const GAME_REPOS: GameRepo[] = [
     label: "XTA (Spring Necromancy Edition)",
     repo: "Recoil-Game-Archive/xta-springrts",
     nameKey: "xta(springnecromancyedition)",
+    archiveKey: "xtasne",
   },
 ];
 
@@ -120,8 +128,40 @@ export function githubRepoForGame(
   repos: GameRepo[],
   gameName: string,
 ): string | undefined {
+  return githubSourceForGame(repos, gameName)?.repo;
+}
+
+/** The curated source behind {@link githubRepoForGame}, whole. */
+export function githubSourceForGame(
+  repos: GameRepo[],
+  gameName: string,
+): GameRepo | undefined {
   const n = norm(gameName);
-  return repos.find((g) => g.nameKey && n.startsWith(g.nameKey))?.repo;
+  return repos.find((g) => g.nameKey && n.startsWith(g.nameKey));
+}
+
+/** What follows `key` in a normalised name, minus a leading `v`, or undefined
+ * when the name does not start with `key`. */
+const versionAfter = (normalised: string, key: string) =>
+  normalised.startsWith(key)
+    ? normalised.slice(key.length).replace(/^v/, "")
+    : undefined;
+
+/** Whether a release archive is the one for `gameName`, which `source` was
+ * already chosen for. Without an `archiveKey` the normalised names must be
+ * equal. With one, the version after the name key must equal the version after
+ * the archive key, and must not be empty, so another archive in the same repo
+ * (another game, or a variant of the same version) never matches (issue #5158). */
+export function githubArchiveMatchesGame(
+  source: GameRepo,
+  gameName: string,
+  filename: string,
+): boolean {
+  const name = norm(gameName);
+  const file = norm(filename);
+  if (!source.archiveKey) return file === name;
+  const wanted = versionAfter(name, source.nameKey);
+  return !!wanted && wanted === versionAfter(file, source.archiveKey);
 }
 
 /**

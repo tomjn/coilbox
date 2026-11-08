@@ -171,6 +171,100 @@ describe("downloadGameAnySource, github step", () => {
   });
 });
 
+describe("downloadGameAnySource, a game whose release archive is named differently (issue #5158)", () => {
+  const archive = (filename: string, tag: string) => ({
+    filename,
+    url: `https://example.com/${tag}/${filename}`,
+    size: 1,
+    tag,
+  });
+  const fetchGame = (gameName: string) =>
+    downloadGameAnySource({
+      gameName,
+      writePath: "/data",
+      onProgress: () => {},
+    });
+
+  it("fetches THIS_0.13.9.sdz for THIS (Spring Necromancy Edition) 0.13.9", async () => {
+    // The names are the repo's real releases: the modinfo name carries the
+    // edition, the asset is `THIS_<version>.sdz`.
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        archive("THIS_0.13.9.sdz", "0.13.9"),
+        archive("THIS_0.13.8.sdz", "0.13.8"),
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    await expect(
+      fetchGame("THIS (Spring Necromancy Edition) 0.13.9"),
+    ).resolves.toBe("github release");
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: "THIS_0.13.9.sdz" }),
+    );
+  });
+
+  it("fetches the older THIS version asked for, not the newest", async () => {
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [
+        archive("THIS_0.13.9.sdz", "0.13.9"),
+        archive("THIS_0.13.8.sdz", "0.13.8"),
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    await fetchGame("THIS (Spring Necromancy Edition) 0.13.8");
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: "THIS_0.13.8.sdz" }),
+    );
+  });
+
+  it("fetches xta-sne-v10.00.sdz for XTA (Spring Necromancy Edition) v10.00", async () => {
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [archive("xta-sne-v10.00.sdz", "v10.00")],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    await expect(
+      fetchGame("XTA (Spring Necromancy Edition) v10.00"),
+    ).resolves.toBe("github release");
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: "xta-sne-v10.00.sdz" }),
+    );
+  });
+
+  it("also fetches XTA when the game reports its version without the v", async () => {
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [archive("xta-sne-v10.00.sdz", "v10.00")],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    await fetchGame("XTA (Spring Necromancy Edition) 10.00");
+
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: "xta-sne-v10.00.sdz" }),
+    );
+  });
+
+  it("gives the existing failure for a version with no release", async () => {
+    dlGithubReleaseArchives.mockResolvedValueOnce({
+      archives: [archive("THIS_0.13.9.sdz", "0.13.9")],
+    });
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+
+    const err = await fetchGame(
+      "THIS (Spring Necromancy Edition) 0.12.0",
+    ).catch((e: Error) => e);
+
+    expect(String(err)).toContain("Recoil-Game-Archive/THIS");
+    expect(String(err)).toContain("THIS (Spring Necromancy Edition) 0.12.0");
+    expect(dlDownloadFileRaw).not.toHaveBeenCalled();
+  });
+});
+
 describe("downloadGameAnySource, progress across sources", () => {
   /** A channel a command has returned from is closed, and a send on it is lost
    * without a word. Both fakes below behave that way, which is what makes these

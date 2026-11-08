@@ -48,13 +48,15 @@
       "key": "this",
       "label": "THIS",
       "repo": "Recoil-Game-Archive/THIS",
-      "nameKey": "this(springnecromancyedition)"
+      "nameKey": "this(springnecromancyedition)",
+      "archiveKey": "this"
     },
     {
       "key": "xta-sne",
       "label": "XTA (Spring Necromancy Edition)",
       "repo": "Recoil-Game-Archive/xta-springrts",
-      "nameKey": "xta(springnecromancyedition)"
+      "nameKey": "xta(springnecromancyedition)",
+      "archiveKey": "xtasne"
     }
   ],
   "suggested": {

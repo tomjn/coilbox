@@ -7,7 +7,9 @@ import { withDownloadNotify } from "./downloadNotify";
 import { pinnedSource, readGamePrefs } from "./gamePrefs";
 import {
   GAME_REPOS,
+  githubArchiveMatchesGame,
   githubRepoForGame,
+  githubSourceForGame,
   mergeGameRepos,
   norm,
 } from "./gameRepos";
@@ -122,13 +124,16 @@ async function downloadGameAnySourceImpl(opts: {
       // Curated GitHub releases: resolve a known repo from the game name and
       // fetch its exact-matching release archive.
       case "github": {
-        const repo = githubRepoForGame(repos, gameName);
-        if (!repo || !writePath) return null;
+        const source = githubSourceForGame(repos, gameName);
+        if (!source || !writePath) return null;
+        const repo = source.repo;
         const archives = await loadGithubReleases(repo);
         // No releases at all: this source genuinely has nothing, same as any
         // other step finding no candidate. Move on to the next source.
         if (archives.length === 0) return null;
-        const hit = archives.find((a) => norm(a.filename) === target);
+        const hit = archives.find((a) =>
+          githubArchiveMatchesGame(source, gameName, a.filename),
+        );
         // Releases exist but none matches the requested version. Only the
         // most recent 30 are fetched (`dl_github_release_archives`), so the
         // one asked for may have aged off, been renamed, or been deleted.
