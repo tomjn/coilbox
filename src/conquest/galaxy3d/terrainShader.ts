@@ -146,6 +146,12 @@ uniform vec4 uTerrainFrame;
 uniform float uTerrainHaze;
 uniform vec3 uTerrainFar;
 uniform float uTerrainGreyBeyond;
+// Rivers (rivers.ts): how far the nearest river's edge is, over the same
+// picture as vTerrainUv, as a share of uRiverSpan's two reaches.
+uniform sampler2D uRiverField;
+uniform float uRiverOn;
+uniform float uRiverFrozen;
+uniform vec2 uRiverSpan;
 uniform vec3 uForest[6];
 uniform float uForestAutumn;
 varying vec2 vTerrainUv;
@@ -589,6 +595,14 @@ const DETAIL = /* glsl */ `
 
     // Steep ground shows bare rock, whatever grows on the level.
     float steep = smoothstep(0.08, 0.22, 1.0 - n.y) * land;
+    // How far the nearest river's water is (rivers.ts), in world units,
+    // below 0 on it. A river's own valley is grassed and not bare rock, so
+    // its sides are steep only where the hills around it are.
+    float rEdge = 1.0;
+    if (uRiverOn > 0.5) {
+      rEdge = texture2D(uRiverField, vTerrainUv).r * (uRiverSpan.x + uRiverSpan.y) - uRiverSpan.x;
+      steep *= smoothstep(0.2, uRiverSpan.y, rEdge);
+    }
 
     // The ground's shape from the heightmap: -1 to 1 for how far it stands
     // proud of its surroundings close in (edges and ridges up, gullies down)
@@ -608,6 +622,8 @@ const DETAIL = /* glsl */ `
     // The drop to the sea counts as a face, but the shore is left to the wet
     // band.
     talus = smoothstep(0.0, 0.5, talus) * (1.0 - pw[${P.snow}]) * (1.0 - smoothstep(0.02, 0.2, seaNear));
+    // Nor along a river's valley floor, which is grassed.
+    talus *= smoothstep(0.2, uRiverSpan.y, rEdge);
     for (int k = 0; k < ${PATTERN_COUNT}; k++) pw[k] *= 1.0 - talus;
     pw[${P.scree}] += talus;
 
@@ -622,6 +638,31 @@ const DETAIL = /* glsl */ `
     pw[${P.forest}] *= 1.0 - gully * 0.8;
     pw[${P.taiga}] *= 1.0 - gully * 0.8;
     pw[${P.scrub}] *= 1.0 - gully * 0.8;
+
+    // Rivers. The field gives the distance to the water's edge in world
+    // units, below 0 on the water. Water draws over whatever grows, with a
+    // band of wet ground along each bank as at the shore. Where the ground
+    // is as dry as dunes or salt, the bed has run dry and shows as a pale
+    // wash. Desert ground beside running water is greener.
+    float river = 0.0;
+    float riverBank = 0.0;
+    float riverDry = 0.0;
+    float riverGreen = 0.0;
+    if (rEdge < uRiverSpan.y - 0.005) {
+      float rSoft = max(footprint * 0.6, 0.003);
+      river = (1.0 - smoothstep(-rSoft, rSoft, rEdge)) * land;
+      float dry = (pw[${P.dunes}] + pw[${P.sand}] + pw[${P.salt}] + pw[${P.dust}] + pw[${P.cracked}] + 0.5 * pw[${P.scrub}]) / max(land, 1e-3);
+      riverDry = smoothstep(0.75, 0.95, dry);
+      // Wet ground at the water's edge, then damp ground fading out up the
+      // bank, ragged along the river.
+      float wetW = 0.02 + 0.012 * fine.x;
+      float dampW = 0.16 + 0.08 * fine.x + 0.06 * broad.x;
+      riverBank = max(1.0 - smoothstep(0.0, wetW + rSoft, rEdge), 0.45 * (1.0 - smoothstep(0.0, dampW, rEdge))) * (1.0 - river) * land;
+      riverGreen = (1.0 - smoothstep(0.02, 0.14 + 0.06 * broad.x, rEdge)) * (1.0 - river) * land * smoothstep(0.25, 0.5, dry) * (1.0 - riverDry);
+      pw[${P.forest}] *= 1.0 - river;
+      pw[${P.taiga}] *= 1.0 - river;
+      pw[${P.scrub}] *= 1.0 - max(river, riverGreen);
+    }
 
     float shadeMul = 1.0;
     // Light and dark from the ground's shape: strata, rims, crevices and
@@ -1097,11 +1138,42 @@ const DETAIL = /* glsl */ `
     float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
     albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), wet * 0.85);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
+    if (river + riverBank + riverGreen > 0.001) {
+      // Dry country by running water is green.
+      albedo = mix(albedo, albedo * vec3(0.62, 0.86, 0.5), riverGreen * 0.8);
+      if (uRiverFrozen > 0.5) {
+        // Frozen over: clear ice, dark with the water under it, so it reads
+        // apart from the sea's pale floes and the roads, with frost along its
+        // edges and snow drifted against the banks.
+        vec3 ice = vec3(0.045, 0.085, 0.13) * (1.0 + 0.25 * broad.x + 0.12 * fine.x);
+        float frost = 1.0 - smoothstep(-0.009, -0.002, rEdge);
+        ice = mix(vec3(0.55, 0.62, 0.68), ice, frost);
+        albedo = mix(albedo, vec3(0.8, 0.86, 0.9), riverBank * 0.5);
+        albedo = mix(albedo, ice, river);
+      } else {
+        albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), riverBank * 0.85 * (1.0 - 0.6 * riverDry));
+        // Water seen from above is dark: brown green where it runs shallow,
+        // bluer where the sky shows in it, changing slowly along a river.
+        vec3 water = mix(vec3(0.02, 0.032, 0.022), vec3(0.014, 0.034, 0.05), 0.5 + 0.5 * broad.x);
+        water *= 1.0 + 0.12 * fine.x;
+        // A dry bed: the ground's own sand, browner and damper, with no
+        // crisp edge, so it never reads as a road.
+        vec3 wash = albedo * vec3(0.64, 0.57, 0.47) * (1.0 + 0.12 * fine.x);
+        float washCover = (1.0 - smoothstep(-0.03, 0.02, rEdge)) * land;
+        albedo = mix(albedo, water, river * (1.0 - riverDry));
+        albedo = mix(albedo, wash, washCover * riverDry);
+      }
+      // The water lies flat, whatever slope the valley has.
+      bump *= 1.0 - river;
+      bump3 *= 1.0 - river;
+      n = normalize(mix(n, vec3(0.0, 1.0, 0.0), river));
+    }
     n = normalize(n + vec3(-bump.x, 0.0, -bump.y) - (bump3 - n * dot(bump3, n)));
 
     vec3 h = normalize(view + uTerrainSun);
-    spec += pow(max(dot(n, h), 0.0), 40.0) * 0.08 * liquid * (1.0 - foam);
-    sheen = liquid * (1.0 - foam);
+    float riverWet = river * (1.0 - riverDry) * (1.0 - uRiverFrozen);
+    spec += pow(max(dot(n, h), 0.0), 40.0) * 0.08 * max(liquid * (1.0 - foam), riverWet);
+    sheen = max(liquid * (1.0 - foam), riverWet);
   }
 `;
 
@@ -1293,6 +1365,14 @@ export function applyTerrainShader(
     };
     shader.uniforms.uTerrainGreyBeyond = {
       value: frame?.greyBeyond ? 1 : 0,
+    };
+    // Rivers, which the detail draws and the roads bridge.
+    const rivers = detail ? shading.ground?.river : undefined;
+    shader.uniforms.uRiverField = { value: rivers?.field ?? dry };
+    shader.uniforms.uRiverOn = { value: rivers ? 1 : 0 };
+    shader.uniforms.uRiverFrozen = { value: rivers?.frozen ? 1 : 0 };
+    shader.uniforms.uRiverSpan = {
+      value: new THREE.Vector2(...(rivers?.span ?? [0, 1])),
     };
     shader.uniforms.uTerrainSun = {
       value: new THREE.Vector3(...TERRAIN_SUN),

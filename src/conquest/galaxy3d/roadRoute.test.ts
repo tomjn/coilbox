@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cheapestCells,
   type MapXY,
+  markRivers,
   markRoad,
   ROUTE_MAX_CELLS,
   roundCorners,
@@ -178,5 +179,33 @@ describe("markRoad", () => {
     expect(middle.length).toBeGreaterThan(100);
     // More than the three cells either side that count as beside a road.
     expect(nearest).toBeGreaterThan(3 * g.stepY);
+  });
+});
+
+describe("markRivers", () => {
+  it("routes a road over a river once", () => {
+    const g = routeGrid(
+      MAP,
+      MAP,
+      64,
+      1,
+      grid(() => 0.1),
+    );
+    // A river running down the map, bending once.
+    markRivers(g, [new Float32Array([300, 0, 4, 330, 300, 4, 300, MAP, 4])]);
+    const road = routeRoad(g, [40, 100], [600, 500]);
+    // Which side of the river each point of the road lies on.
+    const side = (p: MapXY) => {
+      const [ax, ay, bx, by] =
+        p[1] < 300 ? [300, 0, 330, 300] : [330, 300, 300, MAP];
+      return Math.sign((bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax));
+    };
+    let crossings = 0;
+    for (let k = 1; k < road.length; k++) {
+      if (side(road[k]) !== side(road[k - 1])) crossings++;
+    }
+    expect(crossings).toBe(1);
+    // The river costs the road something: it is marked on the grid.
+    expect(g.river?.some((v) => v === 2)).toBe(true);
   });
 });

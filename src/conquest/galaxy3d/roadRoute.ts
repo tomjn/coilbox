@@ -43,6 +43,12 @@ export interface RouteGrid {
    * {@link OUTSIDE_COST} for every step into any other.
    */
   region?: Int32Array;
+  /**
+   * 2 for a cell on a river and 1 for one on its banks, written by
+   * {@link markRivers}. A step onto one pays {@link RIVER_COST}, so a road
+   * crosses a river rarely and square on, and never runs along it.
+   */
+  river?: Uint8Array;
 }
 
 /** The two regions a route keeps to. */
@@ -82,6 +88,15 @@ const END_CELLS = 8;
  * cuts through a third, and finite so a route always exists.
  */
 const OUTSIDE_COST = 40;
+/**
+ * The extra cost of a step onto a river's bank and onto the river itself, as
+ * a share of its length. A crossing costs about what a dozen cells of dry
+ * ground do, so a road goes some way round to share a bridge's spot with
+ * none and never follows a river's course.
+ */
+const RIVER_COST = [0, 2, 12];
+/** How far a river's banks reach past its water for routing, in cells. */
+const BANK_CELLS = 2;
 
 /** True when cell `c` is in a province other than the two in `keep`. */
 function outside(grid: RouteGrid, c: number, keep?: Keep): boolean {
@@ -262,7 +277,8 @@ export function stepCost(
     GRADE_WEIGHT * grade * grade +
     HEIGHT_WEIGHT * h +
     WANDER * wander[to] +
-    BESIDE_ROAD * grid.taken[to];
+    BESIDE_ROAD * grid.taken[to] +
+    (grid.river ? RIVER_COST[grid.river[to]] : 0);
   return run * (outside(grid, to, keep) ? base + OUTSIDE_COST : base);
 }
 
@@ -385,7 +401,7 @@ function heightNear(grid: RouteGrid, [x, y]: MapXY): number {
  * beside another road where it does not. A shortcut like that would carry a
  * smoothed road over a shoulder of the hill the route went round, or back
  * alongside the road it kept off. A shortcut into a province outside `keep`
- * is refused too.
+ * is refused too, and so is any over a river, which would move the crossing.
  */
 function shortcutClimbs(
   grid: RouteGrid,
@@ -418,6 +434,8 @@ function shortcutClimbs(
     }
     if (clear && grid.taken[cellAt(grid, p)]) return true;
     if (outside(grid, cellAt(grid, p), keep)) return true;
+    // The route crosses a river where it chose to, square on.
+    if (grid.river?.[cellAt(grid, p)] === 2) return true;
   }
   return false;
 }
@@ -512,6 +530,62 @@ export function markRoad(grid: RouteGrid, line: MapXY[]): void {
     for (let j = cj - BESIDE_CELLS; j <= cj + BESIDE_CELLS; j++) {
       for (let i = ci - BESIDE_CELLS; i <= ci + BESIDE_CELLS; i++) {
         if (i >= 0 && j >= 0 && i < cols && j < rows) taken[j * cols + i] = 1;
+      }
+    }
+  }
+}
+
+/**
+ * Mark the cells on and beside each river for routing. `rivers` are x, y and
+ * half width triples in map units.
+ */
+export function markRivers(
+  grid: RouteGrid,
+  rivers: readonly Float32Array[],
+): void {
+  const { cols, rows, stepX, stepY } = grid;
+  const river = grid.river ?? new Uint8Array(cols * rows);
+  grid.river = river;
+  const cell = Math.min(stepX, stepY);
+  const banks = cell * BANK_CELLS;
+  for (const points of rivers) {
+    for (let k = 0; k + 5 < points.length; k += 3) {
+      const ax = points[k];
+      const ay = points[k + 1];
+      const bx = points[k + 3];
+      const by = points[k + 4];
+      // The water reaches half a cell past its edge, so any cell it touches
+      // counts.
+      const wet = Math.max(points[k + 2], points[k + 5]) + cell * 0.5;
+      const reach = wet + banks;
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      const inv = len2 === 0 ? 0 : 1 / len2;
+      const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - reach) / stepX));
+      const i1 = Math.min(
+        cols - 1,
+        Math.ceil((Math.max(ax, bx) + reach) / stepX),
+      );
+      const j0 = Math.max(0, Math.floor((Math.min(ay, by) - reach) / stepY));
+      const j1 = Math.min(
+        rows - 1,
+        Math.ceil((Math.max(ay, by) + reach) / stepY),
+      );
+      for (let j = j0; j <= j1; j++) {
+        const ry = j * stepY - ay;
+        for (let i = i0; i <= i1; i++) {
+          const rx = i * stepX - ax;
+          let t = (rx * dx + ry * dy) * inv;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const ex = dx * t - rx;
+          const ey = dy * t - ry;
+          const d2 = ex * ex + ey * ey;
+          if (d2 > reach * reach) continue;
+          const level = d2 <= wet * wet ? 2 : 1;
+          const at = j * cols + i;
+          if (level > river[at]) river[at] = level;
+        }
       }
     }
   }
