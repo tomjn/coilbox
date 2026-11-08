@@ -291,17 +291,24 @@ describe("a variant of a roster tier between two sizes", () => {
 
 describe("a variant that fails the checks with the unit's covering", () => {
   it("rolls the covering again and keeps the seed", () => {
-    for (let seed = 1; seed <= 40; seed++) {
-      const unit = generatedAt("medium", "artillery", "biped", seed);
+    // The largest tier has no size above it, so only the covering can change.
+    for (let seed = 1; seed <= 60; seed++) {
+      const unit = generatedAt("large", "artillery", "biped", seed);
       const result = makeVariant(unit, "heavier", { pack, modules });
       if (result.status !== "ok") continue;
       const record = result.unit.generated;
       if (record?.coveringSeed === undefined) continue;
-      expect(record.seed).toBe(seed);
+      expect(record.seed).toBe(unit.generated?.seed);
       expect(record.plan).toBe(unit.generated?.plan);
       expect(record.thickness).toBe(COVERING_STEP);
-      expect(slotScales(result.unit, "weapon")).toHaveLength(
-        slotScales(unit, "weapon").length,
+      expect(result.unit.skeleton?.proportions).toEqual(
+        unit.skeleton?.proportions,
+      );
+      expect(slotScales(result.unit, "weapon")).toEqual(
+        slotScales(unit, "weapon"),
+      );
+      expect(slotScales(result.unit, "chassis")).toEqual(
+        slotScales(unit, "chassis"),
       );
       return;
     }

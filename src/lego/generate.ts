@@ -6,8 +6,9 @@
  * body bone, and the job's weapon or build arm on top of the chassis. The
  * result is an ordinary unit, which the game maker then edits like any other.
  *
- * The same four inputs and the same module library always give the same
- * document. Every choice rolls its own PRNG, seeded off the inputs and the
+ * The same four inputs, the same options that change the unit (style, factor,
+ * thickness, weapon seed and covering seed) and the same module library always
+ * give the same document. Every choice rolls its own PRNG, seeded off the inputs and the
  * choice's own key (`hashString`, `mulberry32` from `src/conquest/rng.ts`, the
  * pattern `src/workshop/randomMod.ts` follows), never off one stream that every
  * choice draws from in turn. Adding a choice later then leaves every other
