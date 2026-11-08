@@ -304,10 +304,10 @@ export function worldGeometry(
 }
 
 /**
- * What each support piece stands on. A foot or wheel is its own vertices. A
- * track is usually an empty bone with the tread and road wheels hung under it,
- * so it takes everything under it, and the tread's underside is its lowest
- * point.
+ * What each support piece stands on. A foot is its own vertices. A wheel or
+ * track is usually an empty bone with the part hung under it (a wheel's tyre, a
+ * track's tread and road wheels), so it takes everything under it, and a
+ * tread's underside is a track's lowest point.
  */
 function supportGeometry(
   project: LegoProject,
@@ -318,7 +318,7 @@ function supportGeometry(
   for (const [id, role] of roles) {
     if (!isSupportRole(role)) continue;
     let own = geometry.filter((g) => g.id === id);
-    if (role === "track") {
+    if (role === "track" || role === "wheel") {
       const under = new Set<string>();
       const collect = (at: string) => {
         under.add(at);
