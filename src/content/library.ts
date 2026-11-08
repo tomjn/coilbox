@@ -5,6 +5,7 @@ import type {
   ReleaseArchive,
   SpringFile,
 } from "../downloads/bindings";
+import { isBlockedGame } from "../downloads/blockedGames";
 import type { QueueItem } from "../downloads/DownloadQueueProvider";
 import {
   type DownloadHistory,
@@ -329,6 +330,10 @@ function buildGames(
   for (const c of input.catalogues) {
     if (c.source === "springfiles" && c.kind === "game") {
       for (const f of c.entries) {
+        // The index loader already drops these. This keeps one from becoming an
+        // update or a download when a caller hands the library an index it read
+        // some other way (issue #4780).
+        if (isBlockedGame(f)) continue;
         addSource(f.springname || f.name, {
           kind: "springfiles",
           filename: f.filename,

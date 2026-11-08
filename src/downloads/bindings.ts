@@ -106,6 +106,8 @@ export interface SpringFile {
   filename: string;
   category: string;
   size: number;
+  /** The archive's MD5. Null or missing when the site gave none. */
+  md5?: string | null;
   /** When the file was added, in the site's own time with no zone. Null on a
    * few old rows. */
   timestamp: string | null;

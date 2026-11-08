@@ -310,6 +310,70 @@ describe("downloadGameAnySource, every springfiles mirror (issue #4577)", () => 
     ]);
   });
 
+  it("does not fetch XTA 9.729 MT from springfiles, by name or by what the index lists (issue #4780)", async () => {
+    dlSpringfilesList.mockResolvedValue({
+      results: [
+        entry(
+          [`https://mirror1.example.com/xta-9.729_mt.sdz`],
+          "XTA 9.729 MT",
+          "xta-9.729_mt.sdz",
+        ),
+        {
+          ...entry(
+            [`https://mirror1.example.com/renamed.sdz`],
+            "XTA 9.729 MT copy",
+            "renamed.sdz",
+          ),
+          md5: "3F52BE87244D93719CF730A029060A8A",
+        },
+      ],
+    });
+    dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
+
+    for (const gameName of ["XTA 9.729 MT", "XTA 9.729 MT copy"]) {
+      await expect(
+        downloadGameAnySource({
+          gameName,
+          writePath: "/data",
+          onProgress: () => {},
+        }),
+      ).rejects.toThrow(/No source could provide/);
+    }
+    expect(dlDownloadFileRaw).not.toHaveBeenCalled();
+  });
+
+  it("still fetches another XTA version from springfiles (issue #4780)", async () => {
+    dlSpringfilesList.mockResolvedValue({
+      results: [
+        entry(
+          [`https://mirror1.example.com/xta-9.728.sdz`],
+          "XTA 9.728",
+          "xta-9.728.sdz",
+        ),
+        {
+          ...entry(
+            [`https://mirror1.example.com/xta-9.729_mt.sdz`],
+            "XTA 9.729 MT",
+            "xta-9.729_mt.sdz",
+          ),
+          md5: "3f52be87244d93719cf730a029060a8a",
+        },
+      ],
+    });
+    dlDownloadFileRaw.mockResolvedValueOnce({ message: "ok", path: "" });
+
+    await expect(
+      downloadGameAnySource({
+        gameName: "XTA 9.728",
+        writePath: "/data",
+        onProgress: () => {},
+      }),
+    ).resolves.toBe("springfiles mirror");
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: "xta-9.728.sdz" }),
+    );
+  });
+
   it("tries every mirror before pr-downloader, and says why each failed", async () => {
     dlSpringfilesList.mockResolvedValue({
       results: [

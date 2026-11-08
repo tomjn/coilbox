@@ -4,6 +4,7 @@ import {
   dlHakoraMaps,
   dlSpringfilesList,
 } from "./bindings";
+import { withoutBlockedGames } from "./blockedGames";
 
 type Springfiles = Awaited<ReturnType<typeof dlSpringfilesList>>;
 type Hakora = Awaited<ReturnType<typeof dlHakoraMaps>>;
@@ -56,14 +57,24 @@ function load<T extends object>(
 
 const springfilesKey = (category: string) => `springfiles:${category}`;
 
-/** Every springfiles entry in a category. Pass `refresh` to fetch it again. */
+/**
+ * Every springfiles entry in a category, minus the games coilbox does not offer
+ * (see `blockedGames.ts`). Every game download, library listing and update check
+ * reads the index here, so one filter covers them all. Pass `refresh` to fetch
+ * it again.
+ */
 export function loadSpringfilesList(
   category: string,
   refresh = false,
 ): Promise<Springfiles> {
   return load(
     springfilesKey(category),
-    () => dlSpringfilesList({ category }),
+    async () => {
+      const res = await dlSpringfilesList({ category });
+      if (category !== "game") return res;
+      const results = withoutBlockedGames(res.results);
+      return results === res.results ? res : { ...res, results };
+    },
     refresh,
   );
 }
