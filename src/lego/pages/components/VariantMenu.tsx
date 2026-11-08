@@ -33,11 +33,15 @@ export function VariantMenu({
   project,
   pack,
   projects,
+  ready,
 }: {
   project: LegoProject;
   pack: LoadedPack;
   /** The saved units, so the variant's name is a free one. */
   projects: readonly LegoProject[];
+  /** Whether the saved units have been read. A name is checked against them,
+   *  so a variant is not made before then. */
+  ready: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const modules = useMemo(() => starterModules(pack), [pack]);
@@ -79,7 +83,7 @@ export function VariantMenu({
         <Button
           size="sm"
           variant="ghost"
-          disabled={busy}
+          disabled={busy || !ready}
           aria-label={t`Make a variant`}
           title={t`Make a variant of this unit as a new unit`}
         >
@@ -93,10 +97,13 @@ export function VariantMenu({
             <DropdownMenuItem
               key={kind.id}
               disabled={refusal !== null}
-              title={refusal ?? undefined}
+              className="flex-col items-start gap-0"
               onSelect={() => void make(kind.id)}
             >
               {kind.label}
+              {refusal !== null ? (
+                <span className="text-xs text-muted-foreground">{refusal}</span>
+              ) : null}
             </DropdownMenuItem>
           );
         })}

@@ -345,7 +345,8 @@ describe("variants listed together", () => {
         .sort(),
     ).toEqual(["p", "q"]);
     const byId = new Map(list.map((p) => [p.id, p]));
-    expect(variantRoot(list[0] as LegoProject, byId).id).toBeDefined();
+    expect(variantRoot(list[0] as LegoProject, byId).id).toBe("p");
+    expect(variantRoot(list[1] as LegoProject, byId).id).toBe("q");
   });
 
   it("finds the root of a chain", () => {

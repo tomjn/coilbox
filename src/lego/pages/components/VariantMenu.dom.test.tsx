@@ -40,8 +40,10 @@ vi.mock("../../variant", async (importOriginal) => ({
 const unit = { id: "unit", name: "Unit", pieces: [] } as unknown as LegoProject;
 const pack = {} as LoadedPack;
 
-function open() {
-  render(<VariantMenu project={unit} pack={pack} projects={[]} />);
+function open(ready = true) {
+  render(
+    <VariantMenu project={unit} pack={pack} projects={[]} ready={ready} />,
+  );
   fireEvent.keyDown(screen.getByRole("button", { name: "Make a variant" }), {
     key: "Enter",
   });
@@ -56,16 +58,28 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("VariantMenu", () => {
-  it("saves the variant a kind makes", async () => {
-    const made = { id: "v", name: "Unit (heavier)" } as LegoProject;
-    makeVariant.mockReturnValue({ status: "ok", unit: made, kind: "heavier" });
+  it.each([
+    ["heavier", "Heavier"],
+    ["lighter", "Lighter"],
+    ["weapon", "Different weapon"],
+  ])("saves the %s variant", async (kind, label) => {
+    const made = { id: "v", name: `Unit (${kind})` } as LegoProject;
+    makeVariant.mockReturnValue({ status: "ok", unit: made, kind });
     open();
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Heavier" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: label }));
     await waitFor(() => expect(saveProject).toHaveBeenCalledWith(made));
-    expect(makeVariant.mock.calls[0]?.[1]).toBe("heavier");
+    expect(makeVariant.mock.calls[0]?.[1]).toBe(kind);
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ level: "success" }),
     );
+  });
+
+  it("cannot be opened before the saved units are read", () => {
+    render(
+      <VariantMenu project={unit} pack={pack} projects={[]} ready={false} />,
+    );
+    const trigger = screen.getByRole("button", { name: "Make a variant" });
+    expect(trigger.hasAttribute("disabled")).toBe(true);
   });
 
   it("says why a variant failed, and saves nothing", async () => {
@@ -86,9 +100,9 @@ describe("VariantMenu", () => {
     );
     open();
     const item = await screen.findByRole("menuitem", {
-      name: "Different weapon",
+      name: /Different weapon/,
     });
     expect(item.getAttribute("aria-disabled")).toBe("true");
-    expect(item.getAttribute("title")).toBe("No weapon.");
+    expect(item.textContent).toContain("No weapon.");
   });
 });

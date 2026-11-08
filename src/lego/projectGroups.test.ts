@@ -343,6 +343,7 @@ describe("variants listed with their original (#3240)", () => {
     ({
       ...project(id, imported),
       id,
+      unitName: id,
       ...(variantOf ? { variantOf } : {}),
     }) as LegoProject;
   const opened: LegoImported = {
@@ -371,6 +372,23 @@ describe("variants listed with their original (#3240)", () => {
     const grouped = groupProjects([variant, original]);
     expect(grouped.own).toEqual([]);
     expect(grouped.games[0]?.projects.map((p) => p.name)).toEqual([
+      "orig",
+      "orig-variant",
+    ]);
+  });
+
+  it("finds a variant by the game of its original", () => {
+    const grouped = groupProjects([
+      unit("orig", opened),
+      unit("orig-variant", undefined, "orig"),
+    ]);
+    const found = filterGrouped(grouped, "some game");
+    expect(found.games[0]?.projects).toHaveLength(2);
+    const byUnit = filterGrouped(
+      { ...grouped, games: [{ ...grouped.games[0], label: "Other" }] },
+      "some game",
+    );
+    expect(byUnit.games[0]?.projects.map((p) => p.name)).toEqual([
       "orig",
       "orig-variant",
     ]);

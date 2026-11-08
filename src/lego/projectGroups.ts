@@ -30,7 +30,7 @@ export interface LegoGameGroup {
    *  under an archive name be carried to this group's key. */
   archives: string[];
   /** Built units first, then opened ones, each in the order they were given
-   *  (newest first). */
+   *  (newest first), with each variant right after the unit it came from. */
   projects: LegoProject[];
 }
 
@@ -151,10 +151,21 @@ export function filterGrouped(
 ): GroupedProjects {
   const needle = query.trim().toLowerCase();
   if (!needle) return grouped;
+  // A variant has the game of the unit it came from (#3240).
+  const byId = new Map(
+    [
+      ...grouped.own,
+      ...grouped.files,
+      ...grouped.games.flatMap((game) => game.projects),
+    ].map((p) => [p.id, p]),
+  );
   const matches = (project: LegoProject) =>
     project.name.toLowerCase().includes(needle) ||
     project.unitName.toLowerCase().includes(needle) ||
-    (unitGame(project)?.name.toLowerCase().includes(needle) ?? false);
+    (unitGame(variantRoot(project, byId))
+      ?.name.toLowerCase()
+      .includes(needle) ??
+      false);
 
   return {
     own: grouped.own.filter(matches),

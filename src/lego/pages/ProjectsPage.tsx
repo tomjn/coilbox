@@ -342,11 +342,11 @@ export default function ProjectsPage() {
             <p className="truncate text-sm font-medium">
               {isRenaming ? "" : project.name}
             </p>
-            <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {parentName !== undefined && !isRenaming ? (
                 <GitFork
                   size={12}
-                  className="shrink-0"
+                  className="mr-1 inline-block align-[-2px]"
                   aria-label={t`Variant of ${parentName}`}
                 />
               ) : null}

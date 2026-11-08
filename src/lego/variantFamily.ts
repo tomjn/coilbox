@@ -18,7 +18,9 @@ export function variantRoot(
   let at = project;
   for (;;) {
     const parent = at.variantOf ? byId.get(at.variantOf) : undefined;
-    if (!parent || seen.has(parent.id)) return at;
+    if (!parent) return at;
+    // A chain that loops has no root, so each unit stands for itself.
+    if (seen.has(parent.id)) return project;
     seen.add(parent.id);
     at = parent;
   }

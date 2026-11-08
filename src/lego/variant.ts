@@ -14,9 +14,10 @@
  *   the original's, larger or smaller.
  * - A different weapon rolls the weapon slots' module, size and gun roles off
  *   another seed. It picks another module when the library has more than one
- *   of the weapon's category, and always rolls the slot's size and the gun's
- *   length again, so with one weapon module in the library that is all it
- *   changes.
+ *   of the weapon's category. It rolls the slot's size again when the job
+ *   gives the slot a size range, and the barrel's length when the job gives
+ *   it a stretch. With one weapon module in the library that is all it can
+ *   change, and `variantRefusal` refuses a unit where it would change nothing.
  *
  * A variant keeps the original's seed, because another seed is another unit. One
  * that fails the construction checks at that seed is reported with the check

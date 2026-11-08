@@ -412,7 +412,11 @@ function Builder({ id }: { id: string | undefined }) {
   const { loading: modulesLoading } = useLegoCompounds();
   // Only for the keep-set when a texture changes: the store is shared, so
   // nothing can decide a key is dead by looking at one unit.
-  const { projects } = useLegoProjects();
+  const {
+    projects,
+    loading: projectsLoading,
+    error: projectsError,
+  } = useLegoProjects();
 
   // The meshes of a unit imported from somebody else's model. Read once
   // alongside the document, and null for a unit built out of parts.
@@ -3161,6 +3165,7 @@ function Builder({ id }: { id: string | undefined }) {
                         project={draft}
                         pack={pack}
                         projects={projects}
+                        ready={!projectsLoading && projectsError === null}
                       />
                     ) : null}
                     {pack && !draft.imported ? (
