@@ -69,6 +69,12 @@ js_lane() {
   run_check i18n-extract i18n_extract_check
   run_check typecheck bun run typecheck
   run_check test bun run test
+  # The same golden units on V8, which is Windows' webview. The line above is
+  # JavaScriptCore. See the "Generator under V8" step in lint.yml (#5113).
+  run_check test-v8 node node_modules/vitest/vitest.mjs run \
+    src/lego/generate.test.ts \
+    src/lego/portableAngles.test.ts \
+    src/lego/portableRotation.test.ts
   # The mission runtime and the blueprint widget are Lua the engine runs, so
   # nothing above compiles them.
   run_check mission-tests scripts/mission-tests.sh

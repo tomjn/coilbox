@@ -99,6 +99,19 @@ jobs:
           sudo apt-get install -y luajit
       - name: Vitest
         run: bun run test --shard=${{ matrix.shard }}/2
+      # `bun run test` runs vitest on JavaScriptCore (bunfig.toml), the engine of
+      # the macOS and Linux webviews. The Windows webview runs V8, which rounds
+      # sin, cos, log and atan2 differently in the last bit, so a generated unit
+      # must be the same document on both (#5113). These files hold the golden
+      # units and the tables that prove it. Node is vitest's own runtime, so it
+      # is V8. One shard runs them, as they are quick and need no second copy.
+      - name: Generator under V8
+        if: matrix.shard == 1
+        run: >-
+          node node_modules/vitest/vitest.mjs run
+          src/lego/generate.test.ts
+          src/lego/portableAngles.test.ts
+          src/lego/portableRotation.test.ts
 
   # The conquest map generators must build the same map from a seed on every
   # platform. The Linux vitest job above already runs their fixture tests, so
