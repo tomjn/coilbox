@@ -587,7 +587,7 @@
     "hash": 4115366407
   },
   "wheeled assault small": {
-    "pieces": 17,
+    "pieces": 23,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
@@ -599,25 +599,25 @@
       "trackWidth": 19.171796979568896,
       "wheelHeight": 3.4669829521147766
     },
-    "hash": 2771149444
+    "hash": 1440937513
   },
   "wheeled assault large": {
-    "pieces": 23,
+    "pieces": 30,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
-    "covering": 8,
+    "covering": 7,
     "proportions": {
       "axles": 4,
       "axleSpacing": 33.092130402890035,
       "trackWidth": 41.340437390282744,
       "wheelHeight": 7.165181722120614
     },
-    "hash": 2659552971
+    "hash": 2176822474
   },
   "wheeled artillery small": {
-    "pieces": 18,
+    "pieces": 24,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
@@ -629,25 +629,25 @@
       "trackWidth": 25.349175847973672,
       "wheelHeight": 4.462768442497356
     },
-    "hash": 186185332
+    "hash": 3986489154
   },
   "wheeled artillery large": {
-    "pieces": 18,
+    "pieces": 26,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
-    "covering": 5,
+    "covering": 7,
     "proportions": {
       "axles": 3,
       "axleSpacing": 34.17423703414574,
       "trackWidth": 46.37334102361463,
       "wheelHeight": 7.808303394014248
     },
-    "hash": 2148571341
+    "hash": 1540311553
   },
   "wheeled scout small": {
-    "pieces": 18,
+    "pieces": 28,
     "modules": [
       "chassis.1=builtin.deck"
     ],
@@ -658,10 +658,10 @@
       "trackWidth": 13.366805543098597,
       "wheelHeight": 1.9981918589468115
     },
-    "hash": 4122598662
+    "hash": 441678355
   },
   "wheeled scout large": {
-    "pieces": 20,
+    "pieces": 30,
     "modules": [
       "chassis.1=builtin.deck",
       "weapon.1=builtin.turret"
@@ -673,10 +673,10 @@
       "trackWidth": 20.78907890958246,
       "wheelHeight": 3.8438142965186852
     },
-    "hash": 3333199286
+    "hash": 421138722
   },
   "wheeled builder small": {
-    "pieces": 18,
+    "pieces": 24,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
@@ -688,10 +688,10 @@
       "trackWidth": 20.604339359002186,
       "wheelHeight": 3.9332400271279035
     },
-    "hash": 570184998
+    "hash": 3785249977
   },
   "wheeled builder large": {
-    "pieces": 15,
+    "pieces": 19,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
@@ -703,10 +703,10 @@
       "trackWidth": 42.05167684823274,
       "wheelHeight": 5.86031011432968
     },
-    "hash": 444956705
+    "hash": 95553030
   },
   "wheeled antiair small": {
-    "pieces": 18,
+    "pieces": 24,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
@@ -718,70 +718,70 @@
       "trackWidth": 19.76221791228745,
       "wheelHeight": 3.803954693134292
     },
-    "hash": 1693368196
+    "hash": 402742651
   },
   "wheeled antiair large": {
-    "pieces": 22,
+    "pieces": 33,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
-    "covering": 7,
+    "covering": 10,
     "proportions": {
       "axles": 4,
       "axleSpacing": 26.613067614596336,
       "trackWidth": 42.244517909474666,
       "wheelHeight": 5.87271835457161
     },
-    "hash": 1630876259
+    "hash": 1118379965
   },
   "tracked assault small": {
-    "pieces": 28,
-    "modules": [
-      "chassis.1=builtin.hull-long",
-      "weapon.1=builtin.turret"
-    ],
-    "covering": 3,
-    "proportions": {
-      "trackLength": 34.95692736722063,
-      "trackWidth": 14.94654593743442,
-      "trackHeight": 7.309132867986337,
-      "roadWheels": 8
-    },
-    "hash": 3413641105
-  },
-  "tracked assault large": {
-    "pieces": 27,
+    "pieces": 51,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
     "covering": 4,
     "proportions": {
+      "trackLength": 34.95692736722063,
+      "trackWidth": 14.94654593743442,
+      "trackHeight": 7.309132867986337,
+      "roadWheels": 8
+    },
+    "hash": 784095544
+  },
+  "tracked assault large": {
+    "pieces": 52,
+    "modules": [
+      "chassis.1=builtin.hull-long",
+      "weapon.1=builtin.turret"
+    ],
+    "covering": 5,
+    "proportions": {
       "trackLength": 64.98948277776594,
       "trackWidth": 25,
       "trackHeight": 14.052821901943533,
       "roadWheels": 7
     },
-    "hash": 953262916
+    "hash": 370638572
   },
   "tracked artillery small": {
-    "pieces": 31,
+    "pieces": 57,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
     ],
-    "covering": 3,
+    "covering": 5,
     "proportions": {
       "trackLength": 48.1238546145726,
       "trackWidth": 16.507619238203855,
       "trackHeight": 8.40548383492604,
       "roadWheels": 10
     },
-    "hash": 2449803748
+    "hash": 3782677869
   },
   "tracked artillery large": {
-    "pieces": 25,
+    "pieces": 49,
     "modules": [
       "chassis.1=builtin.hull",
       "weapon.1=builtin.turret"
@@ -793,95 +793,95 @@
       "trackHeight": 15,
       "roadWheels": 7
     },
-    "hash": 18165733
+    "hash": 1322156724
   },
   "tracked scout small": {
-    "pieces": 19,
+    "pieces": 37,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 2,
     "proportions": {
       "trackLength": 25,
       "trackWidth": 10,
       "trackHeight": 5,
       "roadWheels": 7
     },
-    "hash": 2247207655
+    "hash": 4123173247
   },
   "tracked scout large": {
-    "pieces": 15,
+    "pieces": 31,
     "modules": [
       "chassis.1=builtin.deck"
     ],
-    "covering": 0,
+    "covering": 2,
     "proportions": {
       "trackLength": 33.96858105285047,
       "trackWidth": 17.351263180436217,
       "trackHeight": 7.5088915747469285,
       "roadWheels": 5
     },
-    "hash": 574732043
+    "hash": 4276642126
   },
   "tracked builder small": {
-    "pieces": 26,
+    "pieces": 48,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
-    "covering": 3,
+    "covering": 5,
     "proportions": {
       "trackLength": 39.3962685244577,
       "trackWidth": 11.769454818955275,
       "trackHeight": 6.358709253980779,
       "roadWheels": 7
     },
-    "hash": 1765762926
+    "hash": 3549840900
   },
   "tracked builder large": {
-    "pieces": 24,
+    "pieces": 50,
     "modules": [
       "chassis.1=builtin.hull",
       "buildarm.1=builtin.buildarm"
     ],
-    "covering": 3,
+    "covering": 5,
     "proportions": {
       "trackLength": 65,
       "trackWidth": 23.983612776929977,
       "trackHeight": 12.388028231739996,
       "roadWheels": 6
     },
-    "hash": 4002442055
+    "hash": 2459321119
   },
   "tracked antiair small": {
-    "pieces": 34,
+    "pieces": 63,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
-    "covering": 3,
+    "covering": 4,
     "proportions": {
       "trackLength": 35.300082384995186,
       "trackWidth": 14.356666210059192,
       "trackHeight": 6.5965599434729665,
       "roadWheels": 11
     },
-    "hash": 1494314195
+    "hash": 616723855
   },
   "tracked antiair large": {
-    "pieces": 34,
+    "pieces": 67,
     "modules": [
       "chassis.1=builtin.hull-long",
       "weapon.1=builtin.turret"
     ],
-    "covering": 3,
+    "covering": 4,
     "proportions": {
       "trackLength": 65,
       "trackWidth": 25,
       "trackHeight": 12.782799019325525,
       "roadWheels": 11
     },
-    "hash": 3093864400
+    "hash": 703574091
   },
   "turret.building assault small": {
     "pieces": 13,

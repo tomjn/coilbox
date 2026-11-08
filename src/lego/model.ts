@@ -1131,6 +1131,13 @@ export interface LegoGenerated {
    * piece is that bone's child. Absent on a unit generated before covering.
    */
   covering?: { bone: string; piece: string }[];
+  /**
+   * The wheels and treads the generator put on the wheel and track bones
+   * (#5117), by piece id, each with the id in the body plan of its bone. The
+   * piece is that bone's child. Absent on a unit with no wheel or track bone, or
+   * generated before wheels.
+   */
+  running?: { bone: string; piece: string; kind: "wheel" | "tread" }[];
 }
 
 /** A footprint in whole steps of `ELMOS_PER_FOOTPRINT`, and a height in elmos. */
@@ -1987,6 +1994,16 @@ function parseGenerated(value: unknown): LegoGenerated | null {
           : [];
       })
     : undefined;
+  const running = Array.isArray(v.running)
+    ? v.running.flatMap((entry): NonNullable<LegoGenerated["running"]> => {
+        if (typeof entry !== "object" || entry === null) return [];
+        const { bone, piece, kind } = entry as Record<string, unknown>;
+        if (typeof bone !== "string" || typeof piece !== "string") return [];
+        return kind === "wheel" || kind === "tread"
+          ? [{ bone, piece, kind }]
+          : [];
+      })
+    : undefined;
   return {
     seed: v.seed,
     plan: v.plan,
@@ -1994,6 +2011,7 @@ function parseGenerated(value: unknown): LegoGenerated | null {
     size: v.size,
     modules,
     ...(covering ? { covering } : {}),
+    ...(running ? { running } : {}),
   };
 }
 

@@ -412,14 +412,24 @@ describe("generateUnit", () => {
           const kept = unit.pieces.filter(
             (p) => p.module && p.module.instance !== chassis,
           );
-          // Every module but the chassis, and the room each wheel bone needs:
-          // a cube round its joint as wide as the joint is high.
+          // Every module but the chassis, and the room each wheel and track
+          // needs: the wheels and treads on it, or a cube round a wheel bone's
+          // joint as wide as the joint is high when it has none.
           const rooms = kept.flatMap((p) => {
             const box = pieceWorldBox(unit, pack, p);
             return box ? [box] : [];
           });
+          const gear = new Set(unit.generated?.running?.map((r) => r.piece));
+          for (const p of unit.pieces.filter((x) => gear.has(x.id))) {
+            const box = pieceWorldBox(unit, pack, p);
+            if (box) rooms.push(box);
+          }
+          const geared = new Set(
+            unit.pieces.filter((p) => gear.has(p.id)).map((p) => p.parentId),
+          );
           for (const wheel of unit.pieces.filter(
-            (p) => p.bone !== undefined && p.role === "wheel",
+            (p) =>
+              p.bone !== undefined && p.role === "wheel" && !geared.has(p.id),
           )) {
             const joint = new THREE.Vector3().setFromMatrixPosition(
               worldMatrix(unit, wheel.id),

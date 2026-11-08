@@ -38,6 +38,7 @@ import { pieceOwnBox } from "./connectors";
 import type { CoveringRule } from "./generatorJobs";
 import {
   childrenOf,
+  descendantIds,
   type LegoPiece,
   type LegoProject,
   pieceById,
@@ -63,6 +64,9 @@ export interface CoveringOptions {
   chassis: string | null;
   /** The instances that must not be buried: every module but the chassis. */
   keepClear: ReadonlySet<string>;
+  /** The pieces on the wheel and track bones: wheels and treads. Their boxes
+   *  are the room those bones need. A wheel bone with none keeps a cube. */
+  gear?: ReadonlySet<string>;
   /** The skeleton's width and length in elmos, and the unit's width. */
   size: { x: number; z: number };
   width: number;
@@ -88,7 +92,7 @@ const GUN_BONES = new Set(["turret", "barrel", "flare"]);
 const MARKER_ROLES = new Set(["wake", "rudder"]);
 
 /** Two boxes this close are touching, not overlapping. */
-const TOUCH = 1e-6;
+export const TOUCH = 1e-6;
 
 /** The parts that may cover a span, and those that may make a deck. */
 const SPAN_SHAPES = ["beam", "block"];
@@ -141,8 +145,37 @@ function boxIn(
   return { min, max };
 }
 
+/** The box round some boxes, or null for none. */
+function unionBox(boxes: readonly Box[]): Box | null {
+  if (boxes.length === 0) return null;
+  const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  for (const box of boxes) {
+    min.min(box.min);
+    max.max(box.max);
+  }
+  return { min, max };
+}
+
+/**
+ * How far a box reaches from a joint back along `-dir`, which is how far a
+ * span running to the joint along `dir` can go before it meets the box.
+ */
+function nearReach(box: Box, joint: THREE.Vector3, dir: THREE.Vector3): number {
+  let reach = 0;
+  for (let corner = 0; corner < 8; corner++) {
+    const point = new THREE.Vector3(
+      corner & 1 ? box.max.x : box.min.x,
+      corner & 2 ? box.max.y : box.min.y,
+      corner & 4 ? box.max.z : box.min.z,
+    );
+    reach = Math.max(reach, joint.clone().sub(point).dot(dir));
+  }
+  return reach;
+}
+
 /** Where a piece's origin is in the unit's space. */
-function jointOf(project: LegoProject, pieceId: string): THREE.Vector3 {
+export function jointOf(project: LegoProject, pieceId: string): THREE.Vector3 {
   return new THREE.Vector3().setFromMatrixPosition(
     worldMatrix(project, pieceId),
   );
@@ -157,7 +190,7 @@ function wheelRoom(project: LegoProject, bone: LegoPiece): Box {
   return { min: joint.clone().sub(half), max: joint.clone().add(half) };
 }
 
-function isWheel(piece: LegoPiece): boolean {
+export function isWheel(piece: LegoPiece): boolean {
   return piece.bone !== undefined && piece.role === "wheel";
 }
 
@@ -172,12 +205,14 @@ function isGunBone(piece: LegoPiece): boolean {
  * The same key for a bone and its twin across the centre line, so a pair of
  * legs rolls the same part and the unit stays symmetric.
  */
-function sideless(bone: string): string {
+export function sideless(bone: string): string {
   return bone.replace(/\.r(\d*)/g, ".l$1");
 }
 
 /** A part's three sizes, longest first, with the axis each is along. */
-function sortedSizes(part: LegoPartInfo): { size: number; axis: number }[] {
+export function sortedSizes(
+  part: LegoPartInfo,
+): { size: number; axis: number }[] {
   return [0, 1, 2]
     .map((axis) => ({
       size: part.bbox.max[axis] - part.bbox.min[axis],
@@ -272,7 +307,7 @@ function fits(
  * directions. A part is a box, so a direction may be reversed to keep it a
  * rotation rather than a mirror.
  */
-function laidAlong(
+export function laidAlong(
   axes: number[],
   frame: THREE.Vector3[],
 ): [number, number, number] {
@@ -300,7 +335,7 @@ function laidAlong(
 /** The middle of copy `i` of `count`, each `size` long, laid end to end from
  *  one end of `extent` to the other. Where they do not fit exactly they
  *  overlap a little rather than leave a gap. */
-function spaced(i: number, count: number, extent: number, size: number) {
+export function spaced(i: number, count: number, extent: number, size: number) {
   if (count === 1) return 0;
   return -extent / 2 + size / 2 + (i * (extent - size)) / (count - 1);
 }
@@ -332,6 +367,23 @@ interface Plan {
 }
 
 /**
+ * The parts a generated unit is built from: those of the pack in the chassis
+ * part's colourway, or grey when the unit has none.
+ */
+export function coverParts(
+  project: LegoProject,
+  pack: LoadedPack,
+  chassis: string | null,
+): LegoPartInfo[] {
+  const chassisPart = chassis ? pieceById(project, chassis)?.partId : null;
+  const colourway =
+    (chassisPart && pack.byId.get(chassisPart)?.colourway) ?? "grey";
+  return pack.parts.filter(
+    (p) => p.colourway === colourway && p.packId === pack.manifest.id,
+  );
+}
+
+/**
  * The project with the covering added, and which bone each part covers. The
  * chassis is lifted onto the deck when the deck would otherwise reach below the
  * ground.
@@ -348,17 +400,33 @@ export function coverSkeleton(
       (rule.thickness[1] - rule.thickness[0]) * roll("covering:thickness")());
   if (!(thickness > 0)) return { project, covering: [] };
 
-  const chassisPart = options.chassis
-    ? pieceById(project, options.chassis)?.partId
-    : null;
-  const colourway =
-    (chassisPart && pack.byId.get(chassisPart)?.colourway) ?? "grey";
-  const parts = pack.parts.filter(
-    (p) => p.colourway === colourway && p.packId === pack.manifest.id,
-  );
+  const parts = coverParts(project, pack, options.chassis);
 
   const bones = project.pieces.filter((p) => p.bone !== undefined);
-  const wheels = bones.filter(isWheel).map((w) => wheelRoom(project, w));
+  // The room the wheels and tracks need: what stands on them where there is
+  // something, a cube round the bone where there is not.
+  const gearBoxes = new Map<string, Box[]>();
+  for (const piece of project.pieces) {
+    if (!options.gear?.has(piece.id) || !piece.parentId) continue;
+    const box = pieceWorldBox(project, pack, piece);
+    if (box)
+      gearBoxes.set(piece.parentId, [
+        ...(gearBoxes.get(piece.parentId) ?? []),
+        box,
+      ]);
+  }
+  /** The box round the gear on a bone and every bone under it. */
+  const gearUnder = (boneId: string): Box | null =>
+    unionBox(
+      [boneId, ...descendantIds(project, boneId)].flatMap(
+        (id) => gearBoxes.get(id) ?? [],
+      ),
+    );
+  const wheels = bones.flatMap(
+    (bone) =>
+      gearBoxes.get(bone.id) ??
+      (isWheel(bone) ? [wheelRoom(project, bone)] : []),
+  );
   const plans: Plan[] = [];
 
   if (rule.body) {
@@ -431,12 +499,22 @@ export function coverSkeleton(
         const from = new THREE.Vector3(...twin.position);
         const r = Math.max(jointOf(project, child.id).y, 0);
         const span = to.clone().sub(from);
-        const length = span.length() - 2 * r;
+        const along = span.clone().normalize();
+        // Stops short of each wheel's inner face, or of the room kept for it.
+        const reach = (id: string, away: THREE.Vector3) => {
+          const box = gearUnder(id);
+          return box ? nearReach(box, jointOf(project, id), away) : r;
+        };
+        const geared = gearUnder(child.id) || gearUnder(twin.id);
+        const start = reach(twin.id, along.clone().negate());
+        const end = reach(child.id, along);
+        const length = span.length() - start - end;
         if (length <= 0) continue;
-        const along = span.normalize();
         plans.push({
           bone,
-          centre: from.clone().add(to).multiplyScalar(0.5),
+          centre: geared
+            ? from.clone().addScaledVector(along, start + length / 2)
+            : from.clone().add(to).multiplyScalar(0.5),
           frame: frameFor(along),
           length,
           width: thickness / 2,
@@ -448,12 +526,20 @@ export function coverSkeleton(
         continue;
       }
       if (isGunBone(child) || MARKER_ROLES.has(child.role ?? "")) continue;
-      const length = to.length();
+      // Stops at the gear on the child, such as a track's tread, not at its
+      // joint in the middle of it.
+      const dir = to.clone().normalize();
+      const childGear = gearUnder(child.id);
+      const length =
+        to.length() -
+        (childGear ? nearReach(childGear, jointOf(project, child.id), dir) : 0);
       if (length <= TOUCH) continue;
       plans.push({
         bone,
-        centre: to.clone().multiplyScalar(0.5),
-        frame: frameFor(to.clone().normalize()),
+        centre: (childGear ? dir : to)
+          .clone()
+          .multiplyScalar(childGear ? length / 2 : 0.5),
+        frame: frameFor(dir),
         length,
         width: thickness,
         depth: thickness,
@@ -477,13 +563,20 @@ export function coverSkeleton(
   const added: LegoPiece[] = [];
   const names = project.pieces.map((p) => p.name);
   for (const plan of plans) {
-    const candidates = fits(
+    let ranked = fits(
       parts.filter((p) => plan.shapes.includes(p.shape)),
       plan.length,
       plan.width,
       plan.depth,
       plan.rows,
-    ).slice(0, CLOSEST);
+    );
+    // A deck part thicker than the deck reaches below it, and the unit sitting
+    // on the ground would then lift its wheels off it. With no part thin
+    // enough, there is no deck.
+    if (plan.rows && options.gear?.size) {
+      ranked = ranked.filter((fit) => fit.depth <= plan.depth + TOUCH);
+    }
+    const candidates = ranked.slice(0, CLOSEST);
     if (candidates.length === 0) continue;
     const fit = pick(roll(`covering:${plan.key}`), candidates);
     const rotation = laidAlong(fit.axes, plan.frame);

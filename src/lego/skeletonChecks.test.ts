@@ -232,6 +232,29 @@ describe("a foot off the ground", () => {
     expect(ground(bare)).toEqual([]);
   });
 
+  it("leaves a road wheel alone, since it rides on the tread", () => {
+    const track = add(unit(), {
+      id: "track",
+      role: "track",
+      partId: null,
+      position: [3, 2, 0],
+    });
+    const wheel = (id: string, parentId: string) => ({
+      id,
+      parentId,
+      role: "wheel",
+      position: [0, 0, 0] as [number, number, number],
+    });
+    // The road wheel's block is 1.5 elmos up, so the track, which counts
+    // everything under it, is that far off the ground. The wheel is not judged.
+    expect(
+      ground(add(track, wheel("road", "track"))).map((p) => p.message),
+    ).toEqual(['"track" is 1.5 elmos above the ground.']);
+    expect(
+      ground(add(track, wheel("loose", "root"))).map((p) => p.message),
+    ).toEqual(['"loose" is 0.5 elmos below the ground.']);
+  });
+
   it("leaves a unit with no foot or wheel alone", () => {
     expect(run(add(unit(), { id: "hat", position: [0, 9, 0] }))).toEqual([]);
   });

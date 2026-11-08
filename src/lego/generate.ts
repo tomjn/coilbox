@@ -47,6 +47,7 @@ import { insertModule } from "./moduleMount";
 import type { LoadedPack } from "./pack";
 import { applyEuler } from "./portableRotation";
 import { worldMatrix } from "./reparent";
+import { addRunningGear } from "./runningGear";
 import { defaultTarget, skeletonSize } from "./skeletonSize";
 import { ELMOS_PER_FOOTPRINT } from "./unitDef";
 
@@ -517,12 +518,21 @@ export function generateUnit(
     }
   }
 
+  const running = addRunningGear(project, {
+    pack,
+    chassis: chassisTop,
+    newId,
+    roll: (key) => roll(inputs, key),
+  });
+  project = running.project;
+
   const covered = coverSkeleton(project, {
     pack,
     rule: job.covering,
     anchor: anchorBone(project),
     chassis: chassisTop,
     keepClear,
+    gear: new Set(running.gear.map((g) => g.piece)),
     size: extent,
     width,
     newId,
@@ -540,6 +550,7 @@ export function generateUnit(
       size: inputs.size,
       modules: generated,
       covering: covered.covering,
+      ...(running.gear.length > 0 ? { running: running.gear } : {}),
     },
   };
 }
