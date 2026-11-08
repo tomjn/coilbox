@@ -49,6 +49,10 @@ export interface TownShading {
     slots: THREE.Texture;
     /** 1 once the bake is drawn. Until then the shader searches. */
     ready: { value: number };
+    /** {@link townNoiseMaterial}'s picture, laid out as `bake`. */
+    noise: THREE.Texture;
+    /** 1 once the noise bake is drawn. Until then the shader works it out. */
+    noiseReady: { value: number };
   };
   /** The map's rivers, which nothing is built over. */
   river?: GroundRivers;
@@ -441,9 +445,12 @@ void wBlocks3(vec2 x, vec2 d1, vec2 d2, out vec4 b0, out vec4 b1, out vec4 b2, o
 uniform sampler2D uBlockBake;
 uniform sampler2D uBlockSlots;
 uniform float uBlockBaked;
+uniform sampler2D uNoiseBake;
+uniform float uNoiseBaked;
 const float W_BAKE_TEXELS = ${BLOCK_BAKE_TEXELS}.0;
 vec4 wSlot;
 float wSlotCells;
+bool wNoiseBaked;
 
 // As wBlocks, from the bake: its texel names the block that holds the
 // texel's middle and the blocks across its three nearest edges. Whichever of
@@ -519,19 +526,36 @@ struct WLot {
   float v;
 };
 
-// Where a point of the town's own frame lies in the block pattern (wBlocks).
-// Streets curve, so the blocks are bent a little.
-vec2 wBlockAt(vec2 q) {
-  vec2 warp = vec2(tNoise(q * 0.9 + wTSeed * 13.0).x, tNoise(q * 0.9 + wTSeed * 29.0 + 5.0).x) - 0.5;
-  return (q + warp * 0.35) / W_BLOCK + wTSeed * 101.0;
+// The noise behind the streets' bend (xy) and the estates (z) at a point of
+// the town's own frame, as townNoiseMaterial bakes it. Read from the bake
+// inside this town's square, else worked out.
+vec3 wNoiseAt(vec2 q) {
+  if (wNoiseBaked) {
+    vec2 local = (q / W_BLOCK + wTSeed * 101.0 - wSlot.zw) * W_BAKE_TEXELS;
+    // Inside the outermost texels' middles, so no other town's square blends in.
+    if (min(local.x, local.y) >= 0.5 && max(local.x, local.y) <= wSlotCells * W_BAKE_TEXELS - 0.5) {
+      return textureLod(uNoiseBake, (wSlot.xy + local) / vec2(textureSize(uNoiseBake, 0)), 0.0).xyz;
+    }
+  }
+  return vec3(
+    tNoise(q * 0.9 + wTSeed * 13.0).x,
+    tNoise(q * 0.9 + wTSeed * 29.0 + 5.0).x,
+    wTR < 1.2 || length(q) <= 0.4 * wTR ? 0.0 : tNoise(q / wTR * 1.7 + wTSeed * 91.0).x
+  );
 }
 
-// How much of an estate of sheds stands at q: a town of any size has one or
-// two out towards its edge.
-float wShedAt(vec2 q) {
+// Where a point of the town's own frame lies in the block pattern (wBlocks),
+// from its wNoiseAt. Streets curve, so the blocks are bent a little.
+vec2 wBlockAt(vec2 q, vec3 n) {
+  return (q + (n.xy - 0.5) * 0.35) / W_BLOCK + wTSeed * 101.0;
+}
+
+// How much of an estate of sheds stands at q, from its wNoiseAt: a town of
+// any size has one or two out towards its edge.
+float wShedAt(vec2 q, vec3 n) {
   // Small towns have none, and none stand near the middle.
   if (wTR < 1.2 || length(q) <= 0.4 * wTR) return 0.0;
-  return smoothstep(0.75, 0.79, tNoise(q / wTR * 1.7 + wTSeed * 91.0).x) * smoothstep(0.4, 0.6, length(q) / wTR) * step(1.2, wTR);
+  return smoothstep(0.75, 0.79, n.z) * smoothstep(0.4, 0.6, length(q) / wTR) * step(1.2, wTR);
 }
 
 // Whether the plot at q is one of a large town's tall blocks: the middle of
@@ -688,10 +712,12 @@ void main() {
     wSlot = texelFetch(uBlockSlots, ivec2(vTown, 0), 0);
     wSlotCells = texelFetch(uBlockSlots, ivec2(vTown, 1), 0).x;
     bool baked = uBlockBaked > 0.5 && wSlotCells > 0.0;
+    wNoiseBaked = uNoiseBaked > 0.5 && wSlotCells > 0.0;
     // Once single roofs are fully drawn the grain is never seen.
     float keepLot = clamp((W_LOT / gFoot - 1.5) / 2.0, 0.0, 1.0);
-    vec2 x0 = wBlockAt(q);
-    float shed0 = wShedAt(q);
+    vec3 n0 = wNoiseAt(q);
+    vec2 x0 = wBlockAt(q, n0);
+    float shed0 = wShedAt(q, n0);
     vec4 b0;
     vec2 mid0;
     float cell0;
@@ -713,8 +739,10 @@ void main() {
       float high = W_HIGH * (1.0 + 2.0 * wTallAt(dens, shed0));
       qTop = q + lift * high;
       qShadow = q + sunQ * high * 1.3;
-      vec2 xTop = wBlockAt(qTop);
-      vec2 xShadow = wBlockAt(qShadow);
+      vec3 nTop = wNoiseAt(qTop);
+      vec3 nShadow = wNoiseAt(qShadow);
+      vec2 xTop = wBlockAt(qTop, nTop);
+      vec2 xShadow = wBlockAt(qShadow, nShadow);
       vec4 bT;
       vec4 bS;
       vec2 midT;
@@ -734,8 +762,8 @@ void main() {
         if (!inT) bT = wBlocks(xTop, midT, cellT);
         if (!inS) bS = wBlocks(xShadow, midS, cellS);
       }
-      top = wLotOf(qTop, bT, midT, cellT, wShedAt(qTop), dens, w1.z, gFoot);
-      shadow = wLotOf(qShadow, bS, midS, cellS, wShedAt(qShadow), dens, w1.z, gFoot);
+      top = wLotOf(qTop, bT, midT, cellT, wShedAt(qTop, nTop), dens, w1.z, gFoot);
+      shadow = wLotOf(qShadow, bS, midS, cellS, wShedAt(qShadow, nShadow), dens, w1.z, gFoot);
     } else {
       b0 = baked ? wBlocksBaked(x0, mid0, cell0) : wBlocks(x0, mid0, cell0);
     }
@@ -1018,6 +1046,8 @@ export function townMaterial(
       uBlockBake: { value: shading.blocks.bake },
       uBlockSlots: { value: shading.blocks.slots },
       uBlockBaked: shading.blocks.ready,
+      uNoiseBake: { value: shading.blocks.noise },
+      uNoiseBaked: shading.blocks.noiseReady,
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uAmbient: { value: SHADE_AMBIENT },
     },
@@ -1105,6 +1135,61 @@ export function blockBakeMaterial(
   return new THREE.ShaderMaterial({
     vertexShader: BAKE_VERTEX,
     fragmentShader: BAKE_FRAGMENT.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE),
+    uniforms: { uSize: { value: new THREE.Vector2(width, height) } },
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.NoBlending,
+  });
+}
+
+const NOISE_VERTEX = /* glsl */ `
+attribute vec4 slot;
+attribute vec2 town;
+uniform vec2 uSize;
+flat varying vec4 vSlot;
+flat varying vec2 vTown;
+void main() {
+  vSlot = slot;
+  vTown = town;
+  gl_Position = vec4(position.xy / uSize * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
+
+const NOISE_FRAGMENT = /* glsl */ `
+flat varying vec4 vSlot;
+flat varying vec2 vTown;
+TERRAIN_NOISE_HERE
+const float W_BAKE_TEXELS = ${BLOCK_BAKE_TEXELS}.0;
+const float W_BLOCK = ${TOWN_BLOCK};
+void main() {
+  // The texel's middle in the town's own frame, as the town shader's
+  // wBlockAt would put it before the bend.
+  vec2 local = floor(gl_FragCoord.xy) - vSlot.xy + 0.5;
+  vec2 q = (vSlot.zw + local / W_BAKE_TEXELS - vTown.x * 101.0) * W_BLOCK;
+  // As wNoiseAt works them out.
+  gl_FragColor = vec4(
+    tNoise(q * 0.9 + vTown.x * 13.0).x,
+    tNoise(q * 0.9 + vTown.x * 29.0 + 5.0).x,
+    tNoise(q / vTown.y * 1.7 + vTown.x * 91.0).x,
+    1.0
+  );
+}
+`;
+
+/**
+ * The material that draws the noise bake: for each texel of a town's square,
+ * laid out as the block bake, the noise behind the streets' bend and the
+ * estates at the texel's middle, which the town shader then reads filtered in
+ * place of working it out. Draw the block bake's quads, each vertex also
+ * carrying its town's seed and radius as `town`.
+ */
+export function townNoiseMaterial(
+  width: number,
+  height: number,
+): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    vertexShader: NOISE_VERTEX,
+    fragmentShader: NOISE_FRAGMENT.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE),
     uniforms: { uSize: { value: new THREE.Vector2(width, height) } },
     depthTest: false,
     depthWrite: false,

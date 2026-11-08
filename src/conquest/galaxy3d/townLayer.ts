@@ -6,7 +6,12 @@ import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
 import type { TerrainSurface } from "./terrain";
 import type { BiomePixels } from "./terrainMesh";
-import { blockBakeMaterial, TOWN_STATE_ROWS, townMaterial } from "./townShader";
+import {
+  blockBakeMaterial,
+  TOWN_STATE_ROWS,
+  townMaterial,
+  townNoiseMaterial,
+} from "./townShader";
 import {
   anyTexelNear,
   BLOCK_BAKE_TEXELS,
@@ -296,8 +301,12 @@ export function buildTownLayer(
 /**
  * The block pattern of every open town, drawn once on the GPU into one
  * picture (`blockBakeMaterial`), so the town shader looks each block up
- * rather than searching nine cells for it (#3666). A sealed outpost has no
- * blocks, so none is drawn.
+ * rather than searching nine cells for it (#3666). Beside it, laid out the
+ * same, the noise that bends the streets and places the estates
+ * (`townNoiseMaterial`), so the shader reads that too rather than working it
+ * out. The noise needs a float picture, which a GPU without
+ * EXT_color_buffer_float cannot draw, and there the shader goes on working it
+ * out. A sealed outpost has no blocks, so none is drawn.
  */
 function buildBlockBake(
   towns: Town[],
@@ -322,16 +331,27 @@ function buildBlockBake(
       THREE.FloatType,
     ),
   );
+  const noise = new THREE.WebGLRenderTarget(layout.width, layout.height, {
+    depthBuffer: false,
+    generateMipmaps: false,
+    type: THREE.HalfFloatType,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+  });
   const ready = { value: 0 };
-  disposables.push(target, slots);
+  const noiseReady = { value: 0 };
+  disposables.push(target, noise, slots);
   // A quad a town, its corners at the texels its square covers.
-  const placed = layout.slots.filter((s) => s !== null);
+  const placed = layout.slots.flatMap((s, k) =>
+    s ? [{ ...s, town: towns[k] }] : [],
+  );
   let pending = placed.length > 0;
   const draw = (renderer: THREE.WebGLRenderer) => {
     if (!pending) return;
     pending = false;
     const position = new Float32Array(placed.length * 18);
     const slot = new Float32Array(placed.length * 24);
+    const town = new Float32Array(placed.length * 12);
     placed.forEach((s, k) => {
       const side = s.cells * BLOCK_BAKE_TEXELS;
       const [x0, y0, x1, y1] = [s.x, s.y, s.x + side, s.y + side];
@@ -341,25 +361,46 @@ function buildBlockBake(
       );
       for (let v = 0; v < 6; v++)
         slot.set([s.x, s.y, s.base[0], s.base[1]], k * 24 + v * 4);
+      for (let v = 0; v < 6; v++)
+        town.set([s.town.seed, s.town.radius], k * 12 + v * 2);
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(position, 3));
     geo.setAttribute("slot", new THREE.BufferAttribute(slot, 4));
+    geo.setAttribute("town", new THREE.BufferAttribute(town, 2));
     const mat = blockBakeMaterial(layout.width, layout.height);
+    const noiseMat = townNoiseMaterial(layout.width, layout.height);
     const mesh = new THREE.Mesh(geo, mat);
     // Placed in the picture by the vertex shader, not the camera.
     mesh.frustumCulled = false;
     const scene = new THREE.Scene();
     scene.add(mesh);
+    const camera = new THREE.OrthographicCamera();
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(target);
-    renderer.render(scene, new THREE.OrthographicCamera());
+    renderer.render(scene, camera);
+    if (renderer.extensions.has("EXT_color_buffer_float")) {
+      mesh.material = noiseMat;
+      renderer.setRenderTarget(noise);
+      renderer.render(scene, camera);
+      noiseReady.value = 1;
+    }
     renderer.setRenderTarget(previous);
     geo.dispose();
     mat.dispose();
+    noiseMat.dispose();
     ready.value = 1;
   };
-  return { shading: { bake: target.texture, slots, ready }, draw };
+  return {
+    shading: {
+      bake: target.texture,
+      slots,
+      ready,
+      noise: noise.texture,
+      noiseReady,
+    },
+    draw,
+  };
 }
 
 /**
