@@ -59,7 +59,7 @@ let origRender: RenderFn = () => {};
 // bake, one tile a frame. Each is timed to the end of its GPU work.
 const bake: Bake[] = [];
 let firstMainFrameMs = Number.NaN;
-const loadedAt = performance.now();
+// Milliseconds from the start of the page load, which includes making the land.
 let timeToFirstMain = Number.NaN;
 
 // WebGLRenderer assigns `render` in its constructor, so catch the assignment
@@ -85,7 +85,7 @@ Object.defineProperty(THREE.WebGLRenderer.prototype, "render", {
         fn.call(this, s, c);
         if (Number.isNaN(firstMainFrameMs)) {
           firstMainFrameMs = performance.now() - t0;
-          timeToFirstMain = performance.now() - loadedAt;
+          timeToFirstMain = performance.now();
         }
         return;
       }

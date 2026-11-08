@@ -36,6 +36,11 @@ const port = args.port ?? "1479";
 const perf = args.perf === "1";
 const maxLoad = Number(args["max-load"] ?? 6);
 const maxWaitMs = Number(args["max-wait"] ?? 240) * 1000;
+for (const [option, value] of Object.entries({ runs, maxLoad, maxWaitMs })) {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${option} must be a number of at least 0, got ${value}`);
+  }
+}
 const maps = (args.maps ?? Object.keys(MAPS).join(",")).split(",");
 const out = args.out ?? "docs/reports/map-frame-timing";
 const session = `map-frame-timing-${label}`;
@@ -67,6 +72,7 @@ for (const name of maps) {
       console.error(
         `load ${loadBefore.toFixed(2)} is at or above ${maxLoad}, stopping before ${name} run ${run}`,
       );
+      ab("close");
       process.exit(2);
     }
     const url = `http://localhost:${port}/scripts/map-frame-timing/probe.html?${MAPS[name]}${perf ? "&perf=1" : ""}&_=${Date.now()}`;
