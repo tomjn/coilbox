@@ -87,6 +87,7 @@ const COMMANDS: &[&str] = &[
     "content_prune_rapid_pool",
     "content_reclaim_caches",
     "content_storage_overview",
+    "content_duplicate_report",
     "content_delete_engine",
     "content_export_build_tree_html",
     "content_export_build_tree_zip",
