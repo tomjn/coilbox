@@ -92,7 +92,7 @@ export interface CoveringOptions {
 
 export interface CoveringResult {
   project: LegoProject;
-  covering: { bone: string; piece: string }[];
+  covering: { bone: string; piece: string; deck?: true }[];
 }
 
 /** Floats per vertex in a pack: position, normal and uv. */
@@ -389,6 +389,34 @@ export function hasFlatFloor(
   const flat = footprint > 0 && Math.abs(area) / 2 >= FLAT_FLOOR * footprint;
   known.set(key, flat);
   return flat;
+}
+
+/**
+ * The axis of a part that `rotation` stands upright, and `down` as
+ * `hasFlatFloor` takes it, for a part on a bone whose up is the bone's y. The
+ * axis is the same whichever part is in the piece. A negative `scale` on the
+ * axis mirrors the part, which turns its low end over.
+ */
+export function floorOf(
+  rotation: [number, number, number],
+  scale: [number, number, number],
+): {
+  axis: number;
+  down: 1 | -1;
+} {
+  let floor: { axis: number; down: 1 | -1 } = { axis: 0, down: -1 };
+  let best = -1;
+  for (const axis of [0, 1, 2]) {
+    const unit = new THREE.Vector3();
+    // A negative scale on the axis turns that end of the part the other way.
+    unit.setComponent(axis, (scale[axis] as number) < 0 ? -1 : 1);
+    const up = applyEuler(unit, rotation).y;
+    if (Math.abs(up) > best) {
+      best = Math.abs(up);
+      floor = { axis, down: up > 0 ? -1 : 1 };
+    }
+  }
+  return floor;
 }
 
 /**
@@ -747,7 +775,11 @@ export function coverSkeleton(
         const name = uniquePieceName(`${plan.bone.name}cover`, names);
         names.push(name);
         added.push({ ...piece, id, name });
-        covering.push({ bone: plan.bone.bone ?? plan.bone.id, piece: id });
+        covering.push({
+          bone: plan.bone.bone ?? plan.bone.id,
+          piece: id,
+          ...(plan.rows ? { deck: true as const } : {}),
+        });
       }
     }
   }

@@ -693,75 +693,93 @@
     "covering": [
       {
         "bone": "hull",
-        "piece": "unit.12"
+        "piece": "unit.12",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.13"
+        "piece": "unit.13",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.14"
+        "piece": "unit.14",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.15"
+        "piece": "unit.15",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.16"
+        "piece": "unit.16",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.17"
+        "piece": "unit.17",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.18"
+        "piece": "unit.18",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.19"
+        "piece": "unit.19",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.20"
+        "piece": "unit.20",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.21"
+        "piece": "unit.21",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.22"
+        "piece": "unit.22",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.23"
+        "piece": "unit.23",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.24"
+        "piece": "unit.24",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.25"
+        "piece": "unit.25",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.26"
+        "piece": "unit.26",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.27"
+        "piece": "unit.27",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.28"
+        "piece": "unit.28",
+        "deck": true
       },
       {
         "bone": "hull",
-        "piece": "unit.29"
+        "piece": "unit.29",
+        "deck": true
       }
     ]
   }

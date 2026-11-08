@@ -548,7 +548,8 @@
     "covering": [
       {
         "bone": "torso",
-        "piece": "unit.15"
+        "piece": "unit.15",
+        "deck": true
       },
       {
         "bone": "hip",

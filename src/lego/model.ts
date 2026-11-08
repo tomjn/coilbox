@@ -1151,8 +1151,12 @@ export interface LegoGenerated {
    * The structural parts the generator covered the skeleton in (#3233), by
    * piece id, each with the id in the body plan of the bone it covers. The
    * piece is that bone's child. Absent on a unit generated before covering.
+   * `deck` is set on the parts of a deck, which stand the unit on their
+   * underside, so a reroll keeps to parts with a flat floor there (#5140). It
+   * is absent on a unit generated before that, whose parts are rerolled as any
+   * other.
    */
-  covering?: { bone: string; piece: string }[];
+  covering?: { bone: string; piece: string; deck?: true }[];
   /**
    * The wheels and treads the generator put on the wheel and track bones
    * (#5117), by piece id, each with the id in the body plan of its bone. The
@@ -2072,9 +2076,9 @@ function parseGenerated(value: unknown): LegoGenerated | null {
   const covering = Array.isArray(v.covering)
     ? v.covering.flatMap((entry) => {
         if (typeof entry !== "object" || entry === null) return [];
-        const { bone, piece } = entry as Record<string, unknown>;
+        const { bone, piece, deck } = entry as Record<string, unknown>;
         return typeof bone === "string" && typeof piece === "string"
-          ? [{ bone, piece }]
+          ? [{ bone, piece, ...(deck === true ? { deck: true as const } : {}) }]
           : [];
       })
     : undefined;
