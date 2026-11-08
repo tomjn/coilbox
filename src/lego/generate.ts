@@ -245,8 +245,9 @@ function modulesIn(
 function moduleWidth(module: LegoProject, pack: LoadedPack): number | null {
   const root = pieceById(module, module.rootPieceId);
   const box = root && pieceOwnBox(pack, root);
-  if (!box) return null;
-  const width = box.max[0] - box.min[0];
+  if (!root || !box) return null;
+  // The factor worked out from this multiplies the scale the piece already has.
+  const width = (box.max[0] - box.min[0]) * Math.abs(root.scale[0]);
   return width > 0 ? width : null;
 }
 
@@ -356,6 +357,11 @@ export function generateUnit(
   const size = GENERATOR_SIZES.find((s) => s.id === inputs.size);
   if (!job) throw new Error(`no generator job ${inputs.job}`);
   if (!size) throw new Error(`no generator size ${inputs.size}`);
+  // A saved unit keeps only a whole seed (`parseGenerated`), so any other
+  // could not be remade.
+  if (!Number.isSafeInteger(inputs.seed)) {
+    throw new Error(`a generator seed is a whole number, not ${inputs.seed}`);
+  }
   const { pack } = options;
   let counter = 0;
   const newId = options.newId ?? (() => `${options.id}.${++counter}`);

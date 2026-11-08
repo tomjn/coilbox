@@ -118,11 +118,20 @@ describe("generateUnit", () => {
   });
 
   it("gives a different unit for a different seed", () => {
+    // Only what was rolled: the name, the notes and the record name the seed,
+    // so they differ whatever the seed did.
+    const rolled = (unit: LegoProject) =>
+      JSON.stringify({ pieces: unit.pieces, skeleton: unit.skeleton });
     for (const { plan, job, size } of EVERY) {
-      expect(JSON.stringify(generate(1, plan, job, size))).not.toBe(
-        JSON.stringify(generate(2, plan, job, size)),
+      expect(rolled(generate(1, plan, job, size))).not.toBe(
+        rolled(generate(2, plan, job, size)),
       );
     }
+  });
+
+  it("refuses a seed that is not a whole number", () => {
+    expect(() => generate(1.5, "biped", "assault", "small")).toThrow();
+    expect(() => generate(Number.NaN, "biped", "assault", "small")).toThrow();
   });
 
   it("does not depend on the order the library lists modules in", () => {
