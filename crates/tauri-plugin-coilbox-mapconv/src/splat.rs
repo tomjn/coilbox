@@ -1058,9 +1058,9 @@ mod tests {
         }
         for (first, upper, lower) in [(2, 3, 2), (5, 1, 0)] {
             let mut bits = 0u32;
-            for c in 0..4 {
-                bits |= u32::from(grid[upper][c]) << (3 * c);
-                bits |= u32::from(grid[lower][c]) << (12 + 3 * c);
+            for (c, (up, low)) in grid[upper].iter().zip(&grid[lower]).enumerate() {
+                bits |= u32::from(*up) << (3 * c);
+                bits |= u32::from(*low) << (12 + 3 * c);
             }
             block[first..first + 3].copy_from_slice(&bits.to_le_bytes()[..3]);
         }
