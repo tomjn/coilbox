@@ -6,8 +6,8 @@
  * where the last one stopped. Nothing is saved until a candidate is opened,
  * and then it is an ordinary unit.
  *
- * A batch of 12 costs about a quarter of a second to generate and draw, which
- * was measured for #3234, so it is done in the click rather than in a worker.
+ * A batch of 12 took under 0.3 s to generate and draw when measured for #3234,
+ * so it is done in the click rather than in a worker.
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
