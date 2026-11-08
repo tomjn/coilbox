@@ -19810,6 +19810,10 @@ msgstr ""
 msgid "Graphics"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "grass"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Gravity"
 msgstr ""
@@ -33795,6 +33799,10 @@ msgstr ""
 msgid "Same as default"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "sand"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -36558,6 +36566,10 @@ msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
+msgstr ""
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "snow"
 msgstr ""
 
 #: src/lego/pages/components/ReferencePicker.tsx
@@ -45687,6 +45699,10 @@ msgstr ""
 msgid "Write sky"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write splats"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Write stats to the server log"
 msgstr ""
@@ -45786,6 +45802,10 @@ msgstr ""
 #. placeholder {0}: result.groups.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
+msgstr ""
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx

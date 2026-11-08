@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "mc_read_teams",
     "mc_write_mapinfo",
     "mc_write_skybox",
+    "mc_write_splats",
     "mc_package_map",
     "mc_install_map",
     "mc_decompile",

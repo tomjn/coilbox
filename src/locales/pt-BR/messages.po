@@ -24416,6 +24416,10 @@ msgstr "Conceder permissão"
 msgid "Graphics"
 msgstr "Gráficos"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "grass"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Gravity"
@@ -41656,6 +41660,10 @@ msgstr "Igual à precisão, mas usada enquanto a unidade que dispara está em mo
 msgid "Same as default"
 msgstr "Igual ao padrão"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "sand"
+msgstr ""
+
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -45065,6 +45073,10 @@ msgstr "Snapshot"
 #, fuzzy
 msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
 msgstr "Salvar e trocar <0>springsettings.cfg</0>, <1>LuaUI/Config</1> e <2>uikeys.txt</2> desta pasta de conteúdo."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "snow"
+msgstr ""
 
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
@@ -56336,6 +56348,10 @@ msgstr "Portabilidade da raiz de gravação n/a (não portátil)"
 msgid "Write sky"
 msgstr ""
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Write splats"
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
 msgid "Write stats to the server log"
@@ -56461,6 +56477,10 @@ msgstr "\"{name}\" gravado no Chobby"
 #, fuzzy
 msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr "{modelsWritten} de {modelsFound} modelos gravados em {0, plural, one {# folha} other {# folhas}}."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
+msgstr ""
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
