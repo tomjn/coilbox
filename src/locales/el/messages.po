@@ -12414,6 +12414,7 @@ msgstr "Αντίγραφο ασφαλείας: {backup}"
 msgid "bad pic"
 msgstr "κακή εικόνα"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/multiplayer/battle/AutohostControls.tsx
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -23094,6 +23095,7 @@ msgid "Food"
 msgstr "Φαγητό"
 
 #: src/content/pages/GameUnitPage.tsx
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
@@ -24364,6 +24366,7 @@ msgstr "Μεγάλωσε {step}, τώρα {size}."
 msgid "Grid only"
 msgstr "Μόνο πλέγμα"
 
+#: src/lego/generateChecked.ts
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -33114,6 +33117,10 @@ msgstr "Δεν βρέθηκε script, οπότε η μονάδα ανοίγει 
 msgid "No scripts here."
 msgstr "Κανένα script εδώ."
 
+#: src/lego/generateChecked.ts
+msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "No server would say what your public address is."
@@ -36174,6 +36181,7 @@ msgstr "Συνολικά"
 msgid "Overclocked Reactor"
 msgstr "Υπερχρονισμένος αντιδραστήρας"
 
+#: src/lego/generateChecked.ts
 #: src/lego/problems.ts
 #, fuzzy
 msgid "Overlap"
@@ -49863,6 +49871,14 @@ msgstr "Το script μονάδας εκεί έχει αλλάξει από τό�
 #, fuzzy
 msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "Η μονάδα εκτοξεύει ένα δόλωμα κάθε φορά που έρχεται πύραυλος προς αυτήν."
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos above the ground."
+msgstr ""
+
+#: src/lego/generateChecked.ts
+msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #, fuzzy
