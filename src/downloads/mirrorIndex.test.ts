@@ -23,7 +23,7 @@ const {
   loadSpringfilesList,
 } = await import("./mirrorIndex");
 
-const maps = { results: [{ name: "a" }] };
+const maps = { results: [{ name: "a", filename: "a.sd7" }] };
 
 beforeEach(() => {
   invalidateMirrorIndexes();
@@ -59,6 +59,23 @@ describe("the mirror index cache", () => {
     expect(dlSpringfilesList).toHaveBeenCalledWith({ category: "game" });
     expect(dlHakoraMaps).toHaveBeenCalledTimes(1);
     expect(heldHakoraMaps()).toEqual({ maps: [] });
+  });
+
+  it("leaves out the games coilbox does not offer, and only from the game index (issue #4780)", async () => {
+    const ok = { filename: "xta-9.728.sdz", name: "XTA" };
+    const mt = {
+      filename: "xta-9.729_mt.sdz",
+      name: "XTA",
+      md5: "3f52be87244d93719cf730a029060a8a",
+    };
+    dlSpringfilesList.mockResolvedValue({ results: [ok, mt] });
+
+    const games = await loadSpringfilesList("game");
+    expect(games.results).toEqual([ok]);
+    expect(heldSpringfilesList("game")).toBe(games);
+
+    // A map with that file name is not a game, so the filter is not applied.
+    expect((await loadSpringfilesList("map")).results).toEqual([ok, mt]);
   });
 
   it("does not remember a rejection", async () => {

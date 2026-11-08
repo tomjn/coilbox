@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 
 /// One entry from the springfiles `json.php` catalog. Field names match the
 /// springfiles JSON (all lowercase) and pass straight through to the frontend.
-/// Unknown fields (md5, timestamp, metadata, ...) are ignored.
+/// Unknown fields (fid, sdp, ...) are ignored. `md5` is kept, because the
+/// frontend checks it against the archives it refuses to offer.
 /// Map metadata from springfiles' `metadata=1` query. Source keys are
 /// capitalised (`Author`, `Width`, `Height`); accepted via serde aliases and
 /// re-emitted as lowercase for the frontend. Empty/zero for non-map entries.
@@ -62,6 +63,9 @@ pub struct SpringFile {
     /// Version string — populated for engines (e.g. `2025.01.6`), empty for maps.
     pub version: String,
     pub size: u64,
+    /// The archive's MD5, which the frontend checks against the archives it
+    /// refuses to offer. `Option` because the site may send `null`.
+    pub md5: Option<String>,
     /// When the file was added, as springfiles writes it (`2026-09-14T14:09:53`,
     /// no zone). `Option` because the site sends `null` for a few old rows.
     pub timestamp: Option<String>,
@@ -456,6 +460,22 @@ mod tests {
         assert_eq!(v[0].springname, "Comet");
         assert_eq!(v[0].mirrors, vec!["http://m/comet.sd7"]);
         assert_eq!(v[0].mapimages.len(), 1);
+    }
+
+    #[test]
+    fn springfile_keeps_its_md5_and_tolerates_a_null_one() {
+        let json = r#"[
+            {"springname":"A","md5":"3f52be87244d93719cf730a029060a8a"},
+            {"springname":"B","md5":null},
+            {"springname":"C"}
+        ]"#;
+        let v: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            v[0].md5.as_deref(),
+            Some("3f52be87244d93719cf730a029060a8a")
+        );
+        assert_eq!(v[1].md5, None);
+        assert_eq!(v[2].md5, None);
     }
 
     #[test]

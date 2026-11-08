@@ -285,6 +285,54 @@ describe("buildLibrary games", () => {
   });
 });
 
+describe("buildLibrary and XTA 9.729 MT (issue #4780)", () => {
+  const MT_MD5 = "3f52be87244d93719cf730a029060a8a";
+  const withXta = (...entries: SpringFile[]) =>
+    buildLibrary({
+      scan: {
+        games: [
+          scannedGame("XTA 9.65", "xta-9.65.sd7", {
+            shortname: "XTA",
+            version: "9.65",
+          }),
+        ],
+        maps: [],
+      },
+      files: { games: ["xta-9.65.sd7"], maps: [] },
+      hubGames: [],
+      catalogues: [{ source: "springfiles", kind: "game", entries }],
+      queue: [],
+    }).games.find((g) => g.id === "xta");
+  const mt = () => springFile("XTA 9.729 MT", "xta-9.729_mt.sdz", "game");
+
+  it("would offer an MT build as an update if its name and MD5 were not blocked", () => {
+    // Pins that the cases below pass because of the block, not because the
+    // version compares as older.
+    const unblocked = { ...mt(), filename: "xta-9.729_mt_other.sdz" };
+    expect(withXta(unblocked)?.update?.filename).toBe("xta-9.729_mt_other.sdz");
+  });
+
+  it("does not offer it as an update, by name", () => {
+    const xta = withXta(mt());
+    expect(xta?.state).toBe("local");
+    expect(xta?.update).toBeUndefined();
+    expect(xta?.sources).toEqual([]);
+  });
+
+  it("does not offer it as an update, by MD5 under another name", () => {
+    const renamed = { ...mt(), filename: "renamed.sdz", md5: MT_MD5 };
+    const xta = withXta(renamed);
+    expect(xta?.state).toBe("local");
+    expect(xta?.update).toBeUndefined();
+  });
+
+  it("still offers another newer XTA", () => {
+    const xta = withXta(mt(), springFile("XTA 9.752", "xta-9.752.sdz", "game"));
+    expect(xta?.state).toBe("update");
+    expect(xta?.update?.filename).toBe("xta-9.752.sdz");
+  });
+});
+
 describe("buildLibrary maps", () => {
   const { maps } = buildLibrary(input);
   const byId = (id: string) => {
