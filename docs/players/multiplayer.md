@@ -118,7 +118,7 @@ Start positions shows how players are placed on the map. With start boxes, the b
 
 Battle options shows how many of the game's options the host has changed. Select it to see them all. The options are in tabs for Battle, Game, Map and Units. Only the host can change them, so for everyone else they are read only.
 
-Coilbox widgets only load in a game whose `allowuserwidgets` option is on. Coilbox does not turn it on for a battle, so a host who wants widgets in the room sets it in the battle options. See [Games that switch user widgets off](blueprints.md#games-that-switch-user-widgets-off).
+Some games, such as Splinter Faction, load coilbox widgets only when their `allowuserwidgets` option is on. Coilbox does not turn it on for a battle, so a host who wants widgets in the room sets it in the battle options. See [Games that switch user widgets off](blueprints.md#games-that-switch-user-widgets-off).
 
 ### Add an AI
 

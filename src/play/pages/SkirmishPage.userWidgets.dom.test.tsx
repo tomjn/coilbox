@@ -205,6 +205,14 @@ describe("SkirmishPage and user widgets", () => {
     });
   });
 
+  it("turns it on for the blueprints widget alone", async () => {
+    h.widgetStatus = status(true, false);
+    start();
+
+    await vi.waitFor(() => expect(h.launch).toHaveBeenCalledTimes(1));
+    expect(launched().modOptions).toEqual({ allowuserwidgets: "1" });
+  });
+
   it("leaves it out when no widget is installed", async () => {
     start();
 
