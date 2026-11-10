@@ -120,7 +120,7 @@ Importing always adds a new copy. Importing a scenario you already have gives yo
 
 A coilbox link asks you to confirm, then opens the Scenarios page with the import ready to run.
 
-To import from the [community hub](https://coilbox-hub.vercel.app), open Coilbox hub in the sidebar, find the scenario and select Import. Coilbox takes you to the Scenarios page and imports it in the same way.
+To import from the [community hub](https://hub.coilbox.org), open Coilbox hub in the sidebar, find the scenario and select Import. Coilbox takes you to the Scenarios page and imports it in the same way.
 
 ## Import a campaign somebody shared
 

@@ -263,7 +263,7 @@ A coilbox link to a blueprint opens the same box with the code already in it, af
 
 Coilbox opens the Blueprints page with the blueprint read in. Select Add to my library. The blueprint's page then has a See it on the hub link.
 
-You can also browse the hub website at [coilbox-hub.vercel.app](https://coilbox-hub.vercel.app).
+You can also browse the hub website at [hub.coilbox.org](https://hub.coilbox.org).
 
 ### Open a pack
 

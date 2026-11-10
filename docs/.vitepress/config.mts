@@ -9,7 +9,7 @@ const downloads = await resolveDownloads();
 // constant because it is linked from the nav, the sidebar and two places on the
 // homepage. Matches DEFAULT_HUB_URL in src/hub/config.ts, which is where the app
 // itself points.
-const HUB_URL = "https://coilbox-hub.vercel.app";
+const HUB_URL = "https://hub.coilbox.org";
 
 // Notes on formats and protocols other projects own are kept in the repo for
 // people working on coilbox and are not published. Their old addresses forward

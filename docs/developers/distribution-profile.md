@@ -1033,7 +1033,7 @@ A `coilbox://` link can still point at an item for another game. Coilbox shows t
 
 ### `hubUrl` (string)
 
-Points the Coilbox hub at a server you run yourself, instead of the built-in `https://coilbox-hub.vercel.app`. Separate from [`hub`](#hub-boolean), which only turns the feature on or off.
+Points the Coilbox hub at a server you run yourself, instead of the built-in `https://hub.coilbox.org`. Separate from [`hub`](#hub-boolean), which only turns the feature on or off.
 
 ```json
 { "version": 1, "hubUrl": "https://hub.example.com" }
