@@ -4113,6 +4113,10 @@ msgstr "{name} ships inside {gameName}, which is packaged, so it cannot be saved
 msgid "{name} ships inside a game, which is packaged, so it cannot be saved there."
 msgstr "{name} ships inside a game, which is packaged, so it cannot be saved there."
 
+#: src/lego/legChains.ts
+msgid "{name} slides rather than turns when the unit moves, so it is not proposed as a leg."
+msgstr "{name} slides rather than turns when the unit moves, so it is not proposed as a leg."
+
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "{name} wants to be friends"
 msgstr "{name} wants to be friends"
@@ -4141,9 +4145,25 @@ msgstr "{named, plural, one {the trigger name on # building} other {the trigger 
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 msgstr "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 
+#: src/lego/legChains.ts
+msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
+msgstr "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
+
 #: src/lego/moduleFile.ts
 msgid "{names} came from a game, but the file does not say which. A piece from a game only goes in units for that game."
 msgstr "{names} came from a game, but the file does not say which. A piece from a game only goes in units for that game."
+
+#: src/lego/legChains.ts
+msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
+msgstr "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
+
+#: src/lego/legChains.ts
+msgid "{names} turn as a chain of two when the unit moves. That could be a thigh and foot or a shin and foot, so no leg is proposed for them."
+msgstr "{names} turn as a chain of two when the unit moves. That could be a thigh and foot or a shin and foot, so no leg is proposed for them."
+
+#: src/lego/legChains.ts
+msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
+msgstr "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
 
 #: src/lego/upgradeChain.ts
 msgid "{names} upgrade from each other in a loop. An upgrade path is a line."
