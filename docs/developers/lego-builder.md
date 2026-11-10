@@ -644,7 +644,7 @@ Before you press **Fit**, the drawer lists each role it will replace, each prese
 
 Nothing moves. Each proportion is measured from where the picked pieces are, and one whose joints you did not pick is left out. The Skeleton tab then reads, for example, "Two legs, fitted to this unit's pieces" and lists each value or "Not measured". It has no sliders, handles or size fields, because changing a proportion would move pieces you placed.
 
-Fitting differs from [opening a unit from a game](#opening-a-unit-from-a-game). Opening one proposes roles read from the unit's script, and never overwrites a role you set. Fitting is you saying what each piece is, so it replaces the role of every piece you pick. Opening a unit never proposes legs, so fitting a leg plan is how a walker from a game gets its walk.
+Fitting differs from [opening a unit from a game](#opening-a-unit-from-a-game). Opening one proposes roles read from the unit's script, and never overwrites a role you set. Fitting is you saying what each piece is, so it replaces the role of every piece you pick. A walker opened from a game with its legs proposed and accepted arrives with roles such as "Front left thigh" on its leg pieces, so the drawer suggests each leg bone for you. A walker whose legs could not be worked out has none, and you pick them here.
 
 ### What is stored with the unit
 
@@ -712,7 +712,16 @@ Alongside the script come proposals for what its pieces are for, in two groups, 
 - **The script named these.** It hands the piece back when the engine asks. `QueryNanoPiece` answering `nano2` is the script saying what `nano2` is for.
 - **These moved when the unit was asked to work.** Worked out from what turned and which way. A piece that turns horizontally when the unit is told to aim is a turret on nearly every unit ever shipped, and it is still a reading rather than a declaration.
 
-Legs are never proposed. Which of six moving pieces is the front left shin is not something motion reveals, and the walk presets animate a unit inside out if it is guessed wrong. To give a walker its legs, [fit a body plan](#fit-a-body-plan-to-a-unit-you-already-have).
+Legs are proposed from the same run that finds wheels, the unit being told to move. Coilbox records which pieces turn about x during the stride and reads them against the piece tree:
+
+- A chain of three turning pieces, each the child of the last, hanging off a piece that holds still, is a leg: thigh, shin and foot from the top down. The unit's root piece is never part of a leg, because it is the body.
+- The side comes from where the thigh's joint sits in the unit at rest. +x is the unit's left, as the engine has it.
+- A side's legs are numbered front to back, by the same position, as a body plan numbers its pairs. The first pair is the front pair, so a two legged walker's left thigh is proposed as "Front left thigh", as the two legged plan names it.
+- A unit found to have legs has no wheels proposed, and a piece turning as part of a chain is never a wheel.
+
+A chain of two, which could be a thigh and foot or a shin and foot, a chain of more than three, a leg that slides with `Move` rather than turns, a leg on the unit's centre line and two legs on one side level front to back each give a note saying so and no proposal. A wrong leg animates a unit inside out, which is worse than none. To give such a walker its legs, [fit a body plan](#fit-a-body-plan-to-a-unit-you-already-have).
+
+The tests run this against Splinter Faction's Bear, which walks on two legs, its Flashpoint, which has wheels, and the builder's own four legged walk, because Splinter Faction ships no four legged walker. The strides are recorded from the real script runtime in `crates/coilbox-springlua/tests/fixtures/strides.json`, and `tests/strides.rs` checks the recording still matches. The Splinter Faction half of that check needs the game installed, so it is ignored in CI.
 
 Nothing is applied until you accept the unit, every proposal is on screen before that, and a role already set by hand is never overwritten.
 
