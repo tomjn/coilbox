@@ -50,6 +50,16 @@ vi.mock("@/workshop/project", async (importOriginal) => ({
 vi.mock("@/workshop/compile", () => ({
   workshopCompile: (args: unknown) => workshopCompile(args),
 }));
+// The skeleton widget's file goes through the app's filesystem.
+const disk = new Map<string, string>();
+vi.mock("@/blueprint/fileIO", () => ({
+  appFileIO: {
+    read: async (path: string) => disk.get(path) ?? null,
+    write: async (path: string, text: string) => {
+      disk.set(path, text);
+    },
+  },
+}));
 vi.mock("../../bindings", () => ({
   legoAtlasPng: (args: unknown) => legoAtlasPng(args),
   legoExport: (args: unknown) => legoExport(args),
@@ -143,6 +153,7 @@ function show(
 }
 
 beforeEach(() => {
+  disk.clear();
   legoGameLanguage.mockReset();
   legoExport.mockReset();
   legoExportPicture.mockReset();
@@ -991,5 +1002,56 @@ describe("a unit with loadouts (issue #3282)", () => {
         name: "Treat skyfort_loadout_1.lua as coilbox's",
       }),
     ).toBeTruthy();
+  });
+});
+
+describe("the skeleton widget's file (issue #5181)", () => {
+  const FILE = "/data/LuaUI/Config/coilbox_skeletons/TG.json";
+  const withSkeleton = (exportDir: string) => ({
+    ...project,
+    exportDir,
+    game: { name: "Test Game 1.0", archive: "test_1", shortname: "TG" },
+    skeleton: { plan: "biped", proportions: {} },
+    pieces: [{ ...project.pieces[0], bone: "body" }],
+  });
+
+  it("writes a unit's plan bones when the game folder is in a content root", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show(withSkeleton("/data/games/some.sdd"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+    expect(await screen.findByText(FILE)).toBeTruthy();
+    const file = JSON.parse(disk.get(FILE) ?? "{}");
+    expect(file.units.skyfort.evidence).toBe("built");
+    expect(Object.values(file.units.skyfort.pieces)).toEqual([
+      { bone: "body", label: project.pieces[0].name },
+    ]);
+  });
+
+  it("writes nothing for a folder that says nothing of a content root", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show(withSkeleton("/mods/some.sdd"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+    await waitFor(() => expect(legoExport).toHaveBeenCalled());
+    await screen.findByText("/game/units/skyfort.lua");
+    expect(disk.size).toBe(0);
+  });
+
+  it("reports a file it could not write and keeps the export", async () => {
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    disk.set(FILE, "{ broken");
+    show(withSkeleton("/data/games/some.sdd"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+    expect(
+      await screen.findByText(
+        /The unit is exported, but its skeleton file is not:/,
+      ),
+    ).toBeTruthy();
+    expect(disk.get(FILE)).toBe("{ broken");
   });
 });

@@ -35,6 +35,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useEffect, useState } from "react";
+import { appFileIO } from "@/blueprint/fileIO";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -106,6 +107,10 @@ import {
   writtenDigest,
 } from "../../reexport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
+import {
+  contentRootOfGameFolder,
+  writeSkeletonFiles,
+} from "../../skeletonFile";
 import { sheetSources, sheetTextureNames } from "../../textureSheet";
 import { buildUnitDef, defValue, legoUnitDef, unitWords } from "../../unitDef";
 import { exportWeapons } from "../../weaponModule";
@@ -232,6 +237,10 @@ type Result =
        *  locks (#3289). */
       lockedList: string | null;
       lockedProblem: string | null;
+      /** `LuaUI/Config/coilbox_skeletons/<game>.json`, when this export changed
+       *  the unit's plan bones in it (#5181). */
+      skeletonFile: string | null;
+      skeletonProblem: string | null;
       /** Lists under the chassis's old name, emptied because the receipt shows
        *  coilbox wrote them. */
       lockedEmptied: string[];
@@ -729,6 +738,7 @@ export function ExportDrawer({
   const done = result.state === "done" ? result : null;
   const donePictureProblem = done?.pictureProblem ?? "";
   const doneLockedProblem = done?.lockedProblem ?? "";
+  const doneSkeletonProblem = done?.skeletonProblem ?? "";
   const doneBlenderProblem = done?.blenderProblem ?? "";
   const texturesKept = done?.texturesKept.join(", ") ?? "";
   const texturesKeptCount = done?.texturesKept.length ?? 0;
@@ -953,6 +963,23 @@ export function ExportDrawer({
       lockedProblem = describeError(error);
     }
 
+    // The skeleton widget's file, when the folder sits in a content root, so
+    // the unit's bones are labelled in the next match (issue #5181). A failure
+    // is reported and does not undo the export above.
+    let skeletonFile: string | null = null;
+    let skeletonProblem: string | null = null;
+    const contentRoot = project.skeleton ? contentRootOfGameFolder(dir) : null;
+    if (contentRoot) {
+      try {
+        const wrote = await writeSkeletonFiles(appFileIO, contentRoot, [
+          project,
+        ]);
+        skeletonFile = wrote.written[0]?.path ?? null;
+      } catch (error) {
+        skeletonProblem = describeError(error);
+      }
+    }
+
     // The Blender half, which the engine reads none of. A texture the decoder
     // cannot read stops these two and nothing else: the model, the script and
     // the definition are already written and are what the game runs on.
@@ -1091,6 +1118,8 @@ export function ExportDrawer({
       pictureProblem,
       lockedList,
       lockedProblem,
+      skeletonFile,
+      skeletonProblem,
       lockedEmptied,
       lockedKept,
       // Both Blender files write the mask, into the same folder under the
@@ -1927,6 +1956,17 @@ export function ExportDrawer({
                     <Trans>
                       The unit is exported, but the list of locked units is not:{" "}
                       {doneLockedProblem}
+                    </Trans>
+                  </p>
+                ) : null}
+                {result.skeletonFile ? (
+                  <code className="break-all">{result.skeletonFile}</code>
+                ) : null}
+                {result.skeletonProblem ? (
+                  <p className="text-destructive">
+                    <Trans>
+                      The unit is exported, but its skeleton file is not:{" "}
+                      {doneSkeletonProblem}
                     </Trans>
                   </p>
                 ) : null}
