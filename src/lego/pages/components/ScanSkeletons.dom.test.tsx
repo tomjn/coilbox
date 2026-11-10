@@ -234,6 +234,33 @@ describe("ScanSkeletons", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("stops and writes nothing when the preferred root changes mid scan", async () => {
+    read = (unit) =>
+      unit.unit === "ghost"
+        ? new Promise(() => {})
+        : Promise.resolve({ project: project({}), script: "", notes: [] });
+    const at = (rootPath: string) => (
+      <MemoryRouter>
+        <ScanSkeletons
+          rootPath={rootPath}
+          enginePath="/engine"
+          games={[game]}
+          picked={null}
+          busy={false}
+        />
+      </MemoryRouter>
+    );
+    const { rerender } = render(at("/root"));
+    fireEvent.click(screen.getByRole("button", { name: "Skeletons" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan" }));
+    await screen.findByText("Scanned 1 of 2 units.");
+    rerender(at("/other"));
+    await screen.findByText(
+      "The preferred engine changed, so the scan stopped and wrote nothing.",
+    );
+    expect(files.size).toBe(0);
+  });
+
   it("writes nothing when the page goes mid scan", async () => {
     let finish: () => void = () => {};
     read = (unit) =>

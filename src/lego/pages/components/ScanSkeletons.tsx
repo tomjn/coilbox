@@ -101,6 +101,13 @@ export function ScanSkeletons({
     };
   }, []);
 
+  // A new preferred engine or root stops a scan the same way, so it cannot
+  // write into the root it started on after the page has moved off it.
+  const place = useRef({ rootPath, enginePath });
+  place.current = { rootPath, enginePath };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the root and engine are the trigger, not values the effect reads
+  useEffect(() => () => stopper.current?.abort(), [rootPath, enginePath]);
+
   const start = async () => {
     if (!game || !enginePath || !rootPath) return;
     const shortname = game.info?.shortname?.trim();
@@ -152,7 +159,16 @@ export function ScanSkeletons({
           setProgress({ done: count, total: units.length });
         },
       });
+      const moved =
+        place.current.rootPath !== rootPath ||
+        place.current.enginePath !== enginePath;
       if (!live.current) return;
+      if (moved) {
+        setError(
+          t`The preferred engine changed, so the scan stopped and wrote nothing.`,
+        );
+        return;
+      }
       const entries = scanEntries(done);
       const written =
         Object.keys(entries).length > 0
