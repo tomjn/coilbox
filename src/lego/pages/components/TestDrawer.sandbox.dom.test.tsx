@@ -267,6 +267,7 @@ describe("TestDrawer's sandbox launch", () => {
       dataDir: "/data",
       autohost: true,
       onEngineStarted: expect.any(Function),
+      testLaunch: true,
     });
   });
 
@@ -288,6 +289,7 @@ describe("TestDrawer's sandbox launch", () => {
       config: { battle: true },
       executable: "/engine/spring",
       dataDir: "/data",
+      testLaunch: true,
     });
   });
 

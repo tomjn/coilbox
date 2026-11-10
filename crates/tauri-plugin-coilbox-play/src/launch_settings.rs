@@ -72,7 +72,10 @@ pub fn text(autohost_port: Option<u16>, language: Option<&str>) -> Option<String
 /// player's sound volume, and nothing a game writes on its first run, such as
 /// Splinter Faction's recommended graphics, lands in the player's own file.
 pub fn test_config_file(app_data: &Path) -> PathBuf {
-    app_data.join("play").join("test").join("springsettings.cfg")
+    app_data
+        .join("play")
+        .join("test")
+        .join("springsettings.cfg")
 }
 
 /// What a Test in game launch sets every time, whatever the file held.
@@ -120,7 +123,11 @@ fn line_key(line: &str) -> Option<&str> {
 /// launch sets each time. The autohost port and the language are always
 /// replaced, and left out when this launch has none, so a port from an earlier
 /// sandbox is never left behind.
-pub fn test_config_text(existing: &str, autohost_port: Option<u16>, language: Option<&str>) -> String {
+pub fn test_config_text(
+    existing: &str,
+    autohost_port: Option<u16>,
+    language: Option<&str>,
+) -> String {
     let managed: Vec<&str> = TEST_FORCED
         .iter()
         .map(|(key, _)| *key)
@@ -310,8 +317,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("coilbox-test-config-{}", std::process::id()));
         let file = test_config_file(&dir);
         write_test_config(&file, None, None).expect("first");
-        std::fs::write(&file, std::fs::read_to_string(&file).unwrap() + "Shadows = 1\n")
-            .expect("engine write");
+        std::fs::write(
+            &file,
+            std::fs::read_to_string(&file).unwrap() + "Shadows = 1\n",
+        )
+        .expect("engine write");
         write_test_config(&file, None, None).expect("second");
         let read = std::fs::read_to_string(&file).expect("read");
         assert!(read.contains("Shadows = 1\n"), "{read}");
