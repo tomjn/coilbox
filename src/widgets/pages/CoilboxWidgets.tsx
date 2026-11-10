@@ -7,10 +7,12 @@ import {
   contentWidgetInstall,
   contentWidgetRemove,
   contentWidgetStatus,
+  type GameItem,
   type WidgetStatus,
 } from "@/content/bindings";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { describeError } from "@/i18n/uiError";
+import { ScanSkeletons } from "./ScanSkeletons";
 import { WriteSkeletons } from "./WriteSkeletons";
 
 /** What a widget's row hands to its own extra actions. */
@@ -22,6 +24,12 @@ export interface CoilboxWidgetState {
   busy: boolean;
   /** Read the content root again, for an action that changes what is there. */
   reread: () => Promise<void>;
+  /** The engine the page reads the root with. */
+  enginePath: string | undefined;
+  /** The games installed under the root, one version each. */
+  games: readonly GameItem[];
+  /** The game the page has picked, by its full name, or null for all. */
+  picked: string | null;
 }
 
 /** A widget coilbox ships, as the page lists it. */
@@ -47,8 +55,17 @@ function useEntries(): CoilboxWidgetEntry[] {
       widget: "skeleton",
       name: t`Skeleton`,
       description: t`Draws the bones of the selected units in game.`,
-      actions: ({ rootPath, busy }) => (
-        <WriteSkeletons rootPath={rootPath} busy={busy} />
+      actions: ({ rootPath, busy, enginePath, games, picked }) => (
+        <>
+          <WriteSkeletons rootPath={rootPath} busy={busy} />
+          <ScanSkeletons
+            rootPath={rootPath}
+            enginePath={enginePath}
+            games={games}
+            picked={picked}
+            busy={busy}
+          />
+        </>
       ),
     },
   ];
@@ -110,11 +127,13 @@ function CoilboxWidgetRow({
   rootPath,
   refresh,
   onChanged,
+  games,
 }: {
   entry: CoilboxWidgetEntry;
   rootPath: string;
   refresh: number;
   onChanged: () => void;
+  games: GamesOnRoot;
 }) {
   const { t } = useLingui();
   const { status, busy, error, read, install, remove } = useCoilboxWidget(
@@ -173,11 +192,14 @@ function CoilboxWidgetRow({
             {t`Remove widget`}
           </Button>
         )}
-        {entry.actions?.({ rootPath, status, busy, reread: read })}
+        {entry.actions?.({ rootPath, status, busy, reread: read, ...games })}
       </div>
     </li>
   );
 }
+
+/** What the page knows of the games under the root, for a widget's actions. */
+type GamesOnRoot = Pick<CoilboxWidgetState, "enginePath" | "games" | "picked">;
 
 /**
  * The widgets coilbox ships, each with its state in one content root and the
@@ -189,7 +211,10 @@ export function CoilboxWidgets({
   rootPath,
   refresh,
   onChanged,
-}: {
+  enginePath,
+  games,
+  picked,
+}: GamesOnRoot & {
   rootPath: string;
   /** Changes when the page rescans, which reads every row again. */
   refresh: number;
@@ -212,6 +237,7 @@ export function CoilboxWidgets({
             rootPath={rootPath}
             refresh={refresh}
             onChanged={onChanged}
+            games={{ enginePath, games, picked }}
           />
         ))}
       </ul>

@@ -2911,6 +2911,10 @@ msgstr "{fromX} par {fromZ}"
 msgid "{front} and {last}"
 msgstr "{front} et {last}"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{full} full, {partial} partial, {none} none"
+msgstr ""
+
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
 #, fuzzy
 msgid "{game} brought by this game's own published table"
@@ -4955,10 +4959,22 @@ msgstr "{name} ne peut pas aller dans un menu de construction."
 msgid "{name} details"
 msgstr "Détails de {name}"
 
+#: src/lego/skeletonScanRead.ts
+msgid "{name} has no model coilbox can read."
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{name} has no short name, so the widget could not find its file."
+msgstr ""
+
 #: src/campaign/units.ts
 #, fuzzy
 msgid "{name} has no unit name a game can load. Give it one in the unit builder first."
 msgstr "{name} n’a pas de nom d’unité qu’un jeu puisse charger. Donnez-lui-en un d’abord dans l’atelier d’unités."
+
+#: src/lego/skeletonScanRead.ts
+msgid "{name} has only a compiled script, with no source to read."
+msgstr ""
 
 #: src/lego/movement.ts
 #, fuzzy
@@ -5692,6 +5708,10 @@ msgstr "{plan}, arme"
 #, fuzzy
 msgid "{plan}, gun, builds"
 msgstr "{plan}, arme, construit"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{plan}, with no piece for {missing}."
+msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
@@ -7934,6 +7954,10 @@ msgstr "{written, plural, one {Une image envoyée.} other {# images envoyées.}}
 #, fuzzy
 msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
 msgstr "{wrong, plural, one {# sur {orderCount} ne correspond pas à cette liste d’unités, les noms et coûts peuvent donc être faux.} other {# sur {orderCount} ne correspondent pas à cette liste d’unités, les noms et coûts peuvent donc être faux.}}"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{wrote, plural, one {# unit written} other {# units written}}"
+msgstr ""
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -23663,6 +23687,7 @@ msgid "Fuchsia"
 msgstr "Fuchsia"
 
 #: src/multiplayer/battles/BattleFilterPopover.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Full"
 msgstr "Pleine"
@@ -23775,6 +23800,7 @@ msgstr "jeu"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -32895,6 +32921,10 @@ msgstr "Aucune image ici."
 msgid "No piece has a foot or wheel role, so there is no ground it stands on."
 msgstr "Aucune pièce n’a le rôle de pied ou de roue, il n’y a donc aucun sol sur lequel il repose."
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "No plan fits."
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "No player to compare against yet."
@@ -33733,6 +33763,7 @@ msgstr "aucun"
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "None"
 msgstr "Aucun"
@@ -35705,6 +35736,10 @@ msgstr "Ouvrir en pleine page"
 msgid "Open game downloads"
 msgstr "Ouvrir les téléchargements de jeux"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Open in builder"
+msgstr ""
+
 #: src/content/pages/components/OpenInEngineButton.tsx
 #, fuzzy
 msgid "Open in engine"
@@ -36493,6 +36528,10 @@ msgstr "Partie du nom du jeu."
 #, fuzzy
 msgid "Part of the map's name."
 msgstr "Partie du nom de la carte."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Partial"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -39114,6 +39153,10 @@ msgstr "Lecture du jeu."
 #, fuzzy
 msgid "Reading the game's files…"
 msgstr "Lecture des fichiers du jeu…"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Reading the game's units…"
+msgstr ""
 
 #: src/content/pages/components/PlayerNamedStarts.tsx
 msgid "Reading the map."
@@ -42104,6 +42147,10 @@ msgstr "La mise à l’échelle garde les proportions. Cliquez pour redimensionn
 msgid "Scaling: {scaling}."
 msgstr "Échelle : {scaling}."
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan"
+msgstr ""
+
 #: src/content/pages/ArchivesPage.tsx
 #, fuzzy
 msgid "Scan cancelled. Press Rescan to load archives."
@@ -42129,6 +42176,22 @@ msgstr "Échec de l’analyse"
 msgid "Scan on startup"
 msgstr "Analyser au démarrage"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan units"
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan units for skeletons"
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned {all} units in {time}: {counted}. {wroteText}."
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned {done} of {total} units."
+msgstr ""
+
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
 msgid "scanned {scannedAt}"
@@ -42138,6 +42201,10 @@ msgstr "analysé {scannedAt}"
 #, fuzzy
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "{scanRootCount} dossier(s) de contenu analysé(s) : {scanRootPaths}."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned units"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -42170,6 +42237,7 @@ msgstr "Recherche de données orphelines dans le pool…"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -46092,6 +46160,7 @@ msgid "Stone"
 msgstr "Pierre"
 
 #: src/lego/pages/components/TestDrawer.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Stop"
 msgstr "Arrêter"
@@ -46150,6 +46219,10 @@ msgstr "Arrêter l’envoi des images"
 #, fuzzy
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Arrêtez d’abord votre propre salon. Coilbox ne peut être que dans un salon à la fois."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
