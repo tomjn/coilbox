@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   assetTierUrl,
-  BLOB_TIER_BASE,
   DEFAULT_ASSET_CDN_BASE,
   resolveAssetCdnBase,
 } from "./tier";
@@ -30,30 +29,37 @@ describe("resolveAssetCdnBase", () => {
 
 describe("assetTierUrl", () => {
   const base = DEFAULT_ASSET_CDN_BASE;
+  const hubUrl = "https://hub.example/assets/staged/maps/minimap/abc-x1.webp";
 
   it("serves the durable tier from the configured base", () => {
-    expect(assetTierUrl("static", "maps/minimap/abc.webp", base)).toBe(
+    expect(assetTierUrl("static", "maps/minimap/abc.webp", base, "")).toBe(
       "https://tomjn.github.io/coilbox-assets/maps/minimap/abc.webp",
     );
   });
 
-  it("serves staging from the store, which is not configurable", () => {
-    expect(assetTierUrl("blob", "maps/minimap/abc-x1.webp", base)).toBe(
-      `${BLOB_TIER_BASE}maps/minimap/abc-x1.webp`,
-    );
+  it("serves staging from the address the hub answered with", () => {
+    expect(
+      assetTierUrl("bucket", "maps/minimap/abc-x1.webp", base, hubUrl),
+    ).toBe(hubUrl);
+  });
+
+  it("ignores the hub's address for the durable tier", () => {
+    expect(
+      assetTierUrl("static", "maps/minimap/abc.webp", base, "https://x.test/y"),
+    ).toBe("https://tomjn.github.io/coilbox-assets/maps/minimap/abc.webp");
   });
 
   it("keeps the repository subpath when the stored path has a leading slash", () => {
     // `new URL(path, base)` would resolve this against the origin and eat the
     // /coilbox-assets segment, which is why the join is a concatenation.
-    expect(assetTierUrl("static", "/maps/minimap/abc.webp", base)).toBe(
+    expect(assetTierUrl("static", "/maps/minimap/abc.webp", base, "")).toBe(
       "https://tomjn.github.io/coilbox-assets/maps/minimap/abc.webp",
     );
   });
 
   it("follows a distributor's base rather than the default", () => {
     expect(
-      assetTierUrl("static", "maps/minimap/abc.webp", "https://mine.test/"),
+      assetTierUrl("static", "maps/minimap/abc.webp", "https://mine.test/", ""),
     ).toBe("https://mine.test/maps/minimap/abc.webp");
   });
 });

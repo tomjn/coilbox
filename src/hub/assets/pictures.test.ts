@@ -210,6 +210,57 @@ describe("the answer", () => {
     ).toEqual({ ok: true, pictures: [substituted] });
   });
 
+  describe("a bucket answer, which is the hub serving a staged picture", () => {
+    const STAGED = {
+      ...HELD,
+      tier: "bucket",
+      path: "maps/minimap/ccr18-abcdef-x1.webp",
+      url: "https://hub.example/assets/staged/maps/minimap/ccr18-abcdef-x1.webp",
+    };
+
+    function read(picture: unknown) {
+      return readPicturesBody(body([mapResult(picture)]), [MAP]);
+    }
+
+    it("is read, with the address it is loaded from", () => {
+      expect(read(STAGED)).toEqual({ ok: true, pictures: [STAGED] });
+    });
+
+    it("is read from a hub run on this machine over http", () => {
+      const local = { ...STAGED, url: "http://localhost:3000/assets/staged/x" };
+      expect(read(local)).toEqual({ ok: true, pictures: [local] });
+    });
+
+    it("is read as no picture when it carries no address", () => {
+      expect(read({ ...STAGED, url: undefined })).toEqual({
+        ok: true,
+        pictures: [null],
+      });
+      expect(read({ ...STAGED, url: "" })).toEqual({
+        ok: true,
+        pictures: [null],
+      });
+    });
+
+    it.each([
+      ["a relative address", "/assets/staged/x"],
+      ["plain http to another host", "http://hub.example/assets/staged/x"],
+      ["a data URL", "data:image/png;base64,AAAA"],
+      ["a javascript URL", "javascript:alert(1)"],
+    ])("is read as no picture when the address is %s", (_name, url) => {
+      expect(read({ ...STAGED, url })).toEqual({
+        ok: true,
+        pictures: [null],
+      });
+    });
+  });
+
+  it("no longer reads the retired blob tier", () => {
+    expect(
+      readPicturesBody(body([mapResult({ ...HELD, tier: "blob" })]), [MAP]),
+    ).toEqual({ ok: true, pictures: [null] });
+  });
+
   it("refuses something that is not this hub's lookup", () => {
     const refused = readPicturesBody({ results: [] }, [MAP]);
     expect(refused).toEqual({

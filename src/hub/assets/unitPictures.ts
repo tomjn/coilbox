@@ -65,10 +65,10 @@ export function unitPictureIdentity(game: string, def: string): AssetIdentity {
 /**
  * One answer as the plan draws it, or null for a unit the hub holds nothing for.
  *
- * The hub's own `url` is dropped rather than used, the same as `heldMapAsset` in
- * `./heldPictures.ts`: `./tier.ts` joins the path to whichever durable base this
- * session is configured with, and a distributor serving assets from their own is
- * the reason that override exists.
+ * The hub's `url` is used only for a `bucket` answer, the same as `heldMapAsset`
+ * in `./heldPictures.ts`: for a `static` one `./tier.ts` joins the path to
+ * whichever durable base this session is configured with, and a distributor
+ * serving assets from their own is the reason that override exists.
  */
 export function planPicture(
   picture: AssetPicture | null,
@@ -76,7 +76,7 @@ export function planPicture(
 ): PlanPicture | null {
   if (!picture) return null;
   return {
-    url: assetTierUrl(picture.tier, picture.path, cdnBase),
+    url: assetTierUrl(picture.tier, picture.path, cdnBase, picture.url),
     // What came back rather than what was asked for. A build pic served in place
     // of a render is a three quarter icon, and drawing it in a render's box would
     // scale somebody's icon up by the bleed.
