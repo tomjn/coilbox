@@ -21693,6 +21693,10 @@ msgstr ""
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr ""
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Installed, and its licence notice is missing or out of date"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Installing"
 msgstr ""

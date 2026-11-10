@@ -54,6 +54,7 @@ function useEntries(): CoilboxWidgetEntry[] {
 function useCoilboxWidget(
   widget: CoilboxWidget,
   rootPath: string,
+  refresh: number,
   onChanged: () => void,
 ) {
   const [status, setStatus] = useState<WidgetStatus | null>(null);
@@ -69,10 +70,12 @@ function useCoilboxWidget(
     }
   }, [rootPath, widget]);
 
+  // Reads again when the page's Rescan runs, so a change made outside coilbox
+  // does not leave a stale state on the row.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `refresh` is the trigger, not a value the effect reads
   useEffect(() => {
-    setStatus(null);
     void read();
-  }, [read]);
+  }, [read, refresh]);
 
   const act = async (run: () => Promise<unknown>) => {
     setBusy(true);
@@ -101,19 +104,25 @@ function useCoilboxWidget(
 function CoilboxWidgetRow({
   entry,
   rootPath,
+  refresh,
   onChanged,
 }: {
   entry: CoilboxWidgetEntry;
   rootPath: string;
+  refresh: number;
   onChanged: () => void;
 }) {
   const { t } = useLingui();
   const { status, busy, error, read, install, remove } = useCoilboxWidget(
     entry.widget,
     rootPath,
+    refresh,
     onChanged,
   );
-  const staleCount = status?.stale.length ?? 0;
+  // `stale` also lists the shared licence notice, which is not one of the
+  // widget's files.
+  const staleCount =
+    status?.stale.filter((file) => status.files.includes(file)).length ?? 0;
   const fileCount = status?.files.length ?? 0;
   const actionLabel = !status?.installed
     ? t`Install widget`
@@ -136,7 +145,9 @@ function CoilboxWidgetRow({
               ? t`Not installed`
               : status.current
                 ? t`Installed and up to date`
-                : t`Installed, and ${staleCount} of ${plural(fileCount, { one: "# file differs", other: "# files differ" })} from what this coilbox ships`}
+                : staleCount === 0
+                  ? t`Installed, and its licence notice is missing or out of date`
+                  : t`Installed, and ${staleCount} of ${plural(fileCount, { one: "# file differs", other: "# files differ" })} from what this coilbox ships`}
         </p>
         {error && <ErrorBanner message={error} />}
       </div>
@@ -172,9 +183,12 @@ function CoilboxWidgetRow({
  */
 export function CoilboxWidgets({
   rootPath,
+  refresh,
   onChanged,
 }: {
   rootPath: string;
+  /** Changes when the page rescans, which reads every row again. */
+  refresh: number;
   /** Called after an install, update or removal, so the page can list the
    *  files that changed. */
   onChanged: () => void;
@@ -187,9 +201,12 @@ export function CoilboxWidgets({
       <ul className="divide-y rounded-md border">
         {entries.map((entry) => (
           <CoilboxWidgetRow
-            key={entry.widget}
+            // Keyed by the root too, so a read for a root the page has moved
+            // off cannot land on the new root's row.
+            key={`${rootPath}:${entry.widget}`}
             entry={entry}
             rootPath={rootPath}
+            refresh={refresh}
             onChanged={onChanged}
           />
         ))}

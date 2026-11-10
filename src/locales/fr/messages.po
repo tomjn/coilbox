@@ -26549,6 +26549,10 @@ msgstr "Conversion installée dans {archive}."
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "Installé, et {staleCount} sur {fileCount, plural, one {# fichier diffère} other {# fichiers diffèrent}} de ce que fournit ce coilbox"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Installed, and its licence notice is missing or out of date"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installing"

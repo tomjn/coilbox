@@ -26719,6 +26719,10 @@ msgstr "De omzetting is geïnstalleerd in {archive}."
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "Geïnstalleerd, en {staleCount} van {fileCount, plural, one {# bestand wijkt} other {# bestanden wijken}} af van wat deze coilbox meelevert"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Installed, and its licence notice is missing or out of date"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installing"

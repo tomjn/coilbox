@@ -326,6 +326,38 @@ describe("WidgetsPage", () => {
     spy.mockRestore();
   });
 
+  it("does not count the shared licence notice as a widget file that differs", async () => {
+    installedWidgets.add("skeleton");
+    const status = widgetStatus("skeleton");
+    status.current = false;
+    status.stale = ["coilbox-licence/NOTICE.md", "coilbox-licence/COPYING"];
+    const bindings = await import("@/content/bindings");
+    const spy = vi
+      .spyOn(bindings, "contentWidgetStatus")
+      .mockResolvedValue(status);
+    page();
+    const row = within(
+      await screen.findByRole("listitem", { name: "Skeleton" }),
+    );
+    await row.findByText(
+      "Installed, and its licence notice is missing or out of date",
+    );
+    expect(row.getByText("Update widget")).toBeTruthy();
+    spy.mockRestore();
+  });
+
+  it("reads every row again when the page rescans", async () => {
+    page();
+    const row = within(
+      await screen.findByRole("listitem", { name: "Skeleton" }),
+    );
+    await row.findByText("Not installed");
+    // Installed outside coilbox, since the row last looked.
+    installedWidgets.add("skeleton");
+    fireEvent.click(screen.getByText("Rescan"));
+    await row.findByText("Installed and up to date");
+  });
+
   it("lists every file with what it declares and who loads it", () => {
     page();
     expect(screen.getByText("BuildWatch")).toBeTruthy();

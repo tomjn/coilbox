@@ -26549,6 +26549,10 @@ msgstr "Перетворення встановлено в {archive}."
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "Встановлено, але {staleCount} з {fileCount, plural, one {# файлу} few {# файлів} many {# файлів} other {# файлу}} відрізняються від того, що постачає цей coilbox"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Installed, and its licence notice is missing or out of date"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installing"

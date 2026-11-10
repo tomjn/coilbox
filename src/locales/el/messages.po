@@ -26719,6 +26719,10 @@ msgstr "Η μετατροπή εγκαταστάθηκε στο {archive}."
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "Εγκατεστημένο, και {staleCount} από {fileCount, plural, one {# αρχείο διαφέρει} other {# αρχεία διαφέρουν}} από αυτό που περιέχει αυτό το coilbox"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Installed, and its licence notice is missing or out of date"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Installing"
