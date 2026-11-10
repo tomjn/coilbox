@@ -1,7 +1,8 @@
-//! Installing the blueprint widget into a content root (issue #1419).
+//! Installing coilbox's in game widgets into a content root (issues #1419 and
+//! #5180).
 //!
-//! The widget is coilbox-authored Lua kept in this repo under
-//! `lua/blueprint-widget/` and shipped as a bundle resource. Its `luaui/` tree
+//! Each widget is coilbox-authored Lua kept in this repo under
+//! `lua/<name>-widget/` and shipped as a bundle resource. Its `luaui/` tree
 //! goes into `<content root>/LuaUI/`, which every engine coilbox launches reads,
 //! so it is installed once rather than once per engine. Nothing here runs on
 //! its own: the player presses the button, and an update is the same button
@@ -40,18 +41,90 @@ const NOTICE_FILES: [(&str, &[u8]); 3] = [
     ("COPYING", include_bytes!("../../../lua/COPYING")),
 ];
 
-/// Where the widget can sit inside the resource directory, in the order they
-/// are tried. The same shapes the mission runtime is probed under.
-const CANDIDATES: [&str; 4] = [
-    ".coilbox/resources/blueprint-widget",
-    "blueprint-widget",
-    "lua/blueprint-widget",
-    "_up_/lua/blueprint-widget",
-];
+/// One of the widgets coilbox ships. Every command takes one by name, so a
+/// widget is added here and in the bundle resources and nowhere else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Widget {
+    /// Places a blueprint in game and saves one back (issue #1419).
+    Blueprints,
+    /// Draws the skeleton of the selected units (issue #5179).
+    Skeleton,
+}
 
-/// The first [`CANDIDATES`] entry under `resource_dir` that is a directory.
-pub fn bundled_widget_dir(resource_dir: &Path, is_dir: impl Fn(&Path) -> bool) -> Option<PathBuf> {
-    CANDIDATES
+/// Every widget coilbox ships.
+const WIDGETS: [Widget; 2] = [Widget::Blueprints, Widget::Skeleton];
+
+impl Widget {
+    /// The name the commands take.
+    fn parse(name: &str) -> Result<Self, String> {
+        match name {
+            "blueprints" => Ok(Self::Blueprints),
+            "skeleton" => Ok(Self::Skeleton),
+            other => Err(format!("coilbox has no widget called \"{other}\"")),
+        }
+    }
+
+    /// The widget's folder under `lua/` in the repo and in the bundle.
+    fn folder(self) -> &'static str {
+        match self {
+            Self::Blueprints => "blueprint-widget",
+            Self::Skeleton => "skeleton-widget",
+        }
+    }
+
+    /// The widget's own module directory under `LuaUI/`, which is also the
+    /// start of the name of its widget file.
+    fn module(self) -> &'static str {
+        match self {
+            Self::Blueprints => "coilbox_blueprints",
+            Self::Skeleton => "coilbox_skeleton",
+        }
+    }
+
+    /// Whether a path under `LuaUI/` is this widget's to write and remove: its
+    /// own module directory, and its widget files. `Config/coilbox_blueprints*.json`
+    /// shares the name and is data, the library coilbox writes and the spool the
+    /// widget writes, and neither is an install's to touch.
+    fn owns(self, rel: &str) -> bool {
+        let lower = rel.to_lowercase();
+        let module = self.module();
+        lower.starts_with(&format!("{module}/"))
+            || (lower.starts_with("widgets/")
+                && lower
+                    .rsplit('/')
+                    .next()
+                    .is_some_and(|name| name.starts_with(module) && name.ends_with(".lua")))
+    }
+
+    /// What the widget is called in an error message.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Blueprints => "blueprint widget",
+            Self::Skeleton => "skeleton widget",
+        }
+    }
+}
+
+/// Where a widget can sit inside the resource directory, in the order they are
+/// tried. The same shapes the mission runtime is probed under.
+fn candidates(widget: Widget) -> [String; 4] {
+    let folder = widget.folder();
+    [
+        format!(".coilbox/resources/{folder}"),
+        folder.to_string(),
+        format!("lua/{folder}"),
+        format!("_up_/lua/{folder}"),
+    ]
+}
+
+/// The first of the widget's candidate folders under `resource_dir` that is a
+/// directory.
+pub fn bundled_widget_dir(
+    widget: Widget,
+    resource_dir: &Path,
+    is_dir: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    candidates(widget)
         .into_iter()
         .map(|rel| resource_dir.join(rel))
         .find(|path| is_dir(path))
@@ -59,12 +132,13 @@ pub fn bundled_widget_dir(resource_dir: &Path, is_dir: impl Fn(&Path) -> bool) -
 
 /// Under `tauri dev` there are no resources beside the binary, so a debug
 /// build falls back to the source tree.
-pub fn source_tree_widget_dir() -> Option<PathBuf> {
+pub fn source_tree_widget_dir(widget: Widget) -> Option<PathBuf> {
     if !cfg!(debug_assertions) {
         return None;
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../lua/blueprint-widget")
+        .join("../../lua")
+        .join(widget.folder())
         .canonicalize()
         .ok()
         .filter(|dir| dir.is_dir())
@@ -85,17 +159,11 @@ pub struct WidgetStatus {
     pub stale: Vec<String>,
 }
 
-/// Whether a path under `LuaUI/` is the widget's to write and remove: its own
-/// module directory, and its widget files. `Config/coilbox_blueprints*.json`
-/// shares the name and is data, the library coilbox writes and the spool the
-/// widget writes, and neither is an install's to touch.
+/// Whether a path under `LuaUI/` belongs to any widget coilbox ships. The
+/// widget lists and the add and remove guards use it to tell coilbox's files
+/// from a player's.
 pub(crate) fn widget_owned(rel: &str) -> bool {
-    let lower = rel.to_lowercase();
-    lower.starts_with("coilbox_blueprints/")
-        || (lower.starts_with("widgets/")
-            && lower.rsplit('/').next().is_some_and(|name| {
-                name.starts_with("coilbox_blueprints") && name.ends_with(".lua")
-            }))
+    WIDGETS.iter().any(|widget| widget.owns(rel))
 }
 
 fn key(rel: &Path) -> String {
@@ -156,7 +224,7 @@ fn dest_tree(root: &Path) -> PathBuf {
 }
 
 /// Compare what is installed under `root` with what `src` ships.
-pub fn status(src: &Path, root: &Path) -> WidgetStatus {
+pub fn status(widget: Widget, src: &Path, root: &Path) -> WidgetStatus {
     let files = shipped_files(src);
     let dest = dest_tree(root);
     let mut stale = Vec::new();
@@ -183,7 +251,7 @@ pub fn status(src: &Path, root: &Path) -> WidgetStatus {
         }
     }
     if !installed {
-        installed = files_under(&dest).iter().any(|rel| widget_owned(rel));
+        installed = files_under(&dest).iter().any(|rel| widget.owns(rel));
     }
     WidgetStatus {
         installed,
@@ -195,7 +263,7 @@ pub fn status(src: &Path, root: &Path) -> WidgetStatus {
 
 /// Copy the widget into `root`, then drop any of its own files an older
 /// install left behind. Returns the files written, relative to `LuaUI/`.
-pub fn install(src: &Path, root: &Path) -> Result<Vec<String>, String> {
+pub fn install(widget: Widget, src: &Path, root: &Path) -> Result<Vec<String>, String> {
     let files = shipped_files(src);
     if files.is_empty() {
         return Err(format!("no widget files to install from {}", src.display()));
@@ -217,7 +285,7 @@ pub fn install(src: &Path, root: &Path) -> Result<Vec<String>, String> {
     }
     let shipped: Vec<String> = files.iter().map(|f| f.to_lowercase()).collect();
     for rel in files_under(&dest) {
-        if widget_owned(&rel) && !shipped.contains(&rel.to_lowercase()) {
+        if widget.owns(&rel) && !shipped.contains(&rel.to_lowercase()) {
             let stale = dest.join(&rel);
             std::fs::remove_file(&stale)
                 .map_err(|e| format!("could not remove {}: {e}", stale.display()))?;
@@ -252,25 +320,32 @@ fn install_notice(dest: &Path) -> Result<(), String> {
 }
 
 /// Remove every file the widget owns under `root`, and its own directory once
-/// it is empty. The player's config files are not the widget's and stay.
-pub fn remove(root: &Path) -> Result<Vec<String>, String> {
+/// it is empty. The player's config files are not the widget's and stay. The
+/// licence notice goes only when no other coilbox widget is left to need it.
+pub fn remove(widget: Widget, root: &Path) -> Result<Vec<String>, String> {
     let dest = dest_tree(root);
     let mut removed = Vec::new();
     for rel in files_under(&dest) {
-        if widget_owned(&rel) {
+        if widget.owns(&rel) {
             let path = dest.join(&rel);
             std::fs::remove_file(&path)
                 .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
             removed.push(rel);
         }
     }
-    let notice = resolve_case(&dest, Path::new(NOTICE_DIR));
-    for (name, _) in NOTICE_FILES {
-        let _ = std::fs::remove_file(notice.join(name));
+    let others_left = WIDGETS
+        .iter()
+        .filter(|other| **other != widget)
+        .any(|other| files_under(&dest).iter().any(|rel| other.owns(rel)));
+    if !others_left {
+        let notice = resolve_case(&dest, Path::new(NOTICE_DIR));
+        for (name, _) in NOTICE_FILES {
+            let _ = std::fs::remove_file(notice.join(name));
+        }
+        // Only when empty, so anything else in there stays.
+        let _ = std::fs::remove_dir(&notice);
     }
-    // Only when empty, so anything else in there stays.
-    let _ = std::fs::remove_dir(&notice);
-    let own_dir = resolve_case(&dest, Path::new("coilbox_blueprints"));
+    let own_dir = resolve_case(&dest, Path::new(widget.module()));
     if own_dir.is_dir() {
         // Only when empty: remove_dir refuses otherwise, and anything left in
         // there is not the widget's.
@@ -279,55 +354,73 @@ pub fn remove(root: &Path) -> Result<Vec<String>, String> {
     Ok(removed)
 }
 
-/// Where the bundled blueprint widget lives, or a message when this build has
-/// none to offer.
-fn widget_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+/// Where the bundled widget lives, or a message when this build has none to
+/// offer.
+fn widget_dir<R: Runtime>(app: &AppHandle<R>, widget: Widget) -> Result<PathBuf, String> {
     let bundled = app
         .path()
         .resource_dir()
         .ok()
-        .and_then(|dir| bundled_widget_dir(&dir, |path| path.is_dir()));
+        .and_then(|dir| bundled_widget_dir(widget, &dir, |path| path.is_dir()));
     bundled
-        .or_else(source_tree_widget_dir)
-        .ok_or_else(|| "this build of coilbox does not carry the blueprint widget".to_string())
+        .or_else(|| source_tree_widget_dir(widget))
+        .ok_or_else(|| {
+            format!(
+                "this build of coilbox does not carry the {}",
+                widget.label()
+            )
+        })
 }
 
 /// `content_widget_status`, what is installed under a content root against
-/// what coilbox ships. `rootPath` is a `ContentRoot.path`.
+/// what coilbox ships. `rootPath` is a `ContentRoot.path`, and `widget` is
+/// `blueprints` or `skeleton`.
 #[tauri::command]
 pub(crate) async fn content_widget_status<R: Runtime>(
     app: AppHandle<R>,
     root_path: String,
+    widget: String,
 ) -> CliResult {
-    let src = match widget_dir(&app) {
+    let widget = match Widget::parse(&widget) {
+        Ok(w) => w,
+        Err(e) => return CliResult::err(e),
+    };
+    let src = match widget_dir(&app, widget) {
         Ok(d) => d,
         Err(e) => return CliResult::err(e),
     };
     let res =
-        tauri::async_runtime::spawn_blocking(move || status(&src, Path::new(&root_path))).await;
+        tauri::async_runtime::spawn_blocking(move || status(widget, &src, Path::new(&root_path)))
+            .await;
     match res {
         Ok(status) => CliResult::ok(json!(status)),
         Err(e) => CliResult::err(format!("widget status task failed: {e}")),
     }
 }
 
-/// `content_widget_install`, copy the blueprint widget into a content root's
-/// `LuaUI/`. The same command updates one already there. Only ever run from the
+/// `content_widget_install`, copy a coilbox widget into a content root's
+/// `LuaUI/`. The same command updates one already there. Only ever run from a
 /// button: coilbox never installs a widget on its own.
 #[tauri::command]
 pub(crate) async fn content_widget_install<R: Runtime>(
     app: AppHandle<R>,
     root_path: String,
+    widget: String,
 ) -> CliResult {
     if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&root_path)) {
         return CliResult::err(e);
     }
-    let src = match widget_dir(&app) {
+    let widget = match Widget::parse(&widget) {
+        Ok(w) => w,
+        Err(e) => return CliResult::err(e),
+    };
+    let src = match widget_dir(&app, widget) {
         Ok(d) => d,
         Err(e) => return CliResult::err(e),
     };
     let res =
-        tauri::async_runtime::spawn_blocking(move || install(&src, Path::new(&root_path))).await;
+        tauri::async_runtime::spawn_blocking(move || install(widget, &src, Path::new(&root_path)))
+            .await;
     match res {
         Ok(Ok(written)) => CliResult::ok(json!({ "written": written })),
         Ok(Err(e)) => CliResult::err(e),
@@ -335,14 +428,20 @@ pub(crate) async fn content_widget_install<R: Runtime>(
     }
 }
 
-/// `content_widget_remove`, take the blueprint widget out of a content root.
-/// The library file and the spool are data rather than the widget, and stay.
+/// `content_widget_remove`, take a coilbox widget out of a content root. The
+/// blueprint library file and the spool are data rather than the widget, and
+/// stay.
 #[tauri::command]
-pub(crate) async fn content_widget_remove(root_path: String) -> CliResult {
+pub(crate) async fn content_widget_remove(root_path: String, widget: String) -> CliResult {
     if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&root_path)) {
         return CliResult::err(e);
     }
-    let res = tauri::async_runtime::spawn_blocking(move || remove(Path::new(&root_path))).await;
+    let widget = match Widget::parse(&widget) {
+        Ok(w) => w,
+        Err(e) => return CliResult::err(e),
+    };
+    let res =
+        tauri::async_runtime::spawn_blocking(move || remove(widget, Path::new(&root_path))).await;
     match res {
         Ok(Ok(removed)) => CliResult::ok(json!({ "removed": removed })),
         Ok(Err(e)) => CliResult::err(e),
@@ -395,7 +494,7 @@ mod tests {
     fn install_writes_under_luaui_and_status_is_current() {
         let src = source("install");
         let root = tmp("root-install");
-        let written = install(&src, &root).unwrap();
+        let written = install(Widget::Blueprints, &src, &root).unwrap();
         assert_eq!(written.len(), 3);
         assert_eq!(
             std::fs::read_to_string(root.join("LuaUI/widgets/coilbox_blueprints.lua")).unwrap(),
@@ -406,7 +505,7 @@ mod tests {
             "json"
         );
         assert!(!root.join("LuaUI/tests").exists());
-        let s = status(&src, &root);
+        let s = status(Widget::Blueprints, &src, &root);
         assert!(s.installed && s.current);
         assert!(s.stale.is_empty());
     }
@@ -415,7 +514,7 @@ mod tests {
     fn status_before_install_is_neither_installed_nor_current() {
         let src = source("status");
         let root = tmp("root-status");
-        let s = status(&src, &root);
+        let s = status(Widget::Blueprints, &src, &root);
         assert!(!s.installed && !s.current);
         // The three widget files and the three notice files.
         assert_eq!(s.stale.len(), 6);
@@ -425,13 +524,13 @@ mod tests {
     fn a_changed_shipped_file_makes_the_install_stale() {
         let src = source("stale");
         let root = tmp("root-stale");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         write(&src.join("luaui/coilbox_blueprints/json.lua"), "json v2");
-        let s = status(&src, &root);
+        let s = status(Widget::Blueprints, &src, &root);
         assert!(s.installed && !s.current);
         assert_eq!(s.stale, vec!["coilbox_blueprints/json.lua"]);
-        install(&src, &root).unwrap();
-        assert!(status(&src, &root).current);
+        install(Widget::Blueprints, &src, &root).unwrap();
+        assert!(status(Widget::Blueprints, &src, &root).current);
     }
 
     #[test]
@@ -439,10 +538,10 @@ mod tests {
         let src = source("case");
         let root = tmp("root-case");
         write(&root.join("luaui/Widgets/other.lua"), "theirs");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         assert!(root.join("luaui/Widgets/coilbox_blueprints.lua").is_file());
         assert!(!root.join("LuaUI").exists() || cfg!(not(target_os = "linux")));
-        assert!(status(&src, &root).current);
+        assert!(status(Widget::Blueprints, &src, &root).current);
     }
 
     #[test]
@@ -456,7 +555,7 @@ mod tests {
         );
         write(&root.join("LuaUI/Widgets/gui_theirs.lua"), "theirs");
         write(&root.join("LuaUI/Config/coilbox_blueprints.json"), "{}");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         assert!(!root.join("LuaUI/coilbox_blueprints/old.lua").exists());
         assert!(!root
             .join("LuaUI/Widgets/coilbox_blueprints_extra.lua")
@@ -472,13 +571,13 @@ mod tests {
         let src = source("remove");
         let root = tmp("root-remove");
         write(&root.join("LuaUI/Widgets/gui_theirs.lua"), "theirs");
-        install(&src, &root).unwrap();
-        let removed = remove(&root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
+        let removed = remove(Widget::Blueprints, &root).unwrap();
         assert_eq!(removed.len(), 3);
         assert!(!root.join("LuaUI/Widgets/coilbox_blueprints.lua").exists());
         assert!(!root.join("LuaUI/coilbox_blueprints").exists());
         assert!(root.join("LuaUI/Widgets/gui_theirs.lua").is_file());
-        let s = status(&src, &root);
+        let s = status(Widget::Blueprints, &src, &root);
         assert!(!s.installed);
     }
 
@@ -486,9 +585,9 @@ mod tests {
     fn install_refuses_an_empty_source_or_a_missing_root() {
         let empty = tmp("src-empty");
         let root = tmp("root-empty");
-        assert!(install(&empty, &root).is_err());
+        assert!(install(Widget::Blueprints, &empty, &root).is_err());
         let src = source("missing-root");
-        assert!(install(&src, &root.join("nope")).is_err());
+        assert!(install(Widget::Blueprints, &src, &root.join("nope")).is_err());
     }
 
     /// The repo file a notice copy is made from, read at test time so the
@@ -522,7 +621,7 @@ mod tests {
     fn a_fresh_install_writes_the_notice_and_both_licence_texts() {
         let src = source("notice-fresh");
         let root = tmp("root-notice-fresh");
-        let written = install(&src, &root).unwrap();
+        let written = install(Widget::Blueprints, &src, &root).unwrap();
         assert_notice_current(&root);
         // The notice is not one of the widget's files.
         assert!(written.iter().all(|f| !f.starts_with("coilbox-licence")));
@@ -532,13 +631,13 @@ mod tests {
     fn a_reinstall_replaces_a_changed_notice_and_drops_a_stale_file() {
         let src = source("notice-again");
         let root = tmp("root-notice-again");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         for (rel, _) in NOTICE_COPIES {
             std::fs::write(root.join(rel), "an older notice").unwrap();
         }
         let stale = root.join("LuaUI/coilbox-licence/OLD-NOTICE.md");
         write(&stale, "from an older coilbox");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         assert_notice_current(&root);
         assert!(!stale.exists());
     }
@@ -547,13 +646,13 @@ mod tests {
     fn an_install_without_the_notice_is_stale_until_it_is_written() {
         let src = source("notice-stale");
         let root = tmp("root-notice-stale");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         std::fs::remove_dir_all(root.join("LuaUI/coilbox-licence")).unwrap();
-        let s = status(&src, &root);
+        let s = status(Widget::Blueprints, &src, &root);
         assert!(s.installed && !s.current);
         assert!(s.stale.contains(&"coilbox-licence/NOTICE.md".to_string()));
-        install(&src, &root).unwrap();
-        assert!(status(&src, &root).current);
+        install(Widget::Blueprints, &src, &root).unwrap();
+        assert!(status(Widget::Blueprints, &src, &root).current);
     }
 
     #[test]
@@ -561,9 +660,9 @@ mod tests {
         let src = source("notice-case");
         let root = tmp("root-notice-case");
         write(&root.join("luaui/Widgets/other.lua"), "theirs");
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         assert!(root.join("luaui/coilbox-licence/NOTICE.md").is_file());
-        assert!(status(&src, &root).current);
+        assert!(status(Widget::Blueprints, &src, &root).current);
     }
 
     #[test]
@@ -575,8 +674,8 @@ mod tests {
         write(&root.join("LuaUI/COPYING"), "their GPL");
         write(&root.join("LICENSE"), "the root's licence");
         write(&root.join("LuaUI/Config/coilbox_blueprints.json"), "{}");
-        install(&src, &root).unwrap();
-        install(&src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
         for (rel, text) in [
             ("LuaUI/Widgets/gui_theirs.lua", "theirs"),
             ("LuaUI/LICENSE", "their licence"),
@@ -594,18 +693,117 @@ mod tests {
         let root = tmp("root-notice-remove");
         write(&root.join("LuaUI/Widgets/gui_theirs.lua"), "theirs");
         write(&root.join("LuaUI/LICENSE"), "their licence");
-        install(&src, &root).unwrap();
-        remove(&root).unwrap();
+        install(Widget::Blueprints, &src, &root).unwrap();
+        remove(Widget::Blueprints, &root).unwrap();
         assert!(!root.join("LuaUI/coilbox-licence").exists());
         assert!(root.join("LuaUI/Widgets/gui_theirs.lua").is_file());
         assert!(root.join("LuaUI/LICENSE").is_file());
     }
 
+    /// A skeleton widget source tree: one widget file and one module file.
+    fn skeleton_source(tag: &str) -> PathBuf {
+        let src = tmp(&format!("src-skeleton-{tag}"));
+        write(&src.join("luaui/widgets/coilbox_skeleton.lua"), "bones");
+        write(&src.join("luaui/coilbox_skeleton/skeleton.lua"), "module");
+        write(&src.join("tests/skeleton_test.lua"), "test");
+        src
+    }
+
+    #[test]
+    fn the_skeleton_widget_installs_beside_the_blueprint_widget() {
+        let blueprints = source("both-b");
+        let skeleton = skeleton_source("both");
+        let root = tmp("root-both");
+        install(Widget::Blueprints, &blueprints, &root).unwrap();
+        let written = install(Widget::Skeleton, &skeleton, &root).unwrap();
+        assert_eq!(
+            written,
+            vec![
+                "coilbox_skeleton/skeleton.lua",
+                "widgets/coilbox_skeleton.lua"
+            ]
+        );
+        assert!(root.join("LuaUI/widgets/coilbox_skeleton.lua").is_file());
+        assert!(status(Widget::Blueprints, &blueprints, &root).current);
+        assert!(status(Widget::Skeleton, &skeleton, &root).current);
+        assert!(!root.join("LuaUI/tests").exists());
+    }
+
+    #[test]
+    fn a_widget_is_not_installed_by_the_other_widgets_files() {
+        let skeleton = skeleton_source("alone");
+        let root = tmp("root-alone");
+        install(Widget::Skeleton, &skeleton, &root).unwrap();
+        let blueprints = source("alone-b");
+        let s = status(Widget::Blueprints, &blueprints, &root);
+        assert!(!s.installed && !s.current);
+    }
+
+    #[test]
+    fn removing_one_widget_leaves_the_other_and_the_shared_notice() {
+        let blueprints = source("rm-b");
+        let skeleton = skeleton_source("rm");
+        let root = tmp("root-rm");
+        install(Widget::Blueprints, &blueprints, &root).unwrap();
+        install(Widget::Skeleton, &skeleton, &root).unwrap();
+        let removed = remove(Widget::Skeleton, &root).unwrap();
+        assert_eq!(removed.len(), 2);
+        assert!(!root.join("LuaUI/coilbox_skeleton").exists());
+        assert!(!root.join("LuaUI/widgets/coilbox_skeleton.lua").exists());
+        assert!(root.join("LuaUI/widgets/coilbox_blueprints.lua").is_file());
+        assert_notice_current(&root);
+        assert!(status(Widget::Blueprints, &blueprints, &root).current);
+        // The last one out takes the notice with it.
+        remove(Widget::Blueprints, &root).unwrap();
+        assert!(!root.join("LuaUI/coilbox-licence").exists());
+    }
+
+    #[test]
+    fn an_update_of_one_widget_leaves_the_other_untouched() {
+        let blueprints = source("up-b");
+        let skeleton = skeleton_source("up");
+        let root = tmp("root-up");
+        install(Widget::Blueprints, &blueprints, &root).unwrap();
+        install(Widget::Skeleton, &skeleton, &root).unwrap();
+        write(&skeleton.join("luaui/coilbox_skeleton/skeleton.lua"), "v2");
+        let s = status(Widget::Skeleton, &skeleton, &root);
+        assert_eq!(s.stale, vec!["coilbox_skeleton/skeleton.lua"]);
+        install(Widget::Skeleton, &skeleton, &root).unwrap();
+        assert!(status(Widget::Skeleton, &skeleton, &root).current);
+        assert!(status(Widget::Blueprints, &blueprints, &root).current);
+    }
+
+    #[test]
+    fn every_widget_is_coilbox_owned_and_the_players_files_are_not() {
+        assert!(widget_owned("coilbox_skeleton/skeleton.lua"));
+        assert!(widget_owned("Widgets/coilbox_skeleton.lua"));
+        assert!(widget_owned("coilbox_blueprints/store.lua"));
+        assert!(widget_owned("Widgets/coilbox_blueprints.lua"));
+        assert!(!widget_owned("Widgets/gui_skeleton.lua"));
+        assert!(!widget_owned("Config/coilbox_skeleton.json"));
+    }
+
+    #[test]
+    fn a_widget_name_the_commands_do_not_know_is_refused() {
+        assert_eq!(Widget::parse("blueprints"), Ok(Widget::Blueprints));
+        assert_eq!(Widget::parse("skeleton"), Ok(Widget::Skeleton));
+        assert!(Widget::parse("mission").is_err());
+    }
+
     #[test]
     fn bundled_dir_is_the_first_candidate_that_exists() {
         let resources = Path::new("/res");
-        let found = bundled_widget_dir(resources, |p| p.ends_with("lua/blueprint-widget"));
+        let found = bundled_widget_dir(Widget::Blueprints, resources, |p| {
+            p.ends_with("lua/blueprint-widget")
+        });
         assert_eq!(found, Some(PathBuf::from("/res/lua/blueprint-widget")));
-        assert_eq!(bundled_widget_dir(resources, |_| false), None);
+        let found = bundled_widget_dir(Widget::Skeleton, resources, |p| {
+            p == Path::new("/res/skeleton-widget")
+        });
+        assert_eq!(found, Some(PathBuf::from("/res/skeleton-widget")));
+        assert_eq!(
+            bundled_widget_dir(Widget::Skeleton, resources, |_| false),
+            None
+        );
     }
 }
