@@ -177,6 +177,9 @@ async function convert(
 export async function adoptGameScript(
   project: LegoProject,
   engine: { enginePath: string; dataDir: string },
+  /** `infer: false` reads the script without asking it about its pieces, for a
+   *  caller that asks it itself. */
+  options: { infer?: boolean } = {},
 ): Promise<AdoptedScript> {
   const game = project.imported?.game;
   // A unit with no unitdef behind it is a feature, a wreck, or a model nothing
@@ -256,6 +259,20 @@ export async function adoptGameScript(
   // With what has just been read put on it. Inference runs the script the same
   // way the preview does, so it needs the same definition and the same
   // libraries, and the project it was handed predates both.
+  if (options.infer === false) {
+    return {
+      script: result.text,
+      member: result.member,
+      kind: "lua",
+      declared: result.declared,
+      findings: null,
+      converted: null,
+      compiled: null,
+      unitDef,
+      includes,
+      notes,
+    };
+  }
   const findings = await inferRoles(
     {
       ...project,
