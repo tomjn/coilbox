@@ -27253,6 +27253,10 @@ msgstr "Non è stato possibile confermare il gioco esatto dal replay, quindi que
 msgid "its facing is not three numbers of unit length"
 msgstr "il suo orientamento non è formato da tre numeri di lunghezza unitaria"
 
+#: src/lego/pages/components/ExportDrawer.tsx
+msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
+msgstr ""
+
 #: src/lego/connectors.ts
 #, fuzzy
 msgid "its id is not a name"
@@ -33389,6 +33393,10 @@ msgstr "Nessuna preimpostazione salvata da includere."
 #, fuzzy
 msgid "No saved profiles yet."
 msgstr "Ancora nessun profilo salvato."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "No saved unit has a skeleton."
+msgstr ""
 
 #: src/campaign/pages/components/CampaignUnits.tsx
 #, fuzzy
@@ -49812,6 +49820,10 @@ msgstr "Lo stesso seme crea sempre la stessa mappa."
 #, fuzzy
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "Lo stesso seme e le stesse regole per questo gioco producono sempre la stessa mod."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "The saved units could not be read: {loadMessage}"
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

@@ -27081,6 +27081,10 @@ msgstr "无法从回放中确认其确切的游戏，因此只按名称检查。
 msgid "its facing is not three numbers of unit length"
 msgstr "facing 不是三个数字组成的单位向量"
 
+#: src/lego/pages/components/ExportDrawer.tsx
+msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
+msgstr ""
+
 #: src/lego/connectors.ts
 #, fuzzy
 msgid "its id is not a name"
@@ -33180,6 +33184,10 @@ msgstr "没有可包含的已保存预设。"
 #, fuzzy
 msgid "No saved profiles yet."
 msgstr "还没有已保存的配置档案。"
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "No saved unit has a skeleton."
+msgstr ""
 
 #: src/campaign/pages/components/CampaignUnits.tsx
 #, fuzzy
@@ -49469,6 +49477,10 @@ msgstr "相同的种子总是生成相同的地图。"
 #, fuzzy
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "对此游戏使用相同的种子和规则，总是会产生相同的模组。"
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "The saved units could not be read: {loadMessage}"
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

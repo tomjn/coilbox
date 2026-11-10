@@ -22128,6 +22128,10 @@ msgstr "Its exact game couldn't be confirmed from the replay, so this is a name-
 msgid "its facing is not three numbers of unit length"
 msgstr "its facing is not three numbers of unit length"
 
+#: src/lego/pages/components/ExportDrawer.tsx
+msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
+msgstr "its game has no short name coilbox knows, so the widget's file has no place to go"
+
 #: src/lego/connectors.ts
 msgid "its id is not a name"
 msgstr "its id is not a name"
@@ -27112,6 +27116,10 @@ msgstr "No saved presets to include."
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "No saved profiles yet."
 msgstr "No saved profiles yet."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "No saved unit has a skeleton."
+msgstr "No saved unit has a skeleton."
 
 #: src/campaign/pages/components/CampaignUnits.tsx
 msgid "No saved units yet. Build one in the <0>unit builder</0>."
@@ -40439,6 +40447,10 @@ msgstr "The same seed always builds the same map."
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "The same seed and rules against this game always produce the same mod."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "The saved units could not be read: {loadMessage}"
+msgstr "The saved units could not be read: {loadMessage}"
 
 #: src/content/pages/components/states.tsx
 msgid "The scan failed, so no {noun} are listed"

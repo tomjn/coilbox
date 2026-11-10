@@ -352,9 +352,24 @@ describe("WidgetsPage", () => {
         },
       },
     });
+    // The piece with no bone is not in the file
+    expect(
+      Object.keys(JSON.parse(file ?? "{}").units.fedwalker.pieces),
+    ).toEqual(["hull"]);
     // A second press has nothing new to write.
     fireEvent.click(row.getByText("Write skeletons"));
     await row.findByText("No skeleton has changed since the last write.");
+  });
+
+  it("says so when no saved unit has a skeleton", async () => {
+    saved.projects = [{ id: "u1", unitName: "plain", pieces: [] }];
+    page();
+    const row = within(
+      await screen.findByRole("listitem", { name: "Skeleton" }),
+    );
+    fireEvent.click(row.getByText("Write skeletons"));
+    await row.findByText("No saved unit has a skeleton.");
+    expect(disk.size).toBe(0);
   });
 
   it("says why a skeleton file was not written when the file there cannot be read", async () => {

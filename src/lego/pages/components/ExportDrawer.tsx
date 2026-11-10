@@ -975,6 +975,9 @@ export function ExportDrawer({
           project,
         ]);
         skeletonFile = wrote.written[0]?.path ?? null;
+        if (wrote.unplaced.length > 0) {
+          skeletonProblem = t`its game has no short name coilbox knows, so the widget's file has no place to go`;
+        }
       } catch (error) {
         skeletonProblem = describeError(error);
       }
