@@ -44,7 +44,8 @@ export interface AdoptedScript {
   /** What the unit definition asked for, whether or not it resolved. */
   declared: string | null;
   /** Roles the script names or shows, for the caller to offer. Null when there
-   *  was no Lua to ask. */
+   *  was no Lua to ask, and when the caller passed `infer: false` and runs
+   *  `inferRoles` itself. */
   findings: RoleFindings | null;
   /**
    * Set when `script` is a conversion of the `.bos` source beside a `.cob`
