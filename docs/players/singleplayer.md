@@ -64,6 +64,8 @@ Game options is under the player list. Select it to open it. The line beside the
 
 The options under Mod options come from the game, so every game has different ones. Change one by typing a number, ticking a box or picking from a list. Reset beside Game options puts every option back to the game's default.
 
+If you have installed a coilbox widget and the game has an `allowuserwidgets` option, coilbox turns that option on for the battle unless you have set it yourself. See [Games that switch user widgets off](blueprints.md#games-that-switch-user-widgets-off).
+
 The map card shows the map's details but has no settings of its own.
 
 ## What you need to start
