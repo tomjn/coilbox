@@ -529,7 +529,7 @@ function widget:GameFrame(frame)
 			showing = true
 			shownByTest = true
 		end
-		log(LOG.INFO, "selected the test unit and showing its skeleton")
+		Spring.Echo("Coilbox skeleton: selected the test unit and showing its skeleton")
 	elseif result == "unknown" then
 		log(LOG.WARNING, "the skeleton file names a test unit this game does not have")
 	end
