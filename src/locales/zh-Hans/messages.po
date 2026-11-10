@@ -49808,6 +49808,10 @@ msgstr "俯仰角的正弦，所以 0.45 为 27 度"
 msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "横滚角的正弦，所以 0.8 为 53 度"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "The skirmish AIs for this game could not be listed."

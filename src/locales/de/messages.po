@@ -49808,6 +49808,10 @@ msgstr "der Sinus des Neigungswinkels, 0.45 sind also 27 Grad"
 msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "der Sinus des Rollwinkels, 0.8 sind also 53 Grad"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "The skirmish AIs for this game could not be listed."

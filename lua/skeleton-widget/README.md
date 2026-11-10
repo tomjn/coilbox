@@ -35,10 +35,18 @@ Coilbox writes `LuaUI/Config/coilbox_skeletons/<Game.gameShortName>.json` into a
 - A unit is matched by its unit definition's name and a piece by its name in the model, both ignoring case.
 - `evidence` is `built` (coilbox made the pieces from a plan), `fitted` (a plan fitted to pieces the unit already had) or `observed` (read off a game's model, drawn dashed). A word this version does not know is drawn as `built`.
 - `label` is the role's label in the language coilbox was in when it wrote the file, so the widget carries no list of roles. A bone with no role is labelled with its piece's name.
-- Writing merges into the file. An `observed` entry never replaces a `built` or `fitted` one, and units and top level keys the writer was not given are kept. Keys beyond `version` and `units` belong to other writers: `coilbox_test_unit` is the unit Test in game wants selected (issue #5182), and this widget ignores it for now.
+- Writing merges into the file. An `observed` entry never replaces a `built` or `fitted` one, and units and top level keys the writer was not given are kept. Keys beyond `version` and `units` belong to other writers: `coilbox_test_unit` is the unit Test in game wants selected (issue #5182), described below.
 - No file, no folder, or no entry for a unit is the normal case and logs nothing. A file that is there and will not read logs one warning. A plan that names none of a unit's pieces is read as no plan, so a file written for another model dims nothing.
 - The file is read once, when the widget loads. `/luaui reload` reads it again.
 - JSON is read by `luaui/coilbox_skeleton/json.lua`, the decoder of the blueprint widget's `json.lua` without its encoder. Each widget stands alone, so it is a copy.
+
+## Test in game
+
+Test in game (`src/lego/testSkeleton.ts`) installs or updates this widget in the content root, then writes the scratch game's file, `LuaUI/Config/coilbox_skeletons/coilbox_lego_test.json`, with the unit's plan under `units` and the unit's definition name under the top level key `coilbox_test_unit`. A unit with no skeleton gets the key and no plan, and any plan an earlier test left for that name is removed. Coilbox removes the key again when the match ends, because other games, such as a campaign's, are built into folders with the same short name.
+
+`luaui/coilbox_skeleton/testunit.lua` does the rest. Every 15 sim frames until it succeeds, the widget asks for the player's own units of that definition (`Spring.GetTeamUnitsByDefs`). The first time one exists it selects it with `Spring.SelectUnitArray`, turns the skeleton on and logs one line. It does this once per widget load, so a later deselect or Bones press is not undone. A name the game has no definition for logs one warning. A file with no key, which is every file but a Test in game launch's, gets no picker and the widget does nothing extra.
+
+The skeleton showing because of the test is not written to the widget's config. Only a press of the Bones button, or `coilbox_skeleton`, changes what is kept.
 
 ## The bone end rule
 

@@ -40730,6 +40730,10 @@ msgstr "the sine of the pitch angle, so 0.45 is 27 degrees"
 msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "the sine of the roll angle, so 0.8 is 53 degrees"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+msgstr "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "The skirmish AIs for this game could not be listed."
 msgstr "The skirmish AIs for this game could not be listed."
