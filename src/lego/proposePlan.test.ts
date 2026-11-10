@@ -207,6 +207,33 @@ describe("proposePlan", () => {
     expect(proposal.notes.join(" ")).toMatch(/2 wheels on its left and 1/);
   });
 
+  it("proposes no plan for wheels that are not level across the unit", () => {
+    const skew = unit([
+      piece("fl", "root", [14, 0, 10]),
+      piece("fr", "root", [-14, 0, -8]),
+      piece("bl", "root", [14, 0, -10]),
+      piece("br", "root", [-14, 0, -30]),
+    ]);
+    const proposal = proposePlan(
+      skew,
+      findings(
+        ["fl", "fr", "bl", "br"].map((name) =>
+          observed(name, "wheel", "StartMoving"),
+        ),
+      ),
+    );
+    expect(proposal.base).toBeNull();
+    expect(proposal.notes.join(" ")).toMatch(/not level/);
+  });
+
+  it("keeps what the script runs said in its notes", () => {
+    const proposal = proposePlan(unit([]), {
+      ...findings([]),
+      notes: ["a, b turn as a chain of two"],
+    });
+    expect(proposal.notes[0]).toBe("a, b turn as a chain of two");
+  });
+
   it("gives a unit that does not move, with a turret, the turret building plan", () => {
     const gun = unit(
       [

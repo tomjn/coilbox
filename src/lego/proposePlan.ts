@@ -98,7 +98,9 @@ export function proposePlan(
   project: LegoProject,
   findings: RoleFindings,
 ): PlanProposal {
-  const notes: string[] = [];
+  // What the script runs said first, such as why a chain was not a leg,
+  // since that is often why no plan fits.
+  const notes: string[] = [...findings.notes];
   const picks: BonePicks = {};
   const evidence: Record<string, PickEvidence> = {};
   const counts: Record<string, number> = {};
@@ -221,6 +223,22 @@ export function proposePlan(
     if (tied) {
       notes.push(
         t`Two wheels on one side are the same distance front to back, so which axle each is on is unknown and no plan is proposed.`,
+      );
+      return none();
+    }
+    // Each left wheel's axle partner is the right wheel in the same place
+    // front to back, so it has to be nearer that one than any other.
+    const unpaired = left.some((w, i) =>
+      right.some(
+        (other, j) =>
+          j !== i &&
+          Math.abs(other.at[2] - w.at[2]) <=
+            Math.abs((right[i] as (typeof right)[number]).at[2] - w.at[2]),
+      ),
+    );
+    if (unpaired) {
+      notes.push(
+        t`The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed.`,
       );
       return none();
     }
