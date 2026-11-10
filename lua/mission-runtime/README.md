@@ -448,7 +448,7 @@ The objectives panel, the dialogue panel and the debrief are one LuaUI widget, `
 
 What the widget draws is decided in `coilbox_panel_model.lua`, which is pure: it takes a function that reads a game rules param and a function that measures a string, and answers with what to draw. That is the only part of a widget a test outside the engine can reach, so all of it lives there.
 
-The panels' own words, such as "Objectives" and "Mission accomplished", come from `luaui/mission_ui/strings.lua`, one table per locale with `en` complete. `coilbox_i18n.lua` beside it picks the table: the `coilbox_lang` mod option coilbox writes into the start script first, then the engine config key `language`, then `en`. A key a table lacks is drawn in English. `en-XA` is the pseudo-locale, made from `en` with every letter accented, padded and bracketed. Dialogue and objective text are the author's and are never translated. The rewind timeline and the blueprint widget carry the same `coilbox_i18n.lua`, and `tests/i18n_test.lua` fails if the copies differ.
+The panels' own words, such as "Objectives" and "Mission accomplished", come from `luaui/mission_ui/strings.lua`, one table per locale with `en` complete. `coilbox_i18n.lua` beside it picks the table: the `coilbox_lang` mod option coilbox writes into the start script first, then the engine config key `language`, then `en`. A key a table lacks is drawn in English. `en-XA` is the pseudo-locale, made from `en` with every letter accented, padded and bracketed. Dialogue and objective text are the author's and are never translated. The rewind timeline, the blueprint widget and the skeleton widget carry the same `coilbox_i18n.lua`, and `tests/i18n_test.lua` fails if the copies differ.
 
 ### What crosses between the halves
 

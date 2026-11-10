@@ -149,6 +149,7 @@ local CANON = ROOT .. "/luaui/mission_ui/coilbox_i18n.lua"
 for _, copy in ipairs({
 	LUA .. "/rewind-player/luaui/rewind_timeline/coilbox_i18n.lua",
 	LUA .. "/blueprint-widget/luaui/coilbox_blueprints/coilbox_i18n.lua",
+	LUA .. "/skeleton-widget/luaui/coilbox_skeleton/coilbox_i18n.lua",
 }) do
 	check(copy:match("lua/.*$") .. " is the same as the mission runtime's", read(copy) == read(CANON))
 end
@@ -167,6 +168,7 @@ for _, path in ipairs({
 	ROOT .. "/luaui/mission_ui/strings.lua",
 	LUA .. "/rewind-player/luaui/rewind_timeline/strings.lua",
 	LUA .. "/blueprint-widget/luaui/coilbox_blueprints/strings.lua",
+	LUA .. "/skeleton-widget/luaui/coilbox_skeleton/strings.lua",
 }) do
 	local name = path:match("lua/.*$")
 	local loaded = dofile(path)

@@ -24,8 +24,9 @@
 -- what lets the tests run this with plain luajit.
 --
 -- Each tree that ships on its own carries a copy: lua/mission-runtime,
--- lua/rewind-player and lua/blueprint-widget. Change this one, in
--- lua/mission-runtime/luaui/mission_ui/, and copy it to the other two.
+-- lua/rewind-player, lua/blueprint-widget and lua/skeleton-widget. Change
+-- this one, in lua/mission-runtime/luaui/mission_ui/, and copy it to the
+-- other three.
 -- lua/mission-runtime/tests/i18n_test.lua fails while they differ.
 
 local M = {}
