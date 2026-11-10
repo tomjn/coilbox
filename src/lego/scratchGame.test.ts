@@ -152,6 +152,72 @@ for _, f in ipairs({ ${frames.join(", ")} }) do gadget:GameFrame(f) end
   };
 }
 
+interface UnsyncedRun {
+  unit?: string;
+  /** The game rules param `phase` on each frame, false for none. */
+  phases: (string | false)[];
+  /** Splinter Faction's start position spots, by rules params. */
+  spots?: { x: number; z: number; at: number }[];
+  /** Where the engine put the team's start position. */
+  start?: [number, number];
+  /** Whether the game takes a spot selection, as it does a free spot. */
+  accept?: boolean;
+  spectator?: boolean;
+}
+
+/**
+ * Load the start unit gadget's unsynced half and play `phases` through it, one
+ * frame each, with a game that answers the way Splinter Faction's `game_spawn`
+ * does. Prints each message the gadget sent as `send <first byte> <rest>`.
+ */
+function runUnsyncedGadget({
+  unit = "cakebot_test",
+  phases,
+  spots = [],
+  start = [100, 100],
+  accept = true,
+  spectator = false,
+}: UnsyncedRun) {
+  const spotParams = spots
+    .map(
+      (s, i) =>
+        `params.spot_${i + 1}_x = ${s.x} params.spot_${i + 1}_z = ${s.z} params.spot_${i + 1}_at = ${s.at}`,
+    )
+    .join("\n");
+  const harness = `
+gadget = {}
+gadgetHandler = { IsSyncedCode = function() return false end }
+UnitDefNames = { fedcommander = { id = 11 }, lozcommander = { id = 12 } }
+local params = { spotCount = ${spots.length} }
+local teamParams = {}
+${spotParams}
+Spring = {
+  GetGameRulesParam = function(key) return params[key] end,
+  GetTeamRulesParam = function(team, key) return teamParams[key] end,
+  GetMyTeamID = function() return 0 end,
+  GetMyAllyTeamID = function() return 0 end,
+  GetSpectatingState = function() return ${spectator} end,
+  GetTeamStartPosition = function() return ${start[0]}, 0, ${start[1]} end,
+  SendLuaRulesMsg = function(msg)
+    print("send " .. msg:byte(1) .. " " .. msg:sub(2))
+    if msg:byte(1) == 139 and ${accept} then teamParams.selectedSpot = tonumber(msg:sub(2)) end
+  end,
+}
+assert(loadstring(io.read("*a")))()
+for _, phase in ipairs({ ${phases.map((p) => (p === false ? "false" : JSON.stringify(p))).join(", ")} }) do
+  params.phase = phase or nil
+  gadget:GameFrame()
+end
+`;
+  const run = spawnSync("luajit", ["-e", harness], {
+    input: buildStartUnitGadget(unit),
+  });
+  return {
+    stderr: run.stderr?.toString() ?? "",
+    lines: (run.stdout?.toString() ?? "").trim().split("\n"),
+  };
+}
+
 describe("buildModInfo", () => {
   it("declares itself a launchable game", () => {
     expect(buildModInfo("Balanced Annihilation V7.11")).toContain(
@@ -248,10 +314,90 @@ describe("buildStartUnitGadget", () => {
 
     expect(lua).toContain("function gadget:GetInfo()");
     expect(lua).toContain("enabled = true");
-    // Unsynced returns false: spawning is a synced job, and a gadget that ran
-    // twice would create the unit on one side of the sim only.
+    // Spawning is a synced job, and a gadget that ran it twice would create the
+    // unit on one side of the sim only. The unsynced half returns before it.
     expect(lua).toContain("if not gadgetHandler:IsSyncedCode() then");
-    expect(lua).toContain("return false");
+    expect(lua.indexOf("  return\nend")).toBeLessThan(
+      lua.indexOf("function gadget:GameFrame(frame)"),
+    );
+  });
+
+  it("creates nothing from its unsynced half", () => {
+    const run = runUnsyncedGadget({ phases: ["faction"] });
+    expect(run.stderr).toBe("");
+    expect(run.lines.filter((l) => l.startsWith("create"))).toEqual([]);
+  });
+
+  describe("Splinter Faction's setup screens (issue #5197)", () => {
+    const spots = [
+      { x: 900, z: 900, at: 0 },
+      { x: 120, z: 90, at: 0 },
+      { x: 110, z: 110, at: 1 },
+    ];
+
+    it("picks the first faction and the nearest own-side spot, then confirms", () => {
+      const run = runUnsyncedGadget({
+        phases: [
+          "faction",
+          "faction",
+          "placement",
+          "placement",
+          "placement",
+          "done",
+        ],
+        spots,
+      });
+      expect(run.stderr).toBe("");
+      // 11 is fedcommander. Spot 2 is nearest the start position on side 0.
+      expect(run.lines).toEqual(["send 138 11", "send 139 2", "send 140"]);
+    });
+
+    it("takes the faction whose commander the unit's name starts with", () => {
+      const run = runUnsyncedGadget({
+        unit: "lozflyer",
+        phases: ["faction"],
+      });
+      expect(run.lines).toEqual(["send 138 12"]);
+    });
+
+    it("opens every spot in a free for all", () => {
+      const run = runUnsyncedGadget({
+        phases: ["placement"],
+        spots: [
+          { x: 900, z: 900, at: -1 },
+          { x: 300, z: 300, at: -1 },
+        ],
+      });
+      expect(run.lines).toEqual(["send 139 2"]);
+    });
+
+    it("does not confirm a spot the game has not taken", () => {
+      const run = runUnsyncedGadget({
+        phases: ["placement", "placement", "placement"],
+        spots,
+        accept: false,
+      });
+      expect(run.lines).toEqual(["send 139 2"]);
+    });
+
+    it("sends nothing in a game that publishes no phase", () => {
+      const run = runUnsyncedGadget({ phases: [false, false, false], spots });
+      expect(run.stderr).toBe("");
+      expect(run.lines).toEqual([""]);
+    });
+
+    it("sends nothing for a spectator", () => {
+      const run = runUnsyncedGadget({ phases: ["faction"], spectator: true });
+      expect(run.lines).toEqual([""]);
+    });
+
+    it("stops once the match is running", () => {
+      const run = runUnsyncedGadget({
+        phases: ["done", "faction", "placement"],
+        spots,
+      });
+      expect(run.lines).toEqual([""]);
+    });
   });
 
   it("spawns the built unit at a team's start position when it is clear", () => {

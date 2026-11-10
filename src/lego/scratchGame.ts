@@ -240,6 +240,87 @@ export function buildUnitScriptGadget(): string {
 }
 
 /**
+ * The start gadget's unsynced half, which gets a player past Splinter
+ * Faction's two pre-game screens (issue #5197).
+ *
+ * That game opens on a faction screen and then a start position screen, and
+ * holds the match behind each until the player answers or a countdown ends. Its
+ * `game_spawn` gadget publishes the phase it is in as the game rules param
+ * `phase`, and takes the answers as three messages from the player's client. So
+ * this half sends those same messages itself, once per screen. A game that
+ * publishes no `phase` is never touched, and the half then does nothing.
+ *
+ * The faction is the one whose commander's name starts the unit's name, so
+ * `fedtank` takes the Federation, and the first faction otherwise. The start
+ * position is the spot on the player's side nearest the start position the
+ * unit spawns by. If the game turns a message down, its own countdown ends the
+ * screen as it would for a player who did nothing.
+ */
+const SETUP_SCREENS_LUA = [
+  "-- Splinter Faction's faction and start position screens: answer both, the",
+  "-- way a player's clicks would. Games that publish no phase are left alone.",
+  'local FACTIONS = { "fedcommander", "lozcommander" }',
+  'local FACTION_MSG, SELECT_MSG, CONFIRM_MSG = "\\138", "\\139", "\\140"',
+  "local sentFaction, placing, spot, finished = false, false, nil, false",
+  "",
+  "local function factionDefID()",
+  "  for _, name in ipairs(FACTIONS) do",
+  '    local prefix = (name:gsub("commander$", ""))',
+  "    if UNIT_NAME:sub(1, #prefix) == prefix and UnitDefNames[name] then",
+  "      return UnitDefNames[name].id",
+  "    end",
+  "  end",
+  "  local first = UnitDefNames[FACTIONS[1]]",
+  "  return first and first.id",
+  "end",
+  "",
+  "local function nearestSpot()",
+  "  local x, _, z = Spring.GetTeamStartPosition(Spring.GetMyTeamID())",
+  "  local ally = Spring.GetMyAllyTeamID()",
+  "  local best, bestDistance",
+  '  for i = 1, Spring.GetGameRulesParam("spotCount") or 0 do',
+  '    local sx = Spring.GetGameRulesParam("spot_" .. i .. "_x")',
+  '    local sz = Spring.GetGameRulesParam("spot_" .. i .. "_z")',
+  '    local at = Spring.GetGameRulesParam("spot_" .. i .. "_at")',
+  "    if x and sx and sz and (at == -1 or at == ally) then",
+  "      local distance = (sx - x) ^ 2 + (sz - z) ^ 2",
+  "      if not bestDistance or distance < bestDistance then",
+  "        best, bestDistance = i, distance",
+  "      end",
+  "    end",
+  "  end",
+  "  return best",
+  "end",
+  "",
+  "function gadget:GameFrame()",
+  "  if finished or Spring.GetSpectatingState() then",
+  "    return",
+  "  end",
+  '  local phase = Spring.GetGameRulesParam("phase")',
+  '  if phase == "faction" and not sentFaction then',
+  "    sentFaction = true",
+  "    local id = factionDefID()",
+  "    if id then",
+  "      Spring.SendLuaRulesMsg(FACTION_MSG .. id)",
+  "    end",
+  '  elseif phase == "placement" then',
+  "    if not placing then",
+  "      placing = true",
+  "      spot = nearestSpot()",
+  "      if spot then",
+  "        Spring.SendLuaRulesMsg(SELECT_MSG .. spot)",
+  "      end",
+  '    elseif spot and Spring.GetTeamRulesParam(Spring.GetMyTeamID(), "selectedSpot") == spot then',
+  "      finished = true",
+  "      Spring.SendLuaRulesMsg(CONFIRM_MSG)",
+  "    end",
+  '  elseif phase == "done" then',
+  "    finished = true",
+  "  end",
+  "end",
+];
+
+/**
  * The scratch archive's spawn gadget.
  *
  * Declaring the start unit is not enough on its own. The engine leaves spawning
@@ -252,6 +333,9 @@ export function buildUnitScriptGadget(): string {
  * keeps it from adding a second copy on a game that did honour the side. The
  * unit goes on the nearest clear ground to the start position, because a game
  * that spawns a commander puts it on that same spot (issue #4476).
+ *
+ * The same file's unsynced half answers Splinter Faction's setup screens, see
+ * `SETUP_SCREENS_LUA`.
  */
 export function buildStartUnitGadget(unitName: string): string {
   const lines = [
@@ -268,11 +352,13 @@ export function buildStartUnitGadget(unitName: string): string {
     "  }",
     "end",
     "",
+    `local UNIT_NAME = ${luaString(unitName)}`,
+    "",
     "if not gadgetHandler:IsSyncedCode() then",
-    "  return false",
+    ...SETUP_SCREENS_LUA.map((line) => (line ? `  ${line}` : line)),
+    "  return",
     "end",
     "",
-    `local UNIT_NAME = ${luaString(unitName)}`,
     `local SPAWN_FRAME = ${SPAWN_FRAME}`,
     "",
     "-- Already done when `/luarules reload` loads this into a game past its",
