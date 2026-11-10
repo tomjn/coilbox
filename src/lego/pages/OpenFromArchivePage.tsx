@@ -115,7 +115,11 @@ export default function OpenFromArchivePage() {
       archivePath: tree.archivePath,
       member: request.member,
     });
-    if (existing) {
+    // Two units can share one model. A request naming a unit is that unit, so
+    // a project open as another unit, or as no unit, is not offered for it.
+    const existingUnit = projects.find((p) => p.id === existing)?.imported?.game
+      ?.unit;
+    if (existing && (!request.unit || existingUnit === request.unit)) {
       navigate(`/lego/${existing}`, { replace: true });
       return;
     }
