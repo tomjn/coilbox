@@ -254,11 +254,18 @@ describe("clearTestUnit", () => {
   };
 
   it("removes the key and keeps the plans", async () => {
-    const held = io(nameTestUnit(null, "fedwalker", true));
+    const held = io(
+      nameTestUnit(
+        JSON.stringify({ version: 1, units: { fedtank: entry } }),
+        "fedwalker",
+        true,
+      ),
+    );
     await clearTestUnit("/data", held.io);
     const file = JSON.parse(held.files.get(path) ?? "{}");
     expect(file[TEST_UNIT_KEY]).toBeUndefined();
     expect(file.version).toBe(1);
+    expect(file.units.fedtank).toEqual(entry);
   });
 
   it("writes nothing when there is no key or no file", async () => {

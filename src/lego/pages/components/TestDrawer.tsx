@@ -268,6 +268,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     setCheck(null);
     setSkeletonProblem(null);
     setAction(next);
+    let outcome: Phase | null = null;
     try {
       setPhase({ state: "writing" });
       const compat = await compatTarget();
@@ -327,24 +328,27 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       });
       const exitCode = result.exitCode;
       if (exitCode !== null && exitCode !== 0) {
-        setPhase({
+        outcome = {
           state: "failed",
           message: t`The engine exited with code ${exitCode}. Its infolog says why.`,
-        });
+        };
         return;
       }
-      setPhase({ state: "done" });
+      outcome = { state: "done" };
     } catch (error) {
-      setPhase({
+      outcome = {
         state: "failed",
         message: describeError(error),
-      });
+      };
     } finally {
       // What a reload said was about the game that has now closed.
       setSandboxRun(null);
       setReload({ state: "idle" });
       // The unit this match was to select is not another game's to select.
+      // The drawer stays busy until the file is clean, so a second launch
+      // cannot write its own name and have it removed by this one.
       await clearTestUnit(target.dataDir);
+      if (outcome) setPhase(outcome);
     }
   }
 
