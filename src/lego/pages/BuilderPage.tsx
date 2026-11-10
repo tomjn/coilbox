@@ -18,6 +18,7 @@ import {
   Palette,
   PanelRightClose,
   PanelRightOpen,
+  PersonStanding,
   Plus,
   Redo,
   Rocket,
@@ -37,7 +38,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { TipButton } from "@/components/TipButton";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -113,6 +114,7 @@ import {
   transformRoots,
 } from "../groupTransform";
 import { importScript, importSummary } from "../importScript";
+import { inferRoles, type RoleFindings } from "../inferRoles";
 import { useInventoryView } from "../inventory";
 import { withLimits } from "../jointLimits";
 import { liftIntoUnit, pasteIntoUnit, saveModuleMeshes } from "../liftIntoUnit";
@@ -202,6 +204,7 @@ import {
   useLegoProjects,
   useModules,
 } from "../projects";
+import { type PlanProposal, proposePlan } from "../proposePlan";
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
@@ -475,6 +478,10 @@ function Builder({ id }: { id: string | undefined }) {
   const [picturing, setPicturing] = useState(false);
   /** Whether the drawer that fits a body plan to the unit's pieces is open. */
   const [fitting, setFitting] = useState(false);
+  /** The plan and picks the drawer opens with, worked out from the unit's
+   *  roles (#5185). Null for the drawer opened to fit by hand. */
+  const [proposal, setProposal] = useState<PlanProposal | null>(null);
+  const [proposing, setProposing] = useState(false);
   /** Whether the part picker for "Change part" is open, and what the last
    *  swap left behind. */
   const [swapping, setSwapping] = useState(false);
@@ -562,6 +569,49 @@ function Builder({ id }: { id: string | undefined }) {
   // branch folded round the selected piece a moment ago.
   const draftRef = useRef(draft);
   draftRef.current = draft;
+
+  /** Open the fit drawer on a plan worked out from the unit's roles (#5185),
+   *  asking the unit's script for them unless they are given. */
+  async function proposeSkeleton(given?: RoleFindings) {
+    const project = draftRef.current;
+    if (!project) return;
+    let findings = given;
+    if (!findings) {
+      setProposing(true);
+      try {
+        findings = await inferRoles(project, project.script ?? "");
+      } catch (error) {
+        findings = {
+          proposals: [],
+          legs: [],
+          notes: [],
+          error: describeError(error),
+        };
+      } finally {
+        setProposing(false);
+      }
+    }
+    setSelectedId(null);
+    setProposal(proposePlan(draftRef.current ?? project, findings));
+    setFitting(true);
+  }
+
+  // A unit opened from a game with roles proposed arrives with them, and the
+  // drawer opens proposed once. The state is cleared so going back to the unit
+  // does not open it again.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const arrived = (location.state as { proposeSkeleton?: RoleFindings } | null)
+    ?.proposeSkeleton;
+  const answeredArrival = useRef(false);
+  useEffect(() => {
+    if (!arrived || !draft || answeredArrival.current) return;
+    answeredArrival.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+    setSelectedId(null);
+    setProposal(proposePlan(draft, arrived));
+    setFitting(true);
+  }, [arrived, draft, navigate, location.pathname, setSelectedId]);
   useEffect(() => {
     const draft = draftRef.current;
     if (!draft || selectedIds.length === 0) return;
@@ -2244,7 +2294,11 @@ function Builder({ id }: { id: string | undefined }) {
             project={draft}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onOpenChange={setFitting}
+            proposal={proposal}
+            onOpenChange={(open) => {
+              setFitting(open);
+              if (!open) setProposal(null);
+            }}
             onFit={(plan, counts, picks) =>
               edit((project) => fitPlan(project, plan, counts, picks).project)
             }
@@ -2431,6 +2485,7 @@ function Builder({ id }: { id: string | undefined }) {
                                     // A selection made after this picks a
                                     // piece, so none is left over from before.
                                     setSelectedId(null);
+                                    setProposal(null);
                                     setFitting(true);
                                   }}
                                   aria-label={t`Fit a body plan`}
@@ -2442,6 +2497,24 @@ function Builder({ id }: { id: string | undefined }) {
                                 <Trans>Fit a body plan</Trans>
                               </TooltipContent>
                             </Tooltip>
+                            {draft.script ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    disabled={proposing}
+                                    onClick={() => void proposeSkeleton()}
+                                    aria-label={t`Propose a skeleton`}
+                                  >
+                                    <PersonStanding size={14} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <Trans>Propose a skeleton</Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : null}
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button

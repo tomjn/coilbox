@@ -266,6 +266,53 @@ describe("a unit built out of parts", () => {
   });
 });
 
+describe("proposing a skeleton (#5185)", () => {
+  it("opens the fit drawer proposed for a unit that arrives with roles", async () => {
+    doc.current = session(unit({ gameUnitDef: { canmove: false } }));
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/lego/p",
+            state: {
+              proposeSkeleton: {
+                proposals: [],
+                legs: [],
+                notes: [],
+                error: null,
+              },
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/lego/:id" element={<BuilderPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Fit Building" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Body/ }).textContent).toContain(
+      "The unit's root piece",
+    );
+  });
+
+  it("offers the button only for a unit with a script to read", async () => {
+    show(unit());
+    await screen.findByRole("button", { name: "Fit a body plan" });
+    expect(
+      screen.queryByRole("button", { name: "Propose a skeleton" }),
+    ).toBeNull();
+    cleanup();
+
+    show(unit({ script: "return {}" }));
+    expect(
+      await screen.findByRole("button", { name: "Propose a skeleton" }),
+    ).toBeTruthy();
+  });
+});
+
 describe("a shape chosen in the strip (#3337)", () => {
   it("is added in one edit under the unit's root, at its default size", async () => {
     show(unit());
