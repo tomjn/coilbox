@@ -432,7 +432,8 @@ function proposable(findings: RoleFindings): boolean {
 }
 
 /** The findings with only the roles taken, so a role unticked here is not
- *  proposed for a bone either. A leg goes with any of its pieces. */
+ *  proposed for a bone either. A leg is kept only when all three of its
+ *  pieces are taken. */
 function takenFindings(
   findings: RoleFindings,
   taken: Set<string>,

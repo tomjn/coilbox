@@ -665,10 +665,13 @@ Coilbox does not guess. The drawer also lists what reading the script found, suc
 
 - more legs on one side than the other, or an odd number of legs
 - more than four pairs of legs
-- wheels that do not pair up, or are not level across the unit, or two wheels on one side the same distance front to back
+- wheels that do not pair up across the unit
+- wheels on the left that are not level with the wheels on the right
+- two wheels on one side the same distance front to back
 - fewer than two or more than five pairs of wheels
 - a wheel on the unit's centre line
 - a unit that moves but shows no legs or wheels, and a unit with no game definition to say whether it moves
+- a script that could not be read or run
 
 A bone two pieces were proposed for, or a body when the legs hang from different pieces, is left unmatched with a note saying so.
 
