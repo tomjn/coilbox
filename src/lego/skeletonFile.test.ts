@@ -383,6 +383,15 @@ describe("folderGameShortname", () => {
     );
   });
 
+  it("prefers the exact path over one that differs only by case", () => {
+    const games = [
+      game("/data/games/Mod.sdd", "UPPER"),
+      game("/data/games/mod.sdd", "LOWER"),
+    ];
+    expect(folderGameShortname("/data/games/mod.sdd", games)).toBe("LOWER");
+    expect(folderGameShortname("/data/games/MOD.sdd", games)).toBe("UPPER");
+  });
+
   it("is null for a folder no scanned game lives in, or one with no short name", () => {
     expect(folderGameShortname("/data/games/x.sdd", [])).toBeNull();
     expect(

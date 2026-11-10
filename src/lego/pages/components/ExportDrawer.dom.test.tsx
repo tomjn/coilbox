@@ -62,8 +62,13 @@ vi.mock("@/blueprint/fileIO", () => ({
 }));
 // The games a scan has read, which is where a folder's short name comes from.
 const scannedGames = vi.fn((): unknown[] => []);
+// With `scanReady` false the hook has no answer yet, and only `run` has one.
+let scanReady = true;
 vi.mock("@/content/config", () => ({
-  useUnitsyncScan: () => ({ data: { games: scannedGames() } }),
+  useUnitsyncScan: () => ({
+    data: scanReady ? { games: scannedGames() } : null,
+    run: async () => ({ games: scannedGames() }),
+  }),
 }));
 vi.mock("@/play/config", () => ({
   usePreferredTarget: () => ({
@@ -176,6 +181,7 @@ beforeEach(() => {
   workshopCompile.mockReset();
   workshopProjects.mockReturnValue([]);
   scannedGames.mockReturnValue([]);
+  scanReady = true;
 });
 
 afterEach(() => {
@@ -1068,6 +1074,24 @@ describe("the skeleton widget's file (issue #5181)", () => {
     expect(await screen.findByText(MUTATOR_FILE)).toBeTruthy();
     expect(screen.getByText(FILE)).toBeTruthy();
     expect(disk.get(MUTATOR_FILE)).toBe(disk.get(FILE));
+  });
+
+  it("asks for the scan when none has answered yet", async () => {
+    const MUTATOR_FILE = "/data/LuaUI/Config/coilbox_skeletons/MUT.json";
+    scanReady = false;
+    scannedGames.mockReturnValue([
+      {
+        name: "Mutator 1",
+        primaryArchive: { name: "mutator_1", path: "/data/games/some.sdd" },
+        info: { shortname: "MUT" },
+      },
+    ]);
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show(withSkeleton("/data/games/some.sdd"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+    expect(await screen.findByText(MUTATOR_FILE)).toBeTruthy();
   });
 
   it("reports a file it could not write and keeps the export", async () => {

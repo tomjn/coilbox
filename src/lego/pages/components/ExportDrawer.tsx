@@ -985,7 +985,13 @@ export function ExportDrawer({
           appFileIO,
           contentRoot,
           [project],
-          { alsoUnder: folderGameShortname(dir, scan.data?.games ?? []) },
+          {
+            // A scan still running, or never asked for, has no answer yet.
+            alsoUnder: folderGameShortname(
+              dir,
+              (scan.data ?? (await scan.run()))?.games ?? [],
+            ),
+          },
         );
         skeletonFiles = wrote.written.map((file) => file.path);
         if (wrote.unplaced.length > 0) {

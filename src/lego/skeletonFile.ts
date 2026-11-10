@@ -240,11 +240,7 @@ export interface SkeletonWriteResult {
   withSkeleton: number;
 }
 
-function samePath(a: string, b: string): boolean {
-  const flat = (path: string) =>
-    path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-  return flat(a) === flat(b);
-}
+const flatPath = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "");
 
 /**
  * The short name in the modinfo of the game that lives in `folder`, read from a
@@ -256,9 +252,15 @@ export function folderGameShortname(
   folder: string,
   games: readonly GameItem[],
 ): string | null {
-  const game = games.find(
-    (g) => g.primaryArchive.path && samePath(g.primaryArchive.path, folder),
-  );
+  const wanted = flatPath(folder);
+  const at = (same: (path: string) => boolean) =>
+    games.find((g) => g.primaryArchive.path && same(g.primaryArchive.path));
+  // The exact path first, so two folders that differ only by case on a
+  // case-sensitive disk keep their own names. A disk that ignores case may
+  // spell the folder differently in the scan than in the picker.
+  const game =
+    at((path) => flatPath(path) === wanted) ??
+    at((path) => flatPath(path).toLowerCase() === wanted.toLowerCase());
   return game?.info?.shortname?.trim() || null;
 }
 
