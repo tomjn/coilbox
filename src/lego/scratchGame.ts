@@ -325,15 +325,17 @@ const SETUP_SCREENS_LUA = [
  * #5198). Splinter Faction's `Grabinput Local` widget sends `grabinput 1` as
  * it loads and every 150 frames, which keeps the cursor inside the engine's
  * window, and the engine has no setting that stops it. So this sends
- * `grabinput 0` on every drawn frame. The engine draws, and calls `Update`,
- * after the frame's game frames and before it reads input again, so a grab
- * sent in a game frame is let go before the player can move the mouse.
+ * `grabinput 0` after every game frame, once every widget has had that frame,
+ * and on every drawn frame for a grab sent outside a game frame. A gadget
+ * handler without `GameFramePost` still has `Update`.
  */
 const FREE_CURSOR_LUA = [
   "-- Let the cursor go whenever a widget keeps it inside the window.",
-  "function gadget:Update()",
+  "local function freeCursor()",
   '  Spring.SendCommands("grabinput 0")',
   "end",
+  "gadget.GameFramePost = freeCursor",
+  "gadget.Update = freeCursor",
 ];
 
 /**

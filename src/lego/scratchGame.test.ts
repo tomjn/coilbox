@@ -213,7 +213,8 @@ for _, phase in ipairs({ ${phases.map((p) => (p === false ? "false" : JSON.strin
   gadget:GameFrame()
 end
 for _ = 1, ${updates} do
-  gadget:Update()
+  gadget:GameFramePost(1)
+  gadget:Update(0.016)
 end
 `;
   const run = spawnSync("luajit", ["-e", harness], {
@@ -335,10 +336,15 @@ describe("buildStartUnitGadget", () => {
     expect(run.lines.filter((l) => l.startsWith("create"))).toEqual([]);
   });
 
-  it("lets the cursor go on every drawn frame (issue #5198)", () => {
+  it("lets the cursor go after each game frame and drawn frame (issue #5198)", () => {
     const run = runUnsyncedGadget({ phases: [], updates: 2 });
     expect(run.stderr).toBe("");
-    expect(run.lines).toEqual(["command grabinput 0", "command grabinput 0"]);
+    expect(run.lines).toEqual([
+      "command grabinput 0",
+      "command grabinput 0",
+      "command grabinput 0",
+      "command grabinput 0",
+    ]);
   });
 
   describe("Splinter Faction's setup screens (issue #5197)", () => {
