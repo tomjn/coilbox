@@ -52,6 +52,7 @@ vi.mock("../pack", () => ({
 }));
 vi.mock("./components/useTestGame", () => ({
   useTestGame: () => ({
+    target: { enginePath: "/engine", dataDir: "/root" },
     games: [GAME],
     scan: { data: { games: [GAME] } },
   }),
@@ -223,5 +224,14 @@ describe("ProjectsPage rosters (#3239)", () => {
 
     fireEvent.click(heading);
     expect(section.querySelectorAll("li")).toHaveLength(0);
+  });
+});
+
+describe("ProjectsPage skeletons (#5209)", () => {
+  it("opens the Skeletons drawer from the header", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Skeletons" }));
+    expect(screen.getByText("Write saved models")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Scan" })).toBeTruthy();
   });
 });

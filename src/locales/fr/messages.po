@@ -2911,7 +2911,7 @@ msgstr "{fromX} par {fromZ}"
 msgid "{front} and {last}"
 msgstr "{front} et {last}"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{full} full, {partial} partial, {none} none"
 msgstr ""
 
@@ -4963,7 +4963,7 @@ msgstr "Détails de {name}"
 msgid "{name} has no model coilbox can read."
 msgstr ""
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{name} has no short name, so the widget could not find its file."
 msgstr ""
 
@@ -5713,7 +5713,7 @@ msgstr "{plan}, arme"
 msgid "{plan}, gun, builds"
 msgstr "{plan}, arme, construit"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{plan}, with no piece for {missing}."
 msgstr ""
 
@@ -7432,7 +7432,7 @@ msgstr "{unnamedOrders} exclus : la liste d’unités n’atteint pas le numér
 msgid "{unopenable, plural, one {# unit names a model in a format the builder cannot open, which the archive does hold.} other {# units name models in a format the builder cannot open, which the archive does hold.}}"
 msgstr "{unopenable, plural, one {# unité nomme un modèle dans un format que l’atelier ne sait pas ouvrir, que l’archive contient bien.} other {# unités nomment des modèles dans un format que l’atelier ne sait pas ouvrir, que l’archive contient bien.}}"
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "{unplacedCount, plural, one {# unit left out: its game has no short name coilbox knows.} other {# units left out: their games have no short name coilbox knows.}}"
 msgstr ""
 
@@ -7959,7 +7959,7 @@ msgstr "{written, plural, one {Une image envoyée.} other {# images envoyées.}}
 msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
 msgstr "{wrong, plural, one {# sur {orderCount} ne correspond pas à cette liste d’unités, les noms et coûts peuvent donc être faux.} other {# sur {orderCount} ne correspondent pas à cette liste d’unités, les noms et coûts peuvent donc être faux.}}"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{wrote, plural, one {# unit written} other {# units written}}"
 msgstr ""
 
@@ -23690,8 +23690,8 @@ msgstr "Les roues avant braquent"
 msgid "Fuchsia"
 msgstr "Fuchsia"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Full"
 msgstr "Pleine"
@@ -23795,6 +23795,7 @@ msgstr "jeu"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/NewUnitPopover.tsx
 #: src/lego/pages/components/ReferencePicker.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
@@ -23804,7 +23805,6 @@ msgstr "jeu"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -32925,7 +32925,7 @@ msgstr "Aucune image ici."
 msgid "No piece has a foot or wheel role, so there is no ground it stands on."
 msgstr "Aucune pièce n’a le rôle de pied ou de roue, il n’y a donc aucun sol sur lequel il repose."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "No plan fits."
 msgstr ""
 
@@ -33219,7 +33219,7 @@ msgstr "Aucun préréglage enregistré à inclure."
 msgid "No saved profiles yet."
 msgstr "Pas encore de profils enregistrés."
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "No saved unit has a skeleton."
 msgstr ""
 
@@ -33343,7 +33343,7 @@ msgstr "Aucun paramètre à afficher."
 msgid "No shorter part in the pack. Shortest is {elmos} elmos, {units} units"
 msgstr "Aucune pièce plus courte dans le pack. La plus courte fait {elmos} elmos, {units} unités"
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "No skeleton has changed since the last write."
 msgstr ""
 
@@ -33764,10 +33764,10 @@ msgstr "aucun"
 #: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "None"
 msgstr "Aucun"
@@ -35740,7 +35740,7 @@ msgstr "Ouvrir en pleine page"
 msgid "Open game downloads"
 msgstr "Ouvrir les téléchargements de jeux"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Open in builder"
 msgstr ""
 
@@ -36533,7 +36533,7 @@ msgstr "Partie du nom du jeu."
 msgid "Part of the map's name."
 msgstr "Partie du nom de la carte."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Partial"
 msgstr ""
 
@@ -39158,7 +39158,7 @@ msgstr "Lecture du jeu."
 msgid "Reading the game's files…"
 msgstr "Lecture des fichiers du jeu…"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Reading the game's units…"
 msgstr ""
 
@@ -42151,7 +42151,7 @@ msgstr "La mise à l’échelle garde les proportions. Cliquez pour redimensionn
 msgid "Scaling: {scaling}."
 msgstr "Échelle : {scaling}."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scan"
 msgstr ""
 
@@ -42180,19 +42180,11 @@ msgstr "Échec de l’analyse"
 msgid "Scan on startup"
 msgstr "Analyser au démarrage"
 
-#: src/widgets/pages/ScanSkeletons.tsx
-msgid "Scan units"
-msgstr ""
-
-#: src/widgets/pages/ScanSkeletons.tsx
-msgid "Scan units for skeletons"
-msgstr ""
-
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned {all} units in {time}: {counted}. {wroteText}."
 msgstr ""
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned {done} of {total} units."
 msgstr ""
 
@@ -42206,7 +42198,7 @@ msgstr "analysé {scannedAt}"
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "{scanRootCount} dossier(s) de contenu analysé(s) : {scanRootPaths}."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned units"
 msgstr ""
 
@@ -42238,10 +42230,10 @@ msgstr "Recherche de données orphelines dans le pool…"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/direct/HostRoomForm.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -44883,6 +44875,10 @@ msgstr "Calcul de la taille des caches…"
 msgid "Skeleton"
 msgstr "Squelette"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "Skeletons"
+msgstr ""
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "Skeletor IK Animation Guide"
@@ -46163,8 +46159,8 @@ msgstr ""
 msgid "Stone"
 msgstr "Pierre"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/TestDrawer.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Stop"
 msgstr "Arrêter"
@@ -46224,7 +46220,7 @@ msgstr "Arrêter l’envoi des images"
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Arrêtez d’abord votre propre salon. Coilbox ne peut être que dans un salon à la fois."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
 msgstr ""
 
@@ -49311,6 +49307,10 @@ msgstr "Le point autour duquel cette pièce tourne et auquel ses enfants sont su
 msgid "The portrait this line shows"
 msgstr "Le portrait affiché par cette réplique"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "The preferred engine changed, so the scan stopped and wrote nothing."
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "The preflight check could not run: {error}"
@@ -49555,7 +49555,7 @@ msgstr "La même graine construit toujours la même carte."
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "La même graine et les mêmes règles pour ce jeu produisent toujours le même mod."
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "The saved units could not be read: {loadMessage}"
 msgstr ""
 
@@ -56309,8 +56309,8 @@ msgid "Working: {op}"
 msgstr "En cours : {op}"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 #: src/widgets/pages/CoilboxWidgets.tsx
-#: src/widgets/pages/WriteSkeletons.tsx
 #, fuzzy
 msgid "Working…"
 msgstr "En cours…"
@@ -56425,8 +56425,8 @@ msgstr "La racine d’écriture « {writeRootPath} » est en dehors du paquet 
 msgid "Write root portability n/a (not portable)"
 msgstr "Portabilité de la racine d’écriture sans objet (non portable)"
 
-#: src/widgets/pages/WriteSkeletons.tsx
-msgid "Write skeletons"
+#: src/lego/pages/components/WriteSkeletons.tsx
+msgid "Write saved models"
 msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
@@ -56566,7 +56566,7 @@ msgstr "{modelsWritten} modèles sur {modelsFound} écrits dans {0, plural, one 
 msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
 msgstr ""
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
 msgstr ""
 

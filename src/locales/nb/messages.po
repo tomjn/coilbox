@@ -2939,7 +2939,7 @@ msgstr "{fromX} ganger {fromZ}"
 msgid "{front} and {last}"
 msgstr "{front} og {last}"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{full} full, {partial} partial, {none} none"
 msgstr ""
 
@@ -4998,7 +4998,7 @@ msgstr "Detaljer for {name}"
 msgid "{name} has no model coilbox can read."
 msgstr ""
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{name} has no short name, so the widget could not find its file."
 msgstr ""
 
@@ -5757,7 +5757,7 @@ msgstr "{plan}, kanon"
 msgid "{plan}, gun, builds"
 msgstr "{plan}, kanon, bygger"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{plan}, with no piece for {missing}."
 msgstr ""
 
@@ -7484,7 +7484,7 @@ msgstr "{unnamedOrders} utelatt: enhetslisten når ikke opp til enhetens nummer.
 msgid "{unopenable, plural, one {# unit names a model in a format the builder cannot open, which the archive does hold.} other {# units name models in a format the builder cannot open, which the archive does hold.}}"
 msgstr "{unopenable, plural, one {# enhet oppgir en modell i et format byggeren ikke kan åpne, som arkivet faktisk har.} other {# enheter oppgir modeller i et format byggeren ikke kan åpne, som arkivet faktisk har.}}"
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "{unplacedCount, plural, one {# unit left out: its game has no short name coilbox knows.} other {# units left out: their games have no short name coilbox knows.}}"
 msgstr ""
 
@@ -8013,7 +8013,7 @@ msgstr "{written, plural, one {Sendte ett bilde.} other {Sendte # bilder.}}"
 msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
 msgstr "{wrong, plural, one {# av {orderCount} passer ikke til denne enhetslisten, så navn og kostnader kan være feil.} other {# av {orderCount} passer ikke til denne enhetslisten, så navn og kostnader kan være feil.}}"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "{wrote, plural, one {# unit written} other {# units written}}"
 msgstr ""
 
@@ -23836,8 +23836,8 @@ msgstr "Forhjulene styrer"
 msgid "Fuchsia"
 msgstr "Fuksia"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Full"
 msgstr "Full"
@@ -23941,6 +23941,7 @@ msgstr "spill"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/NewUnitPopover.tsx
 #: src/lego/pages/components/ReferencePicker.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/UnitGamePicker.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
@@ -23950,7 +23951,6 @@ msgstr "spill"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -33117,7 +33117,7 @@ msgstr "Ingen bilder her."
 msgid "No piece has a foot or wheel role, so there is no ground it stands on."
 msgstr "Ingen del har rollen fot eller hjul, så det er ingen bakke den står på."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "No plan fits."
 msgstr ""
 
@@ -33411,7 +33411,7 @@ msgstr "Ingen lagrede forhåndsinnstillinger å ta med."
 msgid "No saved profiles yet."
 msgstr "Ingen lagrede profiler ennå."
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "No saved unit has a skeleton."
 msgstr ""
 
@@ -33535,7 +33535,7 @@ msgstr "Ingen innstillinger å vise ennå."
 msgid "No shorter part in the pack. Shortest is {elmos} elmos, {units} units"
 msgstr "Ingen kortere komponent i pakken. Korteste er {elmos} elmo, {units} rutenettenheter"
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "No skeleton has changed since the last write."
 msgstr ""
 
@@ -33957,10 +33957,10 @@ msgstr "ingen"
 #: src/lego/builderFields.ts
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "None"
 msgstr "Ingen"
@@ -35957,7 +35957,7 @@ msgstr "Åpne hel side"
 msgid "Open game downloads"
 msgstr "Åpne spillnedlastinger"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Open in builder"
 msgstr ""
 
@@ -36760,7 +36760,7 @@ msgstr "Del av spillets navn."
 msgid "Part of the map's name."
 msgstr "Del av kartets navn."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Partial"
 msgstr ""
 
@@ -39407,7 +39407,7 @@ msgstr "Leser spillet."
 msgid "Reading the game's files…"
 msgstr "Leser spillets filer…"
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Reading the game's units…"
 msgstr ""
 
@@ -42423,7 +42423,7 @@ msgstr "Skaleringen beholder proporsjonene. Klikk for å skalere én akse om gan
 msgid "Scaling: {scaling}."
 msgstr "Skalering: {scaling}."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scan"
 msgstr ""
 
@@ -42452,19 +42452,11 @@ msgstr "Skanningen mislyktes"
 msgid "Scan on startup"
 msgstr "Skann ved oppstart"
 
-#: src/widgets/pages/ScanSkeletons.tsx
-msgid "Scan units"
-msgstr ""
-
-#: src/widgets/pages/ScanSkeletons.tsx
-msgid "Scan units for skeletons"
-msgstr ""
-
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned {all} units in {time}: {counted}. {wroteText}."
 msgstr ""
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned {done} of {total} units."
 msgstr ""
 
@@ -42478,7 +42470,7 @@ msgstr "skannet {scannedAt}"
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "Skannet innholdsmapper ({scanRootCount}): {scanRootPaths}."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Scanned units"
 msgstr ""
 
@@ -42510,10 +42502,10 @@ msgstr "Skanner poolen etter foreldreløse data..."
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/direct/HostRoomForm.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -45165,6 +45157,10 @@ msgstr "Måler størrelsen på hurtigbufferne..."
 msgid "Skeleton"
 msgstr "Skjelett"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "Skeletons"
+msgstr ""
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "Skeletor IK Animation Guide"
@@ -46456,8 +46452,8 @@ msgstr ""
 msgid "Stone"
 msgstr "Stein"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/TestDrawer.tsx
-#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Stop"
 msgstr "Stopp"
@@ -46517,7 +46513,7 @@ msgstr "Slutt å sende bilder"
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Stopp ditt eget rom først. Coilbox kan bare være i ett rom om gangen."
 
-#: src/widgets/pages/ScanSkeletons.tsx
+#: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
 msgstr ""
 
@@ -49630,6 +49626,10 @@ msgstr "Punktet denne delen dreier rundt, og som barna henger fra. Et bein vil h
 msgid "The portrait this line shows"
 msgstr "Portrettet denne replikken viser"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "The preferred engine changed, so the scan stopped and wrote nothing."
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "The preflight check could not run: {error}"
@@ -49881,7 +49881,7 @@ msgstr "Samme frø bygger alltid samme kart."
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "Samme frø og regler mot dette spillet gir alltid samme mod."
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "The saved units could not be read: {loadMessage}"
 msgstr ""
 
@@ -56666,8 +56666,8 @@ msgid "Working: {op}"
 msgstr "Arbeider: {op}"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 #: src/widgets/pages/CoilboxWidgets.tsx
-#: src/widgets/pages/WriteSkeletons.tsx
 #, fuzzy
 msgid "Working…"
 msgstr "Arbeider…"
@@ -56783,8 +56783,8 @@ msgstr "Skriveroten «{writeRootPath}» ligger utenfor pakken («{appDir}»). Ne
 msgid "Write root portability n/a (not portable)"
 msgstr "Skriverotens portabilitet ikke relevant (ikke portabel)"
 
-#: src/widgets/pages/WriteSkeletons.tsx
-msgid "Write skeletons"
+#: src/lego/pages/components/WriteSkeletons.tsx
+msgid "Write saved models"
 msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
@@ -56925,7 +56925,7 @@ msgstr "Skrev {modelsWritten} av {modelsFound} modeller inn i {0, plural, one {#
 msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
 msgstr ""
 
-#: src/widgets/pages/WriteSkeletons.tsx
+#: src/lego/pages/components/WriteSkeletons.tsx
 msgid "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
 msgstr ""
 

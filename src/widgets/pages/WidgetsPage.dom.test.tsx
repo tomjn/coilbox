@@ -196,16 +196,6 @@ vi.mock("@/blueprint/fileIO", () => ({
   },
 }));
 
-/** The units the builder has saved, for the skeleton widget's button. */
-const saved: { projects: unknown[] } = { projects: [] };
-vi.mock("@/lego/projects", () => ({
-  useLegoProjects: () => ({
-    projects: saved.projects,
-    loading: false,
-    error: null,
-  }),
-}));
-
 /** The widgets the picked game ships. */
 const shipped: { widgets: GameWidget[] | null } = { widgets: null };
 vi.mock("../useGameWidgets", () => ({
@@ -274,7 +264,6 @@ beforeEach(() => {
   installedWidgets.clear();
   widgetCalls.length = 0;
   disk.clear();
-  saved.projects = [];
   shipped.widgets = [];
   installSettingsStorage(memorySettingsStorage());
   resetSets();
@@ -317,80 +306,16 @@ describe("WidgetsPage", () => {
     ]);
   });
 
-  it("writes the saved units' skeletons from a button on the skeleton widget's row", async () => {
-    saved.projects = [
-      {
-        id: "u1",
-        unitName: "fedwalker",
-        game: { name: "Test Game 1.0", archive: "test_1", shortname: "TG" },
-        skeleton: { plan: "biped", proportions: {} },
-        pieces: [
-          { id: "p1", name: "hull", bone: "body", role: "base" },
-          { id: "p2", name: "plate" },
-        ],
-      },
-    ];
+  it("leaves writing skeleton files to the unit builder's Models page", async () => {
     page();
     const row = within(
       await screen.findByRole("listitem", { name: "Skeleton" }),
     );
-    // Not on the other widget's row
-    expect(
-      within(screen.getByRole("listitem", { name: "Blueprints" })).queryByText(
-        "Write skeletons",
-      ),
-    ).toBeNull();
-    fireEvent.click(row.getByText("Write skeletons"));
-    await row.findByText("Wrote 1 unit to 1 file.");
-    const file = disk.get(`${ROOT}/LuaUI/Config/coilbox_skeletons/TG.json`);
-    expect(JSON.parse(file ?? "{}")).toMatchObject({
-      version: 1,
-      units: {
-        fedwalker: {
-          evidence: "built",
-          pieces: { hull: { bone: "body" } },
-        },
-      },
-    });
-    // The piece with no bone is not in the file
-    expect(
-      Object.keys(JSON.parse(file ?? "{}").units.fedwalker.pieces),
-    ).toEqual(["hull"]);
-    // A second press has nothing new to write.
-    fireEvent.click(row.getByText("Write skeletons"));
-    await row.findByText("No skeleton has changed since the last write.");
-  });
-
-  it("says so when no saved unit has a skeleton", async () => {
-    saved.projects = [{ id: "u1", unitName: "plain", pieces: [] }];
-    page();
-    const row = within(
-      await screen.findByRole("listitem", { name: "Skeleton" }),
-    );
-    fireEvent.click(row.getByText("Write skeletons"));
-    await row.findByText("No saved unit has a skeleton.");
-    expect(disk.size).toBe(0);
-  });
-
-  it("says why a skeleton file was not written when the file there cannot be read", async () => {
-    saved.projects = [
-      {
-        id: "u1",
-        unitName: "fedwalker",
-        game: { name: "Test Game 1.0", archive: "test_1", shortname: "TG" },
-        skeleton: { plan: "biped", proportions: {} },
-        pieces: [{ id: "p1", name: "hull", bone: "body" }],
-      },
-    ];
-    const path = `${ROOT}/LuaUI/Config/coilbox_skeletons/TG.json`;
-    disk.set(path, "{ broken");
-    page();
-    const row = within(
-      await screen.findByRole("listitem", { name: "Skeleton" }),
-    );
-    fireEvent.click(row.getByText("Write skeletons"));
-    await row.findByText(/the skeleton file is not JSON/);
-    expect(disk.get(path)).toBe("{ broken");
+    await row.findByText("Not installed");
+    expect(screen.queryByText("Write skeletons")).toBeNull();
+    expect(screen.queryByText("Write saved models")).toBeNull();
+    expect(screen.queryByText("Scan units")).toBeNull();
+    expect(screen.queryByText("Skeletons")).toBeNull();
   });
 
   it("offers an update when what is installed differs from what coilbox ships", async () => {
