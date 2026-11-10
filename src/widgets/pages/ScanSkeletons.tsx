@@ -83,10 +83,18 @@ export function ScanSkeletons({
   const [finished, setFinished] = useState<Finished | null>(null);
   const [error, setError] = useState<string | null>(null);
   const stopper = useRef<AbortController | null>(null);
+  /** Lowered when the page goes, so a scan it stopped writes nothing. */
+  const live = useRef(true);
 
-  // Leaving the page stops a scan, so it cannot write into a root the page has
-  // moved away from.
-  useEffect(() => () => stopper.current?.abort(), []);
+  // Leaving the page stops a scan, and it writes nothing, so it cannot write
+  // into a root the page has moved away from.
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      stopper.current?.abort();
+    };
+  }, []);
 
   const start = async () => {
     if (!game || !enginePath) return;
@@ -113,6 +121,9 @@ export function ScanSkeletons({
         unitsyncArchiveTree({ ...target, archive }),
         unitsyncUnitDataset({ ...target, gameArchive: archive }),
       ]);
+      // A tree that would not read lists no models, and every unit would show
+      // as having none.
+      if (tree.errors.length > 0) throw new Error(tree.errors.join(". "));
       if (dataset.units.length === 0 && dataset.errors.length > 0) {
         throw new Error(dataset.errors.join(". "));
       }
@@ -136,6 +147,7 @@ export function ScanSkeletons({
           setProgress({ done: count, total: units.length });
         },
       });
+      if (!live.current) return;
       const entries = scanEntries(done);
       const written =
         Object.keys(entries).length > 0
