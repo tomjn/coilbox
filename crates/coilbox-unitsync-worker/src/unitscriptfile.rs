@@ -602,7 +602,11 @@ fn read_bos_includes(
     member: &str,
     text: &str,
 ) -> Vec<ScriptInclude> {
-    coilbox_bos2lua::find_includes(text, member, |candidate| {
+    // A header found nowhere beside the script is also looked for in a Scriptor
+    // `Include` folder shipped in the archive, which is where the compiler
+    // searched for Splinter Faction's `sfxtype.h`.
+    let compiler_dirs = coilbox_bos2lua::compiler_include_dirs(list.iter().map(|(lower, _)| lower));
+    coilbox_bos2lua::find_includes_with(text, member, &compiler_dirs, |candidate| {
         let member = exact(list, candidate)?;
         let (_, bytes) = us.read_archive_member(handle, &member, SCRIPT_CAP)?;
         Some((member, String::from_utf8_lossy(&bytes).into_owned()))

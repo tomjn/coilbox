@@ -304,10 +304,13 @@ fn preprocess_and_parse(
         .iter()
         .map(|(path, text)| (normalise(path), (path.clone(), text.clone())))
         .collect();
+    let dirs = compiler_include_dirs(includes.keys());
     let resolve = |wanted: &str, from: &str| {
-        candidates(wanted, from)
-            .iter()
-            .find_map(|candidate| includes.get(candidate).cloned())
+        prefer_content(
+            candidates(wanted, from, &dirs)
+                .iter()
+                .filter_map(|candidate| includes.get(candidate).cloned()),
+        )
     };
     let pre = pp::preprocess(source, name, &resolve, linear_scale, precedence);
     let items = parse::parse(&pre.tokens, linear_scale, precedence).map_err(|e| {
@@ -335,8 +338,9 @@ pub fn convert(source: &str, options: &Options) -> Result<Conversion, String> {
 }
 
 /// Where `wanted` is looked for when the file at `from` includes it, in order:
-/// beside that file, at the root, then under `scripts/`.
-fn candidates(wanted: &str, from: &str) -> [String; 3] {
+/// beside that file, at the root, under `scripts/`, then in each of `dirs`, the
+/// compiler include folders from [`compiler_include_dirs`].
+fn candidates(wanted: &str, from: &str, dirs: &[String]) -> Vec<String> {
     let dir = normalise(from)
         .rsplit_once('/')
         .map(|(dir, _)| format!("{dir}/"))
@@ -347,6 +351,48 @@ fn candidates(wanted: &str, from: &str) -> [String; 3] {
         wanted.clone(),
         format!("scripts/{wanted}"),
     ]
+    .into_iter()
+    .chain(dirs.iter().map(|dir| format!("{dir}/{wanted}")))
+    .collect()
+}
+
+/// The first file with something in it, or the first file if every one is
+/// empty. A game that leaves an empty header beside a script, as a placeholder
+/// for the compiler's own, would otherwise hide the real one: an empty header
+/// defines nothing, so nothing is lost by looking further.
+fn prefer_content(hits: impl IntoIterator<Item = (String, String)>) -> Option<(String, String)> {
+    let mut empty = None;
+    for hit in hits {
+        if !hit.1.trim().is_empty() {
+            return Some(hit);
+        }
+        empty.get_or_insert(hit);
+    }
+    empty
+}
+
+/// The include folders of a BOS compiler shipped inside a game, found among
+/// `paths`: a top-level folder whose name starts with `Scriptor`, matched
+/// regardless of case, that has an `Include` folder in it. Scriptor searched
+/// that folder for an `#include` it did not find beside the script, and games
+/// built with it ship the folder along with the source. Splinter Faction's
+/// `Scriptor_v1(RC1)/Include/sfxtype.h` is the case that matters.
+///
+/// Returned as the lower case folder paths [`find_includes_with`] and
+/// [`convert`] look in, sorted so a game with two compilers gets the same
+/// answer every run.
+pub fn compiler_include_dirs<S: AsRef<str>>(paths: impl IntoIterator<Item = S>) -> Vec<String> {
+    let dirs: std::collections::BTreeSet<String> = paths
+        .into_iter()
+        .filter_map(|path| {
+            let path = normalise(path.as_ref());
+            let mut parts = path.split('/');
+            let (root, include, _file) = (parts.next()?, parts.next()?, parts.next()?);
+            (root.starts_with("scriptor") && include == "include")
+                .then(|| format!("{root}/{include}"))
+        })
+        .collect();
+    dirs.into_iter().collect()
 }
 
 /// How many levels of `#include` [`find_includes`] follows. A header including
@@ -381,6 +427,18 @@ pub struct Include {
 pub fn find_includes(
     source: &str,
     name: &str,
+    read: impl FnMut(&str) -> Option<(String, String)>,
+) -> Vec<Include> {
+    find_includes_with(source, name, &[], read)
+}
+
+/// [`find_includes`], also looking in `compiler_dirs` for a file it finds
+/// nowhere else. They come from [`compiler_include_dirs`] and are tried last,
+/// after beside the script, the root and `scripts/`, as the compiler did.
+pub fn find_includes_with(
+    source: &str,
+    name: &str,
+    compiler_dirs: &[String],
     mut read: impl FnMut(&str) -> Option<(String, String)>,
 ) -> Vec<Include> {
     let mut found = Vec::new();
@@ -393,7 +451,11 @@ pub fn find_includes(
         if found.len() >= MAX_INCLUDES {
             break;
         }
-        let Some((path, text)) = candidates(&wanted, &from).iter().find_map(|c| read(c)) else {
+        let Some((path, text)) = prefer_content(
+            candidates(&wanted, &from, compiler_dirs)
+                .iter()
+                .filter_map(|c| read(c)),
+        ) else {
             continue;
         };
         if !seen.insert(normalise(&path)) {
