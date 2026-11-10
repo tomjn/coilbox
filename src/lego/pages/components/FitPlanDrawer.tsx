@@ -7,6 +7,10 @@
  * the view and the tree have to stay reachable. A piece is never matched by a
  * guess. Suggestions are offered and only taken when the game maker says so.
  *
+ * Opened with a proposal (#5185), it starts on the proposed plan with the
+ * proposed picks filled, each with why it was picked, and every pick can be
+ * changed before Fit as if the game maker had made it.
+ *
  * Nothing changes until Fit, which is one edit. Before it, the drawer says
  * which roles the fit replaces, which presets it cannot add, and which
  * proportions it cannot measure.
@@ -29,12 +33,15 @@ import {
   suggestPicks,
 } from "../../fitPlan";
 import type { LegoProject } from "../../model";
+import type { PlanProposal } from "../../proposePlan";
 
 interface Props {
   project: LegoProject;
   /** The piece selected now. A change to it fills the highlighted bone. */
   selectedId: string | null;
   onSelect: (pieceId: string) => void;
+  /** A plan and picks worked out from the unit's roles, to start from. */
+  proposal?: PlanProposal | null;
   onOpenChange: (open: boolean) => void;
   /** Fits the plan to the picks, as one edit. */
   onFit: (
@@ -67,24 +74,35 @@ export function FitPlanDrawer({
   project,
   selectedId,
   onSelect,
+  proposal = null,
   onOpenChange,
   onFit,
 }: Props) {
   const { t } = useLingui();
+  const from = proposal?.base ? proposal : null;
   // The plan picked from the list, and the gun and build arm groups the
   // "Describe it instead" form adds to it (#3263), so a fitted unit can be
   // any plan a new one can.
-  const [base, setBase] = useState<BodyPlan | null>(null);
-  const [groups, setGroups] = useState({ weapon: false, builds: false });
+  const [base, setBase] = useState<BodyPlan | null>(from?.base ?? null);
+  const [groups, setGroups] = useState(
+    from?.groups ?? { weapon: false, builds: false },
+  );
   const plan = useMemo(
     () => (base ? withGroups(base, groups) : null),
     [base, groups],
   );
   const takesGun =
     !!base && withGroups(base, { weapon: true, builds: false }) !== base;
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [picks, setPicks] = useState<BonePicks>({});
-  const [active, setActive] = useState<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>(
+    from?.counts ?? {},
+  );
+  const [picks, setPicks] = useState<BonePicks>(from?.picks ?? {});
+  const [active, setActive] = useState<string | null>(() =>
+    plan
+      ? (planBones(plan, counts).find((b) => picks[b.id] === undefined)?.id ??
+        null)
+      : null,
+  );
 
   const bones = useMemo(
     () => (plan ? planBones(plan, counts) : []),
@@ -100,6 +118,21 @@ export function FitPlanDrawer({
   );
   const nameOf = (pieceId: string) =>
     project.pieces.find((p) => p.id === pieceId)?.name ?? pieceId;
+  /** Why a bone's piece was picked, while it is still the proposed one. */
+  const evidenceFor = (boneId: string): string | null => {
+    const why = proposal?.evidence[boneId];
+    if (!why || picks[boneId] !== proposal?.picks[boneId]) return null;
+    if (why.kind === "root") return t`The unit's root piece`;
+    if (why.kind === "hangsFrom") {
+      return why.what === "legs"
+        ? t`The legs hang from it`
+        : t`The wheels hang from it`;
+    }
+    const { callin } = why;
+    return why.evidence === "stated"
+      ? t`Named by the script in ${callin}`
+      : t`Moved in ${callin}`;
+  };
 
   // The selection the drawer has already answered, so only a new one fills a
   // bone, and a row selecting its own piece to show it fills nothing.
@@ -177,6 +210,14 @@ export function FitPlanDrawer({
               </Button>
             </DialogPrimitive.Close>
           </div>
+
+          {proposal && proposal.notes.length > 0 ? (
+            <ul className="list-disc space-y-1 border-b border-border/60 py-3 pr-5 pl-9 text-xs text-muted-foreground">
+              {proposal.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
 
           {!plan ? (
             <ul className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
@@ -263,18 +304,26 @@ export function FitPlanDrawer({
                   const pieceId = picks[bone.id];
                   const suggestion = suggested[bone.id];
                   const suggestedName = suggestion ? nameOf(suggestion) : "";
+                  const why = evidenceFor(bone.id);
                   return (
                     <li key={bone.id} className="flex items-center gap-1">
                       <button
                         type="button"
                         aria-pressed={active === bone.id}
                         onClick={() => highlight(bone.id)}
-                        className="flex min-w-0 flex-1 items-baseline justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-primary/15"
+                        className="flex min-w-0 flex-1 flex-col rounded px-2 py-1.5 text-left text-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-primary/15"
                       >
-                        <span className="truncate">{label}</span>
-                        <span className="shrink-0 truncate text-xs text-muted-foreground">
-                          {pieceId ? nameOf(pieceId) : t`Unmatched`}
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="truncate">{label}</span>
+                          <span className="shrink-0 truncate text-xs text-muted-foreground">
+                            {pieceId ? nameOf(pieceId) : t`Unmatched`}
+                          </span>
                         </span>
+                        {why ? (
+                          <span className="truncate text-[0.6875rem] text-muted-foreground">
+                            {why}
+                          </span>
+                        ) : null}
                       </button>
                       {pieceId ? (
                         <Button
