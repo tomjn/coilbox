@@ -146,6 +146,7 @@ import {
 } from "../presets";
 import { reconcileParticipantAis } from "../reconcileAi";
 import { useAiBonusSuggestions } from "../useAiBonusSuggestions";
+import { coilboxWidgetInstalled, withUserWidgets } from "../userWidgets";
 import { useSkirmishDebrief } from "../useSkirmishDebrief";
 import { DebriefDrawer } from "./components/DebriefDrawer";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
@@ -595,6 +596,11 @@ export default function SkirmishPage() {
     // boundary, so the start script gets a real side and each Random AI rolls
     // independently. The participant model stays free of randomness (issue #332).
     const resolved = resolveRandomSides(parts, sides);
+    // A coilbox widget in the content root only loads in a game that ships
+    // `allowuserwidgets` off if the script turns it on (issue #5190).
+    const widgetInstalled = target
+      ? await coilboxWidgetInstalled(target.dataDir)
+      : false;
     // Disabled units render into `[RESTRICT]` via `toBattleConfig`; the team-0
     // perk levers are re-applied afterwards. Both no-op for a hand-built setup.
     return applyRestrictions(
@@ -605,7 +611,11 @@ export default function SkirmishPage() {
         compatBase: compat.kind === "use" ? compat.baseName : undefined,
         startPosType,
         startRects,
-        modOptions: modOptionValues,
+        modOptions: withUserWidgets(
+          modOptionValues,
+          modOptions,
+          widgetInstalled,
+        ),
         mapOptions: mapOptionValues,
         disabledUnits: restrictions?.disabledUnits,
       }),
