@@ -5072,6 +5072,10 @@ msgstr "{named, plural, one {el nombre del disparador en # edificio} other {el n
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 msgstr "{named, plural, one {para qué juego es # plano} other {para qué juego son # planos}}"
 
+#: src/lego/proposePlan.ts
+msgid "{names} are all proposed as {role}, so which one it is is left for you to pick."
+msgstr ""
+
 #: src/lego/legChains.ts
 msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
 msgstr ""
@@ -5091,6 +5095,10 @@ msgstr ""
 
 #: src/lego/legChains.ts
 msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "{names} turn like wheels but sit on the unit's centre line, so which side each is on is unknown and no plan is proposed."
 msgstr ""
 
 #: src/lego/upgradeChain.ts
@@ -30712,6 +30720,10 @@ msgstr "Se movió {movedTitle} a la posición {position} de {total}."
 msgid "Moved {step} {way}, now at {spot}."
 msgstr "Movido {step} {way}, ahora en {spot}."
 
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "Moved in {callin}"
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
@@ -31139,6 +31151,10 @@ msgstr "Nombrado por {namedBy}"
 #, fuzzy
 msgid "Named by the script"
 msgstr "Nombrado por el script"
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "Named by the script in {callin}"
+msgstr ""
 
 #: src/workshop/customParamConsumers.ts
 #, fuzzy
@@ -31817,6 +31833,10 @@ msgstr "Todavía no hay planos"
 #, fuzzy
 msgid "No blueprints yet. A blueprint is a layout of buildings you draw once and place wherever you like: an opening, a wall, a factory corner. Make one with the button above, import one somebody shared, or open a pack: a file of layouts out of a game or off the community gallery."
 msgstr "Todavía no hay planos. Un plano es una distribución de edificios que dibujas una vez y colocas donde quieras: una apertura, un muro, una esquina de fábricas. Crea uno con el botón de arriba, importa uno que alguien haya compartido o abre un paquete, que es un archivo de distribuciones sacado de un juego o de la galería de la comunidad."
+
+#: src/lego/proposePlan.ts
+msgid "No body plan has {pairs} pairs of legs, so none is proposed."
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -38177,6 +38197,11 @@ msgstr "Ascendido a {name}"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Proportions"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GameModelDrawer.tsx
+msgid "Propose a skeleton"
 msgstr ""
 
 #: src/multiplayer/ConsoleDrawer.tsx
@@ -48663,10 +48688,18 @@ msgstr "La última grabación falló. ¿Volver a intentarlo y luego verla con re
 msgid "The launch carries the edits itself. Placing the unit adds a generated game, {WORKSHOP_MUTATOR_FOLDER}, and a rescan."
 msgstr "El lanzamiento lleva los cambios consigo. Colocar la unidad añade un juego generado, {WORKSHOP_MUTATOR_FOLDER}, y un nuevo análisis."
 
+#: src/lego/proposePlan.ts
+msgid "The legs do not all hang from one piece, so the body is left for you to pick."
+msgstr ""
+
 #: src/lego/walkFit.ts
 #, fuzzy
 msgid "The legs do not hang down from their joints, so \"{label}\" cannot keep the feet planted."
 msgstr "Las piernas no cuelgan de sus articulaciones, así que \"{label}\" no puede mantener los pies apoyados."
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The legs hang from it"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -49921,6 +49954,18 @@ msgstr "La definición de la unidad, el volumen de colisión, las notas y dónde
 msgid "The unit definition, the model and the texture changed."
 msgstr "La definición de la unidad, el modelo y la textura han cambiado."
 
+#: src/lego/proposePlan.ts
+msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit has {l} legs on its left and {r} on its right, so they do not pair up and no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit has {l} wheels on its left and {r} on its right, so they do not pair up into axles and no plan is proposed."
+msgstr ""
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "The unit has changed since."
@@ -49930,6 +49975,10 @@ msgstr "La unidad ha cambiado desde entonces."
 #, fuzzy
 msgid "The unit has files the game did not start with, so relaunch to see them."
 msgstr "La unidad tiene archivos con los que no empezó el juego, así que reinicia para verlos."
+
+#: src/lego/proposePlan.ts
+msgid "The unit has no game definition to say whether it moves, and no legs or wheels were found, so no plan is proposed."
+msgstr ""
 
 #: src/lego/footprint.ts
 #, fuzzy
@@ -49976,6 +50025,10 @@ msgstr "La unidad produce como energía la fuerza actual del viento del mapa, co
 msgid "The unit moves sideways when it cannot shoot from where it is."
 msgstr "La unidad se mueve de lado cuando no puede disparar desde donde está."
 
+#: src/lego/proposePlan.ts
+msgid "The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "The unit script there has been changed since coilbox wrote it, or coilbox did not write it, so it has been left alone."
@@ -49992,6 +50045,10 @@ msgstr ""
 
 #: src/lego/generateChecked.ts
 msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The unit's root piece"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
@@ -50058,6 +50115,18 @@ msgstr "No se abandonó la senda de guerra. {reason}"
 #, fuzzy
 msgid "The warpath was not started. {reason}"
 msgstr "No se empezó la senda de guerra. {reason}"
+
+#: src/lego/proposePlan.ts
+msgid "The wheels do not all hang from one piece, so the body is left for you to pick."
+msgstr ""
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The wheels hang from it"
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -53016,6 +53085,10 @@ msgstr "Dos bandos"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
 msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "Two wheels on one side are the same distance front to back, so which axle each is on is unknown and no plan is proposed."
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx

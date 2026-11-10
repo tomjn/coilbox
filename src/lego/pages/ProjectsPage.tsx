@@ -31,6 +31,7 @@ import { describeError } from "@/i18n/uiError";
 import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
 import { BODY_PLANS, type BodyPlan, projectFromPlan } from "../bodyPlans";
+import type { RoleFindings } from "../inferRoles";
 import { type LegoProject, newProject, type SkeletonTarget } from "../model";
 import { loadPack } from "../pack";
 import {
@@ -258,14 +259,22 @@ export default function ProjectsPage() {
    * candidate. All arrive as an ordinary document, and an imported one already
    * has its geometry and its textures on disk.
    */
-  async function opened(project: LegoProject) {
+  /** Save a newly opened unit and open it. `proposeFrom` is the roles its
+   *  script proposed, when it opens with a skeleton proposed from them. */
+  async function opened(project: LegoProject, proposeFrom?: RoleFindings) {
     setOpening(false);
     setPicking(false);
     setGenerating(false);
     setProblem(null);
     try {
       await saveProject(project);
-      navigate(`/lego/${project.id}`);
+      if (proposeFrom) {
+        navigate(`/lego/${project.id}`, {
+          state: { proposeSkeleton: proposeFrom },
+        });
+      } else {
+        navigate(`/lego/${project.id}`);
+      }
     } catch (e) {
       const reason = describeError(e);
       setProblem(t`Could not save the model: ${reason}`);
@@ -518,7 +527,7 @@ export default function ProjectsPage() {
       <GameModelDrawer
         open={picking}
         onOpenChange={setPicking}
-        onOpened={(project) => void opened(project)}
+        onOpened={(project, proposeFrom) => void opened(project, proposeFrom)}
         onExisting={(id) => {
           setPicking(false);
           navigate(`/lego/${id}`);

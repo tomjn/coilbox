@@ -5072,6 +5072,10 @@ msgstr "{named, plural, other {# 个建筑上的触发器名称}}"
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 msgstr "{named, plural, other {# 个蓝图所适用的游戏}}"
 
+#: src/lego/proposePlan.ts
+msgid "{names} are all proposed as {role}, so which one it is is left for you to pick."
+msgstr ""
+
 #: src/lego/legChains.ts
 msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
 msgstr ""
@@ -5091,6 +5095,10 @@ msgstr ""
 
 #: src/lego/legChains.ts
 msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "{names} turn like wheels but sit on the unit's centre line, so which side each is on is unknown and no plan is proposed."
 msgstr ""
 
 #: src/lego/upgradeChain.ts
@@ -30712,6 +30720,10 @@ msgstr "已将 {movedTitle} 移到第 {position} 位（共 {total} 个）。"
 msgid "Moved {step} {way}, now at {spot}."
 msgstr "已移动 {step}（{way}），现在位于 {spot}。"
 
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "Moved in {callin}"
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
@@ -31139,6 +31151,10 @@ msgstr "由 {namedBy} 指定"
 #, fuzzy
 msgid "Named by the script"
 msgstr "由脚本指定"
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "Named by the script in {callin}"
+msgstr ""
 
 #: src/workshop/customParamConsumers.ts
 #, fuzzy
@@ -31817,6 +31833,10 @@ msgstr "还没有蓝图"
 #, fuzzy
 msgid "No blueprints yet. A blueprint is a layout of buildings you draw once and place wherever you like: an opening, a wall, a factory corner. Make one with the button above, import one somebody shared, or open a pack: a file of layouts out of a game or off the community gallery."
 msgstr "还没有蓝图。蓝图是你画一次就能随处放置的建筑布局：开局、城墙、工厂角落。用上面的按钮新建一个，导入别人分享的蓝图，或打开一个包：包是从游戏或社区图库中取得的布局文件。"
+
+#: src/lego/proposePlan.ts
+msgid "No body plan has {pairs} pairs of legs, so none is proposed."
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -38177,6 +38197,11 @@ msgstr "晋升为 {name}"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Proportions"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GameModelDrawer.tsx
+msgid "Propose a skeleton"
 msgstr ""
 
 #: src/multiplayer/ConsoleDrawer.tsx
@@ -48663,10 +48688,18 @@ msgstr "上次录制失败。重试后带倒带观看？"
 msgid "The launch carries the edits itself. Placing the unit adds a generated game, {WORKSHOP_MUTATOR_FOLDER}, and a rescan."
 msgstr "启动时直接带上这些编辑。放置单位会额外生成一个游戏 {WORKSHOP_MUTATOR_FOLDER}，并重新扫描。"
 
+#: src/lego/proposePlan.ts
+msgid "The legs do not all hang from one piece, so the body is left for you to pick."
+msgstr ""
+
 #: src/lego/walkFit.ts
 #, fuzzy
 msgid "The legs do not hang down from their joints, so \"{label}\" cannot keep the feet planted."
 msgstr "腿没有从关节向下垂，所以“{label}”无法让脚保持着地。"
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The legs hang from it"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -49921,6 +49954,18 @@ msgstr "单位定义、碰撞体积、备注，以及单位上次导出的位置
 msgid "The unit definition, the model and the texture changed."
 msgstr "单位定义、模型和纹理已更改。"
 
+#: src/lego/proposePlan.ts
+msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit has {l} legs on its left and {r} on its right, so they do not pair up and no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit has {l} wheels on its left and {r} on its right, so they do not pair up into axles and no plan is proposed."
+msgstr ""
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "The unit has changed since."
@@ -49930,6 +49975,10 @@ msgstr "此后单位已有更改。"
 #, fuzzy
 msgid "The unit has files the game did not start with, so relaunch to see them."
 msgstr "单位有游戏启动时没有的文件，所以请重新启动以查看。"
+
+#: src/lego/proposePlan.ts
+msgid "The unit has no game definition to say whether it moves, and no legs or wheels were found, so no plan is proposed."
+msgstr ""
 
 #: src/lego/footprint.ts
 #, fuzzy
@@ -49976,6 +50025,10 @@ msgstr "单位会把地图当前的风力强度作为能量产出，上限为此
 msgid "The unit moves sideways when it cannot shoot from where it is."
 msgstr "单位无法从当前位置射击时会横向移动。"
 
+#: src/lego/proposePlan.ts
+msgid "The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "The unit script there has been changed since coilbox wrote it, or coilbox did not write it, so it has been left alone."
@@ -49992,6 +50045,10 @@ msgstr ""
 
 #: src/lego/generateChecked.ts
 msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The unit's root piece"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
@@ -50058,6 +50115,18 @@ msgstr "未放弃征途。{reason}"
 #, fuzzy
 msgid "The warpath was not started. {reason}"
 msgstr "未开始征途。{reason}"
+
+#: src/lego/proposePlan.ts
+msgid "The wheels do not all hang from one piece, so the body is left for you to pick."
+msgstr ""
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The wheels hang from it"
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -53016,6 +53085,10 @@ msgstr "两个阵营"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
 msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "Two wheels on one side are the same distance front to back, so which axle each is on is unknown and no plan is proposed."
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx

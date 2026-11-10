@@ -5072,6 +5072,10 @@ msgstr "{named, plural, one {назва тригера на # будівлі} fe
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 msgstr "{named, plural, one {для якої гри призначене # креслення} few {для якої гри призначені # креслення} many {для якої гри призначено # креслень} other {для якої гри призначено # креслення}}"
 
+#: src/lego/proposePlan.ts
+msgid "{names} are all proposed as {role}, so which one it is is left for you to pick."
+msgstr ""
+
 #: src/lego/legChains.ts
 msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
 msgstr ""
@@ -5091,6 +5095,10 @@ msgstr ""
 
 #: src/lego/legChains.ts
 msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "{names} turn like wheels but sit on the unit's centre line, so which side each is on is unknown and no plan is proposed."
 msgstr ""
 
 #: src/lego/upgradeChain.ts
@@ -30712,6 +30720,10 @@ msgstr "{movedTitle} переміщено на позицію {position} з {tot
 msgid "Moved {step} {way}, now at {spot}."
 msgstr "Переміщено: {step} {way}, тепер у {spot}."
 
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "Moved in {callin}"
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
@@ -31139,6 +31151,10 @@ msgstr "Згадується в: {namedBy}"
 #, fuzzy
 msgid "Named by the script"
 msgstr "Згадується в скрипті"
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "Named by the script in {callin}"
+msgstr ""
 
 #: src/workshop/customParamConsumers.ts
 #, fuzzy
@@ -31817,6 +31833,10 @@ msgstr "Ще немає креслень"
 #, fuzzy
 msgid "No blueprints yet. A blueprint is a layout of buildings you draw once and place wherever you like: an opening, a wall, a factory corner. Make one with the button above, import one somebody shared, or open a pack: a file of layouts out of a game or off the community gallery."
 msgstr "Ще немає креслень. Креслення – це розташування будівель, яке ви малюєте один раз і ставите де завгодно: дебют, стіна, кут із заводом. Створіть його кнопкою вище, імпортуйте те, яким хтось поділився, або відкрийте пакет: файл із розташуваннями з гри чи з галереї спільноти."
+
+#: src/lego/proposePlan.ts
+msgid "No body plan has {pairs} pairs of legs, so none is proposed."
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -38177,6 +38197,11 @@ msgstr "Підвищення до рангу {name}"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Proportions"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/GameModelDrawer.tsx
+msgid "Propose a skeleton"
 msgstr ""
 
 #: src/multiplayer/ConsoleDrawer.tsx
@@ -48663,10 +48688,18 @@ msgstr "Останній запис не вдався. Спробувати зн
 msgid "The launch carries the edits itself. Placing the unit adds a generated game, {WORKSHOP_MUTATOR_FOLDER}, and a rescan."
 msgstr "Запуск сам несе зміни. Розміщення юніта додає згенеровану гру {WORKSHOP_MUTATOR_FOLDER} і пересканування."
 
+#: src/lego/proposePlan.ts
+msgid "The legs do not all hang from one piece, so the body is left for you to pick."
+msgstr ""
+
 #: src/lego/walkFit.ts
 #, fuzzy
 msgid "The legs do not hang down from their joints, so \"{label}\" cannot keep the feet planted."
 msgstr "Ноги не звисають зі своїх суглобів, тож «{label}» не може тримати стопи на землі."
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The legs hang from it"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -49921,6 +49954,18 @@ msgstr "Визначення юніта, об’єм зіткнення, при�
 msgid "The unit definition, the model and the texture changed."
 msgstr "Визначення юніта, модель і текстуру змінено."
 
+#: src/lego/proposePlan.ts
+msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit has {l} legs on its left and {r} on its right, so they do not pair up and no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit has {l} wheels on its left and {r} on its right, so they do not pair up into axles and no plan is proposed."
+msgstr ""
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "The unit has changed since."
@@ -49930,6 +49975,10 @@ msgstr "Юніт відтоді змінився."
 #, fuzzy
 msgid "The unit has files the game did not start with, so relaunch to see them."
 msgstr "Юніт має файли, з якими гра не запускалася, тож перезапустіть, щоб їх побачити."
+
+#: src/lego/proposePlan.ts
+msgid "The unit has no game definition to say whether it moves, and no legs or wheels were found, so no plan is proposed."
+msgstr ""
 
 #: src/lego/footprint.ts
 #, fuzzy
@@ -49976,6 +50025,10 @@ msgstr "Юніт виробляє енергію з поточної сили в
 msgid "The unit moves sideways when it cannot shoot from where it is."
 msgstr "Юніт рухається вбік, коли не може стріляти зі свого місця."
 
+#: src/lego/proposePlan.ts
+msgid "The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "The unit script there has been changed since coilbox wrote it, or coilbox did not write it, so it has been left alone."
@@ -49992,6 +50045,10 @@ msgstr ""
 
 #: src/lego/generateChecked.ts
 msgid "The unit's lowest point is {distance} elmos below the ground."
+msgstr ""
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The unit's root piece"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
@@ -50058,6 +50115,18 @@ msgstr "Похід Шляхом війни не покинуто. {reason}"
 #, fuzzy
 msgid "The warpath was not started. {reason}"
 msgstr "Похід Шляхом війни не почато. {reason}"
+
+#: src/lego/proposePlan.ts
+msgid "The wheels do not all hang from one piece, so the body is left for you to pick."
+msgstr ""
+
+#: src/lego/pages/components/FitPlanDrawer.tsx
+msgid "The wheels hang from it"
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -53016,6 +53085,10 @@ msgstr "Дві сторони"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
 msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "Two wheels on one side are the same distance front to back, so which axle each is on is unknown and no plan is proposed."
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx

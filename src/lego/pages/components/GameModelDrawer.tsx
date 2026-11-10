@@ -19,6 +19,7 @@ import { Button, Input } from "@picoframe/frame";
 import { Blocks, ChevronLeft, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useRef, useState } from "react";
+import { CheckField } from "@/components/Field";
 import { Badge } from "@/components/ui/badge";
 import type { GameItem, UnitDisplay } from "@/content/bindings";
 import {
@@ -41,6 +42,7 @@ import {
 } from "../../adoptGameScript";
 import { modelSource, stageModel, stageTextures } from "../../gameImport";
 import { type GameModelRow, gameModelRows } from "../../gameModels";
+import type { RoleFindings } from "../../inferRoles";
 import type { LegoProject } from "../../model";
 import { useLegoProjects } from "../../projects";
 import { gameRecordFor } from "../../unitGame";
@@ -78,8 +80,9 @@ const ROW_CAP = 200;
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** A newly opened unit, for the page to save and open. */
-  onOpened: (project: LegoProject) => void;
+  /** A newly opened unit, for the page to save and open, with the roles to
+   *  propose a skeleton from when that was asked for (#5185). */
+  onOpened: (project: LegoProject, proposeFrom?: RoleFindings) => void;
   /** A model already open as a project, so the page opens that one instead of
    *  quietly making a second copy of it. */
   onExisting: (projectId: string) => void;
@@ -110,6 +113,8 @@ export function GameModelDrawer({
   const [takeScript, setTakeScript] = useState(true);
   /** Piece names whose proposed role is taken when the unit is accepted. */
   const [takenRoles, setTakenRoles] = useState<Set<string>>(new Set());
+  /** Whether the unit opens with a skeleton proposed from its roles. */
+  const [propose, setPropose] = useState(true);
 
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -173,6 +178,7 @@ export function GameModelDrawer({
     setAdopted(null);
     setTakenRoles(new Set());
     setTakeScript(true);
+    setPropose(true);
   }
 
   async function pick(row: GameModelRow) {
@@ -265,16 +271,22 @@ export function GameModelDrawer({
     // Both can be set at once: a conversion taken on leaves the compiled file
     // it came from still worth carrying, and the unit plays the text it owns.
     const compiled = adopted?.compiled;
-    onOpened({
-      ...withRoles,
-      ...(game ? { game: gameRecordFor(game, scan.data?.games ?? []) } : {}),
-      ...(script ? { script } : {}),
-      ...(compiled ? { compiledScript: compiled } : {}),
-      ...(adopted?.unitDef ? { gameUnitDef: adopted.unitDef } : {}),
-      ...(adopted && Object.keys(adopted.includes).length > 0
-        ? { gameScriptIncludes: adopted.includes }
-        : {}),
-    });
+    const findings = adopted?.findings;
+    onOpened(
+      {
+        ...withRoles,
+        ...(game ? { game: gameRecordFor(game, scan.data?.games ?? []) } : {}),
+        ...(script ? { script } : {}),
+        ...(compiled ? { compiledScript: compiled } : {}),
+        ...(adopted?.unitDef ? { gameUnitDef: adopted.unitDef } : {}),
+        ...(adopted && Object.keys(adopted.includes).length > 0
+          ? { gameScriptIncludes: adopted.includes }
+          : {}),
+      },
+      propose && findings && proposable(findings)
+        ? takenFindings(findings, takenRoles)
+        : undefined,
+    );
   }
 
   const loading = Boolean(archive) && (treeLoading || status === "loading");
@@ -347,6 +359,15 @@ export function GameModelDrawer({
                     }
                   />
                 ) : null}
+                {!adopting &&
+                adopted?.findings &&
+                proposable(adopted.findings) ? (
+                  <CheckField
+                    label={t`Propose a skeleton`}
+                    checked={propose}
+                    onChange={setPropose}
+                  />
+                ) : null}
               </ImportResult>
               {stage.state === "failed" ? (
                 <Button
@@ -403,6 +424,27 @@ export function GameModelDrawer({
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
+}
+
+/** Whether the script proposed any roles, so there is a skeleton to propose. */
+function proposable(findings: RoleFindings): boolean {
+  return findings.proposals.length > 0;
+}
+
+/** The findings with only the roles taken, so a role unticked here is not
+ *  proposed for a bone either. A leg is kept only when all three of its
+ *  pieces are taken. */
+function takenFindings(
+  findings: RoleFindings,
+  taken: Set<string>,
+): RoleFindings {
+  return {
+    ...findings,
+    proposals: findings.proposals.filter((p) => taken.has(p.pieceName)),
+    legs: findings.legs.filter((leg) =>
+      Object.values(leg.chain).every((name) => taken.has(name)),
+    ),
+  };
 }
 
 /** Loose games first, since a `.sdd` is what somebody editing a game has, then

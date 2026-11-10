@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BIPED } from "../../bodyPlans";
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
+import type { PlanProposal } from "../../proposePlan";
 import { WHEELED } from "../../vehiclePlans";
 import { FitPlanDrawer } from "./FitPlanDrawer";
 
@@ -173,5 +174,79 @@ describe("FitPlanDrawer", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: /^Turret building/ }));
     expect(screen.queryByRole("checkbox", { name: "Gun" })).toBeNull();
+  });
+});
+
+describe("FitPlanDrawer with a proposal (#5185)", () => {
+  const proposal: PlanProposal = {
+    base: BIPED,
+    groups: { weapon: false, builds: false },
+    counts: {},
+    picks: { base: "root", hip: "pelvis", "thigh.l1": "lthigh" },
+    evidence: {
+      base: { kind: "root" },
+      hip: { kind: "hangsFrom", what: "legs" },
+      "thigh.l1": {
+        kind: "script",
+        callin: "StartMoving",
+        evidence: "observed",
+      },
+    },
+    notes: [],
+  };
+
+  function proposed(given: PlanProposal) {
+    const onFit = vi.fn();
+    render(
+      <FitPlanDrawer
+        project={walker()}
+        selectedId={null}
+        onSelect={vi.fn()}
+        onOpenChange={vi.fn()}
+        onFit={onFit}
+        proposal={given}
+      />,
+    );
+    return { onFit };
+  }
+
+  it("opens on the proposed plan with its picks filled and their evidence", () => {
+    proposed(proposal);
+    expect(screen.getByRole("heading", { name: "Fit Two legs" })).toBeTruthy();
+    const thigh = row(/^Front left thigh/);
+    expect(thigh.textContent).toContain("lthigh");
+    expect(thigh.textContent).toContain("Moved in StartMoving");
+    expect(row(/^Body/).textContent).toContain("The legs hang from it");
+    expect(row(/^base/).textContent).toContain("The unit's root piece");
+    // The first bone the proposal left unmatched is highlighted.
+    expect(row(/^torso/).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("leaves every pick editable before Fit", () => {
+    const { onFit } = proposed(proposal);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Unmatch Front left thigh" }),
+    );
+    expect(row(/^Front left thigh/).textContent).toContain("Unmatched");
+    expect(row(/^Front left thigh/).textContent).not.toContain("StartMoving");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+    expect(onFit).toHaveBeenCalledWith(
+      BIPED,
+      {},
+      { base: "root", hip: "pelvis" },
+    );
+  });
+
+  it("says why no plan fits and offers every plan as before", () => {
+    proposed({
+      ...proposal,
+      base: null,
+      picks: {},
+      evidence: {},
+      notes: ["No plan, said plainly."],
+    });
+    expect(screen.getByText("No plan, said plainly.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Two legs/ })).toBeTruthy();
   });
 });
