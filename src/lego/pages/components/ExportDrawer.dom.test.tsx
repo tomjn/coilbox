@@ -60,6 +60,16 @@ vi.mock("@/blueprint/fileIO", () => ({
     },
   },
 }));
+// The games a scan has read, which is where a folder's short name comes from.
+const scannedGames = vi.fn((): unknown[] => []);
+vi.mock("@/content/config", () => ({
+  useUnitsyncScan: () => ({ data: { games: scannedGames() } }),
+}));
+vi.mock("@/play/config", () => ({
+  usePreferredTarget: () => ({
+    target: { enginePath: "/engine", dataDir: "/data" },
+  }),
+}));
 vi.mock("../../bindings", () => ({
   legoAtlasPng: (args: unknown) => legoAtlasPng(args),
   legoExport: (args: unknown) => legoExport(args),
@@ -165,6 +175,7 @@ beforeEach(() => {
   exportGlb.mockReset();
   workshopCompile.mockReset();
   workshopProjects.mockReturnValue([]);
+  scannedGames.mockReturnValue([]);
 });
 
 afterEach(() => {
@@ -1038,6 +1049,25 @@ describe("the skeleton widget's file (issue #5181)", () => {
     await waitFor(() => expect(legoExport).toHaveBeenCalled());
     await screen.findByText("/game/units/skyfort.lua");
     expect(disk.size).toBe(0);
+  });
+
+  it("also writes the file under the short name of a mutator in the folder (issue #5193)", async () => {
+    const MUTATOR_FILE = "/data/LuaUI/Config/coilbox_skeletons/MUT.json";
+    scannedGames.mockReturnValue([
+      {
+        name: "Mutator 1",
+        primaryArchive: { name: "mutator_1", path: "/data/games/some.sdd" },
+        info: { shortname: "MUT" },
+      },
+    ]);
+    legoGameLanguage.mockResolvedValue({ texts: {} });
+    legoExport.mockResolvedValue(exportResult());
+    show(withSkeleton("/data/games/some.sdd"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Export" }));
+    expect(await screen.findByText(MUTATOR_FILE)).toBeTruthy();
+    expect(screen.getByText(FILE)).toBeTruthy();
+    expect(disk.get(MUTATOR_FILE)).toBe(disk.get(FILE));
   });
 
   it("reports a file it could not write and keeps the export", async () => {

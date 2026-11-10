@@ -29,6 +29,7 @@
  */
 
 import type { BlueprintFileIO } from "@/blueprint/gameFile";
+import type { GameItem } from "@/content/bindings";
 import { underConfigDir } from "@/content/enginePaths";
 import { carriedShortname, rememberedShortname } from "../container/shortnames";
 import { roleLabel } from "./animPresets";
@@ -216,6 +217,38 @@ export interface SkeletonWriteResult {
   unplaced: string[];
 }
 
+function samePath(a: string, b: string): boolean {
+  const flat = (path: string) =>
+    path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return flat(a) === flat(b);
+}
+
+/**
+ * The short name in the modinfo of the game that lives in `folder`, read from a
+ * unitsync scan, which is the code that parses modinfo. Null for a folder no
+ * scanned game lives in, as a folder nobody has scanned since it was made, and
+ * for a game whose modinfo has no short name.
+ */
+export function folderGameShortname(
+  folder: string,
+  games: readonly GameItem[],
+): string | null {
+  const game = games.find(
+    (g) => g.primaryArchive.path && samePath(g.primaryArchive.path, folder),
+  );
+  return game?.info?.shortname?.trim() || null;
+}
+
+export interface SkeletonWriteOptions {
+  /**
+   * A short name to write every unit's file under as well, the one of the game
+   * the units will run in. A match reports the short name of the game it
+   * starts, so a mutator or Test in game's scratch game reports its own and the
+   * widget looks for that file (issue #5193).
+   */
+  alsoUnder?: string | null;
+}
+
 /**
  * Write the plan bones of every unit that has a skeleton, one file for each
  * game, merging into the file already there. Skips a write when the merge says
@@ -225,20 +258,28 @@ export async function writeSkeletonFiles(
   io: BlueprintFileIO,
   root: string,
   projects: readonly LegoProject[],
+  options: SkeletonWriteOptions = {},
 ): Promise<SkeletonWriteResult> {
+  const alsoUnder = options.alsoUnder?.trim() || null;
   const byGame = new Map<string, Record<string, SkeletonUnitEntry>>();
   const unplaced: string[] = [];
   for (const project of projects) {
     const entry = unitSkeletonEntry(project);
     if (!entry) continue;
-    const shortname = skeletonGameShortname(project);
-    if (!shortname) {
+    const shortnames = new Set(
+      [skeletonGameShortname(project), alsoUnder].filter(
+        (name): name is string => name !== null,
+      ),
+    );
+    if (shortnames.size === 0) {
       unplaced.push(project.unitName);
       continue;
     }
-    const entries = byGame.get(shortname) ?? {};
-    entries[project.unitName] = entry;
-    byGame.set(shortname, entries);
+    for (const shortname of shortnames) {
+      const entries = byGame.get(shortname) ?? {};
+      entries[project.unitName] = entry;
+      byGame.set(shortname, entries);
+    }
   }
 
   const written: SkeletonWrite[] = [];
