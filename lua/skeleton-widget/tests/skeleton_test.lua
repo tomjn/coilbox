@@ -41,7 +41,8 @@ local INFO = {
 	base = { parent = "[null]", isEmpty = false, min = { -10, 0, -10 }, max = { 10, 6, 12 } },
 	turret = { parent = "base", isEmpty = false, min = { -4, 0, -4 }, max = { 4, 4, 4 } },
 	barrel = { parent = "turret", isEmpty = false, min = { -1, -1, 0 }, max = { 1, 1, 20 } },
-	flare = { parent = "barrel", isEmpty = true, min = { 0, 0, 0 }, max = { 0, 0, 0 } },
+	-- an empty piece as the engine reports it: a box from 10000 to -10000
+	flare = { parent = "barrel", isEmpty = true, min = { 10000, 10000, 10000 }, max = { -10000, -10000, -10000 } },
 }
 local NAMES = { "base", "turret", "barrel", "flare" }
 local pieces = S.build(NAMES, function(i)

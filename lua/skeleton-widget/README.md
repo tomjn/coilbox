@@ -1,6 +1,6 @@
 # Coilbox skeleton widget
 
-A Recoil engine widget that draws the skeleton of the selected units, from engine data alone. Issue https://github.com/tomjn/coilbox/issues/5179, spike in `docs/reports/2026-11-09-skeleton-widget-spike.md`.
+A Recoil engine widget that draws the skeleton of the selected units, from engine data alone. Issue https://github.com/tomjn/coilbox/issues/5179, in the milestone https://github.com/tomjn/coilbox/milestone/98.
 
 `luaui/` is what gets installed into a content root as `LuaUI/`. `tests/` and this file are not installed.
 
