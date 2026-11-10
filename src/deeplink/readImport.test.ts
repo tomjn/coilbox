@@ -90,6 +90,18 @@ describe("readImport: the four things somebody can hand it", () => {
     });
   });
 
+  it("passes an old Vercel hub address through for the handler to classify", () => {
+    // readImport knows nothing about which hub is configured. The handler
+    // decides, through hubItemIdFromUrl, whether this is an item on the hub.
+    const r = readImport(
+      "https://coilbox-hub.vercel.app/i/9638778b-b619-4339-8d85-7432af1eb984",
+    );
+    expect(r).toEqual({
+      outcome: "link",
+      url: "coilbox://import?url=https%3A%2F%2Fcoilbox-hub.vercel.app%2Fi%2F9638778b-b619-4339-8d85-7432af1eb984",
+    });
+  });
+
   it("ignores surrounding whitespace from a sloppy copy", () => {
     const r = readImport(
       `\n  ${encodeChallenge("warpath", warpathSettings)} \n`,
