@@ -35,7 +35,7 @@ A Recoil engine widget that draws the skeleton of the selected units, from engin
 
 ## Drawing
 
-One vertex buffer, refilled every frame, drawn with one `DrawArrays` of triangles through one shader. Lines are strips two triangles wide, moved across themselves on screen by the vertex shader, because macOS draws `GL.LINES` one pixel wide whatever `gl.LineWidth` asks. Dots are quads the same shader spreads to a fixed size on screen and rounds. Names are `gl.Text`. In `spring-headless` there are no buffers, so the widget logs that once and draws nothing.
+One vertex buffer, refilled every frame, drawn with one `DrawArrays` of triangles through one shader. Lines are strips two triangles wide, moved across themselves on screen by the vertex shader and faded over their outer edges, because macOS draws `GL.LINES` one pixel wide whatever `gl.LineWidth` asks. Dots are quads the same shader spreads to a fixed size on screen and rounds. Names are `gl.Text`. In `spring-headless` there are no buffers, so the widget logs that once and draws nothing.
 
 ## Splinter Faction and user widgets
 

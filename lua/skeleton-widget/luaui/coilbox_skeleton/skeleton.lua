@@ -19,8 +19,8 @@ M.DOT_ALPHA = 0.95
 -- Half the width of each line on screen, in pixels of a view 1080 tall. The
 -- bone is wider than the line to the parent. Lines are strips of two
 -- triangles, because macOS draws GL.LINES one pixel wide whatever is asked.
-M.BONE_WIDTH = 2.5
-M.PARENT_WIDTH = 1.25
+M.BONE_WIDTH = 3
+M.PARENT_WIDTH = 1.5
 
 -- Numbers per vertex: position, colour, corner, then the other end of its
 -- line and the line's half width. A line's corner is the side, -1 or 1, the

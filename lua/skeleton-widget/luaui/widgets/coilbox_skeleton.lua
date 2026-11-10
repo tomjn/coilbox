@@ -123,8 +123,10 @@ uniform float dotRadius;
 uniform float pxScale;
 out vec4 vColor;
 out vec2 vCorner;
+out float vLine;
 void main() {
 	vec4 p = proj * view * vec4(pos, 1.0);
+	vLine = other.w > 0.0 ? 1.0 : 0.0;
 	if (other.w > 0.0) {
 		// a line: moved across itself on screen, by its half width in pixels
 		vec4 q = proj * view * vec4(other.xyz, 1.0);
@@ -146,6 +148,7 @@ local FRAGMENT_SHADER = [[
 #version 130
 in vec4 vColor;
 in vec2 vCorner;
+in float vLine;
 out vec4 fragColor;
 void main() {
 	float d = length(vCorner);
@@ -153,9 +156,11 @@ void main() {
 		discard;
 	}
 	vec4 c = vColor;
-	// a darker rim on dots and along both edges of a line, so they read
-	// against a model of any colour
-	if (d > 0.7) {
+	if (vLine > 0.5) {
+		// a line fades out over its outer edges rather than stopping hard
+		c.a *= 1.0 - smoothstep(0.5, 1.0, d);
+	} else if (d > 0.7) {
+		// a dot gets a darker rim, so it reads against the lines
 		c.rgb *= 0.45;
 	}
 	fragColor = c;
