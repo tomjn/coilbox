@@ -5033,6 +5033,10 @@ msgstr "{name} jest w grze {gameName}, która jest spakowana, więc nie można t
 msgid "{name} ships inside a game, which is packaged, so it cannot be saved there."
 msgstr "{name} jest w grze, która jest spakowana, więc nie można tam zapisać."
 
+#: src/lego/legChains.ts
+msgid "{name} slides rather than turns when the unit moves, so it is not proposed as a leg."
+msgstr ""
+
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
 msgid "{name} wants to be friends"
@@ -5068,10 +5072,26 @@ msgstr "{named, plural, one {nazwa wyzwalacza na # budynku} few {nazwa wyzwalacz
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 msgstr "{named, plural, one {dla której gry jest # plan budowy} few {dla której gry są # plany budowy} many {dla której gry jest # planów budowy} other {dla której gry jest # planu budowy}}"
 
+#: src/lego/legChains.ts
+msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
+msgstr ""
+
 #: src/lego/moduleFile.ts
 #, fuzzy
 msgid "{names} came from a game, but the file does not say which. A piece from a game only goes in units for that game."
 msgstr "{names} pochodzą z gry, ale plik nie mówi, z której. Element z gry trafia tylko do jednostek tej gry."
+
+#: src/lego/legChains.ts
+msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
+msgstr ""
+
+#: src/lego/legChains.ts
+msgid "{names} turn as a chain of two when the unit moves. That could be a thigh and foot or a shin and foot, so no leg is proposed for them."
+msgstr ""
+
+#: src/lego/legChains.ts
+msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
+msgstr ""
 
 #: src/lego/upgradeChain.ts
 #, fuzzy

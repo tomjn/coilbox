@@ -23,6 +23,7 @@
  */
 
 import { legoProbeScript, legoRunScript } from "./bindings";
+import { findLegs, type LegProposal, legRoles } from "./legChains";
 import type { LegoProject } from "./model";
 import { pieceRest } from "./pieceRest";
 import { CREATED, PREVIEW_FRAMES, type ScriptEvent } from "./scriptPlayback";
@@ -40,6 +41,9 @@ export interface RoleProposal {
 
 export interface RoleFindings {
   proposals: RoleProposal[];
+  /** The legs behind the leg roles in `proposals`, with the side, pair and
+   *  chain each came from, for a caller fitting a body plan. */
+  legs: LegProposal[];
   /** What the runs wanted to say: a call-in the script does not define, a call
    *  the sandbox does not model. Not failures, and worth showing. */
   notes: string[];
@@ -110,10 +114,10 @@ const OBSERVED: {
   {
     callin: "StartMoving",
     args: [],
-    // A wheel is the one thing that turns about its own axle on being told to
-    // move. Legs turn too, and are deliberately not here: which of six moving
-    // pieces is the front left shin is not something motion can say, and the
-    // walk presets animate a unit inside out if it is guessed wrong.
+    // A wheel turns about its own axle on being told to move, alone. Legs turn
+    // too, as chains, and `findLegs` reads those off the same run with the
+    // piece tree, because which of six moving pieces is the front left shin is
+    // not something motion alone can say.
     roles: [{ axis: 0, role: "wheel" }],
   },
 ];
@@ -132,6 +136,7 @@ export async function inferRoles(
   const pieces = project.pieces.map((piece) => piece.name);
   const proposals: RoleProposal[] = [];
   const notes: string[] = [];
+  const legs: LegProposal[] = [];
 
   const probes = await legoProbeScript({
     script,
@@ -142,7 +147,9 @@ export async function inferRoles(
     includes: project.gameScriptIncludes ?? null,
     rest: pieceRest(project),
   });
-  if (probes.error) return { proposals: [], notes: [], error: probes.error };
+  if (probes.error) {
+    return { proposals: [], legs: [], notes: [], error: probes.error };
+  }
 
   for (const { callin, role } of STATED) {
     const probe = probes.probes.find((entry) => entry.callin === callin);
@@ -178,9 +185,33 @@ export async function inferRoles(
     // motion is read rather than thrown away. The reason goes in the notes.
     if (timeline.error) notes.push(timeline.error);
 
+    // Read for legs only on the stride. A walker found to have legs has no
+    // wheels, and a piece turning as part of a chain is not one either.
+    const stride =
+      driver.callin === "StartMoving"
+        ? findLegs(project, timeline, MOVED_ROTATION)
+        : null;
+    if (stride) {
+      notes.push(...stride.notes);
+      legs.push(...stride.legs);
+      for (const leg of stride.legs) {
+        for (const { pieceName, role } of legRoles(leg)) {
+          proposals.push({
+            pieceName,
+            role,
+            evidence: "observed",
+            callin: driver.callin,
+          });
+        }
+      }
+    }
+
     for (const { pieceName, axis } of turnedPieces(timeline)) {
       const match = driver.roles.find((entry) => entry.axis === axis);
       if (!match) continue;
+      if (stride && (stride.legs.length > 0 || stride.chained.has(pieceName))) {
+        continue;
+      }
       proposals.push({
         pieceName,
         role: match.role,
@@ -192,6 +223,7 @@ export async function inferRoles(
 
   return {
     proposals: dedupe(proposals),
+    legs,
     notes: [...new Set(notes)],
     error: null,
   };

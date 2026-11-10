@@ -9,11 +9,21 @@
  * reading of the answers, not the sandbox that produces them.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { applyRoles } from "./adoptGameScript";
+import { BIPED, planProportions, QUADRUPED } from "./bodyPlans";
+import { planBones, suggestPicks } from "./fitPlan";
 import { inferRoles } from "./inferRoles";
 import { type LegoPiece, type LegoProject, newProject } from "./model";
-import type { ScriptProbes, ScriptTimeline } from "./scriptPlayback";
+import {
+  CREATED,
+  type ScriptEvent,
+  type ScriptProbes,
+  type ScriptTimeline,
+} from "./scriptPlayback";
 
 const probeScript = vi.fn();
 const runScript = vi.fn();
@@ -197,25 +207,6 @@ describe("what a script only shows by moving", () => {
     ]);
   });
 
-  /**
-   * Which of six moving pieces is the front left shin is not something motion
-   * reveals, and the walk presets animate a unit inside out if it is guessed
-   * wrong. So a walker's legs come back as nothing rather than as a guess.
-   */
-  it("never proposes a leg, however much the legs move", async () => {
-    runScript.mockResolvedValue(
-      turned([
-        { piece: "base", axis: 0 },
-        { piece: "turret", axis: 2 },
-        { piece: "barrel", axis: 2 },
-      ]),
-    );
-
-    const found = await inferRoles(project(), "-- script");
-
-    expect(found.proposals.map((p) => p.role)).not.toContain("leg.l1.thigh");
-  });
-
   it("ignores a piece that barely moved, which is arithmetic rather than intent", async () => {
     const barely = turned([]);
     barely.frames[1][NAMES.indexOf("turret") * 6 + 4] = 0.001;
@@ -297,5 +288,351 @@ describe("when a script says nothing useful", () => {
 
     expect(found.proposals[0]?.role).toBe("turret");
     expect(found.notes.join(" ")).toContain("nil value");
+  });
+});
+
+/**
+ * Real strides, recorded by running each script through the sandbox in
+ * `crates/coilbox-springlua/tests/strides.rs`, which checks the recording
+ * against the runtime. Splinter Faction's scripts stay in the game: what is
+ * here is each model's piece tree and the numbers the run produced.
+ *
+ * Splinter Faction ships no four legged walker, so the four legged case is the
+ * builder's own quadruped walk, `fixtures/walkQuadUnfitted.lua`, on the
+ * quadruped plan's pieces.
+ */
+interface StrideCase {
+  name: string;
+  pieces: { name: string; parent: string | null; offset: number[] }[];
+  events: ScriptEvent[];
+  frames: number;
+  timeline: { frames: number[][]; error: string | null; warnings: string[] };
+}
+
+const STRIDES: StrideCase[] = JSON.parse(
+  readFileSync(
+    join(
+      __dirname,
+      "../../crates/coilbox-springlua/tests/fixtures/strides.json",
+    ),
+    "utf8",
+  ),
+).cases;
+
+function stride(name: string): StrideCase {
+  const found = STRIDES.find((entry) => entry.name === name);
+  if (!found) throw new Error(`no recorded stride for ${name}`);
+  return found;
+}
+
+/** A project shaped like a model's piece tree, by piece name. */
+function tree(
+  pieces: { name: string; parent: string | null; offset: number[] }[],
+): LegoProject {
+  const base = newProject({
+    id: "p",
+    rootPieceId: pieces[0]?.name ?? "root",
+    name: "walker",
+    packId: "lego",
+    packVersion: "1",
+    now: "2026-11-09T00:00:00Z",
+  });
+  return {
+    ...base,
+    pieces: pieces.map(({ name, parent, offset }) => ({
+      id: name,
+      name,
+      parentId: parent,
+      partId: null,
+      position: offset as [number, number, number],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    })),
+  };
+}
+
+/** Answer the stride with the recording and every other run with stillness,
+ *  checking the stride is asked for exactly as it was recorded. */
+function answerWith(recorded: StrideCase) {
+  const names = recorded.pieces.map((piece) => piece.name);
+  const still = new Array(names.length * 6).fill(0);
+  runScript.mockImplementation(
+    ({
+      events,
+      frames,
+      pieces,
+    }: {
+      events: ScriptEvent[];
+      frames: number;
+      pieces: string[];
+    }) => {
+      expect(pieces).toEqual(names);
+      const base = { ...STILL, pieces: names, frames: [still, still] };
+      if (!events.some((event) => event.callin === "StartMoving")) return base;
+      expect(events).toEqual(recorded.events);
+      expect(frames).toBe(recorded.frames);
+      return { ...base, ...recorded.timeline };
+    },
+  );
+  return tree(recorded.pieces);
+}
+
+const roleOf = (
+  found: Awaited<ReturnType<typeof inferRoles>>,
+  pieceName: string,
+) => found.proposals.find((p) => p.pieceName === pieceName)?.role;
+
+describe("a walker's legs, read off its stride", () => {
+  it("records each stride with the events every observation sends", () => {
+    for (const recorded of STRIDES) {
+      expect(recorded.events).toEqual([
+        ...CREATED,
+        { frame: 1, callin: "StartMoving", args: [] },
+      ]);
+      expect(recorded.timeline.error).toBeNull();
+    }
+  });
+
+  /** fedbear: pelvis, then a still `legs` piece with a thigh, shin and foot on
+   *  each side. The pelvis rocks and the turret bobs as it walks. */
+  it("finds Splinter Faction's Bear's two legs, left on +x", async () => {
+    const found = await inferRoles(answerWith(stride("fedbear")), "-- bear");
+
+    expect(found.legs).toEqual([
+      {
+        side: "l",
+        pair: 1,
+        chain: { thigh: "lthigh", shin: "lleg", foot: "lfoot" },
+        hangsFrom: "legs",
+        position: [
+          expect.closeTo(15.2402),
+          expect.closeTo(22.845),
+          expect.closeTo(-0.008),
+        ],
+      },
+      {
+        side: "r",
+        pair: 1,
+        chain: { thigh: "rthigh", shin: "rleg", foot: "rfoot" },
+        hangsFrom: "legs",
+        position: [
+          expect.closeTo(-15.2402),
+          expect.closeTo(22.845),
+          expect.closeTo(-0.008),
+        ],
+      },
+    ]);
+    expect(found.proposals.filter((p) => p.role.startsWith("leg."))).toEqual(
+      [
+        ["lthigh", "leg.l1.thigh"],
+        ["lleg", "leg.l1.shin"],
+        ["lfoot", "leg.l1.foot"],
+        ["rthigh", "leg.r1.thigh"],
+        ["rleg", "leg.r1.shin"],
+        ["rfoot", "leg.r1.foot"],
+      ].map(([pieceName, role]) => ({
+        pieceName,
+        role,
+        evidence: "observed",
+        callin: "StartMoving",
+      })),
+    );
+  });
+
+  it("calls nothing on a walker a wheel, however its body rocks", async () => {
+    const found = await inferRoles(answerWith(stride("fedbear")), "-- bear");
+
+    expect(found.proposals.map((p) => p.role)).not.toContain("wheel");
+    expect(roleOf(found, "pelvis")).toBeUndefined();
+    expect(roleOf(found, "turret")).toBeUndefined();
+    expect(found.notes).toEqual([]);
+  });
+
+  it("orders a four legged walker's legs front to back on each side", async () => {
+    const found = await inferRoles(answerWith(stride("quad")), "-- quad");
+
+    expect(
+      found.legs.map((leg) => [leg.side, leg.pair, leg.chain.thigh]),
+    ).toEqual([
+      ["l", 1, "lthighf"],
+      ["l", 2, "lthighb"],
+      ["r", 1, "rthighf"],
+      ["r", 2, "rthighb"],
+    ]);
+    expect(roleOf(found, "lfootb")).toBe("leg.l2.foot");
+    expect(roleOf(found, "rshinf")).toBe("leg.r1.shin");
+    expect(found.legs.every((leg) => leg.hangsFrom === "body")).toBe(true);
+  });
+
+  /** The quad recording is the plan's own pieces, so a change to the plan
+   *  shows up here rather than as a quietly stale fixture. */
+  it("records the quadruped on the plan's own pieces", () => {
+    const bones = QUADRUPED.bones(planProportions(QUADRUPED, {}));
+    expect(stride("quad").pieces).toEqual(
+      bones.map((bone) => ({
+        name: bone.name,
+        parent: bones.find((b) => b.id === bone.parent)?.name ?? null,
+        // The Rust side reads and writes the file, and its float parsing
+        // is not exact in the last bit.
+        offset: bone.position.map((value) => expect.closeTo(value, 6)),
+      })),
+    );
+  });
+
+  it("proposes no legs for Splinter Faction's wheeled Flashpoint, only wheels", async () => {
+    const found = await inferRoles(
+      answerWith(stride("lozflashpoint")),
+      "-- flashpoint",
+    );
+
+    expect(found.legs).toEqual([]);
+    expect(found.proposals).toEqual([
+      {
+        pieceName: "frontwheels",
+        role: "wheel",
+        evidence: "observed",
+        callin: "StartMoving",
+      },
+      {
+        pieceName: "rearwheels",
+        role: "wheel",
+        evidence: "observed",
+        callin: "StartMoving",
+      },
+    ]);
+  });
+
+  it("hands the fit drawer each leg bone once the proposals are taken", async () => {
+    for (const [name, plan] of [
+      ["fedbear", BIPED],
+      ["quad", QUADRUPED],
+    ] as const) {
+      const project = answerWith(stride(name));
+      const found = await inferRoles(project, "-- walker");
+      const taken = applyRoles(project, found.proposals);
+      const picks = suggestPicks(taken, planBones(plan, {}));
+
+      for (const leg of found.legs) {
+        const id = `${leg.side}${leg.pair}`;
+        expect(picks[`thigh.${id}`]).toBe(leg.chain.thigh);
+        expect(picks[`shin.${id}`]).toBe(leg.chain.shin);
+        expect(picks[`foot.${id}`]).toBe(leg.chain.foot);
+      }
+    }
+  });
+});
+
+describe("a stride that does not say which leg is which", () => {
+  /** A still body with whatever hangs off it, every piece turning about x on
+   *  the stride's last frame unless listed as sliding instead. */
+  function walker(
+    pieces: { name: string; parent: string; offset: number[] }[],
+    slides: string[] = [],
+  ) {
+    const all = [{ name: "body", parent: null, offset: [0, 20, 0] }, ...pieces];
+    const names = all.map((piece) => piece.name);
+    const last = new Array(names.length * 6).fill(0);
+    for (const piece of pieces) {
+      const at = names.indexOf(piece.name) * 6;
+      if (slides.includes(piece.name)) last[at + 1] = 2;
+      else last[at + 3] = 0.5;
+    }
+    runScript.mockImplementation(({ events }: { events: ScriptEvent[] }) => ({
+      ...STILL,
+      pieces: names,
+      frames: [
+        new Array(names.length * 6).fill(0),
+        events.some((event) => event.callin === "StartMoving")
+          ? last
+          : new Array(names.length * 6).fill(0),
+      ],
+    }));
+    return tree(all);
+  }
+
+  it("says a chain of two could be either thigh and foot or shin and foot", async () => {
+    const found = await inferRoles(
+      walker([
+        { name: "lthigh", parent: "body", offset: [5, 0, 0] },
+        { name: "lfoot", parent: "lthigh", offset: [0, -10, 0] },
+      ]),
+      "-- two",
+    );
+
+    expect(found.legs).toEqual([]);
+    expect(found.proposals).toEqual([]);
+    expect(found.notes.join(" ")).toContain(
+      "lthigh, lfoot turn as a chain of two",
+    );
+  });
+
+  it("calls nothing under a turning fork a wheel", async () => {
+    const found = await inferRoles(
+      walker([
+        { name: "hip", parent: "body", offset: [5, 0, 0] },
+        { name: "toe1", parent: "hip", offset: [1, -5, 0] },
+        { name: "toe2", parent: "hip", offset: [-1, -5, 0] },
+      ]),
+      "-- fork",
+    );
+
+    expect(found.proposals).toEqual([]);
+  });
+
+  it("says a chain longer than thigh, shin and foot is not proposed", async () => {
+    const found = await inferRoles(
+      walker([
+        { name: "a", parent: "body", offset: [5, 0, 0] },
+        { name: "b", parent: "a", offset: [0, -5, 0] },
+        { name: "c", parent: "b", offset: [0, -5, 0] },
+        { name: "d", parent: "c", offset: [0, -5, 0] },
+      ]),
+      "-- four",
+    );
+
+    expect(found.proposals).toEqual([]);
+    expect(found.notes.join(" ")).toContain("chain of 4");
+  });
+
+  it("says a leg that slides rather than turns is not a leg", async () => {
+    const found = await inferRoles(
+      walker(
+        [{ name: "lpiston", parent: "body", offset: [5, 0, 0] }],
+        ["lpiston"],
+      ),
+      "-- slides",
+    );
+
+    expect(found.proposals).toEqual([]);
+    expect(found.notes.join(" ")).toContain("lpiston slides rather than turns");
+  });
+
+  it("says a leg on the centre line has no side", async () => {
+    const found = await inferRoles(
+      walker([
+        { name: "thigh", parent: "body", offset: [0, 0, 0] },
+        { name: "shin", parent: "thigh", offset: [0, -5, 0] },
+        { name: "foot", parent: "shin", offset: [0, -5, 0] },
+      ]),
+      "-- centre",
+    );
+
+    expect(found.proposals).toEqual([]);
+    expect(found.notes.join(" ")).toContain("centre line");
+  });
+
+  it("says two legs on one side level front to back have no order", async () => {
+    const leg = (prefix: string, y: number) => [
+      { name: `${prefix}thigh`, parent: "body", offset: [5, y, 0] },
+      { name: `${prefix}shin`, parent: `${prefix}thigh`, offset: [0, -5, 0] },
+      { name: `${prefix}foot`, parent: `${prefix}shin`, offset: [0, -5, 0] },
+    ];
+    const found = await inferRoles(
+      walker([...leg("a", 0), ...leg("b", 2)]),
+      "-- level",
+    );
+
+    expect(found.proposals).toEqual([]);
+    expect(found.notes.join(" ")).toContain("same distance front to back");
   });
 });

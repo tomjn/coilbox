@@ -4112,6 +4112,10 @@ msgstr ""
 msgid "{name} ships inside a game, which is packaged, so it cannot be saved there."
 msgstr ""
 
+#: src/lego/legChains.ts
+msgid "{name} slides rather than turns when the unit moves, so it is not proposed as a leg."
+msgstr ""
+
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "{name} wants to be friends"
 msgstr ""
@@ -4140,8 +4144,24 @@ msgstr ""
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
 msgstr ""
 
+#: src/lego/legChains.ts
+msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
+msgstr ""
+
 #: src/lego/moduleFile.ts
 msgid "{names} came from a game, but the file does not say which. A piece from a game only goes in units for that game."
+msgstr ""
+
+#: src/lego/legChains.ts
+msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
+msgstr ""
+
+#: src/lego/legChains.ts
+msgid "{names} turn as a chain of two when the unit moves. That could be a thigh and foot or a shin and foot, so no leg is proposed for them."
+msgstr ""
+
+#: src/lego/legChains.ts
+msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
 msgstr ""
 
 #: src/lego/upgradeChain.ts

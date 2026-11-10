@@ -30,7 +30,7 @@ function adopted(over: Partial<AdoptedScript> = {}): AdoptedScript {
     member: "scripts/armcom.lua",
     kind: "lua",
     declared: "armcom.cob",
-    findings: { proposals: [], notes: [], error: null },
+    findings: { proposals: [], legs: [], notes: [], error: null },
     converted: null,
     compiled: null,
     unitDef: null,
@@ -225,6 +225,7 @@ describe("the two kinds of proposal", () => {
         }),
         proposal(),
       ],
+      legs: [],
       notes: [],
       error: null,
     },
@@ -254,7 +255,7 @@ describe("the two kinds of proposal", () => {
   it("shows only the heading that has proposals under it", () => {
     show(
       adopted({
-        findings: { proposals: [proposal()], notes: [], error: null },
+        findings: { proposals: [proposal()], legs: [], notes: [], error: null },
       }),
     );
 
@@ -276,6 +277,7 @@ describe("what the panel starts with taken", () => {
     const value = adopted({
       findings: {
         proposals: [proposal(), proposal({ pieceName: "nano1" })],
+        legs: [],
         notes: [],
         error: null,
       },
@@ -290,7 +292,7 @@ describe("what the panel starts with taken", () => {
 
   it("leaves a box clear when its piece is not in the taken set", () => {
     const value = adopted({
-      findings: { proposals: [proposal()], notes: [], error: null },
+      findings: { proposals: [proposal()], legs: [], notes: [], error: null },
     });
     show(value, new Set());
 
