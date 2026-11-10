@@ -312,10 +312,10 @@ describe("WidgetsPage", () => {
       await screen.findByRole("listitem", { name: "Skeleton" }),
     );
     await row.findByText("Not installed");
-    expect(row.queryByText("Write skeletons")).toBeNull();
-    expect(row.queryByText("Write saved models")).toBeNull();
-    expect(row.queryByText("Scan units")).toBeNull();
-    expect(row.queryByText("Skeletons")).toBeNull();
+    expect(screen.queryByText("Write skeletons")).toBeNull();
+    expect(screen.queryByText("Write saved models")).toBeNull();
+    expect(screen.queryByText("Scan units")).toBeNull();
+    expect(screen.queryByText("Skeletons")).toBeNull();
   });
 
   it("offers an update when what is installed differs from what coilbox ships", async () => {
