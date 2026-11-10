@@ -2,7 +2,7 @@ import { type RefObject, useEffect } from "react";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
-import { skeletonJoints } from "../../skeletonJoints";
+import { geometryJoints, skeletonJoints } from "../../skeletonJoints";
 import { dotMaterial } from "./dotsAndPoints";
 import type { SceneState } from "./sceneState";
 import {
@@ -15,7 +15,8 @@ import {
 const JOINT_DOT = 9;
 
 /**
- * Draw the unit's skeleton while `show` is on, and free it when it is off.
+ * Draw the unit's skeleton while `show` is on, and free it when it is off. A
+ * unit with no skeleton gets its geometry skeleton instead, dimmed (#5183).
  * The drawing is of the rest pose.
  * While a script plays, `applyTimelineFrame` moves it onto the pieces.
  */
@@ -39,14 +40,18 @@ export function useSkeleton(
     if (state.skeleton) disposeSkeleton(state.skeleton);
     state.skeleton = null;
     if (show) {
+      const real = project.skeleton !== undefined;
       state.skeleton = buildSkeleton(
-        skeletonJoints(project, pack, raw),
+        real
+          ? skeletonJoints(project, pack, raw)
+          : geometryJoints(project, pack, raw),
         dotMaterial(
           JOINT_DOT,
           state.renderer.getPixelRatio(),
           false,
           SKELETON_COLOUR,
         ),
+        { dimmed: !real },
       );
       if (state.skeleton) state.overlay.add(state.skeleton);
     }

@@ -7,7 +7,11 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { bakedPieces } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
-import { skeletonJoints } from "../../skeletonJoints";
+import {
+  geometryJoints,
+  type SkeletonJoint,
+  skeletonJoints,
+} from "../../skeletonJoints";
 import { applyTimelineFrame } from "./animationPlayback";
 import type { SceneState } from "./sceneState";
 import { buildSkeleton, disposeSkeleton } from "./skeletonLayer";
@@ -46,7 +50,7 @@ function bareUnit(): LegoProject {
 
 /** The scene the viewport builds for a unit of empty pieces: one group each,
  *  nested like the document, and the skeleton drawn over it. */
-function scene(project: LegoProject) {
+function scene(project: LegoProject, geometry = false) {
   const root = new THREE.Group();
   const groups = new Map<string, THREE.Group>();
   const rest = new Map<string, [number, number, number]>();
@@ -59,9 +63,29 @@ function scene(project: LegoProject) {
     rest.set(piece.id, [...offset]);
     (piece.parentId ? groups.get(piece.parentId) : root)?.add(group);
   }
-  const skeleton = buildSkeleton(
-    skeletonJoints(project, pack, null),
-    new THREE.PointsMaterial(),
+  const skeleton = (
+    geometry
+      ? buildSkeleton(
+          // The plan's pieces have no geometry, so give the foot a bone 4 long
+          // on z, as a piece with a box that long would have.
+          geometryJoints(project, pack, null).map((joint) =>
+            joint.label === "foot"
+              ? {
+                  ...joint,
+                  reach: {
+                    local: [0, 0, 4],
+                    at: [joint.at[0], joint.at[1], joint.at[2] + 4],
+                  },
+                }
+              : joint,
+          ) as SkeletonJoint[],
+          new THREE.PointsMaterial(),
+          { dimmed: true },
+        )
+      : buildSkeleton(
+          skeletonJoints(project, pack, null),
+          new THREE.PointsMaterial(),
+        )
   ) as THREE.Group;
   const state = {
     root,
@@ -128,7 +152,7 @@ function kneeBend(project: LegoProject): ScriptTimeline {
   } as unknown as ScriptTimeline;
 }
 
-function positions(skeleton: THREE.Group, role: "bones" | "dots") {
+function positions(skeleton: THREE.Group, role: "bones" | "dots" | "reach") {
   const object = skeleton.children.find((c) => c.userData.role === role) as
     | THREE.LineSegments
     | THREE.Points;
@@ -204,5 +228,49 @@ describe("the skeleton while a script poses a unit with no parts", () => {
 
     // The overlay follows the root, so the drawing stays in the root's space.
     expect(positions(skeleton, "dots").slice(0, 3)).toEqual([0, 0, 0]);
+  });
+});
+
+describe("the geometry skeleton while a script poses a unit", () => {
+  it("turns a bone's far end with its piece", () => {
+    const project = bareUnit();
+    const { state, skeleton } = scene(project, true);
+    const rest = positions(skeleton, "reach");
+
+    // The foot is at (3, 3, 1), so its bone runs 4 along z from there.
+    expect(rest).toEqual([3, 3, 1, 3, 3, 5]);
+
+    applyTimelineFrame(state, project, kneeBend(project), 0);
+    const bent = positions(skeleton, "reach");
+    const dots = positions(skeleton, "dots");
+
+    // The bone still starts on the foot's origin. The thigh turned a quarter
+    // about x, which takes the foot's z to -y, so the end hangs 4 below it.
+    expect(bent.slice(0, 3)).toEqual(dots.slice(9, 12));
+    expect(bent[3]).toBeCloseTo(bent[0] as number);
+    expect(bent[4]).toBeCloseTo((bent[1] as number) - 4);
+    expect(bent[5]).toBeCloseTo(bent[2] as number);
+    disposeSkeleton(skeleton);
+  });
+
+  it("follows a script that moves the whole unit in the root's space", () => {
+    const project = bareUnit();
+    const { state, skeleton } = scene(project, true);
+    state.root.position.set(100, 0, 0);
+
+    applyTimelineFrame(
+      state,
+      project,
+      {
+        fps: 30,
+        pieces: ["base", "body", "thigh", "foot"],
+        frames: [new Array(24).fill(0)],
+        hidden: [],
+      } as unknown as ScriptTimeline,
+      0,
+    );
+
+    expect(positions(skeleton, "reach")).toEqual([3, 3, 1, 3, 3, 5]);
+    disposeSkeleton(skeleton);
   });
 });
