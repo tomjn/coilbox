@@ -51,11 +51,13 @@ export const MAX_PICTURE_KEYS = 500;
 /**
  * Where one picture is, as the hub answers.
  *
- * `path` is tier relative, exactly as the row stores it, so it is joined to
- * whichever base this session is configured with. `url` is the hub joining it to
- * its own bases, which coilbox does not use for a map: `./tier.ts` carries a
- * profile override for a distributor serving assets from somewhere else, and
- * taking the hub's URL would ignore it.
+ * `path` is tier relative, exactly as the row stores it. For a `static` answer it
+ * is joined to whichever base this session is configured with, and `url` is
+ * unused: `./tier.ts` carries a profile override for a distributor serving assets
+ * from somewhere else, and taking the hub's URL would ignore it. A `bucket`
+ * answer is the staging tier, which is private and served by the hub itself, so
+ * its `url` is the only address there is and {@link readPicture} refuses one it
+ * will not load.
  */
 export interface AssetPicture {
   tier: AssetTier;
@@ -109,17 +111,43 @@ function echoes(
   }
 }
 
+/**
+ * Whether a `bucket` answer's address is one to load a picture from: https, or
+ * http to this machine for a hub run locally.
+ *
+ * The scheme is checked and the host is not. The hub builds the address from its
+ * own configured site URL, which need not be the address this copy of coilbox was
+ * given for it, so requiring the same origin would drop every staged picture
+ * from a hub reached by an alias. The route a hub serves them from is the hub's
+ * to choose.
+ */
+function isLoadableUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "https:") return true;
+  return (
+    url.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+  );
+}
+
 /** One answer's picture, or null for anything that is not one. A result whose
  *  picture is malformed is read as no picture, because the caller's fallback is
  *  what it would draw for a missing one anyway. */
 function readPicture(value: unknown): AssetPicture | null {
   if (typeof value !== "object" || value === null) return null;
   const picture = value as Record<string, unknown>;
-  if (picture.tier !== "static" && picture.tier !== "blob") return null;
+  if (picture.tier !== "static" && picture.tier !== "bucket") return null;
   if (typeof picture.path !== "string" || !picture.path) return null;
   if (typeof picture.width !== "number" || typeof picture.height !== "number") {
     return null;
   }
+  if (picture.tier === "bucket" && !isLoadableUrl(picture.url)) return null;
   return {
     tier: picture.tier,
     path: picture.path,

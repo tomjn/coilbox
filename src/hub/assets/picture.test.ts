@@ -5,7 +5,7 @@ import {
   mapPictureLadder,
   shownMapPicture,
 } from "./picture";
-import { BLOB_TIER_BASE, DEFAULT_ASSET_CDN_BASE } from "./tier";
+import { DEFAULT_ASSET_CDN_BASE } from "./tier";
 
 const MAP = "Supreme Isthmus V2";
 
@@ -17,10 +17,17 @@ const LOCAL = "coilbox://localhost/unitsyncthumb/abc.png";
 const HELD_STATIC = {
   tier: "static" as const,
   path: "maps/minimap/deadbeef.webp",
+  url: "https://tomjn.github.io/coilbox-assets/maps/minimap/deadbeef.webp",
   width: 1024,
   height: 1024,
 };
-const HELD_BLOB = { ...HELD_STATIC, tier: "blob" as const };
+const BUCKET_URL =
+  "https://hub.example/assets/staged/maps/minimap/deadbeef.webp";
+const HELD_BUCKET = {
+  ...HELD_STATIC,
+  tier: "bucket" as const,
+  url: BUCKET_URL,
+};
 
 /** Every rung's origin, in order, which is what the ladder is. */
 function order(over: Partial<MapPictureSources> = {}): string[] {
@@ -51,7 +58,7 @@ describe("mapPictureLadder order", () => {
   });
 
   it("serves a row still in staging from the staging tier", () => {
-    expect(order({ held: HELD_BLOB })).toEqual(["blob", "placeholder"]);
+    expect(order({ held: HELD_BUCKET })).toEqual(["bucket", "placeholder"]);
   });
 
   it("draws a map the hub has not been seeded with rather than asking BAR", () => {
@@ -63,7 +70,7 @@ describe("mapPictureLadder order", () => {
       {},
       { local: LOCAL },
       { held: HELD_STATIC },
-      { local: LOCAL, held: HELD_BLOB },
+      { local: LOCAL, held: HELD_BUCKET },
     ]) {
       const ladder = mapPictureLadder(sources(over));
       expect(ladder.at(-1)?.from).toBe("placeholder");
@@ -97,14 +104,11 @@ describe("mapPictureLadder URLs", () => {
     });
   });
 
-  it("builds a staging URL from the store rather than the CDN base", () => {
+  it("loads a staged picture from the address the hub gave, not the CDN base", () => {
     const rung = mapPictureLadder(
-      sources({ held: HELD_BLOB, cdnBase: "https://mine.test/" }),
+      sources({ held: HELD_BUCKET, cdnBase: "https://mine.test/" }),
     )[0];
-    expect(rung).toMatchObject({
-      from: "blob",
-      url: `${BLOB_TIER_BASE}maps/minimap/deadbeef.webp`,
-    });
+    expect(rung).toMatchObject({ from: "bucket", url: BUCKET_URL });
   });
 
   it("carries no dimensions for a local minimap, which is a square texture", () => {

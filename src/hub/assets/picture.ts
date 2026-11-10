@@ -14,7 +14,9 @@ import { type AssetTier, assetTierUrl } from "./tier";
  *
  * 1. The local archive, through unitsync.
  * 2. The hub's durable tier, on GitHub Pages.
- * 3. The hub's staging tier, for anything approved but not promoted yet.
+ * 3. The hub's staging tier, for anything approved but not promoted yet. The hub
+ *    serves it from its own `/assets/staged/` route, at the address it answered
+ *    with.
  * 4. A drawing of the map's outline, which cannot fail.
  *
  * Local comes first, which is the reverse of the hub's own order in
@@ -59,7 +61,7 @@ import { type AssetTier, assetTierUrl } from "./tier";
 
 /** Which rung answered. The two hub tiers keep their own names, because which
  *  one served a picture is the difference between a request that costs the hub
- *  nothing and one that spends its Blob allowance. */
+ *  nothing and one that the hub serves itself. */
 export type MapPictureFrom = AssetTier | "local" | "placeholder";
 
 /** What the hub holds for one map, off its `asset` row. */
@@ -67,6 +69,9 @@ export interface HeldMapAsset {
   tier: AssetTier;
   /** Tier relative, never a fully qualified URL. */
   path: string;
+  /** The hub's own address for the picture. Read only for a `bucket` row, which
+   *  the hub serves itself. A `static` row is built from `path` instead. */
+  url: string;
   /** The encoded picture's own pixels, so an `<img>` can carry its proportions
    *  and not reshape the page when it loads. */
   width: number;
@@ -128,7 +133,7 @@ export function mapPictureLadder(sources: MapPictureSources): MapPicture[] {
   if (held) {
     ladder.push({
       from: held.tier,
-      url: assetTierUrl(held.tier, held.path, sources.cdnBase),
+      url: assetTierUrl(held.tier, held.path, sources.cdnBase, held.url),
       width: held.width,
       height: held.height,
     });

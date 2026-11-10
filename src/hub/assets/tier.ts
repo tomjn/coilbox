@@ -17,7 +17,7 @@ import { getProfile } from "../../profile/profile";
  */
 
 /** Which store holds an asset, as the hub's `asset.tier` column names it. */
-export type AssetTier = "static" | "blob";
+export type AssetTier = "static" | "bucket";
 
 /**
  * The durable tier: https://github.com/tomjn/coilbox-assets through GitHub
@@ -27,19 +27,6 @@ export type AssetTier = "static" | "blob";
  * and joining must not drop it.
  */
 export const DEFAULT_ASSET_CDN_BASE = "https://tomjn.github.io/coilbox-assets/";
-
-/**
- * The staging tier: the hub's `coilbox-staging` Vercel Blob store, holding
- * anything approved but not promoted yet.
- *
- * A constant and not configuration, which is where this deliberately differs
- * from the durable tier. The base is the identity of one store rather than a
- * choice, and the hub says the same in `lib/assets/blob.ts`: a base pointing at
- * a store the hub's own token cannot write to fails as a 404 on every picture
- * rather than as an error anybody notices.
- */
-export const BLOB_TIER_BASE =
-  "https://eyugwjvmp953ayog.public.blob.vercel-storage.com/";
 
 /**
  * The durable tier base, always with exactly one trailing slash so joining is a
@@ -55,7 +42,12 @@ export function resolveAssetCdnBase(profileBase?: string): string {
 }
 
 /**
- * The absolute URL for a tier relative `asset.path`.
+ * The absolute URL for a picture the hub answered with.
+ *
+ * A `static` row is `path` joined to the configured durable base, and the hub's
+ * `hubUrl` for it is ignored, so a distributor's own base is honoured. A
+ * `bucket` row is `hubUrl`: the staging bucket is private and the hub serves its
+ * bytes from its own route, so there is no path a client could join to a base.
  *
  * Joined by concatenation rather than with `new URL(path, base)`, which
  * resolves the path against the origin: a path starting with a slash would come
@@ -67,9 +59,10 @@ export function assetTierUrl(
   tier: AssetTier,
   path: string,
   cdnBase: string,
+  hubUrl: string,
 ): string {
-  const base = tier === "static" ? cdnBase : BLOB_TIER_BASE;
-  return base + path.replace(/^\/+/, "");
+  if (tier === "bucket") return hubUrl;
+  return cdnBase + path.replace(/^\/+/, "");
 }
 
 /** The durable tier this session reads from: the profile's, or the default. */

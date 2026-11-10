@@ -152,6 +152,7 @@ it("shows a missing map with the hub's picture and details, and downloads it", a
   hoisted.held = {
     tier: "static",
     path: "minimaps/comet.webp",
+    url: "https://tomjn.github.io/coilbox-assets/minimaps/comet.webp",
     width: 512,
     height: 512,
   } satisfies HeldMapAsset;
