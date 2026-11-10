@@ -63,6 +63,119 @@ pub fn text(autohost_port: Option<u16>, language: Option<&str>) -> Option<String
     (!text.is_empty()).then_some(text)
 }
 
+/// Where a Test in game launch keeps its own configuration file, under
+/// coilbox's own app data (issue #5198).
+///
+/// The unit builder starts the engine with `--config` naming this file, which
+/// makes it the only file the engine reads settings from and the only one it
+/// writes to (`ConfigHandler::Instantiate`). So a test launch does not use the
+/// player's sound volume, and nothing a game writes on its first run, such as
+/// Splinter Faction's recommended graphics, lands in the player's own file.
+pub fn test_config_file(app_data: &Path) -> PathBuf {
+    app_data
+        .join("play")
+        .join("test")
+        .join("springsettings.cfg")
+}
+
+/// What a Test in game launch sets every time, whatever the file held.
+///
+/// `Sound = 0` starts the engine with no audio at all (`ISound::IsNullAudio`),
+/// so no music and no sound effects. Coilbox has no sound setting for a test
+/// launch, so it is always muted. The engine's default for `Fullscreen` is on,
+/// and a test launch is a window.
+const TEST_FORCED: [(&str, &str); 2] = [("Sound", "0"), ("Fullscreen", "0")];
+
+/// What a Test in game launch sets only when the file does not have it yet, so
+/// the engine or the game can change it after the first launch.
+///
+/// The window size is a chosen size, not a measured one. The engine's own
+/// default of 0 opens a window the size of the whole screen.
+///
+/// `SFInitialSettingsVersion` is Splinter Faction's mark that it has written
+/// its recommended settings, at that game's `VERSION` of 1 in 0.1.96
+/// (`LuaUI/Configs/initial_settings.lua`). Without it a first launch on this
+/// file writes 38 settings and then reloads the match to use them, so it loads
+/// twice. With it the test launch keeps the engine's own graphics defaults.
+/// When the game raises its version it applies the list once more, reloads
+/// once and writes the new mark here, which then stays.
+const TEST_SEEDED: [(&str, &str); 3] = [
+    ("XResolutionWindowed", "1280"),
+    ("YResolutionWindowed", "720"),
+    ("SFInitialSettingsVersion", "1"),
+];
+
+/// The key of a `key = value` line in an engine settings file, as the engine
+/// reads it, or `None` for a line that sets nothing.
+fn line_key(line: &str) -> Option<&str> {
+    let line = line.trim();
+    if line.starts_with('#') {
+        return None;
+    }
+    let (key, _) = line.split_once('=')?;
+    Some(key.trim())
+}
+
+/// The Test in game configuration file's text, from what it held before
+/// (`existing`, empty for a new file) and this launch's own settings.
+///
+/// Every line the engine or a game wrote is kept, apart from the keys this
+/// launch sets each time. The autohost port and the language are always
+/// replaced, and left out when this launch has none, so a port from an earlier
+/// sandbox is never left behind.
+pub fn test_config_text(
+    existing: &str,
+    autohost_port: Option<u16>,
+    language: Option<&str>,
+) -> String {
+    let managed: Vec<&str> = TEST_FORCED
+        .iter()
+        .map(|(key, _)| *key)
+        .chain(["AutohostIP", "AutohostPort", LANGUAGE_KEY])
+        .collect();
+    let mut text = String::new();
+    let mut present: Vec<&str> = Vec::new();
+    for line in existing.lines() {
+        match line_key(line) {
+            Some(key) if managed.contains(&key) => continue,
+            Some(key) => present.push(key),
+            None => {}
+        }
+        text.push_str(line);
+        text.push('\n');
+    }
+    for (key, value) in TEST_SEEDED {
+        if !present.contains(&key) {
+            text.push_str(&format!("{key} = {value}\n"));
+        }
+    }
+    for (key, value) in TEST_FORCED {
+        text.push_str(&format!("{key} = {value}\n"));
+    }
+    text.push_str(&self::text(autohost_port, language).unwrap_or_default());
+    text
+}
+
+/// Write the Test in game configuration file at `file`, keeping what the
+/// engine wrote to it last time.
+pub fn write_test_config(
+    file: &Path,
+    autohost_port: Option<u16>,
+    language: Option<&str>,
+) -> Result<(), String> {
+    let existing = match std::fs::read_to_string(file) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("could not read {}: {e}", file.display())),
+    };
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    }
+    std::fs::write(file, test_config_text(&existing, autohost_port, language))
+        .map_err(|e| format!("could not write {}: {e}", file.display()))
+}
+
 /// Write `text` as the settings file in `dir`.
 pub fn write(dir: &Path, text: &str) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
@@ -160,6 +273,59 @@ mod tests {
         write(&dir, "CoilboxLanguage = fr\n").expect("write");
         let read = std::fs::read_to_string(dir.join("springsettings.cfg")).expect("read");
         assert_eq!(read, "CoilboxLanguage = fr\n");
+        std::fs::remove_dir_all(&dir).expect("clean up");
+    }
+
+    /// Issue #5198: a test launch is muted and windowed, and a fresh file
+    /// carries Splinter Faction's mark so its first run does not reload.
+    #[test]
+    fn a_new_test_config_is_muted_windowed_and_marked() {
+        let text = test_config_text("", None, None);
+        assert_eq!(
+            text,
+            "XResolutionWindowed = 1280\nYResolutionWindowed = 720\n\
+             SFInitialSettingsVersion = 1\nSound = 0\nFullscreen = 0\n"
+        );
+    }
+
+    #[test]
+    fn a_test_config_keeps_what_the_engine_wrote_and_forces_the_rest() {
+        let existing = "# comment\nSound = 1\nMSAALevel = 8\nXResolutionWindowed = 900\n\
+                        SFInitialSettingsVersion = 2\nFullscreen=1\nAutohostPort = 1\n\
+                        CoilboxLanguage = de\n";
+        let text = test_config_text(existing, Some(53344), Some("fr"));
+        assert_eq!(
+            text,
+            "# comment\nMSAALevel = 8\nXResolutionWindowed = 900\n\
+             SFInitialSettingsVersion = 2\nYResolutionWindowed = 720\nSound = 0\n\
+             Fullscreen = 0\nAutohostIP = 127.0.0.1\nAutohostPort = 53344\n\
+             CoilboxLanguage = fr\n"
+        );
+    }
+
+    #[test]
+    fn a_test_config_drops_an_earlier_port_and_language() {
+        let first = test_config_text("", Some(53344), Some("fr"));
+        let second = test_config_text(&first, None, None);
+        assert!(!second.contains("Autohost"), "{second}");
+        assert!(!second.contains(LANGUAGE_KEY), "{second}");
+        assert_eq!(test_config_text(&second, None, None), second);
+    }
+
+    #[test]
+    fn the_test_config_is_written_and_read_back() {
+        let dir = std::env::temp_dir().join(format!("coilbox-test-config-{}", std::process::id()));
+        let file = test_config_file(&dir);
+        write_test_config(&file, None, None).expect("first");
+        std::fs::write(
+            &file,
+            std::fs::read_to_string(&file).unwrap() + "Shadows = 1\n",
+        )
+        .expect("engine write");
+        write_test_config(&file, None, None).expect("second");
+        let read = std::fs::read_to_string(&file).expect("read");
+        assert!(read.contains("Shadows = 1\n"), "{read}");
+        assert_eq!(read.matches("Sound = 0").count(), 1, "{read}");
         std::fs::remove_dir_all(&dir).expect("clean up");
     }
 

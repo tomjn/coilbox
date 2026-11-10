@@ -208,6 +208,11 @@ export const playLaunch = defineCommand<
      * `playAskLuaRules` can reach the game while it runs (issue #3346).
      */
     autohost?: boolean;
+    /**
+     * The unit builder's Test in game: the engine runs on a settings file of
+     * coilbox's own, muted and in a window (issue #5198).
+     */
+    testLaunch?: boolean;
     onEvent: Channel<LaunchEvent>;
   },
   LaunchOutcome

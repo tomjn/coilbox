@@ -370,6 +370,10 @@ fn launch_result<E: std::fmt::Display>(
 /// `autohost` opens coilbox's end of the engine's autohost interface for this
 /// run, so [`play_ask_lua_rules`] can reach the game while it runs. Only the
 /// unit builder's sandbox asks for it (issue #3346).
+///
+/// `test_launch` is the unit builder's Test in game. It runs on a configuration
+/// file of coilbox's own rather than the player's, muted and in a window, see
+/// [`launch_settings::test_config_file`] (issue #5198).
 // Each argument is one field of the IPC payload, so grouping them would only
 // move the width into a struct the frontend then has to nest.
 #[allow(clippy::too_many_arguments)]
@@ -383,6 +387,7 @@ async fn play_launch<R: Runtime>(
     data_dir: String,
     run_id: String,
     autohost: Option<bool>,
+    test_launch: Option<bool>,
     on_event: Channel<LaunchEvent>,
 ) -> Result<CliResult, ()> {
     let bin = PathBuf::from(&executable);
@@ -425,20 +430,32 @@ async fn play_launch<R: Runtime>(
     } else {
         None
     };
-    let extra_datadir = match launch_settings::text(port, language) {
-        Some(text) => match write_launch_settings(&app, &text) {
-            Ok(dir) => Some(dir),
-            Err(e) => {
-                if let Some(host) = hosts.lock().unwrap().remove(&run_id) {
-                    host.close();
-                }
-                return Ok(CliResult::err(e));
+    // A test launch's own file is the only one the engine reads, so this
+    // launch's settings go into it rather than into a data folder.
+    let written = if test_launch == Some(true) {
+        write_test_config(&app, port, language).map(|file| (None, Some(file)))
+    } else {
+        match launch_settings::text(port, language) {
+            Some(text) => write_launch_settings(&app, &text).map(|dir| (Some(dir), None)),
+            None => Ok((None, None)),
+        }
+    };
+    let (extra_datadir, config_file) = match written {
+        Ok(written) => written,
+        Err(e) => {
+            if let Some(host) = hosts.lock().unwrap().remove(&run_id) {
+                host.close();
             }
-        },
-        None => None,
+            return Ok(CliResult::err(e));
+        }
     };
 
-    let args = build_engine_args(&path.to_string_lossy(), None);
+    let mut args = Vec::new();
+    if let Some(file) = config_file {
+        args.push("--config".to_string());
+        args.push(file.to_string_lossy().into_owned());
+    }
+    args.extend(build_engine_args(&path.to_string_lossy(), None));
     let reg = reg.inner().clone();
     let id = run_id.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -468,6 +485,18 @@ fn write_launch_settings<R: Runtime>(app: &AppHandle<R>, text: &str) -> Result<P
     let dir = launch_settings::settings_dir(&coilbox_portable::data_dir(app)?);
     launch_settings::write(&dir, text)?;
     Ok(dir)
+}
+
+/// Write the Test in game configuration file. Answers its path, for
+/// `--config`.
+fn write_test_config<R: Runtime>(
+    app: &AppHandle<R>,
+    port: Option<u16>,
+    language: Option<&str>,
+) -> Result<PathBuf, String> {
+    let file = launch_settings::test_config_file(&coilbox_portable::data_dir(app)?);
+    launch_settings::write_test_config(&file, port, language)?;
+    Ok(file)
 }
 
 /// How long [`play_ask_lua_rules`] waits for the game to answer.

@@ -313,6 +313,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       }
       const result = await launch("skirmish", {
         ...reachable,
+        testLaunch: true,
         config: toBattleConfig({
           participants,
           mapName: map.name,

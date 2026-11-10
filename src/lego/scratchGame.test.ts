@@ -163,6 +163,8 @@ interface UnsyncedRun {
   /** Whether the game takes a spot selection, as it does a free spot. */
   accept?: boolean;
   spectator?: boolean;
+  /** How many drawn frames to run after the phases. */
+  updates?: number;
 }
 
 /**
@@ -177,6 +179,7 @@ function runUnsyncedGadget({
   start = [100, 100],
   accept = true,
   spectator = false,
+  updates = 0,
 }: UnsyncedRun) {
   const spotParams = spots
     .map(
@@ -202,11 +205,16 @@ Spring = {
     print("send " .. msg:byte(1) .. " " .. msg:sub(2))
     if msg:byte(1) == 139 and ${accept} then teamParams.selectedSpot = tonumber(msg:sub(2)) end
   end,
+  SendCommands = function(command) print("command " .. command) end,
 }
 assert(loadstring(io.read("*a")))()
 for _, phase in ipairs({ ${phases.map((p) => (p === false ? "false" : JSON.stringify(p))).join(", ")} }) do
   params.phase = phase or nil
   gadget:GameFrame()
+end
+for _ = 1, ${updates} do
+  gadget:GameFramePost(1)
+  gadget:Update(0.016)
 end
 `;
   const run = spawnSync("luajit", ["-e", harness], {
@@ -326,6 +334,17 @@ describe("buildStartUnitGadget", () => {
     const run = runUnsyncedGadget({ phases: ["faction"] });
     expect(run.stderr).toBe("");
     expect(run.lines.filter((l) => l.startsWith("create"))).toEqual([]);
+  });
+
+  it("lets the cursor go after each game frame and drawn frame (issue #5198)", () => {
+    const run = runUnsyncedGadget({ phases: [], updates: 2 });
+    expect(run.stderr).toBe("");
+    expect(run.lines).toEqual([
+      "command grabinput 0",
+      "command grabinput 0",
+      "command grabinput 0",
+      "command grabinput 0",
+    ]);
   });
 
   describe("Splinter Faction's setup screens (issue #5197)", () => {

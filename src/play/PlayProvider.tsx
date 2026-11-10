@@ -86,6 +86,8 @@ interface LaunchOpts {
   relayed?: boolean;
   /** Open the engine's autohost interface for this run (issue #3346). */
   autohost?: boolean;
+  /** The unit builder's Test in game, muted and in a window (issue #5198). */
+  testLaunch?: boolean;
 }
 
 interface ReplayOpts {
