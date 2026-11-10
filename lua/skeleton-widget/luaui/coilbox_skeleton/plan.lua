@@ -17,7 +17,9 @@
 --
 -- A unit is matched by its unit definition's name and a piece by the name the
 -- engine reports, both ignoring case. The writer is src/lego/skeletonFile.ts.
--- Keys beyond `version` and `units` belong to other writers and are ignored.
+-- `coilbox_test_unit`, a unit definition's name, is the unit Test in game wants
+-- selected (issue #5182, testunit.lua). Other keys beyond `version` and `units`
+-- belong to other writers and are ignored.
 
 local M = {}
 
@@ -60,6 +62,7 @@ end
 -- @param text string the file
 -- @param decode function(text) the JSON decoder
 -- @return table|nil units by lowercase unit definition name, or nil and a message when the text is not a skeleton file
+-- @return string|nil the file's `coilbox_test_unit`, when it is a name
 function M.parse(text, decode)
 	local value, err = decode(text)
 	if type(value) ~= "table" then
@@ -77,7 +80,8 @@ function M.parse(text, decode)
 			end
 		end
 	end
-	return units
+	local testUnit = type(value.coilbox_test_unit) == "string" and value.coilbox_test_unit ~= "" and value.coilbox_test_unit or nil
+	return units, testUnit
 end
 
 --- Read a game's file.
@@ -88,7 +92,7 @@ end
 --
 -- No file is the normal case, since a game coilbox has written nothing for has
 -- none, so it answers an empty table and no message.
--- @return table units, string|nil a message for a file that is there and will not read
+-- @return table units, string|nil a message for a file that is there and will not read, string|nil the file's `coilbox_test_unit`
 function M.read(vfs, decode, shortName)
 	if not shortName or shortName == "" then
 		return {}
@@ -101,11 +105,11 @@ function M.read(vfs, decode, shortName)
 	if type(text) ~= "string" then
 		return {}, path .. " could not be read"
 	end
-	local units, err = M.parse(text, decode)
+	local units, testUnit = M.parse(text, decode)
 	if not units then
-		return {}, path .. ": " .. err
+		return {}, path .. ": " .. testUnit
 	end
-	return units
+	return units, nil, testUnit
 end
 
 return M

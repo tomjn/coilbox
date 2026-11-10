@@ -68,6 +68,7 @@ import {
   sandboxChanges,
 } from "../../sandboxReload";
 import { SCRATCH_SIDE } from "../../scratchGame";
+import { clearTestUnit, prepareTestSkeleton } from "../../testSkeleton";
 import { CHECK_FRAMES, CHECK_SPAWN_FRAME } from "../../unitCheck";
 import {
   type WrittenScratchUnit,
@@ -174,6 +175,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const [action, setAction] = useState<Action>("launch");
   const [sandboxRun, setSandboxRun] = useState<SandboxRun | null>(null);
   const [reload, setReload] = useState<Reload>({ state: "idle" });
+  /** Why the last launch could not set the skeleton overlay up, if it could not. */
+  const [skeletonProblem, setSkeletonProblem] = useState<string | null>(null);
   /** The launch in flight, so a relaunch can wait for it to finish. */
   const playing = useRef<Promise<void> | null>(null);
 
@@ -263,11 +266,23 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   ) {
     if (!target || !game || !map) return;
     setCheck(null);
+    setSkeletonProblem(null);
     setAction(next);
+    let outcome: Phase | null = null;
     try {
       setPhase({ state: "writing" });
       const compat = await compatTarget();
       const { sandbox, participants, startPosType, modOptions } = await setup();
+      // The match starts with the unit selected and its skeleton shown, which
+      // is the skeleton widget's work (issue #5182).
+      const skeleton = await prepareTestSkeleton({
+        target,
+        baseArchive:
+          compat.kind === "use" ? compat.gameArchive : game.primaryArchive.name,
+        project,
+        modOptions,
+      });
+      setSkeletonProblem(skeleton.problem);
       const written = await scratchGame(compat, sandbox);
       if (!written) return;
       const scratchName = written.name;
@@ -304,7 +319,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
           gameType: scratchName,
           compatBase: compat.kind === "use" ? compat.baseName : undefined,
           startPosType,
-          modOptions,
+          modOptions: skeleton.modOptions,
           // The scratch game is a mutator over the picked game and declares no
           // options of its own, so the base game's are the ones that apply.
         }),
@@ -313,22 +328,27 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       });
       const exitCode = result.exitCode;
       if (exitCode !== null && exitCode !== 0) {
-        setPhase({
+        outcome = {
           state: "failed",
           message: t`The engine exited with code ${exitCode}. Its infolog says why.`,
-        });
+        };
         return;
       }
-      setPhase({ state: "done" });
+      outcome = { state: "done" };
     } catch (error) {
-      setPhase({
+      outcome = {
         state: "failed",
         message: describeError(error),
-      });
+      };
     } finally {
       // What a reload said was about the game that has now closed.
       setSandboxRun(null);
       setReload({ state: "idle" });
+      // The unit this match was to select is not another game's to select.
+      // The drawer stays busy until the file is clean, so a second launch
+      // cannot write its own name and have it removed by this one.
+      await clearTestUnit(target.dataDir);
+      if (outcome) setPhase(outcome);
     }
   }
 
@@ -460,6 +480,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   async function checkLoads() {
     if (!target || !game || !map) return;
     setCheck(null);
+    setSkeletonProblem(null);
     setAction("check");
     try {
       const written = await scratchGame(await compatTarget());
@@ -666,6 +687,15 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
               {phase.state === "failed" ? (
                 <p className="text-xs text-destructive">{phase.message}</p>
+              ) : null}
+
+              {skeletonProblem ? (
+                <p className="text-xs text-destructive">
+                  <Trans>
+                    The skeleton overlay could not be set up, so the match
+                    starts without it: {skeletonProblem}
+                  </Trans>
+                </p>
               ) : null}
 
               {phase.state === "done" ? (

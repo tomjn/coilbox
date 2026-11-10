@@ -49735,6 +49735,10 @@ msgstr "el seno del ángulo de cabeceo, así que 0.45 son 27 grados"
 msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "el seno del ángulo de alabeo, así que 0.8 son 53 grados"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "The skirmish AIs for this game could not be listed."
