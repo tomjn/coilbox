@@ -784,7 +784,8 @@ export function ModelViewport({
   const [showReach, setShowReach] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
   /** Null until somebody chooses, so the overlay follows whether the unit has
-   *  a skeleton: on for one that has, off for one that has not. */
+   *  a skeleton: on for one that has, off for one that has not. A unit that has
+   *  not draws its geometry skeleton once it is turned on. */
   const [skeletonChoice, setSkeletonChoice] = useState<boolean | null>(null);
   const hasSkeleton = project.skeleton !== undefined;
   const showSkeleton = skeletonChoice ?? hasSkeleton;
@@ -1641,7 +1642,7 @@ export function ModelViewport({
     project,
     pack,
     raw,
-    show: showSkeleton && hasSkeleton,
+    show: showSkeleton,
   });
   const proportionHandles = useMemo(
     () => (proportions ? proportionHandlesOf(project, proportions.plan) : []),
@@ -2180,11 +2181,7 @@ export function ModelViewport({
             drawMode={drawMode}
             onNextDrawMode={() => setDrawMode(nextDrawMode)}
             collision={{ on: showCollision, onChange: setShowCollision }}
-            skeleton={
-              hasSkeleton
-                ? { on: showSkeleton, onChange: setSkeletonChoice }
-                : undefined
-            }
+            skeleton={{ on: showSkeleton, onChange: setSkeletonChoice }}
             balance={{ on: showBalance, onChange: setShowBalance }}
             overlap={{ on: showOverlap, onChange: setShowOverlap }}
             footprint={

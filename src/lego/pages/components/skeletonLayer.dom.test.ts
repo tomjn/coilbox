@@ -175,3 +175,84 @@ describe("buildSkeleton", () => {
     disposeSkeleton(group);
   });
 });
+
+describe("buildSkeleton dimmed, for the geometry skeleton", () => {
+  const withBones: SkeletonJoint[] = [
+    {
+      pieceId: "a",
+      label: "base",
+      at: [0, 0, 0],
+      parentAt: null,
+      parentId: null,
+      reach: { local: [0, 4, 0], at: [0, 4, 0] },
+    },
+    {
+      pieceId: "b",
+      label: "flare",
+      at: [0, 4, 0],
+      parentAt: [0, 0, 0],
+      parentId: "a",
+    },
+  ];
+  const dimmed = () =>
+    buildSkeleton(withBones, new THREE.PointsMaterial(), {
+      dimmed: true,
+    }) as THREE.Group;
+  const lines = (group: THREE.Group, role: string) =>
+    group.children.find(
+      (c) => c instanceof THREE.LineSegments && c.userData.role === role,
+    ) as THREE.LineSegments;
+
+  it("draws a bone for each piece with geometry and none for an empty one", () => {
+    const group = dimmed();
+
+    expect(
+      Array.from(lines(group, "reach").geometry.getAttribute("position").array),
+    ).toEqual([0, 0, 0, 0, 4, 0]);
+    expect(lines(group, "bones").geometry.getAttribute("position").count).toBe(
+      2,
+    );
+    disposeSkeleton(group);
+  });
+
+  it("is fainter than a real skeleton, and the bone brighter than the parent line", () => {
+    const group = dimmed();
+    const real = build();
+    const opacity = (o: THREE.Object3D) =>
+      ((o as THREE.LineSegments).material as THREE.LineBasicMaterial).opacity;
+
+    expect(opacity(lines(group, "reach"))).toBeLessThan(
+      opacity(real.children[0] as THREE.Object3D),
+    );
+    expect(opacity(lines(group, "reach"))).toBeGreaterThan(
+      opacity(lines(group, "bones")),
+    );
+    expect(
+      (
+        lines(group, "reach").material as THREE.LineBasicMaterial
+      ).color.getHex(),
+    ).toBe(SKELETON_COLOUR);
+    disposeSkeleton(group);
+    disposeSkeleton(real);
+  });
+
+  it("names a piece only while it is hovered or selected", () => {
+    const group = dimmed();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 1000);
+    camera.position.set(20, 0, 40);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    const visible = () =>
+      group.children
+        .filter((c) => c instanceof THREE.Sprite && c.visible)
+        .map((c) => c.userData.pieceId);
+    const size = { width: 800, height: 600 };
+
+    layoutSkeletonLabels(group, camera, size, new Set());
+    expect(visible()).toEqual([]);
+
+    layoutSkeletonLabels(group, camera, size, new Set(["b"]));
+    expect(visible()).toEqual(["b"]);
+    disposeSkeleton(group);
+  });
+});
