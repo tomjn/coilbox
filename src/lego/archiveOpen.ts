@@ -83,6 +83,9 @@ export interface ArchiveOpenRequest {
    * second time would make the import wait on a scan for a label.
    */
   name?: string;
+  /** The unitdef that names the model, so the opened unit is that unit rather
+   *  than a model named after its file (#5186). */
+  unit?: string;
 }
 
 /**
@@ -106,6 +109,7 @@ export function builderOpenUrl(request: ArchiveOpenRequest): string {
   if (request.name && request.name !== request.archive) {
     params.set("name", request.name);
   }
+  if (request.unit) params.set("unit", request.unit);
   return `${BUILDER_OPEN_PATH}?${params}`;
 }
 
@@ -122,8 +126,14 @@ export function openRequest(
   const archive = params.get("archive")?.trim() ?? "";
   const member = params.get("member")?.trim() ?? "";
   const name = params.get("name")?.trim() ?? "";
+  const unit = params.get("unit")?.trim() ?? "";
   if (!archive || !member) return null;
-  return { archive, member, ...(name ? { name } : {}) };
+  return {
+    archive,
+    member,
+    ...(name ? { name } : {}),
+    ...(unit ? { unit } : {}),
+  };
 }
 
 /** What the opened unit is called: the model's own file name, as the file

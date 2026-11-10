@@ -67,7 +67,7 @@ export default function OpenFromArchivePage() {
    *  a second time without a fresh archive or member, so this doubles as the
    *  identity of "the request currently owning `stage`". */
   const requestKey = request
-    ? JSON.stringify([request.archive, request.member])
+    ? JSON.stringify([request.archive, request.member, request.unit])
     : null;
   /** So a re-render, or the tree arriving twice out of its cache, cannot start
    *  a second import of the same model. Keyed to the request rather than a
@@ -137,14 +137,15 @@ export default function OpenFromArchivePage() {
         const staged = await stageModel(target, picked, tree.files);
         const result = await readModel({
           path: staged.path,
-          name,
-          unitName: name,
+          name: request.unit ?? name,
+          unitName: request.unit ?? name,
           source: modelSource(picked),
           unpacked: staged.staged !== null,
           game: {
             name: request.name ?? request.archive,
             archive: request.archive,
             member: request.member,
+            ...(request.unit ? { unit: request.unit } : {}),
           },
           beforeImport: (textures) =>
             stageTextures(target, picked, staged, tree.files, textures),

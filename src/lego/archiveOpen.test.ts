@@ -47,6 +47,15 @@ describe("builderOpenUrl", () => {
     expect(back(url)?.name).toBe("Comet Catcher Remake");
   });
 
+  it("carries the unitdef that names the model", () => {
+    const url = builderOpenUrl({
+      archive: "Game.sdd",
+      member: "objects3d/tank.s3o",
+      unit: "armtank",
+    });
+    expect(back(url)?.unit).toBe("armtank");
+  });
+
   it("leaves out a display name that is only the archive again", () => {
     const url = builderOpenUrl({
       archive: "Game.sdd",
