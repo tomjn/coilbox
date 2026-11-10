@@ -133,6 +133,10 @@ void main() {
 		vec2 d = (q.xy / q.w - p.xy / p.w) * viewport;
 		float len = length(d);
 		vec2 across = len > 0.0 ? vec2(-d.y, d.x) / len : vec2(0.0, 1.0);
+		// at the far end the other end is behind, so the direction turns round
+		if (corner.y > 0.5) {
+			across = -across;
+		}
 		p.xy += across * corner.x * other.w * pxScale * 2.0 / viewport * p.w;
 	} else {
 		// a dot's corner moves it a fixed number of pixels, however far away
@@ -151,7 +155,8 @@ in vec2 vCorner;
 in float vLine;
 out vec4 fragColor;
 void main() {
-	float d = length(vCorner);
+	// a line's x runs from side to side, a dot's corner from its middle
+	float d = vLine > 0.5 ? abs(vCorner.x) : length(vCorner);
 	if (d > 1.0) {
 		discard;
 	}

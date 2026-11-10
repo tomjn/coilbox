@@ -217,15 +217,17 @@ local function vertex(out, n, p, alpha, cx, cy, other, width)
 end
 
 --- A line from a to b as two triangles. Each vertex knows the other end, so
--- the shader can push it sideways across the line on screen. Seen from the
--- other end the sides swap, so b's sides are the other way round.
+-- the shader can push it sideways across the line on screen. The corner's x
+-- is the side, the same side at both ends, so the fade across the line runs
+-- evenly over both triangles. Its y is 1 at b, which tells the shader that
+-- the other end is behind it, so it turns the direction round.
 local function line(out, n, a, b, alpha, width)
 	n = vertex(out, n, a, alpha, -1, 0, b, width)
 	n = vertex(out, n, a, alpha, 1, 0, b, width)
-	n = vertex(out, n, b, alpha, -1, 0, a, width)
+	n = vertex(out, n, b, alpha, 1, 1, a, width)
 	n = vertex(out, n, a, alpha, -1, 0, b, width)
-	n = vertex(out, n, b, alpha, -1, 0, a, width)
-	n = vertex(out, n, b, alpha, 1, 0, a, width)
+	n = vertex(out, n, b, alpha, 1, 1, a, width)
+	n = vertex(out, n, b, alpha, -1, 1, a, width)
 	return n
 end
 M.LINE_VERTICES = 6

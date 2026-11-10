@@ -101,6 +101,19 @@ check("a selected unit is drawn", #world == 1 and world[1].unitID == 7)
 check("its pose is moved into the world", same(world[1].origins[2], { 100, 6, 200 }), show(world[1].origins[2]))
 check("three lines to a parent and three bones", lines == 6 * S.LINE_VERTICES, lines)
 check("a bone is wider than a line to the parent", S.BONE_WIDTH > S.PARENT_WIDTH)
+
+-- A line's two triangles share the diagonal from its first vertex to its
+-- third. The fade across the line reads the corner's x, so those two must be
+-- on opposite sides, or the fade cuts a see-through stripe along the diagonal.
+local function corner(v)
+	local at = (v - 1) * S.STRIDE
+	return verts[at + 8], verts[at + 9]
+end
+local x1, y1 = corner(1)
+local x3, y3 = corner(3)
+check("a line's shared diagonal runs from one side to the other", x1 == -x3, x1 .. " " .. x3)
+check("the far end is marked as the far end", y1 == 0 and y3 == 1, y1 .. " " .. y3)
+check("the triangles share that diagonal", corner(4) == x1 and select(1, corner(5)) == x3)
 check("a dot at every origin, empty ones too", dots == 4 * 6, dots)
 check("every vertex has its numbers", #verts == (lines + dots) * S.STRIDE, #verts)
 check("a bone is brighter than a line to the parent", S.BONE_ALPHA > S.PARENT_ALPHA)
