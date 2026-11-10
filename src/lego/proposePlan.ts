@@ -270,6 +270,26 @@ export function proposePlan(
       );
       return none();
     }
+    if (moving && flag(field(project.gameUnitDef, "canfly"))) {
+      notes.push(
+        t`The unit flies, and plans are proposed only for units that walk or roll and for buildings, so no plan is proposed.`,
+      );
+      return none();
+    }
+    // The stride's own reason goes last, since the last note is the one a
+    // scan shows for the unit.
+    const said = findings.stride?.notes ?? [];
+    if (moving && said.length > 0) {
+      const rest = notes.filter((note) => !said.includes(note));
+      notes.splice(0, notes.length, ...rest, ...said);
+      return none();
+    }
+    if (moving && findings.stride?.still) {
+      notes.push(
+        t`The unit moves, but its script moves none of its pieces when it starts moving, so there are no legs or wheels to find and no plan is proposed.`,
+      );
+      return none();
+    }
     if (moving) {
       notes.push(
         t`The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed.`,

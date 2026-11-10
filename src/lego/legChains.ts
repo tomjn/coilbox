@@ -42,6 +42,9 @@ export interface LegFindings {
    *  than one chain hangs off, or alone under a turning piece. None of them
    *  is a wheel, whatever else they are. */
   chained: Set<string>;
+  /** Whether no piece but the root turned or slid at all, so the script
+   *  animates nothing when the unit moves. */
+  still: boolean;
 }
 
 /** The part of a run's timeline the reading needs. */
@@ -72,8 +75,8 @@ function turnedBy(from: number, to: number): number {
 }
 
 /**
- * The most each piece turned about x, and slid on any axis, at any point in the
- * stride, against where it started.
+ * The most each piece turned about x, turned about y or z, and slid on any
+ * axis, at any point in the stride, against where it started.
  *
  * Every frame rather than first against last, because a stride comes back on
  * itself: a thigh that swung forward and back again ends near where it began.
@@ -81,14 +84,22 @@ function turnedBy(from: number, to: number): number {
 function motion(stride: Stride) {
   const first = stride.frames[0];
   const turned = new Map<string, number>();
+  const swung = new Map<string, number>();
   const slid = new Map<string, number>();
-  if (!first) return { turned, slid };
+  if (!first) return { turned, swung, slid };
   stride.pieces.forEach((name, index) => {
     let turn = 0;
+    let swing = 0;
     let slide = 0;
     for (const frame of stride.frames) {
       const at = index * 6;
       turn = Math.max(turn, turnedBy(first[at + 3] ?? 0, frame[at + 3] ?? 0));
+      for (const axis of [4, 5]) {
+        swing = Math.max(
+          swing,
+          turnedBy(first[at + axis] ?? 0, frame[at + axis] ?? 0),
+        );
+      }
       for (const axis of [0, 1, 2]) {
         slide = Math.max(
           slide,
@@ -97,9 +108,10 @@ function motion(stride: Stride) {
       }
     }
     turned.set(name, turn);
+    swung.set(name, swing);
     slid.set(name, slide);
   });
-  return { turned, slid };
+  return { turned, swung, slid };
 }
 
 function restPosition(project: LegoProject, piece: LegoPiece): Vec3 {
@@ -121,7 +133,7 @@ export function findLegs(
   stride: Stride,
   moved: number,
 ): LegFindings {
-  const { turned, slid } = motion(stride);
+  const { turned, swung, slid } = motion(stride);
   const byId = new Map(project.pieces.map((piece) => [piece.id, piece]));
   const parentOf = (piece: LegoPiece) =>
     piece.parentId === null ? undefined : byId.get(piece.parentId);
@@ -210,6 +222,41 @@ export function findLegs(
     );
   }
 
+  // Pieces off the centre line that turn only about y or z, joined to another
+  // piece that turns, such as a spider's legs splayed out sideways. Said, so a
+  // walker that came back with no legs says why, but never read as legs. A
+  // lone spinning piece is not a leg of any kind, so it is not said.
+  const swings = (piece: LegoPiece | undefined): piece is LegoPiece =>
+    !!piece &&
+    !isRoot(piece) &&
+    Math.max(turned.get(piece.name) ?? 0, swung.get(piece.name) ?? 0) >=
+      moved;
+  const sideways = project.pieces.filter(
+    (piece) =>
+      !chained.has(piece.name) &&
+      swings(piece) &&
+      (turned.get(piece.name) ?? 0) < moved &&
+      Math.abs(restPosition(project, piece)[0]) >= ON_THE_LINE &&
+      (swings(parentOf(piece)) ||
+        project.pieces.some(
+          (child) => child.parentId === piece.id && swings(child),
+        )),
+  );
+  if (sideways.length > 0) {
+    const names = sideways.map((piece) => piece.name).join(", ");
+    notes.push(
+      t`${names} turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs.`,
+    );
+  }
+
+  const still = project.pieces.every(
+    (piece) =>
+      isRoot(piece) ||
+      ((turned.get(piece.name) ?? 0) < moved &&
+        (swung.get(piece.name) ?? 0) < moved &&
+        (slid.get(piece.name) ?? 0) < moved),
+  );
+
   const legs: LegProposal[] = [];
   for (const side of ["l", "r"] as const) {
     const ones = found
@@ -232,7 +279,7 @@ export function findLegs(
       legs.push({ ...leg, pair: i + 1 });
     });
   }
-  return { legs, notes, chained };
+  return { legs, notes, chained, still };
 }
 
 /** The three roles a leg proposes, top down. */

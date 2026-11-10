@@ -47,6 +47,10 @@ export interface RoleFindings {
   /** What the runs wanted to say: a call-in the script does not define, a call
    *  the sandbox does not model. Not failures, and worth showing. */
   notes: string[];
+  /** What reading the stride for legs found, which is why a mover with no
+   *  legs or wheels has none: its notes, also in `notes`, and whether no piece
+   *  moved at all. Absent when no stride was read. */
+  stride?: { notes: string[]; still: boolean };
   /** Set when the script could not be run at all, in which case there are no
    *  proposals to weigh. */
   error: string | null;
@@ -137,6 +141,7 @@ export async function inferRoles(
   const proposals: RoleProposal[] = [];
   const notes: string[] = [];
   const legs: LegProposal[] = [];
+  let strideRead: RoleFindings["stride"];
 
   const probes = await legoProbeScript({
     script,
@@ -193,6 +198,7 @@ export async function inferRoles(
         : null;
     if (stride) {
       notes.push(...stride.notes);
+      strideRead = { notes: stride.notes, still: stride.still };
       legs.push(...stride.legs);
       for (const leg of stride.legs) {
         for (const { pieceName, role } of legRoles(leg)) {
@@ -225,6 +231,7 @@ export async function inferRoles(
     proposals: dedupe(proposals),
     legs,
     notes: [...new Set(notes)],
+    ...(strideRead ? { stride: strideRead } : {}),
     error: null,
   };
 }

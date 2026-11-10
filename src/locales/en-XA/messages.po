@@ -4173,6 +4173,10 @@ msgid "{names} came from a game, but the file does not say which. A piece from a
 msgstr ""
 
 #: src/lego/legChains.ts
+msgid "{names} turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs."
+msgstr ""
+
+#: src/lego/legChains.ts
 msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
 msgstr ""
 
@@ -40930,6 +40934,10 @@ msgid "The unit definition, the model and the texture changed."
 msgstr ""
 
 #: src/lego/proposePlan.ts
+msgid "The unit flies, and plans are proposed only for units that walk or roll and for buildings, so no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
 msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
 msgstr ""
 
@@ -40991,6 +40999,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "The unit moves sideways when it cannot shoot from where it is."
+msgstr ""
+
+#: src/lego/proposePlan.ts
+msgid "The unit moves, but its script moves none of its pieces when it starts moving, so there are no legs or wheels to find and no plan is proposed."
 msgstr ""
 
 #: src/lego/proposePlan.ts
