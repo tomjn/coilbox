@@ -198,7 +198,12 @@ export async function inferRoles(
         : null;
     if (stride) {
       notes.push(...stride.notes);
-      strideRead = { notes: stride.notes, still: stride.still };
+      // A run that broke may have stopped before anything moved, so it is
+      // never said to move nothing. Its error is in the notes instead.
+      strideRead = {
+        notes: stride.notes,
+        still: stride.still && !timeline.error,
+      };
       legs.push(...stride.legs);
       for (const leg of stride.legs) {
         for (const { pieceName, role } of legRoles(leg)) {

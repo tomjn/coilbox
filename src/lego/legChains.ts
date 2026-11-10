@@ -42,8 +42,9 @@ export interface LegFindings {
    *  than one chain hangs off, or alone under a turning piece. None of them
    *  is a wheel, whatever else they are. */
   chained: Set<string>;
-  /** Whether no piece but the root turned or slid at all, so the script
-   *  animates nothing when the unit moves. */
+  /** Whether no piece but the root turned or slid at all over a stride of
+   *  more than one frame, so the script animates nothing when the unit
+   *  moves. */
   still: boolean;
 }
 
@@ -248,13 +249,15 @@ export function findLegs(
     );
   }
 
-  const still = project.pieces.every(
-    (piece) =>
-      isRoot(piece) ||
-      ((turned.get(piece.name) ?? 0) < moved &&
-        (swung.get(piece.name) ?? 0) < moved &&
-        (slid.get(piece.name) ?? 0) < moved),
-  );
+  const still =
+    stride.frames.length > 1 &&
+    project.pieces.every(
+      (piece) =>
+        isRoot(piece) ||
+        ((turned.get(piece.name) ?? 0) < moved &&
+          (swung.get(piece.name) ?? 0) < moved &&
+          (slid.get(piece.name) ?? 0) < moved),
+    );
 
   const legs: LegProposal[] = [];
   for (const side of ["l", "r"] as const) {

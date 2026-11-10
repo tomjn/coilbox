@@ -656,6 +656,21 @@ describe("a stride that does not say which leg is which", () => {
       "-- still",
     );
     expect(still.stride).toEqual({ notes: [], still: true });
+
+    runScript.mockImplementation(({ pieces }: { pieces: string[] }) => ({
+      ...STILL,
+      pieces,
+      frames: [new Array(pieces.length * 6).fill(0)],
+      error: "StartMoving: attempt to call a nil value",
+    }));
+    const broke = await inferRoles(
+      tree([
+        { name: "body", parent: null, offset: [0, 20, 0] },
+        { name: "hull", parent: "body", offset: [0, 0, 0] },
+      ]),
+      "-- broke",
+    );
+    expect(broke.stride).toEqual({ notes: [], still: false });
   });
 
   it("says a leg on the centre line has no side", async () => {
