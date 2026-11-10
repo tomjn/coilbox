@@ -240,6 +240,7 @@ Beyond All Reason has its own blueprint tool. The widget reads that tool's bluep
 Some games, such as Splinter Faction, load widgets from your content folder only when their `allowuserwidgets` game option is on, and ship with it off. The same goes for every widget on the Widgets page, including the Skeleton widget. Whether coilbox turns it on depends on how you start the game:
 
 - A singleplayer battle: coilbox turns the option on when the game has it and you have installed a coilbox widget. If you set `allowuserwidgets` yourself under Game options, coilbox uses your choice, so setting it to Off keeps widgets out.
+- Test in game in the unit builder: coilbox installs the Skeleton widget, turns the option on when the game has it, and starts the match with the unit's skeleton shown.
 - A battle you host: coilbox leaves the option alone, because it changes the rules for everyone in the room. Turn it on in the battle's options if you want widgets in that game.
 - A battle someone else hosts: you cannot change the option. If the host leaves it off, the widget does not load, even when it is installed. The game's log then says it skipped user widget files.
 

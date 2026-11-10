@@ -74,6 +74,15 @@ vi.mock("../../../play/PlayProvider", () => ({
 }));
 
 const writeScratchGame = vi.fn();
+// The skeleton overlay's setup is covered in TestDrawer.skeleton.dom.test.tsx
+vi.mock("../../testSkeleton", () => ({
+  prepareTestSkeleton: async ({
+    modOptions,
+  }: {
+    modOptions: Record<string, string>;
+  }) => ({ modOptions, problem: null }),
+}));
+
 vi.mock("../../writeScratchGame", () => ({
   writeScratchGame: (args: unknown) => writeScratchGame(args),
 }));

@@ -50079,6 +50079,10 @@ msgstr "il seno dell’angolo di beccheggio, quindi 0.45 sono 27 gradi"
 msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "il seno dell’angolo di rollio, quindi 0.8 sono 53 gradi"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "The skirmish AIs for this game could not be listed."

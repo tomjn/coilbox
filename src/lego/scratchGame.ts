@@ -28,6 +28,12 @@ import { luaString } from "./unitDef";
 /** What the archive calls itself. The engine appends the version to this. */
 const SCRATCH_NAME = "Coilbox unit test";
 
+/**
+ * The scratch game's short name, which the engine reports as
+ * `Game.gameShortName`. The skeleton widget reads its file by it (issue #5182).
+ */
+export const SCRATCH_SHORTNAME = "coilbox_lego_test";
+
 /** Rewritten on every test launch, so it carries no state worth versioning. */
 const SCRATCH_VERSION = "scratch";
 
@@ -71,7 +77,7 @@ export function buildModInfo(
     "",
     "return {",
     `  name = ${luaString(identity.name)},`,
-    '  shortname = "coilbox_lego_test",',
+    `  shortname = ${luaString(SCRATCH_SHORTNAME)},`,
     `  game = ${luaString(identity.name)},`,
     `  version = ${luaString(identity.version)},`,
     `  description = ${luaString(`Units built with coilbox, on top of ${baseGame}.`)},`,

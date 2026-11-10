@@ -49735,6 +49735,10 @@ msgstr "le sinus de l’angle de tangage, donc 0.45 vaut 27 degrés"
 msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "le sinus de l’angle de roulis, donc 0.8 vaut 53 degrés"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "The skirmish AIs for this game could not be listed."
