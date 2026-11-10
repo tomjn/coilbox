@@ -158,7 +158,12 @@ export function findLegs(
       if (next.length !== 1) break;
       chain.push(next[0] as LegoPiece);
     }
-    if (chain.length === 1) continue;
+    // A lone piece off a turning fork, such as a toe under a turning foot, is
+    // part of the structure it hangs from, so it is not a wheel either.
+    if (chain.length === 1) {
+      if (turns(parent)) chained.add(piece.name);
+      continue;
+    }
     for (const link of chain) chained.add(link.name);
 
     const names = chain.map((link) => link.name).join(", ");

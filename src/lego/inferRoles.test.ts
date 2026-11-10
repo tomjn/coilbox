@@ -474,7 +474,7 @@ describe("a walker's legs, read off its stride", () => {
         parent: bones.find((b) => b.id === bone.parent)?.name ?? null,
         // The Rust side reads and writes the file, and its float parsing
         // is not exact in the last bit.
-        offset: bone.position.map((value) => expect.closeTo(value)),
+        offset: bone.position.map((value) => expect.closeTo(value, 6)),
       })),
     );
   });
@@ -564,6 +564,19 @@ describe("a stride that does not say which leg is which", () => {
     expect(found.notes.join(" ")).toContain(
       "lthigh, lfoot turn as a chain of two",
     );
+  });
+
+  it("calls nothing under a turning fork a wheel", async () => {
+    const found = await inferRoles(
+      walker([
+        { name: "hip", parent: "body", offset: [5, 0, 0] },
+        { name: "toe1", parent: "hip", offset: [1, -5, 0] },
+        { name: "toe2", parent: "hip", offset: [-1, -5, 0] },
+      ]),
+      "-- fork",
+    );
+
+    expect(found.proposals).toEqual([]);
   });
 
   it("says a chain longer than thigh, shin and foot is not proposed", async () => {
