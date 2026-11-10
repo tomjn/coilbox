@@ -40320,6 +40320,10 @@ msgstr "The point this piece turns about, and that its children hang from. A leg
 msgid "The portrait this line shows"
 msgstr "The portrait this line shows"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "The preferred engine changed, so the scan stopped and wrote nothing."
+msgstr "The preferred engine changed, so the scan stopped and wrote nothing."
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "The preflight check could not run: {error}"
 msgstr "The preflight check could not run: {error}"

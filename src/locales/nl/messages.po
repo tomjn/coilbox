@@ -49643,6 +49643,10 @@ msgstr "Het punt waarom dit deel draait en waaraan zijn kinderen hangen. Een bee
 msgid "The portrait this line shows"
 msgstr "Het portret dat deze regel toont"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "The preferred engine changed, so the scan stopped and wrote nothing."
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "The preflight check could not run: {error}"

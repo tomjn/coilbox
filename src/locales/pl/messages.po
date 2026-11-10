@@ -49307,6 +49307,10 @@ msgstr "Punkt, wokół którego obraca się ten element i z którego zwisają je
 msgid "The portrait this line shows"
 msgstr "Portret pokazywany przy tej kwestii"
 
+#: src/lego/pages/components/ScanSkeletons.tsx
+msgid "The preferred engine changed, so the scan stopped and wrote nothing."
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "The preflight check could not run: {error}"
