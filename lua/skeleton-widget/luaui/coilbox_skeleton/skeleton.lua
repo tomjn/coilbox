@@ -22,11 +22,15 @@ M.DOT_ALPHA = 0.95
 M.BONE_WIDTH = 3
 M.PARENT_WIDTH = 1.5
 
+-- How much of its opacity a piece keeps when the unit has a plan and the piece
+-- is not in it.
+M.DIM = 0.3
+
 -- Numbers per vertex: position, colour, corner, then the other end of its
--- line and the line's half width. A line's corner is the side, -1 or 1, the
--- vertex shader moves it to. A dot's corners run from -1 to 1 and its half
--- width is 0, which tells the shader it is a dot.
-M.STRIDE = 13
+-- line and the line's half width, then 1 for a dashed line. A line's corner is
+-- the side, -1 or 1, the vertex shader moves it to. A dot's corners run from
+-- -1 to 1 and its half width is 0, which tells the shader it is a dot.
+M.STRIDE = 14
 
 -- Which axis wins when two are as long as each other and reach as far from
 -- the origin: z first, the way a unit faces, then y, then x.
@@ -70,8 +74,12 @@ end
 --- A unit's piece tree.
 -- @param names table piece names by index, as Spring.GetUnitPieceList gives them
 -- @param info function(index) the piece's table, as Spring.GetUnitPieceInfo gives it
--- @return table { [index] = { name, parent = index|nil, bone = {x, y, z}|nil } }
-function M.build(names, info)
+-- @param entry table|nil the unit's bones from the body plan file, as plan.lua
+--   reads them. A piece it names carries `planned = { bone, label }`, and the
+--   result's `evidence` is the entry's. An entry that names none of the pieces
+--   is as no entry, so a file written for another model dims nothing.
+-- @return table { [index] = { name, parent = index|nil, bone = {x, y, z}|nil, planned = { bone, label }|nil }, evidence = string|nil }
+function M.build(names, info, entry)
 	local byName = {}
 	for i, name in ipairs(names) do
 		byName[name] = i
@@ -84,6 +92,20 @@ function M.build(names, info)
 			bone = M.boneEnd(piece.min, piece.max)
 		end
 		pieces[i] = { name = name, parent = byName[piece.parent], bone = bone }
+	end
+	if entry then
+		local matched = false
+		for _, piece in ipairs(pieces) do
+			piece.planned = entry.pieces[piece.name:lower()]
+			matched = matched or piece.planned ~= nil
+		end
+		if matched then
+			pieces.evidence = entry.evidence
+		else
+			for _, piece in ipairs(pieces) do
+				piece.planned = nil
+			end
+		end
 	end
 	return pieces
 end
@@ -206,13 +228,14 @@ end
 
 local NO_END = { 0, 0, 0 }
 
-local function vertex(out, n, p, alpha, cx, cy, other, width)
+local function vertex(out, n, p, alpha, cx, cy, other, width, dash)
 	local c = M.COLOR
 	other = other or NO_END
 	out[n + 1], out[n + 2], out[n + 3] = p[1], p[2], p[3]
 	out[n + 4], out[n + 5], out[n + 6], out[n + 7] = c[1], c[2], c[3], alpha
 	out[n + 8], out[n + 9] = cx, cy
 	out[n + 10], out[n + 11], out[n + 12], out[n + 13] = other[1], other[2], other[3], width or 0
+	out[n + 14] = dash and 1 or 0
 	return n + M.STRIDE
 end
 
@@ -220,32 +243,72 @@ end
 -- the shader can push it sideways across the line on screen. The corner's x
 -- is the side, the same side at both ends, so the fade across the line runs
 -- evenly over both triangles. Its y is 1 at b, which tells the shader that
--- the other end is behind it, so it turns the direction round.
-local function line(out, n, a, b, alpha, width)
-	n = vertex(out, n, a, alpha, -1, 0, b, width)
-	n = vertex(out, n, a, alpha, 1, 0, b, width)
-	n = vertex(out, n, b, alpha, 1, 1, a, width)
-	n = vertex(out, n, a, alpha, -1, 0, b, width)
-	n = vertex(out, n, b, alpha, 1, 1, a, width)
-	n = vertex(out, n, b, alpha, -1, 1, a, width)
+-- the other end is behind it, so it turns the direction round, and which it
+-- reads as how far along the line the vertex is when the line is dashed.
+local function line(out, n, a, b, alpha, width, dash)
+	n = vertex(out, n, a, alpha, -1, 0, b, width, dash)
+	n = vertex(out, n, a, alpha, 1, 0, b, width, dash)
+	n = vertex(out, n, b, alpha, 1, 1, a, width, dash)
+	n = vertex(out, n, a, alpha, -1, 0, b, width, dash)
+	n = vertex(out, n, b, alpha, 1, 1, a, width, dash)
+	n = vertex(out, n, b, alpha, -1, 1, a, width, dash)
 	return n
 end
 M.LINE_VERTICES = 6
 
 local DOT_CORNERS = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, -1 }, { 1, 1 }, { -1, 1 } }
 
+--- How one piece of a unit is drawn.
+-- @param pieces table a unit's pieces from build
+-- @param i integer the piece
+-- @param others boolean whether the pieces outside the plan are drawn
+-- @return table|nil { alpha = multiplier, dash = boolean, parent = index|nil }, nil
+--   for a piece that is not drawn. `parent` is the piece its line runs to: its
+--   own parent, or while the others are hidden the nearest planned ancestor,
+--   since a piece outside the plan can stand between two bones.
+function M.style(pieces, i, others)
+	if not pieces.evidence then
+		return { alpha = 1, dash = false, parent = pieces[i].parent }
+	end
+	if not pieces[i].planned then
+		if not others then
+			return nil
+		end
+		return { alpha = M.DIM, dash = false, parent = pieces[i].parent }
+	end
+	local parent = pieces[i].parent
+	if not others then
+		local seen = 0
+		while parent and not pieces[parent].planned and seen <= #pieces do
+			parent = pieces[parent].parent
+			seen = seen + 1
+		end
+	end
+	return { alpha = 1, dash = pieces.evidence == "observed", parent = parent }
+end
+
 --- The vertices for a list of world poses, all drawn as GL.TRIANGLES: the
 -- lines to the parents first, then the bones over them, then the dots.
+--
+-- A unit with a plan draws the pieces in it in full, and the others dimmed, or
+-- not at all when `others` is false. A plan whose evidence is `observed` draws
+-- its bones and its lines dashed. A unit with no plan draws every piece in full.
+-- @param poses table list of world poses from the tracker
+-- @param others boolean|nil whether pieces outside a plan are drawn, true when nil
 -- @return table the numbers, integer how many line vertices, integer how many dot vertices
-function M.pack(poses)
+function M.pack(poses, others)
+	if others == nil then
+		others = true
+	end
 	local out, n = {}, 0
 	local lines, dots = 0, 0
 	for _, pose in ipairs(poses) do
-		for i, piece in ipairs(pose.pieces) do
+		for i in ipairs(pose.pieces) do
 			local o = pose.origins[i]
-			local parent = o and piece.parent and pose.origins[piece.parent]
+			local style = o and M.style(pose.pieces, i, others)
+			local parent = style and style.parent and pose.origins[style.parent]
 			if parent then
-				n = line(out, n, parent, o, M.PARENT_ALPHA, M.PARENT_WIDTH)
+				n = line(out, n, parent, o, M.PARENT_ALPHA * style.alpha, M.PARENT_WIDTH, style.dash)
 				lines = lines + M.LINE_VERTICES
 			end
 		end
@@ -253,8 +316,9 @@ function M.pack(poses)
 	for _, pose in ipairs(poses) do
 		for i in ipairs(pose.pieces) do
 			local o, e = pose.origins[i], pose.ends[i]
-			if o and e then
-				n = line(out, n, o, e, M.BONE_ALPHA, M.BONE_WIDTH)
+			local style = o and e and M.style(pose.pieces, i, others)
+			if style then
+				n = line(out, n, o, e, M.BONE_ALPHA * style.alpha, M.BONE_WIDTH, style.dash)
 				lines = lines + M.LINE_VERTICES
 			end
 		end
@@ -262,15 +326,47 @@ function M.pack(poses)
 	for _, pose in ipairs(poses) do
 		for i in ipairs(pose.pieces) do
 			local o = pose.origins[i]
-			if o then
+			local style = o and M.style(pose.pieces, i, others)
+			if style then
 				for _, corner in ipairs(DOT_CORNERS) do
-					n = vertex(out, n, o, M.DOT_ALPHA, corner[1], corner[2])
+					n = vertex(out, n, o, M.DOT_ALPHA * style.alpha, corner[1], corner[2])
 				end
 				dots = dots + #DOT_CORNERS
 			end
 		end
 	end
 	return out, lines, dots
+end
+
+--- Which names to write beside the pieces.
+--
+-- A piece in a plan always has its role label, since that is what the plan
+-- adds. Every other piece is named while `naming`, and otherwise only the one
+-- nearest the cursor within `radius`. A piece that is not drawn is not named.
+-- @param marks table list of { x, y, text, planned = boolean, drawn = boolean } in screen pixels
+-- @return table the marks to write
+function M.names(marks, naming, mouseX, mouseY, radius)
+	local out, others = {}, {}
+	for _, mark in ipairs(marks) do
+		if mark.drawn then
+			if mark.planned then
+				out[#out + 1] = mark
+			else
+				others[#others + 1] = mark
+			end
+		end
+	end
+	if naming then
+		for _, mark in ipairs(others) do
+			out[#out + 1] = mark
+		end
+	else
+		local near = M.nearest(others, mouseX, mouseY, radius)
+		if near then
+			out[#out + 1] = near
+		end
+	end
+	return out
 end
 
 --- The piece whose origin is nearest a point on screen, within `radius`.

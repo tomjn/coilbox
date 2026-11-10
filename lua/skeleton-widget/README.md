@@ -10,9 +10,35 @@ A Recoil engine widget that draws the skeleton of the selected units, from engin
 - for every selected unit, drawn through the model in the builder's fuchsia (`0xe879f9`): a dot at each piece's origin, a dim line from it to its parent's origin, and a brighter, wider bone from the origin to the far end of the piece's geometry. An empty piece has no geometry, so it gets a dot and its parent line and no bone
 - the skeleton follows the pose every frame
 - the name of the piece under the cursor, or every piece's name with the Names button or the `coilbox_skeleton_names` action
-- both choices are kept in the widget's config
+- for a unit coilbox knows the body plan of, the plan's bones in full with their role label beside each, and the other pieces dimmed. The Others button, or the `coilbox_skeleton_others` action, hides the dimmed pieces
+- a plan read off a model instead of made by coilbox (evidence `observed`) is drawn dashed
+- all three choices are kept in the widget's config
 
-`WG.CoilboxSkeleton` offers `toggle`, `toggleNames` and `showing()` to a game's own interface.
+`WG.CoilboxSkeleton` offers `toggle`, `toggleNames`, `toggleOthers`, `showing()` and `others()` to a game's own interface.
+
+## The body plan file
+
+Coilbox writes `LuaUI/Config/coilbox_skeletons/<Game.gameShortName>.json` into a content root. The writer is `src/lego/skeletonFile.ts`, the reader `luaui/coilbox_skeleton/plan.lua`. The writer runs when a unit with a skeleton is exported into a game folder under `<content root>/games/`, and from the Write skeletons button on this widget's row on the Widgets page, which writes every saved unit with a skeleton.
+
+```json
+{
+  "version": 1,
+  "units": {
+    "fedcommander": {
+      "evidence": "fitted",
+      "pieces": { "lthigh": { "bone": "thigh.l1", "label": "Left thigh" } }
+    }
+  }
+}
+```
+
+- A unit is matched by its unit definition's name and a piece by its name in the model, both ignoring case.
+- `evidence` is `built` (coilbox made the pieces from a plan), `fitted` (a plan fitted to pieces the unit already had) or `observed` (read off a game's model, drawn dashed). A word this version does not know is drawn as `built`.
+- `label` is the role's label in the language coilbox was in when it wrote the file, so the widget carries no list of roles. A bone with no role is labelled with its piece's name.
+- Writing merges into the file. An `observed` entry never replaces a `built` or `fitted` one, and units and top level keys the writer was not given are kept. Keys beyond `version` and `units` belong to other writers: `coilbox_test_unit` is the unit Test in game wants selected (issue #5182), and this widget ignores it for now.
+- No file, no folder, or no entry for a unit is the normal case and logs nothing. A file that is there and will not read logs one warning. A plan that names none of a unit's pieces is read as no plan, so a file written for another model dims nothing.
+- The file is read once, when the widget loads. `/luaui reload` reads it again.
+- JSON is read by `luaui/coilbox_skeleton/json.lua`, the decoder of the blueprint widget's `json.lua` without its encoder. Each widget stands alone, so it is a copy.
 
 ## The bone end rule
 
@@ -48,4 +74,4 @@ scripts/mission-tests.sh
 luajit lua/skeleton-widget/tests/skeleton_test.lua
 ```
 
-They cover the bone end on each axis and every tie, an empty piece giving a joint and no bone, the tree built from a fake piece map, the pose and the blend between frames, and nothing drawn with no selection. Drawing needs a windowed engine, which CI does not have.
+They cover the bone end on each axis and every tie, an empty piece giving a joint and no bone, the tree built from a fake piece map, the pose and the blend between frames, nothing drawn with no selection, the plan file read from `tests/fixtures/` (a unit with an entry, one without, no file, a broken file), and which pieces are solid, dimmed, hidden, labelled and dashed. Drawing needs a windowed engine, which CI does not have.

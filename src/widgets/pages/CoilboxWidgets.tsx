@@ -11,6 +11,7 @@ import {
 } from "@/content/bindings";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { describeError } from "@/i18n/uiError";
+import { WriteSkeletons } from "./WriteSkeletons";
 
 /** What a widget's row hands to its own extra actions. */
 export interface CoilboxWidgetState {
@@ -46,6 +47,9 @@ function useEntries(): CoilboxWidgetEntry[] {
       widget: "skeleton",
       name: t`Skeleton`,
       description: t`Draws the bones of the selected units in game.`,
+      actions: ({ rootPath, busy }) => (
+        <WriteSkeletons rootPath={rootPath} busy={busy} />
+      ),
     },
   ];
 }

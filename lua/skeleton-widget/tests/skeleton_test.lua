@@ -166,4 +166,167 @@ local marks = { { x = 10, y = 10, name = "a" }, { x = 30, y = 10, name = "b" } }
 check("the nearest origin under the cursor", (S.nearest(marks, 27, 11, 8) or {}).name == "b")
 check("nothing when the cursor is far from every origin", S.nearest(marks, 200, 200, 8) == nil)
 
+--------------------------------------------------------------------------------
+-- a body plan from coilbox's file (issue #5181)
+--------------------------------------------------------------------------------
+
+local function planned(evidence, ...)
+	local named = {}
+	for _, name in ipairs({ ... }) do
+		named[name] = { bone = name .. "-bone", label = name:upper() }
+	end
+	return S.build(NAMES, function(i)
+		return INFO[NAMES[i]]
+	end, { evidence = evidence, pieces = named })
+end
+
+local function drawnPoses(unit)
+	local t = S.tracker({
+		skeleton = function()
+			return unit
+		end,
+		matrix = function(_, i)
+			return MATRICES[i]
+		end,
+		unitMatrix = function()
+			return translate(0, 0, 0)
+		end,
+	})
+	t.update({ 1 }, 1)
+	return t.world(0)
+end
+
+--- The numbers a pack gave, as one table per vertex: alpha, dash
+local function vertexList(out)
+	local list = {}
+	for at = 0, #out - S.STRIDE, S.STRIDE do
+		list[#list + 1] = { alpha = out[at + 7], dash = out[at + 14], width = out[at + 13] }
+	end
+	return list
+end
+
+local plain = planned("built")
+check("no plan is no evidence", plain.evidence == nil and plain[1].planned == nil)
+
+local turretPlan = planned("fitted", "turret", "barrel")
+check("a piece in the plan carries its bone and label", same(turretPlan[2].planned, { bone = "turret-bone", label = "TURRET" }), show(turretPlan[2].planned))
+check("a piece outside the plan carries none", turretPlan[1].planned == nil and turretPlan[4].planned == nil)
+check("the unit has the plan's evidence", turretPlan.evidence == "fitted")
+check("names match whatever the case", S.build({ "Turret" }, function()
+	return INFO.turret
+end, { evidence = "built", pieces = { turret = { bone = "t", label = "T" } } })[1].planned ~= nil)
+
+local stranger = planned("built", "no_such_piece")
+check("a plan naming none of the pieces is as no plan", stranger.evidence == nil and stranger[1].planned == nil and stranger[2].planned == nil)
+
+-- the planned unit: turret and barrel are the plan. base and flare are not.
+local world = drawnPoses(turretPlan)
+local all = vertexList(select(1, S.pack(world)))
+local full, dim = 0, 0
+for _, v in ipairs(all) do
+	if v.alpha == S.PARENT_ALPHA or v.alpha == S.BONE_ALPHA or v.alpha == S.DOT_ALPHA then
+		full = full + 1
+	elseif v.alpha < S.PARENT_ALPHA then
+		dim = dim + 1
+	end
+end
+check("the pieces outside the plan are dimmed, the plan's in full", full > 0 and dim > 0, full .. " " .. dim)
+local dimmest = S.DIM * S.DOT_ALPHA
+local dimDots = 0
+for _, v in ipairs(all) do
+	if v.width == 0 and v.alpha == dimmest then
+		dimDots = dimDots + 1
+	end
+end
+check("a dimmed piece keeps a fraction of its opacity", dimDots == 2 * 6, dimDots)
+check("a built or fitted plan is not dashed", (function()
+	for _, v in ipairs(all) do
+		if v.dash ~= 0 then
+			return false
+		end
+	end
+	return true
+end)())
+
+local hidden, hiddenLines, hiddenDots = S.pack(world, false)
+check("hiding the others draws the plan's dots alone", hiddenDots == 2 * 6, hiddenDots)
+check("hiding the others leaves no dimmed vertex", (function()
+	for _, v in ipairs(vertexList(hidden)) do
+		if v.alpha < S.PARENT_ALPHA then
+			return false
+		end
+	end
+	return true
+end)())
+-- turret's parent base is outside the plan, so with the others hidden its line
+-- runs to nothing and is not drawn. Barrel's parent turret is in the plan, so
+-- that is one line, and the two bones make three.
+check("a line to a parent outside the plan is dropped when the others are hidden", hiddenLines == 3 * S.LINE_VERTICES, hiddenLines)
+
+local _, shownLines, shownDots = S.pack(world, true)
+check("with the others shown every piece has its dot and every parent line", shownDots == 4 * 6 and shownLines == 6 * S.LINE_VERTICES, shownLines .. " " .. shownDots)
+
+-- a bone with a piece outside the plan between it and the next bone
+local chain = S.build({ "a", "b", "c" }, function(i)
+	return { parent = ({ "[null]", "a", "b" })[i], isEmpty = true }
+end, { evidence = "built", pieces = { a = { bone = "a", label = "A" }, c = { bone = "c", label = "C" } } })
+check("with the others hidden a line reaches the nearest bone above", S.style(chain, 3, false).parent == 1, show(S.style(chain, 3, false)))
+check("with the others shown it reaches the piece's own parent", S.style(chain, 3, true).parent == 2)
+check("a piece outside the plan is not drawn while the others are hidden", S.style(chain, 2, false) == nil)
+
+local observed = planned("observed", "turret", "barrel")
+local dashed = vertexList(select(1, S.pack(drawnPoses(observed))))
+local solid, broken = 0, 0
+for _, v in ipairs(dashed) do
+	if v.width > 0 and (v.alpha == S.BONE_ALPHA or v.alpha == S.PARENT_ALPHA) then
+		if v.dash == 1 then
+			solid = solid + 1
+		else
+			broken = broken + 1
+		end
+	end
+end
+check("an observed plan's bones and lines are dashed", solid > 0 and broken == 0, solid .. " " .. broken)
+local dotDashes = 0
+for _, v in ipairs(dashed) do
+	if v.width == 0 and v.dash ~= 0 then
+		dotDashes = dotDashes + 1
+	end
+end
+check("a dot is never dashed", dotDashes == 0)
+
+local solidOnly = vertexList(select(1, S.pack(drawnPoses(turretPlan))))
+local anyDash = false
+for _, v in ipairs(solidOnly) do
+	anyDash = anyDash or v.dash == 1
+end
+check("a fitted plan is drawn solid", not anyDash)
+
+local noPlan = vertexList(select(1, S.pack(drawnPoses(plain))))
+local minAlpha = 1
+for _, v in ipairs(noPlan) do
+	minAlpha = math.min(minAlpha, v.alpha)
+end
+check("a unit with no entry draws every piece in full, whatever the toggle", minAlpha == S.PARENT_ALPHA and select(3, S.pack(drawnPoses(plain), false)) == 4 * 6)
+
+--------------------------------------------------------------------------------
+-- names: role labels beside the plan's pieces
+--------------------------------------------------------------------------------
+
+local function mark(x, text, planned_, drawn)
+	return { x = x, y = 10, text = text, planned = planned_, drawn = drawn }
+end
+local labelled = { mark(10, "Turret", true, true), mark(60, "base", false, true), mark(110, "flare", false, true), mark(160, "gone", false, false) }
+local function texts(list)
+	local out = {}
+	for _, m in ipairs(list) do
+		out[#out + 1] = m.text
+	end
+	return table.concat(out, ",")
+end
+check("a planned piece's label is always written", texts(S.names(labelled, false, 500, 500, 8)) == "Turret", texts(S.names(labelled, false, 500, 500, 8)))
+check("the piece under the cursor is named as well", texts(S.names(labelled, false, 61, 11, 8)) == "Turret,base")
+check("naming writes every drawn piece", texts(S.names(labelled, true, 500, 500, 8)) == "Turret,base,flare")
+check("a piece that is not drawn is never named", not texts(S.names(labelled, true, 160, 10, 8)):find("gone"))
+
 support.report()
