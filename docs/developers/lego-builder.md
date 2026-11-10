@@ -653,19 +653,21 @@ A unit with a Lua script can have its plan and picks worked out for you. Press *
 | What the script shows | Plan |
 | --- | --- |
 | Legs in pairs, one to four pairs | Two, Four, Six or Eight legs |
-| Wheels, in pairs across the unit | Wheels, with an axle for each pair |
+| Wheels in pairs across the unit, two to five pairs | Wheels, with an axle for each pair |
 | No legs or wheels, a unit definition that does not move, and a turret | Turret building |
 | No legs or wheels, a unit definition that does not move, and no turret | Building |
 
-A turret on a walker or a wheeled unit adds **Gun**, and a build arm role adds **Builds**. Each leg bone takes its proposed piece, and the body takes the piece every leg, or every wheel, hangs from. Each wheel goes by its side and its place front to back. The turret, barrel, muzzle flare and build arm bones take the piece with that role. The root bone takes the unit's root.
+A turret on a walker or a wheeled unit adds **Gun**, and a build arm role adds **Builds**. Each leg bone takes its proposed piece, and the body takes the piece every leg, or every wheel, hangs from. Each wheel goes by its side and its place front to back. The turret, barrel, muzzle flare and build arm bones take the piece with that role. The root bone takes the unit's root, unless the legs or wheels hang straight from the root. Then the root is the body and the root bone is left unmatched.
 
 Under each pick the drawer says why it was made, such as "Moved in StartMoving" or "The legs hang from it". Every pick can be changed or unmatched before **Fit**, as if you had made it.
 
-Coilbox does not guess. Where no plan fits, the drawer says why and opens on the plan list as it does without a proposal. That covers:
+Coilbox does not guess. The drawer also lists what reading the script found, such as a chain of pieces that was not taken for a leg. Where no plan fits, the drawer says why and opens on the plan list as it does without a proposal. That covers:
 
 - more legs on one side than the other, or an odd number of legs
 - more than four pairs of legs
-- wheels that do not pair up, or two wheels on one side the same distance front to back
+- wheels that do not pair up, or are not level across the unit, or two wheels on one side the same distance front to back
+- fewer than two or more than five pairs of wheels
+- a wheel on the unit's centre line
 - a unit that moves but shows no legs or wheels, and a unit with no game definition to say whether it moves
 
 A bone two pieces were proposed for, or a body when the legs hang from different pieces, is left unmatched with a note saying so.

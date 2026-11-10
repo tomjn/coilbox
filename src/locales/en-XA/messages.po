@@ -40951,6 +40951,10 @@ msgstr ""
 msgid "The wheels hang from it"
 msgstr ""
 
+#: src/lego/proposePlan.ts
+msgid "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
+msgstr ""
+
 #: src/content/pages/components/DeleteEngineButton.tsx
 msgid "The whole folder goes, freeing {freedBytes}. You would have to download this version again to replay a game recorded on it."
 msgstr ""

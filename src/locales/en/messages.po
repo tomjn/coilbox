@@ -40952,6 +40952,10 @@ msgstr "The wheels do not all hang from one piece, so the body is left for you t
 msgid "The wheels hang from it"
 msgstr "The wheels hang from it"
 
+#: src/lego/proposePlan.ts
+msgid "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
+msgstr "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
+
 #: src/content/pages/components/DeleteEngineButton.tsx
 msgid "The whole folder goes, freeing {freedBytes}. You would have to download this version again to replay a game recorded on it."
 msgstr "The whole folder goes, freeing {freedBytes}. You would have to download this version again to replay a game recorded on it."
