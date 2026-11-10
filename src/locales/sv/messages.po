@@ -27253,6 +27253,10 @@ msgstr "Det exakta spelet kunde inte bekräftas från reprisen, så det här är
 msgid "its facing is not three numbers of unit length"
 msgstr "dess riktning är inte tre tal av enhetslängd"
 
+#: src/lego/pages/components/ExportDrawer.tsx
+msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
+msgstr ""
+
 #: src/lego/connectors.ts
 #, fuzzy
 msgid "its id is not a name"
@@ -33389,6 +33393,10 @@ msgstr "Inga sparade förinställningar att ta med."
 #, fuzzy
 msgid "No saved profiles yet."
 msgstr "Inga sparade profiler än."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "No saved unit has a skeleton."
+msgstr ""
 
 #: src/campaign/pages/components/CampaignUnits.tsx
 #, fuzzy
@@ -49812,6 +49820,10 @@ msgstr "Samma frö bygger alltid samma karta."
 #, fuzzy
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "Samma frö och regler mot det här spelet ger alltid samma mod."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "The saved units could not be read: {loadMessage}"
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

@@ -108,6 +108,12 @@ describe("the file's place", () => {
     expect(skeletonFileName("a b/c")).toBe("a_b_c.json");
   });
 
+  it("changes each byte of a non-ASCII name, as the widget does", () => {
+    // "é" is two bytes in UTF-8, and Lua reads it a byte at a time
+    expect(skeletonFileName("café")).toBe("caf__.json");
+    expect(skeletonFileName("日本")).toBe("______.json");
+  });
+
   it("finds the content root of a game folder, and nothing for another folder", () => {
     expect(contentRootOfGameFolder("/home/p/.spring/games/mod.sdd")).toBe(
       "/home/p/.spring",
@@ -163,6 +169,22 @@ describe("mergeSkeletonFile", () => {
     expect(() => mergeSkeletonFile("{ nope", {})).toThrow(/not JSON/);
     expect(() => mergeSkeletonFile("[]", {})).toThrow(/not an object/);
     expect(() => mergeSkeletonFile('{"version": 2}', {})).toThrow(/version 2/);
+  });
+
+  it("refuses units that are not an object rather than replacing them", () => {
+    expect(() => mergeSkeletonFile('{"version": 1, "units": []}', {})).toThrow(
+      /units are not an object/,
+    );
+    expect(() => mergeSkeletonFile('{"version": 1, "units": "x"}', {})).toThrow(
+      /units are not an object/,
+    );
+  });
+
+  it("treats a file with no units as an empty one", () => {
+    const file = JSON.parse(
+      mergeSkeletonFile('{"version": 1}', { a: entry("built") }),
+    );
+    expect(file.units).toEqual({ a: entry("built") });
   });
 });
 
@@ -239,6 +261,31 @@ describe("writeSkeletonFiles", () => {
       "seen",
       "fedwalker",
     ]);
+  });
+
+  it("lists only the units whose entry changed", async () => {
+    const { io } = memory();
+    await writeSkeletonFiles(io, ROOT, [unit("fedwalker"), unit("fedtwo")]);
+    const again = await writeSkeletonFiles(io, ROOT, [
+      unit("fedwalker"),
+      unit("fedtwo", {
+        pieces: [piece("body", { bone: "body", role: "base" })],
+      }),
+    ]);
+    expect(again.written.map((w) => w.units)).toEqual([["fedtwo"]]);
+  });
+
+  it("counts the units that have a skeleton", async () => {
+    const { io } = memory();
+    const result = await writeSkeletonFiles(io, ROOT, [
+      unit("fedwalker"),
+      unit("plain", { skeleton: undefined }),
+    ]);
+    expect(result.withSkeleton).toBe(1);
+    const none = await writeSkeletonFiles(io, ROOT, [
+      unit("plain", { skeleton: undefined }),
+    ]);
+    expect(none.withSkeleton).toBe(0);
   });
 
   it("writes nothing when the file already says the same", async () => {

@@ -988,6 +988,9 @@ export function ExportDrawer({
           { alsoUnder: folderGameShortname(dir, scan.data?.games ?? []) },
         );
         skeletonFiles = wrote.written.map((file) => file.path);
+        if (wrote.unplaced.length > 0) {
+          skeletonProblem = t`its game has no short name coilbox knows, so the widget's file has no place to go`;
+        }
       } catch (error) {
         skeletonProblem = describeError(error);
       }

@@ -69,11 +69,17 @@ export interface SkeletonFile {
   [other: string]: unknown;
 }
 
-/** The file name for a game, with anything a file name cannot hold changed to
- *  an underscore. `coilbox_skeleton/plan.lua` does the same to
- *  `Game.gameShortName`, so the two agree on every name. */
+/** The file name for a game, with each byte of its UTF-8 that a file name
+ *  cannot hold changed to an underscore. `coilbox_skeleton/plan.lua` does the
+ *  same to `Game.gameShortName`, which Lua reads a byte at a time, so the two
+ *  agree on every name. */
 export function skeletonFileName(shortname: string): string {
-  return `${shortname.replace(/[^A-Za-z0-9._-]/g, "_")}.json`;
+  let name = "";
+  for (const byte of new TextEncoder().encode(shortname)) {
+    const char = String.fromCharCode(byte);
+    name += /[A-Za-z0-9._-]/.test(char) ? char : "_";
+  }
+  return `${name}.json`;
 }
 
 /** Where a game's file is under a content root. */
@@ -140,28 +146,33 @@ function readFile(text: string | null): SkeletonFile {
       `the skeleton file is version ${String(value.version)}, and this coilbox reads version ${VERSION}`,
     );
   }
+  if (value.units !== undefined && !isObject(value.units)) {
+    throw new Error(
+      "the skeleton file could not be read: its units are not an object",
+    );
+  }
   return {
     ...value,
     version: VERSION,
-    units: isObject(value.units)
-      ? (value.units as Record<string, SkeletonUnitEntry>)
-      : {},
+    units: (value.units ?? {}) as Record<string, SkeletonUnitEntry>,
   };
 }
 
 /**
- * The file's text with `entries` merged into what is there. A unit's entry is
- * replaced by a new one, except that an `observed` entry never replaces a
- * `built` or `fitted` one: coilbox's own record of a unit's plan outranks a
- * reading of its model. Units not named and keys coilbox does not know are kept
- * as they are. Throws for text that is not a skeleton file.
+ * The file's text with `entries` merged into what is there, and the units whose
+ * entry is not what the file held. A unit's entry is replaced by a new one,
+ * except that an `observed` entry never replaces a `built` or `fitted` one:
+ * coilbox's own record of a unit's plan outranks a reading of its model. Units
+ * not named and keys coilbox does not know are kept as they are. Throws for
+ * text that is not a skeleton file.
  */
-export function mergeSkeletonFile(
+export function mergeSkeleton(
   existing: string | null,
   entries: Readonly<Record<string, SkeletonUnitEntry>>,
-): string {
+): { text: string; changed: string[] } {
   const file = readFile(existing);
   const units = { ...file.units };
+  const changed: string[] = [];
   for (const [unitName, entry] of Object.entries(entries)) {
     const held = units[unitName];
     if (
@@ -171,9 +182,18 @@ export function mergeSkeletonFile(
     ) {
       continue;
     }
+    if (JSON.stringify(held) !== JSON.stringify(entry)) changed.push(unitName);
     units[unitName] = entry;
   }
-  return JSON.stringify({ ...file, units }, null, 2);
+  return { text: JSON.stringify({ ...file, units }, null, 2), changed };
+}
+
+/** Just the text of {@link mergeSkeleton}. */
+export function mergeSkeletonFile(
+  existing: string | null,
+  entries: Readonly<Record<string, SkeletonUnitEntry>>,
+): string {
+  return mergeSkeleton(existing, entries).text;
 }
 
 /**
@@ -205,7 +225,7 @@ export function contentRootOfGameFolder(folder: string): string | null {
 
 export interface SkeletonWrite {
   path: string;
-  /** The unit definition names written to it. */
+  /** The unit definition names whose entry in it changed. */
   units: string[];
 }
 
@@ -215,6 +235,9 @@ export interface SkeletonWriteResult {
   /** Units with a skeleton that no file could be written for, because their
    *  game has no short name that coilbox knows. */
   unplaced: string[];
+  /** How many of the units given have a skeleton with a bone, whether or not a
+   *  file could be written for them. */
+  withSkeleton: number;
 }
 
 function samePath(a: string, b: string): boolean {
@@ -263,9 +286,11 @@ export async function writeSkeletonFiles(
   const alsoUnder = options.alsoUnder?.trim() || null;
   const byGame = new Map<string, Record<string, SkeletonUnitEntry>>();
   const unplaced: string[] = [];
+  let withSkeleton = 0;
   for (const project of projects) {
     const entry = unitSkeletonEntry(project);
     if (!entry) continue;
+    withSkeleton += 1;
     const shortnames = new Set(
       [skeletonGameShortname(project), alsoUnder].filter(
         (name): name is string => name !== null,
@@ -286,10 +311,10 @@ export async function writeSkeletonFiles(
   for (const [shortname, entries] of byGame) {
     const path = skeletonFilePath(root, shortname);
     const before = await io.read(path);
-    const text = mergeSkeletonFile(before, entries);
-    if (text === before) continue;
+    const { text, changed } = mergeSkeleton(before, entries);
+    if (changed.length === 0) continue;
     await io.write(path, text);
-    written.push({ path, units: Object.keys(entries) });
+    written.push({ path, units: changed });
   }
-  return { written, unplaced };
+  return { written, unplaced, withSkeleton };
 }

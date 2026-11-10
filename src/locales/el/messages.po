@@ -27253,6 +27253,10 @@ msgstr "Το ακριβές παιχνίδι της δεν ήταν δυνατό
 msgid "its facing is not three numbers of unit length"
 msgstr "η κατεύθυνσή του δεν είναι τρεις αριθμοί μοναδιαίου μήκους"
 
+#: src/lego/pages/components/ExportDrawer.tsx
+msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
+msgstr ""
+
 #: src/lego/connectors.ts
 #, fuzzy
 msgid "its id is not a name"
@@ -33389,6 +33393,10 @@ msgstr "Δεν υπάρχουν αποθηκευμένες προρρυθμίσ�
 #, fuzzy
 msgid "No saved profiles yet."
 msgstr "Κανένα αποθηκευμένο προφίλ ακόμη."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "No saved unit has a skeleton."
+msgstr ""
 
 #: src/campaign/pages/components/CampaignUnits.tsx
 #, fuzzy
@@ -49812,6 +49820,10 @@ msgstr "Το ίδιο seed δημιουργεί πάντα τον ίδιο χά�
 #, fuzzy
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "Το ίδιο seed και οι ίδιοι κανόνες για αυτό το παιχνίδι παράγουν πάντα το ίδιο mod."
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "The saved units could not be read: {loadMessage}"
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

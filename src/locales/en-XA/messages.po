@@ -22127,6 +22127,10 @@ msgstr ""
 msgid "its facing is not three numbers of unit length"
 msgstr ""
 
+#: src/lego/pages/components/ExportDrawer.tsx
+msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
+msgstr ""
+
 #: src/lego/connectors.ts
 msgid "its id is not a name"
 msgstr ""
@@ -27110,6 +27114,10 @@ msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "No saved profiles yet."
+msgstr ""
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "No saved unit has a skeleton."
 msgstr ""
 
 #: src/campaign/pages/components/CampaignUnits.tsx
@@ -40437,6 +40445,10 @@ msgstr ""
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "The same seed and rules against this game always produce the same mod."
+msgstr ""
+
+#: src/widgets/pages/WriteSkeletons.tsx
+msgid "The saved units could not be read: {loadMessage}"
 msgstr ""
 
 #: src/content/pages/components/states.tsx
