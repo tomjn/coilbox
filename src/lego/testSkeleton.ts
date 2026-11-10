@@ -27,31 +27,32 @@ import type { LegoProject } from "./model";
 import { SCRATCH_SHORTNAME } from "./scratchGame";
 import {
   mergeSkeleton,
-  type SkeletonUnitEntry,
   skeletonFilePath,
   unitSkeletonEntry,
+  writeSkeletonFiles,
 } from "./skeletonFile";
 
 /** The top level key of the skeleton file that names the test unit. */
 export const TEST_UNIT_KEY = "coilbox_test_unit";
 
 /**
- * The scratch game's skeleton file with the test unit named and its body plan
- * in it, merged into `existing`. The unit's entry is dropped when it has no
- * skeleton, so a plan from an earlier test of the same name does not label a
- * unit that no longer has one. Throws for text that is not a skeleton file.
+ * The scratch game's skeleton file with the test unit named. The unit's entry
+ * is dropped when it has no skeleton, so a plan from an earlier test of the
+ * same name does not label a unit that no longer has one. Everything else in
+ * the file is kept. Throws for text that is not a skeleton file.
  */
-export function testSkeletonText(
+export function nameTestUnit(
   existing: string | null,
   unitName: string,
-  entry: SkeletonUnitEntry | null,
+  hasSkeleton: boolean,
 ): string {
-  const merged = JSON.parse(
-    mergeSkeleton(existing, entry ? { [unitName]: entry } : {}).text,
-  ) as Record<string, unknown> & { units: Record<string, unknown> };
-  if (!entry) delete merged.units[unitName];
-  merged[TEST_UNIT_KEY] = unitName;
-  return JSON.stringify(merged, null, 2);
+  const file = JSON.parse(mergeSkeleton(existing, {}).text) as Record<
+    string,
+    unknown
+  > & { units: Record<string, unknown> };
+  if (!hasSkeleton) delete file.units[unitName];
+  file[TEST_UNIT_KEY] = unitName;
+  return JSON.stringify(file, null, 2);
 }
 
 export interface TestSkeletonArgs {
@@ -121,13 +122,21 @@ export async function prepareTestSkeleton(
     problems.push(describeError(error));
   }
   try {
+    // The plan goes under the unit's own game and under the scratch game, whose
+    // short name is the one the match reports. Then the scratch game's file
+    // names the unit to select.
+    await writeSkeletonFiles(deps.io, root, [project], {
+      alsoUnder: SCRATCH_SHORTNAME,
+    });
     const path = skeletonFilePath(root, SCRATCH_SHORTNAME);
-    const text = testSkeletonText(
-      await deps.io.read(path),
-      project.unitName,
-      unitSkeletonEntry(project),
+    await deps.io.write(
+      path,
+      nameTestUnit(
+        await deps.io.read(path),
+        project.unitName,
+        unitSkeletonEntry(project) !== null,
+      ),
     );
-    await deps.io.write(path, text);
   } catch (error) {
     problems.push(describeError(error));
   }

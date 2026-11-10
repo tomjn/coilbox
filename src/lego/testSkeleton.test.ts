@@ -4,10 +4,10 @@ import type { LegoPiece, LegoProject } from "./model";
 import { SCRATCH_SHORTNAME } from "./scratchGame";
 import { skeletonFilePath } from "./skeletonFile";
 import {
+  nameTestUnit,
   prepareTestSkeleton,
   TEST_UNIT_KEY,
   type TestSkeletonDeps,
-  testSkeletonText,
 } from "./testSkeleton";
 
 vi.mock("@/content/config", () => ({ primeGameInfo: vi.fn() }));
@@ -37,42 +37,43 @@ const entry = {
   pieces: { body: { bone: "body", label: "Base" } },
 };
 
-describe("testSkeletonText", () => {
-  it("names the unit and holds its plan in a file that was not there", () => {
-    const file = JSON.parse(testSkeletonText(null, "fedwalker", entry));
+describe("nameTestUnit", () => {
+  it("names the unit in a file that was not there", () => {
+    const file = JSON.parse(nameTestUnit(null, "fedwalker", true));
     expect(file[TEST_UNIT_KEY]).toBe("fedwalker");
     expect(file.version).toBe(1);
-    expect(file.units.fedwalker).toEqual(entry);
   });
 
-  it("keeps the other units and the keys it does not know", () => {
+  it("keeps the units and the keys it does not know", () => {
     const before = JSON.stringify({
       version: 1,
       other: { keep: true },
-      units: { fedtank: entry },
+      units: { fedtank: entry, fedwalker: entry },
     });
-    const file = JSON.parse(testSkeletonText(before, "fedwalker", entry));
+    const file = JSON.parse(nameTestUnit(before, "fedwalker", true));
     expect(file.other).toEqual({ keep: true });
     expect(Object.keys(file.units).sort()).toEqual(["fedtank", "fedwalker"]);
   });
 
   it("replaces the unit the last test named", () => {
-    const before = testSkeletonText(null, "fedtank", entry);
-    const file = JSON.parse(testSkeletonText(before, "fedwalker", entry));
+    const before = nameTestUnit(null, "fedtank", true);
+    const file = JSON.parse(nameTestUnit(before, "fedwalker", true));
     expect(file[TEST_UNIT_KEY]).toBe("fedwalker");
   });
 
   it("names a unit with no skeleton and drops a plan it had before", () => {
-    const before = testSkeletonText(null, "fedwalker", entry);
-    const file = JSON.parse(testSkeletonText(before, "fedwalker", null));
+    const before = JSON.stringify({
+      version: 1,
+      units: { fedwalker: entry, fedtank: entry },
+    });
+    const file = JSON.parse(nameTestUnit(before, "fedwalker", false));
     expect(file[TEST_UNIT_KEY]).toBe("fedwalker");
     expect(file.units.fedwalker).toBeUndefined();
+    expect(file.units.fedtank).toEqual(entry);
   });
 
   it("refuses a file that is not a skeleton file, so it is not written over", () => {
-    expect(() => testSkeletonText("{ nope", "fedwalker", entry)).toThrow(
-      /not JSON/,
-    );
+    expect(() => nameTestUnit("{ nope", "fedwalker", true)).toThrow(/not JSON/);
   });
 });
 
