@@ -47,7 +47,7 @@ export function WidgetPanel({
   const read = useCallback(async () => {
     if (!rootPath) return;
     try {
-      setStatus(await contentWidgetStatus({ rootPath }));
+      setStatus(await contentWidgetStatus({ rootPath, widget: "blueprints" }));
       setError(null);
     } catch (e) {
       setError(message(e));
@@ -145,7 +145,7 @@ export function WidgetPanel({
           disabled={busy || status === null}
           onClick={() =>
             void act(
-              () => contentWidgetInstall({ rootPath }),
+              () => contentWidgetInstall({ rootPath, widget: "blueprints" }),
               updating
                 ? t`Updated the blueprint widget. Its panel opens on its own the first time a match starts.`
                 : t`Installed the blueprint widget. Its panel opens on its own the first time a match starts.`,
@@ -160,7 +160,7 @@ export function WidgetPanel({
             disabled={busy}
             onClick={() =>
               void act(
-                () => contentWidgetRemove({ rootPath }),
+                () => contentWidgetRemove({ rootPath, widget: "blueprints" }),
                 t`Removed the blueprint widget. Your library file and anything saved in game stay where they are.`,
               )
             }

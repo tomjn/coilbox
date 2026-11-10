@@ -58,6 +58,7 @@ import {
   type WidgetStates,
 } from "../widgetSets";
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
+import { CoilboxWidgets } from "./CoilboxWidgets";
 import {
   RemovedNotice,
   type RemovedWidget,
@@ -94,6 +95,8 @@ export default function WidgetsPage() {
   const files = useGameFiles(list.configDir, list.games, list.rows);
   const sets = useWidgetSets();
   const [adding, setAdding] = useState(false);
+  // Counts the Rescan presses, so the Coilbox widget rows read again with the list.
+  const [rescans, setRescans] = useState(0);
   // Every removal since the page opened, each with its own way back.
   const [removed, setRemoved] = useState<RemovedWidget[]>([]);
   const { running } = usePlay();
@@ -264,6 +267,7 @@ export default function WidgetsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  setRescans((n) => n + 1);
                   void list.reload();
                   void files.reload();
                 }}
@@ -285,6 +289,14 @@ export default function WidgetsPage() {
           onValueChange={pick}
           options={options}
           ariaLabel={t`Game`}
+        />
+      )}
+
+      {list.widgetDir && (
+        <CoilboxWidgets
+          rootPath={list.widgetDir}
+          refresh={rescans}
+          onChanged={reread}
         />
       )}
 

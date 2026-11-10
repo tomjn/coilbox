@@ -59,6 +59,9 @@
   RMDir /r "$INSTDIR\.coilbox\resources\blueprint-widget"
   Rename "$INSTDIR\blueprint-widget" "$INSTDIR\.coilbox\resources\blueprint-widget"
 
+  RMDir /r "$INSTDIR\.coilbox\resources\skeleton-widget"
+  Rename "$INSTDIR\skeleton-widget" "$INSTDIR\.coilbox\resources\skeleton-widget"
+
   ; The licence notice and texts for the Lua above travel beside it.
   RMDir /r "$INSTDIR\.coilbox\resources\coilbox-licence"
   Rename "$INSTDIR\coilbox-licence" "$INSTDIR\.coilbox\resources\coilbox-licence"

@@ -13206,6 +13206,7 @@ msgstr "Navn på blåkopi"
 #: src/content/index.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #: src/scenario/pages/components/modes.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Blueprints"
 msgstr "Blåkopier"
@@ -15149,6 +15150,7 @@ msgstr "kontrollerer…"
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Checking…"
@@ -16541,6 +16543,10 @@ msgstr "Coilbox-oppdatering"
 #, fuzzy
 msgid "Coilbox updates"
 msgstr "Coilbox-oppdateringer"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Coilbox widgets"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -20620,6 +20626,10 @@ msgstr "Tegner en flekk under enheten mens den står der."
 #, fuzzy
 msgid "Draws a trail on the ground behind the unit as it moves."
 msgstr "Tegner et spor på bakken bak enheten når den beveger seg."
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Draws the bones of the selected units in game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26630,6 +26640,7 @@ msgid "Install this conversion?"
 msgstr "Installere denne konverteringen?"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Install widget"
 msgstr "Installer widget"
@@ -26685,6 +26696,7 @@ msgid "Installed and ready."
 msgstr "Installert og klar."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed and up to date"
 msgstr "Installert og oppdatert"
@@ -26700,9 +26712,14 @@ msgid "Installed the conversion into {archive}."
 msgstr "Installerte konverteringen i {archive}."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "Installert, og {staleCount} av {fileCount, plural, one {# fil skiller seg} other {# filer skiller seg}} fra det denne coilbox har med"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Installed, and its licence notice is missing or out of date"
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -34229,6 +34246,7 @@ msgstr "Ikke i denne forhåndsinnstillingen"
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
 #: src/multiplayer/chat/ChatMapCard.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Not installed"
 msgstr "Ikke installert"
@@ -37411,6 +37429,10 @@ msgstr "Plassholderverdier. Angi spillets egne."
 msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
 msgstr "Plasserer en base som dukker opp fra en utløser: først terrengendringene, så bygningene."
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Places a blueprint from your library in game and saves one back."
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
@@ -39959,6 +39981,7 @@ msgid "Reinstall the mission runtime"
 msgstr "Installer oppdragsmotoren på nytt"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Reinstall widget"
 msgstr "Installer widgeten på nytt"
@@ -40446,6 +40469,7 @@ msgid "Remove this text"
 msgstr "Fjern denne teksten"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Remove widget"
 msgstr "Fjern widget"
@@ -45048,6 +45072,7 @@ msgstr "Måler størrelsen på hurtigbufferne..."
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/problems.ts
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Skeleton"
 msgstr "Skjelett"
@@ -54392,6 +54417,7 @@ msgid "Update to the latest \"{liveName}\"?"
 msgstr "Oppdatere til nyeste «{liveName}»?"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Update widget"
 msgstr "Oppdater widget"
@@ -56527,6 +56553,7 @@ msgid "Working: {op}"
 msgstr "Arbeider: {op}"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Working…"
 msgstr "Arbeider…"

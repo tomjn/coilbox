@@ -10,6 +10,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -205,6 +206,19 @@ vi.mock("../useGameWidgets", () => ({
   }),
 }));
 
+/** What each coilbox widget has installed, and every call made for one. */
+const installedWidgets = new Set<string>();
+const widgetCalls: string[] = [];
+const widgetStatus = (widget: string) => {
+  const installed = installedWidgets.has(widget);
+  return {
+    installed,
+    current: installed,
+    files: ["widgets/a.lua", "mod/b.lua"],
+    stale: installed ? [] : ["widgets/a.lua", "mod/b.lua"],
+  };
+};
+
 const removeCalls: { files: string[]; folders: string[] }[] = [];
 vi.mock("@/content/bindings", async () => {
   const actual =
@@ -224,6 +238,21 @@ vi.mock("@/content/bindings", async () => {
     contentWidgetRestore: async () => ["LuaUI/Widgets/gui_build_watch.lua"],
     contentPlayerWidgets: async () => scan,
     contentOpenPath: (args: { path: string }) => openPath(args),
+    contentWidgetStatus: async (args: { rootPath: string; widget: string }) =>
+      widgetStatus(args.widget),
+    contentWidgetInstall: async (args: {
+      rootPath: string;
+      widget: string;
+    }) => {
+      widgetCalls.push(`install ${args.widget} in ${args.rootPath}`);
+      installedWidgets.add(args.widget);
+      return { written: [] };
+    },
+    contentWidgetRemove: async (args: { rootPath: string; widget: string }) => {
+      widgetCalls.push(`remove ${args.widget} in ${args.rootPath}`);
+      installedWidgets.delete(args.widget);
+      return { removed: [] };
+    },
   };
 });
 
@@ -232,6 +261,8 @@ beforeEach(() => {
   list.second = false;
   play.running = false;
   removeCalls.length = 0;
+  installedWidgets.clear();
+  widgetCalls.length = 0;
   disk.clear();
   shipped.widgets = [];
   installSettingsStorage(memorySettingsStorage());
@@ -253,6 +284,80 @@ const page = (url = "/library/widgets") =>
 afterEach(cleanup);
 
 describe("WidgetsPage", () => {
+  it("lists each coilbox widget with its state, and installs and removes the skeleton widget", async () => {
+    page();
+    const row = await screen.findByRole("listitem", { name: "Skeleton" });
+    const own = within(row);
+    await own.findByText("Not installed");
+    expect(own.queryByText("Remove widget")).toBeNull();
+    fireEvent.click(own.getByText("Install widget"));
+    await own.findByText("Installed and up to date");
+    expect(widgetCalls).toEqual([`install skeleton in ${ROOT}`]);
+    // The other widget's row is its own.
+    const blueprints = within(
+      screen.getByRole("listitem", { name: "Blueprints" }),
+    );
+    expect(blueprints.getByText("Not installed")).toBeTruthy();
+    fireEvent.click(own.getByText("Remove widget"));
+    await own.findByText("Not installed");
+    expect(widgetCalls).toEqual([
+      `install skeleton in ${ROOT}`,
+      `remove skeleton in ${ROOT}`,
+    ]);
+  });
+
+  it("offers an update when what is installed differs from what coilbox ships", async () => {
+    installedWidgets.add("skeleton");
+    const status = widgetStatus("skeleton");
+    status.current = false;
+    status.stale = ["mod/b.lua"];
+    const bindings = await import("@/content/bindings");
+    const spy = vi
+      .spyOn(bindings, "contentWidgetStatus")
+      .mockResolvedValue(status);
+    page();
+    const row = within(
+      await screen.findByRole("listitem", { name: "Skeleton" }),
+    );
+    await row.findByText(
+      "Installed, and 1 of 2 files differ from what this coilbox ships",
+    );
+    expect(row.getByText("Update widget")).toBeTruthy();
+    spy.mockRestore();
+  });
+
+  it("does not count the shared licence notice as a widget file that differs", async () => {
+    installedWidgets.add("skeleton");
+    const status = widgetStatus("skeleton");
+    status.current = false;
+    status.stale = ["coilbox-licence/NOTICE.md", "coilbox-licence/COPYING"];
+    const bindings = await import("@/content/bindings");
+    const spy = vi
+      .spyOn(bindings, "contentWidgetStatus")
+      .mockResolvedValue(status);
+    page();
+    const row = within(
+      await screen.findByRole("listitem", { name: "Skeleton" }),
+    );
+    await row.findByText(
+      "Installed, and its licence notice is missing or out of date",
+    );
+    expect(row.getByText("Update widget")).toBeTruthy();
+    spy.mockRestore();
+  });
+
+  it("reads every row again when the page rescans", async () => {
+    page();
+    const row = within(
+      await screen.findByRole("listitem", { name: "Skeleton" }),
+    );
+    await row.findByText("Not installed");
+    // Installed outside coilbox, since the row last looked.
+    installedWidgets.add("skeleton");
+    fireEvent.click(screen.getByText("Rescan"));
+    await row.findByText("Installed and up to date");
+  });
+
   it("lists every file with what it declares and who loads it", () => {
     page();
     expect(screen.getByText("BuildWatch")).toBeTruthy();
