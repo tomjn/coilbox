@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /**
- * The skeleton widget's scan (#5186): it reads a game's units, lists each with
- * how much of a plan it got, links one with none to the builder, writes the
- * file, and stops when asked.
+ * The Models page's Skeletons drawer (#5186, moved there by #5209): its scan
+ * reads a game's units, lists each with how much of a plan it got, links one
+ * with none to the builder, writes the file, and stops when asked.
  */
 import {
   cleanup,
@@ -42,6 +42,10 @@ vi.mock("@/content/bindings", async (importOriginal) => ({
     ],
     errors: [],
   }),
+}));
+
+vi.mock("@/lego/projects", () => ({
+  useLegoProjects: () => ({ projects: [], loading: false, error: null }),
 }));
 
 let read: ScanDeps["read"];
@@ -95,7 +99,7 @@ function renderScan() {
       />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Scan units" }));
+  fireEvent.click(screen.getByRole("button", { name: "Skeletons" }));
   fireEvent.click(screen.getByRole("button", { name: "Scan" }));
 }
 
@@ -195,6 +199,39 @@ describe("ScanSkeletons", () => {
     expect(rows[0]?.textContent).toContain(
       "Turret building, with no piece for Barrel, Muzzle flare.",
     );
+  });
+
+  it("holds the saved models' button beside the scan", () => {
+    render(
+      <MemoryRouter>
+        <ScanSkeletons
+          rootPath="/root"
+          enginePath="/engine"
+          games={[game]}
+          picked={null}
+          busy={false}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("Write saved models")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Skeletons" }));
+    expect(screen.getByText("Write saved models")).toBeTruthy();
+  });
+
+  it("cannot open with no content root to write into", () => {
+    render(
+      <MemoryRouter>
+        <ScanSkeletons
+          rootPath={undefined}
+          enginePath="/engine"
+          games={[game]}
+          picked={null}
+          busy={false}
+        />
+      </MemoryRouter>,
+    );
+    const button = screen.getByRole("button", { name: "Skeletons" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("writes nothing when the page goes mid scan", async () => {

@@ -54,6 +54,7 @@ import { GenerateDrawer } from "./components/GenerateDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
 import { NewUnitPopover } from "./components/NewUnitPopover";
 import { RosterDrawer } from "./components/RosterDrawer";
+import { ScanSkeletons } from "./components/ScanSkeletons";
 import { useTestGame } from "./components/useTestGame";
 
 /** Radix's select has no empty value, so "No game" needs one of its own. */
@@ -154,7 +155,7 @@ export default function ProjectsPage() {
   const [atlas, setAtlas] = useState<string | null>(null);
   /** The game a new unit is for, by archive. "No game" unless one is picked. */
   const [newGame, setNewGame] = useState(NO_GAME);
-  const { games, scan } = useTestGame();
+  const { target, games, game: testGame, scan } = useTestGame();
   const [opening, setOpening] = useState(false);
   const [picking, setPicking] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -513,6 +514,13 @@ export default function ProjectsPage() {
             >
               <Rows3 size={16} /> <Trans>Roster</Trans>
             </Button>
+            <ScanSkeletons
+              rootPath={target?.dataDir}
+              enginePath={target?.enginePath}
+              games={games}
+              picked={testGame?.name ?? null}
+              busy={busy}
+            />
             <NewUnitPopover
               plans={BODY_PLANS}
               label={t`New model`}

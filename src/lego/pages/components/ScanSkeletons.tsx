@@ -1,6 +1,7 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import { Bone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { appFileIO } from "@/blueprint/fileIO";
@@ -26,6 +27,7 @@ import {
 } from "@/lego/skeletonScan";
 import { skeletonScanDeps } from "@/lego/skeletonScanRead";
 import { formatDuration } from "@/lib/format";
+import { WriteSkeletons } from "./WriteSkeletons";
 
 /** Units with no plan first, then those with part of one, since those are the
  *  ones somebody opens the drawer to find. */
@@ -41,13 +43,15 @@ interface Finished {
 }
 
 /**
- * The skeleton widget's scan (#5186): read every unit of one installed game,
- * propose a body plan for each from its script, and write those that got one
- * into the game's skeleton file as `observed`. The drawer lists every unit with
- * how much of a plan it got, so one with none can be opened in the builder and
- * fitted by hand.
+ * The Models page's Skeletons drawer, which writes the files the in-game
+ * skeleton widget labels bones from (#5209). Its scan (#5186) reads every unit
+ * of one installed game, proposes a body plan for each from its script, and
+ * writes those that got one into the game's skeleton file as `observed`. The
+ * drawer lists every unit with how much of a plan it got, so one with none can
+ * be opened in the builder and fitted by hand. It also writes the skeletons of
+ * the saved models (#5181).
  *
- * Runs while the Widgets page is open. Leaving the page stops it.
+ * Runs while the Models page is open. Leaving the page stops it.
  */
 export function ScanSkeletons({
   rootPath,
@@ -56,11 +60,12 @@ export function ScanSkeletons({
   picked,
   busy,
 }: {
-  rootPath: string;
+  /** The content root the files go in, which Test in game launches from. */
+  rootPath: string | undefined;
   enginePath: string | undefined;
   /** The installed games, one version each. */
   games: readonly GameItem[];
-  /** The game the page has picked, by its full name, to scan by default. */
+  /** The game to scan by default, by its full name. */
   picked: string | null;
   busy: boolean;
 }) {
@@ -97,7 +102,7 @@ export function ScanSkeletons({
   }, []);
 
   const start = async () => {
-    if (!game || !enginePath) return;
+    if (!game || !enginePath || !rootPath) return;
     const shortname = game.info?.shortname?.trim();
     const name = game.name;
     if (!shortname) {
@@ -216,24 +221,23 @@ export function ScanSkeletons({
   return (
     <>
       <Button
-        size="sm"
         variant="outline"
-        disabled={busy || games.length === 0 || !enginePath}
+        disabled={!rootPath || !enginePath}
         onClick={() => setOpen(true)}
       >
-        {running ? t`Scanning…` : t`Scan units`}
+        <Bone size={16} /> {running ? t`Scanning…` : t`Skeletons`}
       </Button>
-      {status && !open && (
-        <p role="status" className="w-full text-xs text-muted-foreground">
-          {status}
-        </p>
-      )}
       <SlideDrawer
         open={open}
-        title={t`Scan units for skeletons`}
+        title={t`Skeletons`}
         onClose={() => setOpen(false)}
       >
         <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+          {rootPath && (
+            <div className="flex flex-wrap items-center gap-2">
+              <WriteSkeletons rootPath={rootPath} busy={busy || running} />
+            </div>
+          )}
           <OptionSelect
             value={gameName}
             onValueChange={setChosen}

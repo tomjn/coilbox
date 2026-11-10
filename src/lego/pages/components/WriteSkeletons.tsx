@@ -11,7 +11,7 @@ import {
 } from "@/lego/skeletonFile";
 
 /**
- * The skeleton widget's own button (issue #5181): write the body plan of every
+ * The Skeletons drawer's button for saved models (issue #5181): write the body plan of every
  * unit the builder has saved with a skeleton into the content root, one file
  * for each game, so the widget labels their bones in game. Units already in a
  * file are updated and the rest of the file is kept.
@@ -56,7 +56,7 @@ export function WriteSkeletons({
         disabled={busy || working || loading || !!loadError}
         onClick={() => void write()}
       >
-        {working ? t`Working…` : t`Write skeletons`}
+        {working ? t`Working…` : t`Write saved models`}
       </Button>
       {(result || error || loadError) && (
         <p role="status" className="w-full text-xs text-muted-foreground">
