@@ -321,6 +321,22 @@ const SETUP_SCREENS_LUA = [
 ];
 
 /**
+ * The start gadget's unsynced half also keeps the player's cursor free (issue
+ * #5198). Splinter Faction's `Grabinput Local` widget sends `grabinput 1` as
+ * it loads and every 150 frames, which keeps the cursor inside the engine's
+ * window, and the engine has no setting that stops it. So this sends
+ * `grabinput 0` on every drawn frame. The engine draws, and calls `Update`,
+ * after the frame's game frames and before it reads input again, so a grab
+ * sent in a game frame is let go before the player can move the mouse.
+ */
+const FREE_CURSOR_LUA = [
+  "-- Let the cursor go whenever a widget keeps it inside the window.",
+  "function gadget:Update()",
+  '  Spring.SendCommands("grabinput 0")',
+  "end",
+];
+
+/**
  * The scratch archive's spawn gadget.
  *
  * Declaring the start unit is not enough on its own. The engine leaves spawning
@@ -335,7 +351,7 @@ const SETUP_SCREENS_LUA = [
  * that spawns a commander puts it on that same spot (issue #4476).
  *
  * The same file's unsynced half answers Splinter Faction's setup screens, see
- * `SETUP_SCREENS_LUA`.
+ * `SETUP_SCREENS_LUA`, and keeps the cursor free, see `FREE_CURSOR_LUA`.
  */
 export function buildStartUnitGadget(unitName: string): string {
   const lines = [
@@ -355,7 +371,9 @@ export function buildStartUnitGadget(unitName: string): string {
     `local UNIT_NAME = ${luaString(unitName)}`,
     "",
     "if not gadgetHandler:IsSyncedCode() then",
-    ...SETUP_SCREENS_LUA.map((line) => (line ? `  ${line}` : line)),
+    ...[...SETUP_SCREENS_LUA, "", ...FREE_CURSOR_LUA].map((line) =>
+      line ? `  ${line}` : line,
+    ),
     "  return",
     "end",
     "",
