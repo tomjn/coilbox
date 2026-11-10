@@ -2594,7 +2594,11 @@ export const contentBlueprintDelete = defineCommand<
   { ok: boolean }
 >("coilbox-content", "content_blueprint_delete");
 
-/** What of the in game blueprint widget is installed under a content root,
+/** The in game widgets coilbox ships, by the name the commands take
+ *  (issues #1419 and #5180). */
+export type CoilboxWidget = "blueprints" | "skeleton";
+
+/** What of one of coilbox's in game widgets is installed under a content root,
  *  against what this coilbox ships (issue #1419). */
 export interface WidgetStatus {
   /** Any of the widget's files are there. */
@@ -2609,19 +2613,19 @@ export interface WidgetStatus {
 
 /** Compare the widget under a content root with the one coilbox ships. */
 export const contentWidgetStatus = defineCommand<
-  { rootPath: string },
+  { rootPath: string; widget: CoilboxWidget },
   WidgetStatus
 >("coilbox-content", "content_widget_status");
 
 /** Copy the widget into a content root's `LuaUI/`, or update it there. */
 export const contentWidgetInstall = defineCommand<
-  { rootPath: string },
+  { rootPath: string; widget: CoilboxWidget },
   { written: string[] }
 >("coilbox-content", "content_widget_install");
 
 /** Take the widget out of a content root. Its data files stay. */
 export const contentWidgetRemove = defineCommand<
-  { rootPath: string },
+  { rootPath: string; widget: CoilboxWidget },
   { removed: string[] }
 >("coilbox-content", "content_widget_remove");
 

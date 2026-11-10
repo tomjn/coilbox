@@ -13120,6 +13120,7 @@ msgstr "蓝图名称"
 #: src/content/index.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #: src/scenario/pages/components/modes.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Blueprints"
 msgstr "蓝图"
@@ -15053,6 +15054,7 @@ msgstr "检查中…"
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Checking…"
@@ -16421,6 +16423,10 @@ msgstr "Coilbox 更新"
 #, fuzzy
 msgid "Coilbox updates"
 msgstr "Coilbox 更新"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Coilbox widgets"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -20479,6 +20485,10 @@ msgstr "单位停留时在其下方绘制污渍。"
 #, fuzzy
 msgid "Draws a trail on the ground behind the unit as it moves."
 msgstr "单位移动时在其后方地面上绘制痕迹。"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Draws the bones of the selected units in game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26462,6 +26472,7 @@ msgid "Install this conversion?"
 msgstr "安装此转换结果？"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Install widget"
 msgstr "安装小部件"
@@ -26517,6 +26528,7 @@ msgid "Installed and ready."
 msgstr "已安装，可以使用。"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed and up to date"
 msgstr "已安装且为最新"
@@ -26532,6 +26544,7 @@ msgid "Installed the conversion into {archive}."
 msgstr "已将转换结果安装到 {archive}。"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "已安装，{fileCount, plural, other {# 个文件}}中有 {staleCount} 个与此 coilbox 附带的版本不同"
@@ -34013,6 +34026,7 @@ msgstr "不在此预设中"
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
 #: src/multiplayer/chat/ChatMapCard.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Not installed"
 msgstr "未安装"
@@ -37162,6 +37176,10 @@ msgstr "占位数值。请设置你的游戏的数值。"
 msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
 msgstr ""
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Places a blueprint from your library in game and saves one back."
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
@@ -39681,6 +39699,7 @@ msgid "Reinstall the mission runtime"
 msgstr "重新安装任务运行时"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Reinstall widget"
 msgstr "重新安装小部件"
@@ -40166,6 +40185,7 @@ msgid "Remove this text"
 msgstr "移除此文本"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Remove widget"
 msgstr "移除小部件"
@@ -44741,6 +44761,7 @@ msgstr "正在统计缓存大小…"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/problems.ts
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Skeleton"
 msgstr "骨架"
@@ -53974,6 +53995,7 @@ msgid "Update to the latest \"{liveName}\"?"
 msgstr "更新到最新的“{liveName}”？"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Update widget"
 msgstr "更新小部件"
@@ -56097,6 +56119,7 @@ msgid "Working: {op}"
 msgstr "处理中：{op}"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Working…"
 msgstr "处理中…"

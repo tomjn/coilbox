@@ -58,6 +58,7 @@ import {
   type WidgetStates,
 } from "../widgetSets";
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
+import { CoilboxWidgets } from "./CoilboxWidgets";
 import {
   RemovedNotice,
   type RemovedWidget,
@@ -286,6 +287,10 @@ export default function WidgetsPage() {
           options={options}
           ariaLabel={t`Game`}
         />
+      )}
+
+      {list.widgetDir && (
+        <CoilboxWidgets rootPath={list.widgetDir} onChanged={reread} />
       )}
 
       {removed.map((r) => (

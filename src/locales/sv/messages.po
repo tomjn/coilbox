@@ -13201,6 +13201,7 @@ msgstr "Ritningens namn"
 #: src/content/index.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #: src/scenario/pages/components/modes.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Blueprints"
 msgstr "Ritningar"
@@ -15144,6 +15145,7 @@ msgstr "kontrollerar…"
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Checking…"
@@ -16536,6 +16538,10 @@ msgstr "Coilbox-uppdatering"
 #, fuzzy
 msgid "Coilbox updates"
 msgstr "Coilbox-uppdateringar"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Coilbox widgets"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -20616,6 +20622,10 @@ msgstr "Ritar en fläck under enheten medan den står där."
 #, fuzzy
 msgid "Draws a trail on the ground behind the unit as it moves."
 msgstr "Ritar ett spår på marken bakom enheten när den rör sig."
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Draws the bones of the selected units in game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26632,6 +26642,7 @@ msgid "Install this conversion?"
 msgstr "Installera den här konverteringen?"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Install widget"
 msgstr "Installera widget"
@@ -26687,6 +26698,7 @@ msgid "Installed and ready."
 msgstr "Installerad och klar."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed and up to date"
 msgstr "Installerad och uppdaterad"
@@ -26702,6 +26714,7 @@ msgid "Installed the conversion into {archive}."
 msgstr "Installerade konverteringen i {archive}."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "Installerad, och {staleCount} av {fileCount, plural, one {# fil skiljer sig} other {# filer skiljer sig}} från det som den här coilbox levereras med"
@@ -34226,6 +34239,7 @@ msgstr "Inte i den här förinställningen"
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
 #: src/multiplayer/chat/ChatMapCard.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Not installed"
 msgstr "Inte installerad"
@@ -37408,6 +37422,10 @@ msgstr "Platshållarvärden. Ange ditt spels."
 msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
 msgstr "Placerar en bas som dyker upp från en utlösare: först dess terrängändringar, sedan dess byggnader."
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Places a blueprint from your library in game and saves one back."
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
@@ -39951,6 +39969,7 @@ msgid "Reinstall the mission runtime"
 msgstr "Installera om uppdragsmiljön"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Reinstall widget"
 msgstr "Installera om widgeten"
@@ -40438,6 +40457,7 @@ msgid "Remove this text"
 msgstr "Ta bort den här texten"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Remove widget"
 msgstr "Ta bort widget"
@@ -45040,6 +45060,7 @@ msgstr "Mäter cacheminnena..."
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/problems.ts
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Skeleton"
 msgstr "Skelett"
@@ -54343,6 +54364,7 @@ msgid "Update to the latest \"{liveName}\"?"
 msgstr "Uppdatera till senaste ”{liveName}”?"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Update widget"
 msgstr "Uppdatera widget"
@@ -56478,6 +56500,7 @@ msgid "Working: {op}"
 msgstr "Arbetar: {op}"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Working…"
 msgstr "Arbetar…"

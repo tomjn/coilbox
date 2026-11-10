@@ -13120,6 +13120,7 @@ msgstr "設計図の名前"
 #: src/content/index.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #: src/scenario/pages/components/modes.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Blueprints"
 msgstr "設計図"
@@ -15053,6 +15054,7 @@ msgstr "確認中…"
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
 msgid "Checking…"
@@ -16421,6 +16423,10 @@ msgstr "Coilbox のアップデート"
 #, fuzzy
 msgid "Coilbox updates"
 msgstr "Coilbox のアップデート"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Coilbox widgets"
+msgstr ""
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -20479,6 +20485,10 @@ msgstr "ユニットが立っている間、その下に染みを描きます。
 #, fuzzy
 msgid "Draws a trail on the ground behind the unit as it moves."
 msgstr "ユニットが移動すると、後ろの地面に跡を描きます。"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Draws the bones of the selected units in game."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -26462,6 +26472,7 @@ msgid "Install this conversion?"
 msgstr "この変換結果をインストールしますか？"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Install widget"
 msgstr "ウィジェットをインストール"
@@ -26517,6 +26528,7 @@ msgid "Installed and ready."
 msgstr "インストールが完了し、準備ができました。"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed and up to date"
 msgstr "インストール済みで最新"
@@ -26532,6 +26544,7 @@ msgid "Installed the conversion into {archive}."
 msgstr "変換結果を {archive} にインストールしました。"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} other {# files differ}} from what this coilbox ships"
 msgstr "インストール済み。{fileCount, plural, other {# 個のファイル}}のうち {staleCount} 個が、この coilbox に同梱のものと異なります"
@@ -34013,6 +34026,7 @@ msgstr "このプリセットにはありません"
 #: src/career/pages/CareerPage.tsx
 #: src/content/compatReport.ts
 #: src/multiplayer/chat/ChatMapCard.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Not installed"
 msgstr "未インストール"
@@ -37162,6 +37176,10 @@ msgstr "仮の数値です。ゲームの数値を設定してください。"
 msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
 msgstr ""
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Places a blueprint from your library in game and saves one back."
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
@@ -39681,6 +39699,7 @@ msgid "Reinstall the mission runtime"
 msgstr "ミッションランタイムを再インストール"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Reinstall widget"
 msgstr "ウィジェットを再インストール"
@@ -40166,6 +40185,7 @@ msgid "Remove this text"
 msgstr "このテキストを削除"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Remove widget"
 msgstr "ウィジェットを削除"
@@ -44741,6 +44761,7 @@ msgstr "キャッシュのサイズを計測中…"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/problems.ts
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Skeleton"
 msgstr "スケルトン"
@@ -53974,6 +53995,7 @@ msgid "Update to the latest \"{liveName}\"?"
 msgstr "最新の「{liveName}」に更新しますか？"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Update widget"
 msgstr "ウィジェットをアップデート"
@@ -56097,6 +56119,7 @@ msgid "Working: {op}"
 msgstr "処理中：{op}"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
+#: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
 msgid "Working…"
 msgstr "処理中…"
