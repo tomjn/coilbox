@@ -953,3 +953,176 @@ fn a_weapon_with_no_query_weapon_shoots_from_the_second_piece() {
         );
     }
 }
+
+/// Splinter Faction's header lives in the include folder of the Scriptor
+/// compiler its scripts were written for, and nowhere a script can reach by
+/// its own path.
+const COMPILER_HEADER: &str = "Scriptor_v1(RC1)/Include/sfxtype.h";
+const SFX_SCRIPT: &str =
+    "#include \"sfxtype.h\"\n\nstatic-var spent;\n\nCreate()\n{\n\tspent = BLOW_UP;\n}\n";
+
+/// A reader over `files`, keyed by their real spelling, that answers the
+/// lower case paths `find_includes_with` asks for.
+fn reader<'a>(
+    files: &'a [(&'a str, &'a str)],
+) -> impl FnMut(&str) -> Option<(String, String)> + 'a {
+    move |candidate| {
+        files
+            .iter()
+            .find(|(path, _)| path.to_lowercase() == candidate)
+            .map(|(path, text)| (path.to_string(), text.to_string()))
+    }
+}
+
+fn convert_script(source: &str, name: &str, found: Vec<coilbox_bos2lua::Include>) -> Conversion {
+    let includes: HashMap<String, String> = found.into_iter().map(|f| (f.path, f.text)).collect();
+    convert(
+        source,
+        &Options {
+            name,
+            includes: &includes,
+            pieces: None,
+            linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
+            prune: false,
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_compiler_include_folder_is_recognised_by_its_name() {
+    let dirs = coilbox_bos2lua::compiler_include_dirs([
+        "Scriptor_v1(RC1)/Include/sfxtype.h",
+        "Scriptor_v1(RC1)/Include/yard.h",
+        "scriptor/INCLUDE/b.h",
+        "Scripts/include/c.h",
+        "tools/scriptor/include/d.h",
+        "Scriptor_v1(RC1)/Examples/e.h",
+    ]);
+    assert_eq!(dirs, ["scriptor/include", "scriptor_v1(rc1)/include"]);
+}
+
+#[test]
+fn a_header_only_in_the_compiler_include_folder_is_found_and_used() {
+    let files = [(COMPILER_HEADER, "#define BLOW_UP 8\n")];
+    let found = coilbox_bos2lua::find_includes_with(
+        SFX_SCRIPT,
+        "Scripts/chickenanarchid.bos",
+        &["scriptor_v1(rc1)/include".to_string()],
+        reader(&files),
+    );
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].name, "sfxtype.h");
+    assert_eq!(found[0].path, COMPILER_HEADER);
+
+    let conversion = convert_script(SFX_SCRIPT, "Scripts/chickenanarchid.bos", found);
+    assert!(
+        conversion.missing_includes.is_empty(),
+        "{:?}",
+        conversion.missing_includes
+    );
+    assert!(conversion.lua.contains("BLOW_UP"), "{}", conversion.lua);
+}
+
+#[test]
+fn a_header_found_nowhere_is_still_reported_missing() {
+    let files = [("Scripts/other.h", "#define BLOW_UP 8\n")];
+    let found = coilbox_bos2lua::find_includes_with(
+        SFX_SCRIPT,
+        "Scripts/chickenanarchid.bos",
+        &["scriptor_v1(rc1)/include".to_string()],
+        reader(&files),
+    );
+    assert!(found.is_empty());
+    let conversion = convert_script(SFX_SCRIPT, "Scripts/chickenanarchid.bos", found);
+    assert_eq!(conversion.missing_includes, ["sfxtype.h"]);
+    assert!(
+        conversion.warnings.iter().any(|w| w
+            .to_string()
+            .contains("could not find sfxtype.h, so anything it defines is missing")),
+        "{:?}",
+        conversion.warnings
+    );
+}
+
+/// Beside the script wins, as it does for the compiler, so Scripts/zaal's own
+/// header is the one a zaal script gets.
+#[test]
+fn a_header_beside_the_script_still_wins_over_the_compiler_folder() {
+    let files = [
+        ("Scripts/zaal/sfxtype.h", "#define BLOW_UP 3\n"),
+        (COMPILER_HEADER, "#define BLOW_UP 8\n"),
+    ];
+    let found = coilbox_bos2lua::find_includes_with(
+        SFX_SCRIPT,
+        "Scripts/zaal/walker.bos",
+        &["scriptor_v1(rc1)/include".to_string()],
+        reader(&files),
+    );
+    assert_eq!(found[0].path, "Scripts/zaal/sfxtype.h");
+}
+
+/// Splinter Faction leaves an empty `sfxtype.h` beside the scripts in
+/// `Scripts/faction`. An empty header defines nothing, so a script that needs
+/// the real one goes on to the compiler's folder.
+#[test]
+fn an_empty_header_beside_the_script_gives_way_to_the_compiler_folder() {
+    let files = [
+        ("Scripts/faction/sfxtype.h", ""),
+        (COMPILER_HEADER, "#define BLOW_UP 8\n"),
+    ];
+    let found = coilbox_bos2lua::find_includes_with(
+        SFX_SCRIPT,
+        "Scripts/faction/xcommander.bos",
+        &["scriptor_v1(rc1)/include".to_string()],
+        reader(&files),
+    );
+    assert_eq!(found[0].path, COMPILER_HEADER);
+
+    // Convert agrees when both files are supplied.
+    let both: HashMap<String, String> = files
+        .iter()
+        .map(|(path, text)| (path.to_string(), text.to_string()))
+        .collect();
+    let conversion = convert(
+        SFX_SCRIPT,
+        &Options {
+            name: "Scripts/faction/xcommander.bos",
+            includes: &both,
+            pieces: None,
+            linear_scale: MODERN_LINEAR,
+            precedence: Precedence::Modern,
+            prune: false,
+        },
+    )
+    .unwrap();
+    assert!(conversion.lua.contains("BLOW_UP"), "{}", conversion.lua);
+}
+
+/// An empty header that is the only one there is still comes back, so the
+/// script is not reported as missing a file it did find.
+#[test]
+fn an_empty_header_with_nothing_better_is_still_found() {
+    let files = [("Scripts/faction/sfxtype.h", "")];
+    let found = coilbox_bos2lua::find_includes_with(
+        SFX_SCRIPT,
+        "Scripts/faction/xcommander.bos",
+        &[],
+        reader(&files),
+    );
+    assert_eq!(found.len(), 1);
+}
+
+/// A copy in another script folder is not on the compiler's search path.
+#[test]
+fn a_header_in_a_sibling_script_folder_is_not_searched() {
+    let files = [("Scripts/zaal/sfxtype.h", "#define BLOW_UP 3\n")];
+    let found = coilbox_bos2lua::find_includes_with(
+        SFX_SCRIPT,
+        "Scripts/chickenanarchid.bos",
+        &["scriptor_v1(rc1)/include".to_string()],
+        reader(&files),
+    );
+    assert!(found.is_empty());
+}
