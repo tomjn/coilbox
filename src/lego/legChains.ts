@@ -39,8 +39,8 @@ export interface LegFindings {
   legs: LegProposal[];
   notes: string[];
   /** Pieces that turned as part of a chain of two or more, or as a joint more
-   *  than one chain hangs off. None of them is a wheel, whatever else they
-   *  are. */
+   *  than one chain hangs off, or alone under a turning piece. None of them
+   *  is a wheel, whatever else they are. */
   chained: Set<string>;
 }
 
