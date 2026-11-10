@@ -8,6 +8,11 @@ A Recoil engine widget that draws the skeleton of the selected units, from engin
 
 - a small Bones button at the right edge of the view, and the `coilbox_skeleton` action (bind a key, or type `/coilbox_skeleton`), to show or hide the skeleton
 - for every selected unit, drawn through the model in the builder's fuchsia (`0xe879f9`): a dot at each piece's origin, a dim line from it to its parent's origin, and a brighter, wider bone from the origin to the far end of the piece's geometry. An empty piece has no geometry, so it gets a dot and its parent line and no bone
+- a piece whose geometry reaches both ways from its origin, such as a radar dish on a central pivot, gets one straight bone from face to face. Where the geometry sits to one side of the origin, a thin line joins the dot to the bone
+- hints for telling bones apart. A bone is wide and bright at its origin, and narrow and darker at its tip. Bones turn from fuchsia towards blue as pieces get deeper in the tree. Every line has a dark edge, so it shows against any background
+- a piece that is moving against its parent is paler and wider, and fades back once it stops
+- with the cursor on a piece's dot, that piece and the pieces between it and the root stay in full and the rest are dimmed
+- thinner lines on a unit that is small on screen, so a small or distant unit is not buried under its skeleton
 - the skeleton follows the pose every frame
 - the name of the piece under the cursor, or every piece's name with the Names button or the `coilbox_skeleton_names` action
 - for a unit coilbox knows the body plan of, the plan's bones in full with their role label beside each, and the other pieces dimmed. The Others button, or the `coilbox_skeleton_others` action, hides the dimmed pieces
@@ -58,7 +63,17 @@ The skeleton showing because of the test is not written to the widget's config. 
 4. Ties between axes of the same length go to the one whose far face lies farther from the origin, then z, y, x. Ties between two faces as far from the origin as each other go to the positive side.
 5. A box that is a point at the origin gives no bone.
 
-`src/lego` is to port it with the same cases (issue #5183). The cases are in `tests/skeleton_test.lua` as a box in and a point out.
+`boneStart` gives the other end of a piece that reaches both ways. When the box has the origin between its two faces on the bone's axis, it is the middle of the nearer face. Otherwise there is none. The widget then draws the bone from one face to the other, widest at the point of that line nearest the origin. `boneEnd` is unchanged, so the builder's copy in `src/lego/boneEnd.ts` still matches it. The builder does not draw the other end.
+
+`src/lego/boneEnd.ts` is the same rule, and its test reads the `ends(...)` cases of `tests/skeleton_test.lua`, a box in and a point out.
+
+## Movement
+
+The engine has no read of a piece's pose against its parent. `GetUnitPieceMatrix` is in model space, so every piece of a walking unit changes each frame. The tracker undoes the parent's rotation to get the piece's pose as its parent sees it, and compares that between two sim frames. `TURN_TOLERANCE` and `MOVE_TOLERANCE` are how much it has to change. They were chosen from the size of 32-bit float error and have not been measured in a game.
+
+## Tuned by eye
+
+`FULL_AT_RADIUS`, `FOCUS_DIM`, `HOT_MIX`, `HOT_WIDTH`, `FADE_FRAMES`, `TIP_LUMA`, `DEEP_COLOR` and the shader's `SMALLEST` were set from screenshots of Beyond All Reason units. None is derived from anything.
 
 ## What the engine gives
 
@@ -69,7 +84,7 @@ The skeleton showing because of the test is not written to the widget's config. 
 
 ## Drawing
 
-One vertex buffer, refilled every frame, drawn with one `DrawArrays` of triangles through one shader. Lines are strips two triangles wide, moved across themselves on screen by the vertex shader and faded over their outer edges, because macOS draws `GL.LINES` one pixel wide whatever `gl.LineWidth` asks. Dots are quads the same shader spreads to a fixed size on screen and rounds. Names are `gl.Text`. In `spring-headless` there are no buffers, so the widget logs that once and draws nothing.
+One vertex buffer, refilled every frame, drawn with one `DrawArrays` of triangles through one shader. Lines are strips two triangles wide, moved across themselves on screen by the vertex shader, darkened towards their edges and faded over the outermost part, because macOS draws `GL.LINES` one pixel wide whatever `gl.LineWidth` asks. Dots are quads the same shader spreads to a fixed size on screen and rounds. Each vertex carries its unit's radius as a share of `FULL_AT_RADIUS`, and the shader narrows lines and dots by how many pixels that radius covers, down to `SMALLEST` of their full size. Names are `gl.Text`. In `spring-headless` there are no buffers, so the widget logs that once and draws nothing.
 
 ## Splinter Faction and user widgets
 
@@ -82,4 +97,4 @@ scripts/mission-tests.sh
 luajit lua/skeleton-widget/tests/skeleton_test.lua
 ```
 
-They cover the bone end on each axis and every tie, an empty piece giving a joint and no bone, the tree built from a fake piece map, the pose and the blend between frames, nothing drawn with no selection, the plan file read from `tests/fixtures/` (a unit with an entry, one without, no file, a broken file), and which pieces are solid, dimmed, hidden, labelled and dashed. Drawing needs a windowed engine, which CI does not have.
+They cover the bone end on each axis and every tie, an empty piece giving a joint and no bone, the tree built from a fake piece map, the pose and the blend between frames, nothing drawn with no selection, the plan file read from `tests/fixtures/` (a unit with an entry, one without, no file, a broken file), which pieces are solid, dimmed, hidden, labelled and dashed, the other end and the straight bone of a piece that reaches both ways, depth colour, the taper, a piece moving against its parent and its fade, and the cursor's piece and its chain. Drawing needs a windowed engine, which CI does not have.
