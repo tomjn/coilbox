@@ -44,6 +44,16 @@ function withoutSkeleton(): LegoProject {
   };
 }
 
+/** A pack with no parts: the pieces that have geometry are shapes. */
+const shapePack = {
+  manifest: {} as LoadedPack["manifest"],
+  library: { packs: [], atlases: [], dir: "", problems: [] },
+  parts: [],
+  byId: new Map(),
+  vertices: new Float32Array(),
+  indices: new Uint16Array(),
+} as LoadedPack;
+
 function setup(project: LegoProject, show: boolean) {
   const state = {
     skeleton: null,
@@ -51,7 +61,7 @@ function setup(project: LegoProject, show: boolean) {
     renderer: { getPixelRatio: () => 1 },
     render: vi.fn(),
   } as unknown as SceneState;
-  const props = { project, pack: {} as LoadedPack, raw: null, show };
+  const props = { project, pack: shapePack, raw: null, show };
   const view = renderHook((p) => useSkeleton({ current: state }, p), {
     initialProps: props,
   });
@@ -59,12 +69,44 @@ function setup(project: LegoProject, show: boolean) {
 }
 
 describe("useSkeleton", () => {
-  it("draws the geometry skeleton, dimmed, for a unit with no skeleton", () => {
+  it("draws every piece as a dimmed joint for a unit with no skeleton", () => {
     const { state } = setup(withoutSkeleton(), true);
 
     expect(state.skeleton?.userData.labels).toBe("hover");
     expect(state.skeleton?.userData.joints).toHaveLength(2);
     expect(state.overlay.children).toContain(state.skeleton);
+  });
+
+  it("draws a bone to the far end of a piece's geometry, and none for an empty piece", () => {
+    const plain = withoutSkeleton();
+    const rod: LegoProject = {
+      ...plain,
+      pieces: [
+        ...plain.pieces,
+        {
+          id: "rod",
+          name: "rod",
+          parentId: "root",
+          partId: null,
+          shape: { kind: "cylinder", size: [1, 3, 1], swatch: "grey" },
+          position: [4, 2, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        },
+      ],
+    };
+    const { state } = setup(rod, true);
+    const reach = state.skeleton?.children.find(
+      (c) => c.userData.role === "reach",
+    ) as THREE.LineSegments;
+    const at = Array.from(reach.geometry.getAttribute("position").array);
+
+    // Three empty pieces and the rod: one bone, from the rod's origin to the
+    // top of its box, 1.5 above it.
+    expect(at).toHaveLength(6);
+    expect(at[0]).toBeCloseTo(4, 6);
+    expect(at[1]).toBeCloseTo(2, 6);
+    expect(at[4]).toBeCloseTo(3.5, 6);
   });
 
   it("draws a unit's own skeleton in full, with every label", () => {
