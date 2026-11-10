@@ -171,6 +171,65 @@ describe("hubItemIdFromUrl", () => {
     expect(hubItemIdFromUrl(`${hub}/i/${id}`, null)).toBe(null);
     expect(hubItemIdFromUrl(`${hub}/i/${id}`, "")).toBe(null);
   });
+
+  describe("old Vercel address", () => {
+    const legacy = "https://coilbox-hub.vercel.app";
+
+    it("reads an old item page link on the default hub", () => {
+      expect(hubItemIdFromUrl(`${legacy}/item/${id}`, hub)).toBe(id);
+      expect(hubItemIdFromUrl(`${legacy}/item/${id}?from=discord`, hub)).toBe(
+        id,
+      );
+    });
+
+    it("reads an old import address on the default hub", () => {
+      expect(hubItemIdFromUrl(`${legacy}/i/${id}`, hub)).toBe(id);
+    });
+
+    it("reads it when the default hub is written with a trailing slash", () => {
+      expect(hubItemIdFromUrl(`${legacy}/i/${id}`, `${hub}/`)).toBe(id);
+    });
+
+    it("does not trust it on a hub the player or distribution chose", () => {
+      const distro = "https://hub.example.com";
+      expect(hubItemIdFromUrl(`${legacy}/i/${id}`, distro)).toBe(null);
+      expect(hubItemIdFromUrl(`${legacy}/item/${id}`, distro)).toBe(null);
+      expect(hubItemIdFromUrl(`${legacy}/i/${id}`, legacy)).toBe(id);
+    });
+
+    it("reads nothing when there is no configured hub", () => {
+      expect(hubItemIdFromUrl(`${legacy}/i/${id}`, null)).toBe(null);
+    });
+
+    it("leaves an old link that is not an item alone", () => {
+      expect(hubItemIdFromUrl(legacy, hub)).toBe(null);
+      expect(hubItemIdFromUrl(`${legacy}/gallery`, hub)).toBe(null);
+      expect(hubItemIdFromUrl(`${legacy}/api/v1/items/${id}`, hub)).toBe(null);
+      expect(hubItemIdFromUrl(`${legacy}/i/${id}/raw`, hub)).toBe(null);
+    });
+
+    it("matches the origin exactly", () => {
+      expect(
+        hubItemIdFromUrl(
+          `https://coilbox-hub.vercel.app.evil.test/i/${id}`,
+          hub,
+        ),
+      ).toBe(null);
+      expect(
+        hubItemIdFromUrl(
+          `https://coilbox-hub.vercel.app@evil.test/i/${id}`,
+          hub,
+        ),
+      ).toBe(null);
+      expect(
+        hubItemIdFromUrl(`http://coilbox-hub.vercel.app/i/${id}`, hub),
+      ).toBe(null);
+    });
+
+    it("does not make the old address a hub origin", () => {
+      expect(isHubOrigin(`${legacy}/i/${id}`, hub)).toBe(false);
+    });
+  });
 });
 
 /**
