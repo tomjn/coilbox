@@ -2911,6 +2911,10 @@ msgstr "{fromX} × {fromZ}"
 msgid "{front} and {last}"
 msgstr "{front} і {last}"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{full} full, {partial} partial, {none} none"
+msgstr ""
+
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
 #, fuzzy
 msgid "{game} brought by this game's own published table"
@@ -4955,10 +4959,22 @@ msgstr "{name} не може бути в меню будівництва."
 msgid "{name} details"
 msgstr "Подробиці: {name}"
 
+#: src/lego/skeletonScanRead.ts
+msgid "{name} has no model coilbox can read."
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{name} has no short name, so the widget could not find its file."
+msgstr ""
+
 #: src/campaign/units.ts
 #, fuzzy
 msgid "{name} has no unit name a game can load. Give it one in the unit builder first."
 msgstr "{name} не має назви юніта, яку може завантажити гра. Спершу задайте її в конструкторі юнітів."
+
+#: src/lego/skeletonScanRead.ts
+msgid "{name} has only a compiled script, with no source to read."
+msgstr ""
 
 #: src/lego/movement.ts
 #, fuzzy
@@ -5692,6 +5708,10 @@ msgstr "{plan}, гармата"
 #, fuzzy
 msgid "{plan}, gun, builds"
 msgstr "{plan}, гармата, будує"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{plan}, with no piece for {missing}."
+msgstr ""
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
@@ -7934,6 +7954,10 @@ msgstr "{written, plural, one {Надіслано # зображення.} few {
 #, fuzzy
 msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
 msgstr "{wrong, plural, one {# з {orderCount} не відповідає цьому списку юнітів, тому назви й вартість можуть бути неправильними.} few {# з {orderCount} не відповідають цьому списку юнітів, тому назви й вартість можуть бути неправильними.} many {# з {orderCount} не відповідають цьому списку юнітів, тому назви й вартість можуть бути неправильними.} other {# з {orderCount} не відповідають цьому списку юнітів, тому назви й вартість можуть бути неправильними.}}"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{wrote, plural, one {# unit written} other {# units written}}"
+msgstr ""
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -23663,6 +23687,7 @@ msgid "Fuchsia"
 msgstr "Фуксія"
 
 #: src/multiplayer/battles/BattleFilterPopover.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Full"
 msgstr "Повний"
@@ -23775,6 +23800,7 @@ msgstr "гра"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -32895,6 +32921,10 @@ msgstr "Тут немає зображень."
 msgid "No piece has a foot or wheel role, so there is no ground it stands on."
 msgstr "Жоден елемент не має ролі стопи чи колеса, тож немає опори на землі."
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "No plan fits."
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
 msgid "No player to compare against yet."
@@ -33733,6 +33763,7 @@ msgstr "немає"
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "None"
 msgstr "Немає"
@@ -35705,6 +35736,10 @@ msgstr "Відкрити на всю сторінку"
 msgid "Open game downloads"
 msgstr "Відкрити завантаження ігор"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Open in builder"
+msgstr ""
+
 #: src/content/pages/components/OpenInEngineButton.tsx
 #, fuzzy
 msgid "Open in engine"
@@ -36493,6 +36528,10 @@ msgstr "Частина назви гри."
 #, fuzzy
 msgid "Part of the map's name."
 msgstr "Частина назви мапи."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Partial"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -39114,6 +39153,10 @@ msgstr "Читання гри."
 #, fuzzy
 msgid "Reading the game's files…"
 msgstr "Читання файлів гри…"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Reading the game's units…"
+msgstr ""
 
 #: src/content/pages/components/PlayerNamedStarts.tsx
 msgid "Reading the map."
@@ -42104,6 +42147,10 @@ msgstr "Масштабування зберігає пропорції. Клац
 msgid "Scaling: {scaling}."
 msgstr "Масштабування: {scaling}."
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan"
+msgstr ""
+
 #: src/content/pages/ArchivesPage.tsx
 #, fuzzy
 msgid "Scan cancelled. Press Rescan to load archives."
@@ -42129,6 +42176,22 @@ msgstr "Сканування не вдалося"
 msgid "Scan on startup"
 msgstr "Сканувати під час запуску"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan units"
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan units for skeletons"
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned {all} units in {time}: {counted}. {wroteText}."
+msgstr ""
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned {done} of {total} units."
+msgstr ""
+
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
 msgid "scanned {scannedAt}"
@@ -42138,6 +42201,10 @@ msgstr "проскановано {scannedAt}"
 #, fuzzy
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "Проскановано папки вмісту ({scanRootCount}): {scanRootPaths}."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned units"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -42170,6 +42237,7 @@ msgstr "Пошук осиротілих даних у пулі..."
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -46092,6 +46160,7 @@ msgid "Stone"
 msgstr "Кам’яний"
 
 #: src/lego/pages/components/TestDrawer.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #, fuzzy
 msgid "Stop"
 msgstr "Зупинити"
@@ -46150,6 +46219,10 @@ msgstr "Припинити надсилання зображень"
 #, fuzzy
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Спочатку зупиніть власну кімнату. Coilbox може бути лише в одній кімнаті одночасно."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
+msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy

@@ -2402,6 +2402,10 @@ msgstr "{fromX} by {fromZ}"
 msgid "{front} and {last}"
 msgstr "{front} and {last}"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{full} full, {partial} partial, {none} none"
+msgstr "{full} full, {partial} partial, {none} none"
+
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
 msgid "{game} brought by this game's own published table"
 msgstr "{game} brought by this game's own published table"
@@ -4049,9 +4053,21 @@ msgstr "{name} cannot go on a build menu."
 msgid "{name} details"
 msgstr "{name} details"
 
+#: src/lego/skeletonScanRead.ts
+msgid "{name} has no model coilbox can read."
+msgstr "{name} has no model coilbox can read."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{name} has no short name, so the widget could not find its file."
+msgstr "{name} has no short name, so the widget could not find its file."
+
 #: src/campaign/units.ts
 msgid "{name} has no unit name a game can load. Give it one in the unit builder first."
 msgstr "{name} has no unit name a game can load. Give it one in the unit builder first."
+
+#: src/lego/skeletonScanRead.ts
+msgid "{name} has only a compiled script, with no source to read."
+msgstr "{name} has only a compiled script, with no source to read."
 
 #: src/lego/movement.ts
 msgid "{name} is a ship class, which has no maxSlope."
@@ -4655,6 +4671,10 @@ msgstr "{plan}, gun"
 #: src/lego/describedPlan.ts
 msgid "{plan}, gun, builds"
 msgstr "{plan}, gun, builds"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{plan}, with no piece for {missing}."
+msgstr "{plan}, with no piece for {missing}."
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "{planLabel}, fitted to this unit's pieces"
@@ -6462,6 +6482,10 @@ msgstr "{written, plural, one {Sent one picture.} other {Sent # pictures.}}"
 #: src/content/pages/components/UnitListNotes.tsx
 msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
 msgstr "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "{wrote, plural, one {# unit written} other {# units written}}"
+msgstr "{wrote, plural, one {# unit written} other {# units written}}"
 
 #: src/scenario/validate.ts
 msgid "{x},{z} is off the map, which is {width} by {height} elmos."
@@ -19335,6 +19359,7 @@ msgid "Fuchsia"
 msgstr "Fuchsia"
 
 #: src/multiplayer/battles/BattleFilterPopover.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 msgid "Full"
 msgstr "Full"
 
@@ -19430,6 +19455,7 @@ msgstr "game"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
@@ -26884,6 +26910,10 @@ msgstr "No pictures here."
 msgid "No piece has a foot or wheel role, so there is no ground it stands on."
 msgstr "No piece has a foot or wheel role, so there is no ground it stands on."
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "No plan fits."
+msgstr "No plan fits."
+
 #: src/content/pages/MatchupPage.tsx
 msgid "No player to compare against yet."
 msgstr "No player to compare against yet."
@@ -27568,6 +27598,7 @@ msgstr "none"
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 msgid "None"
 msgstr "None"
 
@@ -29178,6 +29209,10 @@ msgstr "Open full page"
 msgid "Open game downloads"
 msgstr "Open game downloads"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Open in builder"
+msgstr "Open in builder"
+
 #: src/content/pages/components/OpenInEngineButton.tsx
 msgid "Open in engine"
 msgstr "Open in engine"
@@ -29822,6 +29857,10 @@ msgstr "Part of the game's name."
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 msgid "Part of the map's name."
 msgstr "Part of the map's name."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Partial"
+msgstr "Partial"
 
 #: src/workshop/explosionGenerators.ts
 msgid "Particle system"
@@ -31972,6 +32011,10 @@ msgstr "Reading the game."
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 msgid "Reading the game's files…"
 msgstr "Reading the game's files…"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Reading the game's units…"
+msgstr "Reading the game's units…"
 
 #: src/content/pages/components/PlayerNamedStarts.tsx
 msgid "Reading the map."
@@ -34432,6 +34475,10 @@ msgstr "Scaling keeps its proportions. Click to scale one axis at a time"
 msgid "Scaling: {scaling}."
 msgstr "Scaling: {scaling}."
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan"
+msgstr "Scan"
+
 #: src/content/pages/ArchivesPage.tsx
 msgid "Scan cancelled. Press Rescan to load archives."
 msgstr "Scan cancelled. Press Rescan to load archives."
@@ -34452,6 +34499,22 @@ msgstr "Scan failed"
 msgid "Scan on startup"
 msgstr "Scan on startup"
 
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan units"
+msgstr "Scan units"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scan units for skeletons"
+msgstr "Scan units for skeletons"
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned {all} units in {time}: {counted}. {wroteText}."
+msgstr "Scanned {all} units in {time}: {counted}. {wroteText}."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned {done} of {total} units."
+msgstr "Scanned {done} of {total} units."
+
 #: src/content/pages/components/RootCard.tsx
 msgid "scanned {scannedAt}"
 msgstr "scanned {scannedAt}"
@@ -34459,6 +34522,10 @@ msgstr "scanned {scannedAt}"
 #: src/profile/health.ts
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Scanned units"
+msgstr "Scanned units"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 msgid "Scanning content…"
@@ -34486,6 +34553,7 @@ msgstr "Scanning the pool for orphaned data..."
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -37686,6 +37754,7 @@ msgid "Stone"
 msgstr "Stone"
 
 #: src/lego/pages/components/TestDrawer.tsx
+#: src/widgets/pages/ScanSkeletons.tsx
 msgid "Stop"
 msgstr "Stop"
 
@@ -37732,6 +37801,10 @@ msgstr "Stop sending pictures"
 #: src/direct/lan.ts
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Stop your own room first. Coilbox can be in one room at a time."
+
+#: src/widgets/pages/ScanSkeletons.tsx
+msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
+msgstr "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Stopped following {name}"

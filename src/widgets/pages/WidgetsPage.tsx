@@ -297,6 +297,15 @@ export default function WidgetsPage() {
           rootPath={list.widgetDir}
           refresh={rescans}
           onChanged={reread}
+          enginePath={list.enginePath}
+          games={list.installed}
+          picked={
+            game
+              ? (game.versions?.find((v) => v === picked) ??
+                game.versions?.[0] ??
+                game.game)
+              : null
+          }
         />
       )}
 

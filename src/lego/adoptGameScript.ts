@@ -44,7 +44,8 @@ export interface AdoptedScript {
   /** What the unit definition asked for, whether or not it resolved. */
   declared: string | null;
   /** Roles the script names or shows, for the caller to offer. Null when there
-   *  was no Lua to ask. */
+   *  was no Lua to ask, and when the caller passed `infer: false` and runs
+   *  `inferRoles` itself. */
   findings: RoleFindings | null;
   /**
    * Set when `script` is a conversion of the `.bos` source beside a `.cob`
@@ -177,6 +178,9 @@ async function convert(
 export async function adoptGameScript(
   project: LegoProject,
   engine: { enginePath: string; dataDir: string },
+  /** `infer: false` reads the script without asking it about its pieces, for a
+   *  caller that asks it itself. */
+  options: { infer?: boolean } = {},
 ): Promise<AdoptedScript> {
   const game = project.imported?.game;
   // A unit with no unitdef behind it is a feature, a wreck, or a model nothing
@@ -256,6 +260,20 @@ export async function adoptGameScript(
   // With what has just been read put on it. Inference runs the script the same
   // way the preview does, so it needs the same definition and the same
   // libraries, and the project it was handed predates both.
+  if (options.infer === false) {
+    return {
+      script: result.text,
+      member: result.member,
+      kind: "lua",
+      declared: result.declared,
+      findings: null,
+      converted: null,
+      compiled: null,
+      unitDef,
+      includes,
+      notes,
+    };
+  }
   const findings = await inferRoles(
     {
       ...project,

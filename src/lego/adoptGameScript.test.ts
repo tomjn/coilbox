@@ -130,6 +130,25 @@ describe("a unit opened out of a game", () => {
     expect(adopted.findings?.proposals).toHaveLength(1);
   });
 
+  it("reads without asking the script when told not to infer", async () => {
+    readScript.mockResolvedValue(
+      found({
+        unitDef: '{"canmove":true}',
+        includes: [{ name: "lib.lua", member: "scripts/lib.lua", text: "--" }],
+        errors: ["a note"],
+      }),
+    );
+
+    const adopted = await adoptGameScript(project(), ENGINE, { infer: false });
+
+    expect(infer).not.toHaveBeenCalled();
+    expect(adopted.script).toBe("-- the game's own\n");
+    expect(adopted.findings).toBeNull();
+    expect(adopted.unitDef).toEqual({ canmove: true });
+    expect(adopted.includes).toEqual({ "lib.lua": "--" });
+    expect(adopted.notes).toEqual(["a note"]);
+  });
+
   it("asks the game for the unit's own key, not its model name", async () => {
     await adoptGameScript(project(), ENGINE);
 

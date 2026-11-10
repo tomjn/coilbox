@@ -264,6 +264,23 @@ export function folderGameShortname(
   return game?.info?.shortname?.trim() || null;
 }
 
+/**
+ * Merge `entries` into one game's file under `root`, writing only when the
+ * merge changed something. For entries made without a project, as a scan of a
+ * game's units makes them (#5186).
+ */
+export async function writeSkeletonEntries(
+  io: BlueprintFileIO,
+  root: string,
+  shortname: string,
+  entries: Readonly<Record<string, SkeletonUnitEntry>>,
+): Promise<SkeletonWrite> {
+  const path = skeletonFilePath(root, shortname);
+  const { text, changed } = mergeSkeleton(await io.read(path), entries);
+  if (changed.length > 0) await io.write(path, text);
+  return { path, units: changed };
+}
+
 export interface SkeletonWriteOptions {
   /**
    * A short name to write every unit's file under as well, the one of the game
