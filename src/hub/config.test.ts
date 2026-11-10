@@ -57,7 +57,7 @@ describe("isValidHubUrl", () => {
   });
 
   it("accepts http and https addresses", () => {
-    expect(isValidHubUrl("https://coilbox-hub.vercel.app")).toBe(true);
+    expect(isValidHubUrl("https://hub.coilbox.org")).toBe(true);
     expect(isValidHubUrl("http://localhost:3000")).toBe(true);
   });
 
@@ -91,25 +91,19 @@ describe("isHubOrigin", () => {
   });
 
   it("rejects a host that only starts with the hub's name", () => {
-    expect(isHubOrigin("https://coilbox-hub.vercel.app.evil.test/x", hub)).toBe(
-      false,
-    );
+    expect(isHubOrigin("https://hub.coilbox.org.evil.test/x", hub)).toBe(false);
   });
 
   it("rejects the hub's name used as a userinfo prefix", () => {
-    expect(isHubOrigin("https://coilbox-hub.vercel.app@evil.test/x", hub)).toBe(
-      false,
-    );
+    expect(isHubOrigin("https://hub.coilbox.org@evil.test/x", hub)).toBe(false);
   });
 
   it("rejects http where the hub is https", () => {
-    expect(isHubOrigin("http://coilbox-hub.vercel.app/x", hub)).toBe(false);
+    expect(isHubOrigin("http://hub.coilbox.org/x", hub)).toBe(false);
   });
 
   it("rejects a different port on the right host", () => {
-    expect(isHubOrigin("https://coilbox-hub.vercel.app:8443/x", hub)).toBe(
-      false,
-    );
+    expect(isHubOrigin("https://hub.coilbox.org:8443/x", hub)).toBe(false);
   });
 
   it("trusts nothing when there is no configured hub", () => {
@@ -169,7 +163,7 @@ describe("hubItemIdFromUrl", () => {
   it("refuses the same path on any other origin", () => {
     expect(hubItemIdFromUrl(`https://evil.test/i/${id}`, hub)).toBe(null);
     expect(
-      hubItemIdFromUrl(`https://coilbox-hub.vercel.app.evil.test/i/${id}`, hub),
+      hubItemIdFromUrl(`https://hub.coilbox.org.evil.test/i/${id}`, hub),
     ).toBe(null);
   });
 

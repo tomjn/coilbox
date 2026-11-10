@@ -14,7 +14,7 @@ import { getProfile, isHubEnabled } from "../profile/profile";
  */
 
 /** The public hub, live at this address. */
-export const DEFAULT_HUB_URL = "https://coilbox-hub.vercel.app";
+export const DEFAULT_HUB_URL = "https://hub.coilbox.org";
 
 /** The user's hub URL override, persisted under `hub.url`. Empty means unset. */
 export function useHubUrlSetting() {
@@ -79,8 +79,8 @@ export function useTrustedHubUrl(): string | null {
 /**
  * Is `url` served by `hubUrl`? Compares parsed origins - scheme, host and port -
  * never string prefixes, because a prefix test hands the hub's name to anybody who
- * can register a longer one. `https://coilbox-hub.vercel.app.evil.test/` is a
- * different host, `https://coilbox-hub.vercel.app@evil.test/` is `evil.test` with
+ * can register a longer one. `https://hub.coilbox.org.evil.test/` is a
+ * different host, `https://hub.coilbox.org@evil.test/` is `evil.test` with
  * the hub's name as a username, and `http://` is not `https://`. All three are a
  * different origin, so all three are false.
  *

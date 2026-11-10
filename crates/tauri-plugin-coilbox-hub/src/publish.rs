@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn something_that_is_not_an_address_is_refused() {
-        assert!(publish_url("coilbox-hub.vercel.app").is_err());
+        assert!(publish_url("hub.coilbox.org").is_err());
     }
 
     /// The body the hub is sent, by the names it insists on: it rejects a field
@@ -189,7 +189,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "reaches the live hub, so it cannot run in CI"]
     async fn live_publish_needs_a_token() {
-        let url = publish_url("https://coilbox-hub.vercel.app").unwrap();
+        let url = publish_url("https://hub.coilbox.org").unwrap();
         let response = reqwest::Client::new()
             .post(&url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -212,7 +212,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "publishes a real item as your account, so it cannot run in CI"]
     async fn live_publish() {
-        let hub = "https://coilbox-hub.vercel.app";
+        let hub = "https://hub.coilbox.org";
         // A minimal preset container, which is the smallest thing the gallery
         // carries. Sent as raw JSON rather than a code: the hub's `accept()` takes
         // either, and a saved export is JSON.
