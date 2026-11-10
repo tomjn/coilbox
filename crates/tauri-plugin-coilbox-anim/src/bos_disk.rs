@@ -59,7 +59,8 @@ pub fn locate(bos: &Path) -> (PathBuf, String) {
 /// their paths under `root`. A name found nowhere is left out, and the
 /// converter reports it as missing.
 pub fn includes(source: &str, root: &Path, name: &str) -> HashMap<String, String> {
-    coilbox_bos2lua::find_includes(source, name, |candidate| {
+    let compiler_dirs = compiler_dirs(root);
+    coilbox_bos2lua::find_includes_with(source, name, &compiler_dirs, |candidate| {
         let path = find(root, candidate)?;
         let text = read_text(&path).ok()?;
         Some((slashed(path.strip_prefix(root).ok()?), text))
@@ -67,6 +68,30 @@ pub fn includes(source: &str, root: &Path, name: &str) -> HashMap<String, String
     .into_iter()
     .map(|found| (found.path, found.text))
     .collect()
+}
+
+/// The compiler include folders directly under `root`, such as Splinter
+/// Faction's `Scriptor_v1(RC1)/Include`, in the form the game import finds them
+/// in an archive's file list.
+fn compiler_dirs(root: &Path) -> Vec<String> {
+    let names = |dir: &Path| -> Vec<String> {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect()
+    };
+    let paths: Vec<String> = names(root)
+        .into_iter()
+        .flat_map(|top| {
+            names(&root.join(&top))
+                .into_iter()
+                .map(move |sub| format!("{top}/{sub}/x"))
+        })
+        .collect();
+    coilbox_bos2lua::compiler_include_dirs(paths)
 }
 
 fn slashed(rel: &Path) -> String {
@@ -220,6 +245,33 @@ mod tests {
             .collect();
         assert_eq!(from_disk, from_archive);
         assert_eq!(from_disk.len(), 5);
+    }
+
+    /// Splinter Faction ships `sfxtype.h` only in its Scriptor compiler's
+    /// include folder, with an empty copy beside some scripts.
+    #[test]
+    fn reads_a_header_from_a_compiler_include_folder() {
+        let game = tempfile::tempdir().unwrap();
+        write(
+            game.path(),
+            "Scriptor_v1(RC1)/Include/sfxtype.h",
+            "#define BLOW_UP 8\n",
+        );
+        write(game.path(), "scripts/faction/sfxtype.h", "");
+        let source = "#include \"sfxtype.h\"\nstatic-var spent;\nCreate() { spent = BLOW_UP; }\n";
+        write(game.path(), "scripts/chicken.bos", source);
+        write(game.path(), "scripts/faction/x.bos", source);
+
+        for script in ["scripts/chicken.bos", "scripts/faction/x.bos"] {
+            let (name, includes) = found(&game.path().join(script));
+            assert_eq!(
+                sorted_keys(&includes),
+                ["scriptor_v1(rc1)/include/sfxtype.h"]
+            );
+            assert!(convert(source, &name, &includes)
+                .missing_includes
+                .is_empty());
+        }
     }
 
     #[test]
