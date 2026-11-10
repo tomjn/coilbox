@@ -117,6 +117,13 @@ fn check(game: Option<&str>) {
                 timeline.error, recorded["error"]
             ));
         }
+        let warnings: Vec<String> = serde_json::from_value(recorded["warnings"].clone()).unwrap();
+        if warnings != timeline.warnings {
+            failures.push(format!(
+                "{name}: the run warned {:?}, the recording says {warnings:?}",
+                timeline.warnings
+            ));
+        }
         let held: Vec<Vec<f64>> = serde_json::from_value(recorded["frames"].clone()).unwrap();
         if held.len() != frames.len() {
             failures.push(format!(
@@ -127,6 +134,15 @@ fn check(game: Option<&str>) {
             continue;
         }
         for (at, (now, then)) in frames.iter().zip(&held).enumerate() {
+            if now.len() != names.len() * 6 || then.len() != now.len() {
+                failures.push(format!(
+                    "{name}: frame {at} has {} numbers, the recording {}, for {} pieces",
+                    now.len(),
+                    then.len(),
+                    names.len()
+                ));
+                break;
+            }
             if let Some(i) = (0..now.len()).find(|&i| (now[i] - then[i]).abs() > 1e-5) {
                 failures.push(format!(
                     "{name}: frame {at}, {} channel {}: {} where the recording has {}",
