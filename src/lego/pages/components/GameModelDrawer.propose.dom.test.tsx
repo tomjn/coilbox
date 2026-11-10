@@ -181,6 +181,17 @@ describe("GameModelDrawer proposing a skeleton (#5185)", () => {
     expect(onOpened).toHaveBeenCalledWith(expect.anything(), undefined);
   });
 
+  it("passes on only the roles left ticked", async () => {
+    const { onOpened } = await openGun(findings);
+    fireEvent.click(screen.getByRole("checkbox", { name: /turret is/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Open the unit" }));
+
+    expect(onOpened).toHaveBeenCalledWith(expect.anything(), {
+      ...findings,
+      proposals: [],
+    });
+  });
+
   it("does not offer it when no roles were proposed", async () => {
     await openGun({ ...findings, proposals: [] });
     expect(

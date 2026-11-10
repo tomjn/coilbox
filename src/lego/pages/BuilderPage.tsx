@@ -482,6 +482,8 @@ function Builder({ id }: { id: string | undefined }) {
    *  roles (#5185). Null for the drawer opened to fit by hand. */
   const [proposal, setProposal] = useState<PlanProposal | null>(null);
   const [proposing, setProposing] = useState(false);
+  /** Counts proposals, so one made while the drawer is open opens it afresh. */
+  const [proposals, setProposals] = useState(0);
   /** Whether the part picker for "Change part" is open, and what the last
    *  swap left behind. */
   const [swapping, setSwapping] = useState(false);
@@ -592,7 +594,8 @@ function Builder({ id }: { id: string | undefined }) {
       }
     }
     setSelectedId(null);
-    setProposal(proposePlan(draftRef.current ?? project, findings));
+    setProposal(proposePlan(project, findings));
+    setProposals((n) => n + 1);
     setFitting(true);
   }
 
@@ -610,6 +613,7 @@ function Builder({ id }: { id: string | undefined }) {
     navigate(location.pathname, { replace: true, state: null });
     setSelectedId(null);
     setProposal(proposePlan(draft, arrived));
+    setProposals((n) => n + 1);
     setFitting(true);
   }, [arrived, draft, navigate, location.pathname, setSelectedId]);
   useEffect(() => {
@@ -2291,6 +2295,7 @@ function Builder({ id }: { id: string | undefined }) {
 
         {fitting ? (
           <FitPlanDrawer
+            key={proposals}
             project={draft}
             selectedId={selectedId}
             onSelect={setSelectedId}

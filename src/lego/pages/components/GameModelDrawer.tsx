@@ -283,7 +283,9 @@ export function GameModelDrawer({
           ? { gameScriptIncludes: adopted.includes }
           : {}),
       },
-      propose && findings && proposable(findings) ? findings : undefined,
+      propose && findings && proposable(findings)
+        ? takenFindings(findings, takenRoles)
+        : undefined,
     );
   }
 
@@ -427,6 +429,21 @@ export function GameModelDrawer({
 /** Whether the script proposed any roles, so there is a skeleton to propose. */
 function proposable(findings: RoleFindings): boolean {
   return findings.proposals.length > 0;
+}
+
+/** The findings with only the roles taken, so a role unticked here is not
+ *  proposed for a bone either. A leg goes with any of its pieces. */
+function takenFindings(
+  findings: RoleFindings,
+  taken: Set<string>,
+): RoleFindings {
+  return {
+    ...findings,
+    proposals: findings.proposals.filter((p) => taken.has(p.pieceName)),
+    legs: findings.legs.filter((leg) =>
+      Object.values(leg.chain).every((name) => taken.has(name)),
+    ),
+  };
 }
 
 /** Loose games first, since a `.sdd` is what somebody editing a game has, then
