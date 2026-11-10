@@ -1572,7 +1572,7 @@ fn install_unit_def(
 ) -> mlua::Result<()> {
     let globals = lua.globals();
     let def: Value = match unit_def {
-        Some(json) => lua.to_value(json)?,
+        Some(json) => lua.to_value(&with_engine_speed(json))?,
         None => Value::Table(lua.create_table()?),
     };
 
@@ -2546,6 +2546,26 @@ fn unit_size(sim: &Rc<RefCell<Sim>>, asked_by: &str, id: Option<i64>) -> Option<
 /// The definitions come back through a game's own def scripts, which lowercase
 /// every key on the way out, so a lookup that cared about case would find
 /// nothing in most games and everything in the rest.
+/// The definition with `speed` filled in from `maxvelocity` where it gives only
+/// the older key, as the engine fills it (`rts/Sim/Units/UnitDef.cpp:442-443`).
+/// The engine's `UnitDefs[id].speed` is always there, in elmos per second, and
+/// Splinter Faction's walkers time their stride off it, so a definition read
+/// straight from a def file left them doing arithmetic on nothing.
+fn with_engine_speed(json: &serde_json::Value) -> serde_json::Value {
+    let mut out = json.clone();
+    if def_number(Some(json), "speed").is_none() {
+        if let (Some(per_frame), Some(fields)) =
+            (def_number(Some(json), "maxvelocity"), out.as_object_mut())
+        {
+            fields.insert(
+                "speed".to_owned(),
+                serde_json::json!(per_frame.abs() * f64::from(FPS)),
+            );
+        }
+    }
+    out
+}
+
 fn def_number(unit_def: Option<&serde_json::Value>, key: &str) -> Option<f64> {
     unit_def?
         .as_object()?

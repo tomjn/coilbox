@@ -836,6 +836,58 @@ fn the_move_type_falls_back_to_the_definitions_max_velocity() {
     assert_close(pose(&timeline, 0, "turret")[2], 20.0);
 }
 
+/// Splinter Faction's Bear reads `UnitDefs[Spring.GetUnitDefID(unitID)].speed`
+/// from a definition that gives only `maxVelocity`. The engine fills `speed` in
+/// from it, per second, and the preview has to as well.
+#[test]
+fn the_definition_reads_its_speed_from_max_velocity_as_the_engine_does() {
+    let def = serde_json::json!({ "maxvelocity": 2.4 });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            Move(piece("turret"), z_axis, UnitDefs[Spring.GetUnitDefID(unitID)].speed)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+        &HashMap::new(),
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 72.0);
+}
+
+/// A definition that gives `speed` keeps it, whatever `maxvelocity` says.
+#[test]
+fn the_definition_keeps_a_speed_it_gives() {
+    let def = serde_json::json!({ "speed": 60.0, "maxvelocity": 9.0 });
+    let names = pieces();
+    let timeline = run(
+        r#"
+        function script.Create()
+            Move(piece("turret"), z_axis, UnitDefs[Spring.GetUnitDefID(unitID)].speed)
+        end
+        "#,
+        "test.lua",
+        &Unit {
+            def: Some(&def),
+            ..Unit::new(&names)
+        },
+        &create(),
+        3,
+        &HashMap::new(),
+    );
+
+    assert_eq!(timeline.error, None);
+    assert_close(pose(&timeline, 0, "turret")[2], 60.0);
+}
+
 /// Scripts work out how fast to play a walk cycle from the unit's top speed, so
 /// the preview has to answer with the definition's own rather than a zero they
 /// would divide by.
