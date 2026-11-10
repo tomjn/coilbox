@@ -63,7 +63,7 @@ const scenarioPlugin: FramePlugin = {
         {
           id: "scenario.guide",
           label: lazyText(msg`Scenarios guide`),
-          href: "https://tomjn.github.io/coilbox/developers/scenarios",
+          href: "https://coilbox.org/developers/scenarios",
           icon: CoilMark,
           sidebar: false,
           order: 4,

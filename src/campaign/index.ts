@@ -59,7 +59,7 @@ const campaignPlugin: FramePlugin = {
         {
           id: "campaign.guide",
           label: lazyText(msg`Campaigns guide`),
-          href: "https://tomjn.github.io/coilbox/developers/campaigns",
+          href: "https://coilbox.org/developers/campaigns",
           icon: CoilMark,
           sidebar: false,
           order: 3,

@@ -1,6 +1,6 @@
 # Coilbox documentation
 
-These pages are published at [tomjn.github.io/coilbox](https://tomjn.github.io/coilbox/). They are grouped by who reads them, one folder each.
+These pages are published at [coilbox.org](https://coilbox.org/). They are grouped by who reads them, one folder each.
 
 | Folder | Reader | Start at |
 | --- | --- | --- |
