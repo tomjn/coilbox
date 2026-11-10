@@ -638,13 +638,39 @@ The drawer on the left lists the plan's bones, with one highlighted. Select a pi
 
 - **Gun** and **Builds** add the same bones as [Describe it instead](#describe-it-instead). Gun is not offered for a plan that already has a turret.
 - A plan with a count, such as **Axles**, asks for it first, because the count decides which bones there are.
-- Coilbox suggests pieces but never picks them. **Use suggestions** takes them all, and the **Use** button on a bone's row takes one. It suggests the unit's root for the root bone, the only piece with a bone's role, or a piece with the bone's name. It suggests a leg only from a role already set, never from a name.
+- Opened with **Fit a body plan**, the drawer suggests pieces but never picks them. To have them picked, see [Propose a skeleton](#propose-a-skeleton). **Use suggestions** takes them all, and the **Use** button on a bone's row takes one. It suggests the unit's root for the root bone, the only piece with a bone's role, or a piece with the bone's name. It suggests a leg only from a role already set, never from a name.
 
 Before you press **Fit**, the drawer lists each role it will replace, each preset it will hold back and what that preset needs, and each proportion it cannot measure. **Fit** is one undo step. It sets the role of each piece you picked, marks it as that bone and adds the plan's presets. A preset the unit already has keeps its settings. A bone with no role in the plan, such as a torso or a track, leaves its piece's role alone. Fitting replaces any skeleton the unit had.
 
 Nothing moves. Each proportion is measured from where the picked pieces are, and one whose joints you did not pick is left out. The Skeleton tab then reads, for example, "Two legs, fitted to this unit's pieces" and lists each value or "Not measured". It has no sliders, handles or size fields, because changing a proportion would move pieces you placed.
 
 Fitting differs from [opening a unit from a game](#opening-a-unit-from-a-game). Opening one proposes roles read from the unit's script, and never overwrites a role you set. Fitting is you saying what each piece is, so it replaces the role of every piece you pick. A walker opened from a game with its legs proposed and accepted arrives with roles such as "Front left thigh" on its leg pieces, so the drawer suggests each leg bone for you. A walker whose legs could not be worked out has none, and you pick them here.
+
+#### Propose a skeleton
+
+A unit with a Lua script can have its plan and picks worked out for you. Press **Propose a skeleton**, the button beside **Fit a body plan**. Coilbox reads the unit's roles from its script, as opening a unit from a game does, and opens the drawer on the plan they point to with the bones picked:
+
+| What the script shows | Plan |
+| --- | --- |
+| Legs in pairs, one to four pairs | Two, Four, Six or Eight legs |
+| Wheels, in pairs across the unit | Wheels, with an axle for each pair |
+| No legs or wheels, a unit definition that does not move, and a turret | Turret building |
+| No legs or wheels, a unit definition that does not move, and no turret | Building |
+
+A turret on a walker or a wheeled unit adds **Gun**, and a build arm role adds **Builds**. Each leg bone takes its proposed piece, and the body takes the piece every leg, or every wheel, hangs from. Each wheel goes by its side and its place front to back. The turret, barrel, muzzle flare and build arm bones take the piece with that role. The root bone takes the unit's root.
+
+Under each pick the drawer says why it was made, such as "Moved in StartMoving" or "The legs hang from it". Every pick can be changed or unmatched before **Fit**, as if you had made it.
+
+Coilbox does not guess. Where no plan fits, the drawer says why and opens on the plan list as it does without a proposal. That covers:
+
+- more legs on one side than the other, or an odd number of legs
+- more than four pairs of legs
+- wheels that do not pair up, or two wheels on one side the same distance front to back
+- a unit that moves but shows no legs or wheels, and a unit with no game definition to say whether it moves
+
+A bone two pieces were proposed for, or a body when the legs hang from different pieces, is left unmatched with a note saying so.
+
+Opening a unit from a game offers the same thing. When the script proposed any roles, a **Propose a skeleton** checkbox appears under them, ticked, and the unit opens with the drawer proposed.
 
 ### What is stored with the unit
 
