@@ -618,7 +618,9 @@ To remove a skeleton, open the **Skeleton** tab, press **Remove skeleton** and c
 
 A unit with a skeleton shows it in the view: a line from each bone to its parent, a dot on each joint and the bone's role beside the dot. The bone button beside the collision button, or `K`, shows and hides it. It is on whenever a unit with a skeleton opens. It draws through the parts, a click passes through it to the part behind, and it is never exported.
 
-While the preview plays, the skeleton moves with the pieces, so a skeleton with no parts walks, rolls or aims on screen. The proportion handles hide until it stops.
+A unit with no skeleton, such as one opened from a game, has the bone button too. It is off when the unit opens. Turned on, it draws the geometry skeleton, the same one the in-game skeleton widget draws: a dot on every piece's origin, a thin line to the piece it hangs from, and a bone from the origin to the far end of the piece's own geometry. The far end is found from the box of the piece's own vertices. Take the axis the box is longest along. The bone ends at the middle of the box face on that axis that is farther from the origin, keeping the box's offset on the other two axes. If two axes are equally long, the one whose far face is farther from the origin wins, then z, y, x in that order. If both faces are equally far, the positive one wins. A piece with no geometry has a dot and no bone. It is fainter than a real skeleton's, and a piece's name shows only while you hover or select it. `boneEnd` in `src/lego/boneEnd.ts` holds the rule, and its test reads the cases of the widget's Lua test, so the two cannot drift.
+
+While the preview plays, the skeleton moves with the pieces, so a skeleton with no parts walks, rolls or aims on screen. The geometry skeleton does the same. The proportion handles hide until it stops.
 
 ### Skeleton checks
 

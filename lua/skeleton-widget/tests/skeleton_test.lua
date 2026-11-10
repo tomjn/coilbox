@@ -1,8 +1,9 @@
 -- Run: luajit lua/skeleton-widget/tests/skeleton_test.lua
 --
 -- The skeleton from engine data: the bone end rule, the piece tree, the pose
--- and what gets drawn. src/lego is to port boneEnd with these same cases
--- (issue #5183), so keep each case a plain box in and a point out.
+-- and what gets drawn. src/lego/boneEnd.ts is the same rule and
+-- src/lego/boneEnd.test.ts reads the `ends(...)` lines below (issue #5183), so
+-- keep each case a plain box in and a point out on one line.
 
 local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check, same, show = support.check, support.same, support.show

@@ -22,6 +22,11 @@ import { label } from "./weaponReachLayer";
  *  selection and the weapon ring colours. */
 export const SKELETON_COLOUR = 0xe879f9;
 
+/** How opaque each mark of the geometry skeleton is, against the 0.95 of a real
+ *  skeleton's lines. The bone is brighter than the line to the parent, as in
+ *  the widget. */
+const DIMMED = { parent: 0.3, bone: 0.6, dot: 0.7 };
+
 /** How far right of its marker a label starts, as a share of its width. */
 const LABEL_OFFSET = 0.15;
 
@@ -39,8 +44,8 @@ const AT = new THREE.Vector3();
  * Hide each label that would cover a nearer one on screen, for the view
  * `camera` draws into a `width` by `height` CSS pixel canvas. The labels of
  * the pieces in `always`, the selection and the hovered piece, are shown
- * whatever they cover. Run before each render, since any camera move changes
- * which labels collide.
+ * whatever they cover. A skeleton marked `labels: "hover"` shows only those.
+ * Run before each render, since any camera move changes which labels collide.
  */
 export function layoutSkeletonLabels(
   skeleton: THREE.Group,
@@ -71,7 +76,10 @@ export function layoutSkeletonLabels(
       always: always.has(child.userData.pieceId),
     });
   }
-  const shown = shownLabels(boxes);
+  const shown =
+    skeleton.userData.labels === "hover"
+      ? new Set(boxes.filter((box) => box.always).map((box) => box.id))
+      : shownLabels(boxes);
   for (const sprite of sprites) {
     sprite.visible = shown.has(sprite.userData.pieceId);
   }
@@ -80,17 +88,24 @@ export function layoutSkeletonLabels(
 /**
  * The drawing for `joints`, or null when there are none. `marker` is the
  * material for the joint dots, which the group owns from here and frees.
+ *
+ * With `dimmed`, as for the geometry skeleton of a unit with no skeleton, the
+ * marks are fainter than a real skeleton's, a joint with a `reach` also gets a
+ * bone, and a piece's name shows only while it is hovered or selected.
  */
 export function buildSkeleton(
   joints: SkeletonJoint[],
   marker: THREE.PointsMaterial,
+  { dimmed = false }: { dimmed?: boolean } = {},
 ): THREE.Group | null {
   if (joints.length === 0) return null;
   const group = new THREE.Group();
-  group.userData.joints = joints.map(({ pieceId, parentId }) => ({
+  group.userData.joints = joints.map(({ pieceId, parentId, reach }) => ({
     pieceId,
     parentId,
+    reach: reach?.local ?? null,
   }));
+  if (dimmed) group.userData.labels = "hover";
 
   const segments: number[] = [];
   for (const joint of joints) {
@@ -104,7 +119,7 @@ export function buildSkeleton(
     new THREE.LineBasicMaterial({
       color: SKELETON_COLOUR,
       transparent: true,
-      opacity: 0.95,
+      opacity: dimmed ? DIMMED.parent : 0.95,
       depthTest: false,
     }),
   );
@@ -112,6 +127,31 @@ export function buildSkeleton(
   bones.renderOrder = 4;
   bones.raycast = () => {};
   group.add(bones);
+
+  if (dimmed) {
+    const reaches = new THREE.LineSegments(
+      new THREE.BufferGeometry().setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(
+          joints.flatMap(({ at, reach }) =>
+            reach ? [...at, ...reach.at] : [],
+          ),
+          3,
+        ),
+      ),
+      new THREE.LineBasicMaterial({
+        color: SKELETON_COLOUR,
+        transparent: true,
+        opacity: DIMMED.bone,
+        depthTest: false,
+      }),
+    );
+    reaches.userData.role = "reach";
+    reaches.renderOrder = 4;
+    reaches.raycast = () => {};
+    group.add(reaches);
+    marker.opacity = DIMMED.dot;
+  }
 
   const dots = new THREE.Points(
     new THREE.BufferGeometry().setAttribute(
@@ -174,6 +214,7 @@ export function poseSkeleton(
   const joints = skeleton.userData.joints as {
     pieceId: string;
     parentId: string | null;
+    reach: [number, number, number] | null;
   }[];
   state.root.updateMatrixWorld(true);
   ROOT_INVERSE.copy(state.root.matrixWorld).invert();
@@ -196,7 +237,11 @@ export function poseSkeleton(
   const dots = skeleton.children.find((c) => c.userData.role === "dots") as
     | THREE.Points
     | undefined;
+  const reaches = skeleton.children.find((c) => c.userData.role === "reach") as
+    | THREE.LineSegments
+    | undefined;
   const lines = bones?.geometry.getAttribute("position");
+  const reachLines = reaches?.geometry.getAttribute("position");
   const points = dots?.geometry.getAttribute("position");
   const labels = new Map<string, THREE.Object3D>();
   for (const child of skeleton.children) {
@@ -205,11 +250,24 @@ export function poseSkeleton(
   }
 
   let segment = 0;
+  let reach = 0;
   joints.forEach((joint, index) => {
+    // A reach has its slot whether or not its piece is found.
+    const slot = joint.reach ? reach++ : -1;
     const at = originOf(joint.pieceId);
     if (!at) return;
     points?.setXYZ(index, ...at);
     labels.get(joint.pieceId)?.position.set(...at);
+    const group = state.groups.get(joint.pieceId);
+    if (joint.reach && group) {
+      // The piece's own space is the group's while a script plays, since the
+      // pieces are baked, so the bone's end turns with the piece.
+      WORLD.set(...joint.reach)
+        .applyMatrix4(group.matrixWorld)
+        .applyMatrix4(ROOT_INVERSE);
+      reachLines?.setXYZ(slot * 2, ...at);
+      reachLines?.setXYZ(slot * 2 + 1, WORLD.x, WORLD.y, WORLD.z);
+    }
     const parentAt = joint.parentId ? originOf(joint.parentId) : undefined;
     if (!joint.parentId) return;
     if (parentAt) {
@@ -219,7 +277,9 @@ export function poseSkeleton(
     segment++;
   });
   if (lines) lines.needsUpdate = true;
+  if (reachLines) reachLines.needsUpdate = true;
   if (points) points.needsUpdate = true;
   bones?.geometry.computeBoundingSphere();
+  reaches?.geometry.computeBoundingSphere();
   dots?.geometry.computeBoundingSphere();
 }
