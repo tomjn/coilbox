@@ -229,8 +229,7 @@ export function findLegs(
   const swings = (piece: LegoPiece | undefined): piece is LegoPiece =>
     !!piece &&
     !isRoot(piece) &&
-    Math.max(turned.get(piece.name) ?? 0, swung.get(piece.name) ?? 0) >=
-      moved;
+    Math.max(turned.get(piece.name) ?? 0, swung.get(piece.name) ?? 0) >= moved;
   const sideways = project.pieces.filter(
     (piece) =>
       !chained.has(piece.name) &&
