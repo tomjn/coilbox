@@ -5139,6 +5139,10 @@ msgid "{names} came from a game, but the file does not say which. A piece from a
 msgstr "{names} veio de um jogo, mas o arquivo não diz qual. Uma peça de um jogo só entra em unidades desse jogo."
 
 #: src/lego/legChains.ts
+msgid "{names} turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs."
+msgstr ""
+
+#: src/lego/legChains.ts
 msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
 msgstr ""
 
@@ -50384,6 +50388,10 @@ msgid "The unit definition, the model and the texture changed."
 msgstr "A definição da unidade, o modelo e a textura mudaram."
 
 #: src/lego/proposePlan.ts
+msgid "The unit flies, and plans are proposed only for units that walk or roll and for buildings, so no plan is proposed."
+msgstr ""
+
+#: src/lego/proposePlan.ts
 msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
 msgstr ""
 
@@ -50457,6 +50465,10 @@ msgstr "A unidade gera como energia a força atual do vento do mapa, limitada a 
 #, fuzzy
 msgid "The unit moves sideways when it cannot shoot from where it is."
 msgstr "A unidade se move para o lado quando não consegue atirar de onde está."
+
+#: src/lego/proposePlan.ts
+msgid "The unit moves, but its script moves none of its pieces when it starts moving, so there are no legs or wheels to find and no plan is proposed."
+msgstr ""
 
 #: src/lego/proposePlan.ts
 msgid "The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed."

@@ -339,6 +339,45 @@ describe("proposePlan", () => {
     expect(proposal.notes).toHaveLength(1);
   });
 
+  it("says a flier has no plan because it flies", () => {
+    const plane = unit([piece("hull", "root", [0, 5, 0])], {
+      gameUnitDef: { canfly: true, maxvelocity: 9 },
+    });
+    const proposal = proposePlan(plane, {
+      ...findings([]),
+      stride: { notes: [], still: true },
+    });
+    expect(proposal.base).toBeNull();
+    expect(proposal.notes.at(-1)).toMatch(/flies/);
+  });
+
+  it("says a mover's script moves nothing when it starts moving", () => {
+    const ship = unit([piece("hull", "root", [0, 5, 0])], {
+      gameUnitDef: MOVER,
+    });
+    const proposal = proposePlan(ship, {
+      ...findings([]),
+      notes: ["A sandbox warning."],
+      stride: { notes: [], still: true },
+    });
+    expect(proposal.base).toBeNull();
+    expect(proposal.notes.at(-1)).toMatch(/moves none of its pieces/);
+  });
+
+  it("ends with the stride's reason when a mover's legs were not read", () => {
+    const spider = unit([piece("hull", "root", [0, 5, 0])], {
+      gameUnitDef: MOVER,
+    });
+    const why = "rf1, rf2 turn about y or z when the unit moves.";
+    const proposal = proposePlan(spider, {
+      ...findings([]),
+      notes: [why, "A sandbox warning."],
+      stride: { notes: [why], still: false },
+    });
+    expect(proposal.base).toBeNull();
+    expect(proposal.notes).toEqual(["A sandbox warning.", why]);
+  });
+
   it("proposes no plan for a unit with no definition and nothing found", () => {
     const proposal = proposePlan(unit([]), findings([]));
     expect(proposal.base).toBeNull();

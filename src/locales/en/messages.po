@@ -4174,6 +4174,10 @@ msgid "{names} came from a game, but the file does not say which. A piece from a
 msgstr "{names} came from a game, but the file does not say which. A piece from a game only goes in units for that game."
 
 #: src/lego/legChains.ts
+msgid "{names} turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs."
+msgstr "{names} turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs."
+
+#: src/lego/legChains.ts
 msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
 msgstr "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
 
@@ -40931,6 +40935,10 @@ msgid "The unit definition, the model and the texture changed."
 msgstr "The unit definition, the model and the texture changed."
 
 #: src/lego/proposePlan.ts
+msgid "The unit flies, and plans are proposed only for units that walk or roll and for buildings, so no plan is proposed."
+msgstr "The unit flies, and plans are proposed only for units that walk or roll and for buildings, so no plan is proposed."
+
+#: src/lego/proposePlan.ts
 msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
 msgstr "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
 
@@ -40993,6 +41001,10 @@ msgstr "The unit makes the map's current wind strength as energy, capped at this
 #: src/content/unitFieldNotes.ts
 msgid "The unit moves sideways when it cannot shoot from where it is."
 msgstr "The unit moves sideways when it cannot shoot from where it is."
+
+#: src/lego/proposePlan.ts
+msgid "The unit moves, but its script moves none of its pieces when it starts moving, so there are no legs or wheels to find and no plan is proposed."
+msgstr "The unit moves, but its script moves none of its pieces when it starts moving, so there are no legs or wheels to find and no plan is proposed."
 
 #: src/lego/proposePlan.ts
 msgid "The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed."

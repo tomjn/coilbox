@@ -524,10 +524,12 @@ describe("a walker's legs, read off its stride", () => {
 
 describe("a stride that does not say which leg is which", () => {
   /** A still body with whatever hangs off it, every piece turning about x on
-   *  the stride's last frame unless listed as sliding instead. */
+   *  the stride's last frame unless listed as sliding or swinging about z
+   *  instead. */
   function walker(
     pieces: { name: string; parent: string; offset: number[] }[],
     slides: string[] = [],
+    swings: string[] = [],
   ) {
     const all = [{ name: "body", parent: null, offset: [0, 20, 0] }, ...pieces];
     const names = all.map((piece) => piece.name);
@@ -535,6 +537,7 @@ describe("a stride that does not say which leg is which", () => {
     for (const piece of pieces) {
       const at = names.indexOf(piece.name) * 6;
       if (slides.includes(piece.name)) last[at + 1] = 2;
+      else if (swings.includes(piece.name)) last[at + 5] = 0.5;
       else last[at + 3] = 0.5;
     }
     runScript.mockImplementation(({ events }: { events: ScriptEvent[] }) => ({
@@ -605,6 +608,69 @@ describe("a stride that does not say which leg is which", () => {
 
     expect(found.proposals).toEqual([]);
     expect(found.notes.join(" ")).toContain("lpiston slides rather than turns");
+  });
+
+  it("says legs splayed out sideways turn about y or z, not as legs", async () => {
+    const found = await inferRoles(
+      walker(
+        [
+          { name: "rf1", parent: "body", offset: [-5, 0, 5] },
+          { name: "rf2", parent: "rf1", offset: [-5, 0, 0] },
+          { name: "spinner", parent: "body", offset: [3, 5, 0] },
+        ],
+        [],
+        ["rf1", "rf2", "spinner"],
+      ),
+      "-- spider",
+    );
+
+    expect(found.proposals).toEqual([]);
+    expect(found.stride).toEqual({
+      notes: [
+        "rf1, rf2 turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs.",
+      ],
+      still: false,
+    });
+  });
+
+  it("says when the script moves no piece as the unit moves", async () => {
+    const found = await inferRoles(
+      walker([{ name: "hull", parent: "body", offset: [0, 0, 0] }], [], []),
+      "-- still",
+    );
+    expect(found.stride).toMatchObject({ still: false });
+
+    runScript.mockImplementation(({ pieces }: { pieces: string[] }) => ({
+      ...STILL,
+      pieces,
+      frames: [
+        new Array(pieces.length * 6).fill(0),
+        new Array(pieces.length * 6).fill(0),
+      ],
+    }));
+    const still = await inferRoles(
+      tree([
+        { name: "body", parent: null, offset: [0, 20, 0] },
+        { name: "hull", parent: "body", offset: [0, 0, 0] },
+      ]),
+      "-- still",
+    );
+    expect(still.stride).toEqual({ notes: [], still: true });
+
+    runScript.mockImplementation(({ pieces }: { pieces: string[] }) => ({
+      ...STILL,
+      pieces,
+      frames: [new Array(pieces.length * 6).fill(0)],
+      error: "StartMoving: attempt to call a nil value",
+    }));
+    const broke = await inferRoles(
+      tree([
+        { name: "body", parent: null, offset: [0, 20, 0] },
+        { name: "hull", parent: "body", offset: [0, 0, 0] },
+      ]),
+      "-- broke",
+    );
+    expect(broke.stride).toEqual({ notes: [], still: false });
   });
 
   it("says a leg on the centre line has no side", async () => {
