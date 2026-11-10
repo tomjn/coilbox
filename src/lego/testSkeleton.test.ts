@@ -4,6 +4,7 @@ import type { LegoPiece, LegoProject } from "./model";
 import { SCRATCH_SHORTNAME } from "./scratchGame";
 import { skeletonFilePath } from "./skeletonFile";
 import {
+  clearTestUnit,
   nameTestUnit,
   prepareTestSkeleton,
   TEST_UNIT_KEY,
@@ -70,6 +71,15 @@ describe("nameTestUnit", () => {
     expect(file[TEST_UNIT_KEY]).toBe("fedwalker");
     expect(file.units.fedwalker).toBeUndefined();
     expect(file.units.fedtank).toEqual(entry);
+  });
+
+  it("drops a plan kept under another case of the name", () => {
+    const before = JSON.stringify({
+      version: 1,
+      units: { FedWalker: entry, fedtank: entry },
+    });
+    const file = JSON.parse(nameTestUnit(before, "fedwalker", false));
+    expect(Object.keys(file.units)).toEqual(["fedtank"]);
   });
 
   it("refuses a file that is not a skeleton file, so it is not written over", () => {
@@ -205,7 +215,7 @@ describe("prepareTestSkeleton", () => {
     });
     const result = await prepare(d);
     expect(result.problem).toContain("disk full");
-    expect(result.modOptions).toEqual({ allowuserwidgets: "1" });
+    expect(result.modOptions).toEqual({});
   });
 
   it("does not write over a file it cannot read", async () => {
@@ -216,7 +226,7 @@ describe("prepareTestSkeleton", () => {
     expect(d.io.write).not.toHaveBeenCalled();
   });
 
-  it("launches without the option when the game's options cannot be read", async () => {
+  it("launches without the option and says why when the game's options cannot be read", async () => {
     const d = deps({
       gameOptions: vi.fn(async () => {
         throw new Error("no unitsync");
@@ -224,6 +234,45 @@ describe("prepareTestSkeleton", () => {
     });
     const result = await prepare(d);
     expect(result.modOptions).toEqual({});
-    expect(result.problem).toBeNull();
+    expect(result.problem).toContain("no unitsync");
+  });
+});
+
+describe("clearTestUnit", () => {
+  const io = (text: string | null) => {
+    const files = new Map<string, string>();
+    if (text !== null) files.set(path, text);
+    return {
+      files,
+      io: {
+        read: vi.fn(async (p: string) => files.get(p) ?? null),
+        write: vi.fn(async (p: string, t: string) => {
+          files.set(p, t);
+        }),
+      },
+    };
+  };
+
+  it("removes the key and keeps the plans", async () => {
+    const held = io(nameTestUnit(null, "fedwalker", true));
+    await clearTestUnit("/data", held.io);
+    const file = JSON.parse(held.files.get(path) ?? "{}");
+    expect(file[TEST_UNIT_KEY]).toBeUndefined();
+    expect(file.version).toBe(1);
+  });
+
+  it("writes nothing when there is no key or no file", async () => {
+    const none = io(null);
+    await clearTestUnit("/data", none.io);
+    const bare = io(JSON.stringify({ version: 1, units: {} }));
+    await clearTestUnit("/data", bare.io);
+    expect(none.io.write).not.toHaveBeenCalled();
+    expect(bare.io.write).not.toHaveBeenCalled();
+  });
+
+  it("does not throw for a file it cannot read", async () => {
+    const broken = io("{ nope");
+    await expect(clearTestUnit("/data", broken.io)).resolves.toBeUndefined();
+    expect(broken.io.write).not.toHaveBeenCalled();
   });
 });

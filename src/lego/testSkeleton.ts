@@ -50,9 +50,40 @@ export function nameTestUnit(
     string,
     unknown
   > & { units: Record<string, unknown> };
-  if (!hasSkeleton) delete file.units[unitName];
+  if (!hasSkeleton) {
+    // The widget matches unit names without regard to case, so a plan under
+    // another case of the name would label this unit too.
+    for (const name of Object.keys(file.units)) {
+      if (name.toLowerCase() === unitName.toLowerCase()) {
+        delete file.units[name];
+      }
+    }
+  }
   file[TEST_UNIT_KEY] = unitName;
   return JSON.stringify(file, null, 2);
+}
+
+/**
+ * Take the test unit out of the scratch game's skeleton file once its match is
+ * over. Other games built into folders with the same short name, such as a
+ * campaign's, would otherwise select that unit too. Best effort: a file that
+ * is missing or will not read is left as it is.
+ */
+export async function clearTestUnit(
+  root: string,
+  io: BlueprintFileIO = appFileIO,
+): Promise<void> {
+  try {
+    const path = skeletonFilePath(root, SCRATCH_SHORTNAME);
+    const text = await io.read(path);
+    if (text === null) return;
+    const file = JSON.parse(text) as Record<string, unknown>;
+    if (!(TEST_UNIT_KEY in file)) return;
+    delete file[TEST_UNIT_KEY];
+    await io.write(path, JSON.stringify(file, null, 2));
+  } catch {
+    // Nothing to tell the player. The next Test in game writes the key again.
+  }
 }
 
 export interface TestSkeletonArgs {
@@ -121,6 +152,7 @@ export async function prepareTestSkeleton(
   } catch (error) {
     problems.push(describeError(error));
   }
+  let fileWritten = false;
   try {
     // The plan goes under the unit's own game and under the scratch game, whose
     // short name is the one the match reports. Then the scratch game's file
@@ -137,20 +169,23 @@ export async function prepareTestSkeleton(
         unitSkeletonEntry(project) !== null,
       ),
     );
+    fileWritten = true;
   } catch (error) {
     problems.push(describeError(error));
   }
+  // With no file naming this test's unit, a widget that loaded would select
+  // whichever unit an earlier test left there, so it is not turned on.
+  const wanted = widgetReady && fileWritten;
   let options: ConfigOption[] = [];
-  if (widgetReady) {
+  if (wanted) {
     try {
       options = await deps.gameOptions(target.enginePath, root, baseArchive);
-    } catch {
-      // With no option list nothing is turned on. The widget still loads in a
-      // game that loads user widgets by default.
+    } catch (error) {
+      problems.push(describeError(error));
     }
   }
   return {
-    modOptions: withUserWidgets(modOptions, options, widgetReady),
+    modOptions: withUserWidgets(modOptions, options, wanted),
     problem: problems.length ? problems.join(" ") : null,
   };
 }

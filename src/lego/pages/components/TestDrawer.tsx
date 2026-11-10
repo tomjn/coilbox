@@ -68,7 +68,7 @@ import {
   sandboxChanges,
 } from "../../sandboxReload";
 import { SCRATCH_SIDE } from "../../scratchGame";
-import { prepareTestSkeleton } from "../../testSkeleton";
+import { clearTestUnit, prepareTestSkeleton } from "../../testSkeleton";
 import { CHECK_FRAMES, CHECK_SPAWN_FRAME } from "../../unitCheck";
 import {
   type WrittenScratchUnit,
@@ -266,6 +266,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   ) {
     if (!target || !game || !map) return;
     setCheck(null);
+    setSkeletonProblem(null);
     setAction(next);
     try {
       setPhase({ state: "writing" });
@@ -342,6 +343,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       // What a reload said was about the game that has now closed.
       setSandboxRun(null);
       setReload({ state: "idle" });
+      // The unit this match was to select is not another game's to select.
+      await clearTestUnit(target.dataDir);
     }
   }
 
@@ -473,6 +476,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   async function checkLoads() {
     if (!target || !game || !map) return;
     setCheck(null);
+    setSkeletonProblem(null);
     setAction("check");
     try {
       const written = await scratchGame(await compatTarget());

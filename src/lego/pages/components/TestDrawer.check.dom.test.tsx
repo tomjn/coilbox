@@ -81,6 +81,7 @@ vi.mock("../../testSkeleton", () => ({
   }: {
     modOptions: Record<string, string>;
   }) => ({ modOptions, problem: null }),
+  clearTestUnit: async () => {},
 }));
 
 vi.mock("../../writeScratchGame", () => ({

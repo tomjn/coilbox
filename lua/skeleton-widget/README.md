@@ -42,7 +42,7 @@ Coilbox writes `LuaUI/Config/coilbox_skeletons/<Game.gameShortName>.json` into a
 
 ## Test in game
 
-Test in game (`src/lego/testSkeleton.ts`) installs or updates this widget in the content root, then writes the scratch game's file, `LuaUI/Config/coilbox_skeletons/coilbox_lego_test.json`, with the unit's plan under `units` and the unit's definition name under the top level key `coilbox_test_unit`. A unit with no skeleton gets the key and no plan, and any plan an earlier test left for that name is removed.
+Test in game (`src/lego/testSkeleton.ts`) installs or updates this widget in the content root, then writes the scratch game's file, `LuaUI/Config/coilbox_skeletons/coilbox_lego_test.json`, with the unit's plan under `units` and the unit's definition name under the top level key `coilbox_test_unit`. A unit with no skeleton gets the key and no plan, and any plan an earlier test left for that name is removed. Coilbox removes the key again when the match ends, because other games, such as a campaign's, are built into folders with the same short name.
 
 `luaui/coilbox_skeleton/testunit.lua` does the rest. Every 15 sim frames until it succeeds, the widget asks for the player's own units of that definition (`Spring.GetTeamUnitsByDefs`). The first time one exists it selects it with `Spring.SelectUnitArray`, turns the skeleton on and logs one line. It does this once per widget load, so a later deselect or Bones press is not undone. A name the game has no definition for logs one warning. A file with no key, which is every file but a Test in game launch's, gets no picker and the widget does nothing extra.
 

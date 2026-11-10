@@ -41,8 +41,9 @@ vi.mock("../../../content/config", () => ({
     cancel: vi.fn(),
   }),
 }));
+const resolveCompatTarget = vi.fn();
 vi.mock("../../../play/compatTarget", () => ({
-  resolveCompatTarget: async () => ({ kind: "off" }),
+  resolveCompatTarget: (args: unknown) => resolveCompatTarget(args),
 }));
 vi.mock("@/workshop/config", () => ({
   useUnitDefs: () => ({ defs: null, defsFor: null }),
@@ -86,8 +87,10 @@ vi.mock("../../writeScratchGame", () => ({
 }));
 
 const prepareTestSkeleton = vi.fn();
+const clearTestUnit = vi.fn(async (_root: string) => {});
 vi.mock("../../testSkeleton", () => ({
   prepareTestSkeleton: (args: unknown) => prepareTestSkeleton(args),
+  clearTestUnit: (root: string) => clearTestUnit(root),
 }));
 
 import { newProject } from "../../model";
@@ -118,6 +121,7 @@ function open() {
 }
 
 beforeEach(() => {
+  resolveCompatTarget.mockResolvedValue({ kind: "off" });
   toBattleConfig.mockReturnValue({ battle: true });
   launch.mockResolvedValue({ exitCode: 0, signal: null });
 });
@@ -146,6 +150,30 @@ describe("TestDrawer and the skeleton overlay", () => {
     expect(toBattleConfig).toHaveBeenCalledWith(
       expect.objectContaining({ modOptions: { allowuserwidgets: "1" } }),
     );
+  });
+
+  it("reads the options of the compatibility mutator's archive when the game's switch is on", async () => {
+    resolveCompatTarget.mockResolvedValue({
+      kind: "use",
+      gameType: "SplinterFaction 0.1.96 (compat 2)",
+      gameArchive: "coilbox-compat-splinterfaction_0.1.96-2.sdd",
+      baseName: GAME.name,
+    });
+    prepareTestSkeleton.mockResolvedValue({ modOptions: {}, problem: null });
+    open();
+    await waitFor(() => expect(launch).toHaveBeenCalled());
+
+    expect(prepareTestSkeleton).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseArchive: "coilbox-compat-splinterfaction_0.1.96-2.sdd",
+      }),
+    );
+  });
+
+  it("takes the test unit out of the file once the match is over", async () => {
+    prepareTestSkeleton.mockResolvedValue({ modOptions: {}, problem: null });
+    open();
+    await waitFor(() => expect(clearTestUnit).toHaveBeenCalledWith("/data"));
   });
 
   it("says when the overlay could not be set up, and still launches", async () => {
