@@ -299,7 +299,13 @@ export default function WidgetsPage() {
           onChanged={reread}
           enginePath={list.enginePath}
           games={list.installed}
-          picked={game ? (game.versions?.[0] ?? game.game) : null}
+          picked={
+            game
+              ? (game.versions?.find((v) => v === picked) ??
+                game.versions?.[0] ??
+                game.game)
+              : null
+          }
         />
       )}
 
