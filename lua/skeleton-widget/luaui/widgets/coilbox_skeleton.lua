@@ -8,8 +8,18 @@
 -- origin, a dim line from it to its parent's origin and a bright bone to the
 -- far end of the piece's geometry. Everything comes from the engine: the
 -- piece tree, each piece's box and its live matrix. Nothing is set up in
--- coilbox. LuaUI/coilbox_skeleton/skeleton.lua holds the rules and is
--- tested there. This file reads the engine, uploads and draws.
+-- coilbox.
+--
+-- When coilbox has written a body plan for the unit (issue #5181), in
+-- LuaUI/Config/coilbox_skeletons/<Game.gameShortName>.json, the pieces in the
+-- plan are drawn in full with their role label beside them, and the others
+-- dimmed, or hidden with the Others button. A plan read off a model rather
+-- than made by coilbox is drawn dashed. A game with no such file, or a unit
+-- with no entry in it, gets the engine's skeleton alone, and nothing is logged.
+--
+-- LuaUI/coilbox_skeleton/skeleton.lua holds the rules and is tested there,
+-- as is plan.lua, which reads the file. This file reads the engine, uploads
+-- and draws.
 --
 -- No immediate mode: one vertex buffer, refilled each frame, drawn as lines
 -- and as dots through one shader. Text is gl.Text, which the engine batches.
@@ -20,6 +30,7 @@ local MODULE_DIR = "LuaUI/coilbox_skeleton/"
 
 local ACTION_TOGGLE = "coilbox_skeleton"
 local ACTION_NAMES = "coilbox_skeleton_names"
+local ACTION_OTHERS = "coilbox_skeleton_others"
 
 local keyActions = {}
 local me = nil
@@ -74,18 +85,22 @@ local function include(name)
 	return value
 end
 
-local SKELETON, I18N, STRINGS
+local SKELETON, PLAN, JSON, I18N, STRINGS
 local TEXT = nil
 
 --------------------------------------------------------------------------------
 -- State
 --------------------------------------------------------------------------------
 
--- Whether the skeleton is shown, and whether every piece is named. Kept in
--- the widget's config.
+-- Whether the skeleton is shown, whether every piece is named, and whether the
+-- pieces outside a unit's plan are drawn. Kept in the widget's config.
 local showing = false
 local naming = false
+local others = true
 local saved = nil
+
+-- Each unit's bones from coilbox's file, by lowercase unit definition name
+local plans = {}
 
 local tracker
 -- The poses drawn last, in the world, for the names DrawScreen writes.
@@ -107,6 +122,7 @@ local VERTEX_LAYOUT = {
 	{ id = 1, name = "color", size = 4 },
 	{ id = 2, name = "corner", size = 2 },
 	{ id = 3, name = "other", size = 4 },
+	{ id = 4, name = "dash", size = 1 },
 }
 
 local VERTEX_SHADER = [[
@@ -116,6 +132,7 @@ layout(location = 0) in vec3 pos;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 corner;
 layout(location = 3) in vec4 other;
+layout(location = 4) in float dash;
 uniform mat4 proj;
 uniform mat4 view;
 uniform vec2 viewport;
@@ -124,9 +141,14 @@ uniform float pxScale;
 out vec4 vColor;
 out vec2 vCorner;
 out float vLine;
+out float vDash;
+// how far along a line the vertex is, in pixels, on screen
+noperspective out float vAlong;
 void main() {
 	vec4 p = proj * view * vec4(pos, 1.0);
 	vLine = other.w > 0.0 ? 1.0 : 0.0;
+	vDash = dash;
+	vAlong = 0.0;
 	if (other.w > 0.0) {
 		// a line: moved across itself on screen, by its half width in pixels
 		vec4 q = proj * view * vec4(other.xyz, 1.0);
@@ -138,6 +160,8 @@ void main() {
 			across = -across;
 		}
 		p.xy += across * corner.x * other.w * pxScale * 2.0 / viewport * p.w;
+		// d spans the view's width as 2, so half of it is in pixels
+		vAlong = corner.y * len * 0.5;
 	} else {
 		// a dot's corner moves it a fixed number of pixels, however far away
 		p.xy += corner * dotRadius * 2.0 / viewport * p.w;
@@ -153,12 +177,22 @@ local FRAGMENT_SHADER = [[
 in vec4 vColor;
 in vec2 vCorner;
 in float vLine;
+in float vDash;
+noperspective in float vAlong;
+uniform float pxScale;
 out vec4 fragColor;
 void main() {
 	// a line's x runs from side to side, a dot's corner from its middle
 	float d = vLine > 0.5 ? abs(vCorner.x) : length(vCorner);
 	if (d > 1.0) {
 		discard;
+	}
+	if (vDash > 0.5) {
+		// a dashed line is drawn for the first half of each period
+		float period = 16.0 * pxScale;
+		if (mod(vAlong, period) > period * 0.5) {
+			discard;
+		}
 	}
 	vec4 c = vColor;
 	if (vLine > 0.5) {
@@ -257,9 +291,10 @@ local function readSkeleton(unitID)
 	if type(names) ~= "table" or #names == 0 then
 		return nil
 	end
+	local def = UnitDefs[defID]
 	local pieces = SKELETON.build(names, function(i)
 		return Spring.GetUnitPieceInfo(unitID, i)
-	end)
+	end, def and plans[def.name:lower()])
 	skeletons[defID] = pieces
 	return pieces
 end
@@ -282,6 +317,11 @@ local function toggleNames()
 	return true
 end
 
+local function toggleOthers()
+	others = not others
+	return true
+end
+
 -- Sizes for a view 1080 pixels tall, scaled with its height, as the
 -- blueprint widget's panel is.
 local BUTTON_H = 26
@@ -301,7 +341,7 @@ local function scale()
 end
 
 --- The Bones button against the right edge of the view, a little above the
--- middle, and the Names button to its left while the skeleton shows.
+-- middle, and the Names and Others buttons to its left while the skeleton shows.
 local function layoutButtons()
 	local s = scale()
 	local h = BUTTON_H * s
@@ -313,6 +353,7 @@ local function layoutButtons()
 	}
 	if showing then
 		list[2] = { label = TEXT.names, run = toggleNames, on = naming }
+		list[3] = { label = TEXT.others, run = toggleOthers, on = others }
 	end
 	buttons = {}
 	for _, b in ipairs(list) do
@@ -342,13 +383,19 @@ function widget:SetConfigData(data)
 end
 
 function widget:GetConfigData()
-	return { showing = showing, naming = naming }
+	return { showing = showing, naming = naming, others = others }
 end
 
 function widget:Initialize()
 	local err
 	SKELETON, err = include("skeleton.lua")
 	if SKELETON then
+		PLAN, err = include("plan.lua")
+	end
+	if PLAN then
+		JSON, err = include("json.lua")
+	end
+	if JSON then
 		I18N, err = include("coilbox_i18n.lua")
 	end
 	if I18N then
@@ -364,6 +411,22 @@ function widget:Initialize()
 	if type(saved) == "table" then
 		showing = saved.showing == true
 		naming = saved.naming == true
+		others = saved.others ~= false
+	end
+
+	-- A game coilbox has written nothing for has no file, which is not worth a
+	-- line. One that is there and will not read is.
+	local read, problem = PLAN.read({
+		exists = function(path)
+			return VFS.FileExists(path, VFS.RAW)
+		end,
+		load = function(path)
+			return VFS.LoadFile(path, VFS.RAW)
+		end,
+	}, JSON.decode, Game.gameShortName)
+	plans = read
+	if problem then
+		log(LOG.WARNING, problem)
 	end
 
 	tracker = SKELETON.tracker({
@@ -392,6 +455,7 @@ function widget:Initialize()
 	keyActions = {
 		[ACTION_TOGGLE] = toggle,
 		[ACTION_NAMES] = toggleNames,
+		[ACTION_OTHERS] = toggleOthers,
 	}
 	me = self
 	for action, run in pairs(keyActions) do
@@ -402,8 +466,12 @@ function widget:Initialize()
 	WG.CoilboxSkeleton = {
 		toggle = toggle,
 		toggleNames = toggleNames,
+		toggleOthers = toggleOthers,
 		showing = function()
 			return showing
+		end,
+		others = function()
+			return others
 		end,
 	}
 
@@ -484,7 +552,7 @@ function widget:DrawWorld()
 	end
 	tracker.update(Spring.GetSelectedUnits(), Spring.GetGameFrame())
 	drawn = tracker.world(Spring.GetFrameTimeOffset())
-	local verts, lines, dots = SKELETON.pack(drawn)
+	local verts, lines, dots = SKELETON.pack(drawn, others)
 	if lines + dots == 0 or not reserve(lines + dots) then
 		return
 	end
@@ -508,8 +576,8 @@ local function colourCode(c)
 	return string.char(255, math.floor(c[1] * 254) + 1, math.floor(c[2] * 254) + 1, math.floor(c[3] * 254) + 1)
 end
 
---- The names to write: every piece's while naming, else the one under the
--- cursor.
+--- The names to write: a planned piece's role label always, and the others'
+-- names as SKELETON.names says.
 local function names()
 	local marks = {}
 	for _, pose in ipairs(drawn) do
@@ -518,17 +586,19 @@ local function names()
 			if o then
 				local sx, sy, sz = Spring.WorldToScreenCoords(o[1], o[2], o[3])
 				if sx and sz and sz < 1 then
-					marks[#marks + 1] = { x = sx, y = sy, name = piece.name }
+					marks[#marks + 1] = {
+						x = sx,
+						y = sy,
+						text = piece.planned and piece.planned.label or piece.name,
+						planned = piece.planned ~= nil,
+						drawn = SKELETON.style(pose.pieces, i, others) ~= nil,
+					}
 				end
 			end
 		end
 	end
-	if naming then
-		return marks
-	end
 	local mx, my = Spring.GetMouseState()
-	local near = SKELETON.nearest(marks, mx, my, 3 * DOT_RADIUS * scale())
-	return near and { near } or {}
+	return SKELETON.names(marks, naming, mx, my, 3 * DOT_RADIUS * scale())
 end
 
 local function quad(out, x, y, w, h, c)
@@ -539,6 +609,7 @@ local function quad(out, x, y, w, h, c)
 		out[n + 4], out[n + 5], out[n + 6], out[n + 7] = c[1], c[2], c[3], c[4]
 		out[n + 8], out[n + 9] = 0, 0
 		out[n + 10], out[n + 11], out[n + 12], out[n + 13] = 0, 0, 0, 0
+		out[n + 14] = 0
 	end
 end
 
@@ -574,7 +645,7 @@ function widget:DrawScreen()
 		local size = NAME_FONT * scale()
 		local colour = colourCode(SKELETON.COLOR)
 		for _, mark in ipairs(names()) do
-			gl.Text(colour .. mark.name, mark.x + DOT_RADIUS * scale() * 2, mark.y, size, "o")
+			gl.Text(colour .. mark.text, mark.x + DOT_RADIUS * scale() * 2, mark.y, size, "o")
 		end
 	end
 end
