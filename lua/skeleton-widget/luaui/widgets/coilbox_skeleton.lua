@@ -17,6 +17,11 @@
 -- than made by coilbox is drawn dashed. A game with no such file, or a unit
 -- with no entry in it, gets the engine's skeleton alone, and nothing is logged.
 --
+-- Test in game (issue #5182) also writes a `coilbox_test_unit` into that file.
+-- When it is there, the widget selects the player's unit of that definition the
+-- first time it exists and shows the skeleton, once. Nothing in the file, nothing
+-- done.
+--
 -- LuaUI/coilbox_skeleton/skeleton.lua holds the rules and is tested there,
 -- as is plan.lua, which reads the file. This file reads the engine, uploads
 -- and draws.
@@ -85,7 +90,7 @@ local function include(name)
 	return value
 end
 
-local SKELETON, PLAN, JSON, I18N, STRINGS
+local SKELETON, PLAN, JSON, I18N, STRINGS, TESTUNIT
 local TEXT = nil
 
 --------------------------------------------------------------------------------
@@ -95,6 +100,9 @@ local TEXT = nil
 -- Whether the skeleton is shown, whether every piece is named, and whether the
 -- pieces outside a unit's plan are drawn. Kept in the widget's config.
 local showing = false
+-- Whether the skeleton is showing because Test in game asked for it, not the
+-- player, so it is not kept in the config as the player's choice.
+local shownByTest = false
 local naming = false
 local others = true
 local saved = nil
@@ -102,6 +110,8 @@ local saved = nil
 -- Each unit's bones from coilbox's file, by lowercase unit definition name
 local plans = {}
 
+-- Picks the unit the file names for Test in game, or nil when it names none
+local testUnit = nil
 local tracker
 -- The poses drawn last, in the world, for the names DrawScreen writes.
 local drawn = {}
@@ -305,6 +315,7 @@ end
 
 local function toggle()
 	showing = not showing
+	shownByTest = false
 	if not showing then
 		tracker.update({}, -1)
 		drawn = {}
@@ -383,7 +394,7 @@ function widget:SetConfigData(data)
 end
 
 function widget:GetConfigData()
-	return { showing = showing, naming = naming, others = others }
+	return { showing = showing and not shownByTest, naming = naming, others = others }
 end
 
 function widget:Initialize()
@@ -401,7 +412,10 @@ function widget:Initialize()
 	if I18N then
 		STRINGS, err = include("strings.lua")
 	end
-	if not STRINGS then
+	if STRINGS then
+		TESTUNIT, err = include("testunit.lua")
+	end
+	if not TESTUNIT then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -416,7 +430,7 @@ function widget:Initialize()
 
 	-- A game coilbox has written nothing for has no file, which is not worth a
 	-- line. One that is there and will not read is.
-	local read, problem = PLAN.read({
+	local read, problem, testName = PLAN.read({
 		exists = function(path)
 			return VFS.FileExists(path, VFS.RAW)
 		end,
@@ -428,6 +442,21 @@ function widget:Initialize()
 	if problem then
 		log(LOG.WARNING, problem)
 	end
+
+	-- Only a match Test in game started has a unit to select. Another match
+	-- gets no picker and does nothing here.
+	testUnit = TESTUNIT.new(testName, {
+		defID = function(name)
+			local def = UnitDefNames[name]
+			return def and def.id
+		end,
+		units = function(defID)
+			return Spring.GetTeamUnitsByDefs(Spring.GetMyTeamID(), defID)
+		end,
+		select = function(unitID)
+			Spring.SelectUnitArray({ unitID })
+		end,
+	})
 
 	tracker = SKELETON.tracker({
 		skeleton = readSkeleton,
@@ -484,6 +513,26 @@ function widget:Shutdown()
 	end
 	WG.CoilboxSkeleton = nil
 	dropGL()
+end
+
+-- How often, in sim frames, to look for the test unit until it exists
+local TEST_UNIT_EVERY = 15
+
+function widget:GameFrame(frame)
+	if not (testUnit and testUnit.pending()) or frame % TEST_UNIT_EVERY ~= 0 then
+		return
+	end
+	local result = testUnit.step()
+	if result == "selected" then
+		-- Shown for this match without changing what the player chose to keep
+		if not showing then
+			showing = true
+			shownByTest = true
+		end
+		log(LOG.INFO, "selected the test unit and showing its skeleton")
+	elseif result == "unknown" then
+		log(LOG.WARNING, "the skeleton file names a test unit this game does not have")
+	end
 end
 
 function widget:ViewResize(x, y)
