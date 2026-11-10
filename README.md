@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://coilbox-hub.vercel.app">Coilbox Hub</a> ·
   <a href="https://discord.gg/GUpRg6Wz3e">Discord</a> ·
-  <a href="https://tomjn.github.io/coilbox/">Documentation</a>
+  <a href="https://coilbox.org/">Documentation</a>
 </p>
 
 <p align="center">

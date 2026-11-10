@@ -10,7 +10,7 @@ import { t } from "@lingui/core/macro";
 
 /** The docs page that says what each source is, what it costs and how far to trust it. */
 export const REPLAY_SOURCES_DOC_URL =
-  "https://tomjn.github.io/coilbox/reference/replay-data-sources";
+  "https://coilbox.org/reference/replay-data-sources";
 
 /**
  * Getters, so each note reads the active language when it is shown. Callers
