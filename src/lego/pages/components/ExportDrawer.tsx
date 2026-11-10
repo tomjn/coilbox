@@ -39,7 +39,9 @@ import { appFileIO } from "@/blueprint/fileIO";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useUnitsyncScan } from "@/content/config";
 import { describeError } from "@/i18n/uiError";
+import { usePreferredTarget } from "@/play/config";
 import { workshopCompile } from "@/workshop/compile";
 import { useModProjects } from "@/workshop/project";
 import {
@@ -109,6 +111,7 @@ import {
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import {
   contentRootOfGameFolder,
+  folderGameShortname,
   writeSkeletonFiles,
 } from "../../skeletonFile";
 import { sheetSources, sheetTextureNames } from "../../textureSheet";
@@ -237,9 +240,10 @@ type Result =
        *  locks (#3289). */
       lockedList: string | null;
       lockedProblem: string | null;
-      /** `LuaUI/Config/coilbox_skeletons/<game>.json`, when this export changed
-       *  the unit's plan bones in it (#5181). */
-      skeletonFile: string | null;
+      /** `LuaUI/Config/coilbox_skeletons/<game>.json`, each one this export
+       *  changed the unit's plan bones in: the unit's game, and the game in the
+       *  folder when its short name differs (#5181, #5193). */
+      skeletonFiles: string[];
       skeletonProblem: string | null;
       /** Lists under the chassis's old name, emptied because the receipt shows
        *  coilbox wrote them. */
@@ -489,6 +493,9 @@ export function ExportDrawer({
   const [scope, setScope] = useState<"active" | "all">("active");
   const [batch, setBatch] = useState<BatchLine[] | null>(null);
   const [dir, setDir] = useState(project.exportDir ?? "");
+  // A mutator's modinfo has its own short name, which only a scan has read.
+  const { target: scanTarget } = usePreferredTarget();
+  const scan = useUnitsyncScan(scanTarget?.enginePath, scanTarget?.dataDir);
   const [withTexture, setWithTexture] = useState(
     project.exportTexture !== false,
   );
@@ -966,15 +973,27 @@ export function ExportDrawer({
     // The skeleton widget's file, when the folder sits in a content root, so
     // the unit's bones are labelled in the next match (issue #5181). A failure
     // is reported and does not undo the export above.
-    let skeletonFile: string | null = null;
+    let skeletonFiles: string[] = [];
     let skeletonProblem: string | null = null;
     const contentRoot = project.skeleton ? contentRootOfGameFolder(dir) : null;
     if (contentRoot) {
       try {
-        const wrote = await writeSkeletonFiles(appFileIO, contentRoot, [
-          project,
-        ]);
-        skeletonFile = wrote.written[0]?.path ?? null;
+        // Also under the short name of the game in this folder: the widget
+        // reads the file of the game a match starts, which for a mutator is
+        // the mutator and not the game it builds on (issue #5193).
+        const wrote = await writeSkeletonFiles(
+          appFileIO,
+          contentRoot,
+          [project],
+          {
+            // A scan still running, or never asked for, has no answer yet.
+            alsoUnder: folderGameShortname(
+              dir,
+              (scan.data ?? (await scan.run()))?.games ?? [],
+            ),
+          },
+        );
+        skeletonFiles = wrote.written.map((file) => file.path);
         if (wrote.unplaced.length > 0) {
           skeletonProblem = t`its game has no short name coilbox knows, so the widget's file has no place to go`;
         }
@@ -1121,7 +1140,7 @@ export function ExportDrawer({
       pictureProblem,
       lockedList,
       lockedProblem,
-      skeletonFile,
+      skeletonFiles,
       skeletonProblem,
       lockedEmptied,
       lockedKept,
@@ -1962,9 +1981,11 @@ export function ExportDrawer({
                     </Trans>
                   </p>
                 ) : null}
-                {result.skeletonFile ? (
-                  <code className="break-all">{result.skeletonFile}</code>
-                ) : null}
+                {result.skeletonFiles.map((path) => (
+                  <code key={path} className="break-all">
+                    {path}
+                  </code>
+                ))}
                 {result.skeletonProblem ? (
                   <p className="text-destructive">
                     <Trans>

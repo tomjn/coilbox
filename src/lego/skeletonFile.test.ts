@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { BlueprintFileIO } from "@/blueprint/gameFile";
+import type { GameItem } from "@/content/bindings";
 import type { LegoPiece, LegoProject } from "./model";
 import {
   contentRootOfGameFolder,
+  folderGameShortname,
   mergeSkeletonFile,
   type SkeletonUnitEntry,
   skeletonFileName,
@@ -311,5 +313,92 @@ describe("writeSkeletonFiles", () => {
       writeSkeletonFiles(io, ROOT, [unit("fedwalker")]),
     ).rejects.toThrow(/not JSON/);
     expect(writes).toEqual([]);
+  });
+
+  describe("under the short name of the game the unit will run in (issue #5193)", () => {
+    const MUT = "/data/LuaUI/Config/coilbox_skeletons/MUT.json";
+
+    it("also writes the file the mutator's short name names", async () => {
+      const { io, disk } = memory();
+      const result = await writeSkeletonFiles(io, ROOT, [unit("fedwalker")], {
+        alsoUnder: "MUT",
+      });
+      expect(result.written.map((w) => [w.path, w.units])).toEqual([
+        [PATH, ["fedwalker"]],
+        [MUT, ["fedwalker"]],
+      ]);
+      expect(disk.get(MUT)).toBe(disk.get(PATH));
+    });
+
+    it("writes one file when the two short names are the same", async () => {
+      const { io, writes } = memory();
+      await writeSkeletonFiles(io, ROOT, [unit("fedwalker")], {
+        alsoUnder: "TG",
+      });
+      expect(writes).toEqual([PATH]);
+    });
+
+    it("places a unit of no game under the short name it is given", async () => {
+      const { io, disk } = memory();
+      const result = await writeSkeletonFiles(
+        io,
+        ROOT,
+        [unit("fedwalker", { game: null })],
+        { alsoUnder: "MUT" },
+      );
+      expect(result.unplaced).toEqual([]);
+      expect([...disk.keys()]).toEqual([MUT]);
+    });
+
+    it("ignores an empty short name", async () => {
+      const { io, writes } = memory();
+      await writeSkeletonFiles(io, ROOT, [unit("fedwalker")], {
+        alsoUnder: "  ",
+      });
+      expect(writes).toEqual([PATH]);
+    });
+  });
+});
+
+describe("folderGameShortname", () => {
+  const game = (path: string | undefined, shortname?: string) =>
+    ({
+      name: "G",
+      primaryArchive: { name: "g", path },
+      info: shortname === undefined ? {} : { shortname },
+    }) as unknown as GameItem;
+
+  it("is the short name of the scanned game that lives in the folder", () => {
+    const games = [
+      game("/data/games/base.sdd", "BASE"),
+      game("/data/games/mutator.sdd", " MUT "),
+    ];
+    expect(folderGameShortname("/data/games/mutator.sdd", games)).toBe("MUT");
+  });
+
+  it("matches a folder whatever its slashes, trailing slash or case", () => {
+    const games = [game("C:\\Spring\\games\\Mutator.sdd", "MUT")];
+    expect(folderGameShortname("c:/spring/games/mutator.sdd/", games)).toBe(
+      "MUT",
+    );
+  });
+
+  it("prefers the exact path over one that differs only by case", () => {
+    const games = [
+      game("/data/games/Mod.sdd", "UPPER"),
+      game("/data/games/mod.sdd", "LOWER"),
+    ];
+    expect(folderGameShortname("/data/games/mod.sdd", games)).toBe("LOWER");
+    expect(folderGameShortname("/data/games/MOD.sdd", games)).toBe("UPPER");
+  });
+
+  it("is null for a folder no scanned game lives in, or one with no short name", () => {
+    expect(folderGameShortname("/data/games/x.sdd", [])).toBeNull();
+    expect(
+      folderGameShortname("/data/games/x.sdd", [
+        game("/data/games/x.sdd"),
+        game(undefined, "NOPATH"),
+      ]),
+    ).toBeNull();
   });
 });
