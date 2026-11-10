@@ -68,7 +68,8 @@ export interface UnitScan {
   plan: string | null;
   /** The plan's bones no piece was found for, by their label. */
   missing: string[];
-  /** The first thing the reading or the proposal said, as the reason. */
+  /** Why the unit has no plan: the last thing the proposal said, which is its
+   *  own reason. The script's warnings come before it. */
   note: string | null;
   /** What goes into the skeleton file, or null for nothing. */
   entry: SkeletonUnitEntry | null;
@@ -85,7 +86,7 @@ export function judgeUnit(
   findings: RoleFindings,
 ): UnitScan {
   const proposal = proposePlan(project, findings);
-  const note = proposal.notes[0] ?? null;
+  const note = proposal.notes.at(-1) ?? null;
   const none: UnitScan = {
     ...unit,
     outcome: "none",

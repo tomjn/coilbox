@@ -91,6 +91,14 @@ describe("judgeUnit", () => {
     expect(scan.note).toMatch(/no game definition/);
   });
 
+  it("gives the proposal's own reason, not a warning from the script run", () => {
+    const scan = judgeUnit(scanned, unit([], null), {
+      ...findings(),
+      notes: ["Spring.SetUnitNanoPieces does nothing in the preview."],
+    });
+    expect(scan.note).toMatch(/no game definition/);
+  });
+
   it("gives no plan to a script that would not run, with its reason", () => {
     const scan = judgeUnit(scanned, unit([]), findings([], "boom"));
     expect(scan.outcome).toBe("none");
