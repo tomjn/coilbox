@@ -115,6 +115,8 @@ local testUnit = nil
 local tracker
 -- The poses drawn last, in the world, for the names DrawScreen writes.
 local drawn = {}
+-- Where each piece of those poses is on screen
+local marks = {}
 -- Each unit def's piece tree, read from the first unit of it selected.
 local skeletons = {}
 
@@ -132,7 +134,7 @@ local VERTEX_LAYOUT = {
 	{ id = 1, name = "color", size = 4 },
 	{ id = 2, name = "corner", size = 2 },
 	{ id = 3, name = "other", size = 4 },
-	{ id = 4, name = "dash", size = 1 },
+	{ id = 4, name = "extra", size = 2 },
 }
 
 local VERTEX_SHADER = [[
@@ -142,7 +144,9 @@ layout(location = 0) in vec3 pos;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 corner;
 layout(location = 3) in vec4 other;
-layout(location = 4) in float dash;
+// x: 1 for a dashed line. y: the unit's grain, how many elmos one pixel of
+// width may cover, 0 for no limit
+layout(location = 4) in vec2 extra;
 uniform mat4 proj;
 uniform mat4 view;
 uniform vec2 viewport;
@@ -154,11 +158,19 @@ out float vLine;
 out float vDash;
 // how far along a line the vertex is, in pixels, on screen
 noperspective out float vAlong;
+// the least a far away unit's lines and dots shrink to, so they stay visible
+const float SMALLEST = 0.6;
 void main() {
 	vec4 p = proj * view * vec4(pos, 1.0);
 	vLine = other.w > 0.0 ? 1.0 : 0.0;
-	vDash = dash;
+	vDash = extra.x;
 	vAlong = 0.0;
+	// a unit that is small on screen gets narrower lines and smaller dots
+	float shrink = 1.0;
+	if (extra.y > 0.0 && pxScale > 0.0 && p.w > 0.0) {
+		float pixelsPerElmo = proj[1][1] * viewport.y * 0.5 / p.w;
+		shrink = clamp(extra.y * pixelsPerElmo / pxScale, SMALLEST, 1.0);
+	}
 	if (other.w > 0.0) {
 		// a line: moved across itself on screen, by its half width in pixels
 		vec4 q = proj * view * vec4(other.xyz, 1.0);
@@ -169,12 +181,12 @@ void main() {
 		if (corner.y > 0.5) {
 			across = -across;
 		}
-		p.xy += across * corner.x * other.w * pxScale * 2.0 / viewport * p.w;
+		p.xy += across * corner.x * other.w * shrink * pxScale * 2.0 / viewport * p.w;
 		// d spans the view's width as 2, so half of it is in pixels
 		vAlong = corner.y * len * 0.5;
 	} else {
-		// a dot's corner moves it a fixed number of pixels, however far away
-		p.xy += corner * dotRadius * 2.0 / viewport * p.w;
+		// a dot's corner moves it a number of pixels
+		p.xy += corner * dotRadius * shrink * 2.0 / viewport * p.w;
 	}
 	gl_Position = p;
 	vColor = color;
@@ -206,8 +218,10 @@ void main() {
 	}
 	vec4 c = vColor;
 	if (vLine > 0.5) {
-		// a line fades out over its outer edges rather than stopping hard
-		c.a *= 1.0 - smoothstep(0.5, 1.0, d);
+		// a line has a dark edge, so it reads against any unit and any sky,
+		// and fades out past it rather than stopping hard
+		c.rgb *= mix(1.0, 0.3, smoothstep(0.45, 0.7, d));
+		c.a *= 1.0 - smoothstep(0.8, 1.0, d);
 	} else if (d > 0.7) {
 		// a dot gets a darker rim, so it reads against the lines
 		c.rgb *= 0.45;
@@ -319,6 +333,7 @@ local function toggle()
 	if not showing then
 		tracker.update({}, -1)
 		drawn = {}
+		marks = {}
 	end
 	return true
 end
@@ -466,6 +481,7 @@ function widget:Initialize()
 		unitMatrix = function(unitID)
 			return pack16(Spring.GetUnitTransformMatrix(unitID))
 		end,
+		radius = Spring.GetUnitRadius,
 	})
 
 	-- spring-headless gives no buffers. The widget stays loaded and draws
@@ -595,13 +611,43 @@ local function ortho(w, h)
 	return { 2 / w, 0, 0, 0, 0, 2 / h, 0, 0, 0, 0, -1, 0, -1, -1, 0, 1 }
 end
 
+--- Where each piece of the drawn poses is on screen.
+local function placeMarks()
+	local out = {}
+	for _, pose in ipairs(drawn) do
+		for i, piece in ipairs(pose.pieces) do
+			local o = pose.origins[i]
+			if o then
+				local sx, sy, sz = Spring.WorldToScreenCoords(o[1], o[2], o[3])
+				if sx and sz and sz < 1 then
+					out[#out + 1] = {
+						x = sx,
+						y = sy,
+						pose = pose,
+						piece = i,
+						text = piece.planned and piece.planned.label or piece.name,
+						planned = piece.planned ~= nil,
+						drawn = SKELETON.style(pose.pieces, i, others) ~= nil,
+					}
+				end
+			end
+		end
+	end
+	return out
+end
+
 function widget:DrawWorld()
 	if not (glReady and showing) then
 		return
 	end
 	tracker.update(Spring.GetSelectedUnits(), Spring.GetGameFrame())
 	drawn = tracker.world(Spring.GetFrameTimeOffset())
-	local verts, lines, dots = SKELETON.pack(drawn, others)
+	marks = placeMarks()
+	-- the piece under the cursor and its way to the root stay in full, and
+	-- the rest dims, which is what picks one bone out of a crowd
+	local mx, my = Spring.GetMouseState()
+	local focus = SKELETON.focus(marks, mx, my, 3 * DOT_RADIUS * scale())
+	local verts, lines, dots = SKELETON.pack(drawn, others, focus)
 	if lines + dots == 0 or not reserve(lines + dots) then
 		return
 	end
@@ -628,24 +674,6 @@ end
 --- The names to write: a planned piece's role label always, and the others'
 -- names as SKELETON.names says.
 local function names()
-	local marks = {}
-	for _, pose in ipairs(drawn) do
-		for i, piece in ipairs(pose.pieces) do
-			local o = pose.origins[i]
-			if o then
-				local sx, sy, sz = Spring.WorldToScreenCoords(o[1], o[2], o[3])
-				if sx and sz and sz < 1 then
-					marks[#marks + 1] = {
-						x = sx,
-						y = sy,
-						text = piece.planned and piece.planned.label or piece.name,
-						planned = piece.planned ~= nil,
-						drawn = SKELETON.style(pose.pieces, i, others) ~= nil,
-					}
-				end
-			end
-		end
-	end
 	local mx, my = Spring.GetMouseState()
 	return SKELETON.names(marks, naming, mx, my, 3 * DOT_RADIUS * scale())
 end
@@ -658,7 +686,7 @@ local function quad(out, x, y, w, h, c)
 		out[n + 4], out[n + 5], out[n + 6], out[n + 7] = c[1], c[2], c[3], c[4]
 		out[n + 8], out[n + 9] = 0, 0
 		out[n + 10], out[n + 11], out[n + 12], out[n + 13] = 0, 0, 0, 0
-		out[n + 14] = 0
+		out[n + 14], out[n + 15] = 0, 0
 	end
 end
 

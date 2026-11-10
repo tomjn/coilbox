@@ -35,6 +35,22 @@ ends("faces as far as each other: the positive one", { -1, -1, -8 }, { 1, 1, 8 }
 ends("a box that is a point at the origin has no end", { 0, 0, 0 }, { 0, 0, 0 }, nil)
 
 --------------------------------------------------------------------------------
+-- boneStart: the other end of a piece that reaches both ways from its origin
+--------------------------------------------------------------------------------
+
+local function starts(name, min, max, want)
+	local got = S.boneStart(min, max)
+	check(name, same(got, want), show(got))
+end
+
+starts("a dish centred on its pivot reaches the other way too", { -1, -1, -8 }, { 1, 1, 8 }, { 0, 0, -8 })
+starts("the nearer face when the box straddles the origin", { -4, -1, -1 }, { 10, 1, 1 }, { -4, 0, 0 })
+starts("the nearer face on the positive side", { -10, -1, -1 }, { 4, 1, 1 }, { 4, 0, 0 })
+starts("it keeps the box's offset on the other axes", { -1, 5, -10 }, { 1, 7, 30 }, { 0, 6, -10 })
+starts("a piece that turns about one end has no other end", { -1, -1, 0 }, { 1, 1, 30 }, nil)
+starts("nor one whose box lies wholly past the origin", { 4, 6, -1 }, { 24, 10, 1 }, nil)
+
+--------------------------------------------------------------------------------
 -- build: the tree from a fake piece map
 --------------------------------------------------------------------------------
 
@@ -56,6 +72,9 @@ check("a child points at its parent by index", pieces[2].parent == 1 and pieces[
 check("a piece with geometry has a bone", same(pieces[3].bone, { 0, 0, 20 }), show(pieces[3].bone))
 check("an empty piece has no bone", pieces[4].bone == nil, show(pieces[4]))
 check("an empty piece is still in the tree as a joint", pieces[4].name == "flare" and pieces[4].parent == 3)
+check("a piece knows how deep it is", pieces[1].depth == 0 and pieces[3].depth == 2 and pieces.deepest == 3, show(pieces[3]))
+check("a piece centred on its origin has a second end", same(pieces[2].back, { 0, 2, -4 }), show(pieces[2].back))
+check("a piece that turns about one end has none", pieces[3].back == nil, show(pieces[3].back))
 
 --------------------------------------------------------------------------------
 -- pose and pack
@@ -101,8 +120,11 @@ local world = tracker.world(0)
 verts, lines, dots = S.pack(world)
 check("a selected unit is drawn", #world == 1 and world[1].unitID == 7)
 check("its pose is moved into the world", same(world[1].origins[2], { 100, 6, 200 }), show(world[1].origins[2]))
-check("three lines to a parent and three bones", lines == 6 * S.LINE_VERTICES, lines)
+-- base and turret reach both ways from origins their boxes lie to one side
+-- of, so each is two halves and a link to its origin
+check("three lines to a parent, a bone, two bones in halves and their links", lines == 10 * S.LINE_VERTICES, lines)
 check("a bone is wider than a line to the parent", S.BONE_WIDTH > S.PARENT_WIDTH)
+check("a bone narrows to its tip", S.BONE_TIP_WIDTH < S.BONE_WIDTH)
 
 -- A line's two triangles share the diagonal from its first vertex to its
 -- third. The fade across the line reads the corner's x, so those two must be
@@ -261,10 +283,11 @@ end)())
 -- turret's parent base is outside the plan, so with the others hidden its line
 -- runs to nothing and is not drawn. Barrel's parent turret is in the plan, so
 -- that is one line, and the two bones make three.
-check("a line to a parent outside the plan is dropped when the others are hidden", hiddenLines == 3 * S.LINE_VERTICES, hiddenLines)
+-- The turret reaches both ways, so it is two halves and a link.
+check("a line to a parent outside the plan is dropped when the others are hidden", hiddenLines == 5 * S.LINE_VERTICES, hiddenLines)
 
 local _, shownLines, shownDots = S.pack(world, true)
-check("with the others shown every piece has its dot and every parent line", shownDots == 4 * 6 and shownLines == 6 * S.LINE_VERTICES, shownLines .. " " .. shownDots)
+check("with the others shown every piece has its dot and every parent line", shownDots == 4 * 6 and shownLines == 10 * S.LINE_VERTICES, shownLines .. " " .. shownDots)
 
 -- a bone with a piece outside the plan between it and the next bone
 local chain = S.build({ "a", "b", "c" }, function(i)
@@ -308,6 +331,153 @@ for _, v in ipairs(noPlan) do
 	minAlpha = math.min(minAlpha, v.alpha)
 end
 check("a unit with no entry draws every piece in full, whatever the toggle", minAlpha == S.PARENT_ALPHA and select(3, S.pack(drawnPoses(plain), false)) == 4 * 6)
+
+--------------------------------------------------------------------------------
+-- what tells one bone from another: taper, depth, movement, the cursor, size
+--------------------------------------------------------------------------------
+
+--- One table per vertex of a pack: colour, alpha, corner, width, grain
+local function drawnVertices(out)
+	local list = {}
+	for at = 0, #out - S.STRIDE, S.STRIDE do
+		list[#list + 1] = {
+			colour = { out[at + 4], out[at + 5], out[at + 6] },
+			alpha = out[at + 7],
+			far = out[at + 9] == 1,
+			width = out[at + 13],
+			grain = out[at + 15],
+		}
+	end
+	return list
+end
+
+local function luma(c)
+	return c[1] + c[2] + c[3]
+end
+
+local plainWorld = drawnPoses(plain)
+local taper = drawnVertices(select(1, S.pack(plainWorld)))
+local wideOrigins, narrowTips, darkTips = 0, 0, 0
+for at = 1, #taper, S.LINE_VERTICES do
+	local a, b = taper[at], taper[at + 2]
+	if a.width == S.BONE_WIDTH then
+		wideOrigins = wideOrigins + 1
+		if b.far and b.width == S.BONE_TIP_WIDTH then
+			narrowTips = narrowTips + 1
+		end
+		if luma(b.colour) < luma(a.colour) then
+			darkTips = darkTips + 1
+		end
+	end
+end
+check("every bone is wide at its origin and narrow at its tip", wideOrigins == 5 and narrowTips == 5, wideOrigins .. " " .. narrowTips)
+check("and darker at its tip", darkTips == 5, darkTips)
+
+-- The turret's box is 2 above its origin and reaches 4 each way along z, so
+-- its bone runs straight from face to face through the point 2 above.
+local packed = select(1, S.pack(plainWorld))
+local turretAt = plainWorld[1].origins[2]
+local halves, tips = 0, {}
+for at = 0, #packed - S.STRIDE, S.LINE_VERTICES * S.STRIDE do
+	local from = { packed[at + 1], packed[at + 2], packed[at + 3] }
+	if packed[at + 13] == S.BONE_WIDTH and same(from, { turretAt[1], turretAt[2] + 2, turretAt[3] }) then
+		halves = halves + 1
+		tips[#tips + 1] = packed[at + 12] - turretAt[3]
+	end
+end
+table.sort(tips)
+check("a piece that reaches both ways is one straight bone past its origin", halves == 2 and same(tips, { -4, 4 }), halves .. " " .. show(tips))
+
+-- The dots come last, six vertices each, in no fixed order of piece.
+local dotColours = {}
+for at = #taper - 4 * 6 + 1, #taper, 6 do
+	dotColours[#dotColours + 1] = taper[at].colour
+end
+local rootDots, deepDots = 0, 0
+for _, c in ipairs(dotColours) do
+	if same(c, S.COLOR) then
+		rootDots = rootDots + 1
+	elseif same(c, S.DEEP_COLOR) then
+		deepDots = deepDots + 1
+	end
+end
+check("the root is the skeleton's colour and the deepest piece the deep one", rootDots == 1 and deepDots == 1, rootDots .. " " .. deepDots)
+
+-- movement: the barrel turns against the turret, and the flare rides along
+local function turnY(angle, x, y, z)
+	local c, s = math.cos(angle), math.sin(angle)
+	return { c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, x, y, z, 1 }
+end
+local barrelAngle = 0
+local turning = S.tracker({
+	skeleton = function()
+		return pieces
+	end,
+	matrix = function(_, i)
+		if i == 3 then
+			return turnY(barrelAngle, 0, 8, 2)
+		elseif i == 4 then
+			-- the flare, 20 along the barrel's z
+			local m = turnY(barrelAngle, 0, 8, 2)
+			m[13], m[14], m[15] = S.apply(m, 0, 0, 20)
+			return m
+		end
+		return MATRICES[i]
+	end,
+	unitMatrix = function()
+		return translate(0, 0, 0)
+	end,
+	radius = function()
+		return 50
+	end,
+})
+turning.update({ 1 }, 1)
+turning.update({ 1 }, 2)
+check("a still unit has no moving piece", next(turning.world(0)[1].heat) == nil, show(turning.world(0)[1].heat))
+barrelAngle = 0.3
+turning.update({ 1 }, 3)
+local heat = turning.world(0)[1].heat
+check("a piece that turns against its parent is moving", heat[3] == 1, show(heat))
+check("a piece carried by it, still against it, is not", heat[4] == nil and heat[2] == nil, show(heat))
+local hot = drawnVertices(select(1, S.pack(turning.world(0))))
+local widest = 0
+for _, v in ipairs(hot) do
+	widest = math.max(widest, v.width)
+end
+check("a moving bone is drawn wider", widest == S.BONE_WIDTH * (1 + S.HOT_WIDTH), widest)
+turning.update({ 1 }, 4)
+local cooling = turning.world(0)[1].heat[3]
+check("it fades once it stops", cooling > 0 and cooling < 1, cooling)
+for frame = 5, 3 + S.FADE_FRAMES do
+	turning.update({ 1 }, frame)
+end
+check("and is gone after the fade", turning.world(0)[1].heat[3] == nil)
+check("the unit's radius sets its grain", turning.world(0)[1].grain == 50 / S.FULL_AT_RADIUS and hot[1].grain == 50 / S.FULL_AT_RADIUS, hot[1].grain)
+check("with no radius there is no limit", taper[1].grain == 0, taper[1].grain)
+
+-- the cursor: the piece under it and its way to the root stay in full
+local pose1 = plainWorld[1]
+local function at(piece, x, drawn)
+	return { x = x, y = 10, pose = pose1, piece = piece, drawn = drawn }
+end
+local screen = { at(1, 10, true), at(2, 60, true), at(3, 110, true), at(4, 160, false) }
+local focus = S.focus(screen, 111, 11, 8)
+check("the cursor picks the piece under it", focus ~= nil and focus.piece == 3 and focus.pose == pose1)
+check("and its way to the root", focus.chain[3] and focus.chain[2] and focus.chain[1] and not focus.chain[4], show(focus.chain))
+check("nothing far from every piece", S.focus(screen, 500, 500, 8) == nil)
+check("a piece that is not drawn is never picked", S.focus(screen, 160, 10, 8) == nil)
+local focused = drawnVertices(select(1, S.pack(plainWorld, true, focus)))
+local dimmedDots, fullDots = 0, 0
+for _, v in ipairs(focused) do
+	if v.width == 0 then
+		if v.alpha == S.DOT_ALPHA then
+			fullDots = fullDots + 1
+		elseif v.alpha == S.DOT_ALPHA * S.FOCUS_DIM then
+			dimmedDots = dimmedDots + 1
+		end
+	end
+end
+check("the pieces off that way are dimmed", fullDots == 3 * 6 and dimmedDots == 6, fullDots .. " " .. dimmedDots)
 
 --------------------------------------------------------------------------------
 -- names: role labels beside the plan's pieces
