@@ -18556,11 +18556,6 @@ msgstr "累计"
 msgid "Curated map"
 msgstr "精选地图"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "赢得战斗后掉落的货币（精英和首领掉落更多）。可在仓库用于解锁单位、天赋和维修。"
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56232,6 +56227,10 @@ msgstr "获胜"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "{known} 场中 {won} 胜"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

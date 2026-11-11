@@ -18681,11 +18681,6 @@ msgstr "Kumulativ"
 msgid "Curated map"
 msgstr "Utvalgt kart"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Valuta du får ved å vinne kamper (mer for eliter og bosser). Bruk den ved depoter på å låse opp enheter, fordeler og reparasjoner."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56589,6 +56584,10 @@ msgstr "Vunnet"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "vant {won} av {known}"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

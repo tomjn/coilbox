@@ -18684,11 +18684,6 @@ msgstr "Cumulatief"
 msgid "Curated map"
 msgstr "Uitgelichte kaart"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Valuta die je krijgt door gevechten te winnen (meer bij elites en bazen). Besteed het bij depots aan ontgrendelde eenheden, voordelen en reparaties."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56613,6 +56608,10 @@ msgstr "Gewonnen"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "{won} van {known} gewonnen"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

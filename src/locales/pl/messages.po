@@ -18556,11 +18556,6 @@ msgstr "Narastająco"
 msgid "Curated map"
 msgstr "Wybrana mapa"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Waluta zdobywana za wygrane bitwy (więcej za elity i bossów). Wydawaj ją w składach na odblokowanie jednostek, atuty i naprawy."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56232,6 +56227,10 @@ msgstr "Wygrane"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "wygrane {won} z {known}"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

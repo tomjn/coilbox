@@ -18684,11 +18684,6 @@ msgstr "Αθροιστικό"
 msgid "Curated map"
 msgstr "Επιλεγμένος"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Νόμισμα που πέφτει όταν κερδίζετε μάχες (περισσότερο από επίλεκτους και αρχηγούς). Ξοδέψτε το σε αποθήκες για ξεκλείδωμα μονάδων, πλεονεκτήματα και επισκευές."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56613,6 +56608,10 @@ msgstr "Νίκη"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "νίκες {won} από {known}"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

@@ -15171,10 +15171,6 @@ msgstr "Cumulative"
 msgid "Curated map"
 msgstr "Curated map"
 
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -45989,6 +45985,10 @@ msgstr "Won"
 #: src/content/pages/components/MapRecords.tsx
 msgid "won {won} of {known}"
 msgstr "won {won} of {known}"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "Won is the games {name} won out of the games with a recorded result in which they ordered the unit. It is what happened in those games, not a sign that the unit caused it."

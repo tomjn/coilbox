@@ -18556,11 +18556,6 @@ msgstr "Cumulé"
 msgid "Curated map"
 msgstr "Carte sélectionnée"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Monnaie obtenue en gagnant des batailles (plus pour les élites et les boss). Dépensez-la aux dépôts en déblocages d’unités, atouts et réparations."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56232,6 +56227,10 @@ msgstr "Gagnées"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "{won} gagnées sur {known}"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

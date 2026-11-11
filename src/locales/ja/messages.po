@@ -18556,11 +18556,6 @@ msgstr "累積"
 msgid "Curated map"
 msgstr "厳選マップ"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "戦闘に勝つと手に入る通貨です（エリートやボスでは多め）。倉庫でユニットのアンロック、パーク、修理に使えます。"
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -56232,6 +56227,10 @@ msgstr "勝利"
 #, fuzzy
 msgid "won {won} of {known}"
 msgstr "{known} 試合中 {won} 勝"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy

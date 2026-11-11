@@ -170,27 +170,15 @@ export function RunHud({
 
       <StatCard
         grow={false}
-        icon={<CircuitBoard className="size-3.5 text-yellow-300" aria-hidden />}
-        label={t`Salvage`}
-        labelInk="text-yellow-300"
-        value={`${p.salvage}`}
-        accent="neutral"
-        action={
-          <HelpDot
-            label={t`Salvage`}
-            help={t`Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs.`}
-          />
-        }
+        icon={<Gauge className="size-3.5 text-amber-400" aria-hidden />}
+        label={t`Difficulty`}
+        meta={ascension > 0 ? `A${ascension}` : undefined}
+        value={diffWord}
+        accent="amber"
       >
-        <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Trans>
-            Spend at{" "}
-            <span className="inline-flex items-center gap-1 align-middle text-emerald-300">
-              <Store className="size-3" aria-hidden />
-              depots
-            </span>
-          </Trans>
-        </p>
+        <div className="mt-1.5">
+          <DifficultyPips filled={difficulty} />
+        </div>
       </StatCard>
 
       {onInspectArsenal ? (
@@ -199,7 +187,7 @@ export function RunHud({
             type="button"
             onClick={onInspectArsenal}
             aria-label={t`Open arsenal`}
-            className="pointer-events-auto block h-full cursor-pointer px-3 py-2 text-left transition-colors hover:bg-foreground/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            className="pointer-events-auto flex h-full cursor-pointer flex-col justify-start px-3 py-2 text-left transition-colors hover:bg-foreground/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           >
             <span
               className={`flex items-center gap-1.5 font-display text-[10px] font-medium uppercase tracking-[0.18em] ${HUD_DIM_INK_CLASS}`}
@@ -228,15 +216,27 @@ export function RunHud({
 
       <StatCard
         grow={false}
-        icon={<Gauge className="size-3.5 text-amber-400" aria-hidden />}
-        label={t`Difficulty`}
-        meta={ascension > 0 ? `A${ascension}` : undefined}
-        value={diffWord}
-        accent="amber"
+        icon={<CircuitBoard className="size-3.5 text-yellow-300" aria-hidden />}
+        label={t`Salvage`}
+        labelInk="text-yellow-300"
+        value={`${p.salvage}`}
+        accent="neutral"
+        action={
+          <HelpDot
+            label={t`Salvage`}
+            help={t`Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs.`}
+          />
+        }
       >
-        <div className="mt-1.5">
-          <DifficultyPips filled={difficulty} />
-        </div>
+        <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <Trans>
+            Spend at{" "}
+            <span className="inline-flex items-center gap-1 align-middle text-emerald-300">
+              <Store className="size-3" aria-hidden />
+              depots
+            </span>
+          </Trans>
+        </p>
       </StatCard>
     </div>
   );
