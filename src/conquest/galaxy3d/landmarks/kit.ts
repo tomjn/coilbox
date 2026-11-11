@@ -14,8 +14,8 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 /** sRGB, 0 to 255. */
 export type Rgb = [number, number, number];
 
-/** 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels. */
-export type Kind = 0 | 2 | 7 | 8;
+/** 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn skin. */
+export type Kind = 0 | 2 | 7 | 8 | 9;
 
 /** What a part is, so a test can find it. */
 export type PartTag = "body" | "tower" | "mast" | "crag";
@@ -37,6 +37,14 @@ export interface Paint {
   blend?: (x: number, z: number) => Rgb | undefined;
   /** 0 to 1: how far towards `blend` a point is pulled. */
   blendWeight?: (x: number, z: number) => number;
+  /** What has bled onto the part: rust, oxide, soot. Later ones lie over earlier. */
+  stains?: Stain[];
+}
+
+export interface Stain {
+  colour: Rgb;
+  /** 0 to 1: how much of it shows at a point. */
+  at: (x: number, y: number, z: number) => number;
 }
 
 export const TAU = Math.PI * 2;
@@ -186,6 +194,33 @@ export function sweep(
   return g;
 }
 
+/**
+ * Turn a closed skin so its faces look outwards, whichever way it was wound.
+ * The sign of the volume it encloses says which way that is.
+ */
+export function faceOut(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = g.getAttribute("position");
+  const idx = g.index;
+  if (!idx) return g;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  let volume = 0;
+  for (let i = 0; i < idx.count; i += 3) {
+    a.fromBufferAttribute(pos, idx.getX(i));
+    b.fromBufferAttribute(pos, idx.getX(i + 1));
+    c.fromBufferAttribute(pos, idx.getX(i + 2));
+    volume += a.dot(b.cross(c));
+  }
+  if (volume < 0)
+    for (let i = 0; i < idx.count; i += 3) {
+      const first = idx.getX(i);
+      idx.setX(i, idx.getX(i + 1));
+      idx.setX(i + 1, first);
+    }
+  return g;
+}
+
 /** What {@link Builder.build} gives back: geometries, with no material yet. */
 export interface BuiltLandmark {
   solid: THREE.BufferGeometry;
@@ -229,6 +264,10 @@ export class Builder {
     const base = linear(color);
     const top = paint.top ? linear(paint.top) : null;
     const cover = paint.topCover ?? 0.5;
+    const stains = (paint.stains ?? []).map((s) => ({
+      colour: linear(s.colour),
+      at: s.at,
+    }));
     const shade = hash3(this.n++, 3.1, 7.7);
     const c = new THREE.Color();
     for (let i = 0; i < count; i++) {
@@ -265,6 +304,7 @@ export class Builder {
           );
         }
       }
+      for (const stain of stains) c.lerp(stain.colour, stain.at(x, y, z));
       if (paint.tint) c.multiplyScalar(paint.tint(x, y, z));
       const towards = paint.blend?.(x, z);
       if (towards) c.lerp(linear(towards), paint.blendWeight?.(x, z) ?? 0);

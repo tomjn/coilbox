@@ -24,14 +24,18 @@ varying vec3 vNormal;
 varying vec3 vWorldNormal;
 varying vec4 vShadow;
 varying float vKind;
+varying vec3 vSunLocal;
 #if defined(USE_COLOR_ALPHA)
 varying vec4 vColor;
 #elif defined(USE_COLOR)
 varying vec3 vColor;
 #endif
 uniform mat4 uShadowMatrix;
+uniform vec3 uSun;
 void main() {
   vLocal = position;
+  // The sun in the landmark's own frame, for the relief drawn on a worn skin.
+  vSunLocal = normalize(uSun * mat3(modelMatrix));
   vNormal = normal;
   vWorldNormal = normalize(mat3(modelMatrix) * normal);
   vKind = kind;
@@ -55,6 +59,7 @@ varying vec3 vNormal;
 varying vec3 vWorldNormal;
 varying vec4 vShadow;
 varying float vKind;
+varying vec3 vSunLocal;
 #if defined(USE_COLOR_ALPHA)
 varying vec4 vColor;
 #elif defined(USE_COLOR)
@@ -62,6 +67,35 @@ varying vec3 vColor;
 #endif
 
 float lmHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float lmHash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float lmNoise3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(lmHash3(i), lmHash3(i + vec3(1, 0, 0)), f.x),
+        mix(lmHash3(i + vec3(0, 1, 0)), lmHash3(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(lmHash3(i + vec3(0, 0, 1)), lmHash3(i + vec3(1, 0, 1)), f.x),
+        mix(lmHash3(i + vec3(0, 1, 1)), lmHash3(i + vec3(1, 1, 1)), f.x), f.y),
+    f.z);
+}
+
+/**
+ * How far a worn skin stands proud at a point, 0 to 1: broad swells, cracks
+ * that wander, beds the stone was laid down in and pits. \`fine\` fades the
+ * smallest of it out as the landmark gets small on screen.
+ */
+float relic(vec3 p, float fine) {
+  float h = 0.55 * lmNoise3(p * 5.0) + 0.25 * lmNoise3(p * 11.0);
+  float crack = abs(lmNoise3(p * vec3(3.1, 1.3, 3.1) + 7.0) - 0.5);
+  h -= 0.55 * (1.0 - smoothstep(0.004, 0.03, crack));
+  // A bed shows only here and there, where the face has opened along it.
+  float bed = abs(fract(p.y * 2.3 + 1.6 * lmNoise3(p * 1.3)) - 0.5);
+  h -= 0.3 * smoothstep(0.45, 0.49, bed) * smoothstep(0.45, 0.65, lmNoise3(p * 2.1 + 11.0));
+  h += fine * 0.2 * lmNoise3(p * 23.0);
+  h -= fine * 0.3 * smoothstep(0.76, 0.88, lmNoise3(p * 27.0 + 3.0));
+  return h;
+}
 
 /** 1 in sunlight, 0 in the landmark's own shadow, softened over 3 by 3 texels. */
 float sunlit() {
@@ -121,6 +155,27 @@ void main() {
   vec3 w = normalize(vWorldNormal);
   vec3 hemi = mix(uGroundBounce, uSky, w.y * 0.5 + 0.5);
   float facing = max(dot(w, uSun), 0.0);
+  if (vKind > 8.5) {
+    // A worn skin: relief the light catches, dark in its cracks and hollows.
+    float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
+    float fine = clamp(1.0 - foot * 45.0, 0.0, 1.0);
+    float coarse = clamp(1.0 - foot * 9.0, 0.0, 1.0);
+    float e = max(0.008, foot);
+    float h = relic(vLocal, fine);
+    vec3 grad = vec3(
+      relic(vLocal + vec3(e, 0, 0), fine) - h,
+      relic(vLocal + vec3(0, e, 0), fine) - h,
+      relic(vLocal + vec3(0, 0, e), fine) - h) / e;
+    grad -= n * dot(grad, n);
+    vec3 nl = normalize(n - grad * 0.055 * coarse);
+    // Streaks run down the walls.
+    float streak = lmNoise3(vec3(vLocal.x * 13.0, vLocal.y * 0.9, vLocal.z * 13.0));
+    float wall = 1.0 - smoothstep(0.5, 0.8, abs(n.y));
+    base *= mix(1.0, (0.62 + 0.62 * smoothstep(-0.5, 0.8, h))
+      * (1.0 - 0.3 * wall * smoothstep(0.5, 0.78, streak)), coarse);
+    hemi = mix(uGroundBounce, uSky, nl.y * 0.5 + 0.5);
+    facing = max(dot(nl, normalize(vSunLocal)), 0.0);
+  }
   vec3 colour = base * (hemi + uSunLight * facing * sunlit());
 
   // Hidden by fog, drawn dim and grey as a hidden town is.

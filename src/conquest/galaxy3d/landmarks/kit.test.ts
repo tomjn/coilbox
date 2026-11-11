@@ -53,3 +53,17 @@ describe("landmark kit", () => {
     expect([a(), a(), a()]).toEqual([b(), b(), b()]);
   });
 });
+
+describe("stains", () => {
+  it("pull a part's colour towards the stain where it lies", () => {
+    const red = (stained: boolean) => {
+      const b = new Builder();
+      b.add(box(1, 1, 1, 0, 1), [100, 100, 100], at(0, 0, 0), {
+        stains: stained ? [{ colour: [255, 0, 0], at: () => 1 }] : [],
+      });
+      const col = b.build().solid.getAttribute("color");
+      return col.getX(0) / Math.max(1e-6, col.getY(0));
+    };
+    expect(red(true)).toBeGreaterThan(red(false) * 5);
+  });
+});
