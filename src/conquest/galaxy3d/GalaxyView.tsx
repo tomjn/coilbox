@@ -34,6 +34,7 @@ import {
   placeLabels,
   sameNumbers,
 } from "./labelDeclutter";
+import type { AnomalyKind } from "./landmarks/kinds";
 import {
   buildLandmarkLayer,
   type LandmarkLayer,
@@ -144,10 +145,10 @@ export interface NodeIdentity {
   /** Read on a terrain map only, where the town stands in a dark haze. */
   mist?: boolean;
   /**
-   * Read on a terrain map only, where a ruined castle stands in place of the
-   * town. See landmarks/landmarkLayer.ts.
+   * Read on a terrain map only, where an anomaly's model stands in place of
+   * the town. See landmarks/landmarkLayer.ts.
    */
-  landmark?: "ruin";
+  landmark?: AnomalyKind;
 }
 
 /** A label's icon slot and the icon React draws into it. */

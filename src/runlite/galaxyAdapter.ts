@@ -12,9 +12,11 @@ import type {
   NodeEmphasis,
   NodeIdentity,
 } from "../conquest/galaxy3d/GalaxyView";
+import { ANOMALY_KINDS } from "../conquest/galaxy3d/landmarks/kinds";
 import { hashString } from "../conquest/galaxy3d/layout";
 import { type Faction, type GalaxyDoc, NEUTRAL } from "../conquest/model";
-import { mulberry32 } from "../conquest/rng";
+import type { PlanetId } from "../conquest/planets";
+import { mulberry32, shuffled } from "../conquest/rng";
 import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
 import { hasSideTrips, openFrom, successors } from "./progress";
 
@@ -624,6 +626,8 @@ export function mapRunIdentities(
   /** Locations on no route, from {@link mapRunScenery}. Their names carry a
    * question mark, so they read as somewhere the run does not go. */
   scenery?: Set<string>,
+  /** The planet the map is of. A moon is dealt no ruin, which it never had. */
+  planet?: PlanetId,
 ): Map<string, NodeIdentity> {
   const out = new Map(byLocation(runIdentities(run), locations));
   for (const at of scenery ?? []) {
@@ -639,13 +643,22 @@ export function mapRunIdentities(
       end: n.type === "start" ? "start" : "goal",
     });
   }
-  // One anomaly, picked by the run's seed, stands in a ruined castle.
-  const events = run.nodes.filter((n) => n.type === "event");
-  if (events.length > 0) {
-    const n =
-      events[Math.floor(mulberry32(run.settings.seed)() * events.length)];
+  // Each kind of anomaly is one of a kind. The run's seed deals them out, one
+  // to a stop, and any stop left over keeps its town in the haze.
+  const rng = mulberry32(run.settings.seed);
+  const events = shuffled(
+    rng,
+    run.nodes.filter((n) => n.type === "event"),
+  );
+  const kinds = shuffled(
+    rng,
+    ANOMALY_KINDS.filter((k) => planet !== "moon" || k !== "ruin"),
+  );
+  for (const [k, kind] of kinds.entries()) {
+    const n = events[k];
+    if (!n) break;
     const at = locations.get(n.id) ?? n.id;
-    out.set(at, { ...out.get(at), landmark: "ruin" });
+    out.set(at, { ...out.get(at), landmark: kind });
   }
   return out;
 }

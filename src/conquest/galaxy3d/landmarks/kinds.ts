@@ -1,7 +1,21 @@
 import { type GalaxyNode, NEUTRAL } from "../../model";
 
+/**
+ * What a run's anomaly can be. Each is one of a kind: a map holds at most one
+ * of each.
+ */
+export const ANOMALY_KINDS = [
+  "ruin",
+  "monolith",
+  "shard",
+  "gate",
+  "overhang",
+  "stump",
+] as const;
+export type AnomalyKind = (typeof ANOMALY_KINDS)[number];
+
 /** What stands on a location in place of its town. */
-export type LandmarkKind = "stronghold" | "ruin";
+export type LandmarkKind = "stronghold" | AnomalyKind;
 
 /**
  * Which locations get a landmark, by index into `nodes`.
@@ -12,13 +26,13 @@ export type LandmarkKind = "stronghold" | "ruin";
  * held by its own faction in the document, not the player's, so it is ruled
  * out by its identity.
  *
- * A ruin goes where a run's identities ask for one. A stronghold wins if a
- * location is asked for both.
+ * An anomaly goes where a run's identities ask for one. A stronghold wins if
+ * a location is asked for both.
  */
 export function landmarkKinds(
   nodes: Pick<GalaxyNode, "id" | "kind" | "owner">[],
   playerFactionId: string,
-  identities?: ReadonlyMap<string, { landmark?: "ruin"; end?: string }>,
+  identities?: ReadonlyMap<string, { landmark?: AnomalyKind; end?: string }>,
 ): Map<number, LandmarkKind> {
   const out = new Map<number, LandmarkKind>();
   nodes.forEach((n, i) => {
@@ -29,7 +43,7 @@ export function landmarkKinds(
       n.owner !== NEUTRAL;
     if (n.kind === "capital" && enemy && identity?.end !== "start")
       out.set(i, "stronghold");
-    else if (identity?.landmark === "ruin") out.set(i, "ruin");
+    else if (identity?.landmark) out.set(i, identity.landmark);
   });
   return out;
 }
