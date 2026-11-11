@@ -16,7 +16,9 @@ import type { TownLayer, TownStyle } from "./townLayer";
  * holds it, so each one also carries a badge on a short pole above it: a
  * piece of interface rather than of the ground, in its owner's colour and its
  * owner's faction shape, with a star for a capital. The badge faces the
- * camera and keeps much the same size on screen at every zoom. The links
+ * camera and keeps much the same size on screen at every zoom. A landmark
+ * stands where a badge would, so it has none: the ring on the ground round it
+ * is always drawn, in the colour and the shape its badge would have. The links
  * `roadLinks` picks out are painted into the ground as tracks, and this
  * layer gives each one its state there.
  *
@@ -38,6 +40,10 @@ import type { TownLayer, TownStyle } from "./townLayer";
 export const BADGE_RADIUS = 0.36;
 /** How far the badge's centre stands above the ground, in badge radii. */
 export const POLE_RADII = 3;
+/** How strongly a landmark's ring shows while nothing picks it out. */
+export const LANDMARK_RING = 0.8;
+/** How many times a town's ring a landmark's is wide, to read as its badge. */
+export const LANDMARK_RING_WEIGHT = 3.5;
 /** A capital's badge is this much bigger, and ringed. */
 export const CAPITAL_SCALE = 1.35;
 /** Growth of a selected badge and of a hovered or emphasised one. */
@@ -363,6 +369,11 @@ interface Marker {
   z: number;
   /** The town's radius under the badge, 0 for none. */
   townRadius: number;
+  /**
+   * How far a landmark here rises above the anchor, or undefined for none. A
+   * landmark has no badge: the ring round it is drawn in the badge's colour.
+   */
+  landmark: number | undefined;
   /** The badge's size against a plain one, for the current state. */
   look: number;
 }
@@ -385,6 +396,8 @@ export function buildCityLayer(
     Partial<Pick<TownLayer, "setTownStyle" | "towns">> & {
       /** Where a landmark stands in place of a town, it takes the town's state. */
       setLandmarkStyle?: TownLayer["setTownStyle"];
+      /** The height of each landmark's top, in world units, by node index. */
+      landmarkTops?: ReadonlyMap<number, number>;
     },
   /** Whether a location's town is drawn in an anomaly's haze. */
   misty: (id: string) => boolean = () => false,
@@ -456,6 +469,8 @@ export function buildCityLayer(
     badge.raycast = () => {};
     // The badge turns to face the camera each time it is drawn.
     group.add(pole, badge);
+    const landmarkTop = ground.landmarkTops?.get(i);
+    group.visible = landmarkTop === undefined;
     scene.add(group);
     const marker: Marker = {
       i,
@@ -470,6 +485,7 @@ export function buildCityLayer(
       ground: groundY,
       z,
       townRadius: ground.towns?.[i]?.radius ?? 0,
+      landmark: landmarkTop === undefined ? undefined : landmarkTop - groundY,
       look: 1,
     };
     badge.onBeforeRender = (_r, _s, camera) => {
@@ -516,7 +532,21 @@ export function buildCityLayer(
     if (label) label.visible = look.label;
     const town = misty(m.id) ? { ...look.town, mist: true } : look.town;
     ground.setTownStyle?.(m.i, town);
-    ground.setLandmarkStyle?.(m.i, town);
+    ground.setLandmarkStyle?.(
+      m.i,
+      m.landmark === undefined || town.hidden
+        ? town
+        : {
+            ...town,
+            ring: {
+              color: look.fill,
+              strength: Math.max(LANDMARK_RING, town.ring?.strength ?? 0),
+              thick: m.id === selectedId,
+              sides: look.sides,
+              weight: LANDMARK_RING_WEIGHT,
+            },
+          },
+    );
     place(m);
   };
 
@@ -553,7 +583,8 @@ export function buildCityLayer(
   const fitCores = () => {
     for (const m of markers) {
       const r = BADGE_RADIUS * zoom * (m.capital ? CAPITAL_SCALE : 1);
-      const top = poleOf() + r;
+      // A landmark has no badge to pick, so its target covers the model.
+      const top = m.landmark ?? poleOf() + r;
       const across = Math.max(m.townRadius * 0.85, r * 1.4);
       at.set(m.x, m.ground + top / 2, m.z);
       size.set(across, top / 2 + r * 0.3, across);

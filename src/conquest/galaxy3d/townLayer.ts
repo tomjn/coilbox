@@ -48,6 +48,13 @@ export interface TownStyle {
     strength: number;
     /** True for the thick ring of a selected town. */
     thick: boolean;
+    /**
+     * A landmark's ring only, which stands in for its badge: the faction
+     * shape it is drawn as, 0 or left out for round.
+     */
+    sides?: number;
+    /** A landmark's ring only: how many times a town's ring it is wide. */
+    weight?: number;
   };
   /** Drawn in a dark violet haze, for a warpath's anomaly. */
   mist?: boolean;

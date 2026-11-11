@@ -64,6 +64,8 @@ export interface LandmarkLayer {
   nodes: ReadonlySet<number>;
   /** Where each landmark stands, in map units, for the end markers to step aside. */
   anchors: { pos: [number, number] }[];
+  /** The height of each landmark's top, in world units, by node index. */
+  tops: ReadonlyMap<number, number>;
   /** Show a location's fog, ring and haze, as a town would. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
@@ -98,6 +100,7 @@ export function buildLandmarkLayer(
   const sun = new THREE.Vector3(...TERRAIN_SUN);
   const placed = new Map<number, Placed>();
   const anchors: { pos: [number, number] }[] = [];
+  const tops = new Map<number, number>();
   const bakes: (() => void)[] = [];
   let renderer: THREE.WebGLRenderer | null = null;
 
@@ -229,12 +232,14 @@ export function buildLandmarkLayer(
     });
 
     placed.set(i, { materials, decal });
+    tops.set(i, bounds.max.y);
     anchors.push({ pos: surface.worldToMap(site.x, site.z) });
   }
 
   return {
     nodes: new Set(placed.keys()),
     anchors,
+    tops,
     setStyle(i, style) {
       const at = placed.get(i);
       if (!at) return;

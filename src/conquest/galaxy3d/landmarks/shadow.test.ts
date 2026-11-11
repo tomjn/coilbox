@@ -61,6 +61,18 @@ describe("groundDecal", () => {
     });
     expect(u.uRingStrength.value).toBe(0.95);
     expect(u.uRingThick.value).toBe(1);
+    // A town's ring is round and of a town's width.
+    expect(u.uRingSides.value).toBe(0);
+    expect(u.uRingWeight.value).toBe(1);
+    decal.setRing({
+      color: new THREE.Color(1, 0, 0),
+      strength: 0.8,
+      thick: false,
+      sides: 3,
+      weight: 3.5,
+    });
+    expect(u.uRingSides.value).toBe(3);
+    expect(u.uRingWeight.value).toBe(3.5);
     decal.setRing(undefined);
     expect(u.uRingStrength.value).toBe(0);
   });
