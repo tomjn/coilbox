@@ -3,6 +3,7 @@ import { PLANETS } from "../../planets";
 import {
   DEPOT_LIVERIES,
   depotPalette,
+  landingPalette,
   RUIN_PALETTES,
   ruinPalette,
   STRONGHOLD_PALETTES,
@@ -19,8 +20,8 @@ describe("landmark palettes", () => {
     if (id === "moon") expect(ruin).toBeUndefined();
     else expect(ruin).toBeDefined();
     for (const p of ruin
-      ? [strongholdPalette(id), depotPalette(id), ruin]
-      : [strongholdPalette(id), depotPalette(id)]) {
+      ? [strongholdPalette(id), depotPalette(id), landingPalette(id), ruin]
+      : [strongholdPalette(id), depotPalette(id), landingPalette(id)]) {
       const c = channels(p);
       expect(c.length).toBeGreaterThan(0);
       for (const v of c) {

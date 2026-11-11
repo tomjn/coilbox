@@ -75,6 +75,25 @@ export const DEPOT_LIVERIES: readonly DepotLivery[] = [
 ];
 const DEPOT_METAL: Rgb = [70, 74, 82];
 
+/** A run's landing pad. Like a depot, only its stone and what settles on it are the planet's. */
+export interface LandingPalette {
+  /** The cast foundation and footings. */
+  pad: Rgb;
+  /** Bare metal: the frame, the pedestal, the masts. */
+  metal: Rgb;
+  /** The deck's plate. */
+  deck: Rgb;
+  /** The towers' paint. */
+  shell: Rgb;
+  /** The deck's markings and the towers' band. */
+  mark: Rgb;
+  top: Rgb;
+  topCover: number;
+}
+const LANDING_DECK: Rgb = [164, 168, 170];
+const LANDING_SHELL: Rgb = [190, 192, 190];
+const LANDING_MARK: Rgb = [58, 106, 172];
+
 export const ANOMALY_PALETTES: Record<PlanetId, AnomalyPalette> = {
   temperate: {
     slate: [78, 80, 88],
@@ -267,4 +286,18 @@ export const anomalyPalette = (planet?: PlanetId): AnomalyPalette =>
 export const depotPalette = (planet?: PlanetId): DepotPalette => {
   const { armour, top, topCover } = strongholdPalette(planet);
   return { pad: armour, metal: DEPOT_METAL, top, topCover };
+};
+
+/** A landing pad stands on the planet's own cast stone, as a depot does. */
+export const landingPalette = (planet?: PlanetId): LandingPalette => {
+  const { armour, top, topCover } = strongholdPalette(planet);
+  return {
+    pad: armour,
+    metal: DEPOT_METAL,
+    deck: LANDING_DECK,
+    shell: LANDING_SHELL,
+    mark: LANDING_MARK,
+    top,
+    topCover,
+  };
 };

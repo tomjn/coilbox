@@ -52,7 +52,7 @@ export interface Depot {
 }
 
 /** A bowl of radius `r` opening along +y, then tipped `tilt` towards +x, with its feed. */
-function dish(r: number, tilt: number) {
+export function dish(r: number, tilt: number) {
   const depth = r * 0.3;
   const skin = r * 0.05;
   const steps = 8;
