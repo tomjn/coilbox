@@ -94,6 +94,9 @@ export function buildLandmarkLayer(
     identities,
   )) {
     const stronghold = kind === "stronghold";
+    // A planet with no ruin, such as a moon, leaves the anomaly its town.
+    const ruin = stronghold ? undefined : ruinPalette(planet);
+    if (!stronghold && !ruin) continue;
     // A stronghold takes a capital's room, a ruin an ordinary town's.
     const reach = stronghold ? STRONGHOLD_REACH : RUIN_REACH;
     const share = stronghold ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE;
@@ -120,9 +123,9 @@ export function buildLandmarkLayer(
           )
       : undefined;
     const seed = hashString(node.id);
-    const { built } = stronghold
-      ? buildStronghold(site.ground, strongholdPalette(planet), seed, edge)
-      : buildRuin(site.ground, ruinPalette(planet), seed, edge);
+    const { built } = ruin
+      ? buildRuin(site.ground, ruin, seed, edge)
+      : buildStronghold(site.ground, strongholdPalette(planet), seed, edge);
 
     const group = new THREE.Group();
     group.position.set(site.x, site.y, site.z);

@@ -142,6 +142,8 @@ The spike's few small lamp points and the reactor collars stay, because they are
 
 ## The ruined castle
 
+A moon has no history for a castle to be a ruin of, so on a moon map the anomaly keeps its town and no ruin is built (the user's ruling, 11 November 2026).
+
 A small broken historic site, built down from `citadel.ts`. It is a ruin, not a working castle. It keeps:
 
 - The mound, at a lower height.

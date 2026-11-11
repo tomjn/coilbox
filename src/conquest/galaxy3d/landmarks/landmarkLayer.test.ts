@@ -99,6 +99,20 @@ describe("buildLandmarkLayer", () => {
     expect([...layer.nodes].sort()).toEqual([1, 2]);
   });
 
+  it("raises no ruin on a moon, where the anomaly keeps its town", () => {
+    const layer = buildLandmarkLayer(
+      new THREE.Scene(),
+      [],
+      surfaceAt(0.5),
+      galaxy,
+      "me",
+      new Map([["field", { landmark: "ruin" as const }]]),
+      "moon",
+      undefined,
+    );
+    expect([...layer.nodes]).toEqual([1]);
+  });
+
   it("raises nothing where the capital is under the sea", () => {
     const { layer, scene } = build(0);
     expect(layer.nodes.size).toBe(0);

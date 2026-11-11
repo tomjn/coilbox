@@ -98,7 +98,8 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
   },
 };
 
-export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
+/** A moon has no history for a castle to be a ruin of, so it has none. */
+export const RUIN_PALETTES: Record<Exclude<PlanetId, "moon">, RuinPalette> = {
   temperate: {
     stone: [188, 168, 130],
     darkStone: [130, 114, 90],
@@ -127,13 +128,6 @@ export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
     top: [176, 98, 66],
     topCover: 0.35,
   },
-  moon: {
-    stone: [176, 172, 166],
-    darkStone: [134, 130, 124],
-    rock: [104, 104, 110],
-    top: [186, 186, 190],
-    topCover: 0.25,
-  },
   volcanic: {
     stone: [148, 120, 98],
     darkStone: [104, 86, 72],
@@ -154,5 +148,5 @@ export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
 export const strongholdPalette = (planet?: PlanetId): StrongholdPalette =>
   STRONGHOLD_PALETTES[planet ?? "temperate"];
 
-export const ruinPalette = (planet?: PlanetId): RuinPalette =>
-  RUIN_PALETTES[planet ?? "temperate"];
+export const ruinPalette = (planet?: PlanetId): RuinPalette | undefined =>
+  planet === "moon" ? undefined : RUIN_PALETTES[planet ?? "temperate"];
