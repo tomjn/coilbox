@@ -113,7 +113,7 @@ The decal's contact darkening then sits under the blend rather than drawing a ri
 
 - Hidden by fog. The town draws dim and grey. The landmark does the same through a material uniform: something is there, but its colour is gone.
 - Ring. Selected, hovered and emphasised draw the town's ring in the same colour, strength and thickness. The landmark's ring is a thin band on the ground decal at the footprint's edge.
-- Mist. The event's dark violet haze, matched to the town shader's mist by reading its colour and strength from `townShader.ts`.
+- Mist. Not drawn on landmarks. Tinting a 3D model's faces with the town shader's violet haze hid the ruin's shape, and the user ruled it out on 11 November 2026.
 
 The landmark meshes set `raycast` to a no-op. Picking still goes through the node's hit target, as it does for towns and markers.
 
@@ -141,6 +141,8 @@ A port of `bastion.ts` with the crag, long wall, decks on piers, containment sph
 The spike's few small lamp points and the reactor collars stay, because they are in the approved shots. They are the only lit parts.
 
 ## The ruined castle
+
+A moon has no history for a castle to be a ruin of, so on a moon map the anomaly keeps its town and no ruin is built (the user's ruling, 11 November 2026).
 
 A small broken historic site, built down from `citadel.ts`. It is a ruin, not a working castle. It keeps:
 

@@ -98,55 +98,49 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
   },
 };
 
-export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
+/** A moon has no history for a castle to be a ruin of, so it has none. */
+export const RUIN_PALETTES: Record<Exclude<PlanetId, "moon">, RuinPalette> = {
   temperate: {
-    stone: [176, 166, 146],
-    darkStone: [140, 132, 118],
+    stone: [188, 168, 130],
+    darkStone: [130, 114, 90],
     rock: [112, 104, 92],
     top: [92, 118, 62],
     topCover: 0.5,
   },
   desert: {
-    stone: [190, 164, 124],
-    darkStone: [150, 126, 96],
+    stone: [214, 188, 146],
+    darkStone: [168, 142, 108],
     rock: [158, 124, 92],
     top: [214, 190, 140],
     topCover: 0.4,
   },
   ice: {
-    stone: [160, 164, 170],
-    darkStone: [120, 124, 132],
+    stone: [196, 198, 204],
+    darkStone: [150, 152, 160],
     rock: [100, 102, 110],
     top: [238, 242, 246],
     topCover: 0.65,
   },
   red: {
-    stone: [150, 96, 74],
-    darkStone: [112, 72, 58],
+    stone: [178, 118, 90],
+    darkStone: [134, 88, 68],
     rock: [110, 66, 50],
     top: [176, 98, 66],
     topCover: 0.35,
   },
-  moon: {
-    stone: [150, 150, 154],
-    darkStone: [112, 112, 118],
-    rock: [104, 104, 110],
-    top: [186, 186, 190],
-    topCover: 0.25,
-  },
   volcanic: {
-    stone: [96, 84, 80],
-    darkStone: [74, 64, 62],
-    rock: [50, 42, 40],
+    stone: [148, 120, 98],
+    darkStone: [104, 86, 72],
+    rock: [78, 60, 50],
     top: [62, 46, 38],
     topCover: 0.25,
   },
   acid: {
-    stone: [140, 130, 98],
+    stone: [168, 156, 116],
     darkStone: [108, 100, 78],
     rock: [104, 96, 80],
     top: [150, 142, 88],
-    topCover: 0.4,
+    topCover: 0.25,
   },
 };
 
@@ -154,5 +148,5 @@ export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
 export const strongholdPalette = (planet?: PlanetId): StrongholdPalette =>
   STRONGHOLD_PALETTES[planet ?? "temperate"];
 
-export const ruinPalette = (planet?: PlanetId): RuinPalette =>
-  RUIN_PALETTES[planet ?? "temperate"];
+export const ruinPalette = (planet?: PlanetId): RuinPalette | undefined =>
+  planet === "moon" ? undefined : RUIN_PALETTES[planet ?? "temperate"];

@@ -37,7 +37,10 @@ const galaxy: Pick<GalaxyDoc, "nodes" | "links"> = {
   ],
 };
 
-const build = (level = 0.5) => {
+const build = (
+  level = 0.5,
+  identities?: ReadonlyMap<string, { landmark?: "ruin" }>,
+) => {
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
   const layer = buildLandmarkLayer(
@@ -46,7 +49,7 @@ const build = (level = 0.5) => {
     surfaceAt(level),
     galaxy,
     "me",
-    undefined,
+    identities,
     undefined,
     undefined,
   );
@@ -86,6 +89,28 @@ describe("buildLandmarkLayer", () => {
     layer.setStyle(1, { hidden: true });
     for (const m of shaded(scene)) expect(m.uniforms.uHidden.value).toBe(1);
     expect(() => layer.setStyle(0, { hidden: true })).not.toThrow();
+  });
+
+  it("raises a ruin where a run asks for one", () => {
+    const { layer } = build(
+      0.5,
+      new Map([["field", { landmark: "ruin" as const }]]),
+    );
+    expect([...layer.nodes].sort()).toEqual([1, 2]);
+  });
+
+  it("raises no ruin on a moon, where the anomaly keeps its town", () => {
+    const layer = buildLandmarkLayer(
+      new THREE.Scene(),
+      [],
+      surfaceAt(0.5),
+      galaxy,
+      "me",
+      new Map([["field", { landmark: "ruin" as const }]]),
+      "moon",
+      undefined,
+    );
+    expect([...layer.nodes]).toEqual([1]);
   });
 
   it("raises nothing where the capital is under the sea", () => {

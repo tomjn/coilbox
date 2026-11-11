@@ -16,8 +16,6 @@ const SUN_LIGHT = new THREE.Color(0xfff4e2).multiplyScalar(2.7 / Math.PI);
 /** The light from the sky above and the ground below, likewise. */
 const SKY = new THREE.Color(0xcfe0ff).multiplyScalar(1.5 / Math.PI);
 const GROUND_BOUNCE = new THREE.Color(0x6a5a48).multiplyScalar(1.5 / Math.PI);
-/** The town shader's anomaly haze, `townShader.ts`. */
-const MIST = new THREE.Vector3(0.16, 0.12, 0.24);
 
 const VERTEX = /* glsl */ `
 attribute float kind;
@@ -52,8 +50,6 @@ uniform vec3 uGroundBounce;
 uniform sampler2D uShadow;
 uniform float uShadowOn;
 uniform float uHidden;
-uniform float uMist;
-uniform vec3 uMistColour;
 varying vec3 vLocal;
 varying vec3 vNormal;
 varying vec3 vWorldNormal;
@@ -66,13 +62,6 @@ varying vec3 vColor;
 #endif
 
 float lmHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float lmNoise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(lmHash(i), lmHash(i + vec2(1.0, 0.0)), f.x),
-             mix(lmHash(i + vec2(0.0, 1.0)), lmHash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
 
 /** 1 in sunlight, 0 in the landmark's own shadow, softened over 3 by 3 texels. */
 float sunlit() {
@@ -99,14 +88,14 @@ void main() {
   if (vKind < 0.5 && abs(n.y) < 0.6) {
     // Courses of stone on a wall.
     float u = abs(n.x) > abs(n.z) ? vLocal.z : vLocal.x;
-    vec2 size = vec2(0.17, 0.075);
+    vec2 size = vec2(0.13, 0.065);
     vec2 b = vec2(u, vLocal.y) / size;
     b.x += 0.5 * mod(floor(b.y), 2.0);
     vec2 f = fract(b);
     float edge = min(min(f.x, 1.0 - f.x) * size.x, min(f.y, 1.0 - f.y) * size.y);
-    float mortar = 1.0 - smoothstep(0.003, 0.011, edge);
-    float fade = clamp(1.0 - fwidth(b.y) * 1.6, 0.0, 1.0);
-    float stone = 0.88 + 0.24 * lmHash(floor(b));
+    float mortar = 1.0 - smoothstep(0.004, 0.012, edge);
+    float fade = clamp(1.0 - fwidth(b.y) * 0.9, 0.0, 1.0);
+    float stone = 0.76 + 0.48 * lmHash(floor(b));
     base *= mix(1.0, stone * (1.0 - 0.4 * mortar), fade);
   } else if (vKind > 7.5 && vKind < 8.5) {
     // Cast panels seen from far off: tall, close set, a few recessed.
@@ -137,11 +126,6 @@ void main() {
   // Hidden by fog, drawn dim and grey as a hidden town is.
   if (uHidden > 0.5)
     colour = mix(colour, vec3(dot(colour, vec3(0.2126, 0.7152, 0.0722))), 0.7) * 0.7;
-  // An anomaly's haze, as the town shader draws it.
-  if (uMist > 0.5) {
-    float drift = lmNoise(vLocal.xz / 0.5);
-    colour = mix(colour, uMistColour, 0.45 + 0.4 * drift);
-  }
   gl_FragColor = vec4(colour, alpha);
   #include <colorspace_fragment>
 }
@@ -164,8 +148,6 @@ export function landmarkMaterial(
       uShadowMatrix: { value: new THREE.Matrix4() },
       uShadowOn: { value: 0 },
       uHidden: { value: 0 },
-      uMist: { value: 0 },
-      uMistColour: { value: MIST.clone() },
     },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
@@ -176,7 +158,7 @@ export function landmarkMaterial(
 export function glowMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexColors: true,
-    uniforms: { uHidden: { value: 0 }, uMist: { value: 0 } },
+    uniforms: { uHidden: { value: 0 } },
     vertexShader: /* glsl */ `
 varying vec3 vColor;
 void main() {
@@ -185,10 +167,9 @@ void main() {
 }`,
     fragmentShader: /* glsl */ `
 uniform float uHidden;
-uniform float uMist;
 varying vec3 vColor;
 void main() {
-  vec3 c = vColor * (uHidden > 0.5 ? 0.25 : 1.0) * (uMist > 0.5 ? 0.5 : 1.0);
+  vec3 c = vColor * (uHidden > 0.5 ? 0.25 : 1.0);
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`,
@@ -196,11 +177,13 @@ void main() {
   });
 }
 
-/** Show a landmark hidden by fog, standing in an anomaly's haze, or plain. */
+/**
+ * Show a landmark hidden by fog, or plain. An anomaly's haze is not drawn
+ * over a model: tinting its faces hid its shape.
+ */
 export function setLandmarkState(
   m: THREE.ShaderMaterial,
-  s: { hidden: boolean; mist: boolean },
+  s: { hidden: boolean },
 ): void {
   m.uniforms.uHidden.value = s.hidden ? 1 : 0;
-  m.uniforms.uMist.value = s.mist ? 1 : 0;
 }

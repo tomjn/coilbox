@@ -16,11 +16,12 @@ import { hashString } from "../../rng";
 import { TERRAIN_SUN, type TerrainSurface } from "../terrain";
 import type { TerrainColorSource } from "../terrainMesh";
 import type { TownStyle } from "../townLayer";
-import { CAPITAL_NEIGHBOUR_SHARE } from "../towns";
+import { CAPITAL_NEIGHBOUR_SHARE, NEIGHBOUR_SHARE } from "../towns";
 import { landmarkKinds } from "./kinds";
 import type { Rgb } from "./kit";
 import { glowMaterial, landmarkMaterial, setLandmarkState } from "./material";
-import { strongholdPalette } from "./palettes";
+import { ruinPalette, strongholdPalette } from "./palettes";
+import { buildRuin, RUIN_REACH } from "./ruin";
 import { createLandmarkShadow, groundDecal } from "./shadow";
 import { pickSite } from "./site";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
@@ -92,8 +93,13 @@ export function buildLandmarkLayer(
     playerFactionId,
     identities,
   )) {
-    // The ruined castle comes later. Until then its location keeps its town.
-    if (kind !== "stronghold") continue;
+    const stronghold = kind === "stronghold";
+    // A planet with no ruin, such as a moon, leaves the anomaly its town.
+    const ruin = stronghold ? undefined : ruinPalette(planet);
+    if (!stronghold && !ruin) continue;
+    // A stronghold takes a capital's room, a ruin an ordinary town's.
+    const reach = stronghold ? STRONGHOLD_REACH : RUIN_REACH;
+    const share = stronghold ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE;
     const node = galaxy.nodes[i];
     const link = galaxy.links.find(([a, b]) => a === node.id || b === node.id);
     const other = link && index.get(link[0] === node.id ? link[1] : link[0]);
@@ -102,8 +108,8 @@ export function buildLandmarkLayer(
       world[i],
       world.filter((_, k) => k !== i),
       other === undefined ? undefined : world[other],
-      STRONGHOLD_REACH,
-      CAPITAL_NEIGHBOUR_SHARE,
+      reach,
+      share,
     );
     if (!site) continue;
 
@@ -116,13 +122,10 @@ export function buildLandmarkLayer(
             site.z + (-lx * sin + lz * cos) * site.scale,
           )
       : undefined;
-    const p = strongholdPalette(planet);
-    const { built } = buildStronghold(
-      site.ground,
-      p,
-      hashString(node.id),
-      edge,
-    );
+    const seed = hashString(node.id);
+    const { built } = ruin
+      ? buildRuin(site.ground, ruin, seed, edge)
+      : buildStronghold(site.ground, strongholdPalette(planet), seed, edge);
 
     const group = new THREE.Group();
     group.position.set(site.x, site.y, site.z);
@@ -145,7 +148,7 @@ export function buildLandmarkLayer(
     scene.add(group);
     group.updateMatrixWorld(true);
 
-    const decal = groundDecal(surface, site, STRONGHOLD_REACH, null);
+    const decal = groundDecal(surface, site, reach, null);
     scene.add(decal.mesh);
     disposables.push(
       decal.mesh.geometry,
@@ -186,7 +189,7 @@ export function buildLandmarkLayer(
     setStyle(i, style) {
       const at = placed.get(i);
       if (!at) return;
-      const state = { hidden: style.hidden, mist: !!style.mist };
+      const state = { hidden: style.hidden };
       for (const m of at.materials) setLandmarkState(m, state);
       at.decal.setHidden(style.hidden);
       at.decal.setRing(style.ring);
