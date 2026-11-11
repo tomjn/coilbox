@@ -92,7 +92,12 @@ export function RunHud({
 }) {
   const { t } = useLingui();
   const p = run.progress;
-  const maxCol = Math.max(...run.nodes.map((n) => n.col), 1);
+  // The warlord's column, since a side trip can lie further from the start.
+  const maxCol = Math.max(
+    run.nodes.find((n) => n.type === "boss")?.col ??
+      Math.max(...run.nodes.map((n) => n.col)),
+    1,
+  );
   const depth = Math.max(
     ...run.nodes.filter((n) => p.visited.includes(n.id)).map((n) => n.col),
     0,

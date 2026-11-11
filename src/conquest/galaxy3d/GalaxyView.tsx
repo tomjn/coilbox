@@ -197,6 +197,12 @@ interface GalaxyViewProps {
    */
   closedLinks?: Set<string>;
   /**
+   * The locations the player may step to now. Given, a terrain map's choices
+   * are these, whichever way a link is written. A run with side trips can
+   * step against a link's direction. Only honoured with {@link laneFlow}.
+   */
+  choiceIds?: Set<string>;
+  /**
    * Locations the pointer ignores: no hover, no pointer cursor, and a click
    * on one selects nothing. A run across a land map lists its scenery here.
    * They are still drawn.
@@ -573,6 +579,7 @@ export function GalaxyView({
   laneFlow = false,
   pathLinks,
   closedLinks,
+  choiceIds,
   inertIds,
   burstNodeId,
   spaceMaps,
@@ -599,6 +606,7 @@ export function GalaxyView({
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
   const closedLinksRef = useRef<Set<string> | undefined>(closedLinks);
+  const choiceIdsRef = useRef<Set<string> | undefined>(choiceIds);
   const inertRef = useRef<Set<string> | undefined>(inertIds);
   const burstRef = useRef<string | null | undefined>(burstNodeId);
   const applyBurstRef = useRef<(() => void) | null>(null);
@@ -1023,6 +1031,7 @@ export function GalaxyView({
                 ? {
                     pathLinks: pathLinksRef.current,
                     closedLinks: closedLinksRef.current,
+                    choices: choiceIdsRef.current,
                   }
                 : undefined,
             }),
@@ -1886,6 +1895,7 @@ export function GalaxyView({
     emphasisRef.current = emphasis;
     pathLinksRef.current = pathLinks;
     closedLinksRef.current = closedLinks;
+    choiceIdsRef.current = choiceIds;
     inertRef.current = inertIds;
     attackableRef.current = attackableIds;
     applyOwnersRef.current?.();
@@ -1897,6 +1907,7 @@ export function GalaxyView({
     emphasis,
     pathLinks,
     closedLinks,
+    choiceIds,
     inertIds,
     attackableIds,
   ]);

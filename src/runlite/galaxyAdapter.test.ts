@@ -532,3 +532,40 @@ describe("a land run's cues on the strategic map", () => {
     expect(kinds["far isle"]).toBe("crossing");
   });
 });
+
+describe("a land run that chose its side trips", () => {
+  it("leaves every location off the run off the map, with its links", () => {
+    const r: RogueliteRun = {
+      ...landRun(),
+      settings: { ...landRun().settings, sideTrips: false },
+    };
+    const doc = mapRunToGalaxyDoc(r, landMap(), located(r));
+    expect(doc.nodes.map((n) => n.id).sort()).toEqual(
+      ["east", "gate", "north", "south"].sort(),
+    );
+    for (const [a, b] of doc.links) {
+      expect(["far", "isle"]).not.toContain(a);
+      expect(["far", "isle"]).not.toContain(b);
+    }
+    expect(doc.blockedBorders ?? []).toEqual([]);
+  });
+
+  it("lights a choice against the link's direction, from the player's end", () => {
+    const cues = mapCues({
+      galaxy: {
+        nodes: [
+          { id: "here", owner: PLAYER_FACTION },
+          { id: "back", owner: "type-battle" },
+        ],
+        links: [["back", "here"]],
+      },
+      owners: {},
+      playerFactionId: PLAYER_FACTION,
+      run: { choices: new Set(["back"]) },
+    });
+    expect(cues.links).toEqual([
+      expect.objectContaining({ a: "here", b: "back", tone: "choice" }),
+    ]);
+    expect(cues.locations.get("back")?.attackable).toBe(true);
+  });
+});

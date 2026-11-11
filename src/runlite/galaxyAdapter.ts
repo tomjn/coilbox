@@ -15,7 +15,7 @@ import type {
 import { hashString } from "../conquest/galaxy3d/layout";
 import { type Faction, type GalaxyDoc, NEUTRAL } from "../conquest/model";
 import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
-import { successors } from "./progress";
+import { hasSideTrips, openFrom, successors } from "./progress";
 
 /**
  * Adapt a run into a conquest {@link GalaxyDoc} so the run map renders through
@@ -225,13 +225,20 @@ export function runPathLinks(run: RogueliteRun): Set<string> {
 /** The steps behind {@link runPathLinks}, as pairs of run node ids. */
 function runPathSteps(run: RogueliteRun): [string, string][] {
   const edges = new Set(run.edges.map(([a, b]) => linkKey(a, b)));
-  const visited = run.nodes
-    .filter((n) => run.progress.visited.includes(n.id))
-    .sort((a, b) => a.col - b.col);
+  // A side trip can step back a rank, so its path is the order of the visits.
+  const sideTrips = hasSideTrips(run);
+  const visited = sideTrips
+    ? run.progress.visited
+    : run.nodes
+        .filter((n) => run.progress.visited.includes(n.id))
+        .sort((a, b) => a.col - b.col)
+        .map((n) => n.id);
   const out: [string, string][] = [];
   for (let i = 0; i + 1 < visited.length; i++) {
-    const step: [string, string] = [visited[i].id, visited[i + 1].id];
-    if (edges.has(linkKey(...step))) out.push(step);
+    const [a, b] = [visited[i], visited[i + 1]];
+    // Each step as its edge is written, which is how the view's links are.
+    if (edges.has(linkKey(a, b))) out.push([a, b]);
+    else if (sideTrips && edges.has(linkKey(b, a))) out.push([b, a]);
   }
   return out;
 }
@@ -330,6 +337,7 @@ export function forwardReachable(
   run: RogueliteRun,
   fromId: string,
 ): Set<string> {
+  if (hasSideTrips(run)) return openFrom(run, fromId);
   const adj = new Map<string, string[]>();
   for (const [a, b] of run.edges) {
     const list = adj.get(a);
@@ -431,7 +439,9 @@ export function runLocations(
  * map has it and {@link mapRunClosedLinks} names it for the view.
  *
  * A road from a route location into scenery would look like a way on, so it
- * is left out and the border between the two is drawn blocked instead.
+ * is left out and the border between the two is drawn blocked instead. A run
+ * that chose whether to take side trips has no scenery to show: every
+ * location off the run is left off the map, with its links.
  */
 export function mapRunToGalaxyDoc(
   run: RogueliteRun,
@@ -442,9 +452,23 @@ export function mapRunToGalaxyDoc(
     run.nodes.map((n) => [locations.get(n.id) ?? n.id, n]),
   );
   const steps = stepKeys(run, locations);
+  const shown =
+    run.settings.sideTrips === undefined
+      ? map
+      : {
+          ...map,
+          nodes: map.nodes.filter((place) => nodeAt.has(place.id)),
+          links: map.links.filter(([a, b]) => nodeAt.has(a) && nodeAt.has(b)),
+          linkKinds: map.linkKinds?.filter(
+            ([a, b]) => nodeAt.has(a) && nodeAt.has(b),
+          ),
+          blockedBorders: map.blockedBorders?.filter(
+            ([a, b]) => nodeAt.has(a) && nodeAt.has(b),
+          ),
+        };
 
   return {
-    ...map,
+    ...shown,
     title: t`Warpath`,
     game: run.settings.game,
     playerFactionId: PLAYER_FACTION,
@@ -454,7 +478,7 @@ export function mapRunToGalaxyDoc(
       ...runFactions(),
       { id: TAKEN_FACTION, name: t`Taken`, color: TYPE_COLOR.start },
     ],
-    nodes: map.nodes.map((place) => {
+    nodes: shown.nodes.map((place) => {
       const n = nodeAt.get(place.id);
       if (!n) {
         return {
@@ -478,14 +502,14 @@ export function mapRunToGalaxyDoc(
         battle: { mapName: n.battle?.mapName ?? "" },
       };
     }),
-    links: map.links
+    links: shown.links
       .filter(([a, b]) => nodeAt.has(a) === nodeAt.has(b))
       .map(([a, b]): [string, string] =>
         steps.has(linkKey(b, a)) ? [b, a] : [a, b],
       ),
     blockedBorders: [
-      ...(map.blockedBorders ?? []),
-      ...map.links.filter(([a, b]) => nodeAt.has(a) !== nodeAt.has(b)),
+      ...(shown.blockedBorders ?? []),
+      ...shown.links.filter(([a, b]) => nodeAt.has(a) !== nodeAt.has(b)),
     ],
   };
 }
