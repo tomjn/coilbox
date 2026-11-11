@@ -108,6 +108,14 @@ describe("buildLandmarkLayer", () => {
     expect([...layer.nodes].sort()).toEqual([1, 2]);
   });
 
+  it("raises a landing pad where a run asks for one", () => {
+    const { layer } = build(
+      0.5,
+      new Map([["field", { landmark: "landing" as const }]]),
+    );
+    expect([...layer.nodes].sort()).toEqual([1, 2]);
+  });
+
   it("raises no ruin on a moon, where the anomaly keeps its town", () => {
     const layer = buildLandmarkLayer(
       new THREE.Scene(),

@@ -34,6 +34,13 @@ describe("landmarkKinds", () => {
     expect(landmarkKinds(nodes, "me", ids).has(1)).toBe(false);
   });
 
+  it("puts the landing pad on a run's start when the identity asks for it", () => {
+    const ids = new Map([
+      ["their", { end: "start" as const, landmark: "landing" as const }],
+    ]);
+    expect(landmarkKinds(nodes, "me", ids).get(1)).toBe("landing");
+  });
+
   it("prefers the stronghold when a capital is also asked for a ruin", () => {
     const ids = new Map([["their", { landmark: "ruin" as const }]]);
     expect(landmarkKinds(nodes, "me", ids).get(1)).toBe("stronghold");
