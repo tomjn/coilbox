@@ -14,6 +14,7 @@ import type {
 } from "../conquest/galaxy3d/GalaxyView";
 import { hashString } from "../conquest/galaxy3d/layout";
 import { type Faction, type GalaxyDoc, NEUTRAL } from "../conquest/model";
+import { mulberry32 } from "../conquest/rng";
 import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
 import { hasSideTrips, openFrom, successors } from "./progress";
 
@@ -637,6 +638,14 @@ export function mapRunIdentities(
       ...out.get(at),
       end: n.type === "start" ? "start" : "goal",
     });
+  }
+  // One anomaly, picked by the run's seed, stands in a ruined castle.
+  const events = run.nodes.filter((n) => n.type === "event");
+  if (events.length > 0) {
+    const n =
+      events[Math.floor(mulberry32(run.settings.seed)() * events.length)];
+    const at = locations.get(n.id) ?? n.id;
+    out.set(at, { ...out.get(at), landmark: "ruin" });
   }
   return out;
 }

@@ -99,13 +99,8 @@ export const at = (x: number, y: number, z: number, ry = 0, s = 1) =>
   );
 
 /** A placement relative to another. */
-export const on = (
-  m: THREE.Matrix4,
-  x: number,
-  y: number,
-  z: number,
-  ry = 0,
-) => m.clone().multiply(at(x, y, z, ry));
+export const on = (m: THREE.Matrix4, x: number, y: number, z: number, ry = 0) =>
+  m.clone().multiply(at(x, y, z, ry));
 
 /** A placement `r` out along bearing `a`, turned to face out from the centre. */
 export const polar = (r: number, a: number, y = 0, turn = 0) =>

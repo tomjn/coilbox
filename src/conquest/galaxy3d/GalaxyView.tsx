@@ -138,6 +138,11 @@ export interface NodeIdentity {
   icon?: LucideIcon;
   /** Read on a terrain map only, where the town stands in a dark haze. */
   mist?: boolean;
+  /**
+   * Read on a terrain map only, where a ruined castle stands in place of the
+   * town. See landmarks/landmarkLayer.ts.
+   */
+  landmark?: "ruin";
 }
 
 /** A label's icon slot and the icon React draws into it. */

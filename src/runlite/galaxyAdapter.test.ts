@@ -6,6 +6,7 @@ import {
   Store,
 } from "lucide-react";
 import { describe, expect, it } from "vitest";
+import { landmarkKinds } from "../conquest/galaxy3d/landmarks/kinds";
 import { mapCues } from "../conquest/galaxy3d/mapCues";
 import type { GalaxyDoc } from "../conquest/model";
 import {
@@ -430,6 +431,40 @@ describe("a land run's live state", () => {
     expect(runIdentities(r).get("odd")?.mist).toBeUndefined();
     const land = mapRunIdentities(r, new Map([["odd", "fen"]]));
     expect(land.get("fen")?.mist).toBe(true);
+  });
+
+  it("puts one ruin on one event stop, the same one for the same seed", () => {
+    const odd = (n: number): RunNode => ({
+      id: `odd${n}`,
+      type: "event",
+      col: 1,
+      row: 9 + n,
+    });
+    const r = { ...run(), nodes: [...run().nodes, odd(0), odd(1), odd(2)] };
+    const at = new Map([
+      ["odd0", "fen"],
+      ["odd1", "moor"],
+      ["odd2", "heath"],
+    ]);
+    const ruins = (ids: Map<string, { landmark?: string }>) =>
+      [...ids].filter(([, v]) => v.landmark === "ruin").map(([k]) => k);
+    const once = ruins(mapRunIdentities(r, at));
+    expect(once).toHaveLength(1);
+    expect(ruins(mapRunIdentities(r, at))).toEqual(once);
+    expect(ruins(mapRunIdentities(run(), new Map()))).toEqual([]);
+  });
+
+  it("gives the boss a stronghold and the start none", () => {
+    const doc = mapRunToGalaxyDoc(moved, map, located(moved));
+    const kinds = landmarkKinds(
+      doc.nodes,
+      doc.playerFactionId,
+      mapRunIdentities(moved, located(moved)),
+    );
+    const at = (id: string) => doc.nodes.findIndex((n) => n.id === id);
+    expect(kinds.get(at("east"))).toBe("stronghold");
+    expect(kinds.has(at("gate"))).toBe(false);
+    expect([...kinds.values()]).toEqual(["stronghold"]);
   });
 
   it("marks a location on no route with a question mark", () => {
