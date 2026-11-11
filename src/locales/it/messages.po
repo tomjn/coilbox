@@ -8676,16 +8676,6 @@ msgstr "Un carattere: b parallelepipedo, e ellissoide, c cilindro, s sfera."
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "Un carattere: x, y o z. Ha senso solo per un cilindro."
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "Ti aspetta una scelta"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "Una scelta sul filo, senza battaglia."
-
 #: src/lego/drive.ts
 #, fuzzy
 msgid "A circle to the left"
@@ -11450,6 +11440,13 @@ msgstr "Messaggio dell’annuncio"
 #, fuzzy
 msgid "Announcements"
 msgstr "Annunci"
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -21694,7 +21691,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "Stima da ramp + durata. Le metriche dal vivo compaiono quando l’esecuzione è in corso."
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "Evento"
@@ -32051,11 +32047,6 @@ msgstr "Nessun file di clip audio corrispondente nell’archivio di questo gioco
 #, fuzzy
 msgid "No author stated"
 msgstr "Nessun autore indicato"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "nessuna battaglia"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -44979,13 +44970,6 @@ msgstr "Esci"
 msgid "Sign-in"
 msgstr "Accesso"
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "Segnale"
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -45490,6 +45474,10 @@ msgstr "Qualcosa non è riuscito"
 #, fuzzy
 msgid "Something finished"
 msgstr "Qualcosa è terminato"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
 
 #: src/scenario/pages/components/groups.ts
 #, fuzzy

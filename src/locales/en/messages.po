@@ -7018,14 +7018,6 @@ msgstr "A character: b box, e ellipsoid, c cylinder, s sphere."
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "A character: x, y or z. Only meaningful for a cylinder."
 
-#: src/runlite/pages/RunPage.tsx
-msgid "A choice awaits"
-msgstr "A choice awaits"
-
-#: src/runlite/pages/RunPage.tsx
-msgid "A choice on the wire — no battle."
-msgstr "A choice on the wire — no battle."
-
 #: src/lego/drive.ts
 msgid "A circle to the left"
 msgstr "A circle to the left"
@@ -9264,6 +9256,13 @@ msgstr "Announcement message"
 #: src/multiplayer/admin/tools.tsx
 msgid "Announcements"
 msgstr "Announcements"
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr "Anomaly"
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "Another action for this key, e.g. areaattack"
@@ -17629,7 +17628,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "Estimated from ramp + duration; live metrics appear once the run is under way."
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 msgid "Event"
 msgstr "Event"
 
@@ -26039,10 +26037,6 @@ msgstr "No audio clip files matched in this game's archive."
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "No author stated"
 msgstr "No author stated"
-
-#: src/runlite/pages/RunPage.tsx
-msgid "no battle"
-msgstr "no battle"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -36542,12 +36536,6 @@ msgstr "Sign out"
 msgid "Sign-in"
 msgstr "Sign-in"
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-msgid "Signal"
-msgstr "Signal"
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Signed in"
@@ -36959,6 +36947,10 @@ msgstr "Something failed"
 #: src/sound/events.ts
 msgid "Something finished"
 msgstr "Something finished"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr "Something strange is here. Make a choice, with no battle."
 
 #: src/scenario/pages/components/groups.ts
 msgid "something that is gone"

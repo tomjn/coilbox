@@ -8619,16 +8619,6 @@ msgstr "Символ: b – паралелепіпед, e – еліпсоїд, 
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "Символ: x, y або z. Має значення лише для циліндра."
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "На вас чекає вибір"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "Вибір на маршруті – без бою."
-
 #: src/lego/drive.ts
 #, fuzzy
 msgid "A circle to the left"
@@ -11375,6 +11365,13 @@ msgstr "Текст оголошення"
 #, fuzzy
 msgid "Announcements"
 msgstr "Оголошення"
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -21550,7 +21547,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "Оцінено з наростання й тривалості. Живі показники з’являться, коли прогін почнеться."
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "Подія"
@@ -31849,11 +31845,6 @@ msgstr "В архіві цієї гри не знайдено відповідн
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "No author stated"
 msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "без битви"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -44680,13 +44671,6 @@ msgstr "Вийти"
 msgid "Sign-in"
 msgstr "Вхід"
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "Сигнал"
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -45184,6 +45168,10 @@ msgstr "Щось не вдалося"
 #, fuzzy
 msgid "Something finished"
 msgstr "Щось завершилося"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
 
 #: src/scenario/pages/components/groups.ts
 #, fuzzy

@@ -8676,16 +8676,6 @@ msgstr "Ett tecken: b låda, e ellipsoid, c cylinder, s sfär."
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "Ett tecken: x, y eller z. Har bara betydelse för en cylinder."
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "Ett val väntar"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "Ett val på vägen — ingen strid."
-
 #: src/lego/drive.ts
 #, fuzzy
 msgid "A circle to the left"
@@ -11450,6 +11440,13 @@ msgstr "Meddelandetext"
 #, fuzzy
 msgid "Announcements"
 msgstr "Meddelanden"
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -21694,7 +21691,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "Uppskattat från upptrappning + längd. Live-mätvärden visas när körningen är igång."
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "Händelse"
@@ -32051,11 +32047,6 @@ msgstr "Inga ljudklippsfiler matchade i spelets arkiv."
 #, fuzzy
 msgid "No author stated"
 msgstr "Ingen upphovsperson angiven"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "ingen strid"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -44979,13 +44970,6 @@ msgstr "Logga ut"
 msgid "Sign-in"
 msgstr "Inloggning"
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "Signal"
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -45490,6 +45474,10 @@ msgstr "Något misslyckades"
 #, fuzzy
 msgid "Something finished"
 msgstr "Något blev klart"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
 
 #: src/scenario/pages/components/groups.ts
 #, fuzzy

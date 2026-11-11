@@ -1,5 +1,7 @@
 import { t } from "@lingui/core/macro";
-import { useEffect, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
@@ -132,6 +134,16 @@ export interface NodeIdentity {
    * only, where it draws a marker over the location. See endMarkerLayer.ts.
    */
   end?: "start" | "goal";
+  /** Drawn before the node's name, in the name's colour. */
+  icon?: LucideIcon;
+  /** Read on a terrain map only, where the town stands in a dark haze. */
+  mist?: boolean;
+}
+
+/** A label's icon slot and the icon React draws into it. */
+interface LabelIcon {
+  host: HTMLElement;
+  Icon: LucideIcon;
 }
 
 interface GalaxyViewProps {
@@ -574,6 +586,9 @@ export function GalaxyView({
   className,
 }: GalaxyViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // The label icons the scene build asks for, drawn through portals because
+  // the labels are DOM the build makes itself.
+  const [labelIcons, setLabelIcons] = useState<LabelIcon[]>([]);
 
   // Live-mutation channels into the built scene (no rebuild on change).
   const ownersRef = useRef(owners);
@@ -897,12 +912,22 @@ export function GalaxyView({
         .getHexString()}`;
 
     const labelObjects: CSS2DObject[] = [];
+    const iconHosts: LabelIcon[] = [];
     if (!performanceMode) {
       galaxy.nodes.forEach((n) => {
         const p = positions.get(n.id);
         if (!p) return;
         const el = document.createElement("div");
-        el.textContent = n.name;
+        const Icon = identities?.get(n.id)?.icon;
+        if (Icon) {
+          const host = document.createElement("span");
+          host.style.cssText =
+            "display:inline-flex;vertical-align:-2px;margin-right:4px;";
+          el.append(host, n.name);
+          iconHosts.push({ host, Icon });
+        } else {
+          el.textContent = n.name;
+        }
         el.style.cssText =
           "pointer-events:none;font-size:10px;font-weight:600;" +
           "letter-spacing:0.14em;text-transform:uppercase;" +
@@ -914,6 +939,7 @@ export function GalaxyView({
         scene.add(label);
       });
     }
+    setLabelIcons(iconHosts);
 
     // Nodes with an outline, drawn as areas on the terrain. `undefined` on a
     // galaxy or theatre map, and on a terrain map of point locations only.
@@ -953,6 +979,7 @@ export function GalaxyView({
                 towns?.commit();
               },
             },
+            (id) => !!identities?.get(id)?.mist,
           )
         : undefined;
 
@@ -1799,6 +1826,7 @@ export function GalaxyView({
       detachWheel();
       controls?.dispose();
       for (const label of labelObjects) label.removeFromParent();
+      setLabelIcons([]);
       disposeLanePair(lanes);
       disposeLanePair(factionLanes);
       disposeLanePair(frontier);
@@ -1890,6 +1918,11 @@ export function GalaxyView({
       ref={containerRef}
       className={className}
       style={{ overflow: "hidden" }}
-    />
+    >
+      {labelIcons.map(({ host, Icon }, i) =>
+        // biome-ignore lint/suspicious/noArrayIndexKey: one slot per label, rebuilt with the scene
+        createPortal(<Icon size={12} strokeWidth={2.5} aria-hidden />, host, i),
+      )}
+    </div>
   );
 }

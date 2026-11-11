@@ -172,7 +172,7 @@ export function EventOverlay({
       icon={
         <Sparkles className={`size-5 ${HUD_ACCENT_INK.violet}`} aria-hidden />
       }
-      title={ev?.title ?? t`Signal`}
+      title={ev?.title ?? t`Anomaly`}
       lede={ev?.body}
       onClose={onClose}
     >

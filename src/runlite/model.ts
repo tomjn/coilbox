@@ -512,7 +512,7 @@ function parseEvent(value: unknown): EventSpec | undefined {
       })
     : [];
   return {
-    title: typeof value.title === "string" ? value.title : t`Signal`,
+    title: typeof value.title === "string" ? value.title : t`Anomaly`,
     body: typeof value.body === "string" ? value.body : "",
     choices,
   };

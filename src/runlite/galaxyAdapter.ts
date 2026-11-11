@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Gift, HandFist, type LucideIcon, Split, Store } from "lucide-react";
 import type {
   NodeBodyKind,
   NodeEmphasis,
@@ -44,7 +45,7 @@ function typeLabel(type: RunNodeType): string {
     case "elite":
       return t`Elite`;
     case "event":
-      return t`Event`;
+      return t`Anomaly`;
     case "reward":
       return t`Collect salvage`;
     case "shop":
@@ -55,6 +56,15 @@ function typeLabel(type: RunNodeType): string {
 }
 
 const RUN_TYPES = Object.keys(TYPE_COLOR) as RunNodeType[];
+
+/** The icon before a node's name, saying what happens there. */
+const TYPE_ICON: Partial<Record<RunNodeType, LucideIcon>> = {
+  battle: HandFist,
+  elite: HandFist,
+  event: Split,
+  reward: Gift,
+  shop: Store,
+};
 
 /**
  * Curated per-run backdrop palettes. A run picks one by its seed so every run
@@ -285,6 +295,10 @@ export function runIdentities(run: RogueliteRun): Map<string, NodeIdentity> {
     if (body && hashString(`${n.id}-identity`) % 100 < BODY_CHANCE) {
       out.set(n.id, { body });
     }
+  }
+  for (const n of run.nodes) {
+    const icon = TYPE_ICON[n.type];
+    if (icon) out.set(n.id, { ...out.get(n.id), icon });
   }
   return out;
 }
@@ -572,8 +586,10 @@ export function mapRunIdentities(
 ): Map<string, NodeIdentity> {
   const out = new Map(byLocation(runIdentities(run), locations));
   for (const n of run.nodes) {
-    if (n.type !== "start" && n.type !== "boss") continue;
     const at = locations.get(n.id) ?? n.id;
+    // An anomaly's town stands in a haze, so it reads as somewhere strange.
+    if (n.type === "event") out.set(at, { ...out.get(at), mist: true });
+    if (n.type !== "start" && n.type !== "boss") continue;
     out.set(at, {
       ...out.get(at),
       end: n.type === "start" ? "start" : "goal",

@@ -8676,16 +8676,6 @@ msgstr "Ένας χαρακτήρας: b κουτί, e ελλειψοειδές,
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "Ένας χαρακτήρας: x, y ή z. Έχει νόημα μόνο για κύλινδρο."
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "Σας περιμένει μια επιλογή"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "Μια επιλογή της τελευταίας στιγμής — χωρίς μάχη."
-
 #: src/lego/drive.ts
 #, fuzzy
 msgid "A circle to the left"
@@ -11450,6 +11440,13 @@ msgstr "Μήνυμα ανακοίνωσης"
 #, fuzzy
 msgid "Announcements"
 msgstr "Ανακοινώσεις"
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -21694,7 +21691,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "Εκτίμηση από την κλιμάκωση και τη διάρκεια. Οι ζωντανές μετρήσεις εμφανίζονται μόλις ξεκινήσει η εκτέλεση."
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "Γεγονός"
@@ -32051,11 +32047,6 @@ msgstr "Κανένα αρχείο ηχητικού αποσπάσματος δε
 #, fuzzy
 msgid "No author stated"
 msgstr "Δεν αναφέρεται δημιουργός"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "καμία μάχη"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -44979,13 +44970,6 @@ msgstr "Αποσύνδεση"
 msgid "Sign-in"
 msgstr "Σύνδεση"
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "Σήμα"
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -45490,6 +45474,10 @@ msgstr "Κάτι απέτυχε"
 #, fuzzy
 msgid "Something finished"
 msgstr "Κάτι ολοκληρώθηκε"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
 
 #: src/scenario/pages/components/groups.ts
 #, fuzzy

@@ -7017,14 +7017,6 @@ msgstr ""
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr ""
 
-#: src/runlite/pages/RunPage.tsx
-msgid "A choice awaits"
-msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-msgid "A choice on the wire — no battle."
-msgstr ""
-
 #: src/lego/drive.ts
 msgid "A circle to the left"
 msgstr ""
@@ -9262,6 +9254,13 @@ msgstr ""
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #: src/multiplayer/admin/tools.tsx
 msgid "Announcements"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -17628,7 +17627,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr ""
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 msgid "Event"
 msgstr ""
 
@@ -26037,10 +26035,6 @@ msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "No author stated"
-msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-msgid "no battle"
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
@@ -36541,12 +36535,6 @@ msgstr ""
 msgid "Sign-in"
 msgstr ""
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-msgid "Signal"
-msgstr ""
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Signed in"
@@ -36957,6 +36945,10 @@ msgstr ""
 
 #: src/sound/events.ts
 msgid "Something finished"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
 msgstr ""
 
 #: src/scenario/pages/components/groups.ts

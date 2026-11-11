@@ -524,7 +524,7 @@ function nodeTitle(type: RunNodeType): string {
     case "reward":
       return coreT`Salvage cache`;
     case "event":
-      return coreT`Signal`;
+      return coreT`Anomaly`;
     case "shop":
       return coreT`Depot`;
   }
@@ -554,7 +554,7 @@ function nodeDescription(type: RunNodeType): string {
     case "reward":
       return coreT`Move here to collect it: a schematic that unlocks units, or a field upgrade for you.`;
     case "event":
-      return coreT`A choice on the wire — no battle.`;
+      return coreT`Something strange is here. Make a choice, with no battle.`;
     case "shop":
       return coreT`Spend salvage on unlocks, perks, and repairs.`;
   }
@@ -587,7 +587,6 @@ function previewRows(node: RunNode): [string, string][] {
     const perks = node.reward.options.length - unlocks;
     return [[coreT`Choose one of`, coreT`${unlocks} unlock, ${perks} perk`]];
   }
-  if (node.event) return [[coreT`A choice awaits`, coreT`no battle`]];
   if (node.shop) {
     const cheapest = Math.min(...node.shop.offers.map((o) => o.cost));
     const restHull = node.shop.restHull;

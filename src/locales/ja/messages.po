@@ -8619,16 +8619,6 @@ msgstr "1 文字：b はボックス、e は楕円体、c は円柱、s は球�
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "1 文字：x、y、z のいずれか。円柱の場合だけ意味があります。"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "選択の時"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "道中での選択。戦闘はありません。"
-
 #: src/lego/drive.ts
 #, fuzzy
 msgid "A circle to the left"
@@ -11375,6 +11365,13 @@ msgstr "お知らせのメッセージ"
 #, fuzzy
 msgid "Announcements"
 msgstr "お知らせ"
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -21550,7 +21547,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "段階的増加と時間からの推定値です。実行が始まるとリアルタイムの指標が表示されます。"
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "イベント"
@@ -31849,11 +31845,6 @@ msgstr "このゲームのアーカイブに一致する音声クリップファ
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "No author stated"
 msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "戦闘なし"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -44680,13 +44671,6 @@ msgstr "ログアウト"
 msgid "Sign-in"
 msgstr "ログイン"
 
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "信号"
-
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -45184,6 +45168,10 @@ msgstr "失敗時"
 #, fuzzy
 msgid "Something finished"
 msgstr "完了時"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
 
 #: src/scenario/pages/components/groups.ts
 #, fuzzy

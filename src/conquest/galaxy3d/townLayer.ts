@@ -49,6 +49,8 @@ export interface TownStyle {
     /** True for the thick ring of a selected town. */
     thick: boolean;
   };
+  /** Drawn in a dark violet haze, for a warpath's anomaly. */
+  mist?: boolean;
 }
 
 export interface TownLayer {
@@ -285,6 +287,7 @@ export function buildTownLayer(
       const low = (columns + i) * 4;
       state[low] = style.hidden ? 255 : 0;
       state[low + 1] = ring?.thick ? 255 : 0;
+      state[low + 2] = style.mist ? 255 : 0;
     },
     commit: () => {
       stateTexture.needsUpdate = true;
