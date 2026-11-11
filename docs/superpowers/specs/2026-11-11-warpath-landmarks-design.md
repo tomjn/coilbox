@@ -225,9 +225,9 @@ The mast and the dome carry one small red beacon. Nothing else glows.
 
 A run's starting point stands as a landing pad in place of its town. `mapRunIdentities` gives the `start` node `landmark: "landing"`, so a map has exactly one.
 
-The pad is a wide eight-sided deck with blue painted markings, and a round control tower standing off one back corner with a dish and a mast. Where the start lies picks one of four:
+The pad is a wide eight-sided deck with blue painted markings, a kerb, and pods, clamps and pipe runs round its edge. A round control tower stands off one back corner, about twice the height of a raised deck, with a ribbed main dish, smaller dishes and whip aerials. A mast stands on the ground beside the tower and rises past the dish. Where the start lies picks one of four:
 
-- the deck, from `LANDING_PADS`: raised on a central pedestal with buttresses and four legs, or flush on a cast foundation cut into the slope
+- the deck, from `LANDING_PADS`: raised on a central pedestal with buttresses and four legs, or flush on a cast foundation level with the highest ground under it
 - the towers, from `LANDING_TOWERS`: one, or a second smaller one off the other back corner
 
 It also picks which side the main tower stands and where the dish points.
