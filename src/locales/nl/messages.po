@@ -16633,6 +16633,10 @@ msgstr "Zijbalk inklappen bij smalle vensters"
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Inklappen verbergt de zijbalk helemaal in plaats van een balk met pictogrammen te tonen."
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -19880,6 +19884,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Difficulty"
 msgstr "Moeilijkheidsgraad"
@@ -30846,6 +30851,10 @@ msgstr "Elk van de {boxHolders} gebieden doorschuiven naar de volgende bondgenoo
 msgid "Move earlier"
 msgstr "Eerder zetten"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
 msgid "Move key {keyNumber} earlier"
@@ -31915,6 +31924,7 @@ msgid "Newest first"
 msgstr "Nieuwste"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Next"
 msgstr "Volgende"
@@ -31924,6 +31934,10 @@ msgstr "Volgende"
 #, fuzzy
 msgid "Next match"
 msgstr "Volgende overeenkomst"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -36516,6 +36530,10 @@ msgstr "Verouderd"
 msgid "Out of date: {reasons}"
 msgstr "Verouderd: {reasons}"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr ""
+
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
 msgid "Out of sync"
@@ -38890,11 +38908,6 @@ msgstr "Wordt verhoogd naar 38 als het lager is ingesteld, het minimum waarmee e
 msgid "Raised wall"
 msgstr "Verhoogde muur"
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-#, fuzzy
-msgid "raises tech ceiling · both sides"
-msgstr "verhoogt het techplafond · beide kanten"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -39838,11 +39851,6 @@ msgstr "Records"
 #, fuzzy
 msgid "Recover {name}"
 msgstr "{name} herstellen"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "Haal een bouwtekening terug om het arsenaal uit te breiden, of een veldupgrade voor jezelf."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -41918,7 +41926,6 @@ msgstr "Loopt tot het opnieuw gestart wordt."
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
@@ -44133,11 +44140,6 @@ msgstr "Gedeeld door {authorName}"
 #, fuzzy
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "Gedeeld door {authorName} op {createdAt}"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Shared ceiling"
-msgstr "Gedeeld plafond"
 
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
@@ -50539,9 +50541,8 @@ msgid "The units of this replay's game could not be read, so nothing says which 
 msgstr "De eenheden van het spel van deze replay konden niet gelezen worden, dus niets zegt welke voltooide eenheden gebouwen zijn. Deze laag heeft het spel geïnstalleerd nodig."
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "De eenheden die je nu kunt bouwen, uit de volledige boom van je factie. Beloningen en depots ontgrendelen meer, maar ontgrendelen verhoogt een gedeeld techplafond, dus de vijand groeit met je mee. Je persoonlijke voordeel komt uit voordelen, niet uit ontgrendelingen."
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -54182,15 +54183,14 @@ msgstr "Eenheden die deze fabriek bouwt zodra de basis op de kaart staat, op vol
 msgid "Units unlocked"
 msgstr "Ontgrendelde eenheden"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "Eenheden die in je gedeelde arsenaal ontgrendeld zijn, opgelicht tegen de volledige bouwboom van de factie."
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "Eenheden die in dit gevecht bruikbaar zijn, opgelicht tegen de bouwboom van je factie. Beperkte eenheden blijven donker."
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units you can build, lit up against the faction's full build tree."
+msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
@@ -57298,6 +57298,10 @@ msgstr "Je hebt een account nodig om dingen op de hub te delen. Bladeren en impo
 msgid "you only · per-team"
 msgstr "alleen jij · per team"
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "You retreat, hull scarred."
@@ -57382,6 +57386,10 @@ msgstr "De relayserver van je gevecht ligt eruit"
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "Je beste: {best}. {attempts}."
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your build list"
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

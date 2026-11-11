@@ -13493,6 +13493,10 @@ msgstr "Collapse sidebar on narrow windows"
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Collapsing the sidebar hides it fully instead of showing an icon rail."
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr "Collect salvage"
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Collection"
@@ -16145,6 +16149,7 @@ msgstr "Different weapon"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 msgid "Difficulty"
 msgstr "Difficulty"
 
@@ -25057,6 +25062,10 @@ msgstr "Move each of the {boxHolders} boxes on to the next ally"
 msgid "Move earlier"
 msgstr "Move earlier"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 msgid "Move key {keyNumber} earlier"
 msgstr "Move key {keyNumber} earlier"
@@ -25927,6 +25936,7 @@ msgid "Newest first"
 msgstr "Newest first"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 msgid "Next"
 msgstr "Next"
 
@@ -25934,6 +25944,10 @@ msgstr "Next"
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "Next match"
 msgstr "Next match"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr "Next:"
 
 #: src/career/pages/CareerPage.tsx
 msgid "next: {nextMission}"
@@ -29650,6 +29664,10 @@ msgstr "Out of date"
 msgid "Out of date: {reasons}"
 msgstr "Out of date: {reasons}"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr "Out of reach from here"
+
 #: src/multiplayer/battle/SyncStatusPill.tsx
 msgid "Out of sync"
 msgstr "Out of sync"
@@ -31581,10 +31599,6 @@ msgstr "Raised to 38 if set lower, the least that lets a 1x1 builder reach a 1x1
 msgid "Raised wall"
 msgstr "Raised wall"
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-msgid "raises tech ceiling · both sides"
-msgstr "raises tech ceiling · both sides"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -32353,10 +32367,6 @@ msgstr "Records"
 #: src/lego/pages/components/ImportResult.tsx
 msgid "Recover {name}"
 msgstr "Recover {name}"
-
-#: src/runlite/pages/RunPage.tsx
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -34051,7 +34061,6 @@ msgstr "Runs until it is started again."
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Salvage"
@@ -35857,10 +35866,6 @@ msgstr "Shared by {authorName}"
 #: src/hub/pages/ItemPage.tsx
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "Shared by {authorName} on {createdAt}"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Shared ceiling"
-msgstr "Shared ceiling"
 
 #: src/content/pages/components/BindingList.tsx
 msgid "shared key"
@@ -41051,8 +41056,8 @@ msgid "The units of this replay's game could not be read, so nothing says which 
 msgstr "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 
 #: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
+msgstr "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "The usual reason a playback does not match is that the installed game or engine is not exactly the one the match was played on."
@@ -44008,13 +44013,13 @@ msgstr "Units this factory builds once the base is on the map, in order."
 msgid "Units unlocked"
 msgstr "Units unlocked"
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units you can build, lit up against the faction's full build tree."
+msgstr "Units you can build, lit up against the faction's full build tree."
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 msgid "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
@@ -46536,6 +46541,10 @@ msgstr "You need an account to share things on the hub. Browsing and importing n
 msgid "you only · per-team"
 msgstr "you only · per-team"
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr "you only · unlocks units"
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "You retreat, hull scarred."
 msgstr "You retreat, hull scarred."
@@ -46603,6 +46612,10 @@ msgstr "Your battle's relay is down"
 #: src/challenge/record.ts
 msgid "Your best: {best}. {attempts}."
 msgstr "Your best: {best}. {attempts}."
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your build list"
+msgstr "Your build list"
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Your capital has fallen."

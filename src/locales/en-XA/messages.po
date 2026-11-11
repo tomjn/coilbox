@@ -13492,6 +13492,10 @@ msgstr ""
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr ""
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Collection"
@@ -16144,6 +16148,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 msgid "Difficulty"
 msgstr ""
 
@@ -25056,6 +25061,10 @@ msgstr ""
 msgid "Move earlier"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 msgid "Move key {keyNumber} earlier"
 msgstr ""
@@ -25926,12 +25935,17 @@ msgid "Newest first"
 msgstr ""
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 msgid "Next"
 msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "Next match"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
 msgstr ""
 
 #: src/career/pages/CareerPage.tsx
@@ -29649,6 +29663,10 @@ msgstr ""
 msgid "Out of date: {reasons}"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr ""
+
 #: src/multiplayer/battle/SyncStatusPill.tsx
 msgid "Out of sync"
 msgstr ""
@@ -31580,10 +31598,6 @@ msgstr ""
 msgid "Raised wall"
 msgstr ""
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-msgid "raises tech ceiling · both sides"
-msgstr ""
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -32351,10 +32365,6 @@ msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
 msgid "Recover {name}"
-msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -34050,7 +34060,6 @@ msgstr ""
 msgid "S3O Blender Tools"
 msgstr ""
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Salvage"
@@ -35855,10 +35864,6 @@ msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 msgid "Shared by {authorName} on {createdAt}"
-msgstr ""
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Shared ceiling"
 msgstr ""
 
 #: src/content/pages/components/BindingList.tsx
@@ -41050,7 +41055,7 @@ msgid "The units of this replay's game could not be read, so nothing says which 
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -44007,12 +44012,12 @@ msgstr ""
 msgid "Units unlocked"
 msgstr ""
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr ""
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units you can build, lit up against the faction's full build tree."
 msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
@@ -46535,6 +46540,10 @@ msgstr ""
 msgid "you only · per-team"
 msgstr ""
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "You retreat, hull scarred."
 msgstr ""
@@ -46601,6 +46610,10 @@ msgstr ""
 
 #: src/challenge/record.ts
 msgid "Your best: {best}. {attempts}."
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your build list"
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx

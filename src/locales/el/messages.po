@@ -16633,6 +16633,10 @@ msgstr "Σύμπτυξη πλαϊνής στήλης σε στενά παράθ�
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Η σύμπτυξη της πλαϊνής στήλης την κρύβει πλήρως αντί να δείχνει μια στήλη εικονιδίων."
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -19880,6 +19884,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Difficulty"
 msgstr "Δυσκολία"
@@ -30846,6 +30851,10 @@ msgstr "Μετακίνηση καθεμιάς από τις {boxHolders} περ�
 msgid "Move earlier"
 msgstr "Μετακίνηση νωρίτερα"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
 msgid "Move key {keyNumber} earlier"
@@ -31915,6 +31924,7 @@ msgid "Newest first"
 msgstr "Νεότερα"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Next"
 msgstr "Επόμενο"
@@ -31924,6 +31934,10 @@ msgstr "Επόμενο"
 #, fuzzy
 msgid "Next match"
 msgstr "Επόμενο αποτέλεσμα"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -36516,6 +36530,10 @@ msgstr "Παρωχημένο"
 msgid "Out of date: {reasons}"
 msgstr "Παρωχημένο: {reasons}"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr ""
+
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
 msgid "Out of sync"
@@ -38890,11 +38908,6 @@ msgstr "Αυξάνεται σε 38 αν οριστεί χαμηλότερα, τ�
 msgid "Raised wall"
 msgstr "Υπερυψωμένο τείχος"
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-#, fuzzy
-msgid "raises tech ceiling · both sides"
-msgstr "ανεβάζει το ανώτατο όριο τεχνολογίας · και οι δύο πλευρές"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -39838,11 +39851,6 @@ msgstr "Ρεκόρ"
 #, fuzzy
 msgid "Recover {name}"
 msgstr "Ανάκτηση του {name}"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "Ανακτήστε ένα σχεδιάγραμμα για να διευρύνετε το οπλοστάσιο ή μια βελτίωση πεδίου για τον εαυτό σας."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -41918,7 +41926,6 @@ msgstr "Συνεχίζει μέχρι να ξεκινήσει ξανά."
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
@@ -44133,11 +44140,6 @@ msgstr "Κοινοποιήθηκε από {authorName}"
 #, fuzzy
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "Κοινοποιήθηκε από {authorName} στις {createdAt}"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Shared ceiling"
-msgstr "Κοινό ανώτατο όριο"
 
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
@@ -50539,9 +50541,8 @@ msgid "The units of this replay's game could not be read, so nothing says which 
 msgstr "Δεν ήταν δυνατή η ανάγνωση των μονάδων του παιχνιδιού αυτής της επανάληψης, οπότε τίποτα δεν λέει ποιες ολοκληρωμένες μονάδες είναι κτίρια, και αυτό το επίπεδο χρειάζεται το παιχνίδι εγκατεστημένο."
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "Οι μονάδες που μπορείτε να κατασκευάσετε τώρα, από ολόκληρο το δέντρο της φατρίας σας. Οι ανταμοιβές και οι αποθήκες ξεκλειδώνουν περισσότερες, αλλά το ξεκλείδωμα ανεβάζει ένα κοινό ανώτατο όριο τεχνολογίας, οπότε ο εχθρός κλιμακώνεται μαζί σας. Το προσωπικό σας πλεονέκτημα προέρχεται από τα πλεονεκτήματα, όχι από τα ξεκλειδώματα."
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -54182,15 +54183,14 @@ msgstr "Οι μονάδες που κατασκευάζει αυτό το εργ
 msgid "Units unlocked"
 msgstr "Μονάδες που ξεκλειδώθηκαν"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "Μονάδες που ξεκλειδώθηκαν στο κοινό σας οπλοστάσιο, φωτισμένες πάνω στο πλήρες δέντρο κατασκευής της φατρίας."
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "Μονάδες που μπορούν να χρησιμοποιηθούν σε αυτή τη μάχη, φωτισμένες πάνω στο δέντρο κατασκευής της φατρίας σας. Οι περιορισμένες μονάδες μένουν σβηστές."
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units you can build, lit up against the faction's full build tree."
+msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
@@ -57298,6 +57298,10 @@ msgstr "Χρειάζεστε λογαριασμό για να κοινοποιε
 msgid "you only · per-team"
 msgstr "μόνο εσείς · ανά ομάδα"
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "You retreat, hull scarred."
@@ -57382,6 +57386,10 @@ msgstr "Η αναμετάδοση της μάχης σας είναι εκτός
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "Το καλύτερό σας: {best}. {attempts}."
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your build list"
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

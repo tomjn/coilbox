@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   error: null as string | null,
+  run: null as import("../model").RogueliteRun | null,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -41,13 +42,20 @@ vi.mock("../../play/config", () => ({
   }),
 }));
 vi.mock("../../play/useGameCatalog", () => ({ useGameCatalog: () => [] }));
+vi.mock("../../play/gameOffer", async (orig) => ({
+  ...(await orig<typeof import("../../play/gameOffer")>()),
+  resolveGameDownload: () => null,
+}));
 vi.mock("../RunMapView", () => ({ RunMapView: () => null }));
+vi.mock("./components/RunContentNotice", () => ({
+  RunContentNotice: () => null,
+}));
 vi.mock("../useAwardFinishedRuns", () => ({
   useAwardFinishedRuns: vi.fn(),
 }));
 vi.mock("../runs", () => ({
   useRun: () => ({
-    run: null,
+    run: h.run,
     loading: false,
     error: h.error,
     refresh: vi.fn(),
@@ -55,11 +63,14 @@ vi.mock("../runs", () => ({
   }),
 }));
 
+import { generateRun } from "../generate";
+import { nextChoices } from "../progress";
 import RunPage from "./RunPage";
 
 afterEach(() => {
   cleanup();
   h.error = null;
+  h.run = null;
 });
 
 function renderPage() {
@@ -69,6 +80,46 @@ function renderPage() {
     </MemoryRouter>,
   );
 }
+
+describe("RunPage with an active run", () => {
+  function activeRun() {
+    return generateRun({
+      seed: 777,
+      length: "standard",
+      difficulty: 3,
+      ascension: 2,
+      game: { shortname: "ba" },
+      factionId: "player",
+      side: "ARM",
+      skin: "galaxy",
+      maps: [
+        { name: "Small", size: 64 },
+        { name: "Medium", size: 256 },
+      ],
+      now: "2026-07-18T00:00:00.000Z",
+    });
+  }
+
+  it("lists the nodes the player can move to in a Next strip", () => {
+    const run = activeRun();
+    h.run = run;
+    renderPage();
+    const strip = screen.getByRole("navigation", { name: "Next" });
+    expect(strip.textContent).toContain("Next:");
+    const choices = nextChoices(run);
+    expect(choices.length).toBeGreaterThan(0);
+    expect(strip.querySelectorAll("button").length).toBe(choices.length);
+  });
+
+  it("shows difficulty as a stat card with its ascension", () => {
+    h.run = activeRun();
+    renderPage();
+    expect(screen.getByText("Difficulty")).toBeTruthy();
+    expect(screen.getByText("Veteran")).toBeTruthy();
+    expect(screen.getByText("A2")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Difficulty 3 of 5" })).toBeTruthy();
+  });
+});
 
 describe("RunPage with no run", () => {
   it("gives the reason and says nothing was changed when the file could not be read", () => {

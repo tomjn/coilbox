@@ -176,13 +176,13 @@ export default function RunPage() {
 
   // Read-only lit-tree of the run's unlocked arsenal, opened from the HUD's
   // Arsenal tile. The unlocked-unit set lights up against the faction's full
-  // tree, so the shared tech ceiling is visible without changing unlock rules.
+  // tree, so what the player can build is visible without changing unlock rules.
   const openArsenalTree =
     run && dataset && run.startUnit
       ? () =>
           drawer.open({
             title: t`Arsenal`,
-            description: t`Units unlocked into your shared arsenal, lit up against the faction's full build tree.`,
+            description: t`Units you can build, lit up against the faction's full build tree.`,
             width: "40rem",
             content: (
               <UnitPicker
@@ -381,6 +381,43 @@ export default function RunPage() {
             />
           </div>
         </div>
+        {!ended && !active && choices.length > 0 && (
+          <nav
+            aria-label={t`Next`}
+            className="pointer-events-auto flex flex-wrap items-center gap-2"
+          >
+            <span
+              className={`${MAP_BAND_CLASS} px-2 py-1 text-xs font-semibold ${MAP_DIM_INK_CLASS}`}
+            >
+              <Trans>Next:</Trans>
+            </span>
+            {choices.map((node) => (
+              <button
+                key={node.id}
+                type="button"
+                onClick={() => onSelect(node.id)}
+                className={`flex items-center gap-1.5 px-2 py-1 text-xs transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${HUD_CARD_CLASS}`}
+              >
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: NODE_TINT[node.type] }}
+                />
+                <span
+                  className="font-semibold"
+                  style={{ color: NODE_TINT[node.type] }}
+                >
+                  {nodeTitle(node.type)}
+                </span>
+                {node.battle && (
+                  <span className="text-muted-foreground">
+                    {node.battle.mapName}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        )}
         {/* A battle's briefing has its own gate for a missing game, so this one
             stays out of its way. Only it can offer an engine. */}
         {(!active || gameNotice.kind === "no-engine") && (
@@ -409,6 +446,11 @@ export default function RunPage() {
             <InspectPanel
               node={run.nodes.find((n) => n.id === selectedId)}
               isChoice={choiceIds.has(selectedId)}
+              outOfReach={
+                !choiceIds.has(selectedId) &&
+                !run.progress.visited.includes(selectedId) &&
+                run.progress.currentNodeId !== selectedId
+              }
               chosen={run.history
                 .filter((h) => h.nodeId === selectedId && h.note)
                 .at(-1)
@@ -510,7 +552,7 @@ function nodeDescription(type: RunNodeType): string {
     case "boss":
       return coreT`The sector warlord. Break it to win the run.`;
     case "reward":
-      return coreT`Recover a schematic to widen the arsenal, or a field upgrade for yourself.`;
+      return coreT`Move here to collect it: a schematic that unlocks units, or a field upgrade for you.`;
     case "event":
       return coreT`A choice on the wire — no battle.`;
     case "shop":
@@ -563,6 +605,7 @@ function previewRows(node: RunNode): [string, string][] {
 function InspectPanel({
   node,
   isChoice,
+  outOfReach,
   chosen,
   runId,
   dataDir,
@@ -572,6 +615,8 @@ function InspectPanel({
 }: {
   node: RunNode | undefined;
   isChoice: boolean;
+  /** Not a choice, not visited and not where the player stands. */
+  outOfReach: boolean;
   /** For a resolved node, what the player took here (from run history). */
   chosen?: string;
   /** For a battle node's replay history — the run's opaque id + the target's
@@ -665,6 +710,11 @@ function InspectPanel({
           <Button size="sm" onClick={onEnter} className="w-full">
             <Trans>Chart a course here</Trans>
           </Button>
+        )}
+        {outOfReach && (
+          <p className="text-xs text-muted-foreground">
+            <Trans>Out of reach from here</Trans>
+          </p>
         )}
       </div>
     </BracketFrame>

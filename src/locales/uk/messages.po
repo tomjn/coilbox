@@ -16517,6 +16517,10 @@ msgstr "Згортати бічну панель у вузьких вікнах"
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Згортання бічної панелі повністю ховає її замість показу смуги значків."
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -19746,6 +19750,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Difficulty"
 msgstr "Складність"
@@ -30650,6 +30655,10 @@ msgstr "Передати кожну зону ({boxHolders}) наступному
 msgid "Move earlier"
 msgstr "Перемістити раніше"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
 msgid "Move key {keyNumber} earlier"
@@ -31714,6 +31723,7 @@ msgid "Newest first"
 msgstr "Найновіші"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Next"
 msgstr "Далі"
@@ -31723,6 +31733,10 @@ msgstr "Далі"
 #, fuzzy
 msgid "Next match"
 msgstr "Наступний збіг"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -36273,6 +36287,10 @@ msgstr "Застарілий"
 msgid "Out of date: {reasons}"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr ""
+
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
 msgid "Out of sync"
@@ -38626,11 +38644,6 @@ msgstr "Підвищується до 38, якщо задано менше, – 
 msgid "Raised wall"
 msgstr ""
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-#, fuzzy
-msgid "raises tech ceiling · both sides"
-msgstr "підвищує стелю технологій · для обох сторін"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -39569,11 +39582,6 @@ msgstr "Рекорди"
 #, fuzzy
 msgid "Recover {name}"
 msgstr "Відновити {name}"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "Здобудьте схему, щоб розширити арсенал, або польове покращення для себе."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -41638,7 +41646,6 @@ msgstr "Триває, доки його не запустять знову."
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
@@ -43838,11 +43845,6 @@ msgstr "Автор: {authorName}"
 #, fuzzy
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "Автор: {authorName}, {createdAt}"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Shared ceiling"
-msgstr "Спільна стеля"
 
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
@@ -50190,9 +50192,8 @@ msgid "The units of this replay's game could not be read, so nothing says which 
 msgstr "Не вдалося прочитати юніти гри цього повтору, тож невідомо, які завершені юніти є будівлями, і для цього шару потрібно встановити гру."
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "Юніти, які ви зараз можете будувати, з повного дерева вашої фракції. Нагороди й склади відкривають більше, але відкриття піднімає спільну стелю технологій, тож ворог посилюється разом із вами. Ваша особиста перевага – у перках, а не у відкриттях."
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53813,15 +53814,14 @@ msgstr "Юніти, які цей завод будує по черзі, щой�
 msgid "Units unlocked"
 msgstr "Відкриті юніти"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "Юніти, відкриті у вашому спільному арсеналі, підсвічені на повному дереві будівництва фракції."
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "Юніти, доступні в цьому бою, підсвічені на дереві будівництва вашої фракції. Обмежені юніти не підсвічуються."
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units you can build, lit up against the faction's full build tree."
+msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
@@ -56912,6 +56912,10 @@ msgstr "Щоб ділитися речами в хабі, потрібен об�
 msgid "you only · per-team"
 msgstr "лише ви · для кожної команди"
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "You retreat, hull scarred."
@@ -56992,6 +56996,10 @@ msgstr ""
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "Ваш найкращий результат: {best}. {attempts}."
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your build list"
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

@@ -1,6 +1,7 @@
 import { t as coreT } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
+  Gauge,
   Heart,
   HelpCircle,
   Layers,
@@ -16,12 +17,11 @@ import {
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { clamp } from "@/lib/clamp";
+import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
 import { toRoman } from "../../../conquest/names";
 import {
   BracketFrame,
-  HUD_ACCENT_INK,
   type HudAccent,
-  MAP_BAND_CLASS,
   StatCard,
 } from "../../../conquest/pages/components/hudChrome";
 import type { RogueliteRun } from "../../model";
@@ -205,29 +205,27 @@ export function RunHud({
             )}
             <HelpDot
               label={t`Arsenal`}
-              help={t`The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks.`}
+              help={t`The units you can currently build, out of your faction's full tree. Rewards and depots unlock more.`}
             />
           </div>
         }
       >
         <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Trans>Shared ceiling</Trans>
+          <Trans>Your build list</Trans>
         </p>
       </StatCard>
 
-      <div className="flex items-center">
-        {/* The one thing in this row that is not a framed tile, so it is the one
-            thing with the node map straight behind it. Its amber measured
-            1.0:1 there, since ink and canvas can be the same colour, and the
-            band is the answer the conquest map's loose labels already take
-            (#1052, #1801). */}
-        <span
-          className={`${MAP_BAND_CLASS} border border-dashed border-amber-400/80 px-3 py-2 font-display text-xs font-semibold uppercase tracking-[0.2em] ${HUD_ACCENT_INK.amber}`}
-        >
-          {diffWord}
-          {ascension > 0 && <span className="ml-1">A{ascension}</span>}
-        </span>
-      </div>
+      <StatCard
+        icon={<Gauge className="size-3.5 text-amber-400" aria-hidden />}
+        label={t`Difficulty`}
+        meta={ascension > 0 ? `A${ascension}` : undefined}
+        value={diffWord}
+        accent="amber"
+      >
+        <div className="mt-1.5">
+          <DifficultyPips filled={difficulty} />
+        </div>
+      </StatCard>
     </div>
   );
 }

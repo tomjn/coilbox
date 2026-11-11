@@ -16517,6 +16517,10 @@ msgstr "窗口较窄时折叠侧边栏"
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "折叠侧边栏会将其完全隐藏，而不是显示图标栏。"
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -19746,6 +19750,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Difficulty"
 msgstr "难度"
@@ -30650,6 +30655,10 @@ msgstr "将 {boxHolders} 个出生区域各自移给下一个盟友"
 msgid "Move earlier"
 msgstr "前移"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
 msgid "Move key {keyNumber} earlier"
@@ -31714,6 +31723,7 @@ msgid "Newest first"
 msgstr "最新优先"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Next"
 msgstr "下一个"
@@ -31723,6 +31733,10 @@ msgstr "下一个"
 #, fuzzy
 msgid "Next match"
 msgstr "下一个匹配"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -36273,6 +36287,10 @@ msgstr "已过期"
 msgid "Out of date: {reasons}"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr ""
+
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
 msgid "Out of sync"
@@ -38626,11 +38644,6 @@ msgstr "低于 38 时会提升到 38，这是让 1x1 建造单位能够到 1x1 �
 msgid "Raised wall"
 msgstr ""
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-#, fuzzy
-msgid "raises tech ceiling · both sides"
-msgstr "提高科技上限 · 双方"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -39569,11 +39582,6 @@ msgstr "战绩"
 #, fuzzy
 msgid "Recover {name}"
 msgstr "恢复 {name}"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "取得一张图纸以扩充军火库，或为自己取得一项战地改装。"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -41638,7 +41646,6 @@ msgstr "持续运行，直到再次开始。"
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
@@ -43838,11 +43845,6 @@ msgstr "由 {authorName} 分享"
 #, fuzzy
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "由 {authorName} 于 {createdAt} 分享"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Shared ceiling"
-msgstr "共享上限"
 
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
@@ -50190,9 +50192,8 @@ msgid "The units of this replay's game could not be read, so nothing says which 
 msgstr "无法读取此回放所用游戏的单位，所以无从得知哪些已完成的单位是建筑，因此此图层需要安装该游戏。"
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "你目前能建造的单位，取自你阵营的完整科技树。奖励和仓库可以解锁更多单位，但解锁会提高共享的科技上限，所以敌人也会随你升级。你个人的优势来自天赋，而不是解锁。"
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53813,15 +53814,14 @@ msgstr "基地放到地图上后，此工厂按顺序建造的单位。"
 msgid "Units unlocked"
 msgstr "已解锁的单位"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "已解锁到你共享军火库中的单位，在阵营的完整建造树中点亮显示。"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "此战斗中可用的单位，在你阵营的建造树中点亮显示。受限单位不会点亮。"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units you can build, lit up against the faction's full build tree."
+msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
@@ -56912,6 +56912,10 @@ msgstr "在中心上分享内容需要账号。浏览和导入不需要账号。
 msgid "you only · per-team"
 msgstr "仅你 · 按队伍"
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "You retreat, hull scarred."
@@ -56992,6 +56996,10 @@ msgstr ""
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "个人最佳：{best}。{attempts}。"
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your build list"
+msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

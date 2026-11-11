@@ -46,7 +46,7 @@ function typeLabel(type: RunNodeType): string {
     case "event":
       return t`Event`;
     case "reward":
-      return t`Salvage`;
+      return t`Collect salvage`;
     case "shop":
       return t`Depot`;
     case "boss":
@@ -443,6 +443,9 @@ export function mapRunToGalaxyDoc(
       }
       return {
         ...place,
+        // A cache is collected by moving onto it, so it says so in place of
+        // the town's name.
+        name: n.type === "reward" ? typeLabel(n.type) : place.name,
         owner: typeFaction(n.type),
         kind:
           n.type === "boss" || n.type === "start"

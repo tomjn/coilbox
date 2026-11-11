@@ -74,7 +74,7 @@ function optionText(o: RewardOption): {
         one: "Unlocks # unit along the build tree.",
         other: "Unlocks # units along the build tree.",
       }),
-      tag: coreT`raises tech ceiling · both sides`,
+      tag: coreT`you only · unlocks units`,
     };
   }
   const pct = Math.round(o.perk.value * 100);
