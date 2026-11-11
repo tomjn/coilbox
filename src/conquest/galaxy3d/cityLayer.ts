@@ -382,7 +382,10 @@ export function buildCityLayer(
   cores: THREE.InstancedMesh,
   /** Where the roads and towns are painted, and their state with them. */
   ground: Pick<GroundLayer, "setRoadStyle" | "commit"> &
-    Partial<Pick<TownLayer, "setTownStyle" | "towns">>,
+    Partial<Pick<TownLayer, "setTownStyle" | "towns">> & {
+      /** Where a landmark stands in place of a town, it takes the town's state. */
+      setLandmarkStyle?: TownLayer["setTownStyle"];
+    },
   /** Whether a location's town is drawn in an anomaly's haze. */
   misty: (id: string) => boolean = () => false,
 ): CityLayer {
@@ -511,10 +514,9 @@ export function buildCityLayer(
     m.look = look.scale;
     const label = labelObjects[m.i];
     if (label) label.visible = look.label;
-    ground.setTownStyle?.(
-      m.i,
-      misty(m.id) ? { ...look.town, mist: true } : look.town,
-    );
+    const town = misty(m.id) ? { ...look.town, mist: true } : look.town;
+    ground.setTownStyle?.(m.i, town);
+    ground.setLandmarkStyle?.(m.i, town);
     place(m);
   };
 

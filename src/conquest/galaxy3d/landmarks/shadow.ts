@@ -6,8 +6,8 @@
  * drawn again.
  */
 import * as THREE from "three";
-import type { TownStyle } from "../townLayer";
 import type { TerrainSurface } from "../terrain";
+import type { TownStyle } from "../townLayer";
 import type { LandmarkSite } from "./site";
 
 /** Rings and segments of the sheet draped on the terrain. */
@@ -128,7 +128,7 @@ export interface GroundDecal {
   setRing(ring: TownStyle["ring"] | undefined): void;
   setHidden(hidden: boolean): void;
   /** Start reading the landmark's shadow, once it is drawn. */
-  useShadow(shadow: LandmarkShadow): void;
+  takeShadow(shadow: LandmarkShadow): void;
 }
 
 const DECAL_VERTEX = /* glsl */ `
@@ -250,12 +250,12 @@ export function groundDecal(
     setHidden(hidden) {
       u.uHidden.value = hidden ? 1 : 0;
     },
-    useShadow(s) {
+    takeShadow(s) {
       u.uShadow.value = s.target.depthTexture;
       u.uShadowMatrix.value.copy(s.matrix);
       u.uShadowOn.value = 1;
     },
   };
-  if (shadow?.baked) decal.useShadow(shadow);
+  if (shadow?.baked) decal.takeShadow(shadow);
   return decal;
 }

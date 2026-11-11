@@ -34,6 +34,11 @@ import {
   placeLabels,
   sameNumbers,
 } from "./labelDeclutter";
+import {
+  buildLandmarkLayer,
+  type LandmarkLayer,
+  terrainColourReader,
+} from "./landmarks/landmarkLayer";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
@@ -751,6 +756,9 @@ export function GalaxyView({
     let terrainSheet: TerrainSheet | undefined;
     // A town at every location. See townLayer.ts.
     let towns: TownLayer | undefined;
+    // A stronghold on every enemy capital, and a run's ruin, in place of the
+    // town. See landmarks/landmarkLayer.ts.
+    let landmarks: LandmarkLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
     // the roads. See crossingPlan.ts.
     const crossingPlan = surface ? planCrossings(galaxy, surface) : undefined;
@@ -787,6 +795,16 @@ export function GalaxyView({
         // out, so there no road goes round them and none is bridged.
         performanceMode ? undefined : terrainExtension,
       );
+      landmarks = buildLandmarkLayer(
+        scene,
+        disposables,
+        surface,
+        galaxy,
+        playerFactionId,
+        identities,
+        terrainBiomes?.planet,
+        terrainColourReader(terrainColor, surface),
+      );
       if (planned.towns) {
         towns = buildTownLayer(
           scene,
@@ -796,6 +814,7 @@ export function GalaxyView({
           planned.towns,
           terrainBiomes,
           !terrainColor,
+          landmarks.nodes,
         );
       }
       terrainSheet = buildTerrainMesh(
@@ -987,6 +1006,7 @@ export function GalaxyView({
             {
               setRoadStyle: ground.setRoadStyle,
               setTownStyle: towns?.setTownStyle,
+              setLandmarkStyle: landmarks?.setStyle,
               towns: towns?.towns,
               commit: () => {
                 ground?.commit();
@@ -1009,6 +1029,7 @@ export function GalaxyView({
             ownerColor,
             placedForMarkers,
             renderRef,
+            landmarks?.anchors,
           )
         : undefined;
 
@@ -1223,6 +1244,7 @@ export function GalaxyView({
       }
       // One tile of the ground's bake a frame, until it is done.
       towns?.prepare(renderer);
+      landmarks?.prepare(renderer);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;
       renderer.render(scene, camera);

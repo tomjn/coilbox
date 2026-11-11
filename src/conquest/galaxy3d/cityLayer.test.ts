@@ -99,6 +99,7 @@ function build(labels = true) {
   // The ground the roads and towns are painted on, recording their styles.
   const styles: RoadStyle[] = [];
   const towns: TownStyle[] = [];
+  const landmarks: TownStyle[] = [];
   let commits = 0;
   const ground = {
     setRoadStyle: (k: number, style: RoadStyle) => {
@@ -106,6 +107,9 @@ function build(labels = true) {
     },
     setTownStyle: (i: number, style: TownStyle) => {
       towns[i] = style;
+    },
+    setLandmarkStyle: (i: number, style: TownStyle) => {
+      landmarks[i] = style;
     },
     // The middle city's town reaches 3 world units.
     towns: galaxy.nodes.map((_, i) => ({
@@ -158,6 +162,7 @@ function build(labels = true) {
     sidesOf,
     road: (k: number) => styles[k],
     town: (i: number) => towns[i],
+    landmark: (i: number) => landmarks[i],
     commits: () => commits,
     ownersRef,
     labelObjects,
@@ -242,6 +247,14 @@ describe("buildCityLayer", () => {
     expect(hex(part(groups[1], FILL).color)).toBe(RED);
     expect(town(1).ring).toBeUndefined();
     expect(town(2).ring).toBeUndefined();
+  });
+
+  it("rings a landmark as it rings a town", () => {
+    const { layer, landmark } = build();
+    layer.select("mid");
+    expect(landmark(1).ring?.thick).toBe(true);
+    layer.select(null);
+    expect(landmark(1).ring).toBeUndefined();
   });
 
   it("fades roads with the lane dimming the view passes in", () => {

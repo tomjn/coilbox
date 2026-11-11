@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { glowMaterial, landmarkMaterial, setLandmarkState } from "./material";
-import { insideShield, shieldMesh } from "./shield";
 import { STRONGHOLD_PALETTES } from "./palettes";
+import { insideShield, shieldMesh } from "./shield";
 
 describe("landmarkMaterial", () => {
   it("carries the sun, the shadow and the fog and mist states", () => {

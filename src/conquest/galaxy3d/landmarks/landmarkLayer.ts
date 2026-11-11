@@ -17,8 +17,8 @@ import { TERRAIN_SUN, type TerrainSurface } from "../terrain";
 import type { TerrainColorSource } from "../terrainMesh";
 import type { TownStyle } from "../townLayer";
 import { CAPITAL_NEIGHBOUR_SHARE } from "../towns";
-import type { Rgb } from "./kit";
 import { landmarkKinds } from "./kinds";
+import type { Rgb } from "./kit";
 import { glowMaterial, landmarkMaterial, setLandmarkState } from "./material";
 import { strongholdPalette } from "./palettes";
 import { createLandmarkShadow, groundDecal } from "./shadow";
@@ -177,7 +177,7 @@ export function buildLandmarkLayer(
           m.uniforms.uShadowMatrix.value.copy(shadow.matrix);
           m.uniforms.uShadowOn.value = 1;
         }
-      decal.useShadow(shadow);
+      decal.takeShadow(shadow);
     });
 
     placed.set(i, { materials, decal });

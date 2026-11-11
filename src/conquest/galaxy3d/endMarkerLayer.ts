@@ -86,11 +86,14 @@ export function buildEndMarkerLayer(
   ownerColor: (owner: string | undefined) => THREE.Color,
   placed?: Pick<PlacedModelsLayer, "failed" | "settled">,
   renderRef?: { current: (() => void) | null },
+  /** Where a landmark stands, in map units. It takes the marker's place. */
+  landmarks: { pos: [number, number] }[] = [],
 ): EndMarkerLayer | undefined {
   const reach = endMarkerReach(surface);
-  const markers = endMarkersToDraw(galaxy.nodes, ends, undefined, reach);
+  const markers = endMarkersToDraw(galaxy.nodes, ends, landmarks, reach);
+  const standing = [...(galaxy.models ?? []), ...landmarks];
   const drawNow = new Set(
-    endMarkersToDraw(galaxy.nodes, ends, galaxy.models, reach).map((m) => m.id),
+    endMarkersToDraw(galaxy.nodes, ends, standing, reach).map((m) => m.id),
   );
   if (markers.length === 0 || (drawNow.size === 0 && !placed)) {
     return undefined;
