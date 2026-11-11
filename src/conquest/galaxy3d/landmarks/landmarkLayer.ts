@@ -186,7 +186,7 @@ export function buildLandmarkLayer(
     setStyle(i, style) {
       const at = placed.get(i);
       if (!at) return;
-      const state = { hidden: style.hidden, mist: !!style.mist };
+      const state = { hidden: style.hidden };
       for (const m of at.materials) setLandmarkState(m, state);
       at.decal.setHidden(style.hidden);
       at.decal.setRing(style.ring);
