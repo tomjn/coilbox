@@ -60,9 +60,7 @@ function dish(r: number, tilt: number) {
     const x = (r * i) / steps;
     return new THREE.Vector2(x, depth * (x / r) ** 2);
   });
-  const outer = inner
-    .map((v) => new THREE.Vector2(v.x, v.y - skin))
-    .reverse();
+  const outer = inner.map((v) => new THREE.Vector2(v.x, v.y - skin)).reverse();
   const bowl = faceOut(new THREE.LatheGeometry([...inner, ...outer], 24));
   const boom = shaft(r * 0.025, r * 0.025, r * 0.8, 5);
   const feed = box(r * 0.14, r * 0.1, r * 0.14).translate(0, r * 0.8, 0);
@@ -159,7 +157,12 @@ export function buildDepot(
     tower(box(0.17, 0.05, 0.17), livery.accent, on(C, 0, 0.47, 0), fitted);
     const H = on(C, 0, 0.77, 0, aim);
     tower(box(0.17, 0.12, 0.21, 0.02), livery.accent, H, fitted);
-    tower(new THREE.SphereGeometry(0.05, 12, 8), p.metal, on(H, 0, 0.15, 0), bare);
+    tower(
+      new THREE.SphereGeometry(0.05, 12, 8),
+      p.metal,
+      on(H, 0, 0.15, 0),
+      bare,
+    );
     const d = dish(0.36, 0.85);
     const D = on(H, 0.02, 0.17, 0);
     tower(d.bowl, livery.shell, D, curved);
@@ -170,18 +173,33 @@ export function buildDepot(
     for (let k = 0; k < 4; k++) {
       const L = on(C, 0, 0, 0, Math.PI / 4 + (k * Math.PI) / 2);
       tower(tube(0.03, 0.4, 6, -0.6), p.metal, on(L, 0.03, 0.225, 0), bare);
-      tower(box(0.1, 0.03, 0.1, 0.008), livery.accent, on(L, 0.35, 0, 0), panel);
+      tower(
+        box(0.1, 0.03, 0.1, 0.008),
+        livery.accent,
+        on(L, 0.35, 0, 0),
+        panel,
+      );
     }
     tower(box(0.15, 0.52, 0.15), p.metal, C, bare);
     for (const s of [-1, 1]) {
       const K = on(C, s * 0.145, 0.07, 0);
       tower(box(0.14, 0.3, 0.22, 0.02), livery.shell, K, fitted);
-      tower(box(0.15, 0.03, 0.23, 0.008), livery.accent, on(K, 0, 0.3, 0), fitted);
+      tower(
+        box(0.15, 0.03, 0.23, 0.008),
+        livery.accent,
+        on(K, 0, 0.3, 0),
+        fitted,
+      );
     }
     const P = on(C, 0, 0.52, 0);
     tower(box(0.11, 0.5, 0.07, 0.015), livery.shell, P, fitted);
     for (const s of [-1, 1])
-      tower(box(0.02, 0.44, 0.1, 0.006), livery.accent, on(P, s * 0.065, 0.03, 0), fitted);
+      tower(
+        box(0.02, 0.44, 0.1, 0.006),
+        livery.accent,
+        on(P, s * 0.065, 0.03, 0),
+        fitted,
+      );
     const M = on(P, 0, 0.5, 0);
     tower(shaft(0.015, 0.008, 0.78, 6), p.metal, M, bare);
     for (const y of [0.16, 0.42])
@@ -189,7 +207,12 @@ export function buildDepot(
     for (let k = 0; k < 3; k++) {
       const A = on(M, 0, 0.5, 0, aim + (k * TAU) / 3);
       tower(box(0.07, 0.008, 0.008), p.metal, on(A, 0.035, 0.07, 0), bare);
-      tower(box(0.025, 0.15, 0.06, 0.006), livery.accent, on(A, 0.075, 0, 0), fitted);
+      tower(
+        box(0.025, 0.15, 0.06, 0.006),
+        livery.accent,
+        on(A, 0.075, 0, 0),
+        fitted,
+      );
     }
     beacon(on(M, 0, 0.785, 0));
   } else {
@@ -222,7 +245,12 @@ export function buildDepot(
     beacon(on(O, 0, R + 0.295, 0));
     const X = on(C, 0.46, 0, 0.1 * side);
     tower(box(0.26, 0.17, 0.3, 0.02), livery.shell, X, panel);
-    tower(box(0.27, 0.035, 0.31, 0.008), livery.accent, on(X, 0, 0.1, 0), fitted);
+    tower(
+      box(0.27, 0.035, 0.31, 0.008),
+      livery.accent,
+      on(X, 0, 0.1, 0),
+      fitted,
+    );
     const d = dish(0.11, 0.7);
     const D = on(X, 0, 0.2, 0.06, aim);
     tower(shaft(0.014, 0.014, 0.04, 6), p.metal, on(X, 0, 0.17, 0.06), bare);
@@ -268,7 +296,12 @@ export function buildDepot(
         bare,
       );
       b.add(shaft(0.09, 0.07, 0.03, 14), p.metal, on(O, 0, r - 0.008, 0), bare);
-      b.add(box(0.2, 0.14, 0.14, 0.015), livery.shell, on(S, 0.28, 0, 0.2), panel);
+      b.add(
+        box(0.2, 0.14, 0.14, 0.015),
+        livery.shell,
+        on(S, 0.28, 0, 0.2),
+        panel,
+      );
     } else if (store === "silos") {
       // Two upright tanks piped together over the top, in a frame.
       const r = 0.14;
@@ -277,13 +310,22 @@ export function buildDepot(
         b.add(shaft(0.13, 0.11, 0.1, 14), p.metal, T, bare);
         b.add(shaft(r, r, 0.46, 22), livery.shell, on(T, 0, 0.1, 0), curved);
         b.add(
-          new THREE.SphereGeometry(r, 22, 8, 0, TAU, 0, Math.PI / 2).scale(1, 0.7, 1),
+          new THREE.SphereGeometry(r, 22, 8, 0, TAU, 0, Math.PI / 2).scale(
+            1,
+            0.7,
+            1,
+          ),
           livery.shell,
           on(T, 0, 0.56, 0),
           curved,
         );
         for (const y of [0.2, 0.44])
-          b.add(shaft(r + 0.004, r + 0.004, 0.035, 22), livery.accent, on(T, 0, y, 0), curved);
+          b.add(
+            shaft(r + 0.004, r + 0.004, 0.035, 22),
+            livery.accent,
+            on(T, 0, y, 0),
+            curved,
+          );
         b.add(shaft(0.02, 0.02, 0.07, 6), p.metal, on(T, 0, 0.65, 0), bare);
       }
       b.add(
@@ -294,7 +336,12 @@ export function buildDepot(
       );
       b.add(box(0.1, 0.5, 0.1), p.metal, on(S, 0, 0, 0.1), bare);
       b.add(box(0.3, 0.36, 0.1, 0.015), livery.shell, on(S, 0, 0, 0.2), panel);
-      b.add(box(0.31, 0.03, 0.11, 0.008), livery.accent, on(S, 0, 0.2, 0.2), fitted);
+      b.add(
+        box(0.31, 0.03, 0.11, 0.008),
+        livery.accent,
+        on(S, 0, 0.2, 0.2),
+        fitted,
+      );
     } else {
       // Tanks lying side by side on saddles.
       const r = 0.105;
@@ -310,12 +357,32 @@ export function buildDepot(
             curved,
           );
         for (const x of [0.1, len - 0.1 - 0.04])
-          b.add(tube(r + 0.004, 0.04, 20), livery.accent, on(T, x, 0, 0), curved);
-        b.add(shaft(0.03, 0.03, 0.03, 8), p.metal, on(T, len / 2, r - 0.005, 0), bare);
+          b.add(
+            tube(r + 0.004, 0.04, 20),
+            livery.accent,
+            on(T, x, 0, 0),
+            curved,
+          );
+        b.add(
+          shaft(0.03, 0.03, 0.03, 8),
+          p.metal,
+          on(T, len / 2, r - 0.005, 0),
+          bare,
+        );
       }
       for (const x of [-0.16, 0.16])
-        b.add(box(0.06, 0.1, 0.52, 0.008), livery.accent, on(S, x, 0, 0), panel);
-      b.add(tube(0.016, 0.28, 6), p.metal, on(S, 0, 0.3, -0.14, -Math.PI / 2), bare);
+        b.add(
+          box(0.06, 0.1, 0.52, 0.008),
+          livery.accent,
+          on(S, x, 0, 0),
+          panel,
+        );
+      b.add(
+        tube(0.016, 0.28, 6),
+        p.metal,
+        on(S, 0, 0.3, -0.14, -Math.PI / 2),
+        bare,
+      );
     }
   }
 
@@ -334,19 +401,42 @@ export function buildDepot(
     if (kind === "long") {
       b.add(box(0.26, 0.12, 0.14, 0.012), livery.shell, m, paint);
       for (const s of [-1, 1])
-        b.add(box(0.05, 0.128, 0.148, 0.012), livery.accent, on(m, s * 0.115, 0, 0), paint);
+        b.add(
+          box(0.05, 0.128, 0.148, 0.012),
+          livery.accent,
+          on(m, s * 0.115, 0, 0),
+          paint,
+        );
       b.add(box(0.07, 0.012, 0.08), p.metal, on(m, 0, 0.12, 0), bare);
     } else if (kind === "cube") {
       b.add(box(0.16, 0.16, 0.16, 0.028), livery.shell, m, paint);
-      b.add(box(0.168, 0.09, 0.09, 0.006), livery.accent, on(m, 0, 0.035, 0), fitted);
-      b.add(box(0.09, 0.09, 0.168, 0.006), livery.accent, on(m, 0, 0.035, 0), fitted);
+      b.add(
+        box(0.168, 0.09, 0.09, 0.006),
+        livery.accent,
+        on(m, 0, 0.035, 0),
+        fitted,
+      );
+      b.add(
+        box(0.09, 0.09, 0.168, 0.006),
+        livery.accent,
+        on(m, 0, 0.035, 0),
+        fitted,
+      );
       b.add(box(0.1, 0.012, 0.1), p.metal, on(m, 0, 0.16, 0), bare);
     } else {
       const r = 0.075;
       const T = on(m, -0.12, r * Math.cos(Math.PI / 6), 0);
-      b.add(tube(r, 0.24, 6).rotateX(Math.PI / 6), livery.accent, T, { ...paint, clean: true });
+      b.add(tube(r, 0.24, 6).rotateX(Math.PI / 6), livery.accent, T, {
+        ...paint,
+        clean: true,
+      });
       for (const x of [0.02, 0.19])
-        b.add(tube(r + 0.006, 0.03, 6).rotateX(Math.PI / 6), livery.shell, on(T, x, 0, 0), fitted);
+        b.add(
+          tube(r + 0.006, 0.03, 6).rotateX(Math.PI / 6),
+          livery.shell,
+          on(T, x, 0, 0),
+          fitted,
+        );
     }
   };
 
