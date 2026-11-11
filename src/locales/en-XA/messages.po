@@ -6615,6 +6615,10 @@ msgstr ""
 msgid "+{reward} salvage"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "+{salvage} salvage, -{hullCost} hull"
 msgstr ""
@@ -9628,8 +9632,8 @@ msgstr ""
 msgid "Arrived sound"
 msgstr ""
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 msgid "Arsenal"
 msgstr ""
 
@@ -10034,6 +10038,7 @@ msgstr ""
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -11216,6 +11221,10 @@ msgstr ""
 #: src/lego/generatorJobs.ts
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "Builder"
+msgstr ""
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -15588,6 +15597,7 @@ msgstr ""
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Defence"
 msgstr ""
 
@@ -17047,6 +17057,7 @@ msgstr ""
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 msgid "Economy"
 msgstr ""
@@ -18199,6 +18210,10 @@ msgstr ""
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
 msgid "Factions"
+msgstr ""
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -21762,6 +21777,10 @@ msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
+msgstr ""
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -28675,6 +28694,7 @@ msgstr ""
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Offence"
 msgstr ""
 
@@ -29175,6 +29195,10 @@ msgstr ""
 msgid "Open another file"
 msgstr ""
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr ""
+
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Open backup"
 msgstr ""
@@ -29618,6 +29642,7 @@ msgstr ""
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Other"
 msgstr ""
 
@@ -34056,6 +34081,7 @@ msgstr ""
 
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 msgid "Salvage"
 msgstr ""
 
@@ -37135,7 +37161,7 @@ msgid "Speed, elmos a second"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
-msgid "Spend at depots"
+msgid "Spend at <0><1/>depots</0>"
 msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
@@ -38331,10 +38357,6 @@ msgstr ""
 
 #: src/play/presetParts.ts
 msgid "Teams and bots"
-msgstr ""
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Tech {techNumeral}"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -41044,10 +41066,6 @@ msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
-msgstr ""
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -44008,10 +44026,6 @@ msgstr ""
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr ""
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units you can build, lit up against the faction's full build tree."
-msgstr ""
-
 #: src/campaign/pages/components/UnitRestrictions.tsx
 msgid "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
 msgstr ""
@@ -44105,10 +44119,6 @@ msgstr ""
 
 #: src/multiplayer/battle/hostSuggestion.ts
 msgid "unlock the room"
-msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-msgid "unlocked"
 msgstr ""
 
 #. placeholder {0}: option.unitName
@@ -44694,10 +44704,6 @@ msgstr ""
 msgid "View"
 msgstr ""
 
-#: src/runlite/pages/components/RunHud.tsx
-msgid "View arsenal tree"
-msgstr ""
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "View available units"
 msgstr ""
@@ -44727,10 +44733,6 @@ msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "View tech tree"
-msgstr ""
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "View the arsenal tech tree"
 msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
@@ -46602,10 +46604,6 @@ msgstr ""
 
 #: src/challenge/record.ts
 msgid "Your best: {best}. {attempts}."
-msgstr ""
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Your build list"
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx

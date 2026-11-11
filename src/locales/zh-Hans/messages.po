@@ -8118,6 +8118,10 @@ msgstr "船体 +{restHull}"
 msgid "+{reward} salvage"
 msgstr "废料 +{reward}"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr ""
+
 #: src/runlite/generate.ts
 #, fuzzy
 msgid "+{salvage} salvage, -{hullCost} hull"
@@ -11822,8 +11826,8 @@ msgstr "{x}, {z} 附近，半径 {radius}"
 msgid "Arrived sound"
 msgstr "到达音效"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Arsenal"
 msgstr "军械库"
@@ -12316,6 +12320,7 @@ msgstr "返回征服地图"
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -13768,6 +13773,10 @@ msgstr "建造单位"
 #, fuzzy
 msgid "Builder"
 msgstr "建造单位"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -19068,6 +19077,7 @@ msgstr "失败。"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Defence"
 msgstr "防御"
@@ -20843,6 +20853,7 @@ msgstr "简单"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Economy"
@@ -22252,6 +22263,10 @@ msgstr "新 AI 的阵营"
 #, fuzzy
 msgid "Factions"
 msgstr "阵营"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -26622,6 +26637,10 @@ msgstr "安装中…"
 #, fuzzy
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr "将适用于此平台的引擎安装到所配置内容文件夹的 <0>engine/</0> 目录中（在<1>内容文件夹设置</1>中设置目标位置）。"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -35083,6 +35102,7 @@ msgstr "关：在单位脚本中的 AimWeapon() 返回之前，武器无法开�
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Offence"
 msgstr "进攻"
@@ -35691,6 +35711,10 @@ msgstr ""
 msgid "Open another file"
 msgstr "打开其他文件"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr ""
+
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Open backup"
 msgstr ""
@@ -36230,6 +36254,7 @@ msgstr "其他"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
 msgstr "其他"
@@ -41639,6 +41664,7 @@ msgstr "S3O Blender Tools"
 
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Salvage"
 msgstr "废料"
@@ -45397,9 +45423,8 @@ msgid "Speed, elmos a second"
 msgstr "速度，elmo/秒"
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Spend at depots"
-msgstr "在仓库中花费"
+msgid "Spend at <0><1/>depots</0>"
+msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -46857,11 +46882,6 @@ msgstr "队伍"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "队伍和机器人"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Tech {techNumeral}"
-msgstr "科技 {techNumeral}"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -50178,10 +50198,6 @@ msgstr "无法读取此回放所用游戏的单位，所以没有任何信息说
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "无法读取此回放所用游戏的单位，所以无从得知哪些已完成的单位是建筑，因此此图层需要安装该游戏。"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
-msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53807,10 +53823,6 @@ msgstr "已解锁的单位"
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "此战斗中可用的单位，在你阵营的建造树中点亮显示。受限单位不会点亮。"
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units you can build, lit up against the faction's full build tree."
-msgstr ""
-
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
 msgid "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
@@ -53926,11 +53938,6 @@ msgstr "解锁"
 #, fuzzy
 msgid "unlock the room"
 msgstr "解锁房间"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "unlocked"
-msgstr "已解锁"
 
 #. placeholder {0}: option.unitName
 #: src/runlite/progress.ts
@@ -54646,11 +54653,6 @@ msgstr "来自游戏文件的视频"
 msgid "View"
 msgstr "查看"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View arsenal tree"
-msgstr "查看军火库科技树"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "View available units"
@@ -54688,11 +54690,6 @@ msgstr "查看结果"
 #, fuzzy
 msgid "View tech tree"
 msgstr "查看科技树"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View the arsenal tech tree"
-msgstr "查看军火库的科技树"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -56984,10 +56981,6 @@ msgstr ""
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "个人最佳：{best}。{attempts}。"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Your build list"
-msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

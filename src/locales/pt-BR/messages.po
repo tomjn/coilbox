@@ -8172,6 +8172,10 @@ msgstr "+{restHull} de casco"
 msgid "+{reward} salvage"
 msgstr "+{reward} de sucata"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr ""
+
 #: src/runlite/generate.ts
 #, fuzzy
 msgid "+{salvage} salvage, -{hullCost} hull"
@@ -11896,8 +11900,8 @@ msgstr "Perto de {x}, {z}, num raio de {radius}"
 msgid "Arrived sound"
 msgstr "Som de chegada"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Arsenal"
 msgstr "Arsenal"
@@ -12392,6 +12396,7 @@ msgstr "Voltar ao mapa de conquista"
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -13849,6 +13854,10 @@ msgstr "construtor"
 #, fuzzy
 msgid "Builder"
 msgstr "Construtor"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -19198,6 +19207,7 @@ msgstr "Derrota."
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Defence"
 msgstr "Defesa"
@@ -20976,6 +20986,7 @@ msgstr "Fácil"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Economy"
@@ -22392,6 +22403,10 @@ msgstr "Facção da nova IA"
 #, fuzzy
 msgid "Factions"
 msgstr "Facções"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -26782,6 +26797,10 @@ msgstr "Instalando…"
 #, fuzzy
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr "Instala uma engine para esta plataforma na pasta <0>engine/</0> da pasta de conteúdo configurada (defina o destino em <1>Configurações de pastas de conteúdo</1>)."
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -35286,6 +35305,7 @@ msgstr "Desligado, a arma não pode disparar até AimWeapon() retornar no script
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Offence"
 msgstr "Ataque"
@@ -35907,6 +35927,10 @@ msgstr "O Open Annihilation aceita uma senha de até {OA_PASSWORD_MAX} caractere
 msgid "Open another file"
 msgstr "Abrir outro arquivo"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr ""
+
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Open backup"
@@ -36455,6 +36479,7 @@ msgstr "outro"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
 msgstr "Outros"
@@ -41902,6 +41927,7 @@ msgstr "S3O Blender Tools"
 
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Salvage"
 msgstr "Sucata"
@@ -45686,9 +45712,8 @@ msgid "Speed, elmos a second"
 msgstr "Velocidade, elmos por segundo"
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Spend at depots"
-msgstr "Gaste nos depósitos"
+msgid "Spend at <0><1/>depots</0>"
+msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -47156,11 +47181,6 @@ msgstr "Equipes"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "Equipes e bots"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Tech {techNumeral}"
-msgstr "Tec {techNumeral}"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -50510,10 +50530,6 @@ msgstr "Não foi possível ler as unidades do jogo deste replay, então nada diz
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "Não foi possível ler as unidades do jogo deste replay, então nada diz quais unidades prontas são construções, e esta camada precisa do jogo instalado."
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
-msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -54152,10 +54168,6 @@ msgstr "Unidades desbloqueadas"
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "Unidades utilizáveis nesta luta, destacadas sobre a árvore de construção da sua facção. As unidades restritas ficam apagadas."
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units you can build, lit up against the faction's full build tree."
-msgstr ""
-
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
 msgid "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
@@ -54271,11 +54283,6 @@ msgstr "Destravar"
 #, fuzzy
 msgid "unlock the room"
 msgstr "destravar a sala"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "unlocked"
-msgstr "desbloqueado"
 
 #. placeholder {0}: option.unitName
 #: src/runlite/progress.ts
@@ -54994,11 +55001,6 @@ msgstr "Vídeo dos arquivos do jogo"
 msgid "View"
 msgstr "Visão"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View arsenal tree"
-msgstr "Ver árvore do arsenal"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "View available units"
@@ -55036,11 +55038,6 @@ msgstr "Ver resultados"
 #, fuzzy
 msgid "View tech tree"
 msgstr "Ver árvore tecnológica"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View the arsenal tech tree"
-msgstr "Ver a árvore tecnológica do arsenal"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -57350,10 +57347,6 @@ msgstr "A retransmissão da sua sala caiu"
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "Seu melhor: {best}. {attempts}."
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Your build list"
-msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

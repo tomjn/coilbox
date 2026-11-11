@@ -972,10 +972,24 @@ const PALETTE_SITES: PaletteSite[] = [
   },
   {
     file: "../../../runlite/pages/components/RunHud.tsx",
-    className: "text-cyan-400",
+    className: "text-red-300",
     on: "card",
     bar: 3,
     what: "the hull icon",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-yellow-300",
+    on: "card",
+    bar: 4.5,
+    what: "the Salvage label",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-emerald-300",
+    on: "card",
+    bar: 4.5,
+    what: "the depots caption",
   },
   {
     file: "../../../runlite/pages/components/RunHud.tsx",
@@ -1098,6 +1112,7 @@ describe("no importer outside the two dark routes", () => {
     "conquest/pages/components/BattleOverlay.tsx",
     "conquest/pages/components/BattleOverlayParts.tsx",
     "conquest/pages/components/RunSetup.tsx",
+    "runlite/pages/components/ArsenalOverlay.tsx",
     "runlite/pages/components/EncounterOverlay.tsx",
     "runlite/pages/components/NodeOverlays.tsx",
     "runlite/pages/components/RunContentNotice.tsx",

@@ -6616,6 +6616,10 @@ msgstr "+{restHull} hull"
 msgid "+{reward} salvage"
 msgstr "+{reward} salvage"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr "+{salvage} salvage"
+
 #: src/runlite/generate.ts
 msgid "+{salvage} salvage, -{hullCost} hull"
 msgstr "+{salvage} salvage, -{hullCost} hull"
@@ -9629,8 +9633,8 @@ msgstr "Around {x}, {z}, within {radius}"
 msgid "Arrived sound"
 msgstr "Arrived sound"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 msgid "Arsenal"
 msgstr "Arsenal"
 
@@ -10035,6 +10039,7 @@ msgstr "Back to conquest map"
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -11218,6 +11223,10 @@ msgstr "builder"
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "Builder"
 msgstr "Builder"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
+msgstr "Builders"
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "Builders, factories, sensors and transports"
@@ -15589,6 +15598,7 @@ msgstr "Defeat."
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Defence"
 msgstr "Defence"
 
@@ -17048,6 +17058,7 @@ msgstr "Easy"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 msgid "Economy"
 msgstr "Economy"
@@ -18201,6 +18212,10 @@ msgstr "Faction for the new AI"
 #: src/content/pages/StatsPage.tsx
 msgid "Factions"
 msgstr "Factions"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
+msgstr "Factories"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -21764,6 +21779,10 @@ msgstr "Installing…"
 #: src/downloads/pages/components/EngineInstaller.tsx
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
+msgstr "Intelligence"
 
 #: src/content/unitFieldNotes.ts
 msgid "Interceptable-by bitmask"
@@ -28676,6 +28695,7 @@ msgstr "Off, the weapon can't fire until AimWeapon() returns in the unit's scrip
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Offence"
 msgstr "Offence"
 
@@ -29176,6 +29196,10 @@ msgstr "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters
 msgid "Open another file"
 msgstr "Open another file"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr "Open arsenal"
+
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Open backup"
 msgstr "Open backup"
@@ -29619,6 +29643,7 @@ msgstr "other"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 msgid "Other"
 msgstr "Other"
 
@@ -34057,6 +34082,7 @@ msgstr "S3O Blender Tools"
 
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 msgid "Salvage"
 msgstr "Salvage"
 
@@ -37136,8 +37162,8 @@ msgid "Speed, elmos a second"
 msgstr "Speed, elmos a second"
 
 #: src/runlite/pages/components/RunHud.tsx
-msgid "Spend at depots"
-msgstr "Spend at depots"
+msgid "Spend at <0><1/>depots</0>"
+msgstr "Spend at <0><1/>depots</0>"
 
 #: src/runlite/pages/RunPage.tsx
 msgid "Spend salvage on unlocks, perks, and repairs."
@@ -38333,10 +38359,6 @@ msgstr "Teams"
 #: src/play/presetParts.ts
 msgid "Teams and bots"
 msgstr "Teams and bots"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Tech {techNumeral}"
-msgstr "Tech {techNumeral}"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -41046,10 +41068,6 @@ msgstr "The units of this replay's game could not be read, so nothing says what 
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
-msgstr "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "The usual reason a playback does not match is that the installed game or engine is not exactly the one the match was played on."
@@ -44009,10 +44027,6 @@ msgstr "Units unlocked"
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units you can build, lit up against the faction's full build tree."
-msgstr "Units you can build, lit up against the faction's full build tree."
-
 #: src/campaign/pages/components/UnitRestrictions.tsx
 msgid "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
 msgstr "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
@@ -44107,10 +44121,6 @@ msgstr "Unlock"
 #: src/multiplayer/battle/hostSuggestion.ts
 msgid "unlock the room"
 msgstr "unlock the room"
-
-#: src/runlite/pages/RunPage.tsx
-msgid "unlocked"
-msgstr "unlocked"
 
 #. placeholder {0}: option.unitName
 #: src/runlite/progress.ts
@@ -44695,10 +44705,6 @@ msgstr "Video from game files"
 msgid "View"
 msgstr "View"
 
-#: src/runlite/pages/components/RunHud.tsx
-msgid "View arsenal tree"
-msgstr "View arsenal tree"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "View available units"
 msgstr "View available units"
@@ -44729,10 +44735,6 @@ msgstr "View results"
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "View tech tree"
 msgstr "View tech tree"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "View the arsenal tech tree"
-msgstr "View the arsenal tech tree"
 
 #: src/workshop/pages/UnitPage.tsx
 msgid "View unit details"
@@ -46604,10 +46606,6 @@ msgstr "Your battle's relay is down"
 #: src/challenge/record.ts
 msgid "Your best: {best}. {attempts}."
 msgstr "Your best: {best}. {attempts}."
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Your build list"
-msgstr "Your build list"
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Your capital has fallen."

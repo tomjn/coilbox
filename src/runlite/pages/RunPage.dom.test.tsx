@@ -4,13 +4,14 @@
  * reason and say nothing was changed, not "No active warpath", which reads as if
  * the run were gone.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   error: null as string | null,
   run: null as import("../model").RogueliteRun | null,
+  units: null as unknown[] | null,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -28,7 +29,10 @@ vi.mock("../../challenge/ChallengeRecordLine", () => ({
 }));
 vi.mock("../../content/config", () => ({
   useUnitsyncScan: () => ({ data: null, error: null, run: vi.fn() }),
-  useUnitsyncUnitDataset: () => ({ dataset: null }),
+  useUnitsyncUnitDataset: () => ({
+    dataset: h.units ? { units: h.units } : null,
+  }),
+  useUnitsyncUnitBuildpics: () => null,
   useScanEpoch: () => 0,
 }));
 vi.mock("../../content/mapEligibility", () => ({
@@ -71,6 +75,7 @@ afterEach(() => {
   cleanup();
   h.error = null;
   h.run = null;
+  h.units = null;
 });
 
 function renderPage() {
@@ -118,6 +123,67 @@ describe("RunPage with an active run", () => {
     expect(screen.getByText("Veteran")).toBeTruthy();
     expect(screen.getByText("A2")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Difficulty 3 of 5" })).toBeTruthy();
+  });
+});
+
+describe("RunPage arsenal", () => {
+  function runWithArsenal() {
+    const base = generateRun({
+      seed: 777,
+      length: "standard",
+      difficulty: 3,
+      ascension: 0,
+      game: { shortname: "ba" },
+      factionId: "player",
+      side: "ARM",
+      skin: "galaxy",
+      maps: [{ name: "Small", size: 64 }],
+      now: "2026-07-18T00:00:00.000Z",
+    });
+    return {
+      ...base,
+      startUnit: "armcom",
+      progress: { ...base.progress, unlockedUnits: ["armcom", "armsolar"] },
+    };
+  }
+
+  it("opens a panel of full unit names, not internal ones, from one Arsenal button", () => {
+    h.run = runWithArsenal();
+    h.units = [
+      {
+        name: "armcom",
+        fullName: "Commander",
+        mobile: true,
+        buildOptions: ["armsolar", "armlocked"],
+        stats: { builder: true },
+      },
+      {
+        name: "armsolar",
+        fullName: "Solar Collector",
+        mobile: false,
+        buildOptions: [],
+        stats: { energyMake: 20 },
+      },
+      {
+        name: "armlocked",
+        fullName: "Locked Thing",
+        mobile: false,
+        buildOptions: [],
+        stats: { weapons: [{}] },
+      },
+    ];
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Open arsenal" }));
+    const panel = screen.getByRole("dialog", { name: "Arsenal" });
+    expect(panel.textContent).toContain("Commander");
+    expect(panel.textContent).toContain("Solar Collector");
+    expect(panel.textContent).toContain("Economy (1)");
+    expect(panel.textContent).not.toContain("armcom");
+    expect(panel.textContent).not.toContain("armsolar");
+    expect(panel.textContent).not.toContain("Locked Thing");
+    expect(panel.textContent).toContain("2 / 3");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Arsenal" })).toBeNull();
   });
 });
 

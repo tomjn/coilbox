@@ -1,8 +1,16 @@
 import { t as coreT } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, useDrawer, useHideSidebar } from "@picoframe/frame";
-import { ArrowLeft, Check, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Button, useHideSidebar } from "@picoframe/frame";
+import {
+  ArrowLeft,
+  Check,
+  CircuitBoard,
+  HandFist,
+  Split,
+  Store,
+  X,
+} from "lucide-react";
+import { type CSSProperties, useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
@@ -26,7 +34,6 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
 import { resolveGameDownload } from "../../play/gameOffer";
 import { resolveGameByShortname } from "../../play/installedGames";
@@ -42,6 +49,7 @@ import { runGameNotice } from "../runContent";
 import { useRun } from "../runs";
 import { reachableFromAll, startSetFor } from "../unitLimit";
 import { useAwardFinishedRuns } from "../useAwardFinishedRuns";
+import { ArsenalOverlay } from "./components/ArsenalOverlay";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
   EventOverlay,
@@ -76,7 +84,7 @@ export default function RunPage() {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // The node id to celebrate with a win burst (cleared after the burst plays).
   const [burstId, setBurstId] = useState<string | null>(null);
-  const drawer = useDrawer();
+  const [arsenalOpen, setArsenalOpen] = useState(false);
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
   const {
@@ -174,39 +182,9 @@ export default function RunPage() {
     return dataset.units.filter((u) => reachable.has(u.name.toLowerCase()));
   }, [run?.startUnit, dataset, startSet]);
 
-  // Read-only lit-tree of the run's unlocked arsenal, opened from the HUD's
-  // Arsenal tile. The unlocked-unit set lights up against the faction's full
-  // tree, so what the player can build is visible without changing unlock rules.
-  const openArsenalTree =
-    run && dataset && run.startUnit
-      ? () =>
-          drawer.open({
-            title: t`Arsenal`,
-            description: t`Units you can build, lit up against the faction's full build tree.`,
-            width: "40rem",
-            content: (
-              <UnitPicker
-                units={arsenalUnits}
-                factions={
-                  run.startUnit
-                    ? [
-                        {
-                          startUnit: startSet?.derived
-                            ? startSet.roots[0]
-                            : run.startUnit,
-                        },
-                      ]
-                    : []
-                }
-                selected={run.progress.unlockedUnits}
-                selectedLabel={t`unlocked`}
-                enginePath={target?.enginePath}
-                dataDir={target?.dataDir}
-                gameArchive={game?.primaryArchive.name}
-              />
-            ),
-          })
-      : undefined;
+  // The arsenal panel is opened from the HUD's Arsenal tile.
+  const openArsenal =
+    run && dataset && run.startUnit ? () => setArsenalOpen(true) : undefined;
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
 
@@ -276,6 +254,7 @@ export default function RunPage() {
   };
 
   const closeOverlay = () => setActiveNodeId(null);
+  const closeArsenal = () => setArsenalOpen(false);
   const applyAndSave = async (next: typeof run) => {
     await save(next);
   };
@@ -377,7 +356,7 @@ export default function RunPage() {
               arsenalTotal={arsenalTotal}
               logo={factionLogo}
               side={run.settings.side}
-              onInspectArsenal={openArsenalTree}
+              onInspectArsenal={openArsenal}
             />
           </div>
         </div>
@@ -396,13 +375,10 @@ export default function RunPage() {
                 key={node.id}
                 type="button"
                 onClick={() => onSelect(node.id)}
-                className={`flex items-center gap-1.5 px-2 py-1 text-xs transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${HUD_CARD_CLASS}`}
+                style={{ "--tint": NODE_TINT[node.type] } as CSSProperties}
+                className={`flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs transition-colors hover:border-[var(--tint)] hover:text-foreground hover:ring-1 hover:ring-[var(--tint)] hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--tint)] ${HUD_CARD_CLASS}`}
               >
-                <span
-                  aria-hidden
-                  className="size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: NODE_TINT[node.type] }}
-                />
+                <NodeGlyph type={node.type} tint={NODE_TINT[node.type]} />
                 <span
                   className="font-semibold"
                   style={{ color: NODE_TINT[node.type] }}
@@ -478,6 +454,17 @@ export default function RunPage() {
             onCelebrate={() => celebrate(active.id)}
           />
         )}
+        {arsenalOpen && !active && (
+          <ArsenalOverlay
+            units={arsenalUnits}
+            unlocked={run.progress.unlockedUnits}
+            total={arsenalTotal}
+            enginePath={target?.enginePath}
+            dataDir={target?.dataDir}
+            gameArchive={game?.primaryArchive.name}
+            onClose={closeArsenal}
+          />
+        )}
         {active?.type === "reward" && (
           <RewardOverlay
             run={run}
@@ -527,6 +514,32 @@ function nodeTitle(type: RunNodeType): string {
       return coreT`Anomaly`;
     case "shop":
       return coreT`Depot`;
+  }
+}
+
+/** The node type's icon in its tint, or the tint as a dot where it has none. */
+function NodeGlyph({ type, tint }: { type: RunNodeType; tint: string }) {
+  const cls = "size-3.5 shrink-0";
+  switch (type) {
+    case "battle":
+    case "elite":
+      return <HandFist aria-hidden className={cls} style={{ color: tint }} />;
+    case "event":
+      return <Split aria-hidden className={cls} style={{ color: tint }} />;
+    case "reward":
+      return (
+        <CircuitBoard aria-hidden className={cls} style={{ color: tint }} />
+      );
+    case "shop":
+      return <Store aria-hidden className={cls} style={{ color: tint }} />;
+    default:
+      return (
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: tint }}
+        />
+      );
   }
 }
 
@@ -585,7 +598,11 @@ function previewRows(node: RunNode): [string, string][] {
       (o) => o.kind === "unlock",
     ).length;
     const perks = node.reward.options.length - unlocks;
-    return [[coreT`Choose one of`, coreT`${unlocks} unlock, ${perks} perk`]];
+    const salvage = node.reward.salvage;
+    return [
+      [coreT`Choose one of`, coreT`${unlocks} unlock, ${perks} perk`],
+      ...(salvage ? [[coreT`Salvage`, coreT`+${salvage} salvage`]] : []),
+    ] as [string, string][];
   }
   if (node.shop) {
     const cheapest = Math.min(...node.shop.offers.map((o) => o.cost));

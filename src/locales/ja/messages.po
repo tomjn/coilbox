@@ -8118,6 +8118,10 @@ msgstr "船体 +{restHull}"
 msgid "+{reward} salvage"
 msgstr "サルベージ +{reward}"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr ""
+
 #: src/runlite/generate.ts
 #, fuzzy
 msgid "+{salvage} salvage, -{hullCost} hull"
@@ -11822,8 +11826,8 @@ msgstr "{x}, {z} 付近、半径 {radius}"
 msgid "Arrived sound"
 msgstr "到着時のサウンド"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Arsenal"
 msgstr "兵器庫"
@@ -12316,6 +12320,7 @@ msgstr "コンクエストのマップに戻る"
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -13768,6 +13773,10 @@ msgstr "建設ユニット"
 #, fuzzy
 msgid "Builder"
 msgstr "建設ユニット"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -19068,6 +19077,7 @@ msgstr "敗北。"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Defence"
 msgstr "防衛"
@@ -20843,6 +20853,7 @@ msgstr "イージー"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Economy"
@@ -22252,6 +22263,10 @@ msgstr "新しい AI の勢力"
 #, fuzzy
 msgid "Factions"
 msgstr "勢力"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -26622,6 +26637,10 @@ msgstr "インストール中…"
 #, fuzzy
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr "このプラットフォームに合うエンジンを、設定したコンテンツフォルダーの <0>engine/</0> ディレクトリにインストールします（インストール先は<1>コンテンツフォルダーの設定</1>で設定します）。"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -35083,6 +35102,7 @@ msgstr "オフ：ユニットのスクリプトで AimWeapon() が戻るまで�
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Offence"
 msgstr "攻撃"
@@ -35691,6 +35711,10 @@ msgstr ""
 msgid "Open another file"
 msgstr "別のファイルを開く"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr ""
+
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Open backup"
 msgstr ""
@@ -36230,6 +36254,7 @@ msgstr "その他"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
 msgstr "その他"
@@ -41639,6 +41664,7 @@ msgstr "S3O Blender Tools"
 
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Salvage"
 msgstr "サルベージ"
@@ -45397,9 +45423,8 @@ msgid "Speed, elmos a second"
 msgstr "速度（elmo/秒）"
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Spend at depots"
-msgstr "倉庫で使う"
+msgid "Spend at <0><1/>depots</0>"
+msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -46857,11 +46882,6 @@ msgstr "チーム"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "チームとボット"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Tech {techNumeral}"
-msgstr "技術 {techNumeral}"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -50178,10 +50198,6 @@ msgstr "このリプレイのゲームのユニットを読み込めなかった
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "このリプレイのゲームのユニットを読み込めなかったため、どの完成ユニットが建物かわかりません。このレイヤーにはゲームのインストールが必要です。"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more."
-msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53807,10 +53823,6 @@ msgstr "解放したユニット"
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 msgstr "この交戦で使えるユニット。勢力の建設ツリーの中で点灯表示され、制限されたユニットは消灯したままです。"
 
-#: src/runlite/pages/RunPage.tsx
-msgid "Units you can build, lit up against the faction's full build tree."
-msgstr ""
-
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #, fuzzy
 msgid "unitsync couldn't enumerate its units — the game's own def files errored while loading: {infoError}"
@@ -53926,11 +53938,6 @@ msgstr "ロック解除"
 #, fuzzy
 msgid "unlock the room"
 msgstr "ルームのロックを解除"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "unlocked"
-msgstr "解放済み"
 
 #. placeholder {0}: option.unitName
 #: src/runlite/progress.ts
@@ -54646,11 +54653,6 @@ msgstr "ゲームファイルの動画"
 msgid "View"
 msgstr "表示"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View arsenal tree"
-msgstr "兵器ツリーを表示"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "View available units"
@@ -54688,11 +54690,6 @@ msgstr "結果を表示"
 #, fuzzy
 msgid "View tech tree"
 msgstr "技術ツリーを表示"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View the arsenal tech tree"
-msgstr "兵器の技術ツリーを表示"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -56984,10 +56981,6 @@ msgstr ""
 #, fuzzy
 msgid "Your best: {best}. {attempts}."
 msgstr "自己ベスト：{best}。{attempts}。"
-
-#: src/runlite/pages/components/RunHud.tsx
-msgid "Your build list"
-msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy

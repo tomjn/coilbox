@@ -251,6 +251,9 @@ export function StatCard({
   action,
   children,
   className,
+  grow = true,
+  lead,
+  labelInk,
 }: {
   icon?: ReactNode;
   label: string;
@@ -260,15 +263,18 @@ export function StatCard({
   action?: ReactNode;
   children?: ReactNode;
   className?: string;
+  /** Stretch to share the row. Pass false for a tile sized to its content. */
+  grow?: boolean;
+  /** Something to the left of the whole tile body, such as an emblem. */
+  lead?: ReactNode;
+  /** A text colour class for the label, in place of the accent's. */
+  labelInk?: string;
 }) {
-  return (
-    <BracketFrame
-      accent={accent}
-      className={`min-w-[8.5rem] flex-1 px-3 py-2 ${className ?? ""}`}
-    >
+  const body = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <span
-          className={`flex items-center gap-1.5 font-display text-[10px] font-medium uppercase tracking-[0.18em] ${LABEL[accent]}`}
+          className={`flex items-center gap-1.5 font-display text-[10px] font-medium uppercase tracking-[0.18em] ${labelInk ?? LABEL[accent]}`}
         >
           {icon}
           {label}
@@ -288,6 +294,21 @@ export function StatCard({
         {value}
       </div>
       {children}
+    </>
+  );
+  return (
+    <BracketFrame
+      accent={accent}
+      className={`${grow ? "min-w-[8.5rem] flex-1" : "flex-none"} px-3 py-2 ${className ?? ""}`}
+    >
+      {lead ? (
+        <div className="flex items-center gap-3">
+          {lead}
+          <div className="min-w-0 flex-1">{body}</div>
+        </div>
+      ) : (
+        body
+      )}
     </BracketFrame>
   );
 }
