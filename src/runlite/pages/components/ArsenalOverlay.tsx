@@ -136,7 +136,7 @@ export function ArsenalOverlay({
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
-      <BracketFrame className="flex max-h-full w-[60rem] max-w-full flex-col gap-4 p-6">
+      <BracketFrame className="flex max-h-full w-[60rem] max-w-full flex-col gap-3 p-5">
         <BackToMapButton
           onClick={onClose}
           className="absolute right-full top-0 mr-4"
@@ -150,23 +150,23 @@ export function ArsenalOverlay({
             {count}
           </span>
         </header>
-        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
+        <div className="flex min-h-0 flex-wrap content-start gap-x-8 gap-y-4 overflow-y-auto pr-1">
           {groups.map(({ group, units: list }) => (
             <section key={group} className="flex flex-col gap-2">
               <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {heading(group)} ({list.length})
               </h2>
-              <ul className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
+              <ul className="flex flex-wrap gap-2">
                 {list.map((u) => (
                   <li
                     key={u.name}
-                    className="flex flex-col items-center gap-1.5 text-center"
+                    className="flex w-20 flex-col items-center gap-1 text-center"
                   >
                     <BuildPic
                       display={pics?.units[u.name.toLowerCase()]}
                       pending={picsPending}
                     />
-                    <span className="text-xs leading-tight">
+                    <span className="text-[11px] leading-tight">
                       {u.fullName?.trim() || u.name}
                     </span>
                   </li>
@@ -180,7 +180,7 @@ export function ArsenalOverlay({
   );
 }
 
-/** A 96px build picture, a pulsing box while the pictures load, or a labelled box when the game has none. */
+/** A 64px build picture, a pulsing box while the pictures load, or a labelled box when the game has none. */
 function BuildPic({
   display,
   pending,
@@ -188,7 +188,7 @@ function BuildPic({
   display?: Parameters<typeof unitIconSrc>[0];
   pending: boolean;
 }) {
-  const box = "size-24 shrink-0 rounded";
+  const box = "size-16 shrink-0 rounded";
   const src = unitIconSrc(display);
   if (src) {
     return (
