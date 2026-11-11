@@ -22,8 +22,13 @@ const CONTACT_FROM = 2.9;
 const CONTACT_OVER = 1.5;
 /** The darkening at the crag's foot, at its strongest. */
 const CONTACT = 0.42;
-/** How dark the landmark's shadow falls on the ground. */
-const SHADOW = 0.5;
+/**
+ * How dark the landmark's shadow falls on the ground. Past the crag it fades
+ * out, so the tower's head never throws a lone dark shape onto open ground.
+ */
+const SHADOW = 0.35;
+const SHADOW_FADE_FROM = 3.0;
+const SHADOW_FADE_TO = 4.2;
 /** Where the selection ring is drawn, as a share of the landmark's reach. */
 const RING_AT = 0.92;
 /**
@@ -162,10 +167,11 @@ float shaded() {
   if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 0.0;
   vec2 texel = 1.0 / vec2(textureSize(uShadow, 0));
   float dark = 0.0;
-  for (int i = -1; i <= 1; i++)
-    for (int j = -1; j <= 1; j++)
-      dark += 1.0 - step(p.z - 0.002, texture2D(uShadow, p.xy + vec2(i, j) * texel).r);
-  return dark / 9.0;
+  // Five by five samples two texels apart, for a soft edge.
+  for (int i = -2; i <= 2; i++)
+    for (int j = -2; j <= 2; j++)
+      dark += 1.0 - step(p.z - 0.002, texture2D(uShadow, p.xy + vec2(i, j) * texel * 2.0).r);
+  return dark / 25.0;
 }
 
 void main() {
@@ -173,7 +179,8 @@ void main() {
   float r = dist / uScale;
   float t = clamp((r - ${CONTACT_FROM.toFixed(3)}) / ${CONTACT_OVER.toFixed(3)}, 0.0, 1.0);
   float contact = ${CONTACT.toFixed(3)} * (1.0 - t) * (1.0 - t);
-  float dark = max(contact, ${SHADOW.toFixed(3)} * shaded()) * (uHidden > 0.5 ? 0.7 : 1.0);
+  float thrown = ${SHADOW.toFixed(3)} * shaded() * (1.0 - smoothstep(${SHADOW_FADE_FROM.toFixed(3)}, ${SHADOW_FADE_TO.toFixed(3)}, r));
+  float dark = max(contact, thrown) * (uHidden > 0.5 ? 0.7 : 1.0);
   // The town shader's ring, the same width in the same units.
   float foot = fwidth(dist);
   float ringW = max(0.035, foot * 1.3) * (1.0 + 1.2 * uRingThick);

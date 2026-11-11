@@ -73,11 +73,11 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [176, 98, 66],
     topCover: 0.3,
     lamp: [255, 190, 140],
-    shield: [240, 150, 110],
+    shield: [200, 150, 128],
   },
   moon: {
-    concrete: [150, 150, 154],
-    armour: [122, 122, 128],
+    concrete: [154, 152, 150],
+    armour: [126, 124, 122],
     trim: [50, 50, 56],
     rock: [104, 104, 110],
     top: [180, 180, 186],
@@ -103,7 +103,7 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [150, 142, 88],
     topCover: 0.35,
     lamp: [240, 236, 170],
-    shield: [200, 220, 120],
+    shield: [176, 184, 140],
   },
 };
 

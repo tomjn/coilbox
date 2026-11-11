@@ -56,7 +56,7 @@ varying float vUp;
 void main() {
   float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0);
   float foot = smoothstep(0.13, 0.0, vUp);
-  gl_FragColor = vec4(tint * (rim * 0.4 + foot * 0.1 + 0.015), 1.0);
+  gl_FragColor = vec4(tint * (rim * 0.4 + foot * 0.05 + 0.0075), 1.0);
 }`,
   });
   const mesh = new THREE.Mesh(g, m);
