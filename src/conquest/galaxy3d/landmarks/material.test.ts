@@ -9,7 +9,7 @@ describe("landmarkMaterial", () => {
     const m = landmarkMaterial();
     for (const name of [
       "uSun",
-      "uAmbient",
+      "uSunLight",
       "uSky",
       "uGroundBounce",
       "uShadow",

@@ -4,23 +4,20 @@
  *
  * It lights itself rather than taking the scene's lights, because a run's map
  * adds a low raking light for its stations that the ground never sees. The
- * sun and the ambient share are the terrain shader's, so level concrete is
- * lit as level ground is.
+ * sun comes from the terrain's direction. Its strength and the sky's are the
+ * lights the approved look was drawn under: a sun of 2.7 and a sky of 1.5, as
+ * three.js lights a rough surface with them.
  */
 import * as THREE from "three";
-import { SHADE_AMBIENT, TERRAIN_SUN } from "../terrain";
+import { TERRAIN_SUN } from "../terrain";
 
-/** Colours the faces turned away from the sun take: sky above, ground below. */
-const SKY = new THREE.Color(0xcfe0ff);
-const GROUND_BOUNCE = new THREE.Color(0x6a5a48);
+/** The light a surface facing the sun takes, as three.js lights a rough one. */
+const SUN_LIGHT = new THREE.Color(0xfff4e2).multiplyScalar(2.7 / Math.PI);
+/** The light from the sky above and the ground below, likewise. */
+const SKY = new THREE.Color(0xcfe0ff).multiplyScalar(1.5 / Math.PI);
+const GROUND_BOUNCE = new THREE.Color(0x6a5a48).multiplyScalar(1.5 / Math.PI);
 /** The town shader's anomaly haze, `townShader.ts`. */
 const MIST = new THREE.Vector3(0.16, 0.12, 0.24);
-
-/** Scale a colour so its channels average 1, keeping only its tint. */
-const tintOf = (c: THREE.Color, level: number) => {
-  const mean = (c.r + c.g + c.b) / 3;
-  return new THREE.Vector3(c.r, c.g, c.b).multiplyScalar(level / mean);
-};
 
 const VERTEX = /* glsl */ `
 attribute float kind;
@@ -49,7 +46,7 @@ void main() {
 
 const FRAGMENT = /* glsl */ `
 uniform vec3 uSun;
-uniform float uAmbient;
+uniform vec3 uSunLight;
 uniform vec3 uSky;
 uniform vec3 uGroundBounce;
 uniform sampler2D uShadow;
@@ -134,8 +131,8 @@ void main() {
 
   vec3 w = normalize(vWorldNormal);
   vec3 hemi = mix(uGroundBounce, uSky, w.y * 0.5 + 0.5);
-  float facing = max(dot(w, uSun), 0.0) / uSun.y;
-  vec3 colour = base * (uAmbient * hemi + (1.0 - uAmbient) * facing * sunlit());
+  float facing = max(dot(w, uSun), 0.0);
+  vec3 colour = base * (hemi + uSunLight * facing * sunlit());
 
   // Hidden by fog, drawn dim and grey as a hidden town is.
   if (uHidden > 0.5)
@@ -160,9 +157,9 @@ export function landmarkMaterial(
     depthWrite: !opts.transparent,
     uniforms: {
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
-      uAmbient: { value: SHADE_AMBIENT },
-      uSky: { value: tintOf(SKY, 1.05) },
-      uGroundBounce: { value: tintOf(GROUND_BOUNCE, 0.75) },
+      uSunLight: { value: SUN_LIGHT.clone() },
+      uSky: { value: SKY.clone() },
+      uGroundBounce: { value: GROUND_BOUNCE.clone() },
       uShadow: { value: null },
       uShadowMatrix: { value: new THREE.Matrix4() },
       uShadowOn: { value: 0 },

@@ -40,6 +40,8 @@ const FADE_FROM = 2.6;
 const FADE_OVER = 0.9;
 /** How far the crag's outermost row sinks below the ground. */
 const EDGE_SINK = 0.03;
+/** How far up the crag's fall the ground's colour reaches, 0 at its foot to 1 at its top. */
+const BLEND_UP_TO = 0.4;
 /** The crag's height under the block. */
 const LIFT = 0.8;
 
@@ -127,7 +129,8 @@ export function buildStronghold(
         return 1 - Math.min(1, Math.max(0, (r - FADE_FROM) / FADE_OVER));
       },
       blend: edgeColour,
-      blendWeight: (x, z) => 1 - fallAt(x, z),
+      // Only the foot of the crag takes the ground's colour. Its slopes stay rock.
+      blendWeight: (x, z) => 1 - smooth(0, BLEND_UP_TO, fallAt(x, z)),
     },
     "crag",
   );
