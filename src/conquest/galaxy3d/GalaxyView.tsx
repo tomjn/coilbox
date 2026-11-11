@@ -849,6 +849,7 @@ export function GalaxyView({
       flowEnabled,
       chevrons,
       layoutChevrons,
+      placeChevrons,
       cores,
       coronaSprites,
       ownerRingMats,
@@ -1028,6 +1029,11 @@ export function GalaxyView({
             crossingPlan && ground ? { plan: crossingPlan, ground } : undefined,
             terrainBiomes?.planet !== undefined &&
               planetOf(terrainBiomes.planet).sea.crossing === "solid",
+            // A run's open choices get travelling chevrons along their road
+            // or crossing. A terrain map has no straight lanes to lay them on.
+            laneFlow && ground
+              ? { roads: ground.roads, place: placeChevrons }
+              : undefined,
           )
         : undefined;
 
