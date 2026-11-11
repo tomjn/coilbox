@@ -68,9 +68,9 @@ Levelling runs when towns are drawn: on a generated map, and on a hand-made map 
 `levelGround(grids, towns, frame)` returns new grids and leaves its inputs alone, because the generated pixels are shared.
 
 - It levels three grids alike: the map's heights, the wider heights that carry the land past the map's edge, and the relief the light is worked out from. A grid left out is skipped.
-- A town's level is the mean height of the dry land inside its edge, read from the map's heights.
-- Inside 0.95 of the town's edge the ground is flat at that level. From there to 1.7 times the edge it eases back to the land's own height. These are the spike's values and are tuned on screen.
-- Where two towns' skirts overlap, a point is pulled towards each town's level in proportion to each town's pull, so the result does not depend on the order of the towns.
+- Inside 0.95 of the town's edge the ground is flat at the town's level. From there to 1.7 times the edge it eases back to the land's own height. These are the spike's values and are tuned on screen.
+- A town's level is the mean height of the dry land in that flat part, read from the map's heights.
+- Where two towns' skirts overlap, a point is pulled towards each town's level, each by its own pull less the other's, so the result does not depend on the order of the towns. Where a neighbour's skirt reaches a town's flat part, that part keeps the town's own level.
 - Sea is never raised and land is never lowered to sea.
 - A location that a landmark is expected to stand on is not levelled. If the landmark then finds no site and the town is drawn after all, its buildings stand on the raw ground and the layout's slope rule applies.
 
