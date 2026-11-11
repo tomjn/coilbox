@@ -71,6 +71,8 @@ describe("buildLandmarkLayer", () => {
     const { layer } = build();
     expect([...layer.nodes]).toEqual([1]);
     expect(layer.anchors).toHaveLength(1);
+    // Its top is above the ground it stands on.
+    expect(layer.tops.get(1)).toBeGreaterThan(0);
   });
 
   it("stands no bigger than its design, and is never picked", () => {

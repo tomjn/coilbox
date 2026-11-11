@@ -1010,6 +1010,7 @@ export function GalaxyView({
               setRoadStyle: ground.setRoadStyle,
               setTownStyle: towns?.setTownStyle,
               setLandmarkStyle: landmarks?.setStyle,
+              landmarkTops: landmarks?.tops,
               towns: towns?.towns,
               commit: () => {
                 ground?.commit();
