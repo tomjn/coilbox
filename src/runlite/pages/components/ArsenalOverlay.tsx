@@ -154,7 +154,7 @@ export function ArsenalOverlay({
           {groups.map(({ group, units: list }) => (
             <section
               key={group}
-              className="flex flex-col gap-2 rounded-md border border-border/60 p-3"
+              className="flex flex-col gap-2 rounded-md border border-muted-foreground/50 bg-foreground/[0.03] p-3"
             >
               <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {heading(group)} ({list.length})
