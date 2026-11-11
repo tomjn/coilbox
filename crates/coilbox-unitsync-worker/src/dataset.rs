@@ -323,6 +323,13 @@ local function stats_of(d, wdefs)
     local cells = string.lower(yard):gsub('^h', '')
     put_flag('needGeo', cells:find('[gj]') ~= nil)
   end
+  -- Zero-K pays income from a gadget: its unitdefs_post moves `energymake` and
+  -- `metalmake` into these customparams and zeroes the engine's own, and marks
+  -- an extractor with `metal_extractor_mult`.
+  local cp = lowered(u['customparams'])
+  put('incomeEnergy', stat(cp, 'income_energy'))
+  put('incomeMetal', stat(cp, 'income_metal'))
+  put('metalExtractorMult', stat(cp, 'metal_extractor_mult'))
   return '{' .. table.concat(parts, ',') .. '}'
 end
 
@@ -2753,6 +2760,27 @@ mod tests {
         assert_eq!(by("hires")["needGeo"], serde_json::json!(false));
         assert_eq!(by("plain")["needGeo"], serde_json::json!(false));
         assert!(!by("plane").contains_key("needGeo"));
+    }
+
+    /// Zero-K's unitdefs_post moves a unit's income into customparams and
+    /// zeroes the engine's keys, so the dataset reads it from there.
+    #[test]
+    fn zero_k_income_is_read_from_customparams() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                solar = { energymake = 0, customParams = { income_energy = 2 } },
+                mex = { customparams = { metal_extractor_mult = '1', income_metal = 0.5 } },
+              },
+              weapondefs = {},
+            }"#,
+        );
+        let by = |name: &str| units.iter().find(|u| u.name == name).expect("unit present");
+
+        assert_eq!(stat(by("solar"), "incomeEnergy"), Some(2.0));
+        assert_eq!(stat(by("mex"), "metalExtractorMult"), Some(1.0));
+        assert_eq!(stat(by("mex"), "incomeMetal"), Some(0.5));
+        assert_eq!(stat(by("solar"), "metalExtractorMult"), None);
     }
 
     /// A negative upkeep is income in the engine, so it travels as written

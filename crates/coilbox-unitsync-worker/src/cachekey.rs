@@ -83,8 +83,10 @@ use std::path::{Path, PathBuf};
 /// that, so a blob cached under v26 has no edge out of a starting commander.
 /// v28: the dataset now reports `canFly`, `isFeature` and `needGeo`, which a
 /// warpath's starting build list is chosen by, and a blob cached under v27 has
-/// none of them.
-pub const INFO_CACHE_VERSION: u32 = 28;
+/// none of them. v29: the dataset now reports Zero-K's income and extractor
+/// customparams, and a blob cached under v28 has none, which leaves a Zero-K
+/// warpath with no energy building or extractor to start with.
+pub const INFO_CACHE_VERSION: u32 = 29;
 
 /// Salts the unit model cache's keys and file names. Bump when the way a model
 /// is flattened or a texture is transcoded changes, so every entry is read again.
@@ -414,9 +416,9 @@ mod tests {
 
     #[test]
     fn a_game_s_keys_are_the_ones_the_worker_wrote_before() {
-        assert_eq!(game_key(&game()), "e00185ec58278958");
-        assert_eq!(dataset_key(&game()), "b2e98077a6b6ab8b");
-        assert_eq!(archive_hash_key(&game()), "770f0b6a0077cd27");
+        assert_eq!(game_key(&game()), "5e4d1d57c7d59568");
+        assert_eq!(dataset_key(&game()), "b9453dbd5f2308ef");
+        assert_eq!(archive_hash_key(&game()), "7a7c7c8a57358dbd");
         assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
@@ -428,11 +430,11 @@ mod tests {
         let map = map();
         assert_eq!(
             map_info_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("839ea9c0293d2f5c")
+            Some("9c35d019e23a9b7d")
         );
         assert_eq!(
             map_meta_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("3ba5249696ea9e05")
+            Some("b10428bd260acafe")
         );
         assert_eq!(
             thumb_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -444,11 +446,11 @@ mod tests {
     fn a_map_with_no_archive_path_keys_on_its_name_and_file() {
         assert_eq!(
             map_info_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("nd5a974c4b3b21a54")
+            Some("n9102634a1472817e")
         );
         assert_eq!(
             map_meta_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n8424eb56c5befaab")
+            Some("n0a29e31e49eed373")
         );
         assert_eq!(
             thumb_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -520,8 +522,8 @@ mod tests {
             13,
             1_700_000_000,
         );
-        assert_eq!(skirmish_key(&engine, Some(&game())), "a80b96698a639e576");
-        assert_eq!(skirmish_key(&engine, None), "a389cdf061e42e341");
+        assert_eq!(skirmish_key(&engine, Some(&game())), "ab0b52a26a7a185a0");
+        assert_eq!(skirmish_key(&engine, None), "a15e70cd985d2a6ca");
     }
 
     #[test]
