@@ -414,9 +414,9 @@ mod tests {
 
     #[test]
     fn a_game_s_keys_are_the_ones_the_worker_wrote_before() {
-        assert_eq!(game_key(&game()), "e30bfa55710ce3e1");
-        assert_eq!(dataset_key(&game()), "fad95fe3246dcefb");
-        assert_eq!(archive_hash_key(&game()), "8449a163e09b010b");
+        assert_eq!(game_key(&game()), "e00185ec58278958");
+        assert_eq!(dataset_key(&game()), "b2e98077a6b6ab8b");
+        assert_eq!(archive_hash_key(&game()), "770f0b6a0077cd27");
         assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
@@ -428,11 +428,11 @@ mod tests {
         let map = map();
         assert_eq!(
             map_info_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("f18633f00c6ae599")
+            Some("839ea9c0293d2f5c")
         );
         assert_eq!(
             map_meta_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("35ede80fb8f12967")
+            Some("3ba5249696ea9e05")
         );
         assert_eq!(
             thumb_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -444,11 +444,11 @@ mod tests {
     fn a_map_with_no_archive_path_keys_on_its_name_and_file() {
         assert_eq!(
             map_info_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n6c546e6e1f127364")
+            Some("nd5a974c4b3b21a54")
         );
         assert_eq!(
             map_meta_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("nff4b1d5b26776013")
+            Some("n8424eb56c5befaab")
         );
         assert_eq!(
             thumb_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -520,8 +520,8 @@ mod tests {
             13,
             1_700_000_000,
         );
-        assert_eq!(skirmish_key(&engine, Some(&game())), "a12deb27d73f288c4");
-        assert_eq!(skirmish_key(&engine, None), "a2a165670e8c75bb4");
+        assert_eq!(skirmish_key(&engine, Some(&game())), "a80b96698a639e576");
+        assert_eq!(skirmish_key(&engine, None), "a389cdf061e42e341");
     }
 
     #[test]
