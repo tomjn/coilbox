@@ -220,3 +220,16 @@ A depot is three groups on level slabs cut into the ground: a comms building in 
 Depots are painted metal, not cast stone, and wear the same paint on every planet. Only the slab's stone and what settles on top (snow, sand, ash) come from the planet. Three surface kinds were added for them: 11 painted plate with seams, 12 painted with none (tanks, domes, dishes) and 13 bare metal. The material gives all three a sun glint and a sky sheen at glancing angles, and wears the paint through in scuffs when seen close. The builder weathers them less than stone.
 
 The mast and the dome carry one small red beacon. Nothing else glows.
+
+## Landing pad
+
+A run's starting point stands as a landing pad in place of its town. `mapRunIdentities` gives the `start` node `landmark: "landing"`, so a map has exactly one.
+
+The pad is a wide eight-sided deck with blue painted markings, and a round control tower standing off one back corner with a dish and a mast. Where the start lies picks one of four:
+
+- the deck, from `LANDING_PADS`: raised on a central pedestal with buttresses and four legs, or flush on a cast foundation cut into the slope
+- the towers, from `LANDING_TOWERS`: one, or a second smaller one off the other back corner
+
+It also picks which side the main tower stands and where the dish points.
+
+Like a depot it is painted metal and wears the same paint on every planet. Only the foundation's stone and what settles on top come from the planet. The mast carries one small red beacon and nothing else is lit. It takes a capital's share of the gap to its neighbours, because the start is a capital.
