@@ -197,7 +197,9 @@ Two PRs, so the stronghold is not held back by the ruin's review.
 
 Added after the ruin, from seven reference images the user gave on 11 November 2026. Six more kinds of anomaly, each a single worn mass standing in its own rubble: a monolith, a shard of plate sunk at a slant, a gate (a fluted slab with a round hole through it), an overhang (a stem carrying a head out past its foot) a stump (a banded drum on roots) and a sphere (a cracked ball sunk to its waist, with a hole bored into it, added from an eighth image the same day). The monolith has three forms, an obelisk, a slotted tower and a panelled stele.
 
-- A run deals each kind to one event stop at most, shuffled by the run's seed, so no map shows the same anomaly twice. Event stops beyond the seven kinds keep their town in mist.
+- A run deals each kind to one event stop at most, shuffled by the run's seed, so no map shows the same anomaly twice.
+- A bigger run has more event stops than kinds. Those stops get each standing kind once more as a group: two smaller ones of the kind standing together, one bigger than the other. The sphere comes as three and the monolith as two or three. The ruin has no group. Each member is the same model at its own seed, size and place, built of a coarser mesh the smaller it is.
+- Event stops beyond those thirteen, or twelve on a moon, keep their town in mist.
 - The node's id and position seed the model, which varies its proportions, lean and what has broken off.
 - Unlike the ruin they stand on a moon. A moon run is dealt only these six, so no event stop is spent on a ruin that would not be built.
 - The sphere is `kind` 10, the same skin worn smooth: few cracks, no beds and no pits, because the full relief made a ball that size look like a golf ball.

@@ -443,25 +443,38 @@ describe("a land run's live state", () => {
       col: 1,
       row: 9 + n,
     });
-    const stops = Array.from({ length: 8 }, (_, n) => odd(n));
+    const standing = ANOMALY_KINDS.filter((k) => k !== "ruin");
+    const stops = Array.from({ length: 16 }, (_, n) => odd(n));
     const r = { ...run(), nodes: [...run().nodes, ...stops] };
     const at = new Map(stops.map((n) => [n.id, `place-${n.id}`]));
-    const dealt = (ids: Map<string, { landmark?: string }>) =>
-      [...ids].flatMap(([k, v]) => (v.landmark ? [`${k}:${v.landmark}`] : []));
+    const dealt = (
+      ids: Map<string, { landmark?: string; landmarkGroup?: boolean }>,
+      group = false,
+    ) =>
+      [...ids].flatMap(([k, v]) =>
+        v.landmark && !!v.landmarkGroup === group ? [`${k}:${v.landmark}`] : [],
+      );
     const once = dealt(mapRunIdentities(r, at));
     expect(once.map((d) => d.split(":")[1]).sort()).toEqual(
       [...ANOMALY_KINDS].sort(),
+    );
+    // Stops beyond the kinds get each standing kind once more, as a group.
+    const groups = dealt(mapRunIdentities(r, at), true);
+    expect(groups.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...standing].sort(),
     );
     expect(dealt(mapRunIdentities(r, at))).toEqual(once);
     // The stops left over keep their town in the haze.
     const ids = mapRunIdentities(r, at);
     const plain = [...ids.values()].filter((v) => v.mist && !v.landmark);
-    expect(plain).toHaveLength(stops.length - ANOMALY_KINDS.length);
+    expect(plain).toHaveLength(
+      stops.length - ANOMALY_KINDS.length - standing.length,
+    );
     expect(dealt(mapRunIdentities(run(), new Map()))).toEqual([]);
     // A moon never had a castle, so it is dealt only the kinds that stand there.
     const moon = dealt(mapRunIdentities(r, at, undefined, "moon"));
     expect(moon.map((d) => d.split(":")[1]).sort()).toEqual(
-      ANOMALY_KINDS.filter((k) => k !== "ruin").sort(),
+      [...standing].sort(),
     );
   });
 

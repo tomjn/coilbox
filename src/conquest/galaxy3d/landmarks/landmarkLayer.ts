@@ -74,7 +74,10 @@ export function buildLandmarkLayer(
   galaxy: Pick<GalaxyDoc, "nodes" | "links">,
   playerFactionId: string,
   identities:
-    | ReadonlyMap<string, { landmark?: AnomalyKind; end?: string }>
+    | ReadonlyMap<
+        string,
+        { landmark?: AnomalyKind; landmarkGroup?: boolean; end?: string }
+      >
     | undefined,
   planet: PlanetId | undefined,
   colour: TerrainColourReader | undefined,
@@ -140,6 +143,7 @@ export function buildLandmarkLayer(
             // lies picks the variation.
             hashString(`${node.id}:${node.pos[0]}:${node.pos[1]}`),
             edge,
+            identities?.get(node.id)?.landmarkGroup,
           );
 
     const group = new THREE.Group();

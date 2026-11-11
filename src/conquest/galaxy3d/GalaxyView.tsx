@@ -149,6 +149,8 @@ export interface NodeIdentity {
    * the town. See landmarks/landmarkLayer.ts.
    */
   landmark?: AnomalyKind;
+  /** The anomaly is a group of smaller ones of its kind, not the one. */
+  landmarkGroup?: boolean;
 }
 
 /** A label's icon slot and the icon React draws into it. */

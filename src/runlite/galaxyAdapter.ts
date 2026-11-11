@@ -644,21 +644,28 @@ export function mapRunIdentities(
     });
   }
   // Each kind of anomaly is one of a kind. The run's seed deals them out, one
-  // to a stop, and any stop left over keeps its town in the haze.
+  // to a stop, and any stop still left over keeps its town in the haze.
   const rng = mulberry32(run.settings.seed);
   const events = shuffled(
     rng,
     run.nodes.filter((n) => n.type === "event"),
   );
-  const kinds = shuffled(
-    rng,
-    ANOMALY_KINDS.filter((k) => planet !== "moon" || k !== "ruin"),
-  );
-  for (const [k, kind] of kinds.entries()) {
+  const standing = ANOMALY_KINDS.filter((k) => k !== "ruin");
+  const kinds = shuffled(rng, planet === "moon" ? standing : ANOMALY_KINDS);
+  // A bigger run has more stops than kinds. Those get each standing kind
+  // once more, as a group of smaller ones.
+  const deal: Pick<NodeIdentity, "landmark" | "landmarkGroup">[] = [
+    ...kinds.map((landmark) => ({ landmark })),
+    ...shuffled(rng, standing).map((landmark) => ({
+      landmark,
+      landmarkGroup: true,
+    })),
+  ];
+  for (const [k, dealt] of deal.entries()) {
     const n = events[k];
     if (!n) break;
     const at = locations.get(n.id) ?? n.id;
-    out.set(at, { ...out.get(at), landmark: kind });
+    out.set(at, { ...out.get(at), ...dealt });
   }
   return out;
 }
