@@ -5,6 +5,7 @@ import {
   type LucideIcon,
   ShieldQuestionMark,
   Split,
+  Store,
 } from "lucide-react";
 import type {
   NodeBodyKind,
@@ -69,7 +70,7 @@ const TYPE_ICON: Partial<Record<RunNodeType, LucideIcon>> = {
   elite: HandFist,
   event: Split,
   reward: CircuitBoard,
-  shop: CircuitBoard,
+  shop: Store,
 };
 
 /**

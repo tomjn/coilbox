@@ -3,6 +3,7 @@ import {
   HandFist,
   ShieldQuestionMark,
   Split,
+  Store,
 } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { mapCues } from "../conquest/galaxy3d/mapCues";
@@ -416,7 +417,7 @@ describe("a land run's live state", () => {
     expect(ids.get("elite")?.icon).toBe(HandFist);
     expect(ids.get("event")?.icon).toBe(Split);
     expect(ids.get("reward")?.icon).toBe(CircuitBoard);
-    expect(ids.get("shop")?.icon).toBe(CircuitBoard);
+    expect(ids.get("shop")?.icon).toBe(Store);
     expect(ids.get(run().nodes[0].id)?.icon).toBeUndefined();
   });
 
