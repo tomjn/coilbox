@@ -6,14 +6,16 @@ const flat = () => 0;
 const slope = (x: number, z: number) => 0.2 * x - 0.1 * z;
 const SEEDS = Array.from({ length: 60 }, (_, i) => i + 1);
 const palette = depotPalette("temperate");
+// Built once and shared, because 60 depots take over a second to build.
+const onFlat = SEEDS.map((seed) => buildDepot(flat, palette, seed));
+const onSlope = SEEDS.map((seed) => buildDepot(slope, palette, seed));
 
 describe("buildDepot", () => {
   it.each([
-    ["flat", flat],
-    ["sloping", slope],
-  ])("stays whole and inside its reach on %s ground", (_, ground) => {
-    for (const seed of SEEDS) {
-      const { built } = buildDepot(ground, palette, seed);
+    ["flat", onFlat],
+    ["sloping", onSlope],
+  ])("stays whole and inside its reach on %s ground", (_, depots) => {
+    for (const { built } of depots) {
       const pos = built.solid.getAttribute("position");
       expect(pos.array.every(Number.isFinite)).toBe(true);
       let far = 0;
@@ -25,8 +27,8 @@ describe("buildDepot", () => {
   });
 
   it("stands its comms building on the ground, well above the crates", () => {
-    for (const seed of SEEDS) {
-      const tower = buildDepot(flat, palette, seed).built.bounds("tower");
+    for (const { built } of onFlat) {
+      const tower = built.bounds("tower");
       if (!tower) throw new Error("no comms building");
       expect(tower.min.y).toBeGreaterThan(0);
       expect(tower.max.y).toBeGreaterThan(0.6);
@@ -35,9 +37,8 @@ describe("buildDepot", () => {
   });
 
   it("builds every comms building and every kind of storage", () => {
-    const depots = SEEDS.map((seed) => buildDepot(flat, palette, seed));
-    expect(new Set(depots.map((d) => d.comms))).toEqual(new Set(DEPOT_COMMS));
-    expect(new Set(depots.map((d) => d.store))).toEqual(new Set(DEPOT_STORES));
+    expect(new Set(onFlat.map((d) => d.comms))).toEqual(new Set(DEPOT_COMMS));
+    expect(new Set(onFlat.map((d) => d.store))).toEqual(new Set(DEPOT_STORES));
   });
 
   it("builds the same depot from the same seed", () => {
