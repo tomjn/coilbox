@@ -391,7 +391,7 @@ function buildBlockBake(
  */
 export function townsOnRoads(
   galaxy: GalaxyDoc,
-  surface: TerrainSurface,
+  surface: Pick<TerrainSurface, "mapToWorldXZ">,
   roads: RoadLine[],
 ): { towns: Town[]; roads: RoadLine[] } {
   const toWorld = (x: number, y: number) => surface.mapToWorldXZ(x, y);

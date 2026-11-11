@@ -21,12 +21,11 @@ import {
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
-import { planCrossings } from "./crossingPlan";
 import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
-import { buildGroundLayer, type GroundLayer } from "./groundLayer";
+import { type GroundLayer, paintGround } from "./groundLayer";
 import {
   type LabelElement,
   type LabelInput,
@@ -38,9 +37,11 @@ import type { RunLandmark } from "./landmarks/kinds";
 import {
   buildLandmarkLayer,
   type LandmarkLayer,
+  landmarkNodes,
   terrainColourReader,
 } from "./landmarks/landmarkLayer";
 import { hashString } from "./layout";
+import { layoutLevelledMap } from "./levelledMap";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
 import {
@@ -55,7 +56,6 @@ import {
   cameraFloorAt,
   clampPanToSheet,
   createMarginSurface,
-  layoutStrategicMap,
   TERRAIN_MAX_SEGMENTS,
   terrainCameraLimits,
   terrainSpecOf,
@@ -68,8 +68,7 @@ import {
 } from "./terrainLoad";
 import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
-import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
-import type { Town } from "./towns";
+import { buildTownLayer, type TownLayer } from "./townLayer";
 import { createVisibility } from "./visibility";
 
 /**
@@ -689,11 +688,27 @@ export function GalaxyView({
 
     // `surface` is set for a terrain map only. A galaxy or theatre map has
     // none and takes the same layout it always has.
-    const { skin, extent, positions, bounds, surface } = layoutStrategicMap(
-      galaxy,
-      terrainHeights,
-      performanceMode ? TERRAIN_MAX_SEGMENTS / 2 : TERRAIN_MAX_SEGMENTS,
-    );
+    // Towns on a generated map, and on a hand-made map whose manifest asks
+    // for them, since the author's picture may show its own. Performance
+    // mode goes without. The ground is levelled under each town the map
+    // draws, so everything below stands on `map.heights`, not the raw grid.
+    const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
+    const map = layoutLevelledMap(galaxy, terrainHeights, terrainExtension, {
+      maxSegments: performanceMode
+        ? TERRAIN_MAX_SEGMENTS / 2
+        : TERRAIN_MAX_SEGMENTS,
+      drawTowns,
+      // Rivers are drawn with the detail, which performance mode leaves
+      // out, so there no road goes round them and none is bridged.
+      routeRivers: !performanceMode,
+      skip: landmarkNodes(
+        galaxy.nodes,
+        playerFactionId,
+        identities,
+        terrainBiomes?.planet,
+      ),
+    });
+    const { skin, extent, positions, bounds, surface } = map.layout;
     const nodeIds = galaxy.nodes.map((n) => n.id);
     const factionColor = new Map(
       galaxy.factions.map((f) => [f.id, new THREE.Color(f.color)]),
@@ -764,39 +779,21 @@ export function GalaxyView({
     let landmarks: LandmarkLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
     // the roads. See crossingPlan.ts.
-    const crossingPlan = surface ? planCrossings(galaxy, surface) : undefined;
+    const crossingPlan = map.crossingPlan;
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
-    if (surface && terrainSpec) {
-      // Towns on a generated map, and on a hand-made map whose manifest asks
-      // for them, since the author's picture may show its own. Performance
-      // mode goes without.
+    if (surface && terrainSpec && map.plan) {
       // The towns are planned from the roads, and the roads then stop at
       // each town's edge.
       // Neighbouring provinces' towns are joined by roads where there are
       // towns to join.
-      const planned: { towns?: Town[] } = {};
       const terrain = surface;
-      const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
-      ground = buildGroundLayer(
+      ground = paintGround(
         disposables,
-        galaxy,
         surface,
-        terrainHeights,
-        crossingPlan?.tracks,
-        drawTowns
-          ? (roads) => {
-              const shaped = townsOnRoads(galaxy, terrain, roads);
-              planned.towns = shaped.towns;
-              return shaped.roads;
-            }
-          : undefined,
-        drawTowns,
-        crossingPlan?.landLinks,
+        map.plan,
         terrainBiomes?.planet,
-        // Rivers are drawn with the detail, which performance mode leaves
-        // out, so there no road goes round them and none is bridged.
-        performanceMode ? undefined : terrainExtension,
+        performanceMode ? undefined : map.extension,
       );
       landmarks = buildLandmarkLayer(
         scene,
@@ -808,13 +805,13 @@ export function GalaxyView({
         terrainBiomes?.planet,
         terrainColourReader(terrainColor, surface),
       );
-      if (planned.towns) {
+      if (map.towns) {
         towns = buildTownLayer(
           scene,
           disposables,
           surface,
           ground,
-          planned.towns,
+          map.towns,
           terrainBiomes,
           !terrainColor,
           landmarks.nodes,
@@ -826,9 +823,9 @@ export function GalaxyView({
         surface,
         terrainColor ?? terrainSpec.image,
         renderRef,
-        terrainHeights,
+        map.heights,
         !performanceMode,
-        terrainExtension,
+        map.extension,
         ground.shading,
         terrainBiomes,
       );
@@ -1127,11 +1124,11 @@ export function GalaxyView({
     // The land drawn past a generated map's edge, which the camera must clear
     // when it looks in from outside the map.
     const marginGround =
-      surface && terrainExtension && surface.maxHeight > 0
+      surface && map.extension && surface.maxHeight > 0
         ? createMarginSurface(
             surface,
-            terrainExtension.heights,
-            terrainExtension.margin,
+            map.extension.heights,
+            map.extension.margin,
           )
         : undefined;
     // Start high above the plane (~27° from vertical), pulled back to frame the

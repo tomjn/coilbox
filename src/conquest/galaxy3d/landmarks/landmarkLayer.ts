@@ -77,6 +77,25 @@ interface Placed {
   decal: ReturnType<typeof groundDecal>;
 }
 
+/**
+ * The locations a landmark is expected to stand on, by node index. A planet
+ * with no ruin, such as a moon, leaves a ruin out and the location its town.
+ */
+export function landmarkNodes(
+  nodes: GalaxyDoc["nodes"],
+  playerFactionId: string,
+  identities: Parameters<typeof landmarkKinds>[2],
+  planet: PlanetId | undefined,
+): Set<number> {
+  const hasRuin = ruinPalette(planet) !== undefined;
+  const out = new Set<number>();
+  for (const [i, kind] of landmarkKinds(nodes, playerFactionId, identities)) {
+    if (kind === "ruin" && !hasRuin) continue;
+    out.add(i);
+  }
+  return out;
+}
+
 /** Build every landmark on a terrain map into `scene`. */
 export function buildLandmarkLayer(
   scene: THREE.Scene,
@@ -104,17 +123,19 @@ export function buildLandmarkLayer(
   const bakes: (() => void)[] = [];
   let renderer: THREE.WebGLRenderer | null = null;
 
-  for (const [i, kind] of landmarkKinds(
+  const kinds = landmarkKinds(galaxy.nodes, playerFactionId, identities);
+  const expected = landmarkNodes(
     galaxy.nodes,
     playerFactionId,
     identities,
-  )) {
+    planet,
+  );
+  for (const [i, kind] of kinds) {
+    if (!expected.has(i)) continue;
     const stronghold = kind === "stronghold";
     const depot = kind === "depot";
     const landing = kind === "landing";
-    // A planet with no ruin, such as a moon, leaves the anomaly its town.
     const ruin = kind === "ruin" ? ruinPalette(planet) : undefined;
-    if (kind === "ruin" && !ruin) continue;
     // A stronghold and a landing pad take a capital's room, an anomaly an
     // ordinary town's.
     const reach = stronghold

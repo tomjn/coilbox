@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "../../model";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
 import type { RunLandmark } from "./kinds";
-import { buildLandmarkLayer, terrainColourReader } from "./landmarkLayer";
+import {
+  buildLandmarkLayer,
+  landmarkNodes,
+  terrainColourReader,
+} from "./landmarkLayer";
 
 const SIDE = 101;
 const surfaceAt = (level: number) => {
@@ -160,6 +164,24 @@ describe("buildLandmarkLayer", () => {
     expect(
       disposables.filter((d) => d instanceof THREE.BufferGeometry).length,
     ).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("landmarkNodes", () => {
+  it("names the enemy capital and not the player's", () => {
+    expect([
+      ...landmarkNodes(galaxy.nodes, "me", undefined, undefined),
+    ]).toEqual([1]);
+  });
+
+  it("leaves out a ruin on a moon", () => {
+    const identities = new Map([["field", { landmark: "ruin" as const }]]);
+    expect([
+      ...landmarkNodes(galaxy.nodes, "me", identities, undefined),
+    ]).toEqual([1, 2]);
+    expect([...landmarkNodes(galaxy.nodes, "me", identities, "moon")]).toEqual([
+      1,
+    ]);
   });
 });
 
