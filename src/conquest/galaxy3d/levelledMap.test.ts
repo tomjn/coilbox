@@ -75,6 +75,13 @@ describe("layoutLevelledMap", () => {
     expect(map.layout.surface!.groundHeightAtWorld(t.x + 1, t.z)).toBe(
       raw.groundHeightAtWorld(t.x + 1, t.z),
     );
+    const levelled = layoutLevelledMap(doc, slope, undefined, {
+      ...opts,
+      skip: new Set<number>(),
+    });
+    expect(levelled.layout.surface!.groundHeightAtWorld(t.x + 1, t.z)).not.toBe(
+      raw.groundHeightAtWorld(t.x + 1, t.z),
+    );
   });
 
   it("hands the same heights on when no towns are drawn", () => {

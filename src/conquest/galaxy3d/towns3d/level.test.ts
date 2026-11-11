@@ -82,6 +82,31 @@ describe("levelGround", () => {
     expect(one.heights.data).toEqual(two.heights.data);
   });
 
+  it("keeps a town's core flat where a neighbour's skirt reaches it", () => {
+    // Two towns 6 apart. The left one's skirt (3 * 1.27 * 1.7 = 6.5) reaches
+    // well into the right one's core.
+    const a = town(-3, 0, 3);
+    const b = { ...town(3, 0, 3), node: 1 };
+    const out = levelGround({ heights: ramp(101, 0) }, [a, b], frame);
+    const level = at(out.heights, 0, 3, 0);
+    for (const x of [1, 2, 4, 5]) {
+      expect(at(out.heights, 0, x, 0)).toBeCloseTo(level, 6);
+    }
+  });
+
+  it("leaves no step at the edge of a core beside a neighbour", () => {
+    const a = town(-3, 0, 3);
+    const b = { ...town(3, 0, 3), node: 1 };
+    const out = levelGround({ heights: ramp(101, 0) }, [a, b], frame);
+    // Pixel to pixel along the line between the towns, the ground never jumps
+    // by more than the land's own slope allows across the skirts.
+    for (let x = -4; x < 4; x++) {
+      expect(
+        Math.abs(at(out.heights, 0, x + 1, 0) - at(out.heights, 0, x, 0)),
+      ).toBeLessThan(0.02);
+    }
+  });
+
   it("moves the wider heights and the relief as it moves the map's", () => {
     const out = levelGround(
       {

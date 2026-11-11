@@ -88,7 +88,15 @@ export function townLevels(
   });
 }
 
-/** Level one grid, which stands `margin` pixels in from the map's own edge. */
+/**
+ * Level one grid, which stands `margin` pixels in from the map's own edge.
+ * The ground at a pixel is a weighted mean of the land's own height and each
+ * town's level, and the weights add up to 1. A town's share is its pull times
+ * one minus the strongest pull any other town has there. The land's share is
+ * one minus the two strongest pulls, multiplied. Inside a town's core its pull
+ * is 1, so every other share is 0 and the ground takes that town's level
+ * outright. Beside the core the shares change smoothly, so there is no step.
+ */
 function levelGrid(
   grid: HeightGrid,
   margin: number,
@@ -96,32 +104,48 @@ function levelGrid(
   levels: (number | null)[],
   frame: LevelFrame,
 ): HeightGrid {
-  const pull = new Float64Array(grid.data.length);
-  const weighted = new Float64Array(grid.data.length);
+  const size = grid.data.length;
+  const strongest = new Float64Array(size);
+  const second = new Float64Array(size);
+  const strongestTown = new Int32Array(size).fill(-1);
+  const reach = (town: Town) => town.radius * EDGE_REACH * LEVEL_SKIRT;
+  const pullAt = (share: number) =>
+    1 - smoothstep(LEVEL_CORE, LEVEL_SKIRT, share);
+  towns.forEach((town, k) => {
+    if (levels[k] === null) return;
+    visitTown(grid, margin, town, reach(town), frame, (index, share) => {
+      const w = pullAt(share);
+      if (w > strongest[index]) {
+        second[index] = strongest[index];
+        strongest[index] = w;
+        strongestTown[index] = k;
+      } else if (w > second[index]) {
+        second[index] = w;
+      }
+    });
+  });
+  const shares = new Float64Array(size);
+  const weighted = new Float64Array(size);
   towns.forEach((town, k) => {
     const level = levels[k];
     if (level === null) return;
-    visitTown(
-      grid,
-      margin,
-      town,
-      town.radius * EDGE_REACH * LEVEL_SKIRT,
-      frame,
-      (index, share) => {
-        const w = 1 - smoothstep(LEVEL_CORE, LEVEL_SKIRT, share);
-        pull[index] += w;
-        weighted[index] += w * level;
-      },
-    );
+    visitTown(grid, margin, town, reach(town), frame, (index, share) => {
+      const other =
+        strongestTown[index] === k ? second[index] : strongest[index];
+      const w = pullAt(share) * (1 - other);
+      shares[index] += w;
+      weighted[index] += w * level;
+    });
   });
-  const data = new Float32Array(grid.data.length);
+  const data = new Float32Array(size);
   for (let index = 0; index < data.length; index++) {
     const raw = grid.data[index];
+    const land = (1 - strongest[index]) * (1 - second[index]);
+    const total = land + shares[index];
     data[index] =
-      raw <= SEA_HEIGHT
+      raw <= SEA_HEIGHT || total <= 0
         ? raw
-        : raw +
-          (weighted[index] - raw * pull[index]) / Math.max(1, pull[index]);
+        : (land * raw + weighted[index]) / total;
   }
   return { data, width: grid.width, height: grid.height };
 }
