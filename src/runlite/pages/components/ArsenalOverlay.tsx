@@ -152,7 +152,10 @@ export function ArsenalOverlay({
         </header>
         <div className="flex min-h-0 flex-wrap content-start gap-x-8 gap-y-4 overflow-y-auto pr-1">
           {groups.map(({ group, units: list }) => (
-            <section key={group} className="flex flex-col gap-2">
+            <section
+              key={group}
+              className="flex flex-col gap-2 rounded-md border border-border/60 p-3"
+            >
               <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {heading(group)} ({list.length})
               </h2>
