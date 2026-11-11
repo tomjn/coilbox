@@ -7,8 +7,8 @@ Status: draft for review, 11 November 2026.
 Procedural 3D landmarks that stand on the terrain map in place of a town at some warpath stops. This spec covers three things:
 
 1. A shared landmark layer: geometry kit, material, planet palettes, placement on the ground, and the fog, selection and mist states towns already have.
-2. The stronghold at boss stops, ported from the approved spike (`docs/reports/warpath-landmarks/bastion.ts`, shots `bastion3-*`).
-3. A ruined castle at event stops, built down from the spike's `citadel.ts`. Its look is not approved yet and is reviewed on real terrain before it merges.
+2. The stronghold at the boss and at any enemy capital that is a battle stop, ported from the approved spike (`docs/reports/warpath-landmarks/bastion.ts`, shots `bastion3-*`).
+3. At most one ruined castle per map, on one event stop, built down from the spike's `citadel.ts`. Its look is not approved yet and is reviewed on real terrain before it merges.
 
 The spike folder is gitignored and throwaway. Code is ported from it into `src`, never imported.
 
@@ -17,7 +17,8 @@ The spike folder is gitignored and throwaway. Code is ported from it into `src`,
 These came from the brief and are not reopened here.
 
 - Landmarks are procedural geometry built in code. Authored glTF through `placedModelsLayer.ts` is the fallback only if this route fails.
-- A landmark replaces the town at boss, event, reward and start stops. Shop and elite stops keep a town. Battle stops stay towns.
+- Towns stay as they are everywhere except two cases. A stronghold replaces the town at a battle stop that is an enemy capital or the run's finale. One ruined castle at most replaces the town at one event stop. Every other stop keeps its town.
+- A stronghold is only ever placed on a battle stop.
 - One stronghold design for every game, with no era detection.
 - Style follows the memory `warpath-landmark-style`: cast concrete megastructure seen from continent height. No windows, doors, ramps, vehicles or anything else that sets a human scale. No saturated glowing faces. A faint shield dome is the only effect. The whole model is tinted to the planet. The footprint stays smaller than a capital town.
 - Landmark palettes are designed on their own and take nothing from the towns.
@@ -28,12 +29,14 @@ These came from the brief and are not reopened here.
 | Stop | Today | After this spec |
 |---|---|---|
 | boss | town plus goal pole | stronghold |
-| event | town in violet mist | ruined castle, in the same mist |
-| reward | town | town, until a reward landmark exists |
-| start | town plus start pole | town, until a start landmark exists |
-| shop, elite, battle | town | town |
+| battle or elite on an enemy capital | does not occur yet | stronghold |
+| one event stop per map | town in violet mist | ruined castle, in the same mist |
+| every other event stop | town in violet mist | unchanged |
+| start, reward, shop, elite, battle | town | unchanged |
 
-Reward and start are named in the decision but have no design yet. The kind table carries them so adding a model later is one entry, and until then they keep their town. Building those two is a later spec.
+In a warpath today the only capitals are the start and the boss (`galaxyAdapter.ts`, the `kind: "capital"` lines), and the start is the player's. So the boss is the only stronghold a run gets now. The rule is written for enemy capitals in general, so it holds if runs gain more of them.
+
+The ruin goes on one event stop, chosen from the run's event stops by the run's seed. A run with no event stops has no ruin.
 
 ## Architecture
 
@@ -54,7 +57,7 @@ New folder `src/conquest/galaxy3d/landmarks/`. Each file has one job.
 ### How a stop becomes a landmark
 
 1. `NodeIdentity` in `GalaxyView.tsx` gains `landmark?: LandmarkKind`, where `LandmarkKind` is `"stronghold" | "ruin"`.
-2. `mapRunIdentities` in `src/runlite/galaxyAdapter.ts` sets `landmark: "stronghold"` on the boss location and `landmark: "ruin"` on each event location. The existing `end` and `mist` fields stay as they are.
+2. `mapRunIdentities` in `src/runlite/galaxyAdapter.ts` sets `landmark: "stronghold"` on the boss location and on any battle stop whose location is an enemy capital. It sets `landmark: "ruin"` on one event location picked by the run's seed. The existing `end` and `mist` fields stay as they are.
 3. In `GalaxyView`, the towns planned by `townsOnRoads` are split. Every town still takes part in road planning, so roads are unchanged. Towns whose node has a landmark are left out of `buildTownLayer`, so neither the town nor its fields are painted.
 4. `buildLandmarkLayer` runs after `buildTerrainMesh` with the scene, disposables, surface, ground heights, terrain colour pixels, planet, the galaxy nodes, the identities and the planned towns.
 5. The goal pole at the boss is dropped. `endMarkersToDraw` already hides a marker when a placed model stands on the location, and a landmark counts as one. The start keeps its pole because it keeps its town.
@@ -147,7 +150,7 @@ It drops the halls, roofs, windows, banners, gatehouse portcullis, turrets, tree
 
 Vitest in the node environment, following `placedModelsLayer.test.ts`, with a flat `createTerrainSurface`.
 
-- `mapRunIdentities` sets `landmark` on boss and event locations and on nothing else.
+- `mapRunIdentities` puts a stronghold on the boss and never on a non-battle stop, and a ruin on exactly one event stop when the run has any. The same seed picks the same event stop. Every other stop gets no landmark.
 - Each `PlanetId` has both palettes. The `Record` type enforces it, and a test walks `PlanetId` values as well.
 - `site.ts`: a flat site centres on the node, a sloped site moves to the flatter side, the size respects the town cap, and a coastal node with no dry site returns none.
 - The landmark layer builds both landmarks on a flat surface, leaves the landmark nodes out of the town list, and `setStyle` flips the fog uniform.
@@ -178,6 +181,6 @@ Two PRs, so the stronghold is not held back by the ruin's review.
 ## Out of scope
 
 - Moving towns onto the landmark layer.
-- Reward and start landmarks.
+- Landmarks at start, reward, shop or other event stops.
 - Any change to the terrain shader.
 - Era detection or per-game strongholds.
