@@ -15,8 +15,9 @@ describe.each(KINDS)("buildAnomaly %s", (kind) => {
   it.each([1, 2, 3])("stands whole and in the ground for seed %i", (seed) => {
     const built = build(kind, seed);
     expect(built.glow).toBeNull();
-    for (const v of built.solid.getAttribute("position").array)
-      expect(Number.isFinite(v)).toBe(true);
+    expect(
+      built.solid.getAttribute("position").array.every(Number.isFinite),
+    ).toBe(true);
     const tower = built.bounds("tower");
     if (!tower) throw new Error("no tower");
     // It goes down into the ground and stands well above it.
@@ -46,7 +47,7 @@ describe.each(KINDS)("buildAnomaly %s", (kind) => {
       true,
     );
     const pos = built.solid.getAttribute("position");
-    for (const v of pos.array) expect(Number.isFinite(v)).toBe(true);
+    expect(pos.array.every(Number.isFinite)).toBe(true);
     const tower = built.bounds("tower");
     if (!tower) throw new Error("no tower");
     expect(tower.max.y).toBeLessThan(
