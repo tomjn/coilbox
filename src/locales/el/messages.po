@@ -44885,6 +44885,10 @@ msgstr "βίντεο πλευρικού γραφικού"
 msgid "Side not described"
 msgstr "Η φατρία δεν περιγράφεται"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"

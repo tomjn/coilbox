@@ -44868,6 +44868,10 @@ msgstr "sidegrafikkvideo"
 msgid "Side not described"
 msgstr "Fraksjonen er ikke beskrevet"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"

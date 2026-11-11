@@ -36471,6 +36471,10 @@ msgstr ""
 msgid "Side not described"
 msgstr ""
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 msgid "Side view, with no perspective"
 msgstr ""

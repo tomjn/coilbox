@@ -44885,6 +44885,10 @@ msgstr "zijafbeelding (video)"
 msgid "Side not described"
 msgstr "Factie niet beschreven"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"

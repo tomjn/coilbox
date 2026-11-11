@@ -44589,6 +44589,10 @@ msgstr "侧边图像（视频）"
 msgid "Side not described"
 msgstr "阵营未描述"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"

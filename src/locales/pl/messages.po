@@ -44589,6 +44589,10 @@ msgstr "wideo grafiki bocznej"
 msgid "Side not described"
 msgstr "Frakcja bez opisu"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"
