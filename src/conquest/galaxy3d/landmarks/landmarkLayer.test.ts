@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "../../model";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
-import type { AnomalyKind } from "./kinds";
+import type { RunLandmark } from "./kinds";
 import { buildLandmarkLayer, terrainColourReader } from "./landmarkLayer";
 
 const SIDE = 101;
@@ -40,7 +40,7 @@ const galaxy: Pick<GalaxyDoc, "nodes" | "links"> = {
 
 const build = (
   level = 0.5,
-  identities?: ReadonlyMap<string, { landmark?: AnomalyKind }>,
+  identities?: ReadonlyMap<string, { landmark?: RunLandmark }>,
 ) => {
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
@@ -96,6 +96,14 @@ describe("buildLandmarkLayer", () => {
     const { layer } = build(
       0.5,
       new Map([["field", { landmark: "ruin" as const }]]),
+    );
+    expect([...layer.nodes].sort()).toEqual([1, 2]);
+  });
+
+  it("raises a depot where a run asks for one", () => {
+    const { layer } = build(
+      0.5,
+      new Map([["field", { landmark: "depot" as const }]]),
     );
     expect([...layer.nodes].sort()).toEqual([1, 2]);
   });

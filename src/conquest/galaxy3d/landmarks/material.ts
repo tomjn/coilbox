@@ -22,6 +22,7 @@ attribute float kind;
 varying vec3 vLocal;
 varying vec3 vNormal;
 varying vec3 vWorldNormal;
+varying vec3 vWorld;
 varying vec4 vShadow;
 varying float vKind;
 varying vec3 vSunLocal;
@@ -41,6 +42,7 @@ void main() {
   vKind = kind;
   vColor = color;
   vec4 world = modelMatrix * vec4(position, 1.0);
+  vWorld = world.xyz;
   vShadow = uShadowMatrix * world;
   gl_Position = projectionMatrix * viewMatrix * world;
 }
@@ -57,6 +59,7 @@ uniform float uHidden;
 varying vec3 vLocal;
 varying vec3 vNormal;
 varying vec3 vWorldNormal;
+varying vec3 vWorld;
 varying vec4 vShadow;
 varying float vKind;
 varying vec3 vSunLocal;
@@ -152,6 +155,25 @@ void main() {
     float shade = hh > 0.9 ? 0.85 : 0.95 + 0.09 * hh;
     float fade = clamp(1.0 - max(fwidth(b.x), fwidth(b.y)) * 1.6, 0.0, 1.0);
     base *= mix(1.0, shade * (1.0 - 0.16 * seam), fade);
+  } else if (vKind > 10.5 && vKind < 11.5) {
+    // Painted plate: small sheets with a dark joint between them.
+    vec2 size = vec2(0.09, 0.075);
+    vec2 b = abs(n.y) < 0.75
+      ? vec2(abs(n.x) > abs(n.z) ? vLocal.z : vLocal.x, vLocal.y) / size
+      : vLocal.xz / size;
+    vec2 f = fract(b);
+    float edge = min(min(f.x, 1.0 - f.x) * size.x, min(f.y, 1.0 - f.y) * size.y);
+    float seam = 1.0 - smoothstep(0.001, 0.004, edge);
+    float fade = clamp(1.0 - max(fwidth(b.x), fwidth(b.y)) * 1.6, 0.0, 1.0);
+    base *= mix(1.0, (0.96 + 0.07 * lmHash(floor(b))) * (1.0 - 0.3 * seam), fade);
+  }
+  if (vKind > 10.5 && vKind < 12.5) {
+    // Paint worn through to the primer and the steel, in scuffs and at chips.
+    float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
+    float near = clamp(1.0 - foot * 30.0, 0.0, 1.0);
+    float scuff = lmNoise3(vLocal * 9.0) * 0.6 + lmNoise3(vLocal * 31.0) * 0.4;
+    float worn = smoothstep(0.66, 0.74, scuff) * near;
+    base = mix(base, vec3(0.16, 0.11, 0.08), 0.75 * worn);
   }
 
   vec3 w = normalize(vWorldNormal);
@@ -179,7 +201,18 @@ void main() {
     hemi = mix(uGroundBounce, uSky, nl.y * 0.5 + 0.5);
     facing = max(dot(nl, normalize(vSunLocal)), 0.0);
   }
-  vec3 colour = base * (hemi + uSunLight * facing * sunlit());
+  float lit = sunlit();
+  vec3 colour = base * (hemi + uSunLight * facing * lit);
+  if (vKind > 10.5) {
+    // Metal: the sun glints off it and the sky shows at a glancing angle.
+    // Bare metal is the shinier, paint the duller.
+    float bare = step(12.5, vKind);
+    vec3 view = normalize(cameraPosition - vWorld);
+    float glint = pow(max(dot(w, normalize(uSun + view)), 0.0), mix(24.0, 48.0, bare));
+    float glance = pow(1.0 - max(dot(w, view), 0.0), 4.0);
+    colour += uSunLight * glint * lit * mix(0.22, 0.5, bare)
+      + uSky * glance * max(w.y, 0.0) * mix(0.12, 0.3, bare);
+  }
 
   // Hidden by fog, drawn dim and grey as a hidden town is.
   if (uHidden > 0.5)

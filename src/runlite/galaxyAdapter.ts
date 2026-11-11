@@ -637,6 +637,8 @@ export function mapRunIdentities(
     const at = locations.get(n.id) ?? n.id;
     // An anomaly's town stands in a haze, so it reads as somewhere strange.
     if (n.type === "event") out.set(at, { ...out.get(at), mist: true });
+    // Every supply stop is a depot. They are not one of a kind.
+    if (n.type === "shop") out.set(at, { ...out.get(at), landmark: "depot" });
     if (n.type !== "start" && n.type !== "boss") continue;
     out.set(at, {
       ...out.get(at),

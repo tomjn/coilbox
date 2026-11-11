@@ -20,6 +20,15 @@ describe("landmarkKinds", () => {
     expect(landmarkKinds(nodes, "me", ids).get(4)).toBe("ruin");
   });
 
+  it("puts a depot where the identity asks for one, as often as it asks", () => {
+    const ids = new Map([
+      ["town", { landmark: "depot" as const }],
+      ["odd", { landmark: "depot" as const }],
+    ]);
+    const kinds = landmarkKinds(nodes, "me", ids);
+    expect([kinds.get(3), kinds.get(4)]).toEqual(["depot", "depot"]);
+  });
+
   it("never puts a stronghold on a run's start, whoever owns it", () => {
     const ids = new Map([["their", { end: "start" as const }]]);
     expect(landmarkKinds(nodes, "me", ids).has(1)).toBe(false);

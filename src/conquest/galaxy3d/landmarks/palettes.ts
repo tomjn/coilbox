@@ -48,6 +48,33 @@ export interface AnomalyPalette {
   topCover: number;
 }
 
+/** What a depot takes from its planet. Its paint is in {@link DEPOT_LIVERIES}. */
+export interface DepotPalette {
+  /** The cast slabs it stands on. */
+  pad: Rgb;
+  /** Bare metal: frames, masts, pipes. */
+  metal: Rgb;
+  /** What settles on it: moss, sand, snow, ash. */
+  top: Rgb;
+  topCover: number;
+}
+
+/** The paint a depot wears, the same on every planet. A depot's seed picks one. */
+export interface DepotLivery {
+  /** The broad panels. */
+  shell: Rgb;
+  /** Bands, end caps and fins. */
+  accent: Rgb;
+}
+export const DEPOT_LIVERIES: readonly DepotLivery[] = [
+  { shell: [214, 210, 200], accent: [204, 104, 44] },
+  { shell: [206, 212, 218], accent: [48, 92, 146] },
+  { shell: [210, 206, 198], accent: [164, 56, 46] },
+  { shell: [88, 122, 108], accent: [206, 118, 48] },
+  { shell: [186, 156, 72], accent: [70, 74, 80] },
+];
+const DEPOT_METAL: Rgb = [70, 74, 82];
+
 export const ANOMALY_PALETTES: Record<PlanetId, AnomalyPalette> = {
   temperate: {
     slate: [78, 80, 88],
@@ -235,3 +262,9 @@ export const ruinPalette = (planet?: PlanetId): RuinPalette | undefined =>
 
 export const anomalyPalette = (planet?: PlanetId): AnomalyPalette =>
   ANOMALY_PALETTES[planet ?? "temperate"];
+
+/** A depot stands on the planet's own cast stone and wears what settles there. */
+export const depotPalette = (planet?: PlanetId): DepotPalette => {
+  const { armour, top, topCover } = strongholdPalette(planet);
+  return { pad: armour, metal: DEPOT_METAL, top, topCover };
+};

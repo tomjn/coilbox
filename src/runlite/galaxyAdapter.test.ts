@@ -478,6 +478,23 @@ describe("a land run's live state", () => {
     );
   });
 
+  it("makes every supply stop a depot on a land map", () => {
+    const shops: RunNode[] = [1, 2, 3].map((n) => ({
+      id: `shop${n}`,
+      type: "shop",
+      col: 1,
+      row: 9 + n,
+    }));
+    const r = { ...run(), nodes: [...run().nodes, ...shops] };
+    const at = new Map(shops.map((n) => [n.id, `place-${n.id}`]));
+    const ids = mapRunIdentities(r, at);
+    for (const n of shops) {
+      expect(ids.get(`place-${n.id}`)?.landmark).toBe("depot");
+      expect(ids.get(`place-${n.id}`)?.mist).toBeUndefined();
+      expect(runIdentities(r).get(n.id)?.landmark).toBeUndefined();
+    }
+  });
+
   it("gives the boss a stronghold and the start none", () => {
     const doc = mapRunToGalaxyDoc(moved, map, located(moved));
     const kinds = landmarkKinds(

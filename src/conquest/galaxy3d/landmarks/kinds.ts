@@ -15,8 +15,11 @@ export const ANOMALY_KINDS = [
 ] as const;
 export type AnomalyKind = (typeof ANOMALY_KINDS)[number];
 
+/** What a run can ask to stand on one of its stops: an anomaly, or a depot on a supply stop. */
+export type RunLandmark = AnomalyKind | "depot";
+
 /** What stands on a location in place of its town. */
-export type LandmarkKind = "stronghold" | AnomalyKind;
+export type LandmarkKind = "stronghold" | RunLandmark;
 
 /**
  * Which locations get a landmark, by index into `nodes`.
@@ -27,13 +30,13 @@ export type LandmarkKind = "stronghold" | AnomalyKind;
  * held by its own faction in the document, not the player's, so it is ruled
  * out by its identity.
  *
- * An anomaly goes where a run's identities ask for one. A stronghold wins if
- * a location is asked for both.
+ * An anomaly or a depot goes where a run's identities ask for one. A
+ * stronghold wins if a location is asked for both.
  */
 export function landmarkKinds(
   nodes: Pick<GalaxyNode, "id" | "kind" | "owner">[],
   playerFactionId: string,
-  identities?: ReadonlyMap<string, { landmark?: AnomalyKind; end?: string }>,
+  identities?: ReadonlyMap<string, { landmark?: RunLandmark; end?: string }>,
 ): Map<number, LandmarkKind> {
   const out = new Map<number, LandmarkKind>();
   nodes.forEach((n, i) => {
