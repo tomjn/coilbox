@@ -100,6 +100,8 @@ export interface GenerateRunOpts {
   loadoutBranch?: number;
   /** Injected timestamp (tests); defaults to now. */
   now?: string;
+  /** A land run's side trips. See `RunSettings.sideTrips`. */
+  sideTrips?: boolean;
 }
 
 /** Column count per run length. Column 0 = start, last column = boss. */
@@ -758,6 +760,9 @@ export function assembleRun(
       side: opts.side,
       skin: opts.skin,
       ...(map ? { map } : {}),
+      ...(map && opts.sideTrips !== undefined
+        ? { sideTrips: opts.sideTrips }
+        : {}),
     },
     startUnit: opts.build?.startUnit,
     nodes,

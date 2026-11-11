@@ -236,6 +236,15 @@ export interface RunSettings {
   /** Present on a run across a land map. Part of the settings so a challenge
    * code carries it and the recipient crosses the same map. */
   map?: RunMapRef;
+  /**
+   * A land run only. True: every location the start can reach is a run node,
+   * and the player may step along any road to one they have not visited, so
+   * long as the goal can still be reached (see `./progress.ts`). False: only
+   * the locations on a forward route are run nodes, and the view leaves every
+   * other location off the map. Absent on a run made before the choice
+   * existed, which keeps the other locations as scenery.
+   */
+  sideTrips?: boolean;
 }
 
 export type RunStatus = "active" | "won" | "lost";
@@ -647,6 +656,9 @@ export function parseRunSettings(value: unknown): RunSettings | null {
         : undefined,
     skin: readMapSkin(value.skin) ?? "galaxy",
     ...(map ? { map } : {}),
+    ...(typeof value.sideTrips === "boolean"
+      ? { sideTrips: value.sideTrips }
+      : {}),
   };
 }
 
