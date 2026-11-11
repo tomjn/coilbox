@@ -32,6 +32,88 @@ export interface RuinPalette {
   topCover: number;
 }
 
+/** The standing anomalies: the monolith, shard, gate, overhang and stump. */
+export interface AnomalyPalette {
+  /** Dark stone and old plate. */
+  slate: Rgb;
+  /** Pale cast stone. */
+  concrete: Rgb;
+  /** What has bled down them. */
+  rust: Rgb;
+  /** The dull green of old copper. */
+  oxide: Rgb;
+  /** The ground heaped at the foot, and the rubble. */
+  rock: Rgb;
+  top: Rgb;
+  topCover: number;
+}
+
+export const ANOMALY_PALETTES: Record<PlanetId, AnomalyPalette> = {
+  temperate: {
+    slate: [78, 80, 88],
+    concrete: [150, 150, 144],
+    rust: [150, 84, 48],
+    oxide: [84, 122, 112],
+    rock: [112, 104, 92],
+    top: [92, 118, 62],
+    topCover: 0.5,
+  },
+  desert: {
+    slate: [96, 84, 74],
+    concrete: [186, 164, 130],
+    rust: [168, 92, 50],
+    oxide: [104, 130, 112],
+    rock: [158, 124, 92],
+    top: [214, 190, 140],
+    topCover: 0.4,
+  },
+  ice: {
+    slate: [74, 82, 94],
+    concrete: [150, 160, 168],
+    rust: [120, 90, 74],
+    oxide: [88, 128, 132],
+    rock: [100, 102, 110],
+    top: [238, 242, 246],
+    topCover: 0.65,
+  },
+  red: {
+    slate: [84, 58, 52],
+    concrete: [156, 108, 86],
+    rust: [170, 84, 50],
+    oxide: [104, 112, 96],
+    rock: [110, 66, 50],
+    top: [176, 98, 66],
+    topCover: 0.35,
+  },
+  moon: {
+    slate: [58, 58, 64],
+    concrete: [140, 140, 142],
+    rust: [110, 104, 100],
+    oxide: [96, 108, 110],
+    rock: [104, 104, 110],
+    top: [180, 180, 186],
+    topCover: 0.2,
+  },
+  volcanic: {
+    slate: [50, 42, 40],
+    concrete: [120, 94, 74],
+    rust: [150, 74, 40],
+    oxide: [84, 96, 84],
+    rock: [78, 60, 50],
+    top: [62, 46, 38],
+    topCover: 0.25,
+  },
+  acid: {
+    slate: [70, 72, 56],
+    concrete: [150, 142, 104],
+    rust: [128, 120, 52],
+    oxide: [96, 120, 84],
+    rock: [104, 96, 80],
+    top: [150, 142, 88],
+    topCover: 0.25,
+  },
+};
+
 export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
   temperate: {
     concrete: [160, 154, 140],
@@ -150,3 +232,6 @@ export const strongholdPalette = (planet?: PlanetId): StrongholdPalette =>
 
 export const ruinPalette = (planet?: PlanetId): RuinPalette | undefined =>
   planet === "moon" ? undefined : RUIN_PALETTES[planet ?? "temperate"];
+
+export const anomalyPalette = (planet?: PlanetId): AnomalyPalette =>
+  ANOMALY_PALETTES[planet ?? "temperate"];

@@ -160,6 +160,7 @@ uniform float uShadowOn;
 uniform vec2 uCentre;
 uniform float uScale;
 uniform float uReach;
+uniform float uShadowReach;
 uniform float uHidden;
 uniform vec3 uRingColour;
 uniform float uRingStrength;
@@ -186,7 +187,7 @@ void main() {
   float r = dist / (uScale * uReach);
   float t = clamp((r - ${CONTACT_FROM.toFixed(3)}) / ${CONTACT_OVER.toFixed(3)}, 0.0, 1.0);
   float contact = ${CONTACT.toFixed(3)} * (1.0 - t) * (1.0 - t);
-  float thrown = ${SHADOW.toFixed(3)} * shaded() * (1.0 - smoothstep(${SHADOW_FADE_FROM.toFixed(3)}, ${SHADOW_FADE_TO.toFixed(3)}, r));
+  float thrown = ${SHADOW.toFixed(3)} * shaded() * (1.0 - smoothstep(${SHADOW_FADE_FROM.toFixed(3)}, ${SHADOW_FADE_TO.toFixed(3)}, dist / (uScale * uShadowReach)));
   float dark = max(contact, thrown) * (uHidden > 0.5 ? 0.7 : 1.0);
   // The town shader's ring, the same width in the same units.
   float foot = fwidth(dist);
@@ -204,16 +205,19 @@ void main() {
 /**
  * A sheet draped on the terrain round a landmark, in world space: the shadow
  * it throws, the darkening at its foot and a town's selection ring.
+ * `shadowReach` is how far the shadow may fall, for a landmark much taller
+ * than it is wide.
  */
 export function groundDecal(
   surface: TerrainSurface,
   site: LandmarkSite,
   reach: number,
   shadow: LandmarkShadow | null,
+  shadowReach = reach,
 ): GroundDecal {
   const pos: number[] = [];
   const idx: number[] = [];
-  const far = DECAL_REACH * reach * site.scale;
+  const far = DECAL_REACH * shadowReach * site.scale;
   for (let i = 0; i <= RINGS; i++) {
     const r = (i / RINGS) * far;
     for (let s = 0; s < SEGMENTS; s++) {
@@ -242,6 +246,7 @@ export function groundDecal(
       uCentre: { value: new THREE.Vector2(site.x, site.z) },
       uScale: { value: site.scale },
       uReach: { value: reach },
+      uShadowReach: { value: shadowReach },
       uHidden: { value: 0 },
       uRingColour: { value: new THREE.Color() },
       uRingStrength: { value: 0 },

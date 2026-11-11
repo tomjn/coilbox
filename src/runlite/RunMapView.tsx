@@ -6,6 +6,7 @@ import {
   type PlacedModelGame,
   usePlacedModelSources,
 } from "../conquest/galaxy3d/usePlacedModelSources";
+import { resolvePlanet } from "../conquest/planets";
 import { useGeneratedTerrainPixels } from "../conquest/useGeneratedTerrainPixels";
 import { useKnownSpaceMaps } from "../content/mapAppearanceCache";
 import { ErrorBanner } from "../content/pages/components/states";
@@ -122,6 +123,12 @@ export function RunMapView({
             run,
             land.locations,
             mapRunScenery(land.map, land.locations),
+            land.map.generated?.planet
+              ? resolvePlanet(
+                  land.map.generated.planet,
+                  land.map.generated.seed,
+                )
+              : undefined,
           )
         : runIdentities(run),
     [land, run.nodes, run.settings.seed],

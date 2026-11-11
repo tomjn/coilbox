@@ -6,7 +6,10 @@ import {
   Store,
 } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { landmarkKinds } from "../conquest/galaxy3d/landmarks/kinds";
+import {
+  ANOMALY_KINDS,
+  landmarkKinds,
+} from "../conquest/galaxy3d/landmarks/kinds";
 import { mapCues } from "../conquest/galaxy3d/mapCues";
 import type { GalaxyDoc } from "../conquest/model";
 import {
@@ -433,25 +436,46 @@ describe("a land run's live state", () => {
     expect(land.get("fen")?.mist).toBe(true);
   });
 
-  it("puts one ruin on one event stop, the same one for the same seed", () => {
+  it("deals each kind of anomaly to one event stop at most, by the seed", () => {
     const odd = (n: number): RunNode => ({
       id: `odd${n}`,
       type: "event",
       col: 1,
       row: 9 + n,
     });
-    const r = { ...run(), nodes: [...run().nodes, odd(0), odd(1), odd(2)] };
-    const at = new Map([
-      ["odd0", "fen"],
-      ["odd1", "moor"],
-      ["odd2", "heath"],
-    ]);
-    const ruins = (ids: Map<string, { landmark?: string }>) =>
-      [...ids].filter(([, v]) => v.landmark === "ruin").map(([k]) => k);
-    const once = ruins(mapRunIdentities(r, at));
-    expect(once).toHaveLength(1);
-    expect(ruins(mapRunIdentities(r, at))).toEqual(once);
-    expect(ruins(mapRunIdentities(run(), new Map()))).toEqual([]);
+    const standing = ANOMALY_KINDS.filter((k) => k !== "ruin");
+    const stops = Array.from({ length: 16 }, (_, n) => odd(n));
+    const r = { ...run(), nodes: [...run().nodes, ...stops] };
+    const at = new Map(stops.map((n) => [n.id, `place-${n.id}`]));
+    const dealt = (
+      ids: Map<string, { landmark?: string; landmarkGroup?: boolean }>,
+      group = false,
+    ) =>
+      [...ids].flatMap(([k, v]) =>
+        v.landmark && !!v.landmarkGroup === group ? [`${k}:${v.landmark}`] : [],
+      );
+    const once = dealt(mapRunIdentities(r, at));
+    expect(once.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...ANOMALY_KINDS].sort(),
+    );
+    // Stops beyond the kinds get each standing kind once more, as a group.
+    const groups = dealt(mapRunIdentities(r, at), true);
+    expect(groups.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...standing].sort(),
+    );
+    expect(dealt(mapRunIdentities(r, at))).toEqual(once);
+    // The stops left over keep their town in the haze.
+    const ids = mapRunIdentities(r, at);
+    const plain = [...ids.values()].filter((v) => v.mist && !v.landmark);
+    expect(plain).toHaveLength(
+      stops.length - ANOMALY_KINDS.length - standing.length,
+    );
+    expect(dealt(mapRunIdentities(run(), new Map()))).toEqual([]);
+    // A moon never had a castle, so it is dealt only the kinds that stand there.
+    const moon = dealt(mapRunIdentities(r, at, undefined, "moon"));
+    expect(moon.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...standing].sort(),
+    );
   });
 
   it("gives the boss a stronghold and the start none", () => {

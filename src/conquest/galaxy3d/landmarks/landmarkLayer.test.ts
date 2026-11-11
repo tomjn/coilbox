@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "../../model";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
+import type { AnomalyKind } from "./kinds";
 import { buildLandmarkLayer, terrainColourReader } from "./landmarkLayer";
 
 const SIDE = 101;
@@ -39,7 +40,7 @@ const galaxy: Pick<GalaxyDoc, "nodes" | "links"> = {
 
 const build = (
   level = 0.5,
-  identities?: ReadonlyMap<string, { landmark?: "ruin" }>,
+  identities?: ReadonlyMap<string, { landmark?: AnomalyKind }>,
 ) => {
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
@@ -111,6 +112,20 @@ describe("buildLandmarkLayer", () => {
       undefined,
     );
     expect([...layer.nodes]).toEqual([1]);
+  });
+
+  it("raises a standing anomaly on a moon, which a ruin is not", () => {
+    const layer = buildLandmarkLayer(
+      new THREE.Scene(),
+      [],
+      surfaceAt(0.5),
+      galaxy,
+      "me",
+      new Map([["field", { landmark: "monolith" as const }]]),
+      "moon",
+      undefined,
+    );
+    expect([...layer.nodes].sort()).toEqual([1, 2]);
   });
 
   it("raises nothing where the capital is under the sea", () => {
