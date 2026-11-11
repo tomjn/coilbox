@@ -205,3 +205,18 @@ Added after the ruin, from seven reference images the user gave on 11 November 2
 - The sphere is `kind` 10, the same skin worn smooth: few cracks, no beds and no pits, because the full relief made a ball that size look like a golf ball.
 - They are `kind` 9 in the landmark material, which adds relief, cracks and streaks in the shader and lights them by the perturbed normal.
 - `anomalies.ts` holds the models and `anomalyParts.ts` the lofted skin, wear, heaped ground and rubble they share.
+
+## Depots
+
+A run's supply stop (`shop`) stands as a depot in place of its town. `mapRunIdentities` gives every supply stop `landmark: "depot"`, so a map has as many depots as it has supply stops. They are not one of a kind as the anomalies are.
+
+A depot is three groups on level slabs cut into the ground: a comms building in the middle, storage on one side and a yard of crates on the other, with a few crates left on the ground beside them. The seed, taken from the node's id and position, picks:
+
+- the comms building: a dish on a pylon, a mast on splayed legs, or a radar dome with a plant block
+- the storage: a sphere tank on legs, two upright silos, two tanks on saddles, or none
+- the livery, from `DEPOT_LIVERIES`
+- which side the storage is on, and how the crates lie
+
+Depots are painted metal, not cast stone, and wear the same paint on every planet. Only the slab's stone and what settles on top (snow, sand, ash) come from the planet. Three surface kinds were added for them: 11 painted plate with seams, 12 painted with none (tanks, domes, dishes) and 13 bare metal. The material gives all three a sun glint and a sky sheen at glancing angles, and wears the paint through in scuffs when seen close. The builder weathers them less than stone.
+
+The mast and the dome carry one small red beacon. Nothing else glows.

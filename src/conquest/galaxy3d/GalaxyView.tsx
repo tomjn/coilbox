@@ -34,7 +34,7 @@ import {
   placeLabels,
   sameNumbers,
 } from "./labelDeclutter";
-import type { AnomalyKind } from "./landmarks/kinds";
+import type { RunLandmark } from "./landmarks/kinds";
 import {
   buildLandmarkLayer,
   type LandmarkLayer,
@@ -148,7 +148,7 @@ export interface NodeIdentity {
    * Read on a terrain map only, where an anomaly's model stands in place of
    * the town. See landmarks/landmarkLayer.ts.
    */
-  landmark?: AnomalyKind;
+  landmark?: RunLandmark;
   /** The anomaly is a group of smaller ones of its kind, not the one. */
   landmarkGroup?: boolean;
 }
