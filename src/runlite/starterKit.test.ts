@@ -53,22 +53,22 @@ describe("a warpath's starting build list on Splinter Faction", () => {
     ((by.get(n)?.stats?.weapons as unknown[]) ?? []).length > 0;
 
   for (const start of ["fedcommander", "lozcommander"]) {
-    it(`gives ${start} factories that each build an armed unit and a builder`, () => {
+    it(`gives ${start} factories that each build three armed units and a builder`, () => {
       const { unlocked } = startOf(SF, start);
       const factories = [...unlocked].filter(
         (n) => !by.get(n)?.mobile && (by.get(n)?.buildOptions?.length ?? 0),
       );
       expect(factories.length).toBeGreaterThan(0);
+      const isBuilder = (o: string) =>
+        by.get(o.toLowerCase())?.stats?.builder === true;
+      const fighter = (o: string) => armed(o.toLowerCase()) && !isBuilder(o);
       for (const f of factories) {
         const options = by.get(f)?.buildOptions ?? [];
         const units = options.filter((o) => unlocked.has(o.toLowerCase()));
-        expect(
-          units.some((o) => armed(o.toLowerCase())),
-          f,
-        ).toBe(true);
+        expect(units.filter(fighter).length, f).toBe(
+          Math.min(3, options.filter(fighter).length),
+        );
         // A factory that builds no builder, as SF's sea plants, needs none.
-        const isBuilder = (o: string) =>
-          by.get(o.toLowerCase())?.stats?.builder === true;
         expect(units.some(isBuilder), f).toBe(options.some(isBuilder));
       }
     });
@@ -145,12 +145,13 @@ describe("the role rules", () => {
       "llt",
       "teeth",
       "scout",
+      "tank",
       "con",
       "boat",
     ]) {
       expect(unlocked.has(n), n).toBe(true);
     }
-    for (const n of ["geo", "airplant", "plane", "lab2", "tank"]) {
+    for (const n of ["geo", "airplant", "plane", "lab2"]) {
       expect(unlocked.has(n), n).toBe(false);
     }
   });

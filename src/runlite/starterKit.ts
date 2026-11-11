@@ -7,8 +7,8 @@ import type { UnitDatasetEntry } from "../content/bindings";
  *
  * The player starts with a land factory, a sea factory where the game has one,
  * an energy building that needs no geothermal vent, a metal extractor, a radar,
- * an armed defence and a wall. Every factory they hold comes with an armed unit
- * and a builder, and every builder comes with an energy building, an extractor
+ * an armed defence and a wall. Every factory they hold comes with its three
+ * cheapest armed units and a builder, and every builder comes with an energy building, an extractor
  * and a radar of its own tier, so nothing they unlock has an empty build menu.
  */
 
@@ -96,6 +96,13 @@ const START_KINDS: Kind[] = [
   "wall",
 ];
 
+/**
+ * How many armed units each factory brings. The cheapest one alone is often a
+ * scout or a unit that cannot hurt much: Zero-K's cheapest ship mostly
+ * disarms, and its cheapest shield bot is a melee keep-away unit.
+ */
+const FIGHTERS_PER_FACTORY = 3;
+
 /** What a builder brings with it, so it has something of its own to build. */
 const BUILDER_KINDS: Kind[] = ["energy", "metal", "radar"];
 
@@ -169,14 +176,10 @@ function isFallbackMetal(f: UnitFacts): boolean {
 }
 
 /**
- * The cheapest of `options` that is a `kind`, or undefined. Cheapest by metal,
- * then energy, then by the graph's order.
+ * The units of `options` that are a `kind`, cheapest first: by metal, then
+ * energy, then by the graph's order.
  */
-function cheapest(
-  kind: Kind,
-  options: string[],
-  graph: KitGraph,
-): string | undefined {
+function byCost(kind: Kind, options: string[], graph: KitGraph): string[] {
   const rank = new Map(graph.order.map((u, i) => [u, i]));
   const found = options.filter((o) => {
     const f = graph.facts.get(o);
@@ -200,7 +203,16 @@ function cheapest(
       (rank.get(a) ?? 0) - (rank.get(b) ?? 0)
     );
   });
-  return pool[0];
+  return pool;
+}
+
+/** The cheapest of `options` that is a `kind`, or undefined. */
+function cheapest(
+  kind: Kind,
+  options: string[],
+  graph: KitGraph,
+): string | undefined {
+  return byCost(kind, options, graph)[0];
 }
 
 /** Whether a unit is a factory: a building that builds. */
@@ -248,7 +260,7 @@ function baseFactory(unit: string, graph: KitGraph): string | undefined {
 
 /**
  * `units` with what they bring added, repeated until nothing more comes: a
- * factory brings its cheapest armed unit and its cheapest builder, and a builder
+ * factory brings its three cheapest armed units and its cheapest builder, and a builder
  * brings an energy building, an extractor and a radar. A builder takes these
  * from what only it builds when it can, so a second tier builder brings second
  * tier buildings. `roots` are the start units, whose own build list is that
@@ -279,7 +291,12 @@ export function withWhatTheyBring(
     const options = graph.edges.get(unit) ?? [];
     if (isFactory(f)) {
       add(baseFactory(unit, graph));
-      add(cheapest("fighter", options, graph));
+      for (const unit of byCost("fighter", options, graph).slice(
+        0,
+        FIGHTERS_PER_FACTORY,
+      )) {
+        add(unit);
+      }
       add(cheapest("builder", options, graph));
     } else if (f?.mobile && f.builds) {
       const own = options.filter((o) => !baseline.has(o));
