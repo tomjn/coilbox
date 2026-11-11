@@ -83,17 +83,19 @@ float lmNoise3(vec3 p) {
 /**
  * How far a worn skin stands proud at a point, 0 to 1: broad swells, cracks
  * that wander, beds the stone was laid down in and pits. \`fine\` fades the
- * smallest of it out as the landmark gets small on screen.
+ * smallest of it out as the landmark gets small on screen. \`rough\` is 1 on
+ * a broken skin and less on one worn smooth, which keeps few cracks and no pits.
  */
-float relic(vec3 p, float fine) {
+float relic(vec3 p, float fine, float rough) {
   float h = 0.55 * lmNoise3(p * 5.0) + 0.25 * lmNoise3(p * 11.0);
   float crack = abs(lmNoise3(p * vec3(3.1, 1.3, 3.1) + 7.0) - 0.5);
-  h -= 0.55 * (1.0 - smoothstep(0.004, 0.03, crack));
+  h -= 0.55 * (1.0 - smoothstep(0.004, 0.03, crack))
+    * mix(smoothstep(0.45, 0.6, lmNoise3(p * 0.9 + 5.0)), 1.0, rough);
   // A bed shows only here and there, where the face has opened along it.
   float bed = abs(fract(p.y * 2.3 + 1.6 * lmNoise3(p * 1.3)) - 0.5);
-  h -= 0.3 * smoothstep(0.45, 0.49, bed) * smoothstep(0.45, 0.65, lmNoise3(p * 2.1 + 11.0));
+  h -= 0.3 * rough * smoothstep(0.45, 0.49, bed) * smoothstep(0.45, 0.65, lmNoise3(p * 2.1 + 11.0));
   h += fine * 0.2 * lmNoise3(p * 23.0);
-  h -= fine * 0.3 * smoothstep(0.76, 0.88, lmNoise3(p * 27.0 + 3.0));
+  h -= fine * 0.3 * rough * smoothstep(0.76, 0.88, lmNoise3(p * 27.0 + 3.0));
   return h;
 }
 
@@ -161,11 +163,12 @@ void main() {
     float fine = clamp(1.0 - foot * 45.0, 0.0, 1.0);
     float coarse = clamp(1.0 - foot * 9.0, 0.0, 1.0);
     float e = max(0.008, foot);
-    float h = relic(vLocal, fine);
+    float rough = vKind > 9.5 ? 0.0 : 1.0;
+    float h = relic(vLocal, fine, rough);
     vec3 grad = vec3(
-      relic(vLocal + vec3(e, 0, 0), fine) - h,
-      relic(vLocal + vec3(0, e, 0), fine) - h,
-      relic(vLocal + vec3(0, 0, e), fine) - h) / e;
+      relic(vLocal + vec3(e, 0, 0), fine, rough) - h,
+      relic(vLocal + vec3(0, e, 0), fine, rough) - h,
+      relic(vLocal + vec3(0, 0, e), fine, rough) - h) / e;
     grad -= n * dot(grad, n);
     vec3 nl = normalize(n - grad * 0.055 * coarse);
     // Streaks run down the walls.

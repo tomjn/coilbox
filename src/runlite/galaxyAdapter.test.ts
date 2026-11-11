@@ -453,12 +453,12 @@ describe("a land run's live state", () => {
       [...ANOMALY_KINDS].sort(),
     );
     expect(dealt(mapRunIdentities(r, at))).toEqual(once);
-    // Two stops are left over, and keep their town in the haze.
+    // The stops left over keep their town in the haze.
     const ids = mapRunIdentities(r, at);
     const plain = [...ids.values()].filter((v) => v.mist && !v.landmark);
-    expect(plain).toHaveLength(2);
+    expect(plain).toHaveLength(stops.length - ANOMALY_KINDS.length);
     expect(dealt(mapRunIdentities(run(), new Map()))).toEqual([]);
-    // A moon never had a castle, so it is dealt the five that stand there.
+    // A moon never had a castle, so it is dealt only the kinds that stand there.
     const moon = dealt(mapRunIdentities(r, at, undefined, "moon"));
     expect(moon.map((d) => d.split(":")[1]).sort()).toEqual(
       ANOMALY_KINDS.filter((k) => k !== "ruin").sort(),

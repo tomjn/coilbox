@@ -14,8 +14,8 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 /** sRGB, 0 to 255. */
 export type Rgb = [number, number, number];
 
-/** 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn skin. */
-export type Kind = 0 | 2 | 7 | 8 | 9;
+/** 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn skin, 10 the same skin worn smooth. */
+export type Kind = 0 | 2 | 7 | 8 | 9 | 10;
 
 /** What a part is, so a test can find it. */
 export type PartTag = "body" | "tower" | "mast" | "crag";

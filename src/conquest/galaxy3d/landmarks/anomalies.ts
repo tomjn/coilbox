@@ -2,7 +2,8 @@
  * The standing anomalies of a run: things nobody built in living memory, each
  * one of a kind on its map. A monolith, a shard of plate sunk in the ground, a
  * slab with a hole clean through it, a stem that carries a head out over
- * nothing, and the stump of a drum on roots.
+ * nothing, the stump of a drum on roots, and a great ball sunk in the ground
+ * with a hole bored into it.
  *
  * Each is one worn skin with a broken edge somewhere, standing in its own
  * rubble on ground heaped at its foot. The seed varies its proportions, its
@@ -646,12 +647,146 @@ function stump({ b, p, rand, seed, heaps, after }: Ctx): void {
   });
 }
 
+/**
+ * A great ball sunk to its waist in the ground, a round hole bored into it
+ * and its shell cracked into plates that have slipped.
+ */
+function sphere({ b, p, rand, seed, heaps, after }: Ctx): void {
+  const R = 1.05 + rand() * 0.13;
+  const cy = R * (0.5 + rand() * 0.12);
+  const hole = R * (0.3 + rand() * 0.08);
+  const deep = R * (0.5 + rand() * 0.15);
+  const open = Math.asin(hole / R);
+  const yaw = rand() * TAU;
+  // The hole looks up and out, so it shows from above.
+  const m = stand(yaw, 0.65 + rand() * 0.4, 0, 0, cy, 0);
+  // Which way is down, in the ball's own frame, across the face of the hole.
+  const down = new THREE.Vector3(0, -1, 0).transformDirection(
+    m.clone().invert(),
+  );
+  down.y = 0;
+  down.normalize();
+  // Cracks right through it. The shell beyond each has slipped outwards.
+  const slips = Array.from({ length: 3 + Math.floor(rand() * 2) }, () => ({
+    n: new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize(),
+    at: (rand() - 0.5) * 0.9,
+    by: 0.006 + rand() * 0.006,
+  }));
+  // A piece has come away from the rim of the hole.
+  const chipAt = rand() * TAU;
+  const OUT = 120;
+  const IN = 16;
+  const FLOOR = 5;
+  const SEGS = 200;
+  const dir = new THREE.Vector3();
+  b.add(
+    faceOut(
+      sweep(1 + OUT + IN + FLOOR, SEGS, (i, s) => {
+        const a = (s / SEGS) * TAU;
+        if (i === 0) return [0, -R, 0];
+        const mouth = R * Math.cos(open);
+        if (i <= OUT) {
+          const polar = Math.PI - (i / OUT) * (Math.PI - open);
+          dir.set(
+            Math.sin(polar) * Math.cos(a),
+            Math.cos(polar),
+            Math.sin(polar) * Math.sin(a),
+          );
+          // The rim is cut back to a shallow bevel, deeper where it chipped.
+          const round = Math.abs(((a - chipAt + Math.PI * 3) % TAU) - Math.PI);
+          const chip =
+            smooth(0.7, 0.2, round) *
+            smooth(open + 0.3, open + 0.05, polar) *
+            terraced(noise3(dir.x * 5 + seed, dir.y * 5, dir.z * 5), 3);
+          let r = R - 0.035 * smooth(open + 0.09, open, polar) - 0.09 * chip;
+          // Only the lowest pair of points sits on the hole's own edge.
+          if (i < OUT) {
+            for (const c of slips)
+              if (
+                dir.dot(c.n) >
+                c.at + 0.25 * noise3(dir.x * 2, dir.y * 2, dir.z * 2 + seed)
+              )
+                r += c.by;
+            // A ball this size weathers evenly, so its chips stay shallow.
+            r -= 0.3 * wear(dir.x * R, dir.y * R, dir.z * R, seed);
+          }
+          return [dir.x * r, dir.y * r, dir.z * r];
+        }
+        if (i <= OUT + IN) {
+          const y = mouth - ((i - OUT) / IN) * deep;
+          const r =
+            hole + wear(hole * Math.cos(a), y, hole * Math.sin(a), seed);
+          return [r * Math.cos(a), y, r * Math.sin(a)];
+        }
+        const r = hole * (1 - (i - OUT - IN) / FLOOR);
+        return [r * Math.cos(a), mouth - deep, r * Math.sin(a)];
+      }),
+    ),
+    mix(p.concrete, p.slate, 0.1 + rand() * 0.15),
+    m,
+    {
+      kind: 10,
+      top: p.top,
+      topCover: p.topCover * 0.5,
+      tint: (x, y, z) =>
+        footGrime(y) *
+        // Dark down the hole.
+        inFrame(m, (lx, ly, lz) =>
+          Math.hypot(lx, lz) < hole * 1.04 && ly > 0
+            ? 0.2 - 0.12 * smooth(R, R - deep * 0.6, ly)
+            : 1,
+        )(x, y, z),
+      stains: [
+        // What has run out of the hole and down the face under it.
+        {
+          colour: p.slate,
+          at: inFrame(m, (lx, ly, lz) => {
+            const out = Math.hypot(lx, lz);
+            const under = smooth(hole * 0.9, hole * 1.1, out);
+            const reach = smooth(hole * 3.2, hole * 1.1, out);
+            const streak = smooth(
+              0.42,
+              0.7,
+              noise3(Math.atan2(lz, lx) * 9, seed, out * 0.6),
+            );
+            // Only on the side of the hole that is downhill of it.
+            const below = smooth(
+              0.2,
+              0.7,
+              (lx * down.x + lz * down.z) / Math.max(1e-4, out),
+            );
+            return ly > 0 ? 0.75 * under * reach * streak * below : 0;
+          }),
+        },
+        { colour: p.rust, at: rustAt(seed, 0.12) },
+      ],
+    },
+    "tower",
+  );
+  // It lies in a hollow it made, the ground thrown up round it.
+  const waist = Math.sqrt(R * R - cy * cy);
+  for (let k = 0; k < 5; k++) {
+    const a = rand() * TAU;
+    heaps.push({
+      x: Math.cos(a) * waist,
+      z: Math.sin(a) * waist,
+      h: 0.2 + rand() * 0.25,
+      w: 0.35 + rand() * 0.3,
+    });
+  }
+  after.push((heightAt) => {
+    const stone: Paint = { kind: 9, top: p.top, topCover: p.topCover * 0.5 };
+    addRubble(b, rand, heightAt, p.rock, stone, 10, waist * 1.05, 1.35);
+  });
+}
+
 const MODELS: Record<StandingAnomaly, (ctx: Ctx) => void> = {
   monolith,
   shard,
   gate,
   overhang,
   stump,
+  sphere,
 };
 
 export interface Anomaly {

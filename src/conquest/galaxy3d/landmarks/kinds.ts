@@ -11,6 +11,7 @@ export const ANOMALY_KINDS = [
   "gate",
   "overhang",
   "stump",
+  "sphere",
 ] as const;
 export type AnomalyKind = (typeof ANOMALY_KINDS)[number];
 
