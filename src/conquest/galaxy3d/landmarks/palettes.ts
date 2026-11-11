@@ -135,8 +135,8 @@ export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
     topCover: 0.25,
   },
   volcanic: {
-    stone: [96, 84, 80],
-    darkStone: [74, 64, 62],
+    stone: [148, 120, 98],
+    darkStone: [104, 86, 72],
     rock: [50, 42, 40],
     top: [62, 46, 38],
     topCover: 0.25,

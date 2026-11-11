@@ -140,7 +140,8 @@ void main() {
   // An anomaly's haze, as the town shader draws it.
   if (uMist > 0.5) {
     float drift = lmNoise(vLocal.xz / 0.5);
-    colour = mix(colour, uMistColour, 0.45 + 0.4 * drift);
+    // Darkened and tinted violet, so the model keeps its shape inside the haze.
+    colour = mix(colour, colour * 0.45 + uMistColour * 0.35, 0.55 + 0.35 * drift);
   }
   gl_FragColor = vec4(colour, alpha);
   #include <colorspace_fragment>
