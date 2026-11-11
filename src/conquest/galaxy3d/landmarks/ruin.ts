@@ -41,8 +41,12 @@ const FALLEN = 0.28;
 const TOWERS = 0.35;
 /** The tallest a tower stands, as a multiple of its wall. */
 const TOWER_CAP = 1.4;
+/** Bearings the terrace's height is read at, round the inner wall. */
+const TERRACE_BEARINGS = 16;
 /** How far a wall's foot sinks into the mound. */
 const SINK = 0.06;
+/** The cells the ruin's blocks are cut into, so their weathering shows. */
+const CELL = 0.04;
 
 export interface Ruin {
   built: BuiltLandmark;
@@ -71,9 +75,22 @@ export function buildRuin(
     (inner.top - outer.top) * (1 - smooth(inner.r - 0.04, inner.r + 0.15, r));
   const rough = (x: number, z: number) =>
     (noise3(x * 3 + 9, 2, z * 3) - 0.5) * 0.04;
+  // The castle stands on a terrace cut level with the highest ground under its
+  // inner wall. On a slope that faces away from the camera, that lifts it into
+  // view rather than leaving it behind its own hillside.
+  let terrace = ground(0, 0);
+  for (let k = 0; k < TERRACE_BEARINGS; k++) {
+    const a = (k / TERRACE_BEARINGS) * TAU;
+    terrace = Math.max(
+      terrace,
+      ground(inner.r * Math.cos(a), inner.r * Math.sin(a)),
+    );
+  }
   const moundY = (x: number, z: number) => {
     const r = Math.hypot(x, z);
-    return ground(x, z) + rise(r) + rough(x, z) * smooth(0.2, 0.9, r);
+    const level = 1 - smooth(outer.r, RUIN_REACH, r);
+    const base = ground(x, z) * (1 - level) + terrace * level;
+    return base + rise(r) + rough(x, z) * smooth(0.2, 0.9, r);
   };
   const ROWS = 36;
   const SEGS = 128;
@@ -141,7 +158,7 @@ export function buildRuin(
       if (fallen[k]) {
         // What is left of a fallen section: a low course in the grass.
         b.add(
-          box(length * 0.6, SINK + 0.02, ring.thick * 1.2),
+          box(length * 0.6, SINK + 0.02, ring.thick * 1.2, 0, CELL),
           p.darkStone,
           m,
           dark,
@@ -152,14 +169,14 @@ export function buildRuin(
       for (const side of [-1, 1]) {
         const hh = SINK + heightAt(k, side);
         b.add(
-          box(length / 2 + 0.01, hh, ring.thick),
+          box(length / 2 + 0.01, hh, ring.thick, 0, CELL),
           p.stone,
           on(m, side * (length / 4), 0, 0),
           stone,
         );
       }
       b.add(
-        box(length + 0.02, SINK + 0.05, ring.thick * 1.5),
+        box(length + 0.02, SINK + 0.05, ring.thick * 1.5, 0, CELL),
         p.darkStone,
         m,
         dark,
@@ -198,7 +215,7 @@ export function buildRuin(
     const a = ((k + 0.5) / sides) * TAU;
     const m = polar(KEEP * Math.cos(Math.PI / sides), a, y0, Math.PI / 2);
     const hh = SINK + (k % 3 === 0 ? 0.12 : 0.35 + 0.3 * rand());
-    b.add(box(len + 0.02, hh, 0.08), p.stone, m, stone);
+    b.add(box(len + 0.02, hh, 0.08, 0, CELL), p.stone, m, stone);
   }
 
   return { built: b.build() };

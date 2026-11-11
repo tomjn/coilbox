@@ -88,14 +88,14 @@ void main() {
   if (vKind < 0.5 && abs(n.y) < 0.6) {
     // Courses of stone on a wall.
     float u = abs(n.x) > abs(n.z) ? vLocal.z : vLocal.x;
-    vec2 size = vec2(0.17, 0.075);
+    vec2 size = vec2(0.13, 0.065);
     vec2 b = vec2(u, vLocal.y) / size;
     b.x += 0.5 * mod(floor(b.y), 2.0);
     vec2 f = fract(b);
     float edge = min(min(f.x, 1.0 - f.x) * size.x, min(f.y, 1.0 - f.y) * size.y);
-    float mortar = 1.0 - smoothstep(0.003, 0.011, edge);
-    float fade = clamp(1.0 - fwidth(b.y) * 1.6, 0.0, 1.0);
-    float stone = 0.88 + 0.24 * lmHash(floor(b));
+    float mortar = 1.0 - smoothstep(0.004, 0.012, edge);
+    float fade = clamp(1.0 - fwidth(b.y) * 0.9, 0.0, 1.0);
+    float stone = 0.76 + 0.48 * lmHash(floor(b));
     base *= mix(1.0, stone * (1.0 - 0.4 * mortar), fade);
   } else if (vKind > 7.5 && vKind < 8.5) {
     // Cast panels seen from far off: tall, close set, a few recessed.

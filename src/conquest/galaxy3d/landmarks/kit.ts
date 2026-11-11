@@ -40,6 +40,9 @@ export interface Paint {
 }
 
 export const TAU = Math.PI * 2;
+/** How far each part's shade drifts from the next: masonry varies more. */
+const DRIFT = 0.14;
+const MASONRY_DRIFT = 0.3;
 
 const hash3 = (x: number, y: number, z: number) => {
   const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
@@ -112,6 +115,8 @@ export function box(
   h: number,
   d: number,
   bevel = 0,
+  /** The largest a face's cells may be, so weathering has vertices to land on. */
+  cell = 0.25,
 ): THREE.BufferGeometry {
   const g =
     bevel > 0
@@ -120,9 +125,9 @@ export function box(
           w,
           h,
           d,
-          Math.max(1, Math.round(w / 0.25)),
-          Math.max(1, Math.round(h / 0.25)),
-          Math.max(1, Math.round(d / 0.25)),
+          Math.max(1, Math.round(w / cell)),
+          Math.max(1, Math.round(h / cell)),
+          Math.max(1, Math.round(d / cell)),
         );
   g.translate(0, h / 2, 0);
   return g;
@@ -233,7 +238,7 @@ export class Builder {
       const ny = nor.getY(i);
       c.copy(base);
       // No two parts the same shade, and each drifts a little warm or cool.
-      const drift = (shade - 0.5) * 0.14;
+      const drift = (shade - 0.5) * (paint.kind === 0 ? MASONRY_DRIFT : DRIFT);
       c.r *= 1 + drift * 1.2;
       c.g *= 1 + drift;
       c.b *= 1 + drift * 0.7;

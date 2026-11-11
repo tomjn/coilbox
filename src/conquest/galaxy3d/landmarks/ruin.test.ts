@@ -25,6 +25,27 @@ describe("buildRuin", () => {
     expect(far).toBeLessThanOrEqual(RUIN_REACH + 1e-6);
   });
 
+  it("stands level on a slope, raised to the high side", () => {
+    // Ground rising 0.3 per unit towards +z.
+    const slope = (_x: number, z: number) => z * 0.3;
+    // The keep's footing sits at the centre, so it shows the terrace's level.
+    const footing = (g: (x: number, z: number) => number) => {
+      const pos = buildRuin(
+        g,
+        RUIN_PALETTES.temperate,
+        7,
+      ).built.solid.getAttribute("position");
+      let lo = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < pos.count; i++)
+        if (Math.hypot(pos.getX(i), pos.getZ(i)) < 0.3)
+          lo = Math.min(lo, pos.getY(i));
+      return lo;
+    };
+    // The terrace lifts the centre to the high side of the inner wall, which
+    // here is 0.3 * 0.78 above the centre's own ground.
+    expect(footing(slope) - footing(flat)).toBeGreaterThan(0.15);
+  });
+
   it.each(RUIN_WALLS)("leaves gaps in the wall at radius $r", ({ r, top }) => {
     // Which of 72 bearings have standing wall: anything well above the
     // ground the ring stands on, close to the ring's radius.
