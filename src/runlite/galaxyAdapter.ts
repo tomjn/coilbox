@@ -425,11 +425,13 @@ export function runLocations(
  *
  * The view lights a lane as a way forward when its first end is the player's,
  * so each step of the run is written from the earlier location to the later.
- * A link from a route location to scenery is written scenery first, which
- * never lights. A link between two route locations that is not a step joins
+ * A link between two route locations that is not a step joins
  * two of the same rank. It cannot be travelled in this run, and it would
  * light as a choice whichever way round it was written, so it stays as the
  * map has it and {@link mapRunClosedLinks} names it for the view.
+ *
+ * A road from a route location into scenery would look like a way on, so it
+ * is left out and the border between the two is drawn blocked instead.
  */
 export function mapRunToGalaxyDoc(
   run: RogueliteRun,
@@ -476,11 +478,15 @@ export function mapRunToGalaxyDoc(
         battle: { mapName: n.battle?.mapName ?? "" },
       };
     }),
-    links: map.links.map(([a, b]): [string, string] =>
-      steps.has(linkKey(b, a)) || (nodeAt.has(a) && !nodeAt.has(b))
-        ? [b, a]
-        : [a, b],
-    ),
+    links: map.links
+      .filter(([a, b]) => nodeAt.has(a) === nodeAt.has(b))
+      .map(([a, b]): [string, string] =>
+        steps.has(linkKey(b, a)) ? [b, a] : [a, b],
+      ),
+    blockedBorders: [
+      ...(map.blockedBorders ?? []),
+      ...map.links.filter(([a, b]) => nodeAt.has(a) !== nodeAt.has(b)),
+    ],
   };
 }
 

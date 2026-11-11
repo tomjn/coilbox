@@ -338,17 +338,20 @@ describe("mapRunToGalaxyDoc", () => {
     }
   });
 
-  it("writes each step forward and scenery first, and keeps the link between two of one rank", () => {
+  it("writes each step forward, and keeps the link between two of one rank", () => {
     expect(doc.links).toEqual([
       ["gate", "north"],
       ["gate", "south"],
       ["north", "east"],
       ["south", "east"],
       ["north", "south"],
-      ["far", "east"],
       ["far", "isle"],
     ]);
     expect(doc.linkKinds).toEqual(landMap().linkKinds);
+  });
+
+  it("blocks the border from the route into scenery in place of its link", () => {
+    expect(doc.blockedBorders).toEqual([["east", "far"]]);
   });
 
   it("names the link between two of one rank as closed, and no other", () => {
@@ -481,7 +484,6 @@ describe("a land run's cues on the strategic map", () => {
       "north east": "plain",
       "south east": "plain",
       "north south": "plain",
-      "far east": "plain",
       "far isle": "plain",
     });
     expect(attackable(landRun())).toEqual(["north", "south"]);
@@ -495,7 +497,6 @@ describe("a land run's cues on the strategic map", () => {
       "north east": "choice",
       "south east": "plain",
       "north south": "plain",
-      "far east": "plain",
       "far isle": "plain",
     });
     expect(attackable(moved)).toEqual(["east"]);
@@ -528,6 +529,6 @@ describe("a land run's cues on the strategic map", () => {
     );
     expect(kinds["gate north"]).toBe("border");
     expect(kinds["north south"]).toBe("border");
-    expect(kinds["far east"]).toBe("crossing");
+    expect(kinds["far isle"]).toBe("crossing");
   });
 });
