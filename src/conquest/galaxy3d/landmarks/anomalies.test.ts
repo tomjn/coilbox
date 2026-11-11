@@ -36,6 +36,30 @@ describe.each(KINDS)("buildAnomaly %s", (kind) => {
     expect(far).toBeLessThanOrEqual(ANOMALY_REACH + 1e-6);
   });
 
+  it("builds a group of smaller ones inside the same reach", () => {
+    const { built } = buildAnomaly(
+      kind,
+      flat,
+      ANOMALY_PALETTES.temperate,
+      4,
+      undefined,
+      true,
+    );
+    const pos = built.solid.getAttribute("position");
+    for (const v of pos.array) expect(Number.isFinite(v)).toBe(true);
+    const tower = built.bounds("tower");
+    if (!tower) throw new Error("no tower");
+    expect(tower.max.y).toBeLessThan(
+      build(kind, 4).bounds("tower")?.max.y ?? 0,
+    );
+    const soft = built.soft?.getAttribute("position");
+    if (!soft) throw new Error("no ground");
+    let far = 0;
+    for (let i = 0; i < soft.count; i++)
+      far = Math.max(far, Math.hypot(soft.getX(i), soft.getZ(i)));
+    expect(far).toBeLessThanOrEqual(ANOMALY_REACH + 1e-6);
+  });
+
   it("is the same for one seed and differs for another", () => {
     const a = positions(kind, 5);
     expect(positions(kind, 5)).toEqual(a);

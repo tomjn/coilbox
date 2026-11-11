@@ -269,7 +269,7 @@ export function chunk(
  * of the origin, each sunk a little, bigger ones nearer in.
  */
 export function addRubble(
-  b: Builder,
+  b: Pick<Builder, "add">,
   rand: () => number,
   heightAt: (x: number, z: number) => number,
   colour: Rgb,

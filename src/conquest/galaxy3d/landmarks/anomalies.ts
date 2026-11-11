@@ -8,6 +8,9 @@
  * Each is one worn skin with a broken edge somewhere, standing in its own
  * rubble on ground heaped at its foot. The seed varies its proportions, its
  * lean and what has broken off, so two runs never show quite the same one.
+ *
+ * Each also comes as a group: two or three smaller ones of the same kind
+ * standing together, one bigger than the rest.
  */
 import * as THREE from "three";
 import {
@@ -49,12 +52,14 @@ const X = new THREE.Vector3(1, 0, 0);
 const Z = new THREE.Vector3(0, 0, 1);
 
 interface Ctx {
-  b: Builder;
+  b: Pick<Builder, "add">;
   p: AnomalyPalette;
   rand: () => number;
   seed: number;
   /** Heaps to raise on the ground, gathered before the ground is built. */
   heaps: Heap[];
+  /** How many of `n` rows or points to build: fewer on a small one of a group. */
+  mesh: (n: number) => number;
   /** Work that needs the ground's height, run once the ground is built. */
   after: ((heightAt: (x: number, z: number) => number) => void)[];
 }
@@ -73,7 +78,7 @@ const rustAt =
  * an obelisk broken off at a slant, a tower with a slot down it, or a stele
  * with panels cut into its faces and its foot fallen away.
  */
-function monolith({ b, p, rand, seed, heaps, after }: Ctx): void {
+function monolith({ b, p, rand, seed, heaps, mesh, after }: Ctx): void {
   const variant = seed % 3;
   const h = (variant === 1 ? 2.8 : 2.4) + rand() * 0.5;
   const w0 = variant === 0 ? 0.3 + rand() * 0.05 : 0.33 + rand() * 0.09;
@@ -111,8 +116,8 @@ function monolith({ b, p, rand, seed, heaps, after }: Ctx): void {
 
   b.add(
     loft(
-      104,
-      96,
+      mesh(104),
+      mesh(96),
       (t) => {
         const [a, d] = half(t);
         return {
@@ -225,7 +230,7 @@ function monolith({ b, p, rand, seed, heaps, after }: Ctx): void {
  * A vast plate come down edge first and sunk at a slant: dark, strapped,
  * rusted, its upper edge raked to a point.
  */
-function shard({ b, p, rand, seed, heaps, after }: Ctx): void {
+function shard({ b, p, rand, seed, heaps, mesh, after }: Ctx): void {
   const len = 2.1 + rand() * 0.5;
   const tall = 3.1 + rand() * 0.6;
   const thick = 0.1 + rand() * 0.03;
@@ -243,8 +248,8 @@ function shard({ b, p, rand, seed, heaps, after }: Ctx): void {
     0.2 * terraced(noise3(x * 5 + seed, 1, 4), 4);
   const plate = (scale: number, off: number, straps: boolean) =>
     loft(
-      Math.round(84 * scale),
-      Math.round(150 * scale),
+      mesh(84 * scale),
+      mesh(150 * scale),
       (t) => {
         // It narrows towards the buried end, like a blade.
         const a = (len / 2) * scale * (0.62 + 0.38 * smooth(0, 0.5, t));
@@ -324,7 +329,7 @@ function shard({ b, p, rand, seed, heaps, after }: Ctx): void {
  * A fluted slab with a round hole through it and its top cleft into two
  * spires, one broken short.
  */
-function gate({ b, p, rand, seed, heaps, after }: Ctx): void {
+function gate({ b, p, rand, seed, heaps, mesh, after }: Ctx): void {
   const hole = 0.44 + rand() * 0.1;
   const cy = 1.2 + rand() * 0.2;
   const wide = 0.74 + rand() * 0.1;
@@ -356,8 +361,8 @@ function gate({ b, p, rand, seed, heaps, after }: Ctx): void {
   const colour = mix(p.slate, p.concrete, 0.3 + rand() * 0.25);
   b.add(
     loft(
-      220,
-      132,
+      mesh(220),
+      mesh(132),
       (t) => {
         const u = t * TAU;
         const dir = new THREE.Vector3(Math.cos(u), Math.sin(u), 0);
@@ -413,7 +418,7 @@ function gate({ b, p, rand, seed, heaps, after }: Ctx): void {
  * A stem that bends over and carries a long rounded head out past its own
  * foot, with nothing under it.
  */
-function overhang({ b, p, rand, seed, heaps, after }: Ctx): void {
+function overhang({ b, p, rand, seed, heaps, mesh, after }: Ctx): void {
   const stem = 1.55 + rand() * 0.4;
   const bend = 0.5 + rand() * 0.12;
   const head = 0.85 + rand() * 0.35;
@@ -448,8 +453,8 @@ function overhang({ b, p, rand, seed, heaps, after }: Ctx): void {
   const headFrom = SINK + stem + arc * 0.6;
   b.add(
     loft(
-      150,
-      92,
+      mesh(150),
+      mesh(92),
       (t) => {
         const s = t * total;
         const [c, dir] = spine(s);
@@ -521,7 +526,7 @@ function overhang({ b, p, rand, seed, heaps, after }: Ctx): void {
  * The stump of a great drum on a trunk that spreads into roots: banded in
  * old copper and rust, its rim broken open and hollow inside.
  */
-function stump({ b, p, rand, seed, heaps, after }: Ctx): void {
+function stump({ b, p, rand, seed, heaps, mesh, after }: Ctx): void {
   const roots = 6 + Math.floor(rand() * 3);
   const trunk = 0.38 + rand() * 0.06;
   const drumAt = 1.15 + rand() * 0.25;
@@ -569,10 +574,10 @@ function stump({ b, p, rand, seed, heaps, after }: Ctx): void {
       r += 0.035 * smooth(band.w + 0.015, band.w, Math.abs(y - band.y));
     return r;
   };
-  const OUT = 96;
-  const IN = 14;
+  const OUT = mesh(96);
+  const IN = mesh(14);
   const FLOOR = 4;
-  const SEGS = 168;
+  const SEGS = mesh(168);
   const m = stand((rand() - 0.5) * 2, 0.01 + rand() * 0.04, rand() * TAU);
   b.add(
     faceOut(
@@ -651,7 +656,7 @@ function stump({ b, p, rand, seed, heaps, after }: Ctx): void {
  * A great ball sunk to its waist in the ground, a round hole bored into it
  * and its shell cracked into plates that have slipped.
  */
-function sphere({ b, p, rand, seed, heaps, after }: Ctx): void {
+function sphere({ b, p, rand, seed, heaps, mesh, after }: Ctx): void {
   const R = 1.05 + rand() * 0.13;
   const cy = R * (0.5 + rand() * 0.12);
   const hole = R * (0.3 + rand() * 0.08);
@@ -674,10 +679,10 @@ function sphere({ b, p, rand, seed, heaps, after }: Ctx): void {
   }));
   // A piece has come away from the rim of the hole.
   const chipAt = rand() * TAU;
-  const OUT = 120;
-  const IN = 16;
+  const OUT = mesh(120);
+  const IN = mesh(16);
   const FLOOR = 5;
-  const SEGS = 200;
+  const SEGS = mesh(200);
   const dir = new THREE.Vector3();
   b.add(
     faceOut(
@@ -804,25 +809,119 @@ export function buildAnomaly(
   p: AnomalyPalette,
   seed: number,
   edgeColour?: (x: number, z: number) => Rgb | undefined,
+  /** Build a group of smaller ones in place of the one. */
+  group = false,
 ): Anomaly {
-  const ctx: Ctx = {
-    b: new Builder(),
-    p,
-    rand: seeded(seed),
-    seed,
-    heaps: [],
-    after: [],
-  };
-  MODELS[kind](ctx);
+  const b = new Builder();
+  const heaps: Heap[] = [];
+  const after: ((heightAt: (x: number, z: number) => number) => void)[] = [];
+  const spots = group
+    ? groupSpots(kind, seeded(seed ^ 0x9e3779b9))
+    : [{ scale: 1, x: 0, z: 0 }];
+  for (const [k, at] of spots.entries()) {
+    const s = at.scale;
+    const y = ground(at.x, at.z);
+    const place = new THREE.Matrix4()
+      .makeTranslation(at.x, y, at.z)
+      .multiply(new THREE.Matrix4().makeScale(s, s, s));
+    const own = seed + k * 7919;
+    const ctx: Ctx = {
+      b: placed(b, place),
+      p,
+      rand: seeded(own),
+      seed: own,
+      heaps: [],
+      // A smaller one shows less of its skin, so it is built of less.
+      mesh: (n) => Math.round(n * (0.35 + 0.65 * s)),
+      after: [],
+    };
+    MODELS[kind](ctx);
+    for (const h of ctx.heaps)
+      heaps.push({
+        x: at.x + h.x * s,
+        z: at.z + h.z * s,
+        h: h.h * s,
+        w: h.w * s,
+      });
+    after.push((heightAt) => {
+      const local = (x: number, z: number) =>
+        (heightAt(at.x + x * s, at.z + z * s) - y) / s;
+      for (const run of ctx.after) run(local);
+    });
+  }
   const heightAt = addApron(
-    ctx.b,
+    b,
     ground,
     p.rock,
     p.top,
     p.topCover,
-    ctx.heaps,
+    heaps,
     edgeColour,
   );
-  for (const run of ctx.after) run(heightAt);
-  return { built: ctx.b.build() };
+  for (const run of after) run(heightAt);
+  return { built: b.build() };
+}
+
+/**
+ * Where the members of a group stand and how big each is, biggest first. The
+ * balls come in threes and far smaller. The monolith comes in twos or threes.
+ * The small ones stand off to one side of the big one, at their own distances
+ * and sizes, so the group never comes out even.
+ */
+function groupSpots(
+  kind: StandingAnomaly,
+  rand: () => number,
+): { scale: number; x: number; z: number }[] {
+  const ball = kind === "sphere";
+  const count = ball ? 3 : kind === "monolith" && rand() < 0.6 ? 3 : 2;
+  const bearing = rand() * TAU;
+  const side = rand() < 0.5 ? 1 : -1;
+  const at = (scale: number, r: number, a: number) => ({
+    scale,
+    x: r * Math.cos(a),
+    z: r * Math.sin(a),
+  });
+  const spots = [at(ball ? 0.6 : 0.7, 0.5, bearing)];
+  spots.push(
+    at(
+      (ball ? 0.3 : 0.42) + rand() * 0.08,
+      0.8 + rand() * 0.1,
+      bearing + Math.PI + side * (0.15 + rand() * 0.2),
+    ),
+  );
+  if (count > 2)
+    spots.push(
+      at(
+        (ball ? 0.2 : 0.28) + rand() * 0.06,
+        0.72 + rand() * 0.1,
+        bearing + Math.PI - side * (1 + rand() * 0.2),
+      ),
+    );
+  return spots;
+}
+
+/**
+ * A builder that puts each part where `place` says, so a model built round
+ * its own origin can stand anywhere at any size. What a part's paint asks of
+ * a point is asked in the model's own frame.
+ */
+function placed(b: Builder, place: THREE.Matrix4): Pick<Builder, "add"> {
+  return {
+    add(g, colour, m, paint = {}, tag) {
+      b.add(
+        g,
+        colour,
+        place.clone().multiply(m),
+        {
+          ...paint,
+          tint: paint.tint && inFrame(place, paint.tint),
+          stains: paint.stains?.map((s) => ({
+            ...s,
+            at: inFrame(place, s.at),
+          })),
+        },
+        tag,
+      );
+    },
+  };
 }
