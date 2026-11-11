@@ -226,6 +226,42 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
   },
 };
 
+/** What a town takes from its planet. */
+export interface TownPalette {
+  /** The buildings' walls. */
+  building: Rgb;
+  /** The streets, darker than the walls. */
+  street: Rgb;
+  /** What settles on the roofs: moss, sand, snow, ash. */
+  top: Rgb;
+  topCover: number;
+}
+
+const townFrom = ({
+  concrete,
+  top,
+  topCover,
+}: StrongholdPalette): TownPalette => ({
+  building: concrete,
+  street: [
+    Math.round(concrete[0] * 0.42),
+    Math.round(concrete[1] * 0.42),
+    Math.round(concrete[2] * 0.44),
+  ],
+  top,
+  topCover,
+});
+
+export const TOWN_PALETTES: Record<PlanetId, TownPalette> = {
+  temperate: townFrom(STRONGHOLD_PALETTES.temperate),
+  desert: townFrom(STRONGHOLD_PALETTES.desert),
+  ice: townFrom(STRONGHOLD_PALETTES.ice),
+  red: townFrom(STRONGHOLD_PALETTES.red),
+  moon: townFrom(STRONGHOLD_PALETTES.moon),
+  volcanic: townFrom(STRONGHOLD_PALETTES.volcanic),
+  acid: townFrom(STRONGHOLD_PALETTES.acid),
+};
+
 /** A moon has no history for a castle to be a ruin of, so it has none. */
 export const RUIN_PALETTES: Record<Exclude<PlanetId, "moon">, RuinPalette> = {
   temperate: {
@@ -275,6 +311,9 @@ export const RUIN_PALETTES: Record<Exclude<PlanetId, "moon">, RuinPalette> = {
 /** A map with no planet, which is a hand-made one, is drawn as Temperate. */
 export const strongholdPalette = (planet?: PlanetId): StrongholdPalette =>
   STRONGHOLD_PALETTES[planet ?? "temperate"];
+
+export const townPalette = (planet?: PlanetId): TownPalette =>
+  TOWN_PALETTES[planet ?? "temperate"];
 
 export const ruinPalette = (planet?: PlanetId): RuinPalette | undefined =>
   planet === "moon" ? undefined : RUIN_PALETTES[planet ?? "temperate"];
