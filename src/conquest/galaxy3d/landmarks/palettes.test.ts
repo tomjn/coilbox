@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PLANETS } from "../../planets";
 import {
+  DEPOT_LIVERIES,
+  depotPalette,
   RUIN_PALETTES,
   ruinPalette,
   STRONGHOLD_PALETTES,
@@ -17,8 +19,8 @@ describe("landmark palettes", () => {
     if (id === "moon") expect(ruin).toBeUndefined();
     else expect(ruin).toBeDefined();
     for (const p of ruin
-      ? [strongholdPalette(id), ruin]
-      : [strongholdPalette(id)]) {
+      ? [strongholdPalette(id), depotPalette(id), ruin]
+      : [strongholdPalette(id), depotPalette(id)]) {
       const c = channels(p);
       expect(c.length).toBeGreaterThan(0);
       for (const v of c) {
@@ -26,6 +28,15 @@ describe("landmark palettes", () => {
         expect(v).toBeLessThanOrEqual(255);
       }
     }
+  });
+
+  it("paints a depot the same on every planet", () => {
+    expect(DEPOT_LIVERIES.length).toBeGreaterThan(1);
+    for (const v of DEPOT_LIVERIES.flatMap(channels)) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(255);
+    }
+    expect(depotPalette("ice").metal).toEqual(depotPalette("desert").metal);
   });
 
   it("falls back to temperate on a map with no planet", () => {
