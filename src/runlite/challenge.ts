@@ -100,6 +100,9 @@ export function optionsFromChallenge(
     factionId: settings.factionId,
     side: settings.side,
     skin: settings.skin,
+    ...(settings.sideTrips !== undefined
+      ? { sideTrips: settings.sideTrips }
+      : {}),
     maps: env.maps,
     build: env.build,
     enemyAiKey: env.enemyAiKey,

@@ -1,3 +1,10 @@
+import {
+  CircuitBoard,
+  HandFist,
+  ShieldQuestionMark,
+  Split,
+  Store,
+} from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { mapCues } from "../conquest/galaxy3d/mapCues";
 import type { GalaxyDoc } from "../conquest/model";
@@ -94,7 +101,7 @@ describe("runIdentities", () => {
 
   it("danger-tints battle and elite sites but gives them no body", () => {
     const ids = runIdentities(run());
-    expect(ids.get("b1")).toEqual({ starTint: "#e0473a" });
+    expect(ids.get("b1")).toEqual({ starTint: "#e0473a", icon: HandFist });
     expect(ids.get("b2")?.body).toBeUndefined();
     expect(ids.get("b2")?.starTint).toBe("#e0473a");
   });
@@ -331,17 +338,20 @@ describe("mapRunToGalaxyDoc", () => {
     }
   });
 
-  it("writes each step forward and scenery first, and keeps the link between two of one rank", () => {
+  it("writes each step forward, and keeps the link between two of one rank", () => {
     expect(doc.links).toEqual([
       ["gate", "north"],
       ["gate", "south"],
       ["north", "east"],
       ["south", "east"],
       ["north", "south"],
-      ["far", "east"],
       ["far", "isle"],
     ]);
     expect(doc.linkKinds).toEqual(landMap().linkKinds);
+  });
+
+  it("blocks the border from the route into scenery in place of its link", () => {
+    expect(doc.blockedBorders).toEqual([["east", "far"]]);
   });
 
   it("names the link between two of one rank as closed, and no other", () => {
@@ -397,6 +407,36 @@ describe("a land run's live state", () => {
     expect(ids.get("north")?.starTint).toBeDefined();
   });
 
+  it("puts an icon before each node's name saying what happens there", () => {
+    const types = ["battle", "elite", "event", "reward", "shop"] as const;
+    const nodes: RunNode[] = types.map((type, i) => ({
+      id: type,
+      type,
+      col: 1,
+      row: i,
+    }));
+    const ids = runIdentities({ ...run(), nodes: [run().nodes[0], ...nodes] });
+    expect(ids.get("battle")?.icon).toBe(HandFist);
+    expect(ids.get("elite")?.icon).toBe(HandFist);
+    expect(ids.get("event")?.icon).toBe(Split);
+    expect(ids.get("reward")?.icon).toBe(CircuitBoard);
+    expect(ids.get("shop")?.icon).toBe(Store);
+    expect(ids.get(run().nodes[0].id)?.icon).toBeUndefined();
+  });
+
+  it("draws an anomaly's town in a haze on a land map only", () => {
+    const anomaly: RunNode = { id: "odd", type: "event", col: 1, row: 9 };
+    const r = { ...run(), nodes: [...run().nodes, anomaly] };
+    expect(runIdentities(r).get("odd")?.mist).toBeUndefined();
+    const land = mapRunIdentities(r, new Map([["odd", "fen"]]));
+    expect(land.get("fen")?.mist).toBe(true);
+  });
+
+  it("marks a location on no route with a question mark", () => {
+    const ids = mapRunIdentities(run(), new Map(), new Set(["moor"]));
+    expect(ids.get("moor")?.icon).toBe(ShieldQuestionMark);
+  });
+
   it("leaves a column run's start and warlord with no end marker", () => {
     for (const identity of runIdentities(run()).values()) {
       expect(identity.end).toBeUndefined();
@@ -444,7 +484,6 @@ describe("a land run's cues on the strategic map", () => {
       "north east": "plain",
       "south east": "plain",
       "north south": "plain",
-      "far east": "plain",
       "far isle": "plain",
     });
     expect(attackable(landRun())).toEqual(["north", "south"]);
@@ -458,7 +497,6 @@ describe("a land run's cues on the strategic map", () => {
       "north east": "choice",
       "south east": "plain",
       "north south": "plain",
-      "far east": "plain",
       "far isle": "plain",
     });
     expect(attackable(moved)).toEqual(["east"]);
@@ -491,6 +529,43 @@ describe("a land run's cues on the strategic map", () => {
     );
     expect(kinds["gate north"]).toBe("border");
     expect(kinds["north south"]).toBe("border");
-    expect(kinds["far east"]).toBe("crossing");
+    expect(kinds["far isle"]).toBe("crossing");
+  });
+});
+
+describe("a land run that chose its side trips", () => {
+  it("leaves every location off the run off the map, with its links", () => {
+    const r: RogueliteRun = {
+      ...landRun(),
+      settings: { ...landRun().settings, sideTrips: false },
+    };
+    const doc = mapRunToGalaxyDoc(r, landMap(), located(r));
+    expect(doc.nodes.map((n) => n.id).sort()).toEqual(
+      ["east", "gate", "north", "south"].sort(),
+    );
+    for (const [a, b] of doc.links) {
+      expect(["far", "isle"]).not.toContain(a);
+      expect(["far", "isle"]).not.toContain(b);
+    }
+    expect(doc.blockedBorders ?? []).toEqual([]);
+  });
+
+  it("lights a choice against the link's direction, from the player's end", () => {
+    const cues = mapCues({
+      galaxy: {
+        nodes: [
+          { id: "here", owner: PLAYER_FACTION },
+          { id: "back", owner: "type-battle" },
+        ],
+        links: [["back", "here"]],
+      },
+      owners: {},
+      playerFactionId: PLAYER_FACTION,
+      run: { choices: new Set(["back"]) },
+    });
+    expect(cues.links).toEqual([
+      expect.objectContaining({ a: "here", b: "back", tone: "choice" }),
+    ]);
+    expect(cues.locations.get("back")?.attackable).toBe(true);
   });
 });

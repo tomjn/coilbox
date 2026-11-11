@@ -616,6 +616,7 @@ describe("RunSetupForm and the other choices (issue #3638)", () => {
       difficulty: 2,
       ascension: 0,
       loadout: "standard",
+      sideTrips: true,
     });
   });
 

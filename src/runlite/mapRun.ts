@@ -40,6 +40,11 @@ import type {
  *
  * A location on no route from the start to the goal is scenery. It has no run
  * node, so nothing in the run can reach it.
+ *
+ * A run with side trips (`sideTrips`) has no scenery. Every location the start
+ * can reach is a run node, ranked the same way, and every link between two of
+ * them is an edge, written from the lower rank. The player may step along an
+ * edge either way, as `./progress.ts` sets out.
  */
 
 /** A map that cannot carry a run, with a message fit to show the player. */
@@ -179,6 +184,37 @@ function routeFrom(
   return {
     startId,
     goalId,
+    rank: new Map(locations.map((id) => [id, rankOf(id)])),
+    locations,
+    edges,
+  };
+}
+
+/**
+ * Every location the start can reach, as a route: ranked by links from the
+ * start, with every link between two of them as an edge written from the
+ * lower rank, and from the earlier location in map order between two of one
+ * rank.
+ */
+function everyLocation(map: RouteMap, forward: MapRoute): MapRoute {
+  const adj = neighbours(map);
+  const dist = distancesFrom(adj, forward.startId);
+  const order = new Map(map.nodes.map((n, i) => [n.id, i]));
+  const rankOf = (id: string) => dist.get(id) ?? 0;
+  const locations = map.nodes
+    .map((n) => n.id)
+    .filter((id) => dist.has(id))
+    .sort((a, b) => rankOf(a) - rankOf(b));
+  const before = (a: string, b: string) =>
+    rankOf(a) - rankOf(b) || (order.get(a) ?? 0) - (order.get(b) ?? 0);
+  const edges: [string, string][] = [];
+  for (const id of locations) {
+    for (const nb of adj.get(id) ?? []) {
+      if (dist.has(nb) && before(id, nb) < 0) edges.push([id, nb]);
+    }
+  }
+  return {
+    ...forward,
     rank: new Map(locations.map((id) => [id, rankOf(id)])),
     locations,
     edges,
@@ -446,7 +482,8 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
     opts.startId !== undefined && opts.goalId !== undefined
       ? [opts.startId, opts.goalId]
       : pickEnds(map, rng);
-  const route = routeAcrossMap(map, startId, goalId);
+  const forward = routeAcrossMap(map, startId, goalId);
+  const route = opts.sideTrips ? everyLocation(map, forward) : forward;
   const cols = (route.rank.get(goalId) ?? 0) + 1;
 
   const before = new Map<string, string[]>();
@@ -471,6 +508,9 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
   const rowsUsed = new Map<number, number>();
   const nodes: RunNode[] = route.locations.map((id) => {
     const col = route.rank.get(id) ?? 0;
+    // A side trip past the goal's rank draws its kind as the last column
+    // before the goal does.
+    const drawCol = Math.min(col, Math.max(1, cols - 2));
     const row = rowsUsed.get(col) ?? 0;
     rowsUsed.set(col, row + 1);
 
@@ -487,7 +527,7 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
       );
       type = chooseNodeType(
         rng,
-        col,
+        drawCol,
         cols,
         willRest(id) && !shopBefore,
         !shopBefore && !shopAfter,
@@ -619,7 +659,8 @@ export function generateStyledRun(opts: GenerateRunOpts): RogueliteRun {
     ).points > 0;
 
   const first = runOnMap(0);
-  if (hasChoice(first)) return first;
+  // Side trips are a choice wherever a location has another road out.
+  if (opts.sideTrips || hasChoice(first)) return first;
   for (let attempt = 1; attempt < LAND_MAP_TRIES; attempt++) {
     const run = runOnMap(attempt);
     if (hasChoice(run)) return run;

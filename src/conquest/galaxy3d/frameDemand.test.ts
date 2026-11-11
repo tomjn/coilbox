@@ -14,6 +14,7 @@ const still: FrameActivity = {
   burst: false,
   selectionPulse: false,
   combatFlashes: false,
+  routeChevrons: false,
   effects: true,
   reducedResolution: false,
 };
@@ -32,6 +33,7 @@ describe("needsAnotherFrame", () => {
     "burst",
     "selectionPulse",
     "combatFlashes",
+    "routeChevrons",
     "reducedResolution",
   ] as const)("keeps drawing while %s", (key) => {
     expect(needsAnotherFrame({ ...still, [key]: true })).toBe(true);
@@ -41,6 +43,7 @@ describe("needsAnotherFrame", () => {
     const off = { ...still, effects: false };
     expect(needsAnotherFrame({ ...off, selectionPulse: true })).toBe(false);
     expect(needsAnotherFrame({ ...off, combatFlashes: true })).toBe(false);
+    expect(needsAnotherFrame({ ...off, routeChevrons: true })).toBe(false);
   });
 
   it("keeps the camera, bursts and Galaxy maps moving with effects off", () => {

@@ -8118,6 +8118,10 @@ msgstr "船体 +{restHull}"
 msgid "+{reward} salvage"
 msgstr "废料 +{reward}"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr ""
+
 #: src/runlite/generate.ts
 #, fuzzy
 msgid "+{salvage} salvage, -{hullCost} hull"
@@ -8618,16 +8622,6 @@ msgstr "一个字符：b 长方体，e 椭球体，c 圆柱体，s 球体。"
 #, fuzzy
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "一个字符：x、y 或 z。仅对圆柱体有意义。"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "抉择时刻"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "途中的抉择——没有战斗。"
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -11376,6 +11370,13 @@ msgstr "公告消息"
 msgid "Announcements"
 msgstr "公告"
 
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
+
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
 msgid "Another action for this key, e.g. areaattack"
@@ -11825,8 +11826,8 @@ msgstr "{x}, {z} 附近，半径 {radius}"
 msgid "Arrived sound"
 msgstr "到达音效"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Arsenal"
 msgstr "军械库"
@@ -12319,6 +12320,7 @@ msgstr "返回征服地图"
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -13771,6 +13773,10 @@ msgstr "建造单位"
 #, fuzzy
 msgid "Builder"
 msgstr "建造单位"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -16517,6 +16523,10 @@ msgstr "窗口较窄时折叠侧边栏"
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "折叠侧边栏会将其完全隐藏，而不是显示图标栏。"
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -18546,11 +18556,6 @@ msgstr "累计"
 msgid "Curated map"
 msgstr "精选地图"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "赢得战斗后掉落的货币（精英和首领掉落更多）。可在仓库用于解锁单位、天赋和维修。"
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -19067,6 +19072,7 @@ msgstr "失败。"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Defence"
 msgstr "防御"
@@ -19746,6 +19752,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Difficulty"
 msgstr "难度"
@@ -20841,6 +20848,7 @@ msgstr "简单"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Economy"
@@ -21545,7 +21553,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "根据逐步加压和时长估算，运行开始后会显示实时指标。"
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "事件"
@@ -22251,6 +22258,10 @@ msgstr "新 AI 的阵营"
 #, fuzzy
 msgid "Factions"
 msgstr "阵营"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -26622,6 +26633,10 @@ msgstr "安装中…"
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr "将适用于此平台的引擎安装到所配置内容文件夹的 <0>engine/</0> 目录中（在<1>内容文件夹设置</1>中设置目标位置）。"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Interceptable-by bitmask"
@@ -30650,6 +30665,10 @@ msgstr "将 {boxHolders} 个出生区域各自移给下一个盟友"
 msgid "Move earlier"
 msgstr "前移"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
 msgid "Move key {keyNumber} earlier"
@@ -31714,6 +31733,7 @@ msgid "Newest first"
 msgstr "最新优先"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Next"
 msgstr "下一个"
@@ -31723,6 +31743,10 @@ msgstr "下一个"
 #, fuzzy
 msgid "Next match"
 msgstr "下一个匹配"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -31835,11 +31859,6 @@ msgstr "此游戏的归档中没有匹配的音频片段文件。"
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "No author stated"
 msgstr ""
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "无战斗"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -35078,6 +35097,7 @@ msgstr "关：在单位脚本中的 AimWeapon() 返回之前，武器无法开�
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Offence"
 msgstr "进攻"
@@ -35686,6 +35706,10 @@ msgstr ""
 msgid "Open another file"
 msgstr "打开其他文件"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr ""
+
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Open backup"
 msgstr ""
@@ -36225,6 +36249,7 @@ msgstr "其他"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
 msgstr "其他"
@@ -36271,6 +36296,10 @@ msgstr "已过期"
 
 #: src/multiplayer/battles/useHostCompat.ts
 msgid "Out of date: {reasons}"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
 msgstr ""
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
@@ -38626,11 +38655,6 @@ msgstr "低于 38 时会提升到 38，这是让 1x1 建造单位能够到 1x1 �
 msgid "Raised wall"
 msgstr ""
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-#, fuzzy
-msgid "raises tech ceiling · both sides"
-msgstr "提高科技上限 · 双方"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -39569,11 +39593,6 @@ msgstr "战绩"
 #, fuzzy
 msgid "Recover {name}"
 msgstr "恢复 {name}"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "取得一张图纸以扩充军火库，或为自己取得一项战地改装。"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -41638,9 +41657,9 @@ msgstr "持续运行，直到再次开始。"
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Salvage"
 msgstr "废料"
@@ -43839,11 +43858,6 @@ msgstr "由 {authorName} 分享"
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "由 {authorName} 于 {createdAt} 分享"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Shared ceiling"
-msgstr "共享上限"
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "shared key"
@@ -44575,6 +44589,10 @@ msgstr "侧边图像（视频）"
 msgid "Side not described"
 msgstr "阵营未描述"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"
@@ -44677,13 +44695,6 @@ msgstr "退出登录"
 #, fuzzy
 msgid "Sign-in"
 msgstr "登录"
-
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "信号"
 
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -45183,6 +45194,10 @@ msgstr "失败时"
 msgid "Something finished"
 msgstr "完成时"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
+
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
 msgid "something that is gone"
@@ -45407,9 +45422,8 @@ msgid "Speed, elmos a second"
 msgstr "速度，elmo/秒"
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Spend at depots"
-msgstr "在仓库中花费"
+msgid "Spend at <0><1/>depots</0>"
+msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -46867,11 +46881,6 @@ msgstr "队伍"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "队伍和机器人"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Tech {techNumeral}"
-msgstr "科技 {techNumeral}"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -50188,11 +50197,6 @@ msgstr "无法读取此回放所用游戏的单位，所以没有任何信息说
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "无法读取此回放所用游戏的单位，所以无从得知哪些已完成的单位是建筑，因此此图层需要安装该游戏。"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "你目前能建造的单位，取自你阵营的完整科技树。奖励和仓库可以解锁更多单位，但解锁会提高共享的科技上限，所以敌人也会随你升级。你个人的优势来自天赋，而不是解锁。"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -53813,11 +53817,6 @@ msgstr "基地放到地图上后，此工厂按顺序建造的单位。"
 msgid "Units unlocked"
 msgstr "已解锁的单位"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "已解锁到你共享军火库中的单位，在阵营的完整建造树中点亮显示。"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
@@ -53938,11 +53937,6 @@ msgstr "解锁"
 #, fuzzy
 msgid "unlock the room"
 msgstr "解锁房间"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "unlocked"
-msgstr "已解锁"
 
 #. placeholder {0}: option.unitName
 #: src/runlite/progress.ts
@@ -54658,11 +54652,6 @@ msgstr "来自游戏文件的视频"
 msgid "View"
 msgstr "查看"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View arsenal tree"
-msgstr "查看军火库科技树"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "View available units"
@@ -54700,11 +54689,6 @@ msgstr "查看结果"
 #, fuzzy
 msgid "View tech tree"
 msgstr "查看科技树"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View the arsenal tech tree"
-msgstr "查看军火库的科技树"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -56248,6 +56232,10 @@ msgstr "获胜"
 msgid "won {won} of {known}"
 msgstr "{known} 场中 {won} 胜"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "Won is the games {name} won out of the games with a recorded result in which they ordered the unit. It is what happened in those games, not a sign that the unit caused it."
@@ -56911,6 +56899,10 @@ msgstr "在中心上分享内容需要账号。浏览和导入不需要账号。
 #, fuzzy
 msgid "you only · per-team"
 msgstr "仅你 · 按队伍"
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy

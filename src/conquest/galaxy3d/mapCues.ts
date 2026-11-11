@@ -96,6 +96,13 @@ export interface MapCueInput {
   run?: {
     pathLinks?: ReadonlySet<string>;
     closedLinks?: ReadonlySet<string>;
+    /**
+     * The locations the player may step to now. Given, a link is a choice
+     * when one end is the player's and the other is one of these, whichever
+     * way the document writes it, and its cue is written from the player's
+     * end. A run with side trips can step against a link's direction.
+     */
+    choices?: ReadonlySet<string>;
   };
 }
 
@@ -151,13 +158,24 @@ export function mapCues(input: MapCueInput): MapCues {
     const hiddenEnds = (cueA.hidden ? 1 : 0) + (cueB.hidden ? 1 : 0);
     let tone: LinkTone = "plain";
     let owner: string | undefined;
+    // Set when the choice runs against the link's direction.
+    let reversed = false;
     if (hiddenEnds > 0) {
       // A tone would give away who holds the hidden end.
     } else if (run) {
       // The same order the galaxy's lanes use: a step already made first,
       // then a step out of the player's location, and no faction colours.
       if (run.pathLinks?.has(`${a} ${b}`)) tone = "taken";
-      else if (aPlayer && !bPlayer && !run.closedLinks?.has(`${a} ${b}`)) {
+      else if (run.choices) {
+        if (aPlayer && run.choices.has(b)) {
+          tone = "choice";
+          cueB.attackable = true;
+        } else if (bPlayer && run.choices.has(a)) {
+          tone = "choice";
+          cueA.attackable = true;
+          reversed = true;
+        }
+      } else if (aPlayer && !bPlayer && !run.closedLinks?.has(`${a} ${b}`)) {
         tone = "choice";
         cueB.attackable = true;
       }
@@ -176,8 +194,8 @@ export function mapCues(input: MapCueInput): MapCues {
       if (b === selectedId) cueA.emphasised = true;
     }
     links.push({
-      a,
-      b,
+      a: reversed ? b : a,
+      b: reversed ? a : b,
       kind: linkCueKind(
         kinds.get(pairKey(a, b)),
         !nodeA.outline,

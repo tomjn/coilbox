@@ -57,7 +57,8 @@ export interface TownShading {
 /**
  * The town state texture's rows. Row 0 holds the colour of the ring drawn
  * round the town in sRGB and its strength, 0 for no ring. Row 1 holds
- * whether the town is hidden by fog and whether its ring is the thick one.
+ * whether the town is hidden by fog, whether its ring is the thick one and
+ * whether it stands in an anomaly's haze.
  */
 export const TOWN_STATE_ROWS = 2;
 
@@ -959,6 +960,11 @@ void main() {
   // A town hidden by fog is drawn dim and grey: something is there.
   if (ws1.r > 0.5) {
     town.rgb = mix(town.rgb, vec3(dot(town.rgb, vec3(0.2126, 0.7152, 0.0722))), 0.7) * 0.7;
+  }
+  // An anomaly's town stands in a dark violet haze, thicker in drifts.
+  if (ws1.b > 0.5) {
+    float drift = tNoise(rel / 0.5 + wSeed * 37.0).x;
+    town.rgb = mix(town.rgb, vec3(0.16, 0.12, 0.24) * town.a, 0.45 + 0.4 * drift);
   }
   town = wOver(town, pow(ws0.rgb, vec3(2.2)), ring);
   gl_FragColor = vec4(town.rgb / max(town.a, 1e-4), town.a);

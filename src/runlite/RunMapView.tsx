@@ -33,6 +33,7 @@ import {
 import type { RunHandmadeMap } from "./handmadeMap";
 import { resolveRunMap } from "./mapRun";
 import type { RogueliteRun } from "./model";
+import { nextChoices } from "./progress";
 
 const NO_MODEL_GAME: PlacedModelGame = {};
 
@@ -115,7 +116,14 @@ export function RunMapView({
   // prop — a new map rebuilds the scene, which only happens when the graph does.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the graph + seed, both stable across moves
   const identities = useMemo(
-    () => (land ? mapRunIdentities(run, land.locations) : runIdentities(run)),
+    () =>
+      land
+        ? mapRunIdentities(
+            run,
+            land.locations,
+            mapRunScenery(land.map, land.locations),
+          )
+        : runIdentities(run),
     [land, run.nodes, run.settings.seed],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: owners depend only on progress moving, applied live by GalaxyView
@@ -150,6 +158,16 @@ export function RunMapView({
   const closedLinks = useMemo(
     () => (land ? mapRunClosedLinks(run, land.map, land.locations) : undefined),
     [land, run.edges],
+  );
+  // The steps open now, by location, so a side trip against a link's
+  // direction still lights as a choice.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on progress + graph
+  const choiceIds = useMemo(
+    () =>
+      land
+        ? new Set(nextChoices(run).map((n) => land.locations.get(n.id) ?? n.id))
+        : undefined,
+    [land, run.nodes, run.edges, run.progress, run.settings.sideTrips],
   );
   const inertIds = useMemo(
     () => (land ? mapRunScenery(land.map, land.locations) : undefined),
@@ -211,6 +229,7 @@ export function RunMapView({
       laneFlow
       pathLinks={pathLinks}
       closedLinks={closedLinks}
+      choiceIds={choiceIds}
       inertIds={inertIds}
       burstNodeId={toView(burstNodeId)}
       playerFactionId={PLAYER_FACTION}

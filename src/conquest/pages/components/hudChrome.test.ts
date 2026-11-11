@@ -546,10 +546,9 @@ describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
 /**
  * The accent inks over the band rather than over the card (#1801).
  *
- * Two accented labels are not on a card at all: the warpath's run name and its
- * difficulty badge, which sit straight on the node map. Both now take
- * {@link MAP_BAND_CLASS}, so what is behind their ink is 78% of `--background`
- * rather than 78% of `--card`.
+ * The warpath's run name is not on a card at all: it sits straight on the node
+ * map. It takes {@link MAP_BAND_CLASS}, so what is behind its ink is 78% of
+ * `--background` rather than 78% of `--card`.
  *
  * Those are different surfaces, so the card's measurement does not carry over on
  * its own. It happens to be the safe direction, the dark `--background` being
@@ -973,10 +972,24 @@ const PALETTE_SITES: PaletteSite[] = [
   },
   {
     file: "../../../runlite/pages/components/RunHud.tsx",
-    className: "text-cyan-400",
+    className: "text-red-300",
     on: "card",
     bar: 3,
     what: "the hull icon",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-yellow-300",
+    on: "card",
+    bar: 4.5,
+    what: "the Salvage label",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-emerald-300",
+    on: "card",
+    bar: 4.5,
+    what: "the depots caption",
   },
   {
     file: "../../../runlite/pages/components/RunHud.tsx",
@@ -998,13 +1011,6 @@ const PALETTE_SITES: PaletteSite[] = [
     on: "card",
     bar: 3,
     what: "the salvage icon",
-  },
-  {
-    file: "../../../runlite/pages/components/RunHud.tsx",
-    className: "border-amber-400/80",
-    on: "band",
-    bar: 3,
-    what: "the difficulty badge's dashed outline",
   },
   {
     file: "../../../runlite/pages/components/NodeOverlays.tsx",
@@ -1106,6 +1112,7 @@ describe("no importer outside the two dark routes", () => {
     "conquest/pages/components/BattleOverlay.tsx",
     "conquest/pages/components/BattleOverlayParts.tsx",
     "conquest/pages/components/RunSetup.tsx",
+    "runlite/pages/components/ArsenalOverlay.tsx",
     "runlite/pages/components/EncounterOverlay.tsx",
     "runlite/pages/components/NodeOverlays.tsx",
     "runlite/pages/components/RunContentNotice.tsx",

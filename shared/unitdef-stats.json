@@ -83,6 +83,36 @@
       "unit": null,
       "note": "A boolean. Whether the unit can build, repair and reclaim at all, which the engine defaults to false. Written true or false only where the def declares it."
     },
+    "canFly": {
+      "from": ["canFly"],
+      "unit": null,
+      "note": "A boolean, written only where the def declares it."
+    },
+    "isFeature": {
+      "from": ["isFeature"],
+      "unit": null,
+      "note": "A boolean, written only where the def declares it. True for a wall the engine turns into a feature once it is built, such as dragon's teeth."
+    },
+    "needGeo": {
+      "from": ["yardMap"],
+      "unit": null,
+      "note": "A boolean, written only where the def declares a yardmap. True when the yardmap has a `g` or `j` cell, which is how the engine decides a building must stand on a geothermal vent."
+    },
+    "incomeEnergy": {
+      "from": ["customParams.income_energy"],
+      "unit": "energy per second",
+      "note": "Zero-K's unitdefs_post moves `energyMake` here and sets the engine's key to 0, because a gadget pays the income."
+    },
+    "incomeMetal": {
+      "from": ["customParams.income_metal"],
+      "unit": "metal per second",
+      "note": "Zero-K's `metalMake`, moved here as `incomeEnergy` is."
+    },
+    "metalExtractorMult": {
+      "from": ["customParams.metal_extractor_mult"],
+      "unit": null,
+      "note": "Zero-K's mark of a metal extractor, which declares no `extractsMetal` because a gadget does the extracting."
+    },
     "weapons": {
       "from": ["weapons[]"],
       "unit": null,

@@ -313,6 +313,23 @@ local function stats_of(d, wdefs)
   put('seismicDistance', stat(u, 'seismicdistance'))
   put('transportCapacity', stat(u, 'transportcapacity'))
   put_flag('builder', flag(u, 'builder'))
+  -- What a warpath's starting build list is chosen by: an aircraft, a wall the
+  -- engine turns into a feature, and a building that needs a geothermal vent.
+  -- The engine sets `needGeo` from a `g` or `j` in a building's yardmap.
+  put_flag('canFly', flag(u, 'canfly'))
+  put_flag('isFeature', flag(u, 'isfeature'))
+  local yard = u['yardmap']
+  if type(yard) == 'string' and yard ~= '' then
+    local cells = string.lower(yard):gsub('^h', '')
+    put_flag('needGeo', cells:find('[gj]') ~= nil)
+  end
+  -- Zero-K pays income from a gadget: its unitdefs_post moves `energymake` and
+  -- `metalmake` into these customparams and zeroes the engine's own, and marks
+  -- an extractor with `metal_extractor_mult`.
+  local cp = lowered(u['customparams'])
+  put('incomeEnergy', stat(cp, 'income_energy'))
+  put('incomeMetal', stat(cp, 'income_metal'))
+  put('metalExtractorMult', stat(cp, 'metal_extractor_mult'))
   return '{' .. table.concat(parts, ',') .. '}'
 end
 
@@ -2710,6 +2727,60 @@ mod tests {
         assert_eq!(stat(&units[0], "seismicDistance"), Some(2000.0));
         assert_eq!(stat(&units[0], "transportCapacity"), Some(8.0));
         assert_eq!(s["builder"], serde_json::json!(true));
+    }
+
+    /// The flags a warpath's starting build list reads. `needGeo` is not a
+    /// unitdef key: the engine sets it from a `g` or `j` in the yardmap, with a
+    /// leading `h` marking a high resolution yardmap rather than a cell.
+    #[test]
+    fn flying_walls_and_geothermal_buildings_are_flagged() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                plane = { canfly = 1 },
+                wall = { isfeature = 'true' },
+                geo = { yardmap = 'oooo oGoo oooo' },
+                hires = { yardmap = 'hoooo' },
+                plain = { yardmap = 'oooo' },
+              },
+              weapondefs = {},
+            }"#,
+        );
+        let by = |name: &str| {
+            &units
+                .iter()
+                .find(|u| u.name == name)
+                .expect("unit present")
+                .stats
+        };
+
+        assert_eq!(by("plane")["canFly"], serde_json::json!(true));
+        assert_eq!(by("wall")["isFeature"], serde_json::json!(true));
+        assert_eq!(by("geo")["needGeo"], serde_json::json!(true));
+        assert_eq!(by("hires")["needGeo"], serde_json::json!(false));
+        assert_eq!(by("plain")["needGeo"], serde_json::json!(false));
+        assert!(!by("plane").contains_key("needGeo"));
+    }
+
+    /// Zero-K's unitdefs_post moves a unit's income into customparams and
+    /// zeroes the engine's keys, so the dataset reads it from there.
+    #[test]
+    fn zero_k_income_is_read_from_customparams() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                solar = { energymake = 0, customParams = { income_energy = 2 } },
+                mex = { customparams = { metal_extractor_mult = '1', income_metal = 0.5 } },
+              },
+              weapondefs = {},
+            }"#,
+        );
+        let by = |name: &str| units.iter().find(|u| u.name == name).expect("unit present");
+
+        assert_eq!(stat(by("solar"), "incomeEnergy"), Some(2.0));
+        assert_eq!(stat(by("mex"), "metalExtractorMult"), Some(1.0));
+        assert_eq!(stat(by("mex"), "incomeMetal"), Some(0.5));
+        assert_eq!(stat(by("solar"), "metalExtractorMult"), None);
     }
 
     /// A negative upkeep is income in the engine, so it travels as written

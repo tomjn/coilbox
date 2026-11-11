@@ -118,6 +118,9 @@ export type RewardOption =
 export interface RewardSpec {
   title: string;
   options: RewardOption[];
+  /** Salvage banked on reaching the cache, whatever the player takes. Absent
+   * on a run generated before caches paid any. */
+  salvage?: number;
 }
 
 /** A branch of an event card: label + the mutations applied when chosen. */
@@ -233,6 +236,15 @@ export interface RunSettings {
   /** Present on a run across a land map. Part of the settings so a challenge
    * code carries it and the recipient crosses the same map. */
   map?: RunMapRef;
+  /**
+   * A land run only. True: every location the start can reach is a run node,
+   * and the player may step along any road to one they have not visited, so
+   * long as the goal can still be reached (see `./progress.ts`). False: only
+   * the locations on a forward route are run nodes, and the view leaves every
+   * other location off the map. Absent on a run made before the choice
+   * existed, which keeps the other locations as scenery.
+   */
+  sideTrips?: boolean;
 }
 
 export type RunStatus = "active" | "won" | "lost";
@@ -484,6 +496,11 @@ function parseReward(value: unknown): RewardSpec | undefined {
   return {
     title: typeof value.title === "string" ? value.title : t`Salvage`,
     options,
+    ...(typeof value.salvage === "number" &&
+    Number.isFinite(value.salvage) &&
+    value.salvage > 0
+      ? { salvage: value.salvage }
+      : {}),
   };
 }
 
@@ -512,7 +529,7 @@ function parseEvent(value: unknown): EventSpec | undefined {
       })
     : [];
   return {
-    title: typeof value.title === "string" ? value.title : t`Signal`,
+    title: typeof value.title === "string" ? value.title : t`Anomaly`,
     body: typeof value.body === "string" ? value.body : "",
     choices,
   };
@@ -639,6 +656,9 @@ export function parseRunSettings(value: unknown): RunSettings | null {
         : undefined,
     skin: readMapSkin(value.skin) ?? "galaxy",
     ...(map ? { map } : {}),
+    ...(typeof value.sideTrips === "boolean"
+      ? { sideTrips: value.sideTrips }
+      : {}),
   };
 }
 

@@ -25,12 +25,78 @@ function nodeById(run: RogueliteRun, id: string): RunNode | undefined {
   return run.nodes.find((n) => n.id === id);
 }
 
-/** Forward successors of a node (edge targets). */
+/** Whether a run lets the player take side trips across its map. */
+export function hasSideTrips(run: RogueliteRun): boolean {
+  return run.settings.sideTrips === true;
+}
+
+/** Each node's neighbours along the run's edges, in either direction. */
+function roads(run: RogueliteRun): Map<string, string[]> {
+  const adj = new Map<string, string[]>();
+  for (const [a, b] of run.edges) {
+    adj.set(a, [...(adj.get(a) ?? []), b]);
+    adj.set(b, [...(adj.get(b) ?? []), a]);
+  }
+  return adj;
+}
+
+/**
+ * The nodes reachable from `fromId` along the run's edges in either direction
+ * without passing through a visited node, `fromId` included. On a run with
+ * side trips this is everywhere the player can still go.
+ */
+export function openFrom(run: RogueliteRun, fromId: string): Set<string> {
+  const adj = roads(run);
+  const visited = new Set(run.progress.visited);
+  const seen = new Set<string>([fromId]);
+  const queue = [fromId];
+  for (let head = 0; head < queue.length; head++) {
+    for (const nb of adj.get(queue[head]) ?? []) {
+      if (seen.has(nb) || visited.has(nb)) continue;
+      seen.add(nb);
+      queue.push(nb);
+    }
+  }
+  return seen;
+}
+
+/**
+ * The nodes the player may step to from `nodeId`. Most runs move forward
+ * along their edges. A run with side trips moves along them either way, to any
+ * node not yet visited. A detour that ends somewhere with nowhere new to go
+ * sends the player back the way they came (see {@link settle}), so a dead end
+ * never strands them.
+ */
 export function successors(run: RogueliteRun, nodeId: string): RunNode[] {
-  const ids = run.edges.filter(([a]) => a === nodeId).map(([, b]) => b);
-  return ids
+  if (!hasSideTrips(run)) {
+    const ids = run.edges.filter(([a]) => a === nodeId).map(([, b]) => b);
+    return ids
+      .map((id) => nodeById(run, id))
+      .filter((n): n is RunNode => n !== undefined);
+  }
+  const visited = new Set(run.progress.visited);
+  return [...new Set(roads(run).get(nodeId) ?? [])]
+    .filter((id) => !visited.has(id))
     .map((id) => nodeById(run, id))
     .filter((n): n is RunNode => n !== undefined);
+}
+
+/**
+ * On a run with side trips, a player who has just resolved a node with no
+ * unvisited neighbour travels back over the places they have been, to the
+ * last one visited that has an unvisited neighbour. The places visited are
+ * joined to each other and to everything still ahead, the boss included, so
+ * there always is one while the run is on.
+ */
+function settle(run: RogueliteRun): RogueliteRun {
+  if (!hasSideTrips(run) || run.progress.status !== "active") return run;
+  if (successors(run, run.progress.currentNodeId).length > 0) return run;
+  const back = [...run.progress.visited]
+    .reverse()
+    .find((id) => successors(run, id).length > 0);
+  return back
+    ? { ...run, progress: { ...run.progress, currentNodeId: back } }
+    : run;
 }
 
 /** Whether a node has been resolved (its effect applied). */
@@ -115,12 +181,12 @@ export function resolveBattle(
     if (p.hull <= 0) p.status = "lost";
   }
 
-  return {
+  return settle({
     ...run,
     progress: p,
     history: pushHistory(run, { nodeId, type: node.type, outcome }),
     updatedAt: now ?? touch(),
-  };
+  });
 }
 
 // --- Reward / event / shop resolution --------------------------------------
@@ -153,9 +219,10 @@ export function applyReward(
   const p: RunProgress = { ...run.progress };
   const option = node.reward.options[optionIndex];
   if (option) grantOption(p, option);
+  p.salvage += node.reward.salvage ?? 0;
   p.visited = [...p.visited, nodeId];
   p.currentNodeId = nodeId;
-  return {
+  return settle({
     ...run,
     progress: p,
     history: pushHistory(run, {
@@ -164,7 +231,7 @@ export function applyReward(
       note: option ? rewardOptionLabel(option) : undefined,
     }),
     updatedAt: now ?? touch(),
-  };
+  });
 }
 
 /** A short human label for a taken reward/shop option (recorded in history so a
@@ -199,12 +266,12 @@ export function applyEvent(
   if (p.hull <= 0) p.status = "lost";
   p.visited = [...p.visited, nodeId];
   p.currentNodeId = nodeId;
-  return {
+  return settle({
     ...run,
     progress: p,
     history: pushHistory(run, { nodeId, type: node.type, note: choice?.label }),
     updatedAt: now ?? touch(),
-  };
+  });
 }
 
 /** Buy one shop offer (if affordable). The shop stays open — resolve it with
@@ -258,16 +325,18 @@ export function leaveNode(
 ): RogueliteRun {
   const node = nodeById(run, nodeId);
   if (!node || isResolved(run, nodeId) || !canActOn(run, nodeId)) return run;
-  return {
+  return settle({
     ...run,
     progress: {
       ...run.progress,
+      // Leaving a cache still collects its salvage.
+      salvage: run.progress.salvage + (node.reward?.salvage ?? 0),
       visited: [...run.progress.visited, nodeId],
       currentNodeId: nodeId,
     },
     history: pushHistory(run, { nodeId, type: node.type }),
     updatedAt: now ?? touch(),
-  };
+  });
 }
 
 /** The deepest column the player has reached (for meta stats). */

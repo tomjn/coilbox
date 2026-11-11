@@ -1,7 +1,7 @@
 import { t as coreT, plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Gift, Sparkles, Store } from "lucide-react";
+import { CircuitBoard, Sparkles, Store } from "lucide-react";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
 import {
   BracketFrame,
@@ -74,7 +74,7 @@ function optionText(o: RewardOption): {
         one: "Unlocks # unit along the build tree.",
         other: "Unlocks # units along the build tree.",
       }),
-      tag: coreT`raises tech ceiling · both sides`,
+      tag: coreT`you only · unlocks units`,
     };
   }
   const pct = Math.round(o.perk.value * 100);
@@ -111,7 +111,7 @@ export function RewardOverlay({
   };
   return (
     <Overlay
-      icon={<Gift className="size-5 text-yellow-300" aria-hidden />}
+      icon={<CircuitBoard className="size-5 text-yellow-300" aria-hidden />}
       title={node.reward?.title ?? t`Salvage cache`}
       lede={t`Take a schematic to widen the arsenal, or a field upgrade for your command alone.`}
       onClose={onClose}
@@ -172,7 +172,7 @@ export function EventOverlay({
       icon={
         <Sparkles className={`size-5 ${HUD_ACCENT_INK.violet}`} aria-hidden />
       }
-      title={ev?.title ?? t`Signal`}
+      title={ev?.title ?? t`Anomaly`}
       lede={ev?.body}
       onClose={onClose}
     >

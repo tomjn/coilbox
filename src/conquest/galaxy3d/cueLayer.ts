@@ -22,7 +22,14 @@ import {
 } from "./mapCues";
 import type { ProvinceLayer } from "./provinceLayer";
 import { drapeLine, type MapPoint, ribbonPositions } from "./provinces";
-import { pairKey } from "./roads";
+import type { RoadLine } from "./roadMask";
+import { pairKey, roadLinks } from "./roads";
+import {
+  type ChevronPlacement,
+  type GroundXZ,
+  orientFrom,
+  spotsAlong,
+} from "./routeChevrons";
 import { seaRoute } from "./seaRoute";
 import type { TerrainSurface } from "./terrain";
 
@@ -79,6 +86,20 @@ const CROSSING_PATTERN_OF: Record<LinkTone, CrossingPattern> = {
   choice: "chevrons",
   taken: "filled",
 };
+
+/**
+ * World units above the ground a travelling chevron sits. The chevron is a
+ * flat quad, so on a slope its uphill edge would sink into the ground at
+ * the road layer's own lift. This is a little over the cue lines' 0.16.
+ */
+const CHEVRON_LIFT = 0.2;
+/**
+ * A chevron's size on the terrain map, as a share of the galaxy map's
+ * 2.4 by 1.7 quad. That gives 0.96 by 0.68 world units, a little over the
+ * 0.8 a crossing's line is wide and about the diameter of a city badge
+ * (0.36 radius). Chosen without seeing it on screen.
+ */
+export const TERRAIN_CHEVRON_SCALE = 0.4;
 
 const PLAIN_OPACITY = 0.85;
 const OWNED_OPACITY = 0.9;
@@ -147,6 +168,16 @@ export function buildCueLayer(
   },
   /** Draw the crossings over the sea as solid lines, for a sea that is not liquid. */
   solidCrossings = false,
+  /**
+   * A Warpath run's travelling chevrons. `place` is handed the chevrons for
+   * every open choice on each {@link CueLayer.apply}, an empty list when
+   * there are none. `roads` are the ground layer's, whose `index` is a
+   * road's state index.
+   */
+  flow?: {
+    roads: readonly RoadLine[];
+    place: (placements: ChevronPlacement[], scale: number) => void;
+  },
 ): CueLayer {
   const nodeIndex = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
   /** A node id as a province's node index, or -1 for a point location. */
@@ -442,8 +473,61 @@ export function buildCueLayer(
     crossingStyles.needsUpdate = true;
   };
 
+  /* ------------------------------- chevrons ------------------------------ */
+
+  const roadIndex = new Map(
+    roadLinks(galaxy).map(({ a, b }, i) => [pairKey(a, b), i]),
+  );
+  const piecesByRoad = new Map<number, MapPoint[][]>();
+  for (const road of flow?.roads ?? []) {
+    if (road.index === undefined) continue;
+    const list = piecesByRoad.get(road.index) ?? [];
+    list.push(road.line);
+    piecesByRoad.set(road.index, list);
+  }
+  const kindOf = new Map(
+    structure.links.map((l) => [pairKey(l.a, l.b), l.kind]),
+  );
+  /**
+   * Where a link runs on the ground, as pieces of map points: its road, or a
+   * crossing's whole route, or the straight line between its two locations.
+   */
+  const routeOf = (a: string, b: string): MapPoint[][] => {
+    const key = pairKey(a, b);
+    const kind = kindOf.get(key);
+    if (kind === "crossing") {
+      const route = plan.crossings.get(key)?.route;
+      if (route) return [[...route.jettyA, ...route.sea, ...route.jettyB]];
+    } else {
+      const index =
+        kind === "road" ? roadIndex.get(key) : provinceRoadIndex.get(key);
+      const pieces = index === undefined ? undefined : piecesByRoad.get(index);
+      if (pieces && pieces.length > 0) return pieces;
+    }
+    return [[anchorOf(a), anchorOf(b)]];
+  };
+  const placements = (cues: LinkCue[]): ChevronPlacement[] => {
+    const out: ChevronPlacement[] = [];
+    for (const link of cues) {
+      if (link.tone !== "choice") continue;
+      const world = routeOf(link.a, link.b).map((piece) =>
+        piece.map(([x, y]) => surface.mapToWorldXZ(x, y)),
+      );
+      const [fx, fy] = anchorOf(link.a);
+      const from: GroundXZ = surface.mapToWorldXZ(fx, fy);
+      for (const spot of spotsAlong(orientFrom(world, from))) {
+        out.push({
+          ...spot,
+          y: surface.groundHeightAtWorld(spot.x, spot.z) + CHEVRON_LIFT,
+        });
+      }
+    }
+    return out;
+  };
+
   const apply = () => {
     const cues = mapCues({ galaxy, ...source() });
+    flow?.place(placements(cues.links), TERRAIN_CHEVRON_SCALE);
     styleLines(
       new Map(cues.links.map((l) => [pairKey(l.a, l.b), l])),
       new Set(

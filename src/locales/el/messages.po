@@ -8175,6 +8175,10 @@ msgstr "+{restHull} σκάφος"
 msgid "+{reward} salvage"
 msgstr "+{reward} λάφυρα"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "+{salvage} salvage"
+msgstr ""
+
 #: src/runlite/generate.ts
 #, fuzzy
 msgid "+{salvage} salvage, -{hullCost} hull"
@@ -8675,16 +8679,6 @@ msgstr "Ένας χαρακτήρας: b κουτί, e ελλειψοειδές,
 #, fuzzy
 msgid "A character: x, y or z. Only meaningful for a cylinder."
 msgstr "Ένας χαρακτήρας: x, y ή z. Έχει νόημα μόνο για κύλινδρο."
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice awaits"
-msgstr "Σας περιμένει μια επιλογή"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "A choice on the wire — no battle."
-msgstr "Μια επιλογή της τελευταίας στιγμής — χωρίς μάχη."
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -11451,6 +11445,13 @@ msgstr "Μήνυμα ανακοίνωσης"
 msgid "Announcements"
 msgstr "Ανακοινώσεις"
 
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Anomaly"
+msgstr ""
+
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
 msgid "Another action for this key, e.g. areaattack"
@@ -11902,8 +11903,8 @@ msgstr "Γύρω από {x}, {z}, σε απόσταση {radius}"
 msgid "Arrived sound"
 msgstr "Ήχος άφιξης"
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Arsenal"
 msgstr "Οπλοστάσιο"
@@ -12398,6 +12399,7 @@ msgstr "Πίσω στον χάρτη Κατάκτησης"
 
 #: src/conquest/pages/components/BackToMapButton.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -13855,6 +13857,10 @@ msgstr "κατασκευαστής"
 #, fuzzy
 msgid "Builder"
 msgstr "Κατασκευαστής"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Builders"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -16633,6 +16639,10 @@ msgstr "Σύμπτυξη πλαϊνής στήλης σε στενά παράθ�
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Η σύμπτυξη της πλαϊνής στήλης την κρύβει πλήρως αντί να δείχνει μια στήλη εικονιδίων."
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Collect salvage"
+msgstr ""
+
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -18674,11 +18684,6 @@ msgstr "Αθροιστικό"
 msgid "Curated map"
 msgstr "Επιλεγμένος"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
-msgstr "Νόμισμα που πέφτει όταν κερδίζετε μάχες (περισσότερο από επίλεκτους και αρχηγούς). Ξοδέψτε το σε αποθήκες για ξεκλείδωμα μονάδων, πλεονεκτήματα και επισκευές."
-
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitPictureCard.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -19201,6 +19206,7 @@ msgstr "Ήττα."
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Defence"
 msgstr "Άμυνα"
@@ -19880,6 +19886,7 @@ msgstr ""
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Difficulty"
 msgstr "Δυσκολία"
@@ -20978,6 +20985,7 @@ msgstr "Εύκολο"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Economy"
@@ -21689,7 +21697,6 @@ msgid "Estimated from ramp + duration; live metrics appear once the run is under
 msgstr "Εκτίμηση από την κλιμάκωση και τη διάρκεια. Οι ζωντανές μετρήσεις εμφανίζονται μόλις ξεκινήσει η εκτέλεση."
 
 #: src/hub/pages/components/ItemPreview.tsx
-#: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Event"
 msgstr "Γεγονός"
@@ -22400,6 +22407,10 @@ msgstr "Φατρία για το νέο AI"
 #, fuzzy
 msgid "Factions"
 msgstr "Φατρίες"
+
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Factories"
+msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -26792,6 +26803,10 @@ msgstr "Εγκατάσταση…"
 msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr "Εγκαθιστά μια μηχανή κατάλληλη για αυτή την πλατφόρμα στον κατάλογο <0>engine/</0> του ρυθμισμένου φακέλου περιεχομένου (ορίστε τον προορισμό στις <1>ρυθμίσεις Φακέλων περιεχομένου</1>)."
 
+#: src/runlite/pages/components/ArsenalOverlay.tsx
+msgid "Intelligence"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Interceptable-by bitmask"
@@ -30846,6 +30861,10 @@ msgstr "Μετακίνηση καθεμιάς από τις {boxHolders} περ�
 msgid "Move earlier"
 msgstr "Μετακίνηση νωρίτερα"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
 msgid "Move key {keyNumber} earlier"
@@ -31915,6 +31934,7 @@ msgid "Newest first"
 msgstr "Νεότερα"
 
 #: src/hub/pages/BrowsePage.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Next"
 msgstr "Επόμενο"
@@ -31924,6 +31944,10 @@ msgstr "Επόμενο"
 #, fuzzy
 msgid "Next match"
 msgstr "Επόμενο αποτέλεσμα"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Next:"
+msgstr ""
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -32037,11 +32061,6 @@ msgstr "Κανένα αρχείο ηχητικού αποσπάσματος δε
 #, fuzzy
 msgid "No author stated"
 msgstr "Δεν αναφέρεται δημιουργός"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "no battle"
-msgstr "καμία μάχη"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -35298,6 +35317,7 @@ msgstr "Ανενεργό: το όπλο δεν μπορεί να βάλλει μ
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Offence"
 msgstr "Επίθεση"
@@ -35919,6 +35939,10 @@ msgstr "Το Open Annihilation δέχεται κωδικό πρόσβασης έ
 msgid "Open another file"
 msgstr "Άνοιγμα άλλου αρχείου"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Open arsenal"
+msgstr ""
+
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Open backup"
@@ -36467,6 +36491,7 @@ msgstr "άλλο"
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/runlite/pages/components/ArsenalOverlay.tsx
 #, fuzzy
 msgid "Other"
 msgstr "Άλλο"
@@ -36515,6 +36540,10 @@ msgstr "Παρωχημένο"
 #, fuzzy
 msgid "Out of date: {reasons}"
 msgstr "Παρωχημένο: {reasons}"
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Out of reach from here"
+msgstr ""
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
@@ -38890,11 +38919,6 @@ msgstr "Αυξάνεται σε 38 αν οριστεί χαμηλότερα, τ�
 msgid "Raised wall"
 msgstr "Υπερυψωμένο τείχος"
 
-#: src/runlite/pages/components/NodeOverlays.tsx
-#, fuzzy
-msgid "raises tech ceiling · both sides"
-msgstr "ανεβάζει το ανώτατο όριο τεχνολογίας · και οι δύο πλευρές"
-
 #: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -39838,11 +39862,6 @@ msgstr "Ρεκόρ"
 #, fuzzy
 msgid "Recover {name}"
 msgstr "Ανάκτηση του {name}"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
-msgstr "Ανακτήστε ένα σχεδιάγραμμα για να διευρύνετε το οπλοστάσιο ή μια βελτίωση πεδίου για τον εαυτό σας."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
@@ -41918,9 +41937,9 @@ msgstr "Συνεχίζει μέχρι να ξεκινήσει ξανά."
 msgid "S3O Blender Tools"
 msgstr "S3O Blender Tools"
 
-#: src/runlite/galaxyAdapter.ts
 #: src/runlite/model.ts
 #: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Salvage"
 msgstr "Λάφυρα"
@@ -44134,11 +44153,6 @@ msgstr "Κοινοποιήθηκε από {authorName}"
 msgid "Shared by {authorName} on {createdAt}"
 msgstr "Κοινοποιήθηκε από {authorName} στις {createdAt}"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Shared ceiling"
-msgstr "Κοινό ανώτατο όριο"
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "shared key"
@@ -44871,6 +44885,10 @@ msgstr "βίντεο πλευρικού γραφικού"
 msgid "Side not described"
 msgstr "Η φατρία δεν περιγράφεται"
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Side trips to every town"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Side view, with no perspective"
@@ -44976,13 +44994,6 @@ msgstr "Αποσύνδεση"
 #, fuzzy
 msgid "Sign-in"
 msgstr "Σύνδεση"
-
-#: src/runlite/model.ts
-#: src/runlite/pages/components/NodeOverlays.tsx
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Signal"
-msgstr "Σήμα"
 
 #: src/hub/pages/components/HeaderAccount.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -45489,6 +45500,10 @@ msgstr "Κάτι απέτυχε"
 msgid "Something finished"
 msgstr "Κάτι ολοκληρώθηκε"
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Something strange is here. Make a choice, with no battle."
+msgstr ""
+
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
 msgid "something that is gone"
@@ -45713,9 +45728,8 @@ msgid "Speed, elmos a second"
 msgstr "Ταχύτητα, elmo ανά δευτερόλεπτο"
 
 #: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Spend at depots"
-msgstr "Ξοδέψτε σε αποθήκες"
+msgid "Spend at <0><1/>depots</0>"
+msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -47183,11 +47197,6 @@ msgstr "Ομάδες"
 #, fuzzy
 msgid "Teams and bots"
 msgstr "Ομάδες και bots"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "Tech {techNumeral}"
-msgstr "Τεχνολογία {techNumeral}"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -50537,11 +50546,6 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση των μονάδων �
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "Δεν ήταν δυνατή η ανάγνωση των μονάδων του παιχνιδιού αυτής της επανάληψης, οπότε τίποτα δεν λέει ποιες ολοκληρωμένες μονάδες είναι κτίρια, και αυτό το επίπεδο χρειάζεται το παιχνίδι εγκατεστημένο."
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
-msgstr "Οι μονάδες που μπορείτε να κατασκευάσετε τώρα, από ολόκληρο το δέντρο της φατρίας σας. Οι ανταμοιβές και οι αποθήκες ξεκλειδώνουν περισσότερες, αλλά το ξεκλείδωμα ανεβάζει ένα κοινό ανώτατο όριο τεχνολογίας, οπότε ο εχθρός κλιμακώνεται μαζί σας. Το προσωπικό σας πλεονέκτημα προέρχεται από τα πλεονεκτήματα, όχι από τα ξεκλειδώματα."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -54182,11 +54186,6 @@ msgstr "Οι μονάδες που κατασκευάζει αυτό το εργ
 msgid "Units unlocked"
 msgstr "Μονάδες που ξεκλειδώθηκαν"
 
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
-msgstr "Μονάδες που ξεκλειδώθηκαν στο κοινό σας οπλοστάσιο, φωτισμένες πάνω στο πλήρες δέντρο κατασκευής της φατρίας."
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
@@ -54307,11 +54306,6 @@ msgstr "Ξεκλείδωμα"
 #, fuzzy
 msgid "unlock the room"
 msgstr "ξεκλείδωμα της αίθουσας"
-
-#: src/runlite/pages/RunPage.tsx
-#, fuzzy
-msgid "unlocked"
-msgstr "ξεκλειδώθηκε"
 
 #. placeholder {0}: option.unitName
 #: src/runlite/progress.ts
@@ -55030,11 +55024,6 @@ msgstr "Βίντεο από αρχεία του παιχνιδιού"
 msgid "View"
 msgstr "Προβολή"
 
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View arsenal tree"
-msgstr "Προβολή δέντρου οπλοστασίου"
-
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "View available units"
@@ -55072,11 +55061,6 @@ msgstr "Προβολή αποτελεσμάτων"
 #, fuzzy
 msgid "View tech tree"
 msgstr "Προβολή δέντρου τεχνολογίας"
-
-#: src/runlite/pages/components/RunHud.tsx
-#, fuzzy
-msgid "View the arsenal tech tree"
-msgstr "Προβολή του δέντρου τεχνολογίας του οπλοστασίου"
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -56629,6 +56613,10 @@ msgstr "Νίκη"
 msgid "won {won} of {known}"
 msgstr "νίκες {won} από {known}"
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
+msgstr ""
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "Won is the games {name} won out of the games with a recorded result in which they ordered the unit. It is what happened in those games, not a sign that the unit caused it."
@@ -57297,6 +57285,10 @@ msgstr "Χρειάζεστε λογαριασμό για να κοινοποιε
 #, fuzzy
 msgid "you only · per-team"
 msgstr "μόνο εσείς · ανά ομάδα"
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · unlocks units"
+msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy

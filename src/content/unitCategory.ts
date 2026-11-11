@@ -78,6 +78,10 @@ export function classifyUnit(unit: ClassifiableUnit): UnitCategory {
     positive(stats, "energyMake") ||
     positive(stats, "makesMetal") ||
     positive(stats, "extractsMetal") ||
+    // Zero-K moves its income into customparams for a gadget to pay.
+    positive(stats, "incomeEnergy") ||
+    positive(stats, "incomeMetal") ||
+    positive(stats, "metalExtractorMult") ||
     positive(stats, "windGenerator") ||
     positive(stats, "tidalGenerator") ||
     negative(stats, "metalUpkeep") ||

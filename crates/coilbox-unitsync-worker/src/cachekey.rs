@@ -81,7 +81,12 @@ use std::path::{Path, PathBuf};
 /// would go on listing as unrelated units. v27: the dataset now reads the
 /// definitions a second time with `evocom` on and takes the evolution edges from
 /// that, so a blob cached under v26 has no edge out of a starting commander.
-pub const INFO_CACHE_VERSION: u32 = 27;
+/// v28: the dataset now reports `canFly`, `isFeature` and `needGeo`, which a
+/// warpath's starting build list is chosen by, and a blob cached under v27 has
+/// none of them. v29: the dataset now reports Zero-K's income and extractor
+/// customparams, and a blob cached under v28 has none, which leaves a Zero-K
+/// warpath with no energy building or extractor to start with.
+pub const INFO_CACHE_VERSION: u32 = 29;
 
 /// Salts the unit model cache's keys and file names. Bump when the way a model
 /// is flattened or a texture is transcoded changes, so every entry is read again.
@@ -411,9 +416,9 @@ mod tests {
 
     #[test]
     fn a_game_s_keys_are_the_ones_the_worker_wrote_before() {
-        assert_eq!(game_key(&game()), "e30bfa55710ce3e1");
-        assert_eq!(dataset_key(&game()), "fad95fe3246dcefb");
-        assert_eq!(archive_hash_key(&game()), "8449a163e09b010b");
+        assert_eq!(game_key(&game()), "5e4d1d57c7d59568");
+        assert_eq!(dataset_key(&game()), "b9453dbd5f2308ef");
+        assert_eq!(archive_hash_key(&game()), "7a7c7c8a57358dbd");
         assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
@@ -425,11 +430,11 @@ mod tests {
         let map = map();
         assert_eq!(
             map_info_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("f18633f00c6ae599")
+            Some("9c35d019e23a9b7d")
         );
         assert_eq!(
             map_meta_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("35ede80fb8f12967")
+            Some("b10428bd260acafe")
         );
         assert_eq!(
             thumb_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -441,11 +446,11 @@ mod tests {
     fn a_map_with_no_archive_path_keys_on_its_name_and_file() {
         assert_eq!(
             map_info_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n6c546e6e1f127364")
+            Some("n9102634a1472817e")
         );
         assert_eq!(
             map_meta_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("nff4b1d5b26776013")
+            Some("n0a29e31e49eed373")
         );
         assert_eq!(
             thumb_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -517,8 +522,8 @@ mod tests {
             13,
             1_700_000_000,
         );
-        assert_eq!(skirmish_key(&engine, Some(&game())), "a12deb27d73f288c4");
-        assert_eq!(skirmish_key(&engine, None), "a2a165670e8c75bb4");
+        assert_eq!(skirmish_key(&engine, Some(&game())), "ab0b52a26a7a185a0");
+        assert_eq!(skirmish_key(&engine, None), "a15e70cd985d2a6ca");
     }
 
     #[test]
