@@ -22,6 +22,7 @@
 - Every geometry, material and render target goes into `disposables`.
 - Comments follow the repo's plain English style. No em dashes.
 - Before any PR: `bun run check` passes. PRs go through the `file-pr` skill.
+- Visual advisor: every set of on-screen shots is checked by Claude Fable 5.2 before it goes to the user. Use `delegate_task` with provider `claudeAgent` and model `claude-fable-5-2`. Its brief carries the shot paths, the approved reference shots in `docs/reports/warpath-landmarks/shots/bastion3-*`, the style rules from this plan's Global constraints and the spec's Decisions section. It is read-only and spawns no agents of its own. It reports what departs from the reference or the rules, ranked. Fix what it finds, or say why not, then post the shots and its verdict to the user together.
 
 ## Review focus
 
@@ -309,7 +310,7 @@ Follow `CLAUDE.md` "Driving the app": a seeded portable instance, its own port a
 - [ ] **Step 3:** Repeat Step 1 on volcanic, against `bastion3-volcanic-*`.
 - [ ] **Step 4:** Start runs on desert, ice, red, moon and acid. Tune each new stronghold palette until the model takes the planet's cast. Take one mid shot of each.
 - [ ] **Step 5:** Open a conquest land map. Confirm every enemy capital has a stronghold, the player's capital has a town, and selection, hover and fog show on a stronghold.
-- [ ] **Step 6:** Save every shot as a 1440 by 900 JPEG under `docs/reports/warpath-landmarks/product/` and post them in chat, one per image.
+- [ ] **Step 6:** Save every shot as a 1440 by 900 JPEG under `docs/reports/warpath-landmarks/product/`. Send them to the Fable 5.2 visual advisor, act on its findings, retake what changed, then post the shots in chat one per image with its verdict.
 - [ ] **Step 7:** Commit any tuning. Run `bun run check`. Every lane must pass. Report the output if any fail.
 - [ ] **Step 8:** File PR 1 with the `file-pr` skill. Attach the far, mid and close shots for temperate and volcanic with `gh --attach`.
 
@@ -330,5 +331,5 @@ Built down from `citadel.ts`, per the spec: the mound at a lower height, two bro
 - [ ] **Step 3: Implement `ruin.ts`** and build it in the layer.
 - [ ] **Step 4: Run** again. Expected: PASS.
 - [ ] **Step 5: Commit** `"Add the ruined castle"`.
-- [ ] **Step 6:** On screen as in Task 10: far, mid and close on temperate and volcanic, inside the event mist and with the mist off for comparison. Post the shots as 1440 by 900 JPEGs. Stop and wait for the user's approval. Work through their notes.
+- [ ] **Step 6:** On screen as in Task 10: far, mid and close on temperate and volcanic, inside the event mist and with the mist off for comparison. Send them to the Fable 5.2 visual advisor, with `citadel.ts` shots in place of the bastion references, and act on its findings. Post the shots as 1440 by 900 JPEGs with its verdict. Stop and wait for the user's approval. Work through their notes.
 - [ ] **Step 7:** After approval, tune the other five ruin palettes, take one mid shot of each, run `bun run check`, and file PR 2 with the `file-pr` skill.
