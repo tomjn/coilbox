@@ -213,8 +213,8 @@ const RADIUS_PER_ROAD = 0.2;
 const BUSY_ROADS = 5;
 /** How much of a town's size comes from its roads. The rest is chance. */
 const ROAD_SHARE = 0.65;
-const NEIGHBOUR_SHARE = 0.3;
-const CAPITAL_NEIGHBOUR_SHARE = 0.38;
+export const NEIGHBOUR_SHARE = 0.3;
+export const CAPITAL_NEIGHBOUR_SHARE = 0.38;
 /** The most a town is stretched along its roads. */
 const MAX_STRETCH = 0.35;
 

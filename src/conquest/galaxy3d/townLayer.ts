@@ -107,6 +107,12 @@ export function buildTownLayer(
    * hand-made map, which has no biome weights to say where fields go.
    */
   fieldsAnywhere = false,
+  /**
+   * Towns, by index, that a landmark stands in place of. They keep their
+   * index, so a location's state still finds its town, but nothing of them
+   * is painted.
+   */
+  omit: ReadonlySet<number> = new Set(),
 ): TownLayer {
   const columns = Math.max(1, towns.length);
   const state = new Uint8Array(columns * TOWN_STATE_ROWS * 4);
@@ -213,8 +219,12 @@ export function buildTownLayer(
     return geo;
   };
   const geometry = {
-    town: patchGeometry((k, x, z, half) => townCells[k](x, z, half)),
-    fields: patchGeometry((k, x, z, half) => fieldCells[k](x, z, half)),
+    town: patchGeometry(
+      (k, x, z, half) => !omit.has(k) && townCells[k](x, z, half),
+    ),
+    fields: patchGeometry(
+      (k, x, z, half) => !omit.has(k) && fieldCells[k](x, z, half),
+    ),
   };
   // Where the farm ground is dry, for the fields' look. None on a map with
   // no weights.
