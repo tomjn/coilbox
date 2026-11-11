@@ -1,6 +1,7 @@
 /**
  * The landmarks that stand on a terrain map in place of a town: a stronghold
- * on every enemy capital, and an anomaly or a depot where a run asks for one.
+ * on every enemy capital, and an anomaly, a depot or a landing pad where a run
+ * asks for one.
  *
  * Each is built once, placed on the ground, turned to its road and kept clear
  * of its neighbours. It follows its location's fog, selection and haze the
@@ -21,10 +22,12 @@ import { ANOMALY_REACH, ANOMALY_SHADOW_REACH, buildAnomaly } from "./anomalies";
 import { buildDepot, DEPOT_REACH } from "./depot";
 import { type AnomalyKind, landmarkKinds, type RunLandmark } from "./kinds";
 import type { Rgb } from "./kit";
+import { buildLanding, LANDING_REACH } from "./landing";
 import { glowMaterial, landmarkMaterial, setLandmarkState } from "./material";
 import {
   anomalyPalette,
   depotPalette,
+  landingPalette,
   ruinPalette,
   strongholdPalette,
 } from "./palettes";
@@ -105,18 +108,23 @@ export function buildLandmarkLayer(
   )) {
     const stronghold = kind === "stronghold";
     const depot = kind === "depot";
+    const landing = kind === "landing";
     // A planet with no ruin, such as a moon, leaves the anomaly its town.
     const ruin = kind === "ruin" ? ruinPalette(planet) : undefined;
     if (kind === "ruin" && !ruin) continue;
-    // A stronghold takes a capital's room, an anomaly an ordinary town's.
+    // A stronghold and a landing pad take a capital's room, an anomaly an
+    // ordinary town's.
     const reach = stronghold
       ? STRONGHOLD_REACH
       : ruin
         ? RUIN_REACH
         : depot
           ? DEPOT_REACH
-          : ANOMALY_REACH;
-    const share = stronghold ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE;
+          : landing
+            ? LANDING_REACH
+            : ANOMALY_REACH;
+    const share =
+      stronghold || landing ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE;
     const node = galaxy.nodes[i];
     const link = galaxy.links.find(([a, b]) => a === node.id || b === node.id);
     const other = link && index.get(link[0] === node.id ? link[1] : link[0]);
@@ -149,14 +157,16 @@ export function buildLandmarkLayer(
         ? buildRuin(site.ground, ruin, seed, edge)
         : depot
           ? buildDepot(site.ground, depotPalette(planet), placedSeed)
-          : buildAnomaly(
-              kind as Exclude<AnomalyKind, "ruin">,
-              site.ground,
-              anomalyPalette(planet),
-              placedSeed,
-              edge,
-              identities?.get(node.id)?.landmarkGroup,
-            );
+          : landing
+            ? buildLanding(site.ground, landingPalette(planet), placedSeed)
+            : buildAnomaly(
+                kind as Exclude<AnomalyKind, "ruin">,
+                site.ground,
+                anomalyPalette(planet),
+                placedSeed,
+                edge,
+                identities?.get(node.id)?.landmarkGroup,
+              );
 
     const group = new THREE.Group();
     group.position.set(site.x, site.y, site.z);
@@ -180,7 +190,7 @@ export function buildLandmarkLayer(
     group.updateMatrixWorld(true);
 
     // A standing anomaly is far taller than it is wide, and so is its shadow.
-    // A depot's mast is as tall.
+    // A depot's mast and a landing pad's tower are as tall.
     const decal = groundDecal(
       surface,
       site,

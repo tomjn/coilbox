@@ -643,6 +643,9 @@ export function mapRunIdentities(
     out.set(at, {
       ...out.get(at),
       end: n.type === "start" ? "start" : "goal",
+      // The run sets out from a landing pad. The boss is a capital, which
+      // gets its stronghold without being asked.
+      ...(n.type === "start" && { landmark: "landing" as const }),
     });
   }
   // Each kind of anomaly is one of a kind. The run's seed deals them out, one

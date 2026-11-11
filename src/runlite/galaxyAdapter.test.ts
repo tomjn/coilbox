@@ -403,7 +403,11 @@ describe("a land run's live state", () => {
 
   it("marks the start and the goal, by location", () => {
     const ids = mapRunIdentities(moved, located(moved));
-    expect(ids.get("gate")).toEqual({ body: "beacon", end: "start" });
+    expect(ids.get("gate")).toEqual({
+      body: "beacon",
+      end: "start",
+      landmark: "landing",
+    });
     expect(ids.get("east")).toEqual({ body: warlordBodyFor(1), end: "goal" });
     expect(ids.has("far")).toBe(false);
     // The two battle sites keep their tint and are not an end.
@@ -452,7 +456,9 @@ describe("a land run's live state", () => {
       group = false,
     ) =>
       [...ids].flatMap(([k, v]) =>
-        v.landmark && !!v.landmarkGroup === group ? [`${k}:${v.landmark}`] : [],
+        v.landmark && v.landmark !== "landing" && !!v.landmarkGroup === group
+          ? [`${k}:${v.landmark}`]
+          : [],
       );
     const once = dealt(mapRunIdentities(r, at));
     expect(once.map((d) => d.split(":")[1]).sort()).toEqual(
@@ -495,7 +501,7 @@ describe("a land run's live state", () => {
     }
   });
 
-  it("gives the boss a stronghold and the start none", () => {
+  it("gives the boss a stronghold and the start a landing pad", () => {
     const doc = mapRunToGalaxyDoc(moved, map, located(moved));
     const kinds = landmarkKinds(
       doc.nodes,
@@ -504,8 +510,8 @@ describe("a land run's live state", () => {
     );
     const at = (id: string) => doc.nodes.findIndex((n) => n.id === id);
     expect(kinds.get(at("east"))).toBe("stronghold");
-    expect(kinds.has(at("gate"))).toBe(false);
-    expect([...kinds.values()]).toEqual(["stronghold"]);
+    expect(kinds.get(at("gate"))).toBe("landing");
+    expect([...kinds.values()].sort()).toEqual(["landing", "stronghold"]);
   });
 
   it("marks a location on no route with a question mark", () => {
