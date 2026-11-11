@@ -54,12 +54,18 @@ export function unitFactsFor(
       seaOnly: (u.minWaterDepth ?? 0) > 0,
       needGeo: s.needGeo === true,
       wall: !mobile && s.isFeature === true,
+      // Zero-K pays income from a gadget and declares it in customparams.
       energy:
         num(s, "energyMake") > 0 ||
+        num(s, "incomeEnergy") > 0 ||
         num(s, "windGenerator") > 0 ||
         num(s, "energyUpkeep") < 0,
-      extractor: num(s, "extractsMetal") > 0,
-      makesMetal: num(s, "metalMake") > 0 || num(s, "makesMetal") > 0,
+      extractor:
+        num(s, "extractsMetal") > 0 || num(s, "metalExtractorMult") > 0,
+      makesMetal:
+        num(s, "metalMake") > 0 ||
+        num(s, "incomeMetal") > 0 ||
+        num(s, "makesMetal") > 0,
       radar: num(s, "radarDistance") > 0,
       metalCost: num(s, "metalCost"),
       energyCost: num(s, "energyCost"),
@@ -113,7 +119,7 @@ function matches(
   switch (kind) {
     case "land-factory":
     case "sea-factory": {
-      if (!building || !f.builds) return false;
+      if (!building || !f.builds || baseFactory(unit, graph)) return false;
       if (kind === "sea-factory") return f.seaOnly;
       // An air plant builds only things that fly.
       return (
@@ -125,7 +131,16 @@ function matches(
       );
     }
     case "energy":
-      return building && f.energy && !f.needGeo && !f.seaOnly && !f.armed;
+      // Zero-K pays builders and factories an income for their build power,
+      // so a unit that builds is never the energy building.
+      return (
+        building &&
+        f.energy &&
+        !f.builds &&
+        !f.needGeo &&
+        !f.seaOnly &&
+        !f.armed
+      );
     case "metal":
       return building && f.extractor && !f.needGeo && !f.seaOnly;
     case "radar":
@@ -143,7 +158,14 @@ function matches(
 
 /** A metal source for a game whose extractors declare no `extractsMetal`. */
 function isFallbackMetal(f: UnitFacts): boolean {
-  return !f.mobile && f.makesMetal && !f.needGeo && !f.seaOnly && !f.armed;
+  return (
+    !f.mobile &&
+    !f.builds &&
+    f.makesMetal &&
+    !f.needGeo &&
+    !f.seaOnly &&
+    !f.armed
+  );
 }
 
 /**
@@ -186,6 +208,44 @@ function isFactory(f: UnitFacts | undefined): boolean {
   return !!f && !f.mobile && f.builds;
 }
 
+const bases = new WeakMap<KitGraph, Map<string, string>>();
+
+/**
+ * The factory `unit` extends, or undefined. A cheaper factory that builds
+ * nothing a pricier factory does not, such as a Zero-K plate, is an extension
+ * that only works beside the full factory, so it is never a start pick and
+ * brings its full factory with it.
+ */
+function baseFactory(unit: string, graph: KitGraph): string | undefined {
+  let map = bases.get(graph);
+  if (!map) {
+    map = new Map();
+    const factories = graph.order.filter((u) => isFactory(graph.facts.get(u)));
+    for (const f of factories) {
+      const own = graph.edges.get(f) ?? [];
+      // biome-ignore lint/style/noNonNullAssertion: filtered to factories
+      const cost = graph.facts.get(f)!.metalCost;
+      const base = factories
+        .filter((g) => {
+          const options = new Set(graph.edges.get(g) ?? []);
+          return (
+            g !== f &&
+            (graph.facts.get(g)?.metalCost ?? 0) > cost &&
+            own.every((o) => options.has(o))
+          );
+        })
+        .sort(
+          (a, b) =>
+            (graph.facts.get(a)?.metalCost ?? 0) -
+            (graph.facts.get(b)?.metalCost ?? 0),
+        )[0];
+      if (base) map.set(f, base);
+    }
+    bases.set(graph, map);
+  }
+  return map.get(unit);
+}
+
 /**
  * `units` with what they bring added, repeated until nothing more comes: a
  * factory brings its cheapest armed unit and its cheapest builder, and a builder
@@ -218,6 +278,7 @@ export function withWhatTheyBring(
     const f = graph.facts.get(unit);
     const options = graph.edges.get(unit) ?? [];
     if (isFactory(f)) {
+      add(baseFactory(unit, graph));
       add(cheapest("fighter", options, graph));
       add(cheapest("builder", options, graph));
     } else if (f?.mobile && f.builds) {

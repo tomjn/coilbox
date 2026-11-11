@@ -155,6 +155,36 @@ describe("the role rules", () => {
     }
   });
 
+  it("reads Zero-K's income and passes over a plate for its factory", () => {
+    const zk = [
+      u("com", {
+        mobile: true,
+        builds: ["plate", "fac", "solar", "mex", "radar", "llt"],
+      }),
+      u("plate", { builds: ["con", "raider"], stats: { metalCost: 150 } }),
+      u("fac", { builds: ["con", "raider"], stats: { metalCost: 700 } }),
+      u("con", {
+        mobile: true,
+        builds: ["solar", "mex"],
+        stats: { incomeEnergy: 1, incomeMetal: 1, ...GUN },
+      }),
+      u("raider", { mobile: true, stats: GUN }),
+      u("solar", { stats: { energyMake: 0, incomeEnergy: 2, metalCost: 70 } }),
+      u("mex", { stats: { metalExtractorMult: 1, metalCost: 85 } }),
+      u("radar", { stats: { radarDistance: 2100 } }),
+      u("llt", { stats: GUN }),
+    ];
+    const { unlocked, run } = startOf(zk, "com");
+    for (const n of ["fac", "solar", "mex", "radar", "llt", "raider", "con"]) {
+      expect(unlocked.has(n), n).toBe(true);
+    }
+    expect(unlocked.has("plate")).toBe(false);
+    const plate = run.nodes
+      .flatMap((n) => n.reward?.options ?? [])
+      .find((o) => o.kind === "unlock" && o.unit === "plate");
+    if (plate?.kind === "unlock") expect(plate.opens).toContain("fac");
+  });
+
   it("brings a second tier builder's own buildings with an unlock of its factory", () => {
     const { run } = startOf(tree, "com");
     const offers = run.nodes.flatMap((n) => [
