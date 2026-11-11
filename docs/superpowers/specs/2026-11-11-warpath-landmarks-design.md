@@ -7,7 +7,7 @@ Status: draft for review, 11 November 2026.
 Procedural 3D landmarks that stand on the terrain map in place of a town at some warpath stops. This spec covers three things:
 
 1. A shared landmark layer: geometry kit, material, planet palettes, placement on the ground, and the fog, selection and mist states towns already have.
-2. The stronghold at the boss and at any enemy capital that is a battle stop, ported from the approved spike (`docs/reports/warpath-landmarks/bastion.ts`, shots `bastion3-*`).
+2. The stronghold at every enemy capital, on warpath and conquest land maps alike, ported from the approved spike (`docs/reports/warpath-landmarks/bastion.ts`, shots `bastion3-*`).
 3. At most one ruined castle per map, on one event stop, built down from the spike's `citadel.ts`. Its look is not approved yet and is reviewed on real terrain before it merges.
 
 The spike folder is gitignored and throwaway. Code is ported from it into `src`, never imported.
@@ -34,7 +34,9 @@ These came from the brief and are not reopened here.
 | every other event stop | town in violet mist | unchanged |
 | start, reward, shop, elite, battle | town | unchanged |
 
-In a warpath today the only capitals are the start and the boss (`galaxyAdapter.ts`, the `kind: "capital"` lines), and the start is the player's. So the boss is the only stronghold a run gets now. The rule is written for enemy capitals in general, so it holds if runs gain more of them.
+In a warpath today the only capitals are the start and the boss (`galaxyAdapter.ts`, the `kind: "capital"` lines), and the start is the player's. So the boss is the only stronghold a run gets now.
+
+Conquest uses the same rule. Every enemy faction's capital on a conquest land map gets a stronghold, and the player's own capital keeps its town. Conquest nodes are all battles, so the battle-stop rule holds there too.
 
 The ruin goes on one event stop, chosen from the run's event stops by the run's seed. A run with no event stops has no ruin.
 
@@ -56,11 +58,12 @@ New folder `src/conquest/galaxy3d/landmarks/`. Each file has one job.
 
 ### How a stop becomes a landmark
 
-1. `NodeIdentity` in `GalaxyView.tsx` gains `landmark?: LandmarkKind`, where `LandmarkKind` is `"stronghold" | "ruin"`.
-2. `mapRunIdentities` in `src/runlite/galaxyAdapter.ts` sets `landmark: "stronghold"` on the boss location and on any battle stop whose location is an enemy capital. It sets `landmark: "ruin"` on one event location picked by the run's seed. The existing `end` and `mist` fields stay as they are.
-3. In `GalaxyView`, the towns planned by `townsOnRoads` are split. Every town still takes part in road planning, so roads are unchanged. Towns whose node has a landmark are left out of `buildTownLayer`, so neither the town nor its fields are painted.
-4. `buildLandmarkLayer` runs after `buildTerrainMesh` with the scene, disposables, surface, ground heights, terrain colour pixels, planet, the galaxy nodes, the identities and the planned towns.
-5. The goal pole at the boss is dropped. `endMarkersToDraw` already hides a marker when a placed model stands on the location, and a landmark counts as one. The start keeps its pole because it keeps its town.
+1. Strongholds come from the galaxy doc, so warpath and conquest share one rule. A pure function `landmarkKinds(nodes, playerFactionId, identities)` in `landmarkLayer.ts` gives a node a stronghold when its `kind` is `"capital"` and its `owner` is neither the player's faction nor neutral. A warpath's boss is a capital owned by the enemy, so this covers it with no warpath code. The plan includes a check that a warpath's `playerFactionId` is the start's owner, so the start never gets one.
+2. The rule reads each node's owner as the galaxy doc gives it, not the live owner. On a conquest map a captured enemy capital keeps its stronghold. The stronghold marks the place, and the province colour already shows who holds it. Changing a town into a stronghold, or back, while the map is open would mean rebuilding the town layer, which is built once.
+3. The ruin comes from warpath data. `NodeIdentity` in `GalaxyView.tsx` gains `landmark?: "ruin"`, and `mapRunIdentities` in `src/runlite/galaxyAdapter.ts` sets it on one event location picked by the run's seed. The existing `end` and `mist` fields stay as they are. Conquest has no event stops, so it has no ruin.
+4. In `GalaxyView`, the towns planned by `townsOnRoads` are split. Every town still takes part in road planning, so roads are unchanged. Towns whose node has a landmark are left out of `buildTownLayer`, so neither the town nor its fields are painted.
+5. `buildLandmarkLayer` runs after `buildTerrainMesh` with the scene, disposables, surface, ground heights, terrain colour pixels, planet, the galaxy nodes, `playerFactionId`, the identities and the planned towns.
+6. The goal pole at the boss is dropped. `endMarkersToDraw` already hides a marker when a placed model stands on the location, and a landmark counts as one. The start keeps its pole because it keeps its town.
 
 ### Drawing order and lighting
 
@@ -89,7 +92,7 @@ The kit's shader patterns (cast panels, rock, joints) used world position, so a 
 
 1. Size. Each landmark has a design reach (the stronghold's is 3.6 in the spike). The scale is the smaller of 1 and what the town cap allows: towns cap their radius at 0.3 times the distance to the nearest other node. A landmark never reaches past that, so it never overlaps a neighbour.
 2. Site. Candidates sit on a small grid round the node, out to a fifth of the scaled reach. Any candidate with sea under the footprint is dropped. The one with the least relief across the footprint wins, with a small penalty for distance from the node so the landmark stays on its stop.
-3. Facing. The stronghold's long wall points away from the road that arrives at the stop, so the road meets the main block and the crag, not the end of the wall.
+3. Facing. The stronghold's long wall points away from the road that arrives at the stop (the first in link order when several arrive, as at a conquest capital), so the road meets the main block and the crag, not the end of the wall.
 4. Height. The group stands at the ground height at the site. Its ground function is the terrain height in the landmark's own scaled coordinates, less that base height, as the spike's `local()` was.
 5. Seed. From the node id, so a landmark looks the same each time the map opens.
 
@@ -150,7 +153,8 @@ It drops the halls, roofs, windows, banners, gatehouse portcullis, turrets, tree
 
 Vitest in the node environment, following `placedModelsLayer.test.ts`, with a flat `createTerrainSurface`.
 
-- `mapRunIdentities` puts a stronghold on the boss and never on a non-battle stop, and a ruin on exactly one event stop when the run has any. The same seed picks the same event stop. Every other stop gets no landmark.
+- `landmarkKinds` gives a stronghold to an enemy capital, and none to the player's capital, a neutral capital or a non-capital. It runs on a warpath doc from `mapRunToGalaxyDoc` (the stronghold lands on the boss only) and on a generated conquest doc (every enemy capital gets one).
+- `mapRunIdentities` puts a ruin on exactly one event stop when the run has any. The same seed picks the same event stop.
 - Each `PlanetId` has both palettes. The `Record` type enforces it, and a test walks `PlanetId` values as well.
 - `site.ts`: a flat site centres on the node, a sloped site moves to the flatter side, the size respects the town cap, and a coastal node with no dry site returns none.
 - The landmark layer builds both landmarks on a flat surface, leaves the landmark nodes out of the town list, and `setStyle` flips the fog uniform.
@@ -164,7 +168,7 @@ The look is checked on screen, not by tests.
 
 In a seeded portable instance per `CLAUDE.md`, on its own MCP socket, with `multiplayer.autoConnect` off in the copy.
 
-1. Start a land warpath on a temperate planet and one on a volcanic planet.
+1. Start a land warpath on a temperate planet and one on a volcanic planet. Open one conquest land map too, to check its enemy capitals have strongholds and the player's capital has a town.
 2. Capture the stronghold and the ruin at far, mid and close zoom on each.
 3. Post each as a single 1440 by 900 JPEG.
 4. Capture the five new palettes at mid zoom so every planet has been seen once.
