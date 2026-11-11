@@ -77,6 +77,16 @@ describe("groundDecal", () => {
     expect(u.uRingStrength.value).toBe(0);
   });
 
+  it("darkens the foot unless told not to", () => {
+    const uniforms = (d: typeof decal) =>
+      (d.mesh.material as THREE.ShaderMaterial).uniforms;
+    expect(uniforms(decal).uContact.value).toBe(1);
+    const without = groundDecal(surface, site, 3.79, null, undefined, {
+      contact: false,
+    });
+    expect(uniforms(without).uContact.value).toBe(0);
+  });
+
   it("dims under fog", () => {
     const u = (decal.mesh.material as THREE.ShaderMaterial).uniforms;
     decal.setHidden(true);
