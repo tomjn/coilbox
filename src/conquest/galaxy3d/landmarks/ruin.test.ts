@@ -34,7 +34,7 @@ describe("buildRuin", () => {
       const x = pos.getX(i);
       const z = pos.getZ(i);
       if (Math.abs(Math.hypot(x, z) - r) > 0.12) continue;
-      if (pos.getY(i) < top + 0.15) continue;
+      if (pos.getY(i) < top + 0.04) continue;
       const a = (Math.atan2(z, x) + Math.PI * 2) % (Math.PI * 2);
       bins[Math.floor((a / (Math.PI * 2)) * 72) % 72] = true;
     }

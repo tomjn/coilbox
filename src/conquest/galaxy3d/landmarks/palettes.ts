@@ -100,8 +100,8 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
 
 export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
   temperate: {
-    stone: [176, 166, 146],
-    darkStone: [140, 132, 118],
+    stone: [188, 168, 130],
+    darkStone: [130, 114, 90],
     rock: [112, 104, 92],
     top: [92, 118, 62],
     topCover: 0.5,
@@ -137,7 +137,7 @@ export const RUIN_PALETTES: Record<PlanetId, RuinPalette> = {
   volcanic: {
     stone: [148, 120, 98],
     darkStone: [104, 86, 72],
-    rock: [50, 42, 40],
+    rock: [78, 60, 50],
     top: [62, 46, 38],
     topCover: 0.25,
   },
