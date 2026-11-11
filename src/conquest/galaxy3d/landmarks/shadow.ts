@@ -13,13 +13,19 @@ import type { LandmarkSite } from "./site";
 /** Rings and segments of the sheet draped on the terrain. */
 const RINGS = 28;
 const SEGMENTS = 96;
-/** How far out the sheet reaches, in the landmark's units. */
-const DECAL_REACH = 4.5;
+/*
+ * Distances below are shares of the landmark's reach, set on the stronghold,
+ * whose reach is 3.79: the sheet ends at 4.5, the foot's darkening starts to
+ * fall away at 2.9 and is gone 1.5 further on, and the shadow fades out from
+ * 3.0 to 4.2.
+ */
+/** How far out the sheet reaches. */
+const DECAL_REACH = 1.19;
 /** How far above the terrain it lies, in world units. */
 const LIFT = 0.01;
-/** Where the darkening at the crag's foot starts to fall away, and over how far. */
-const CONTACT_FROM = 2.9;
-const CONTACT_OVER = 1.5;
+/** Where the darkening at the foot starts to fall away, and over how far. */
+const CONTACT_FROM = 0.765;
+const CONTACT_OVER = 0.396;
 /** The darkening at the crag's foot, at its strongest. */
 const CONTACT = 0.42;
 /**
@@ -27,8 +33,8 @@ const CONTACT = 0.42;
  * out, so the tower's head never throws a lone dark shape onto open ground.
  */
 const SHADOW = 0.35;
-const SHADOW_FADE_FROM = 3.0;
-const SHADOW_FADE_TO = 4.2;
+const SHADOW_FADE_FROM = 0.792;
+const SHADOW_FADE_TO = 1.108;
 /** Where the selection ring is drawn, as a share of the landmark's reach. */
 const RING_AT = 0.92;
 /**
@@ -153,6 +159,7 @@ uniform sampler2D uShadow;
 uniform float uShadowOn;
 uniform vec2 uCentre;
 uniform float uScale;
+uniform float uReach;
 uniform float uHidden;
 uniform vec3 uRingColour;
 uniform float uRingStrength;
@@ -176,7 +183,7 @@ float shaded() {
 
 void main() {
   float dist = distance(vWorld.xz, uCentre);
-  float r = dist / uScale;
+  float r = dist / (uScale * uReach);
   float t = clamp((r - ${CONTACT_FROM.toFixed(3)}) / ${CONTACT_OVER.toFixed(3)}, 0.0, 1.0);
   float contact = ${CONTACT.toFixed(3)} * (1.0 - t) * (1.0 - t);
   float thrown = ${SHADOW.toFixed(3)} * shaded() * (1.0 - smoothstep(${SHADOW_FADE_FROM.toFixed(3)}, ${SHADOW_FADE_TO.toFixed(3)}, r));
@@ -206,7 +213,7 @@ export function groundDecal(
 ): GroundDecal {
   const pos: number[] = [];
   const idx: number[] = [];
-  const far = DECAL_REACH * site.scale;
+  const far = DECAL_REACH * reach * site.scale;
   for (let i = 0; i <= RINGS; i++) {
     const r = (i / RINGS) * far;
     for (let s = 0; s < SEGMENTS; s++) {
@@ -234,6 +241,7 @@ export function groundDecal(
       uShadowOn: { value: 0 },
       uCentre: { value: new THREE.Vector2(site.x, site.z) },
       uScale: { value: site.scale },
+      uReach: { value: reach },
       uHidden: { value: 0 },
       uRingColour: { value: new THREE.Color() },
       uRingStrength: { value: 0 },
