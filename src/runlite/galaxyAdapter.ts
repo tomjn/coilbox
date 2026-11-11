@@ -1,5 +1,11 @@
 import { t } from "@lingui/core/macro";
-import { Gift, HandFist, type LucideIcon, Split, Store } from "lucide-react";
+import {
+  CircuitBoard,
+  HandFist,
+  type LucideIcon,
+  ShieldQuestionMark,
+  Split,
+} from "lucide-react";
 import type {
   NodeBodyKind,
   NodeEmphasis,
@@ -62,8 +68,8 @@ const TYPE_ICON: Partial<Record<RunNodeType, LucideIcon>> = {
   battle: HandFist,
   elite: HandFist,
   event: Split,
-  reward: Gift,
-  shop: Store,
+  reward: CircuitBoard,
+  shop: CircuitBoard,
 };
 
 /**
@@ -583,8 +589,14 @@ export function mapRunEmphasis(
 export function mapRunIdentities(
   run: RogueliteRun,
   locations: Map<string, string>,
+  /** Locations on no route, from {@link mapRunScenery}. Their names carry a
+   * question mark, so they read as somewhere the run does not go. */
+  scenery?: Set<string>,
 ): Map<string, NodeIdentity> {
   const out = new Map(byLocation(runIdentities(run), locations));
+  for (const at of scenery ?? []) {
+    out.set(at, { ...out.get(at), icon: ShieldQuestionMark });
+  }
   for (const n of run.nodes) {
     const at = locations.get(n.id) ?? n.id;
     // An anomaly's town stands in a haze, so it reads as somewhere strange.

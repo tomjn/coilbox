@@ -115,7 +115,14 @@ export function RunMapView({
   // prop — a new map rebuilds the scene, which only happens when the graph does.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the graph + seed, both stable across moves
   const identities = useMemo(
-    () => (land ? mapRunIdentities(run, land.locations) : runIdentities(run)),
+    () =>
+      land
+        ? mapRunIdentities(
+            run,
+            land.locations,
+            mapRunScenery(land.map, land.locations),
+          )
+        : runIdentities(run),
     [land, run.nodes, run.settings.seed],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: owners depend only on progress moving, applied live by GalaxyView

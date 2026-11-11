@@ -11,7 +11,7 @@ node c1n0 type=battle col=1 row=0 battle={"mapName":"Small A","enemyAiCount":1,"
 node c1n1 type=battle col=1 row=1 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
 node c1n2 type=battle col=1 row=2 battle={"mapName":"Small B","enemyAiCount":1,"enemyAiKey":"native:BARb","handicap":10,"techTier":2} reward=null event=null shop=null
 node c2n0 type=battle col=2 row=0 battle={"mapName":"Medium","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":20,"techTier":3} reward=null event=null shop=null
-node c2n1 type=reward col=2 row=1 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}}]} event=null shop=null
+node c2n1 type=reward col=2 row=1 battle=null reward={"title":"Salvage Cache","options":[{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}}],"salvage":50} event=null shop=null
 node c2n2 type=shop col=2 row=2 battle=null reward=null event=null shop={"offers":[{"cost":50,"option":{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}}},{"cost":100,"option":{"kind":"perk","perk":{"kind":"income","label":"Salvage Refinery","value":0.2}}}],"restHull":35,"restCost":75}
 node c2n3 type=battle col=2 row=3 battle={"mapName":"Small B","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":20,"techTier":3} reward=null event=null shop=null
 node c3n0 type=battle col=3 row=0 battle={"mapName":"Medium","enemyAiCount":2,"enemyAiKey":"native:BARb","handicap":30,"techTier":4} reward=null event=null shop=null

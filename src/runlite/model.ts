@@ -118,6 +118,9 @@ export type RewardOption =
 export interface RewardSpec {
   title: string;
   options: RewardOption[];
+  /** Salvage banked on reaching the cache, whatever the player takes. Absent
+   * on a run generated before caches paid any. */
+  salvage?: number;
 }
 
 /** A branch of an event card: label + the mutations applied when chosen. */
@@ -484,6 +487,11 @@ function parseReward(value: unknown): RewardSpec | undefined {
   return {
     title: typeof value.title === "string" ? value.title : t`Salvage`,
     options,
+    ...(typeof value.salvage === "number" &&
+    Number.isFinite(value.salvage) &&
+    value.salvage > 0
+      ? { salvage: value.salvage }
+      : {}),
   };
 }
 

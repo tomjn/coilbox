@@ -1,4 +1,9 @@
-import { Gift, HandFist, Split, Store } from "lucide-react";
+import {
+  CircuitBoard,
+  HandFist,
+  ShieldQuestionMark,
+  Split,
+} from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { mapCues } from "../conquest/galaxy3d/mapCues";
 import type { GalaxyDoc } from "../conquest/model";
@@ -410,8 +415,8 @@ describe("a land run's live state", () => {
     expect(ids.get("battle")?.icon).toBe(HandFist);
     expect(ids.get("elite")?.icon).toBe(HandFist);
     expect(ids.get("event")?.icon).toBe(Split);
-    expect(ids.get("reward")?.icon).toBe(Gift);
-    expect(ids.get("shop")?.icon).toBe(Store);
+    expect(ids.get("reward")?.icon).toBe(CircuitBoard);
+    expect(ids.get("shop")?.icon).toBe(CircuitBoard);
     expect(ids.get(run().nodes[0].id)?.icon).toBeUndefined();
   });
 
@@ -421,6 +426,11 @@ describe("a land run's live state", () => {
     expect(runIdentities(r).get("odd")?.mist).toBeUndefined();
     const land = mapRunIdentities(r, new Map([["odd", "fen"]]));
     expect(land.get("fen")?.mist).toBe(true);
+  });
+
+  it("marks a location on no route with a question mark", () => {
+    const ids = mapRunIdentities(run(), new Map(), new Set(["moor"]));
+    expect(ids.get("moor")?.icon).toBe(ShieldQuestionMark);
   });
 
   it("leaves a column run's start and warlord with no end marker", () => {

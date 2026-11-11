@@ -357,6 +357,14 @@ function drawPerk(rng: Rng, tier: number): Perk {
   return { ...base, value: Math.round(value * 100) / 100 };
 }
 
+/**
+ * The price of a depot's cheapest offer at `tier`. A cache pays this much and
+ * the player starts with the tier 1 price, so no depot is a wasted stop.
+ */
+function depotFloor(tier: number): number {
+  return 20 + tier * 10;
+}
+
 function makeReward(
   rng: Rng,
   planner: UnlockPlanner | null,
@@ -372,7 +380,7 @@ function makeReward(
     }
   }
   options.push({ kind: "perk", perk: drawPerk(rng, tier) });
-  return { title: t`Salvage Cache`, options };
+  return { title: t`Salvage Cache`, options, salvage: depotFloor(tier) };
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +452,7 @@ function makeShop(
   // the fight leading in always affords at least this. Drawn a tier softer than
   // the headline perk so the low price reads as a modest boon, not a discount.
   offers.push({
-    cost: 20 + tier * 10,
+    cost: depotFloor(tier),
     option: {
       kind: "perk",
       perk: drawPerk(rng, Math.max(1, tier - 1)),
@@ -759,7 +767,7 @@ export function assembleRun(
       visited: [startId],
       hull: maxHull,
       maxHull,
-      salvage: 0,
+      salvage: depotFloor(1),
       unlockedUnits,
       perks: [],
       status: "active",

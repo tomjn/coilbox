@@ -153,6 +153,7 @@ export function applyReward(
   const p: RunProgress = { ...run.progress };
   const option = node.reward.options[optionIndex];
   if (option) grantOption(p, option);
+  p.salvage += node.reward.salvage ?? 0;
   p.visited = [...p.visited, nodeId];
   p.currentNodeId = nodeId;
   return {
@@ -262,6 +263,8 @@ export function leaveNode(
     ...run,
     progress: {
       ...run.progress,
+      // Leaving a cache still collects its salvage.
+      salvage: run.progress.salvage + (node.reward?.salvage ?? 0),
       visited: [...run.progress.visited, nodeId],
       currentNodeId: nodeId,
     },

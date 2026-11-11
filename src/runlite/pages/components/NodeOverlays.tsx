@@ -1,7 +1,7 @@
 import { t as coreT, plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Gift, Sparkles, Store } from "lucide-react";
+import { CircuitBoard, Sparkles } from "lucide-react";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
 import {
   BracketFrame,
@@ -111,7 +111,7 @@ export function RewardOverlay({
   };
   return (
     <Overlay
-      icon={<Gift className="size-5 text-yellow-300" aria-hidden />}
+      icon={<CircuitBoard className="size-5 text-yellow-300" aria-hidden />}
       title={node.reward?.title ?? t`Salvage cache`}
       lede={t`Take a schematic to widen the arsenal, or a field upgrade for your command alone.`}
       onClose={onClose}
@@ -231,7 +231,7 @@ export function ShopOverlay({
   const canAffordAny = salvage >= cheapest;
   return (
     <Overlay
-      icon={<Store className="size-5 text-emerald-400" aria-hidden />}
+      icon={<CircuitBoard className="size-5 text-emerald-400" aria-hidden />}
       title={t`Salvage depot`}
       lede={t`Salvage: ${salvage} · cheapest ${cheapest} salvage`}
       onClose={onClose}
