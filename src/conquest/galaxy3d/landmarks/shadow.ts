@@ -38,6 +38,11 @@ const SHADOW_FADE_TO = 1.108;
 /** Where the selection ring is drawn, as a share of the landmark's reach. */
 const RING_AT = 0.92;
 /**
+ * How far the sheet must reach for the ring, in ring radii. A triangle's
+ * corners, the furthest of any shape's, lie at 4/3, and the line has a width.
+ */
+const RING_ROOM = 1.5;
+/**
  * Drawn after the town patches (-2.5) and before the borders (-2), as a town
  * would be.
  */
@@ -166,6 +171,8 @@ uniform vec3 uRingColour;
 uniform float uRingStrength;
 uniform float uRingThick;
 uniform float uRingRadius;
+uniform float uRingSides;
+uniform float uRingWeight;
 varying vec3 vWorld;
 varying vec4 vShadow;
 
@@ -190,9 +197,20 @@ void main() {
   float thrown = ${SHADOW.toFixed(3)} * shaded() * (1.0 - smoothstep(${SHADOW_FADE_FROM.toFixed(3)}, ${SHADOW_FADE_TO.toFixed(3)}, dist / (uScale * uShadowReach)));
   float dark = max(contact, thrown) * (uHidden > 0.5 ? 0.7 : 1.0);
   // The town shader's ring, the same width in the same units.
-  float foot = fwidth(dist);
-  float ringW = max(0.035, foot * 1.3) * (1.0 + 1.2 * uRingThick);
-  float ringD = abs(dist - uRingRadius);
+  // How far outside the ring's line this point is. A shape has a corner to
+  // the north, and its corners are as far outside the round ring as the
+  // middles of its sides are inside it.
+  float off = dist - uRingRadius;
+  if (uRingSides > 2.5) {
+    vec2 p = vWorld.xz - uCentre;
+    float sector = 6.2831853 / uRingSides;
+    float a = mod(atan(p.x, -p.y) + sector * 0.5, sector) - sector * 0.5;
+    float c = cos(sector * 0.5);
+    off = dist * cos(a) - uRingRadius * 2.0 * c / (1.0 + c);
+  }
+  float foot = fwidth(off);
+  float ringW = max(0.035, foot * 1.3) * (1.0 + 1.2 * uRingThick) * uRingWeight;
+  float ringD = abs(off);
   float ring = (1.0 - smoothstep(ringW * 0.5 - foot * 0.5, ringW * 0.5 + foot * 0.5, ringD)) * uRingStrength;
   float alpha = ring + dark * (1.0 - ring);
   if (alpha < 0.002) discard;
@@ -217,7 +235,9 @@ export function groundDecal(
 ): GroundDecal {
   const pos: number[] = [];
   const idx: number[] = [];
-  const far = DECAL_REACH * shadowReach * site.scale;
+  const far =
+    Math.max(DECAL_REACH * shadowReach, RING_AT * RING_ROOM * reach) *
+    site.scale;
   for (let i = 0; i <= RINGS; i++) {
     const r = (i / RINGS) * far;
     for (let s = 0; s < SEGMENTS; s++) {
@@ -252,6 +272,8 @@ export function groundDecal(
       uRingStrength: { value: 0 },
       uRingThick: { value: 0 },
       uRingRadius: { value: reach * RING_AT * site.scale },
+      uRingSides: { value: 0 },
+      uRingWeight: { value: 1 },
     },
     vertexShader: DECAL_VERTEX,
     fragmentShader: DECAL_FRAGMENT,
@@ -265,6 +287,8 @@ export function groundDecal(
     setRing(ring) {
       u.uRingStrength.value = ring ? ring.strength : 0;
       u.uRingThick.value = ring?.thick ? 1 : 0;
+      u.uRingSides.value = ring?.sides ?? 0;
+      u.uRingWeight.value = ring?.weight ?? 1;
       if (ring) u.uRingColour.value.copy(ring.color);
     },
     setHidden(hidden) {
