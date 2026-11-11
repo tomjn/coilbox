@@ -14,8 +14,12 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 /** sRGB, 0 to 255. */
 export type Rgb = [number, number, number];
 
-/** 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn skin, 10 the same skin worn smooth. */
-export type Kind = 0 | 2 | 7 | 8 | 9 | 10;
+/**
+ * 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn
+ * skin, 10 the same skin worn smooth, 11 painted metal plate with seams, 12
+ * painted metal with none, as on a tank or a dome, 13 bare metal.
+ */
+export type Kind = 0 | 2 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 
 /** What a part is, so a test can find it. */
 export type PartTag = "body" | "tower" | "mast" | "crag";
@@ -51,6 +55,8 @@ export const TAU = Math.PI * 2;
 /** How far each part's shade drifts from the next: masonry varies more. */
 const DRIFT = 0.14;
 const MASONRY_DRIFT = 0.3;
+/** Paint is one colour from the tin, so metal parts drift less than cast ones. */
+const METAL_DRIFT = 0.05;
 
 const hash3 = (x: number, y: number, z: number) => {
   const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
@@ -269,6 +275,7 @@ export class Builder {
       at: s.at,
     }));
     const shade = hash3(this.n++, 3.1, 7.7);
+    const metal = (paint.kind ?? 8) >= 11;
     const c = new THREE.Color();
     for (let i = 0; i < count; i++) {
       const x = pos.getX(i);
@@ -277,24 +284,37 @@ export class Builder {
       const ny = nor.getY(i);
       c.copy(base);
       // No two parts the same shade, and each drifts a little warm or cool.
-      const drift = (shade - 0.5) * (paint.kind === 0 ? MASONRY_DRIFT : DRIFT);
+      const drift =
+        (shade - 0.5) *
+        (paint.kind === 0 ? MASONRY_DRIFT : metal ? METAL_DRIFT : DRIFT);
       c.r *= 1 + drift * 1.2;
       c.g *= 1 + drift;
       c.b *= 1 + drift * 0.7;
       // Weathering in broad patches and fine grain.
       const broad = noise3(x * 1.3, y * 1.3, z * 1.3);
       const fine = noise3(x * 7, y * 7, z * 7);
-      c.multiplyScalar(0.84 + broad * 0.24 + fine * 0.1);
+      // Paint weathers less than stone does.
+      c.multiplyScalar(
+        metal
+          ? 0.93 + broad * 0.1 + fine * 0.04
+          : 0.84 + broad * 0.24 + fine * 0.1,
+      );
       if (ny < 0.4) {
         // Streaks down the walls from the top edge.
         const streak = noise3(x * 9, 0.5, z * 9);
         const down = 1 - smooth(0, 0.7, bb.max.y - y);
-        c.multiplyScalar(1 - 0.22 * down * smooth(0.45, 0.8, streak));
+        c.multiplyScalar(
+          1 - (metal ? 0.12 : 0.22) * down * smooth(0.45, 0.8, streak),
+        );
         // Grime where the part meets what it stands on.
         if (!paint.clean)
-          c.multiplyScalar(0.6 + 0.4 * smooth(0, 0.3, y - bb.min.y));
+          c.multiplyScalar(
+            metal
+              ? 0.78 + 0.22 * smooth(0, 0.12, y - bb.min.y)
+              : 0.6 + 0.4 * smooth(0, 0.3, y - bb.min.y),
+          );
       } else {
-        c.multiplyScalar(1.1);
+        c.multiplyScalar(metal ? 1.04 : 1.1);
         if (top) {
           const settled = noise3(x * 2.2, y * 2.2, z * 2.2) * 0.7 + fine * 0.3;
           c.lerp(
