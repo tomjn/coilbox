@@ -1783,6 +1783,8 @@ export function GalaxyView({
           // A selected city holds still, so it asks for no frames.
           selectionPulse: selectedIdx >= 0 && !!ownerRings[selectedIdx],
           combatFlashes: visibility.isFlashing(),
+          routeChevrons:
+            flowEnabled && chevrons.some((chev) => chev.mesh.visible),
           effects,
           reducedResolution: resolution.reduced(),
         });
