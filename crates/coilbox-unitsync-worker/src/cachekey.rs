@@ -81,7 +81,10 @@ use std::path::{Path, PathBuf};
 /// would go on listing as unrelated units. v27: the dataset now reads the
 /// definitions a second time with `evocom` on and takes the evolution edges from
 /// that, so a blob cached under v26 has no edge out of a starting commander.
-pub const INFO_CACHE_VERSION: u32 = 27;
+/// v28: the dataset now reports `canFly`, `isFeature` and `needGeo`, which a
+/// warpath's starting build list is chosen by, and a blob cached under v27 has
+/// none of them.
+pub const INFO_CACHE_VERSION: u32 = 28;
 
 /// Salts the unit model cache's keys and file names. Bump when the way a model
 /// is flattened or a texture is transcoded changes, so every entry is read again.
