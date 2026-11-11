@@ -20,8 +20,6 @@ export interface StrongholdPalette {
   topCover: number;
   /** The few small lit points. */
   lamp: Rgb;
-  /** The shield's rim. */
-  shield: Rgb;
 }
 
 export interface RuinPalette {
@@ -43,7 +41,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [92, 118, 62],
     topCover: 0.45,
     lamp: [255, 226, 170],
-    shield: [120, 200, 235],
   },
   desert: {
     concrete: [178, 156, 122],
@@ -53,7 +50,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [214, 190, 140],
     topCover: 0.35,
     lamp: [255, 220, 160],
-    shield: [235, 200, 140],
   },
   ice: {
     concrete: [170, 176, 182],
@@ -63,7 +59,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [236, 240, 246],
     topCover: 0.6,
     lamp: [220, 236, 255],
-    shield: [150, 200, 240],
   },
   red: {
     concrete: [150, 104, 82],
@@ -73,7 +68,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [176, 98, 66],
     topCover: 0.3,
     lamp: [255, 190, 140],
-    shield: [200, 150, 128],
   },
   moon: {
     concrete: [154, 152, 150],
@@ -83,7 +77,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [180, 180, 186],
     topCover: 0.2,
     lamp: [230, 230, 255],
-    shield: [170, 190, 230],
   },
   volcanic: {
     concrete: [124, 94, 70],
@@ -93,7 +86,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [62, 46, 38],
     topCover: 0.25,
     lamp: [255, 186, 110],
-    shield: [230, 150, 90],
   },
   acid: {
     concrete: [146, 138, 104],
@@ -103,7 +95,6 @@ export const STRONGHOLD_PALETTES: Record<PlanetId, StrongholdPalette> = {
     top: [150, 142, 88],
     topCover: 0.35,
     lamp: [240, 236, 170],
-    shield: [176, 184, 140],
   },
 };
 

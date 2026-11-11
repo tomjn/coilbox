@@ -1,7 +1,6 @@
-import * as THREE from "three";
+import type * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { STRONGHOLD_PALETTES } from "./palettes";
-import { insideShield } from "./shield";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
 
 const flat = () => 0;
@@ -10,23 +9,12 @@ const CRAG_EDGE = 3.6 - 1e-3;
 const p = STRONGHOLD_PALETTES.temperate;
 
 describe("buildStronghold", () => {
-  const { built, shield } = buildStronghold(flat, p, 7);
+  const { built } = buildStronghold(flat, p, 7);
 
   it("has a crag, a tower and masts", () => {
     for (const tag of ["crag", "tower", "mast"] as const)
       expect(built.bounds(tag), tag).not.toBeNull();
     console.info(`stronghold triangles: ${built.triangles}`);
-  });
-
-  it("covers every part of the tower and its masts with the shield", () => {
-    for (const tag of ["tower", "mast"] as const) {
-      const v = built.vertices(tag);
-      const point = new THREE.Vector3();
-      for (let i = 0; i < v.length; i += 3) {
-        point.set(v[i], v[i + 1], v[i + 2]);
-        expect(insideShield(shield.radii, shield.centre, point)).toBe(true);
-      }
-    }
   });
 
   it("stays inside its reach", () => {

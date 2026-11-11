@@ -119,6 +119,8 @@ The landmark meshes set `raycast` to a no-op. Picking still goes through the nod
 
 ### Shield
 
+Removed on 11 November 2026 at the review of the first render: the stronghold has no shield. What follows is the original design, kept for the record.
+
 The shield is the spike's additive dome with a bright rim and a faint body. The `Builder` tags each part, and the shield is sized from the bounds of the parts tagged `tower` and `mast`, plus a margin. A test checks every vertex of those parts sits inside the dome's ellipsoid. In the spike the masts poked through, and this test makes that a build failure.
 
 ### Palettes

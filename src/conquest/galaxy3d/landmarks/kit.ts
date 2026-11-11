@@ -17,7 +17,7 @@ export type Rgb = [number, number, number];
 /** 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels. */
 export type Kind = 0 | 2 | 7 | 8;
 
-/** What a part is, so a test or the shield can find it. */
+/** What a part is, so a test can find it. */
 export type PartTag = "body" | "tower" | "mast" | "crag";
 const TAGS: PartTag[] = ["body", "tower", "mast", "crag"];
 

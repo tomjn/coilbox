@@ -26,7 +26,6 @@ import {
   tube,
 } from "./kit";
 import type { StrongholdPalette } from "./palettes";
-import { insideShield } from "./shield";
 
 /**
  * How far the stronghold reaches from its origin. The end block of the long
@@ -45,18 +44,8 @@ const BLEND_UP_TO = 0.4;
 /** The crag's height under the block. */
 const LIFT = 0.8;
 
-/**
- * The dome as it was approved, in the stronghold's units: a sphere of 2.6
- * stretched 1.3 high, then 1.5, 1.9 and 1.38 along x, y and z, lifted 0.4.
- */
-const SHIELD_RADII = new THREE.Vector3(2.6 * 1.5, 2.6 * 1.3 * 1.9, 2.6 * 1.38);
-const SHIELD_CENTRE = new THREE.Vector3(0, 0.4, 0);
-/** How much the dome grows each time a part pokes through it. */
-const SHIELD_GROWTH = 1.05;
-
 export interface Stronghold {
   built: BuiltLandmark;
-  shield: { radii: THREE.Vector3; centre: THREE.Vector3 };
 }
 
 /**
@@ -186,7 +175,7 @@ export function buildStronghold(
         );
     }
   };
-  /** A mast. One on the tower is tagged with it, for the shield. */
+  /** A mast. One on the tower is tagged with it. */
   const mast = (m: THREE.Matrix4, h: number, tag: "mast" | "body" = "body") => {
     b.add(shaft(0.012, 0.004, h, 5), p.trim, m, dark, tag);
     b.add(box(0.05, 0.008, 0.008), p.trim, on(m, 0, h * 0.7, 0), dark, tag);
@@ -385,24 +374,5 @@ export function buildStronghold(
     plate,
   );
 
-  const built = b.build();
-  return { built, shield: fitShield(built) };
-}
-
-/** The approved dome, grown until it covers the tower and its masts. */
-function fitShield(built: BuiltLandmark) {
-  const radii = SHIELD_RADII.clone();
-  const centre = SHIELD_CENTRE.clone();
-  const parts = [built.vertices("tower"), built.vertices("mast")];
-  const point = new THREE.Vector3();
-  const covered = () =>
-    parts.every((v) => {
-      for (let i = 0; i < v.length; i += 3) {
-        point.set(v[i], v[i + 1], v[i + 2]);
-        if (!insideShield(radii, centre, point)) return false;
-      }
-      return true;
-    });
-  while (!covered()) radii.multiplyScalar(SHIELD_GROWTH);
-  return { radii, centre };
+  return { built: b.build() };
 }

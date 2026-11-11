@@ -22,7 +22,6 @@ import type { Rgb } from "./kit";
 import { glowMaterial, landmarkMaterial, setLandmarkState } from "./material";
 import { strongholdPalette } from "./palettes";
 import { createLandmarkShadow, groundDecal } from "./shadow";
-import { shieldMesh } from "./shield";
 import { pickSite } from "./site";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
 
@@ -118,7 +117,7 @@ export function buildLandmarkLayer(
           )
       : undefined;
     const p = strongholdPalette(planet);
-    const { built, shield } = buildStronghold(
+    const { built } = buildStronghold(
       site.ground,
       p,
       hashString(node.id),
@@ -143,9 +142,6 @@ export function buildLandmarkLayer(
     add(built.solid, landmarkMaterial());
     if (built.soft) add(built.soft, landmarkMaterial({ transparent: true }));
     if (built.glow) add(built.glow, glowMaterial());
-    const dome = shieldMesh(p, shield.radii, shield.centre);
-    group.add(dome);
-    disposables.push(dome.geometry, dome.material as THREE.Material);
     scene.add(group);
     group.updateMatrixWorld(true);
 
