@@ -51,8 +51,10 @@ const SHEET_FADE_FROM = 0.9;
 const SHEET_FADE_TO = 1.08;
 /** Between the province fills (-2.5) and the decal (-2.4). */
 const SHEET_ORDER = -2.45;
-/** The decal's reach, in radii, that puts its ring at the town's furthest edge. */
-const DECAL_REACH = 1.38;
+/** The most a town's edge reaches past its radius, as `townEdge` in `towns.ts` has it. */
+const EDGE_MAX = 1.27;
+/** Where the decal draws its ring, as a share of its reach. Must match `RING_AT` in `landmarks/shadow.ts`. */
+const RING_AT = 0.92;
 /** The side of the largest shadow picture. */
 const MAX_SHADOW = 1024;
 /** A gap under a building smaller than this needs no foundation. */
@@ -203,7 +205,8 @@ export function buildTownModelLayer(
       facing: 0,
       ground: (lx, lz) => height(town.x + lx, town.z + lz) - y0,
     };
-    const reach = town.radius * DECAL_REACH;
+    // The ring lies one lot outside the furthest edge, clear of the buildings.
+    const reach = (town.radius * EDGE_MAX + grid.lot) / RING_AT;
     // The longest shadow the tallest building throws on level ground.
     const shadowReach =
       reach + (local.max.y * Math.hypot(sun.x, sun.z)) / sun.y;

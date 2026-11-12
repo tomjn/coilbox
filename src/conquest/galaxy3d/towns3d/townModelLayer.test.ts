@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
 import { CAPITAL_RADIUS, planTowns, withStreets } from "../towns";
+import { OPEN_GRID, SEALED_GRID } from "./layout";
 import { buildTownModelLayer, shadowSide } from "./townModelLayer";
 
 const SIDE = 101;
@@ -111,6 +112,22 @@ describe("buildTownModelLayer", () => {
     expect(decals).toHaveLength(3);
     for (const d of decals) expect(d.name).toBe("town-models");
     for (const s of sheets(scene)) expect(s.name).toBe("town-models");
+  });
+
+  it("draws the ring one lot outside the town's furthest edge", () => {
+    for (const [planet, grid] of [
+      [undefined, OPEN_GRID],
+      ["moon", SEALED_GRID],
+    ] as const) {
+      const { scene, towns } = build({ planet });
+      towns.forEach((town, n) => {
+        const u = decalOf(scene, n).uniforms;
+        expect(u.uRingRadius.value).toBeCloseTo(
+          town.radius * 1.27 + grid.lot,
+          6,
+        );
+      });
+    }
   });
 
   it("leaves out a town a landmark stands in place of", () => {
