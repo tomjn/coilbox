@@ -181,7 +181,6 @@ export function buildPlayLayer(
   galaxy: GalaxyDoc,
   skin: "galaxy" | "theatre",
   positions: Map<string, WorldPos>,
-  playerFactionId: string,
   reduceMotion: boolean,
   effects: boolean,
   performanceMode: boolean,
@@ -198,12 +197,11 @@ export function buildPlayLayer(
   ownersRef: { current: Record<string, string> },
   incursionRef: { current: Incursion | undefined },
   onSelectRef: { current: ((nodeId: string | null) => void) | undefined },
-  prevFactionRef: { current: string | undefined },
   burstRef: { current: string | null | undefined },
   applyBurstRef: { current: (() => void) | null },
   /** Set for a terrain map only. */
   surface?: TerrainSurface,
-  /** The radius of each town's own ring on a terrain map, by node index. */
+  /** The radius of each town's or landmark's own ring on a terrain map, by node index. */
   townRings?: ReadonlyMap<number, number>,
 ) {
   // Lanes: thick translucent capsule quads connecting ring edge to ring
@@ -585,11 +583,7 @@ export function buildPlayLayer(
 
   // Intro warp-in: sprites pop from zero to their target scale (staggered by
   // node), lanes fade up, and the camera eases in. Only when motion is on.
-  const factionOnlyRebuild =
-    prevFactionRef.current !== undefined &&
-    prevFactionRef.current !== playerFactionId;
-  prevFactionRef.current = playerFactionId;
-  const animateIntro = !reduceMotion && effects && !factionOnlyRebuild;
+  const animateIntro = !reduceMotion && effects;
   interface IntroSprite {
     sprite: THREE.Object3D;
     target: number;
@@ -1921,28 +1915,39 @@ export function buildPlayLayer(
   }
 
   // The player's homeworld gets a second, wider ring so "this is you, guard
-  // it" is always legible at a glance.
-  const homeworld = galaxy.nodes.find(
-    (n) => n.kind === "capital" && n.owner === playerFactionId,
-  );
-  const homeTownRing = homeworld
-    ? townRings?.get(galaxy.nodes.indexOf(homeworld))
-    : undefined;
-  if (homeworld && surface && homeTownRing !== undefined) {
-    // A town of buildings stands here, so the ring lies on the ground just
-    // outside it. A flat ring of a fixed size would cut through the buildings.
-    const [x, z] = surface.mapToWorldXZ(homeworld.pos[0], homeworld.pos[1]);
-    const home = buildHomeRing(
-      surface,
-      x,
-      z,
-      homeTownRing,
-      factionSides(galaxy, playerFactionId),
-      ownerColor(playerFactionId),
+  // it" is always legible at a glance. It is drawn again when the player
+  // picks another faction, which changes nothing else that is built.
+  let home: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | undefined;
+  const clearHome = () => {
+    if (!home) return;
+    scene.remove(home);
+    home.geometry.dispose();
+    home.material.dispose();
+    home = undefined;
+  };
+  disposables.push({ dispose: clearHome });
+  const setHome = (playerFactionId: string) => {
+    clearHome();
+    const homeworld = galaxy.nodes.find(
+      (n) => n.kind === "capital" && n.owner === playerFactionId,
     );
-    disposables.push(home.geometry, home.material);
-    scene.add(home);
-  } else if (homeworld) {
+    if (!homeworld) return;
+    const homeTownRing = townRings?.get(galaxy.nodes.indexOf(homeworld));
+    if (surface && homeTownRing !== undefined) {
+      // A town or a landmark stands here, so the ring lies on the ground just
+      // outside it. A flat ring of a fixed size would cut through it.
+      const [x, z] = surface.mapToWorldXZ(homeworld.pos[0], homeworld.pos[1]);
+      home = buildHomeRing(
+        surface,
+        x,
+        z,
+        homeTownRing,
+        factionSides(galaxy, playerFactionId),
+        ownerColor(playerFactionId),
+      );
+      scene.add(home);
+      return;
+    }
     const p = positions.get(homeworld.id);
     const homeGeo = new THREE.RingGeometry(
       2.5,
@@ -1958,13 +1963,12 @@ export function buildPlayLayer(
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    disposables.push(homeGeo, homeMat);
-    const home = new THREE.Mesh(homeGeo, homeMat);
+    home = new THREE.Mesh(homeGeo, homeMat);
     home.rotation.x = -Math.PI / 2;
     if (p) home.position.set(p[0], p[1] - 0.4, p[2]);
     home.raycast = () => {};
     scene.add(home);
-  }
+  };
 
   // Incursion marker: an unambiguous warning symbol floating above the
   // threatened star (a pulsing ring read as decoration, a warning triangle
@@ -2017,7 +2021,7 @@ export function buildPlayLayer(
     variablePulses,
     spinners,
     structureDims,
-    factionOnlyRebuild,
+    setHome,
     animateIntro,
     introSprites,
     introLaneMats,

@@ -143,6 +143,28 @@ describe("GalaxyView with placed models", () => {
     expect(h.gameRead).toHaveBeenCalledWith(["pinetree"]);
   });
 
+  it("keeps the scene it built when the player picks another faction", async () => {
+    const view = (playerFactionId: string) => (
+      <GalaxyView
+        galaxy={galaxy}
+        playerFactionId={playerFactionId}
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />
+    );
+    const { rerender, container } = render(view("a"));
+    const canvas = container.querySelector("canvas");
+    expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender(view("b"));
+    });
+
+    expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("canvas")).toBe(canvas);
+  });
+
   it("reads the models once when the sources are there from the start", async () => {
     const ready: PlacedModelSources = {
       game: { enginePath: "/e", dataDir: "/d", gameArchive: "g.sdz" },

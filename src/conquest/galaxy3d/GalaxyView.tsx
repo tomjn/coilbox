@@ -640,16 +640,10 @@ export function GalaxyView({
     ((sources: PlacedModelSources | undefined) => void) | null
   >(null);
   const renderRef = useRef<(() => void) | null>(null);
-  // The warp-in plays on a fresh mount but not when only the previewed faction
-  // changes. Comparing against the previous faction is robust to StrictMode's
-  // throwaway first mount (a persistent "played" flag would be consumed by it).
-  const prevFactionRef = useRef<string | undefined>(undefined);
-  // The camera pose carried across a faction-switch rebuild, so recentring on
-  // the new faction's worlds eases instead of snapping.
-  const camPoseRef = useRef<{
-    pos: THREE.Vector3;
-    target: THREE.Vector3;
-  } | null>(null);
+  // The faction played as. Nothing that is built depends on it, so picking
+  // another restyles the scene that is there. See `applyPlayerRef`.
+  const playerRef = useRef(playerFactionId);
+  const applyPlayerRef = useRef<(() => void) | null>(null);
 
   onSelectRef.current = onSelect;
   modelSourcesRef.current = modelSources;
@@ -674,6 +668,13 @@ export function GalaxyView({
     terrainHeights,
   );
   const terrainExtension = terrainPixels?.extension ?? surroundLand;
+
+  // Declared before the scene's own effect, so a scene built in the same
+  // commit reads the new faction.
+  useEffect(() => {
+    playerRef.current = playerFactionId;
+    applyPlayerRef.current?.();
+  }, [playerFactionId]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -930,7 +931,7 @@ export function GalaxyView({
       variablePulses,
       spinners,
       structureDims,
-      factionOnlyRebuild,
+      setHome,
       animateIntro,
       introSprites,
       introLaneMats,
@@ -947,7 +948,6 @@ export function GalaxyView({
       galaxy,
       skin,
       positions,
-      playerFactionId,
       reduceMotion,
       effects,
       performanceMode,
@@ -960,7 +960,6 @@ export function GalaxyView({
       ownersRef,
       incursionRef,
       onSelectRef,
-      prevFactionRef,
       burstRef,
       applyBurstRef,
       surface,
@@ -1084,7 +1083,7 @@ export function GalaxyView({
             provinces,
             () => ({
               owners: ownersRef.current,
-              playerFactionId,
+              playerFactionId: playerRef.current,
               selectedId: selectedRef.current,
               attackable: attackableRef.current,
               incursionNodeId: incursionRef.current?.nodeId,
@@ -1133,13 +1132,13 @@ export function GalaxyView({
     // Centre the view on the player's own territory (the previewed faction
     // during setup), so switching faction recentres on that faction's worlds
     // rather than always framing the whole galaxy from the origin.
-    const focus = new THREE.Vector3(0, 0, 0);
-    {
+    const centreOf = (player: string) => {
+      const focus = new THREE.Vector3(0, 0, 0);
       let sx = 0;
       let sz = 0;
       let count = 0;
       for (const n of galaxy.nodes) {
-        if ((ownersRef.current[n.id] ?? n.owner) !== playerFactionId) continue;
+        if ((ownersRef.current[n.id] ?? n.owner) !== player) continue;
         const p = positions.get(n.id);
         if (!p) continue;
         sx += p[0];
@@ -1153,7 +1152,9 @@ export function GalaxyView({
       focus.x += extent * focusBiasX;
       // On a terrain the view pivots on the ground, not on sea level.
       if (surface) focus.y = surface.groundHeightAtWorld(focus.x, focus.z);
-    }
+      return focus;
+    };
+    const focus = centreOf(playerRef.current);
 
     const camera = new THREE.PerspectiveCamera(VIEW_FOV_DEGREES, 1, 0.1, 2500);
     // The land drawn past a generated map's edge, which the camera must clear
@@ -1351,7 +1352,7 @@ export function GalaxyView({
     // (below) can put a ring they were overriding back to its plain style.
     const owners = createOwners(
       galaxy,
-      playerFactionId,
+      () => playerRef.current,
       laneFlow,
       ownersRef,
       pathLinksRef,
@@ -1495,7 +1496,7 @@ export function GalaxyView({
           input.pinned =
             i === hovered ||
             i === selectedIndex ||
-            (ownersRef.current[node.id] ?? node.owner) === playerFactionId;
+            (ownersRef.current[node.id] ?? node.owner) === playerRef.current;
           input.ndc = { x: projected.x, y: projected.y };
         });
         placeLabels(inputs, w, h, keptSizes, remeasure);
@@ -1647,11 +1648,21 @@ export function GalaxyView({
       framedTarget,
       framedPos,
       reduceMotion,
-      factionOnlyRebuild,
-      camPoseRef.current,
     );
     applyFocusRef.current = () => {
       cameraFocus.apply(false);
+      requestRender();
+    };
+    // Another faction: its home ring, its colours on the lanes and the
+    // frontier, and the view framed on its own territory.
+    setHome(playerRef.current);
+    applyPlayerRef.current = () => {
+      setHome(playerRef.current);
+      const centre = centreOf(playerRef.current);
+      framedPos.add(centre).sub(framedTarget);
+      framedTarget.copy(centre);
+      applyOwners();
+      cameraFocus.recentre();
       requestRender();
     };
     // A burst starts from a prop change, so it asks for the frames it plays in.
@@ -1895,11 +1906,6 @@ export function GalaxyView({
       unregisterStats();
       frames.cancel();
       displayClock.cancel();
-      // Remember the final pose so a faction-switch rebuild can ease from here.
-      camPoseRef.current = {
-        pos: camera.position.clone(),
-        target: controls ? controls.target.clone() : new THREE.Vector3(),
-      };
       observer?.disconnect();
       renderer?.domElement.removeEventListener("pointermove", onPointerMove);
       renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
@@ -1920,6 +1926,7 @@ export function GalaxyView({
       }
       renderRef.current = null;
       applyOwnersRef.current = null;
+      applyPlayerRef.current = null;
       applySelectionRef.current = null;
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
@@ -1928,7 +1935,6 @@ export function GalaxyView({
     };
   }, [
     galaxy,
-    playerFactionId,
     reduceMotion,
     effects,
     performanceMode,
