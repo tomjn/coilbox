@@ -109,6 +109,8 @@ The lot sizes are decided. The other widths are the spike's and are tuned on scr
 
 The first entries are ten cuboids from 0.12 to 2.4 high, drawn at 1.5 times those heights, used for both kinds of settlement. A real model replaces a cuboid by taking its footprint and height. When no placeholder is left the list is the inventory.
 
+An open town's real models are in `openTown.ts`: twenty, from 0.18 to 3.6 high, on one, two and four lots. The layout picks the model nearest the height a lot wants, so each model has its own height. A model is built from the cheap parts in `parts.ts` in four finishes of the planet's one colour: pale cast walls, the same walls in broad ribs, a darker cast and dark metal, with a rust panel on a few. The town layer gives each building one of six muted liveries, so neighbours differ. A sealed outpost still uses the cuboids.
+
 ### Town layer
 
 `buildTownModelLayer` builds one group per town.
@@ -118,11 +120,11 @@ The first entries are ten cuboids from 0.12 to 2.4 high, drawn at 1.5 times thos
 - The street sheet is a mesh draped on the ground inside the town's edge, in one colour from the palette, fading out at the edge. It draws where the painted town drew, over a province's tint.
 - Each town bakes one shadow map from the sun, as a landmark does, and its buildings and the ground read it. The map's side follows the town's radius, up to 1024 for a full capital, which is the texel density a stronghold's shadow has. The spike's 2048 for every town would have held about 200 MB on the 18 location test map. The PR reports the texture memory the test map takes.
 - The ground decal gets two changes: ground beyond the shadow map's far side is not drawn as shadowed, and a town's decal leaves out the darkening at the foot, which was drawn for a single model.
-- `setStyle(nodeIndex, TownStyle)` takes the same style the painted towns take. Hidden by fog draws the town dim and grey. The ring is drawn on the decal, one lot outside the town's furthest edge, so it clears the outer buildings.
+- `setStyle(nodeIndex, TownStyle)` takes the same style the painted towns take. Hidden by fog draws the town dim and grey. The ring is drawn on the decal, one lot outside the town's furthest building. A town's edge can reach well past its buildings where the ground is too steep or wet to build on, so the ring follows the buildings and not the edge.
 - The violet mist of an event stop is not drawn on a 3D town, as it is not drawn on a landmark.
 - A town keeps its badge. The badge stands above the town's tallest building, which the layer reports in `tops`.
 - On a Territories map a capital is marked by a star, not a badge. It stands above its town's tallest building too, and faces the camera there. A capital with no town under it keeps its star flat on the ground.
-- The player's home ring is not changed. It is a fixed size on the ground and the outer buildings of a capital stand through it.
+- The player's home ring lies on the ground just outside the capital's own ring, so no building stands through it. A capital with no town of buildings keeps the flat ring of a fixed size.
 - The meshes are never picked. The location's own hit target carries the pointer.
 
 ### Palettes

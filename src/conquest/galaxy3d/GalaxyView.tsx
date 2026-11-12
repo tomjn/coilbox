@@ -941,6 +941,7 @@ export function GalaxyView({
       burstRef,
       applyBurstRef,
       surface,
+      townModels?.rings,
     );
 
     /* ------------------------------- labels -------------------------------- */

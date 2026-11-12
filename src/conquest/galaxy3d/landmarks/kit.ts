@@ -15,11 +15,11 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 export type Rgb = [number, number, number];
 
 /**
- * 0 masonry, 2 rock, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn
+ * 0 masonry, 2 rock, 6 cast concrete in broad ribs, 7 bare trim, 8 cast concrete panels, 9 an anomaly's worn
  * skin, 10 the same skin worn smooth, 11 painted metal plate with seams, 12
  * painted metal with none, as on a tank or a dome, 13 bare metal.
  */
-export type Kind = 0 | 2 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+export type Kind = 0 | 2 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 
 /** What a part is, so a test can find it. */
 export type PartTag = "body" | "tower" | "mast" | "crag";

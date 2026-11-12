@@ -36,6 +36,8 @@ export interface TownModelLayer {
   nodes: ReadonlySet<number>;
   /** The height of each town's tallest building, in world units, by node index. */
   tops: ReadonlyMap<number, number>;
+  /** The radius each town's ring is drawn at, in world units, by node index. */
+  rings: ReadonlyMap<number, number>;
   /** Show a town's fog and ring. Mist is not drawn. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
@@ -69,6 +71,31 @@ const MAX_SHADOW = 1024;
 const FOUNDATION_MIN = 0.001;
 /** How much a building's shade may drift from the kit's own. */
 const SHADE_DRIFT = 0.14;
+/**
+ * The paints an open town's buildings come in: what the planet's wall colour
+ * is multiplied by, and the share of buildings that take it. All are muted, so
+ * a town still reads as one material on its planet.
+ */
+const LIVERIES: readonly { tint: [number, number, number]; share: number }[] = [
+  { tint: [1, 1, 1], share: 0.38 },
+  { tint: [0.84, 0.86, 0.9], share: 0.2 },
+  { tint: [1, 0.92, 0.79], share: 0.12 },
+  { tint: [0.78, 0.87, 0.98], share: 0.1 },
+  { tint: [0.5, 0.53, 0.58], share: 0.12 },
+  { tint: [0.8, 0.89, 0.76], share: 0.08 },
+];
+/** A sealed outpost is one paint throughout. */
+const PLAIN: [number, number, number] = [1, 1, 1];
+
+/** The livery for a number from 0 to 1. */
+export function liveryFor(pick: number): [number, number, number] {
+  let upTo = 0;
+  for (const { tint, share } of LIVERIES) {
+    upTo += share;
+    if (pick < upTo) return tint;
+  }
+  return LIVERIES[0].tint;
+}
 
 /**
  * The shadow picture's side for a town, in proportion to its radius. A full
@@ -118,6 +145,7 @@ export function buildTownModelLayer(
 
   const placed = new Map<number, Placed>();
   const tops = new Map<number, number>();
+  const rings = new Map<number, number>();
   const bakes: (() => void)[] = [];
   let shadowBytes = 0;
   let renderer: THREE.WebGLRenderer | null = null;
@@ -131,6 +159,8 @@ export function buildTownModelLayer(
     const rand = seeded(Math.floor(town.seed * 1e9) + 1);
     const foundations = new Builder();
     let foundationCount = 0;
+    // How far the furthest corner of any building lies from the centre.
+    let built = 0;
     const parts: THREE.BufferGeometry[] = [];
     for (const placement of placements) {
       const model = models[placement.model];
@@ -155,11 +185,14 @@ export function buildTownModelLayer(
       }
       const x = placement.x - town.x;
       const z = placement.z - town.z;
+      built = Math.max(built, Math.hypot(x, z) + Math.hypot(w, d) / 2);
       const copy = geometries[placement.model].clone();
       copy.applyMatrix4(at(x, top - y0, z, placement.turn));
       const shade = 1 + (rand() - 0.5) * SHADE_DRIFT;
+      const tint = style === "organic" ? liveryFor(rand()) : PLAIN;
       const colour = copy.getAttribute("color");
-      for (let i = 0; i < colour.array.length; i++) colour.array[i] *= shade;
+      for (let i = 0; i < colour.array.length; i++)
+        colour.array[i] *= shade * tint[i % 3];
       parts.push(copy);
       // Fill the gap under a building on a slope, so no side shows daylight.
       if (top - lo > FOUNDATION_MIN) {
@@ -223,8 +256,9 @@ export function buildTownModelLayer(
       facing: 0,
       ground: (lx, lz) => height(town.x + lx, town.z + lz) - y0,
     };
-    // The ring lies one lot outside the furthest edge, clear of the buildings.
-    const reach = (town.radius * EDGE_MAX + grid.lot) / RING_AT;
+    // The ring lies one lot outside the furthest building. A town's edge can
+    // reach well past that, where the ground is too steep or wet to build on.
+    const reach = (built + grid.lot) / RING_AT;
     // The longest shadow the tallest building throws on level ground.
     const shadowReach =
       reach + (local.max.y * Math.hypot(sun.x, sun.z)) / sun.y;
@@ -258,11 +292,13 @@ export function buildTownModelLayer(
 
     placed.set(town.node, { material, sheet: sheetMaterial, decal });
     tops.set(town.node, bounds.max.y);
+    rings.set(town.node, reach * RING_AT);
   }
 
   return {
     nodes: new Set(placed.keys()),
     tops,
+    rings,
     shadowBytes,
     setStyle(i, state) {
       const town = placed.get(i);

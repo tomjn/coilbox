@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
 import { CAPITAL_RADIUS, planTowns, withStreets } from "../towns";
 import { OPEN_GRID, RIVER_BANK, SEALED_GRID } from "./layout";
-import { buildTownModelLayer, shadowSide } from "./townModelLayer";
+import { buildTownModelLayer, liveryFor, shadowSide } from "./townModelLayer";
 
 const SIDE = 101;
 const surfaceAt = (level: number) => {
@@ -116,16 +116,13 @@ describe("buildTownModelLayer", () => {
     for (const s of sheets(scene)) expect(s.name).toBe("town-models");
   });
 
-  it("draws the ring one lot outside the town's furthest edge", () => {
-    for (const [planet, grid] of [
-      [undefined, OPEN_GRID],
-      ["moon", SEALED_GRID],
-    ] as const) {
-      const { scene, towns } = build({ planet });
+  it("draws the ring at the radius it reports", () => {
+    for (const planet of [undefined, "moon"] as const) {
+      const { scene, layer, towns } = build({ planet });
       towns.forEach((town, n) => {
         const u = decalOf(scene, n).uniforms;
         expect(u.uRingRadius.value).toBeCloseTo(
-          town.radius * 1.27 + grid.lot,
+          layer.rings.get(town.node) as number,
           6,
         );
       });
@@ -191,6 +188,38 @@ describe("buildTownModelLayer", () => {
       const ground = surface.groundHeightAtWorld(town.x, town.z);
       expect(layer.tops.get(town.node)).toBeGreaterThan(ground);
     }
+  });
+
+  it("reports a ring outside each town's furthest building", () => {
+    const { scene, layer, towns } = build();
+    for (const town of towns) {
+      const group = scene.children.find(
+        (o) =>
+          o instanceof THREE.Group &&
+          o.position.x === town.x &&
+          o.position.z === town.z,
+      );
+      const pos = (group?.children[0] as THREE.Mesh).geometry.getAttribute(
+        "position",
+      );
+      let far = 0;
+      for (let i = 0; i < pos.count; i++)
+        far = Math.max(far, Math.hypot(pos.getX(i), pos.getZ(i)));
+      expect(layer.rings.get(town.node)).toBeGreaterThan(far + 0.25 - 1e-6);
+      // One lot, and at most half a building's diagonal of slack.
+      expect(layer.rings.get(town.node)).toBeLessThan(far + 1);
+    }
+  });
+
+  it("deals every livery out and the plain one most often", () => {
+    const seen = new Map<string, number>();
+    for (let i = 0; i < 1000; i++) {
+      const key = liveryFor(i / 1000).join();
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    expect(seen.size).toBe(6);
+    expect(seen.get("1,1,1")).toBe(Math.max(...seen.values()));
+    expect(liveryFor(0.999999)).toHaveLength(3);
   });
 
   it("dims a town hidden by fog", () => {
