@@ -31,6 +31,23 @@ describe("landmarkMaterial", () => {
     );
   });
 
+  it("wears painted metal unless its paint is fresh", () => {
+    const worn = landmarkMaterial();
+    expect(worn.defines).toEqual({});
+    const fresh = landmarkMaterial({ freshPaint: true });
+    expect(fresh.defines).toEqual({ FRESH_PAINT: 1 });
+    // The scuffs and metal's share of the relief both hang on the one switch.
+    expect(fresh.fragmentShader).toMatch(
+      /#ifndef FRESH_PAINT\s+if \(\(vKind > 10\.5 && vKind < 12\.5\) \|\| vKind > 13\.5\)/,
+    );
+    expect(fresh.fragmentShader).toMatch(
+      /#ifdef FRESH_PAINT\s+#define RELIEF_BELOW 10\.5\s+#else\s+#define RELIEF_BELOW 13\.5/,
+    );
+    expect(fresh.fragmentShader).toMatch(
+      /vKind > 8\.5 && vKind < RELIEF_BELOW/,
+    );
+  });
+
   it("goes grey under fog", () => {
     const m = landmarkMaterial();
     setLandmarkState(m, { hidden: true });

@@ -82,6 +82,14 @@ varying vec4 vColor;
 varying vec3 vColor;
 #endif
 
+// The kinds below this take a worn skin's relief. Fresh paint lies flat, so
+// metal is left out of it.
+#ifdef FRESH_PAINT
+#define RELIEF_BELOW 10.5
+#else
+#define RELIEF_BELOW 13.5
+#endif
+
 float lmHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float lmHash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float lmNoise3(vec3 p) {
@@ -229,6 +237,7 @@ void main() {
     float fade = clamp(1.6 - w * 2.2, 0.0, 1.0);
     base *= mix(${(1 - (1 - STRIPE_DARK) / 2).toFixed(3)}, mix(1.0, ${STRIPE_DARK.toFixed(3)}, band), fade);
   }
+#ifndef FRESH_PAINT
   if ((vKind > 10.5 && vKind < 12.5) || vKind > 13.5) {
     // Paint worn through to the primer and the steel, in scuffs and at chips.
     float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
@@ -237,11 +246,12 @@ void main() {
     float worn = smoothstep(0.66, 0.74, scuff) * near;
     base = mix(base, vec3(0.16, 0.11, 0.08), 0.75 * worn);
   }
+#endif
 
   vec3 w = normalize(vWorldNormal);
   vec3 hemi = mix(uGroundBounce, uSky, w.y * 0.5 + 0.5);
   float facing = max(dot(w, uSun), 0.0);
-  if (vKind > 8.5 && vKind < 13.5) {
+  if (vKind > 8.5 && vKind < RELIEF_BELOW) {
     // A worn skin: relief the light catches, dark in its cracks and hollows.
     float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
     float fine = clamp(1.0 - foot * 45.0, 0.0, 1.0);
@@ -294,14 +304,19 @@ void main() {
 }
 `;
 
-/** The lit surface of a landmark. `transparent` for its see-through edges. */
+/**
+ * The lit surface of a landmark. `transparent` for its see-through edges.
+ * `freshPaint` draws painted metal as it left the factory, with no scuffs
+ * worn through it and no relief, as a sealed outpost keeps its hulls.
+ */
 export function landmarkMaterial(
-  opts: { transparent?: boolean } = {},
+  opts: { transparent?: boolean; freshPaint?: boolean } = {},
 ): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexColors: true,
     transparent: opts.transparent ?? false,
     depthWrite: !opts.transparent,
+    defines: opts.freshPaint ? { FRESH_PAINT: 1 } : {},
     uniforms: {
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uSunLight: { value: SUN_LIGHT.clone() },
