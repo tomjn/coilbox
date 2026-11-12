@@ -130,6 +130,23 @@ describe("buildTownModelLayer", () => {
     }
   });
 
+  it("fades a town's street sheet to nothing on its outer boundary", () => {
+    const { scene } = build();
+    for (const sheet of sheets(scene)) {
+      const colour = sheet.geometry.getAttribute("color");
+      const n = Math.sqrt(colour.count) - 1;
+      expect(Number.isInteger(n)).toBe(true);
+      for (let k = 0; k <= n; k++)
+        for (const [i, j] of [
+          [k, 0],
+          [k, n],
+          [0, k],
+          [n, k],
+        ])
+          expect(colour.getW(j * (n + 1) + i)).toBe(0);
+    }
+  });
+
   it("leaves out a town a landmark stands in place of", () => {
     const { layer } = build({ omit: new Set([1]) });
     expect([...layer.nodes]).toEqual([0, 2]);

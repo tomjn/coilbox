@@ -42,6 +42,8 @@ export interface TownModelLayer {
 const TOWN_NAME = "town-models";
 /** The steps the ground's slope is judged over, in world units. */
 const SLOPE_STEP = 0.25;
+/** The most a town's edge reaches past its radius, as `townEdge` in `towns.ts` has it. */
+const EDGE_MAX = 1.27;
 /** The street sheet's grid step, and how far above the ground it lies. */
 const SHEET_STEP = 0.08;
 const SHEET_LIFT = 0.008;
@@ -51,8 +53,6 @@ const SHEET_FADE_FROM = 0.9;
 const SHEET_FADE_TO = 1.08;
 /** Between the province fills (-2.5) and the decal (-2.4). */
 const SHEET_ORDER = -2.45;
-/** The most a town's edge reaches past its radius, as `townEdge` in `towns.ts` has it. */
-const EDGE_MAX = 1.27;
 /** Where the decal draws its ring, as a share of its reach. Must match `RING_AT` in `landmarks/shadow.ts`. */
 const RING_AT = 0.92;
 /** The side of the largest shadow picture. */
@@ -272,7 +272,9 @@ function streetSheet(
   height: (x: number, z: number) => number,
   buildable: (x: number, z: number) => number,
 ): THREE.BufferGeometry {
-  const n = Math.ceil((town.radius * 1.3 * 2) / SHEET_STEP);
+  const n = Math.ceil(
+    (town.radius * EDGE_MAX * SHEET_FADE_TO * 2) / SHEET_STEP,
+  );
   const colour = new THREE.Color().setRGB(
     street[0] / 255,
     street[1] / 255,
