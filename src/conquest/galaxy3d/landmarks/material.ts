@@ -84,10 +84,15 @@ varying vec3 vColor;
 
 // The kinds below this take a worn skin's relief. Fresh paint lies flat, so
 // metal is left out of it.
-#ifdef FRESH_PAINT
+#ifdef OUTPOST
 #define RELIEF_BELOW 10.5
+// Tinted glass, which keeps a sealed outpost's windows dark on any hull.
+#define GLASS_WHITE 0.0
+#define GLASS_SKY 0.15
 #else
 #define RELIEF_BELOW 13.5
+#define GLASS_WHITE 0.25
+#define GLASS_SKY 0.5
 #endif
 
 float lmHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -237,7 +242,7 @@ void main() {
     float fade = clamp(1.6 - w * 2.2, 0.0, 1.0);
     base *= mix(${(1 - (1 - STRIPE_DARK) / 2).toFixed(3)}, mix(1.0, ${STRIPE_DARK.toFixed(3)}, band), fade);
   }
-#ifndef FRESH_PAINT
+#ifndef OUTPOST
   if ((vKind > 10.5 && vKind < 12.5) || vKind > 13.5) {
     // Paint worn through to the primer and the steel, in scuffs and at chips.
     float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
@@ -282,7 +287,7 @@ void main() {
     float glance = pow(1.0 - max(dot(w, view), 0.0), 3.0);
     float glint = pow(max(dot(w, normalize(uSun + view)), 0.0), 14.0);
     colour = colour * 0.75
-      + uSky * mix(base, vec3(1.0), 0.25) * (0.5 + 1.0 * glance)
+      + uSky * mix(base, vec3(1.0), GLASS_WHITE) * (GLASS_SKY + 1.0 * glance)
       + uSunLight * glint * lit * 0.7;
   }
   if (vKind > 10.5) {
@@ -306,17 +311,17 @@ void main() {
 
 /**
  * The lit surface of a landmark. `transparent` for its see-through edges.
- * `freshPaint` draws painted metal as it left the factory, with no scuffs
- * worn through it and no relief, as a sealed outpost keeps its hulls.
+ * `outpost` draws as a sealed outpost keeps itself: painted metal as it left
+ * the factory, with no scuffs worn through it and no relief, and tinted glass.
  */
 export function landmarkMaterial(
-  opts: { transparent?: boolean; freshPaint?: boolean } = {},
+  opts: { transparent?: boolean; outpost?: boolean } = {},
 ): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexColors: true,
     transparent: opts.transparent ?? false,
     depthWrite: !opts.transparent,
-    defines: opts.freshPaint ? { FRESH_PAINT: 1 } : {},
+    defines: opts.outpost ? { OUTPOST: 1 } : {},
     uniforms: {
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uSunLight: { value: SUN_LIGHT.clone() },

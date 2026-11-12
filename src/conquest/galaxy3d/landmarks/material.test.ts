@@ -31,17 +31,21 @@ describe("landmarkMaterial", () => {
     );
   });
 
-  it("wears painted metal unless its paint is fresh", () => {
+  it("wears painted metal and pales glass except on an outpost", () => {
     const worn = landmarkMaterial();
     expect(worn.defines).toEqual({});
-    const fresh = landmarkMaterial({ freshPaint: true });
-    expect(fresh.defines).toEqual({ FRESH_PAINT: 1 });
+    const fresh = landmarkMaterial({ outpost: true });
+    expect(fresh.defines).toEqual({ OUTPOST: 1 });
     // The scuffs and metal's share of the relief both hang on the one switch.
     expect(fresh.fragmentShader).toMatch(
-      /#ifndef FRESH_PAINT\s+if \(\(vKind > 10\.5 && vKind < 12\.5\) \|\| vKind > 13\.5\)/,
+      /#ifndef OUTPOST\s+if \(\(vKind > 10\.5 && vKind < 12\.5\) \|\| vKind > 13\.5\)/,
     );
     expect(fresh.fragmentShader).toMatch(
-      /#ifdef FRESH_PAINT\s+#define RELIEF_BELOW 10\.5\s+#else\s+#define RELIEF_BELOW 13\.5/,
+      /#ifdef OUTPOST\s+#define RELIEF_BELOW 10\.5[\s\S]*#else\s+#define RELIEF_BELOW 13\.5/,
+    );
+    // An outpost's glass takes no white from the sky, so it stays dark.
+    expect(fresh.fragmentShader).toMatch(
+      /#ifdef OUTPOST[\s\S]*#define GLASS_WHITE 0\.0[\s\S]*#else[\s\S]*#define GLASS_WHITE 0\.25/,
     );
     expect(fresh.fragmentShader).toMatch(
       /vKind > 8\.5 && vKind < RELIEF_BELOW/,
