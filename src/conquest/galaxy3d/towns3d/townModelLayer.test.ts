@@ -1,9 +1,16 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
 import { CAPITAL_RADIUS, planTowns, withStreets } from "../towns";
-import { OPEN_GRID, RIVER_BANK, SEALED_GRID } from "./layout";
-import { buildTownModelLayer, shadowSide } from "./townModelLayer";
+import { OPEN_GRID, RIVER_BANK } from "./layout";
+import { buildOutpost } from "./outposts";
+import { buildTownModelLayer, groundUnder, shadowSide } from "./townModelLayer";
+
+// Counted, to show each structure is built once in each colourway.
+vi.mock("./outposts", async (original) => {
+  const real = await original<typeof import("./outposts")>();
+  return { ...real, buildOutpost: vi.fn(real.buildOutpost) };
+});
 
 const SIDE = 101;
 const surfaceAt = (level: number) => {
@@ -256,16 +263,43 @@ describe("buildTownModelLayer", () => {
     }
   });
 
-  it("draws no streets on a moon, which has no air to drive in", () => {
-    for (const sheet of sheets(build({ planet: "moon" }).scene)) {
-      const m = sheet.material as THREE.MeshBasicMaterial;
-      expect(m.customProgramCacheKey()).not.toBe("town-street-ground");
+  it("draws no street sheet under a sealed outpost", () => {
+    for (const planet of ["moon", "red", "volcanic", "acid"] as const) {
+      const { scene, layer } = build({ planet });
+      expect(layer.nodes.size, planet).toBeGreaterThan(0);
+      expect(sheets(scene), planet).toHaveLength(0);
     }
-    // The other sealed planets keep theirs.
-    for (const sheet of sheets(build({ planet: "red" }).scene)) {
-      const m = sheet.material as THREE.MeshBasicMaterial;
-      expect(m.customProgramCacheKey()).toBe("town-street-ground");
+  });
+
+  it("stands a sealed outpost on striped plates", () => {
+    const { scene } = build({ planet: "moon" });
+    const group = scene.children.find((o) => o instanceof THREE.Group);
+    const mesh = group?.children[0] as THREE.Mesh;
+    expect(Array.from(mesh.geometry.getAttribute("kind").array)).toContain(14);
+  });
+
+  it("fogs and rings a sealed outpost", () => {
+    const { scene, layer, towns } = build({ planet: "red" });
+    expect(() =>
+      layer.setStyle(0, {
+        hidden: true,
+        ring: { color: new THREE.Color(1, 1, 1), strength: 0.9, thick: true },
+      }),
+    ).not.toThrow();
+    expect(materialOf(scene, 0).uniforms.uHidden.value).toBe(1);
+    for (const town of towns) {
+      expect(layer.tops.get(town.node)).toBeDefined();
+      expect(layer.rings.get(town.node)).toBeGreaterThan(0);
     }
+  });
+
+  it("builds each structure once in each colourway", () => {
+    const spy = vi.mocked(buildOutpost);
+    spy.mockClear();
+    build({ planet: "moon" });
+    const keys = spy.mock.calls.map(([m, , , paint]) => `${m.id}:${paint.id}`);
+    expect(keys.length).toBeGreaterThan(0);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("dims a hidden town's street trees with it", () => {
@@ -369,6 +403,17 @@ describe("buildTownModelLayer", () => {
     let bytes = 0;
     for (const t of towns) bytes += 8 * shadowSide(t.radius) ** 2;
     expect(layer.shadowBytes).toBe(bytes);
+  });
+});
+
+describe("groundUnder", () => {
+  it("finds the lowest and highest ground under a turned rectangle", () => {
+    // Ground rising one in ten along x.
+    const slope = (x: number) => x / 10;
+    const { lo, top } = groundUnder(slope, 5, 0, 2, 1, Math.PI / 2);
+    // A quarter turn lays the rectangle's 2 along z, so x spans 4.5 to 5.5.
+    expect(lo).toBeCloseTo(0.45, 9);
+    expect(top).toBeCloseTo(0.55, 9);
   });
 });
 
