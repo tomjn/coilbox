@@ -116,11 +116,13 @@ The first entries are ten cuboids from 0.12 to 2.4 high, drawn at 1.5 times thos
 - Each model is built once. A town's mesh is the models copied to their placements and merged, so a town is one draw. Each copy takes its own shade so no two neighbours match.
 - The material is the landmark material, lit by the terrain's sun, with the cast panel pattern.
 - The street sheet is a mesh draped on the ground inside the town's edge, in one colour from the palette, fading out at the edge. It draws where the painted town drew, over a province's tint.
-- Each town bakes one shadow map from the sun, as a landmark does, and its buildings and the ground read it. The map's side follows the town's size, up to 2048, which is what the spike used for every town. The side per lot is tuned on screen, and the PR reports the texture memory the test map takes.
+- Each town bakes one shadow map from the sun, as a landmark does, and its buildings and the ground read it. The map's side follows the town's radius, up to 1024 for a full capital, which is the texel density a stronghold's shadow has. The spike's 2048 for every town would have held about 200 MB on the 18 location test map. The PR reports the texture memory the test map takes.
 - The ground decal gets two changes: ground beyond the shadow map's far side is not drawn as shadowed, and a town's decal leaves out the darkening at the foot, which was drawn for a single model.
-- `setStyle(nodeIndex, TownStyle)` takes the same style the painted towns take. Hidden by fog draws the town dim and grey. The ring is drawn on the decal.
+- `setStyle(nodeIndex, TownStyle)` takes the same style the painted towns take. Hidden by fog draws the town dim and grey. The ring is drawn on the decal, one lot outside the town's furthest edge, so it clears the outer buildings.
 - The violet mist of an event stop is not drawn on a 3D town, as it is not drawn on a landmark.
 - A town keeps its badge. The badge stands above the town's tallest building, which the layer reports in `tops`.
+- On a Territories map a capital is marked by a star, not a badge. It stands above its town's tallest building too, and faces the camera there. A capital with no town under it keeps its star flat on the ground.
+- The player's home ring is not changed. It is a fixed size on the ground and the outer buildings of a capital stand through it.
 - The meshes are never picked. The location's own hit target carries the pointer.
 
 ### Palettes
