@@ -23,7 +23,13 @@ import { TERRAIN_SUN, type TerrainSurface } from "../terrain";
 import type { TownStyle } from "../townLayer";
 import { buildableAt, CAPITAL_RADIUS, type Town, townEdge } from "../towns";
 import { buildModel, modelsFor } from "./buildings";
-import { footprint, gridFor, layoutTown, type TownGround } from "./layout";
+import {
+  footprint,
+  gridFor,
+  layoutTown,
+  RIVER_BANK,
+  type TownGround,
+} from "./layout";
 
 export interface TownModelLayer {
   /** The towns that were built, by node index. */
@@ -51,6 +57,8 @@ const SHEET_OPACITY = 0.9;
 /** Where the sheet starts to fade and where it is gone, as shares of the town's edge. */
 const SHEET_FADE_FROM = 0.9;
 const SHEET_FADE_TO = 1.08;
+/** Distance from a river's edge where the painted towns began to fade in. */
+const RIVER_FADE_FROM = 0.015;
 /** Between the province fills (-2.5) and the decal (-2.4). */
 const SHEET_ORDER = -2.45;
 /** Where the decal draws its ring, as a share of its reach. Must match `RING_AT` in `landmarks/shadow.ts`. */
@@ -193,7 +201,13 @@ export function buildTownModelLayer(
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -2,
     });
-    const sheetGeometry = streetSheet(town, palette.street, height, buildable);
+    const sheetGeometry = streetSheet(
+      town,
+      palette.street,
+      height,
+      buildable,
+      riverEdge,
+    );
     const sheet = new THREE.Mesh(sheetGeometry, sheetMaterial);
     sheet.name = TOWN_NAME;
     sheet.renderOrder = SHEET_ORDER;
@@ -275,6 +289,7 @@ function streetSheet(
   street: [number, number, number],
   height: (x: number, z: number) => number,
   buildable: (x: number, z: number) => number,
+  riverEdge?: TownGround["riverEdge"],
 ): THREE.BufferGeometry {
   const n = Math.ceil(
     (town.radius * EDGE_MAX * SHEET_FADE_TO * 2) / SHEET_STEP,
@@ -304,12 +319,16 @@ function streetSheet(
             (t - SHEET_FADE_FROM) / (SHEET_FADE_TO - SHEET_FADE_FROM),
           ),
         );
+      // Absent in the water and on the first of the bank, so a river shows.
+      const bank = riverEdge
+        ? smoothstep(RIVER_FADE_FROM, RIVER_BANK, riverEdge(x, z))
+        : 1;
       pos.push(x, height(x, z) + SHEET_LIFT, z);
       col.push(
         colour.r,
         colour.g,
         colour.b,
-        SHEET_OPACITY * fade * (buildable(x, z) > 0 ? 1 : 0),
+        SHEET_OPACITY * fade * bank * (buildable(x, z) > 0 ? 1 : 0),
       );
     }
   for (let j = 0; j < n; j++)
@@ -322,4 +341,10 @@ function streetSheet(
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(col, 4));
   geometry.setIndex(idx);
   return geometry;
+}
+
+/** 0 below `a`, 1 above `b`, and smooth between. */
+function smoothstep(a: number, b: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
 }

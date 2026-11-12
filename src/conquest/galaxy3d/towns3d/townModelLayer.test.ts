@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
 import { CAPITAL_RADIUS, planTowns, withStreets } from "../towns";
-import { OPEN_GRID, SEALED_GRID } from "./layout";
+import { OPEN_GRID, RIVER_BANK, SEALED_GRID } from "./layout";
 import { buildTownModelLayer, shadowSide } from "./townModelLayer";
 
 const SIDE = 101;
@@ -24,6 +24,7 @@ const build = (
     level?: number;
     omit?: ReadonlySet<number>;
     planet?: Parameters<typeof buildTownModelLayer>[5];
+    riverEdge?: (x: number, z: number) => number;
   } = {},
 ) => {
   const surface = surfaceAt(opts.level ?? 0.5);
@@ -49,6 +50,7 @@ const build = (
     towns,
     opts.omit ?? new Set(),
     opts.planet,
+    opts.riverEdge,
   );
   return { scene, disposables, layer, surface, towns };
 };
@@ -145,6 +147,37 @@ describe("buildTownModelLayer", () => {
         ])
           expect(colour.getW(j * (n + 1) + i)).toBe(0);
     }
+  });
+
+  it("lets a river show through the street sheet", () => {
+    const dry = build();
+    const z0 = dry.towns[0].z;
+    const wet = build({ riverEdge: (_x, z) => Math.abs(z - z0) - 0.1 });
+    // The vertices of the first sheet, near the town's heart, as [alpha, dz].
+    const near = (b: ReturnType<typeof build>) => {
+      const town = b.towns[0];
+      const sheet = sheets(b.scene)[0].geometry;
+      const pos = sheet.getAttribute("position");
+      const col = sheet.getAttribute("color");
+      const out: [number, number][] = [];
+      for (let k = 0; k < pos.count; k++) {
+        const dx = pos.getX(k) - town.x;
+        const dz = pos.getZ(k) - town.z;
+        if (Math.hypot(dx, dz) < town.radius * 0.5)
+          out.push([col.getW(k), Math.abs(dz)]);
+      }
+      return out;
+    };
+    const inWater = near(wet).filter(([, dz]) => dz < 0.1);
+    expect(inWater.length).toBeGreaterThan(0);
+    for (const [alpha] of inWater) expect(alpha).toBe(0);
+    const clear = near(wet).filter(([, dz]) => dz > 0.1 + RIVER_BANK);
+    expect(clear.length).toBeGreaterThan(0);
+    for (const [alpha] of clear) expect(alpha).toBeGreaterThan(0);
+    // With no river the same vertices are drawn.
+    const same = near(dry).filter(([, dz]) => dz < 0.1);
+    expect(same.length).toBe(inWater.length);
+    for (const [alpha] of same) expect(alpha).toBeGreaterThan(0);
   });
 
   it("leaves out a town a landmark stands in place of", () => {
