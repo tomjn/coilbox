@@ -63,6 +63,8 @@ export type SeaLook = "water" | "acid" | "lava" | "ice" | "basin" | "maria";
 
 /** Seas that ripple, foam and glint, and show their bed through the shallows. */
 export const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
+/** Seas that are ground, which the land beside them runs into with no shore. */
+export const GROUND_SEAS: readonly SeaLook[] = ["basin", "maria"];
 
 /**
  * How a planet's settlements are laid out. `organic` is a town in the open

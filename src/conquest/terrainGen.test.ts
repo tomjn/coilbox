@@ -3,7 +3,9 @@ import { PLANETS, planetOf } from "./planets";
 import { mulberry32 } from "./rng";
 import {
   coastDistanceOf,
+  extendTerrain,
   generateTerrain,
+  generateTerrainWithMargin,
   LAND_LAYOUTS,
   labelLandMasses,
   landColour,
@@ -13,6 +15,7 @@ import {
   seaColourAtDepth,
   seaDepthOf,
   seaRampOf,
+  shoreOf,
 } from "./terrainGen";
 
 const opts = { seed: 11, shape: "continent" as const };
@@ -168,6 +171,78 @@ describe("planet terrain", () => {
     const coarseLow = coarse[25 * (W / 2) + 15];
     expect(Math.abs(coarseLow - offLow)).toBeLessThan(offLow * 0.25);
   });
+
+  it("puts the water line where the smooth coast is, not on the pixels' steps", () => {
+    // A round island 20.3 pixels across its radius, cut from a smooth level.
+    const W = 64;
+    const R = 20.3;
+    const land = new Uint8Array(W * W);
+    const level = new Float64Array(W * W);
+    for (let y = 0; y < W; y++) {
+      for (let x = 0; x < W; x++) {
+        const dx = x - 31.5;
+        const dy = y - 31.5;
+        level[y * W + x] = R - Math.sqrt(dx * dx + dy * dy);
+        land[y * W + x] = level[y * W + x] > 0 ? 1 : 0;
+      }
+    }
+    const shore = shoreOf(land, coastDistanceOf(land, W, W), level, W, W, 1);
+    for (let i = 0; i < shore.length; i++)
+      expect(shore[i] > 0).toBe(land[i] === 1);
+    // The blend between pixel centres, as a texture gives it.
+    const at = (x: number, y: number) => {
+      const ix = Math.floor(x);
+      const iy = Math.floor(y);
+      const fx = x - ix;
+      const fy = y - iy;
+      const i = iy * W + ix;
+      const top = shore[i] + (shore[i + 1] - shore[i]) * fx;
+      const bottom = shore[i + W] + (shore[i + W + 1] - shore[i + W]) * fx;
+      return top + (bottom - top) * fy;
+    };
+    // Walk out from the middle along 40 directions to where the blend
+    // crosses 0. A 3, 4, 5 triangle turns the direction with no cosine.
+    let worst = 0;
+    let dx = 1;
+    let dy = 0;
+    for (let k = 0; k < 40; k++) {
+      let r = R - 3;
+      while (at(31.5 + dx * r, 31.5 + dy * r) > 0) r += 0.01;
+      worst = Math.max(worst, Math.abs(r - R));
+      [dx, dy] = [0.8 * dx - 0.6 * dy, 0.6 * dx + 0.8 * dy];
+    }
+    // The pixels' own steps are up to half a pixel off the circle.
+    expect(worst).toBeLessThan(0.15);
+  });
+
+  it("measures the shore from the water line on the map and past its edge", () => {
+    const { terrain, margin } = generateTerrainWithMargin(
+      { seed: 11, shape: "continents" },
+      64,
+    );
+    let wrong = 0;
+    let beside = 0;
+    for (let i = 0; i < terrain.land.length; i++) {
+      if (terrain.shore[i] > 0 !== (terrain.land[i] === 1)) wrong++;
+      if (terrain.coastDistance[i] === 3) {
+        beside++;
+        if (Math.abs(terrain.shore[i]) > 1) wrong++;
+      } else if (Math.abs(terrain.shore[i]) < 1.5) wrong++;
+    }
+    expect(beside).toBeGreaterThan(0);
+    expect(wrong).toBe(0);
+    let marginWrong = 0;
+    for (let o = 0; o < margin.shore.length; o++)
+      if (margin.shore[o] > 0 !== margin.heightmap[o] > 0) marginWrong++;
+    expect(marginWrong).toBe(0);
+    const wide = extendTerrain(terrain, margin);
+    expect(wide.shore).toHaveLength(wide.width * wide.height);
+    expect(wide.seaDepth).toHaveLength(wide.width * wide.height);
+    // The map's own values sit in the middle, untouched.
+    const o = (margin.margin + 100) * wide.width + margin.margin + 200;
+    expect(wide.shore[o]).toBe(terrain.shore[100 * terrain.width + 200]);
+    expect(wide.seaDepth[o]).toBe(terrain.seaDepth[100 * terrain.width + 200]);
+  }, 60_000);
 
   it("fades the sea from its shallow colour to its deep one with no edge", () => {
     for (const planet of ["temperate", "ice", "acid"] as const) {

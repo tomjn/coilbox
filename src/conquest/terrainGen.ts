@@ -1,5 +1,6 @@
 import {
   BIOME_SLOTS,
+  GROUND_SEAS,
   LIQUID_SEAS,
   type Planet,
   type PlanetId,
@@ -176,6 +177,14 @@ export interface GeneratedTerrain {
    * and on land, about 1 at the outer edge of the shallows, and more beyond.
    */
   seaDepth: Float32Array;
+  /**
+   * How far each pixel's centre is from the water line, in pixels: above 0 on
+   * land and below it at sea. Beside the coast it is measured to the smooth
+   * line the generator drew the coast from, to a part of a pixel, so the line
+   * where a blend of it crosses 0 does not follow the pixels' steps. For
+   * drawing alone.
+   */
+  shore: Float32Array;
 }
 
 const S = TERRAIN_PIXELS;
@@ -741,8 +750,6 @@ export function seaRampOf(planet: Planet): Rgb[] {
   return ramp;
 }
 
-/** Seas that are ground, which the land beside them runs into with no shore. */
-const GROUND_SEAS: readonly string[] = ["basin", "maria"];
 /** Coast distance, in thirds of a pixel, by which a ground sea has its colour. */
 const GROUND_SHORE = 36;
 /** Pixels across the patches that make a ground sea's edge ragged. */
@@ -847,14 +854,62 @@ export function seaDepthOf(
   return depth;
 }
 
+/** The nearest and furthest a pixel beside the coast may be from the water line. */
+const SHORE_NEAR = 0.05;
+const SHORE_FAR = 1;
+
+/**
+ * How far each pixel of a `w` by `h` grid is from the water line, as
+ * {@link GeneratedTerrain.shore}, in map pixels. `coast` is the grid's own
+ * {@link coastDistanceOf} and `scale` the map pixels to one of its pixels.
+ * `level` is the smooth elevation the land was cut from, less the sea level,
+ * so it is above 0 on every land pixel and below it on every sea one. A pixel
+ * beside the coast is as far from the line as its level over the level's
+ * slope. Further off, the distance is counted in pixels.
+ */
+export function shoreOf(
+  land: Uint8Array,
+  coast: Uint16Array,
+  level: Float64Array,
+  w: number,
+  h: number,
+  scale: number,
+): Float32Array {
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = y * w + x;
+      let d: number;
+      if (coast[o] > 3) {
+        d = coast[o] / 3 - 0.5;
+      } else {
+        const x0 = x > 0 ? x - 1 : x;
+        const x1 = x < w - 1 ? x + 1 : x;
+        const y0 = y > 0 ? y - 1 : y;
+        const y1 = y < h - 1 ? y + 1 : y;
+        const gx =
+          x1 > x0 ? (level[y * w + x1] - level[y * w + x0]) / (x1 - x0) : 0;
+        const gy =
+          y1 > y0 ? (level[y1 * w + x] - level[y0 * w + x]) / (y1 - y0) : 0;
+        const slope = Math.sqrt(gx * gx + gy * gy);
+        const here = level[o] < 0 ? -level[o] : level[o];
+        d = slope > 0 ? here / slope : SHORE_FAR;
+        d = d < SHORE_NEAR ? SHORE_NEAR : d > SHORE_FAR ? SHORE_FAR : d;
+      }
+      out[o] = (land[o] ? d : -d) * scale;
+    }
+  }
+  return out;
+}
+
 /** How fast the sea's colour goes from shallow to deep with depth. */
-const SEA_FADE = 0.4;
+export const SEA_FADE = 0.4;
 /** How fast the bed is lost under a liquid sea with depth. */
-const BED_FADE = 1.6;
+export const BED_FADE = 1.6;
 /** The bed's colour as a share of the dry shore's: wet ground under water. */
-const BED_WET = 0.62;
+export const BED_WET = 0.62;
 /** The most of a liquid sea's colour its bed gives, at the water line. */
-const BED_SHOWS = 0.65;
+export const BED_SHOWS = 0.65;
 
 /** What is left of a colour at `depth` for a rate of `fade`: 1 at the water
  * line, falling fast and then ever more slowly, and never an edge. Light is
@@ -1329,6 +1384,8 @@ interface TerrainContext {
   seaLevel: number;
   shoreSeed: number;
   shelfSeed: number;
+  /** The elevation the land was cut from, nudged to agree with it. */
+  elevation: Float64Array;
 }
 
 /** Build the land for a seed and a layout. */
@@ -1483,6 +1540,9 @@ function buildTerrain(opts: TerrainOptions): {
     1,
     (x, y) => shelf[y * S + x],
   );
+  const level = new Float64Array(S * S);
+  for (let i = 0; i < level.length; i++) level[i] = elevation[i] - seaLevel;
+  const shore = shoreOf(land, coastDistance, level, S, S, 1);
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -1550,6 +1610,7 @@ function buildTerrain(opts: TerrainOptions): {
       image,
       coastDistance,
       seaDepth,
+      shore,
     },
     context: {
       planet,
@@ -1570,6 +1631,7 @@ function buildTerrain(opts: TerrainOptions): {
       seaLevel,
       shoreSeed,
       shelfSeed,
+      elevation,
     },
   };
 }
@@ -1631,6 +1693,10 @@ export interface TerrainMargin {
   relief: Float32Array;
   /** Biome weights, as the map's, at the margin's own width and height. */
   biomes: TerrainBiomes;
+  /** Sea depth, as the map's. */
+  seaDepth: Float32Array;
+  /** Distance from the water line in map pixels, as the map's shore. */
+  shore: Float32Array;
 }
 
 /**
@@ -1696,6 +1762,7 @@ export function generateTerrainWithMargin(
     seaLevel,
     shoreSeed,
     shelfSeed,
+    elevation,
   } = context;
   const seaRamp = seaRampOf(planet);
   const k = MARGIN_SCALE;
@@ -1720,6 +1787,8 @@ export function generateTerrainWithMargin(
   const insideAxis = (i: number) => mapPixel(i) >= 0 && mapPixel(i) < S;
   const count = W * W;
   const inside = new Uint8Array(count);
+  // The elevation less the sea level, for the water line.
+  const level = new Float64Array(count);
   let land: Uint8Array = new Uint8Array(count);
   for (let j = 0; j < W; j++) {
     for (let i = 0; i < W; i++) {
@@ -1727,6 +1796,7 @@ export function generateTerrainWithMargin(
       if (insideAxis(i) && insideAxis(j)) {
         inside[o] = 1;
         land[o] = terrain.land[mapPixel(j) * S + mapPixel(i)];
+        level[o] = elevation[mapPixel(j) * S + mapPixel(i)] - seaLevel;
         continue;
       }
       const x = at(i);
@@ -1741,6 +1811,7 @@ export function generateTerrainWithMargin(
         base(x, y),
       );
       land[o] = e > seaLevel ? 1 : 0;
+      level[o] = e - seaLevel;
     }
   }
 
@@ -1820,6 +1891,12 @@ export function generateTerrainWithMargin(
   const seaDepth = seaDepthOf(land, heightmap, coast, W, W, k, (i, j) =>
     shelf(at(i), at(j)),
   );
+  // The clean-up moved some pixels across the coast, as on the map.
+  for (let o = 0; o < count; o++) {
+    if (land[o] && level[o] <= 0) level[o] = NUDGE;
+    if (!land[o] && level[o] > 0) level[o] = -NUDGE;
+  }
+  const shore = shoreOf(land, coast, level, W, W, k);
   const image = new Uint8ClampedArray(count * 4);
   const biomes: TerrainBiomes = {
     a: new Uint8Array(count * 4),
@@ -1888,6 +1965,8 @@ export function generateTerrainWithMargin(
       heightmap,
       relief,
       biomes,
+      seaDepth,
+      shore,
     },
   };
 }
@@ -1907,6 +1986,10 @@ export interface ExtendedTerrain {
   relief: Float32Array;
   /** Biome weights, as the map's. Blended bytes need not sum to 255. */
   biomes: TerrainBiomes;
+  /** Sea depth, as {@link GeneratedTerrain.seaDepth}. */
+  seaDepth: Float32Array;
+  /** Distance from the water line in map pixels, as {@link GeneratedTerrain.shore}. */
+  shore: Float32Array;
 }
 
 /**
@@ -1917,7 +2000,14 @@ export interface ExtendedTerrain {
 export function extendTerrain(
   terrain: Pick<
     GeneratedTerrain,
-    "width" | "height" | "image" | "heightmap" | "relief" | "biomes"
+    | "width"
+    | "height"
+    | "image"
+    | "heightmap"
+    | "relief"
+    | "biomes"
+    | "seaDepth"
+    | "shore"
   >,
   margin: TerrainMargin,
 ): ExtendedTerrain {
@@ -1928,6 +2018,8 @@ export function extendTerrain(
   const image = new Uint8ClampedArray(w * h * 4);
   const heights = new Float32Array(w * h);
   const relief = new Float32Array(w * h);
+  const seaDepth = new Float32Array(w * h);
+  const shore = new Float32Array(w * h);
   const biomes: TerrainBiomes = {
     a: new Uint8Array(w * h * 4),
     b: new Uint8Array(w * h * 4),
@@ -1948,6 +2040,8 @@ export function extendTerrain(
         image.set(terrain.image.subarray(m * 4, m * 4 + 4), o * 4);
         heights[o] = terrain.heightmap[m] / 255;
         relief[o] = terrain.relief[m] / 255;
+        seaDepth[o] = terrain.seaDepth[m];
+        shore[o] = terrain.shore[m];
         biomes.a.set(terrain.biomes.a.subarray(m * 4, m * 4 + 4), o * 4);
         biomes.b.set(terrain.biomes.b.subarray(m * 4, m * 4 + 4), o * 4);
         continue;
@@ -1994,7 +2088,29 @@ export function extendTerrain(
           margin.relief[c],
           margin.relief[d],
         ) / 255;
+      seaDepth[o] = blend(
+        margin.seaDepth[a],
+        margin.seaDepth[b],
+        margin.seaDepth[c],
+        margin.seaDepth[d],
+      );
+      shore[o] = blend(
+        margin.shore[a],
+        margin.shore[b],
+        margin.shore[c],
+        margin.shore[d],
+      );
     }
   }
-  return { margin: M, width: w, height: h, image, heights, relief, biomes };
+  return {
+    margin: M,
+    width: w,
+    height: h,
+    image,
+    heights,
+    relief,
+    biomes,
+    seaDepth,
+    shore,
+  };
 }
