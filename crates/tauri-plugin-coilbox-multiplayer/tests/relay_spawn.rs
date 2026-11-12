@@ -28,25 +28,21 @@ const PATIENCE: Duration = Duration::from_secs(10);
 ///
 /// `CARGO_BIN_EXE_` only names binaries in the package being tested, and this
 /// is the package holding coilbox's end of the channel rather than the one
-/// holding the sidecar. The layout either side of that is cargo's own:
-/// test binaries live in `target/<profile>/deps` and binaries in
-/// `target/<profile>`.
+/// holding the sidecar. Binaries are in `target/<profile>`, and test binaries
+/// in a folder below it: `deps` up to cargo 1.99, and
+/// `build/<package>/<hash>/out` from 1.100.
 fn agent_binary() -> PathBuf {
-    let mut path = std::env::current_exe().expect("a test binary knows where it is");
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.push(format!(
-        "coilbox-relay-agent{}",
-        std::env::consts::EXE_SUFFIX
-    ));
-    assert!(
-        path.exists(),
-        "no relay agent at {}. Build it first with `cargo build -p coilbox-relay-agent`",
-        path.display()
-    );
-    path
+    let exe = std::env::current_exe().expect("a test binary knows where it is");
+    let name = format!("coilbox-relay-agent{}", std::env::consts::EXE_SUFFIX);
+    exe.ancestors()
+        .map(|dir| dir.join(&name))
+        .find(|path| path.is_file())
+        .unwrap_or_else(|| {
+            panic!(
+                "no relay agent in a folder above {}. Build it first with `cargo build -p coilbox-relay-agent`",
+                exe.display()
+            )
+        })
 }
 
 /// A battle with somewhere to point its loopback sockets. Nothing listens
