@@ -8,6 +8,8 @@ import {
   ruinPalette,
   STRONGHOLD_PALETTES,
   strongholdPalette,
+  TOWN_PALETTES,
+  townPalette,
 } from "./palettes";
 
 const channels = (p: object) =>
@@ -40,7 +42,18 @@ describe("landmark palettes", () => {
     expect(depotPalette("ice").metal).toEqual(depotPalette("desert").metal);
   });
 
+  it.each(PLANETS)("has a town palette for %s with a darker street", (id) => {
+    const p = TOWN_PALETTES[id];
+    expect(p).toBeDefined();
+    for (const v of channels(p)) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(255);
+    }
+    for (let i = 0; i < 3; i++) expect(p.street[i]).toBeLessThan(p.building[i]);
+  });
+
   it("falls back to temperate on a map with no planet", () => {
+    expect(townPalette(undefined)).toBe(TOWN_PALETTES.temperate);
     expect(strongholdPalette(undefined)).toBe(STRONGHOLD_PALETTES.temperate);
     expect(ruinPalette(undefined)).toBe(RUIN_PALETTES.temperate);
   });

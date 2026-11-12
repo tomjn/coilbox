@@ -43,6 +43,11 @@ const CAPITAL_LABEL_GAP = 0.5;
 
 /** Outer radius of the capital star in world units. */
 const CAPITAL_RADIUS = 1.3;
+/** Stands the flat star upright: its face goes from +y to +z, its top from -z to +y. */
+const STAND_UP = new THREE.Quaternion().setFromAxisAngle(
+  new THREE.Vector3(1, 0, 0),
+  Math.PI / 2,
+);
 
 export interface ProvinceLayer {
   /** The provinces, searchable by map point. */
@@ -117,6 +122,12 @@ export function buildProvinceLayer(
    * pushes its scenery back with this. Left out, every province is at 1.
    */
   dimOf: (nodeId: string) => number = () => 1,
+  /**
+   * The height of each town's tallest building in world units, by node
+   * index. A capital's star stands above its town's top. Left out, the star
+   * sits on the ground.
+   */
+  townTops?: ReadonlyMap<number, number>,
 ): ProvinceLayer | undefined {
   const index = provinceIndexFor(galaxy);
   if (!index) return undefined;
@@ -207,7 +218,19 @@ export function buildProvinceLayer(
     }
     const star = new THREE.Mesh(capitalGeo, capitalMat);
     star.name = `province-capital:${galaxy.nodes[i].id}`;
-    star.position.set(x, ground + CAPITAL_LIFT, z);
+    // Above a town the star stands upright and faces the camera, so a tilted
+    // view does not see it edge on. Otherwise it lies flat on the ground.
+    const flat = ground + CAPITAL_LIFT;
+    const raised =
+      (townTops?.get(i) ?? -Infinity) + CAPITAL_RADIUS + CAPITAL_LIFT;
+    star.position.set(x, Math.max(flat, raised), z);
+    if (raised > flat)
+      star.onBeforeRender = (_r, _s, camera) => {
+        // The star lies in x and z with its top at -z. A quarter turn about x
+        // stands it up with its face to +z and its top to +y, as the camera sees.
+        star.quaternion.copy(camera.quaternion).multiply(STAND_UP);
+        star.updateMatrixWorld();
+      };
     star.renderOrder = -1;
     star.raycast = () => {};
     scene.add(star);

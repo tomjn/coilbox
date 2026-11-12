@@ -68,7 +68,11 @@ import {
 } from "./terrainLoad";
 import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
-import { buildTownLayer, type TownLayer } from "./townLayer";
+import { riverEdgeReader } from "./towns3d/layout";
+import {
+  buildTownModelLayer,
+  type TownModelLayer,
+} from "./towns3d/townModelLayer";
 import { createVisibility } from "./visibility";
 
 /**
@@ -772,8 +776,8 @@ export function GalaxyView({
     let ground: GroundLayer | undefined;
     // The ground itself, whose detail is baked over the first frames.
     let terrainSheet: TerrainSheet | undefined;
-    // A town at every location. See townLayer.ts.
-    let towns: TownLayer | undefined;
+    // A town of buildings at every location. See towns3d/townModelLayer.ts.
+    let townModels: TownModelLayer | undefined;
     // A stronghold on every enemy capital, and a run's ruin, in place of the
     // town. See landmarks/landmarkLayer.ts.
     let landmarks: LandmarkLayer | undefined;
@@ -806,15 +810,21 @@ export function GalaxyView({
         terrainColourReader(terrainColor, surface),
       );
       if (map.towns) {
-        towns = buildTownLayer(
+        townModels = buildTownModelLayer(
           scene,
           disposables,
           surface,
-          ground,
           map.towns,
-          terrainBiomes,
-          !terrainColor,
           landmarks.nodes,
+          terrainBiomes?.planet,
+          map.extension
+            ? riverEdgeReader(
+                map.extension.rivers,
+                map.extension.image,
+                map.extension.margin,
+                surface,
+              )
+            : undefined,
         );
       }
       terrainSheet = buildTerrainMesh(
@@ -986,6 +996,7 @@ export function GalaxyView({
           ownersRef,
           labelObjects,
           dimOf,
+          townModels?.tops,
         )
       : undefined;
 
@@ -1005,13 +1016,13 @@ export function GalaxyView({
             cores,
             {
               setRoadStyle: ground.setRoadStyle,
-              setTownStyle: towns?.setTownStyle,
+              setTownStyle: townModels?.setStyle,
               setLandmarkStyle: landmarks?.setStyle,
               landmarkTops: landmarks?.tops,
-              towns: towns?.towns,
+              townTops: townModels?.tops,
+              towns: map.towns,
               commit: () => {
                 ground?.commit();
-                towns?.commit();
               },
             },
             (id) => !!identities?.get(id)?.mist,
@@ -1244,7 +1255,7 @@ export function GalaxyView({
         endMarkers?.fitToCamera(distance);
       }
       // One tile of the ground's bake a frame, until it is done.
-      towns?.prepare(renderer);
+      townModels?.prepare(renderer);
       landmarks?.prepare(renderer);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;

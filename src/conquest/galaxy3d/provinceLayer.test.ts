@@ -45,7 +45,11 @@ const colors: Record<string, number> = { red: 0xff0000, blue: 0x0000ff };
 const ownerColor = (owner: string | undefined) =>
   new THREE.Color(owner && owner in colors ? colors[owner] : 0x808080);
 
-function build(galaxy: GalaxyDoc = doc(nodes), dims?: Record<string, number>) {
+function build(
+  galaxy: GalaxyDoc = doc(nodes),
+  dims?: Record<string, number>,
+  townTops?: ReadonlyMap<number, number>,
+) {
   const scene = new THREE.Scene();
   const ownersRef = { current: {} as Record<string, string> };
   const labels = galaxy.nodes.map(() => new THREE.Object3D());
@@ -58,6 +62,7 @@ function build(galaxy: GalaxyDoc = doc(nodes), dims?: Record<string, number>) {
     ownersRef,
     labels,
     dims && ((id) => dims[id] ?? 1),
+    townTops,
   );
   const fill = (id: string) =>
     (scene.getObjectByName(`province-fill:${id}`) as THREE.Mesh)
@@ -266,6 +271,80 @@ describe("buildProvinceLayer", () => {
     // Same spot east to west, and past the star's southern edge.
     expect(label.position.x).toBe(star?.position.x);
     expect(label.position.z).toBeGreaterThan((star?.position.z ?? 0) + 1.3);
+  });
+
+  it("stands a capital's star above its town's tallest building", () => {
+    const flat = build().scene.getObjectByName("province-capital:west");
+    const lifted = build(doc(nodes), undefined, new Map([[0, 3]]));
+    const star = lifted.scene.getObjectByName("province-capital:west");
+    // The top, the star's radius of 1.3 and the lift of 0.15.
+    expect(star?.position.y).toBeCloseTo(4.45, 6);
+    // With no town tops the star sits on the ground plus the lift.
+    expect(flat?.position.y).toBeCloseTo(0.15, 6);
+    // A town lower than the ground the star clears leaves it where it was.
+    const low = build(doc(nodes), undefined, new Map([[0, -5]]));
+    expect(
+      low.scene.getObjectByName("province-capital:west")?.position.y,
+    ).toBeCloseTo(0.15, 6);
+  });
+
+  it("turns a raised star to face the camera, top point up", () => {
+    const { scene } = build(doc(nodes), undefined, new Map([[0, 3]]));
+    const star = scene.getObjectByName("province-capital:west") as THREE.Mesh;
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(
+      star.position.x + 20,
+      star.position.y,
+      star.position.z + 12,
+    );
+    camera.lookAt(star.position);
+    camera.updateMatrixWorld();
+    star.onBeforeRender(
+      {} as THREE.WebGLRenderer,
+      scene,
+      camera,
+      star.geometry,
+      star.material as THREE.Material,
+      {} as never,
+    );
+    // The face the ground star shows to the sky is its local +y.
+    const normal = new THREE.Vector3(0, 1, 0).transformDirection(
+      star.matrixWorld,
+    );
+    const toCamera = camera.position.clone().sub(star.position).normalize();
+    expect(normal.dot(toCamera)).toBeGreaterThan(0.99);
+    const position = star.geometry.getAttribute("position");
+    let highest = Number.NEGATIVE_INFINITY;
+    let topVertex = new THREE.Vector3();
+    for (let k = 0; k < position.count; k++) {
+      const v = new THREE.Vector3().fromBufferAttribute(position, k);
+      const y = v.clone().applyMatrix4(star.matrixWorld).y;
+      if (y > highest) {
+        highest = y;
+        topVertex = v;
+      }
+    }
+    // The point that went to -z on the ground is the one now highest.
+    expect(topVertex.z).toBeLessThan(-1.29);
+    expect(topVertex.x).toBeCloseTo(0, 6);
+  });
+
+  it("leaves a star with no town top flat", () => {
+    const { scene } = build();
+    const star = scene.getObjectByName("province-capital:west") as THREE.Mesh;
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(20, 5, 12);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    star.onBeforeRender(
+      {} as THREE.WebGLRenderer,
+      scene,
+      camera,
+      star.geometry,
+      star.material as THREE.Material,
+      {} as never,
+    );
+    expect(star.quaternion.toArray()).toEqual([0, 0, 0, 1]);
   });
 
   it("hangs a CSS label below its point", () => {

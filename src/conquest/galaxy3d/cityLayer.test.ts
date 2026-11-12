@@ -51,8 +51,11 @@ const FILL = 1;
 const STAR = 2;
 const BRACKETS = 3;
 
-/** `landmarkRise` stands a landmark that tall on the middle city. */
-function build(labels = true, landmarkRise?: number) {
+/**
+ * `landmarkRise` stands a landmark that tall on the middle city, and
+ * `townRise` gives its 3D town that tall a top.
+ */
+function build(labels = true, landmarkRise?: number, townRise?: number) {
   const galaxy = {
     factions: [
       { id: "red", color: RED },
@@ -133,6 +136,10 @@ function build(labels = true, landmarkRise?: number) {
       landmarkRise === undefined
         ? undefined
         : new Map([[1, surface.mapToWorld(50, 50)[1] + landmarkRise]]),
+    townTops:
+      townRise === undefined
+        ? undefined
+        : new Map([[1, surface.mapToWorld(50, 50)[1] + townRise]]),
   };
   const layer = buildCityLayer(
     scene,
@@ -300,6 +307,27 @@ describe("buildCityLayer", () => {
     m.decompose(at, new THREE.Quaternion(), size);
     const y = surface.mapToWorld(50, 50)[1];
     expect(at.y + size.y).toBeGreaterThanOrEqual(y + 4);
+  });
+
+  it("raises a badge above its 3D town, and leaves a plain one where it was", () => {
+    const plain = build();
+    const tall = build(true, undefined, 3);
+    tall.layer.fitToCamera(GALAXY_MIN_DISTANCE * 4);
+    plain.layer.fitToCamera(GALAXY_MIN_DISTANCE * 4);
+    const b = tall.badge(tall.groups[1]);
+    expect(b.position.y).toBeGreaterThanOrEqual(3 + b.scale.x);
+    // The other markers have no town top and keep their pole.
+    expect(tall.badge(tall.groups[2]).position.y).toBe(
+      plain.badge(plain.groups[2]).position.y,
+    );
+    // The hit target still reaches the badge.
+    const m = new THREE.Matrix4();
+    const at = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    tall.cores.getMatrixAt(1, m);
+    m.decompose(at, new THREE.Quaternion(), size);
+    const y = tall.surface.mapToWorld(50, 50)[1];
+    expect(at.y + size.y).toBeGreaterThanOrEqual(y + b.position.y + b.scale.x);
   });
 
   it("fades roads with the lane dimming the view passes in", () => {

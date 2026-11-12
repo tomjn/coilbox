@@ -17,7 +17,7 @@ const q = new URLSearchParams(location.search);
 const skin = (q.get("skin") ?? "territories") as "territories" | "cities";
 const planet = (q.get("planet") ?? "temperate") as PlanetId;
 const performanceMode = q.get("perf") === "1";
-// Also time each pose over both spots with the towns and fields hidden.
+// Also time each pose over both spots with the 3D towns hidden.
 const townCost = q.get("towns") === "1";
 
 const genStart = performance.now();
@@ -89,6 +89,7 @@ Object.defineProperty(THREE.WebGLRenderer.prototype, "render", {
           firstMainFrameMs = performance.now() - t0;
           timeToFirstMain = performance.now();
         }
+        if (townCost) recordTownShadowBytes(s as THREE.Scene);
         return;
       }
       if (bake.length > 400) {
@@ -109,6 +110,39 @@ OrbitControls.prototype.update = function (dt?: number | null) {
   controls = this;
   return origUpdate.call(this, dt);
 };
+
+// The bytes of shadow texture the 3D towns hold, left on `window` to read by
+// hand. The town layer bakes every shadow in its first `prepare`, which the
+// view calls on its first frames, so a few main frames are enough to find the
+// textures. After that a map with no 3D towns stops being traversed. Four bytes
+// a texel for colour and four for depth.
+const SHADOW_TRIES = 5;
+let townShadowTries = 0;
+let townShadowBytesSet = false;
+function recordTownShadowBytes(root: THREE.Scene) {
+  if (townShadowBytesSet || townShadowTries >= SHADOW_TRIES) return;
+  townShadowTries++;
+  const seen = new Set<THREE.Texture>();
+  let bytes = 0;
+  root.traverse((o) => {
+    if (o.name !== "town-models") return;
+    const material = (o as THREE.Mesh).material as
+      | THREE.ShaderMaterial
+      | undefined;
+    const tex = material?.uniforms?.uShadow?.value as
+      | THREE.Texture
+      | null
+      | undefined;
+    if (!tex || seen.has(tex)) return;
+    seen.add(tex);
+    const image = tex.image as { width: number; height: number };
+    bytes += image.width * image.height * 8;
+  });
+  if (bytes === 0) return;
+  townShadowBytesSet = true;
+  (window as unknown as { __townShadowBytes: number }).__townShadowBytes =
+    bytes;
+}
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -157,19 +191,16 @@ function still(n: number, batches: number) {
   return { best: r2(Math.min(...all)), all: all.map(r2) };
 }
 
-// As `still`, with the towns and their fields shown and then hidden batch by
+// As `still`, with the 3D towns shown and then hidden batch by
 // batch, so both see the same machine. Their cost is the difference.
 function paired(n: number, batches: number) {
   if (!scene) throw new Error("not ready");
-  const meshes = ["towns", "fields"].flatMap((name) => {
-    const found: THREE.Object3D[] = [];
-    scene?.traverse((o) => {
-      if (o.name === name) found.push(o);
-    });
-    return found;
+  const meshes: THREE.Object3D[] = [];
+  scene.traverse((o) => {
+    if (o.name === "town-models") meshes.push(o);
   });
   // A map or mode with nothing to hide would read as towns that cost nothing.
-  if (meshes.length === 0) throw new Error("no towns or fields to hide");
+  if (meshes.length === 0) throw new Error("no 3D towns to hide");
   const show = (on: boolean) => {
     for (const m of meshes) m.visible = on;
   };

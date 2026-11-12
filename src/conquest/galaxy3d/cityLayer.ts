@@ -374,6 +374,11 @@ interface Marker {
    * landmark has no badge: the ring round it is drawn in the badge's colour.
    */
   landmark: number | undefined;
+  /**
+   * How far the 3D town's tallest building rises above the anchor, 0 for none.
+   * The badge stands above it, on a longer pole.
+   */
+  townTop: number;
   /** The badge's size against a plain one, for the current state. */
   look: number;
 }
@@ -398,6 +403,8 @@ export function buildCityLayer(
       setLandmarkStyle?: TownLayer["setTownStyle"];
       /** The height of each landmark's top, in world units, by node index. */
       landmarkTops?: ReadonlyMap<number, number>;
+      /** The height of each 3D town's top, in world units, by node index. */
+      townTops?: ReadonlyMap<number, number>;
     },
   /** Whether a location's town is drawn in an anomaly's haze. */
   misty: (id: string) => boolean = () => false,
@@ -433,6 +440,9 @@ export function buildCityLayer(
 
   const radiusOf = (m: Marker) => BADGE_RADIUS * zoom * m.look;
   const poleOf = () => BADGE_RADIUS * zoom * POLE_RADII;
+  /** How tall a marker's pole is, long enough for the badge to clear its town. */
+  const poleFor = (m: Marker, radius: number) =>
+    Math.max(poleOf(), m.townTop + radius);
 
   /** Put a marker's name just below its badge on screen. */
   /**
@@ -470,6 +480,7 @@ export function buildCityLayer(
     // The badge turns to face the camera each time it is drawn.
     group.add(pole, badge);
     const landmarkTop = ground.landmarkTops?.get(i);
+    const townTop = ground.townTops?.get(i);
     group.visible = landmarkTop === undefined;
     scene.add(group);
     const marker: Marker = {
@@ -486,6 +497,7 @@ export function buildCityLayer(
       z,
       townRadius: ground.towns?.[i]?.radius ?? 0,
       landmark: landmarkTop === undefined ? undefined : landmarkTop - groundY,
+      townTop: townTop === undefined ? 0 : Math.max(0, townTop - groundY),
       look: 1,
     };
     badge.onBeforeRender = (_r, _s, camera) => {
@@ -500,8 +512,9 @@ export function buildCityLayer(
   const place = (m: Marker) => {
     const r = radiusOf(m);
     m.badge.scale.setScalar(r);
-    m.badge.position.set(0, poleOf(), 0);
-    m.pole.scale.set(zoom, poleOf(), zoom);
+    const pole = poleFor(m, r);
+    m.badge.position.set(0, pole, 0);
+    m.pole.scale.set(zoom, pole, zoom);
     placeLabel(m);
   };
 
@@ -584,7 +597,7 @@ export function buildCityLayer(
     for (const m of markers) {
       const r = BADGE_RADIUS * zoom * (m.capital ? CAPITAL_SCALE : 1);
       // A landmark has no badge to pick, so its target covers the model.
-      const top = m.landmark ?? poleOf() + r;
+      const top = m.landmark ?? poleFor(m, r) + r;
       const across = Math.max(m.townRadius * 0.85, r * 1.4);
       at.set(m.x, m.ground + top / 2, m.z);
       size.set(across, top / 2 + r * 0.3, across);

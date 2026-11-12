@@ -167,6 +167,7 @@ uniform float uScale;
 uniform float uReach;
 uniform float uShadowReach;
 uniform float uHidden;
+uniform float uContact;
 uniform vec3 uRingColour;
 uniform float uRingStrength;
 uniform float uRingThick;
@@ -179,7 +180,9 @@ varying vec4 vShadow;
 float shaded() {
   if (uShadowOn < 0.5) return 0.0;
   vec3 p = vShadow.xyz / vShadow.w * 0.5 + 0.5;
-  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 0.0;
+  // Past the far side of the picture there is nothing to read, and the edge
+  // would otherwise show as a grey slab beside a wide town.
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0) return 0.0;
   vec2 texel = 1.0 / vec2(textureSize(uShadow, 0));
   float dark = 0.0;
   // Five by five samples two texels apart, for a soft edge.
@@ -193,7 +196,7 @@ void main() {
   float dist = distance(vWorld.xz, uCentre);
   float r = dist / (uScale * uReach);
   float t = clamp((r - ${CONTACT_FROM.toFixed(3)}) / ${CONTACT_OVER.toFixed(3)}, 0.0, 1.0);
-  float contact = ${CONTACT.toFixed(3)} * (1.0 - t) * (1.0 - t);
+  float contact = ${CONTACT.toFixed(3)} * (1.0 - t) * (1.0 - t) * uContact;
   float thrown = ${SHADOW.toFixed(3)} * shaded() * (1.0 - smoothstep(${SHADOW_FADE_FROM.toFixed(3)}, ${SHADOW_FADE_TO.toFixed(3)}, dist / (uScale * uShadowReach)));
   float dark = max(contact, thrown) * (uHidden > 0.5 ? 0.7 : 1.0);
   // The town shader's ring, the same width in the same units.
@@ -224,7 +227,8 @@ void main() {
  * A sheet draped on the terrain round a landmark, in world space: the shadow
  * it throws, the darkening at its foot and a town's selection ring.
  * `shadowReach` is how far the shadow may fall, for a landmark much taller
- * than it is wide.
+ * than it is wide. `contact` is false for a town, which has no single foot to
+ * darken.
  */
 export function groundDecal(
   surface: TerrainSurface,
@@ -232,6 +236,7 @@ export function groundDecal(
   reach: number,
   shadow: LandmarkShadow | null,
   shadowReach = reach,
+  opts: { contact?: boolean } = {},
 ): GroundDecal {
   const pos: number[] = [];
   const idx: number[] = [];
@@ -268,6 +273,7 @@ export function groundDecal(
       uReach: { value: reach },
       uShadowReach: { value: shadowReach },
       uHidden: { value: 0 },
+      uContact: { value: opts.contact === false ? 0 : 1 },
       uRingColour: { value: new THREE.Color() },
       uRingStrength: { value: 0 },
       uRingThick: { value: 0 },
