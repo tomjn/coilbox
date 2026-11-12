@@ -168,7 +168,7 @@ const TEMPERATE: Planet = {
     return t`Temperate`;
   },
   biomes: [
-    biome("grass", [122, 154, 84], "grass"),
+    biome("grass", [92, 122, 62], "grass"),
     biome("dry", [182, 168, 116], "dunes"),
     biome("forest", [58, 98, 56], "forest"),
     biome("tundra", [146, 146, 122], "tundra"),
@@ -182,7 +182,7 @@ const TEMPERATE: Planet = {
     [122, 106, 90],
     [152, 146, 140],
   ],
-  clearing: [122, 154, 84],
+  clearing: [92, 122, 62],
   forest: {
     broadleaf: [
       [96, 130, 56],

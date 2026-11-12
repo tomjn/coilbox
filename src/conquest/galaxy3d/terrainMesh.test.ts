@@ -275,7 +275,7 @@ describe("the sheet's biome weights", () => {
     );
     expect(dark.equals(expected)).toBe(true);
     expect((u.uBiomeClearing.value as THREE.Color).g).toBeCloseTo(
-      new THREE.Color().setRGB(0, 154 / 255, 0, THREE.SRGBColorSpace).g,
+      new THREE.Color().setRGB(0, 122 / 255, 0, THREE.SRGBColorSpace).g,
     );
   });
 
