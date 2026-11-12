@@ -197,6 +197,18 @@ describe("plantForest", () => {
     );
   });
 
+  it("lays more rocks on a dead world, and most of all on its bare ground", () => {
+    const count = (share: number, alive: boolean) =>
+      plantForest(all(share), 5, SUN, { alive }).count;
+    const stony = count(4, false) / count(4, true);
+    const bare = count(5, false) / count(5, true);
+    // Four and twelve times as likely to a cell, less the ones crowded out.
+    expect(stony).toBeGreaterThan(3);
+    expect(stony).toBeLessThan(4.5);
+    expect(bare).toBeGreaterThan(8);
+    expect(bare).toBeLessThan(12.5);
+  });
+
   it("grows bushes on scrub, with cactus and acacia on a dry world alone", () => {
     const mild = kinds(plantForest(all(3), 5, SUN));
     const dry = kinds(plantForest(all(3), 5, SUN, { arid: true }));

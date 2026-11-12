@@ -128,8 +128,7 @@ describe("buildForestLayer", () => {
     expect(rock.rock).toBeGreaterThan(1000);
     expect(rock.other).toBe(0);
     const regolith = rockAndOther(build({ planet: "moon", slot: 0 }).meshes);
-    expect(regolith.rock).toBeGreaterThan(0);
-    expect(regolith.rock).toBeLessThan(rock.rock / 3);
+    expect(regolith.rock).toBeGreaterThan(1000);
     expect(regolith.other).toBe(0);
   });
 
