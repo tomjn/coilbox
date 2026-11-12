@@ -53,6 +53,10 @@ const RIB_PERIOD = 0.11;
 const RIB_GROOVE = 0.34;
 const RIB_DARK = 0.42;
 
+/** A glass wall's panes and a brick wall's bricks: width and height. */
+const PANE = [0.035, 0.05];
+const BRICK = [0.018, 0.007];
+
 const FRAGMENT = /* glsl */ `
 uniform vec3 uSun;
 uniform vec3 uSunLight;
@@ -141,7 +145,29 @@ void main() {
     float fade = clamp(1.0 - fwidth(b.y) * 0.9, 0.0, 1.0);
     float stone = 0.76 + 0.48 * lmHash(floor(b));
     base *= mix(1.0, stone * (1.0 - 0.4 * mortar), fade);
-  } else if (vKind > 7.5 && vKind < 8.5) {
+  } else if (vKind > 0.5 && vKind < 1.5) {
+    // Brick: small courses, each brick its own shade.
+    if (abs(n.y) < 0.75) {
+      float u = abs(n.x) > abs(n.z) ? vLocal.z : vLocal.x;
+      vec2 size = vec2(${BRICK[0].toFixed(3)}, ${BRICK[1].toFixed(3)});
+      vec2 b = vec2(u, vLocal.y) / size;
+      b.x += 0.5 * mod(floor(b.y), 2.0);
+      float fade = clamp(1.0 - max(fwidth(b.x), fwidth(b.y)) * 1.6, 0.0, 1.0);
+      base *= mix(1.0, 0.86 + 0.28 * lmHash(floor(b)), fade);
+    }
+  } else if (vKind > 2.5 && vKind < 3.5) {
+    // Glass: panes in a dark frame, no two reflecting quite alike.
+    if (abs(n.y) < 0.75) {
+      float u = abs(n.x) > abs(n.z) ? vLocal.z : vLocal.x;
+      vec2 size = vec2(${PANE[0].toFixed(3)}, ${PANE[1].toFixed(3)});
+      vec2 b = vec2(u, vLocal.y) / size;
+      vec2 f = fract(b);
+      float edge = min(min(f.x, 1.0 - f.x) * size.x, min(f.y, 1.0 - f.y) * size.y);
+      float seam = 1.0 - smoothstep(0.001, 0.004, edge);
+      float fade = clamp(1.0 - max(fwidth(b.x), fwidth(b.y)) * 1.6, 0.0, 1.0);
+      base *= mix(1.0, (0.78 + 0.44 * lmHash(floor(b))) * (1.0 - 0.4 * seam), fade);
+    }
+  } else if ((vKind > 7.5 && vKind < 8.5) || (vKind > 4.5 && vKind < 5.5)) {
     // Cast panels seen from far off: tall, close set, a few recessed.
     vec2 size;
     vec2 b;
@@ -223,6 +249,16 @@ void main() {
   }
   float lit = sunlit();
   vec3 colour = base * (hemi + uSunLight * facing * lit);
+  if (vKind > 2.5 && vKind < 3.5) {
+    // Glass shows the sky more than its own colour, most at a glancing angle,
+    // and throws the sun back in a broad glint.
+    vec3 view = normalize(cameraPosition - vWorld);
+    float glance = pow(1.0 - max(dot(w, view), 0.0), 3.0);
+    float glint = pow(max(dot(w, normalize(uSun + view)), 0.0), 14.0);
+    colour = colour * 0.75
+      + uSky * mix(base, vec3(1.0), 0.25) * (0.5 + 1.0 * glance)
+      + uSunLight * glint * lit * 0.7;
+  }
   if (vKind > 10.5) {
     // Metal: the sun glints off it and the sky shows at a glancing angle.
     // Bare metal is the shinier, paint the duller.
