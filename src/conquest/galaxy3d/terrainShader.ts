@@ -1067,11 +1067,15 @@ const DETAIL = /* glsl */ `
     bump3 *= 1.0 - liquid;
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
     form = mix(form, 1.0, liquid);
-    // The pattern evens out along a gully, which reads darker and a little
-    // cooler, as damp ground in shade.
-    shadeMul = mix(shadeMul, 1.0, gully * 0.5);
-    form -= gully * 0.3;
-    albedo = mix(albedo, albedo * vec3(0.82, 0.86, 0.92), gully * 0.6);
+    // The pattern evens out along a gully, which reads a little darker and
+    // cooler, as damp ground in shade. Only along the middle of a course that
+    // has gathered some water, and lightly: the carved relief already lights
+    // one side and shades the other, and a darker, wider band reads as a
+    // stain on the ground.
+    float gullyShade = gully * smoothstep(0.1, 0.24, drain.r);
+    shadeMul = mix(shadeMul, 1.0, gullyShade * 0.5);
+    form -= gullyShade * 0.14;
+    albedo = mix(albedo, albedo * vec3(0.82, 0.86, 0.92), gullyShade * 0.4);
     // A cut in the snow: its sides lit and shaded by the sun, its floor in
     // shade with dark rock showing.
     bump += gullySlope * (1.0 - liquid);
