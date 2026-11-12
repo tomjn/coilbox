@@ -51,6 +51,15 @@ describe("outpost colourways", () => {
     }
   });
 
+  it("glazes every colourway darker than its hull and its trim", () => {
+    const light = ([r, g, b]: readonly number[]) => r + g + b;
+    for (const planet of PLANETS)
+      for (const c of OUTPOST_COLOURWAYS[planet]) {
+        expect(light(c.glass), c.id).toBeLessThan(light(c.hull));
+        expect(light(c.glass), c.id).toBeLessThan(light(c.trim));
+      }
+  });
+
   it("knows which planets are sealed", () => {
     for (const planet of PLANETS) expect(isSealedPlanet(planet)).toBe(true);
     expect(isSealedPlanet("temperate")).toBe(false);
@@ -60,7 +69,7 @@ describe("outpost colourways", () => {
   it("dusts a structure with its planet's ground, thickest at the foot", () => {
     const paint = outpostPaint("red", OUTPOST_COLOURWAYS.red[0]);
     expect(paint.top).toEqual(townPalette("red").top);
-    expect(paint.topCover).toBe(townPalette("red").topCover);
+    expect(paint.topCover).toEqual({ even: townPalette("red").topCover });
     expect(paint.dust).toHaveLength(1);
     expect(paint.dust[0].colour).toEqual(townPalette("red").top);
     expect(paint.dust[0].at(0, 0, 0)).toBeCloseTo(1);
