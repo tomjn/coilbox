@@ -75,6 +75,59 @@ export const DEPOT_LIVERIES: readonly DepotLivery[] = [
 ];
 const DEPOT_METAL: Rgb = [70, 74, 82];
 
+/** What a spire takes from its planet, as a depot does. Its paint is in {@link SPIRE_LIVERIES}. */
+export type SpirePalette = DepotPalette;
+
+/** The paint a spire wears, the same on every planet. Where it stands picks one. */
+export interface SpireLivery {
+  id: string;
+  /** The tall plates and the buttresses. */
+  hull: Rgb;
+  /** The plates laid over them, and the drums at the foot. */
+  hull2: Rgb;
+  /** The dark core, the hall and the crown. */
+  core: Rgb;
+  /** Painted bands and strips. */
+  accent: Rgb;
+}
+export const SPIRE_LIVERIES: readonly SpireLivery[] = [
+  {
+    id: "white-gold",
+    hull: [226, 226, 222],
+    hull2: [196, 198, 200],
+    core: [58, 62, 70],
+    accent: [196, 160, 70],
+  },
+  {
+    id: "graphite-orange",
+    hull: [84, 88, 96],
+    hull2: [112, 116, 122],
+    core: [38, 40, 46],
+    accent: [204, 104, 44],
+  },
+  {
+    id: "sand-oxblood",
+    hull: [198, 176, 134],
+    hull2: [170, 150, 112],
+    core: [72, 64, 54],
+    accent: [120, 50, 40],
+  },
+  {
+    id: "olive-gold",
+    hull: [112, 122, 98],
+    hull2: [142, 148, 122],
+    core: [48, 52, 46],
+    accent: [206, 170, 70],
+  },
+  {
+    id: "navy-white",
+    hull: [60, 78, 108],
+    hull2: [200, 204, 208],
+    core: [34, 40, 52],
+    accent: [206, 206, 200],
+  },
+];
+
 /** A run's landing pad. Like a depot, only its stone and what settles on it are the planet's. */
 export interface LandingPalette {
   /** The cast foundation and footings. */
@@ -371,6 +424,10 @@ export const depotPalette = (planet?: PlanetId): DepotPalette => {
   const { armour, top, topCover } = strongholdPalette(planet);
   return { pad: armour, metal: DEPOT_METAL, top, topCover };
 };
+
+/** A spire's hardstand is the planet's own cast stone, as a depot's slabs are. */
+export const spirePalette = (planet?: PlanetId): SpirePalette =>
+  depotPalette(planet);
 
 /** A landing pad stands on the planet's own cast stone, as a depot does. */
 export const landingPalette = (planet?: PlanetId): LandingPalette => {

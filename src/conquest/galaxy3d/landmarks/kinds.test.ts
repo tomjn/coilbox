@@ -11,13 +11,16 @@ const nodes = [
 ];
 
 describe("landmarkKinds", () => {
-  it("puts a stronghold on an enemy capital only", () => {
-    expect([...landmarkKinds(nodes, "me")]).toEqual([[1, "stronghold"]]);
+  it("puts a stronghold on every capital a faction holds, whoever plays", () => {
+    expect([...landmarkKinds(nodes)]).toEqual([
+      [0, "stronghold"],
+      [1, "stronghold"],
+    ]);
   });
 
   it("puts a ruin where the identity asks for one", () => {
     const ids = new Map([["odd", { landmark: "ruin" as const }]]);
-    expect(landmarkKinds(nodes, "me", ids).get(4)).toBe("ruin");
+    expect(landmarkKinds(nodes, ids).get(4)).toBe("ruin");
   });
 
   it("puts a depot where the identity asks for one, as often as it asks", () => {
@@ -25,24 +28,42 @@ describe("landmarkKinds", () => {
       ["town", { landmark: "depot" as const }],
       ["odd", { landmark: "depot" as const }],
     ]);
-    const kinds = landmarkKinds(nodes, "me", ids);
+    const kinds = landmarkKinds(nodes, ids);
     expect([kinds.get(3), kinds.get(4)]).toEqual(["depot", "depot"]);
   });
 
   it("never puts a stronghold on a run's start, whoever owns it", () => {
     const ids = new Map([["their", { end: "start" as const }]]);
-    expect(landmarkKinds(nodes, "me", ids).has(1)).toBe(false);
+    expect(landmarkKinds(nodes, ids).has(1)).toBe(false);
   });
 
   it("puts the landing pad on a run's start when the identity asks for it", () => {
     const ids = new Map([
       ["their", { end: "start" as const, landmark: "landing" as const }],
     ]);
-    expect(landmarkKinds(nodes, "me", ids).get(1)).toBe("landing");
+    expect(landmarkKinds(nodes, ids).get(1)).toBe("landing");
+  });
+
+  it("puts a landing pad in the stronghold's place when a map asks for one", () => {
+    const ids = new Map([["home", { landmark: "landing" as const }]]);
+    expect(landmarkKinds(nodes, ids).get(0)).toBe("landing");
   });
 
   it("prefers the stronghold when a capital is also asked for a ruin", () => {
     const ids = new Map([["their", { landmark: "ruin" as const }]]);
-    expect(landmarkKinds(nodes, "me", ids).get(1)).toBe("stronghold");
+    expect(landmarkKinds(nodes, ids).get(1)).toBe("stronghold");
+  });
+
+  it("puts a spire in the stronghold's place when a run asks for one", () => {
+    const ids = new Map([["their", { landmark: "spire" as const }]]);
+    expect(landmarkKinds(nodes, ids).get(1)).toBe("spire");
+  });
+
+  it("puts a spire nowhere a stronghold would not stand", () => {
+    const ids = new Map([
+      ["odd", { landmark: "spire" as const }],
+      ["free", { landmark: "spire" as const }],
+    ]);
+    expect([...landmarkKinds(nodes, ids).keys()]).toEqual([0, 1]);
   });
 });

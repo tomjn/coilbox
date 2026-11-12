@@ -1,7 +1,7 @@
 /**
- * The landmarks that stand on a terrain map in place of a town: a stronghold
- * on every enemy capital, and an anomaly, a depot or a landing pad where a run
- * asks for one.
+ * The landmarks that stand on a terrain map in place of a town: a stronghold,
+ * a spire or a landing pad on every capital a faction holds, and an anomaly
+ * or a depot where the map asks for one.
  *
  * Each is built once, placed on the ground, turned to its road and kept clear
  * of its neighbours. It follows its location's fog and selection the
@@ -29,11 +29,14 @@ import {
   depotPalette,
   landingPalette,
   ruinPalette,
+  SPIRE_LIVERIES,
+  spirePalette,
   strongholdPalette,
 } from "./palettes";
 import { buildRuin, RUIN_REACH } from "./ruin";
-import { createLandmarkShadow, groundDecal } from "./shadow";
+import { createLandmarkShadow, groundDecal, RING_AT } from "./shadow";
 import { pickSite } from "./site";
+import { buildSpire, SPIRE_REACH } from "./spire";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
 
 /** The ground's own colour at a world position, or undefined where unknown. */
@@ -66,6 +69,12 @@ export interface LandmarkLayer {
   anchors: { pos: [number, number] }[];
   /** The height of each landmark's top, in world units, by node index. */
   tops: ReadonlyMap<number, number>;
+  /**
+   * The ring each landmark's decal draws, by node index: its radius and its
+   * centre in world units. A landmark stands on the flattest ground near its
+   * location, so the centre is not the location's own position.
+   */
+  rings: ReadonlyMap<number, { radius: number; x: number; z: number }>;
   /** Show a location's fog and ring, as a town would. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
@@ -83,13 +92,12 @@ interface Placed {
  */
 export function landmarkNodes(
   nodes: GalaxyDoc["nodes"],
-  playerFactionId: string,
-  identities: Parameters<typeof landmarkKinds>[2],
+  identities: Parameters<typeof landmarkKinds>[1],
   planet: PlanetId | undefined,
 ): Set<number> {
   const hasRuin = ruinPalette(planet) !== undefined;
   const out = new Set<number>();
-  for (const [i, kind] of landmarkKinds(nodes, playerFactionId, identities)) {
+  for (const [i, kind] of landmarkKinds(nodes, identities)) {
     if (kind === "ruin" && !hasRuin) continue;
     out.add(i);
   }
@@ -102,7 +110,6 @@ export function buildLandmarkLayer(
   disposables: { dispose(): void }[],
   surface: TerrainSurface,
   galaxy: Pick<GalaxyDoc, "nodes" | "links">,
-  playerFactionId: string,
   identities:
     | ReadonlyMap<
         string,
@@ -120,35 +127,36 @@ export function buildLandmarkLayer(
   const placed = new Map<number, Placed>();
   const anchors: { pos: [number, number] }[] = [];
   const tops = new Map<number, number>();
+  const rings = new Map<number, { radius: number; x: number; z: number }>();
   const bakes: (() => void)[] = [];
   let renderer: THREE.WebGLRenderer | null = null;
 
-  const kinds = landmarkKinds(galaxy.nodes, playerFactionId, identities);
-  const expected = landmarkNodes(
-    galaxy.nodes,
-    playerFactionId,
-    identities,
-    planet,
-  );
+  const kinds = landmarkKinds(galaxy.nodes, identities);
+  const expected = landmarkNodes(galaxy.nodes, identities, planet);
   for (const [i, kind] of kinds) {
     if (!expected.has(i)) continue;
     const stronghold = kind === "stronghold";
+    const spire = kind === "spire";
     const depot = kind === "depot";
     const landing = kind === "landing";
     const ruin = kind === "ruin" ? ruinPalette(planet) : undefined;
-    // A stronghold and a landing pad take a capital's room, an anomaly an
-    // ordinary town's.
+    // A stronghold, a spire and a landing pad take a capital's room, an
+    // anomaly an ordinary town's.
     const reach = stronghold
       ? STRONGHOLD_REACH
-      : ruin
-        ? RUIN_REACH
-        : depot
-          ? DEPOT_REACH
-          : landing
-            ? LANDING_REACH
-            : ANOMALY_REACH;
+      : spire
+        ? SPIRE_REACH
+        : ruin
+          ? RUIN_REACH
+          : depot
+            ? DEPOT_REACH
+            : landing
+              ? LANDING_REACH
+              : ANOMALY_REACH;
     const share =
-      stronghold || landing ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE;
+      stronghold || spire || landing
+        ? CAPITAL_NEIGHBOUR_SHARE
+        : NEIGHBOUR_SHARE;
     const node = galaxy.nodes[i];
     const link = galaxy.links.find(([a, b]) => a === node.id || b === node.id);
     const other = link && index.get(link[0] === node.id ? link[1] : link[0]);
@@ -177,20 +185,27 @@ export function buildLandmarkLayer(
     const placedSeed = hashString(`${node.id}:${node.pos[0]}:${node.pos[1]}`);
     const { built } = stronghold
       ? buildStronghold(site.ground, strongholdPalette(planet), seed, edge)
-      : ruin
-        ? buildRuin(site.ground, ruin, seed, edge)
-        : depot
-          ? buildDepot(site.ground, depotPalette(planet), placedSeed)
-          : landing
-            ? buildLanding(site.ground, landingPalette(planet), placedSeed)
-            : buildAnomaly(
-                kind as Exclude<AnomalyKind, "ruin">,
-                site.ground,
-                anomalyPalette(planet),
-                placedSeed,
-                edge,
-                identities?.get(node.id)?.landmarkGroup,
-              );
+      : spire
+        ? buildSpire(
+            site.ground,
+            spirePalette(planet),
+            SPIRE_LIVERIES[placedSeed % SPIRE_LIVERIES.length],
+            placedSeed,
+          )
+        : ruin
+          ? buildRuin(site.ground, ruin, seed, edge)
+          : depot
+            ? buildDepot(site.ground, depotPalette(planet), placedSeed)
+            : landing
+              ? buildLanding(site.ground, landingPalette(planet), placedSeed)
+              : buildAnomaly(
+                  kind as Exclude<AnomalyKind, "ruin">,
+                  site.ground,
+                  anomalyPalette(planet),
+                  placedSeed,
+                  edge,
+                  identities?.get(node.id)?.landmarkGroup,
+                );
 
     const group = new THREE.Group();
     group.position.set(site.x, site.y, site.z);
@@ -214,13 +229,18 @@ export function buildLandmarkLayer(
     group.updateMatrixWorld(true);
 
     // A standing anomaly is far taller than it is wide, and so is its shadow.
-    // A depot's mast and a landing pad's tower are as tall.
+    // A depot's mast and a landing pad's tower are as tall. A spire stands as
+    // tall as a stronghold on a smaller foot, so its shadow falls as far.
     const decal = groundDecal(
       surface,
       site,
       reach,
       null,
-      stronghold || ruin ? reach : ANOMALY_SHADOW_REACH,
+      stronghold || ruin
+        ? reach
+        : spire
+          ? STRONGHOLD_REACH
+          : ANOMALY_SHADOW_REACH,
     );
     scene.add(decal.mesh);
     disposables.push(
@@ -254,6 +274,11 @@ export function buildLandmarkLayer(
 
     placed.set(i, { materials, decal });
     tops.set(i, bounds.max.y);
+    rings.set(i, {
+      radius: reach * RING_AT * site.scale,
+      x: site.x,
+      z: site.z,
+    });
     anchors.push({ pos: surface.worldToMap(site.x, site.z) });
   }
 
@@ -261,6 +286,7 @@ export function buildLandmarkLayer(
     nodes: new Set(placed.keys()),
     anchors,
     tops,
+    rings,
     setStyle(i, style) {
       const at = placed.get(i);
       if (!at) return;

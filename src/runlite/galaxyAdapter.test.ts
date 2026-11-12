@@ -408,7 +408,12 @@ describe("a land run's live state", () => {
       end: "start",
       landmark: "landing",
     });
-    expect(ids.get("east")).toEqual({ body: warlordBodyFor(1), end: "goal" });
+    // This run's seed stands a spire on the boss in place of the stronghold.
+    expect(ids.get("east")).toEqual({
+      body: warlordBodyFor(1),
+      end: "goal",
+      landmark: "spire",
+    });
     expect(ids.has("far")).toBe(false);
     // The two battle sites keep their tint and are not an end.
     expect(ids.get("north")?.end).toBeUndefined();
@@ -448,7 +453,10 @@ describe("a land run's live state", () => {
       group = false,
     ) =>
       [...ids].flatMap(([k, v]) =>
-        v.landmark && v.landmark !== "landing" && !!v.landmarkGroup === group
+        v.landmark &&
+        v.landmark !== "landing" &&
+        v.landmark !== "spire" &&
+        !!v.landmarkGroup === group
           ? [`${k}:${v.landmark}`]
           : [],
       );
@@ -492,17 +500,38 @@ describe("a land run's live state", () => {
     }
   });
 
-  it("gives the boss a stronghold and the start a landing pad", () => {
+  it("gives the boss a spire or a stronghold and the start a landing pad", () => {
     const doc = mapRunToGalaxyDoc(moved, map, located(moved));
     const kinds = landmarkKinds(
       doc.nodes,
-      doc.playerFactionId,
       mapRunIdentities(moved, located(moved)),
     );
     const at = (id: string) => doc.nodes.findIndex((n) => n.id === id);
-    expect(kinds.get(at("east"))).toBe("stronghold");
+    // This run's seed draws the spire. The next test covers the stronghold.
+    expect(kinds.get(at("east"))).toBe("spire");
     expect(kinds.get(at("gate"))).toBe("landing");
-    expect([...kinds.values()].sort()).toEqual(["landing", "stronghold"]);
+    expect([...kinds.values()].sort()).toEqual(["landing", "spire"]);
+  });
+
+  it("stands a spire on the boss on some runs and not others, by the seed", () => {
+    const boss = (seed: number) => {
+      const r = { ...moved, settings: { ...moved.settings, seed } };
+      return mapRunIdentities(r, located(r)).get("east")?.landmark;
+    };
+    const seen = Array.from({ length: 40 }, (_, seed) => boss(seed));
+    expect(new Set(seen)).toEqual(new Set(["spire", undefined]));
+    expect(Array.from({ length: 40 }, (_, seed) => boss(seed))).toEqual(seen);
+    // Either way the boss gets a landmark: a run that draws no spire keeps
+    // the stronghold.
+    const kindAt = (seed: number) => {
+      const r = { ...moved, settings: { ...moved.settings, seed } };
+      const doc = mapRunToGalaxyDoc(r, map, located(r));
+      return landmarkKinds(doc.nodes, mapRunIdentities(r, located(r))).get(
+        doc.nodes.findIndex((n) => n.id === "east"),
+      );
+    };
+    expect(kindAt(seen.indexOf("spire"))).toBe("spire");
+    expect(kindAt(seen.indexOf(undefined))).toBe("stronghold");
   });
 
   it("marks a location on no route with a question mark", () => {

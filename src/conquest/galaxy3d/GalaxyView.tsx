@@ -34,6 +34,7 @@ import {
   placeLabels,
   sameNumbers,
 } from "./labelDeclutter";
+import { conquestDressing, type Dressing } from "./landmarks/dressing";
 import type { RunLandmark } from "./landmarks/kinds";
 import {
   buildLandmarkLayer,
@@ -639,16 +640,10 @@ export function GalaxyView({
     ((sources: PlacedModelSources | undefined) => void) | null
   >(null);
   const renderRef = useRef<(() => void) | null>(null);
-  // The warp-in plays on a fresh mount but not when only the previewed faction
-  // changes. Comparing against the previous faction is robust to StrictMode's
-  // throwaway first mount (a persistent "played" flag would be consumed by it).
-  const prevFactionRef = useRef<string | undefined>(undefined);
-  // The camera pose carried across a faction-switch rebuild, so recentring on
-  // the new faction's worlds eases instead of snapping.
-  const camPoseRef = useRef<{
-    pos: THREE.Vector3;
-    target: THREE.Vector3;
-  } | null>(null);
+  // The faction played as. Nothing that is built depends on it, so picking
+  // another restyles the scene that is there. See `applyPlayerRef`.
+  const playerRef = useRef(playerFactionId);
+  const applyPlayerRef = useRef<(() => void) | null>(null);
 
   onSelectRef.current = onSelect;
   modelSourcesRef.current = modelSources;
@@ -674,6 +669,13 @@ export function GalaxyView({
   );
   const terrainExtension = terrainPixels?.extension ?? surroundLand;
 
+  // Declared before the scene's own effect, so a scene built in the same
+  // commit reads the new faction.
+  useEffect(() => {
+    playerRef.current = playerFactionId;
+    applyPlayerRef.current?.();
+  }, [playerFactionId]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -697,6 +699,10 @@ export function GalaxyView({
     // mode goes without. The ground is levelled under each town the map
     // draws, so everything below stands on `map.heights`, not the raw grid.
     const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
+    // What stands in place of a town, and where. A run says so itself. A
+    // conquest map is dealt its own, from the map and not from the player.
+    const dressing: ReadonlyMap<string, NodeIdentity & Dressing> =
+      identities ?? conquestDressing(galaxy, terrainBiomes?.planet);
     const map = layoutLevelledMap(galaxy, terrainHeights, terrainExtension, {
       maxSegments: performanceMode
         ? TERRAIN_MAX_SEGMENTS / 2
@@ -705,12 +711,7 @@ export function GalaxyView({
       // Rivers are drawn with the detail, which performance mode leaves
       // out, so there no road goes round them and none is bridged.
       routeRivers: !performanceMode,
-      skip: landmarkNodes(
-        galaxy.nodes,
-        playerFactionId,
-        identities,
-        terrainBiomes?.planet,
-      ),
+      skip: landmarkNodes(galaxy.nodes, dressing, terrainBiomes?.planet),
     });
     const { skin, extent, positions, bounds, surface } = map.layout;
     const nodeIds = galaxy.nodes.map((n) => n.id);
@@ -778,8 +779,9 @@ export function GalaxyView({
     let terrainSheet: TerrainSheet | undefined;
     // A town of buildings at every location. See towns3d/townModelLayer.ts.
     let townModels: TownModelLayer | undefined;
-    // A stronghold on every enemy capital, and a run's ruin, in place of the
-    // town. See landmarks/landmarkLayer.ts.
+    // A stronghold, a spire or a landing pad on every held capital, and an
+    // anomaly or a depot where the map asks, in place of the town. See
+    // landmarks/landmarkLayer.ts.
     let landmarks: LandmarkLayer | undefined;
     // The trees of a generated map. See forest3d/forestLayer.ts.
     let forest: ForestLayer | undefined;
@@ -806,8 +808,7 @@ export function GalaxyView({
         disposables,
         surface,
         galaxy,
-        playerFactionId,
-        identities,
+        dressing,
         terrainBiomes?.planet,
         terrainColourReader(terrainColor, surface),
       );
@@ -930,7 +931,7 @@ export function GalaxyView({
       variablePulses,
       spinners,
       structureDims,
-      factionOnlyRebuild,
+      setHome,
       animateIntro,
       introSprites,
       introLaneMats,
@@ -947,7 +948,6 @@ export function GalaxyView({
       galaxy,
       skin,
       positions,
-      playerFactionId,
       reduceMotion,
       effects,
       performanceMode,
@@ -960,11 +960,23 @@ export function GalaxyView({
       ownersRef,
       incursionRef,
       onSelectRef,
-      prevFactionRef,
       burstRef,
       applyBurstRef,
       surface,
-      townModels?.rings,
+      // A capital is a landmark, which stands a little off its location, or
+      // a town, which stands on it.
+      new Map([
+        ...(surface
+          ? [...(townModels?.rings ?? [])].map(([i, radius]) => {
+              const [x, z] = surface.mapToWorldXZ(
+                galaxy.nodes[i].pos[0],
+                galaxy.nodes[i].pos[1],
+              );
+              return [i, { radius, x, z }] as const;
+            })
+          : []),
+        ...(landmarks?.rings ?? []),
+      ]),
     );
 
     /* ------------------------------- labels -------------------------------- */
@@ -1083,7 +1095,7 @@ export function GalaxyView({
             provinces,
             () => ({
               owners: ownersRef.current,
-              playerFactionId,
+              playerFactionId: playerRef.current,
               selectedId: selectedRef.current,
               attackable: attackableRef.current,
               incursionNodeId: incursionRef.current?.nodeId,
@@ -1132,13 +1144,13 @@ export function GalaxyView({
     // Centre the view on the player's own territory (the previewed faction
     // during setup), so switching faction recentres on that faction's worlds
     // rather than always framing the whole galaxy from the origin.
-    const focus = new THREE.Vector3(0, 0, 0);
-    {
+    const centreOf = (player: string) => {
+      const focus = new THREE.Vector3(0, 0, 0);
       let sx = 0;
       let sz = 0;
       let count = 0;
       for (const n of galaxy.nodes) {
-        if ((ownersRef.current[n.id] ?? n.owner) !== playerFactionId) continue;
+        if ((ownersRef.current[n.id] ?? n.owner) !== player) continue;
         const p = positions.get(n.id);
         if (!p) continue;
         sx += p[0];
@@ -1152,7 +1164,9 @@ export function GalaxyView({
       focus.x += extent * focusBiasX;
       // On a terrain the view pivots on the ground, not on sea level.
       if (surface) focus.y = surface.groundHeightAtWorld(focus.x, focus.z);
-    }
+      return focus;
+    };
+    const focus = centreOf(playerRef.current);
 
     const camera = new THREE.PerspectiveCamera(VIEW_FOV_DEGREES, 1, 0.1, 2500);
     // The land drawn past a generated map's edge, which the camera must clear
@@ -1350,7 +1364,7 @@ export function GalaxyView({
     // (below) can put a ring they were overriding back to its plain style.
     const owners = createOwners(
       galaxy,
-      playerFactionId,
+      () => playerRef.current,
       laneFlow,
       ownersRef,
       pathLinksRef,
@@ -1494,7 +1508,7 @@ export function GalaxyView({
           input.pinned =
             i === hovered ||
             i === selectedIndex ||
-            (ownersRef.current[node.id] ?? node.owner) === playerFactionId;
+            (ownersRef.current[node.id] ?? node.owner) === playerRef.current;
           input.ndc = { x: projected.x, y: projected.y };
         });
         placeLabels(inputs, w, h, keptSizes, remeasure);
@@ -1646,11 +1660,21 @@ export function GalaxyView({
       framedTarget,
       framedPos,
       reduceMotion,
-      factionOnlyRebuild,
-      camPoseRef.current,
     );
     applyFocusRef.current = () => {
       cameraFocus.apply(false);
+      requestRender();
+    };
+    // Another faction: its home ring, its colours on the lanes and the
+    // frontier, and the view framed on its own territory.
+    setHome(playerRef.current);
+    applyPlayerRef.current = () => {
+      setHome(playerRef.current);
+      const centre = centreOf(playerRef.current);
+      framedPos.add(centre).sub(framedTarget);
+      framedTarget.copy(centre);
+      applyOwners();
+      cameraFocus.recentre();
       requestRender();
     };
     // A burst starts from a prop change, so it asks for the frames it plays in.
@@ -1894,11 +1918,6 @@ export function GalaxyView({
       unregisterStats();
       frames.cancel();
       displayClock.cancel();
-      // Remember the final pose so a faction-switch rebuild can ease from here.
-      camPoseRef.current = {
-        pos: camera.position.clone(),
-        target: controls ? controls.target.clone() : new THREE.Vector3(),
-      };
       observer?.disconnect();
       renderer?.domElement.removeEventListener("pointermove", onPointerMove);
       renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
@@ -1919,6 +1938,7 @@ export function GalaxyView({
       }
       renderRef.current = null;
       applyOwnersRef.current = null;
+      applyPlayerRef.current = null;
       applySelectionRef.current = null;
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
@@ -1927,7 +1947,6 @@ export function GalaxyView({
     };
   }, [
     galaxy,
-    playerFactionId,
     reduceMotion,
     effects,
     performanceMode,

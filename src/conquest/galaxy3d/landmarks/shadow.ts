@@ -36,7 +36,7 @@ const SHADOW = 0.35;
 const SHADOW_FADE_FROM = 0.792;
 const SHADOW_FADE_TO = 1.108;
 /** Where the selection ring is drawn, as a share of the landmark's reach. */
-const RING_AT = 0.92;
+export const RING_AT = 0.92;
 /**
  * How far the sheet must reach for the ring, in ring radii. A triangle's
  * corners, the furthest of any shape's, lie at 4/3, and the line has a width.

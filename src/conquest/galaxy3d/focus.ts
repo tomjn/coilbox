@@ -21,6 +21,8 @@ export interface Focus {
   /** Re-derive the camera/target goal from `focusRef.current` and start (or
    * snap, if `immediate`) the ease toward it. Locks/unlocks `controls`. */
   apply: (immediate: boolean) => void;
+  /** Ease to the framed overview after it has moved. A focused node is kept. */
+  recentre: () => void;
   /** Advance the focus/recentre tween. Call once per animation frame, only
    * while the intro isn't driving the camera itself. */
   tick: (now: number) => void;
@@ -42,8 +44,6 @@ export function createFocus(
   framedTarget: THREE.Vector3,
   framedPos: THREE.Vector3,
   reduceMotion: boolean,
-  factionOnlyRebuild: boolean,
-  camPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null,
 ): Focus {
   let focusAnim: {
     fromT: THREE.Vector3;
@@ -107,26 +107,33 @@ export function createFocus(
     if (e >= 1) focusAnim = null;
   };
 
-  // A node focused at mount (rare) snaps. Otherwise the intro/overview runs.
-  if (focusShown) {
-    apply(true);
-  } else if (factionOnlyRebuild && !reduceMotion && camPose) {
-    // A faction switch rebuilds the scene with a new focus centroid: start
-    // from the previous camera pose and ease to the new framed overview so
-    // the recentre is a transition, not a jump.
-    camera.position.copy(camPose.pos);
-    controls.target.copy(camPose.target);
+  // A faction switch moves the framed overview: ease to it from wherever the
+  // camera is, so the recentre is a transition, not a jump. A camera held on
+  // a node stays there.
+  const recentre = () => {
+    if (focusShown) return;
+    if (reduceMotion) {
+      controls.target.copy(framedTarget);
+      camera.position.copy(framedPos);
+      controls.update();
+      render();
+      return;
+    }
     focusAnim = {
-      fromT: camPose.target.clone(),
+      fromT: controls.target.clone(),
       toT: framedTarget.clone(),
-      fromP: camPose.pos.clone(),
+      fromP: camera.position.clone(),
       toP: framedPos.clone(),
       t0: performance.now(),
     };
-  }
+  };
+
+  // A node focused at mount (rare) snaps. Otherwise the intro/overview runs.
+  if (focusShown) apply(true);
 
   return {
     apply,
+    recentre,
     tick,
     isFocused: () => !!focusShown,
     isAnimating: () => !!focusAnim,

@@ -233,3 +233,28 @@ The pad is a wide eight-sided deck with blue painted markings, a kerb, and pods,
 It also picks which side the main tower stands and where the dish points.
 
 Like a depot it is painted metal and wears the same paint on every planet. Only the foundation's stone and what settles on top come from the planet. The mast carries one small red beacon and nothing else is lit. It takes a capital's share of the gap to its neighbours, because the start is a capital.
+
+## Spire
+
+A second form for a run's last stop, built from a reference image the user gave on 12 November 2026. On half of all runs, by the run's seed, it stands on the boss in place of the stronghold. `mapRunIdentities` gives the boss `landmark: "spire"`, and `landmarkKinds` honours that only on a location that would get a stronghold. A conquest map deals its capitals a spire too. See Conquest dressing below.
+
+The spire is a dark core inside a ring of eight tall plates with rounded heads. Four of them sweep out at the foot into buttresses, with a dark wall filling in under each. The four between them are shorter and rounded at both ends, over a dark eight-sided hall. A dark crown with a lid and three masts stands inside the plates' heads. It stands on a round cast hardstand, level with the highest ground under it, with a few low drums on the open ground between the buttresses.
+
+Like a depot it is painted metal and wears the same paint on every planet. Where the stop lies picks one of the five in `SPIRE_LIVERIES`: white and gold as in the image, graphite and orange, sand and oxblood, olive and gold, navy and white. Only the hardstand's stone and what settles on top come from the planet. One mast carries a small red beacon and nothing else is lit.
+
+It leaves out what the image has at a human scale: the ships, the signs and the small buildings at the foot.
+
+## Conquest dressing
+
+Added on 12 November 2026, because every enemy capital on a conquest map had the same stronghold and every other location was a town. `conquestDressing` in `landmarks/dressing.ts` deals a conquest land map its own, seeded by the map's id. It is dressing only: a location plays the same whatever stands on it.
+
+- Each capital a faction holds takes a stronghold, a spire or a landing pad in turn, in an order the map shuffles, so three capitals show all three. This replaces the rule in "Scope of stops" that the player's capital keeps its town.
+- One ordinary location in eight is an anomaly, each kind once at most. A moon is dealt no ruin.
+- One in five of the remaining ordinary locations is a depot, the landmark a run's supply stop has. Depots wear the same paint on every planet, so every planet is dealt them.
+
+The deal reads the map and never the player. `landmarkKinds` no longer takes the player's faction, and nothing `GalaxyView` builds depends on it. Picking another faction in the setup preview used to build the whole scene again. It now moves the home ring to the new capital's landmark, restyles the lanes and the frontier, and eases the camera to the new faction's territory. The home ring is drawn round where the landmark stands, which is a little off its location.
+
+A run is unchanged: it passes its own identities, and a conquest map's dressing is dealt only when none are given.
+
+A first version built the sealed planets' habitat structures on open planets. The user ruled that out the same day: the outposts meant were depots.
+
