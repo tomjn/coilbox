@@ -393,6 +393,14 @@ local dotColours = {}
 for at = #taper - 4 * 6 + 1, #taper, 6 do
 	dotColours[#dotColours + 1] = taper[at].colour
 end
+local function depthColour(depth)
+	local t = depth / pieces.deepest
+	return {
+		S.COLOR[1] + (S.DEEP_COLOR[1] - S.COLOR[1]) * t,
+		S.COLOR[2] + (S.DEEP_COLOR[2] - S.COLOR[2]) * t,
+		S.COLOR[3] + (S.DEEP_COLOR[3] - S.COLOR[3]) * t,
+	}
+end
 local rootDots, deepDots = 0, 0
 for _, c in ipairs(dotColours) do
 	if same(c, S.COLOR) then
@@ -402,6 +410,15 @@ for _, c in ipairs(dotColours) do
 	end
 end
 check("the root is the skeleton's colour and the deepest piece the deep one", rootDots == 1 and deepDots == 1, rootDots .. " " .. deepDots)
+local stepped = {}
+for _, c in ipairs(dotColours) do
+	for depth = 1, 2 do
+		if same(c, depthColour(depth)) then
+			stepped[depth] = true
+		end
+	end
+end
+check("and each piece between them a step further towards it", stepped[1] and stepped[2], show(dotColours))
 
 -- movement: the barrel turns against the turret, and the flare rides along
 local function turnY(angle, x, y, z)
@@ -445,6 +462,13 @@ for _, v in ipairs(hot) do
 	widest = math.max(widest, v.width)
 end
 check("a moving bone is drawn wider", widest == S.BONE_WIDTH * (1 + S.HOT_WIDTH), widest)
+local paler = 0
+for _, v in ipairs(hot) do
+	if v.width == widest and luma(v.colour) > luma(depthColour(pieces[3].depth)) then
+		paler = paler + 1
+	end
+end
+check("and paler", paler > 0, paler)
 turning.update({ 1 }, 4)
 local cooling = turning.world(0)[1].heat[3]
 check("it fades once it stops", cooling > 0 and cooling < 1, cooling)
@@ -478,6 +502,30 @@ for _, v in ipairs(focused) do
 	end
 end
 check("the pieces off that way are dimmed", fullDots == 3 * 6 and dimmedDots == 6, fullDots .. " " .. dimmedDots)
+-- the flare has no bone, so its only line is the one to the barrel
+local dimmedLines = 0
+for _, v in ipairs(focused) do
+	if v.width > 0 and v.alpha == S.PARENT_ALPHA * S.FOCUS_DIM then
+		dimmedLines = dimmedLines + 1
+	end
+end
+check("and so are their lines", dimmedLines == S.LINE_VERTICES, dimmedLines)
+
+-- a piece outside a plan, and those between it and the root, are in full
+-- while the cursor is on it
+local turretWorld = drawnPoses(planned("built", "turret"))
+local onBarrel = S.focus({ { x = 110, y = 10, pose = turretWorld[1], piece = 3, drawn = true } }, 110, 10, 8)
+local unplannedDots = { full = 0, dimmed = 0 }
+for _, v in ipairs(drawnVertices(select(1, S.pack(turretWorld, true, onBarrel)))) do
+	if v.width == 0 then
+		if v.alpha == S.DOT_ALPHA then
+			unplannedDots.full = unplannedDots.full + 1
+		elseif v.alpha == S.DOT_ALPHA * S.DIM * S.FOCUS_DIM then
+			unplannedDots.dimmed = unplannedDots.dimmed + 1
+		end
+	end
+end
+check("a piece outside the plan is in full under the cursor", unplannedDots.full == 3 * 6 and unplannedDots.dimmed == 6, show(unplannedDots))
 
 --------------------------------------------------------------------------------
 -- names: role labels beside the plan's pieces

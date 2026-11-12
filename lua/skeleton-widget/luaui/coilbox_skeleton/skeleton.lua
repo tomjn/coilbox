@@ -489,8 +489,14 @@ local function looks(pose, others, focus)
 			local colour = mix(M.COLOR, M.DEEP_COLOR, deepest > 0 and (piece.depth or 0) / deepest or 0)
 			colour = mix(colour, WHITE, heat * M.HOT_MIX)
 			local alpha = style.alpha
-			if focus and not (focus.pose == pose and focus.chain[i]) then
-				alpha = alpha * M.FOCUS_DIM
+			if focus then
+				-- the chain is in full even where it runs through pieces
+				-- outside the plan, which are otherwise dimmed
+				if focus.pose == pose and focus.chain[i] then
+					alpha = 1
+				else
+					alpha = alpha * M.FOCUS_DIM
+				end
 			end
 			out[i] = {
 				colour = colour,
