@@ -98,6 +98,21 @@ describe("buildTownModelLayer", () => {
     expect(decals).toHaveLength(3);
   });
 
+  it("names a town's group, sheet and decal town-models", () => {
+    const { scene } = build();
+    const groups = scene.children.filter((o) => o instanceof THREE.Group);
+    expect(groups).toHaveLength(3);
+    for (const g of groups) expect(g.name).toBe("town-models");
+    const decals = scene.children.filter(
+      (o) =>
+        o instanceof THREE.Mesh &&
+        (o.material as THREE.ShaderMaterial).uniforms?.uRingStrength,
+    );
+    expect(decals).toHaveLength(3);
+    for (const d of decals) expect(d.name).toBe("town-models");
+    for (const s of sheets(scene)) expect(s.name).toBe("town-models");
+  });
+
   it("leaves out a town a landmark stands in place of", () => {
     const { layer } = build({ omit: new Set([1]) });
     expect([...layer.nodes]).toEqual([0, 2]);

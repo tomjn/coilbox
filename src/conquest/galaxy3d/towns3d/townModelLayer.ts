@@ -38,6 +38,8 @@ export interface TownModelLayer {
   shadowBytes: number;
 }
 
+/** The name of a town's group, street sheet and decal, so a probe can find them. */
+const TOWN_NAME = "town-models";
 /** The steps the ground's slope is judged over, in world units. */
 const SLOPE_STEP = 0.25;
 /** The street sheet's grid step, and how far above the ground it lies. */
@@ -163,6 +165,7 @@ export function buildTownModelLayer(
     const local = merged.boundingBox as THREE.Box3;
 
     const group = new THREE.Group();
+    group.name = TOWN_NAME;
     group.position.set(town.x, y0, town.z);
     const material = landmarkMaterial();
     const mesh = new THREE.Mesh(merged, material);
@@ -183,6 +186,7 @@ export function buildTownModelLayer(
     });
     const sheetGeometry = streetSheet(town, palette.street, height, buildable);
     const sheet = new THREE.Mesh(sheetGeometry, sheetMaterial);
+    sheet.name = TOWN_NAME;
     sheet.renderOrder = SHEET_ORDER;
     sheet.raycast = () => {};
     scene.add(sheet);
@@ -203,6 +207,7 @@ export function buildTownModelLayer(
     const decal = groundDecal(surface, site, reach, null, shadowReach, {
       contact: false,
     });
+    decal.mesh.name = TOWN_NAME;
     scene.add(decal.mesh);
     disposables.push(
       decal.mesh.geometry,
