@@ -441,8 +441,8 @@ interface PodSpec {
   /** Foot and head, as shares of a tier's height above the tier's floor. */
   y0: number;
   y1: number;
-  /** Painted in the second hull colour. */
-  alt?: boolean;
+  /** The paint it takes, so that no pod is the colour of one it touches. */
+  paint: "hull" | "hull2" | "accent";
   /** The way its outer face looks, or left out for a pod with none. */
   face?: [number, number];
 }
@@ -456,6 +456,10 @@ interface FortressOpts {
 }
 
 const POD_CUT = 0.035;
+/** Half the width of the ramp. */
+const RAMP = 0.09;
+/** How far the feet of the legs at the ramp's end stand out from their heads. */
+const RAMP_LEG = 0.03;
 /** How far a pod's outer face stays inside the footprint, so its windows fit. */
 const POD_EDGE = 0.012;
 
@@ -463,7 +467,15 @@ const POD_EDGE = 0.012;
 const fortressPods = (hw: number, hd: number): PodSpec[] =>
   hw < 0.4
     ? [
-        { cx: -0.02, cz: 0.01, sx: 0.3, sz: 0.3, y0: 0, y1: 0.85 },
+        {
+          cx: -0.02,
+          cz: 0.01,
+          sx: 0.3,
+          sz: 0.3,
+          y0: 0,
+          y1: 0.85,
+          paint: "hull",
+        },
         {
           cx: hw - POD_EDGE - 0.085,
           cz: -0.07,
@@ -471,6 +483,7 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.22,
           y0: 0.3,
           y1: 1,
+          paint: "hull2",
           face: [1, 0],
         },
         {
@@ -480,7 +493,7 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.26,
           y0: -0.25,
           y1: 0.55,
-          alt: true,
+          paint: "hull2",
           face: [-1, 0],
         },
         {
@@ -490,7 +503,7 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.14,
           y0: 0.1,
           y1: 0.7,
-          alt: true,
+          paint: "hull2",
           face: [0, -1],
         },
         {
@@ -500,11 +513,12 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.13,
           y0: 0.4,
           y1: 0.95,
+          paint: "accent",
           face: [0, 1],
         },
       ]
     : [
-        { cx: 0, cz: 0, sx: 0.78, sz: 0.3, y0: 0, y1: 0.8 },
+        { cx: 0, cz: 0, sx: 0.78, sz: 0.3, y0: 0, y1: 0.8, paint: "hull" },
         {
           cx: hw - POD_EDGE - 0.13,
           cz: -0.03,
@@ -512,6 +526,7 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.34,
           y0: 0.25,
           y1: 1,
+          paint: "hull2",
           face: [1, 0],
         },
         {
@@ -521,7 +536,7 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.3,
           y0: -0.2,
           y1: 0.6,
-          alt: true,
+          paint: "hull2",
           face: [-1, 0],
         },
         {
@@ -531,7 +546,7 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.14,
           y0: 0.1,
           y1: 0.7,
-          alt: true,
+          paint: "hull2",
           face: [0, -1],
         },
         {
@@ -541,14 +556,24 @@ const fortressPods = (hw: number, hd: number): PodSpec[] =>
           sz: 0.13,
           y0: 0.35,
           y1: 0.95,
+          paint: "accent",
           face: [0, 1],
         },
-        { cx: -0.1, cz: 0, sx: 0.3, sz: 0.24, y0: 0.7, y1: 1.15, alt: true },
+        {
+          cx: -0.1,
+          cz: 0,
+          sx: 0.3,
+          sz: 0.24,
+          y0: 0.7,
+          y1: 1.15,
+          paint: "hull2",
+        },
       ];
 
 /**
- * Pods cantilevered off a core that stands on a braced trestle. A ramp runs
- * from the plate up to the base between the trestle's legs.
+ * Pods cantilevered off a core that stands on a braced trestle. The legs at
+ * the -x end stand nearly upright, and a ramp runs from the plate up to the
+ * base in the open beyond them.
  */
 function fortress(
   t: Tools,
@@ -562,7 +587,7 @@ function fortress(
   const long = hw > 0.4;
   const yT = o.deck;
 
-  // The base, and the ramp up to it from the +x end.
+  // The base, and the ramp up to it from the -x end.
   const baseY = 0.09;
   const bx = long ? 0.22 : 0.12;
   t.hull2(column(chamfered(2 * bx, 0.26, 0.03), 0, baseY), true);
@@ -571,12 +596,12 @@ function fortress(
   t.hull2(
     extrude(
       [
-        [bx, 0],
-        [end, 0],
-        [bx, baseY],
+        [-bx, 0],
+        [-end, 0],
+        [-bx, baseY],
       ],
-      -0.07,
-      0.07,
+      -RAMP,
+      RAMP,
     ),
     true,
   );
@@ -584,27 +609,28 @@ function fortress(
     t.stripe(
       extrude(
         [
-          [bx, baseY],
-          [end, 0],
-          [end, 0.007],
-          [bx, baseY + 0.007],
+          [-bx, baseY],
+          [-end, 0],
+          [-end, 0.007],
+          [-bx, baseY + 0.007],
         ],
-        s * 0.07,
-        s * 0.086,
+        s * RAMP,
+        s * (RAMP + 0.02),
       ),
     );
 
-  // The trestle: splayed legs, braces across each face and a girder ring.
+  // The trestle: legs splayed everywhere but at the ramp's end, braces across
+  // each face and a girder ring.
   const fz = hd - 0.04;
   const tz = 0.11;
   const cols = long
     ? [
-        { f: -(hw - 0.04), t: -0.34 },
+        { f: -(0.34 + RAMP_LEG), t: -0.34 },
         { f: 0, t: 0 },
         { f: hw - 0.04, t: 0.34 },
       ]
     : [
-        { f: -(hw - 0.04), t: -0.11 },
+        { f: -(0.11 + RAMP_LEG), t: -0.11 },
         { f: hw - 0.04, t: 0.11 },
       ];
   const leg = (i: number, sz: number, s: number): Xyz => [
@@ -640,8 +666,8 @@ function fortress(
     const p = leg(i, -1, girder);
     const q = leg(i, 1, girder);
     t.metal(plate(0.016, q[2] - p[2], p[1] - 0.008, p[1] + 0.008, p[0], 0));
-    // The ramp comes in under the +x face, so only the far face is braced.
-    if (i > 0) continue;
+    // The way in from the ramp is through the -x face, so only the far face is braced.
+    if (i === 0) continue;
     brace(leg(i, -1, 0.08), leg(i, 1, girder));
     brace(leg(i, 1, 0.08), leg(i, -1, girder));
   }
@@ -664,7 +690,17 @@ function fortress(
       const cz = turn * p.cz;
       const y0 = y + p.y0 * o.tier;
       const y1 = y + p.y1 * o.tier;
-      pod(p.alt ? t.hull2 : t.hull, p.sx, p.sz, y0, y1, cx, cz, POD_CUT);
+      const bright = p.paint === "accent";
+      pod(t[p.paint], p.sx, p.sz, y0, y1, cx, cz, POD_CUT);
+      // A seam round its shoulder, in a paint that shows on any hull.
+      const line = bright ? t.trim : t.accent;
+      line(
+        column(
+          chamfered(p.sx + 0.01, p.sz + 0.01, POD_CUT, cx, cz),
+          y1 - POD_CUT - 0.014,
+          y1 - POD_CUT,
+        ),
+      );
       // A dark hatch plate on the roof.
       t.trim(
         plate(
@@ -691,7 +727,7 @@ function fortress(
       const mid = y0 + 0.62 * (y1 - y0);
       t.glass(plate(sx, sz, mid, mid + 0.03, px, pz));
       const low = y0 + 0.3 * (y1 - y0);
-      t.accent(plate(sx, sz, low, low + 0.022, px, pz));
+      line(plate(sx, sz, low, low + 0.022, px, pz));
       // A strut from the deck's edge up under a pod that hangs clear of it.
       if (y0 > y + 0.05)
         brace(
