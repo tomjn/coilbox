@@ -10,7 +10,7 @@ Measures what one frame of the whole strategic map costs, so a terrain change ca
 - Each pose is the best of 6 batches of 30 renders of the whole scene. The renders are queued back to back and waited on once, so one number is what a frame costs the GPU with the CPU work overlapped. It is not the time between frames, because Chrome skips presenting frames when it can.
 - The CSS labels are not in it. They cost 0.16 to 0.32 ms of CPU a frame on 29 labels when #3652 measured them.
 - The poses are far (distance 118, 0.48 rad from vertical, over the middle of the map), close (distance 25, 0.48 rad, over the player's capital) and tilted (distance 60, 1.25 rad, over the middle).
-- The maps are the temperate, desert and ice planets as Territories maps, and a 30 city Cities map, all from seed 54785. Temperate has rivers, towns and fields. Ice has taiga.
+- The maps are the temperate, desert and ice planets as Territories maps, and a 30 city Cities map, all from seed 54785. Temperate has rivers and towns. Ice has taiga.
 - `--perf 1` turns on performance mode. It also draws at a pixel ratio of 1, so the buffer is 1285 by 1003 and those numbers are not comparable pixel for pixel.
 - The first page load of a map also records its startup: the time to make the land on the main thread (the app does that in a worker) and the ground's bake, one tile a frame. Each bake tile is timed to the end of its GPU work, so the first one or two include shader compiling. These are in the `.jsonl` file under `startup`.
 

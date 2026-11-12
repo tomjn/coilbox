@@ -145,8 +145,6 @@ export interface NodeIdentity {
   end?: "start" | "goal";
   /** Drawn before the node's name, in the name's colour. */
   icon?: LucideIcon;
-  /** Read on a terrain map only, where the town stands in a dark haze. */
-  mist?: boolean;
   /**
    * Read on a terrain map only, where an anomaly's model stands in place of
    * the town. See landmarks/landmarkLayer.ts.
@@ -1026,7 +1024,6 @@ export function GalaxyView({
                 ground?.commit();
               },
             },
-            (id) => !!identities?.get(id)?.mist,
           )
         : undefined;
 

@@ -234,7 +234,7 @@ export function layoutTown(
 /**
  * A `riverEdge` for a map's river field, or undefined for a map with none.
  * `picture` is the image the field covers and `margin` the pixels it holds
- * past the map each side, as `townShader.ts` reads it.
+ * past the map each side.
  */
 export function riverEdgeReader(
   rivers: { field: RiverField } | undefined,

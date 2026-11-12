@@ -432,14 +432,6 @@ describe("a land run's live state", () => {
     expect(ids.get(run().nodes[0].id)?.icon).toBeUndefined();
   });
 
-  it("draws an anomaly's town in a haze on a land map only", () => {
-    const anomaly: RunNode = { id: "odd", type: "event", col: 1, row: 9 };
-    const r = { ...run(), nodes: [...run().nodes, anomaly] };
-    expect(runIdentities(r).get("odd")?.mist).toBeUndefined();
-    const land = mapRunIdentities(r, new Map([["odd", "fen"]]));
-    expect(land.get("fen")?.mist).toBe(true);
-  });
-
   it("deals each kind of anomaly to one event stop at most, by the seed", () => {
     const odd = (n: number): RunNode => ({
       id: `odd${n}`,
@@ -470,9 +462,9 @@ describe("a land run's live state", () => {
       [...standing].sort(),
     );
     expect(dealt(mapRunIdentities(r, at))).toEqual(once);
-    // The stops left over keep their town in the haze.
+    // The stops left over keep their town.
     const ids = mapRunIdentities(r, at);
-    const plain = [...ids.values()].filter((v) => v.mist && !v.landmark);
+    const plain = stops.filter((n) => !ids.get(`place-${n.id}`)?.landmark);
     expect(plain).toHaveLength(
       stops.length - ANOMALY_KINDS.length - standing.length,
     );
@@ -496,7 +488,6 @@ describe("a land run's live state", () => {
     const ids = mapRunIdentities(r, at);
     for (const n of shops) {
       expect(ids.get(`place-${n.id}`)?.landmark).toBe("depot");
-      expect(ids.get(`place-${n.id}`)?.mist).toBeUndefined();
       expect(runIdentities(r).get(n.id)?.landmark).toBeUndefined();
     }
   });

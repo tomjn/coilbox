@@ -296,7 +296,7 @@ export interface GalaxyDoc {
      */
     battles?: Record<string, string>;
     /**
-     * The author asked for painted towns, fields and province roads. Display
+     * The author asked for towns and province roads. Display
      * only: it is left out of the fingerprint, and Conquest never reads it.
      */
     towns?: boolean;

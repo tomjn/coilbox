@@ -233,11 +233,10 @@ describe("buildTownModelLayer", () => {
     expect(sheet.color.r).toBe(1);
   });
 
-  it("draws a ring and no mist", () => {
+  it("draws a ring", () => {
     const { scene, layer } = build();
     layer.setStyle(0, {
       hidden: false,
-      mist: true,
       ring: { color: new THREE.Color(1, 1, 1), strength: 0.9, thick: true },
     });
     expect(decalOf(scene, 0).uniforms.uRingStrength.value).toBe(0.9);

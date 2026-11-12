@@ -154,8 +154,8 @@ export interface MapManifest {
    */
   background?: string;
   /**
-   * True to have coilbox paint towns on the map, with fields round them and
-   * roads between neighbouring provinces' towns. Off by default, because the
+   * True to have coilbox draw towns on the map and roads between neighbouring
+   * provinces' towns. Off by default, because the
    * map picture may already show towns. This only changes how the map looks.
    */
   towns?: boolean;

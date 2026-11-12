@@ -392,16 +392,15 @@ A surround never stops a map from loading. If it cannot be used, the map falls b
 
 ## Towns
 
-Coilbox can paint a town at each location, fields on the flat ground round the towns, and roads between the towns of neighbouring provinces. A map you make gets none of these by default, because your picture may already show towns and a second set on top would look wrong. Roads from the `roads` list are painted either way.
+Coilbox can draw a town at each location and roads between the towns of neighbouring provinces. A map you make gets neither by default, because your picture may already show towns and a second set on top would look wrong. Roads from the `roads` list are painted either way.
 
-Set `towns` to `true` to turn all three on together.
+Set `towns` to `true` to turn both on together.
 
 ```json
 "towns": true
 ```
 
 - The towns sit on the ground from the heightmap. They keep off steep slopes and the sea, and a capital is larger.
-- The fields go on any flat land near a town. Coilbox does not read your picture to find farmland, so a map painted as desert or snow still gets fields.
 - The roads between provinces join the towns of provinces that touch.
 - Performance mode in the player's settings turns the towns off.
 

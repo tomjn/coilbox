@@ -162,8 +162,7 @@ FOREST_HERE
 
 /**
  * Hashes, noise and the helpers that fade a pattern out with distance, for
- * any shader that draws on the ground: the terrain's own, and the towns'
- * (`townShader.ts`).
+ * any shader that draws on the ground: the terrain's own.
  */
 export const TERRAIN_NOISE = /* glsl */ `
 float tHash(vec2 p) {
