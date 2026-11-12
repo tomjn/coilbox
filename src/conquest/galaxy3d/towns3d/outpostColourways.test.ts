@@ -20,7 +20,6 @@ const FAMILIES: OutpostFamily[] = [
   "capsule",
   "research",
   "utility",
-  "placeholder",
 ];
 
 describe("outpost colourways", () => {

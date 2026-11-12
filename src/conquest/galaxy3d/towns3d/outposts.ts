@@ -3,11 +3,9 @@
  * design from the references in the sealed outposts design, and each preset
  * here is one shape of it. A preset is built in the colourway it is given, so
  * the layer builds each pair of preset and colourway once.
- *
- * The plain cuboids at the end stand in until every family is built.
  */
 import type * as THREE from "three";
-import { at, Builder, box } from "../landmarks/kit";
+import { Builder } from "../landmarks/kit";
 import type { OutpostFamily, OutpostPaint } from "./outpostColourways";
 import { OUTPOST_DOMES } from "./outpostDomes";
 import { OUTPOST_INDUSTRY } from "./outpostIndustry";
@@ -28,40 +26,10 @@ export interface OutpostModel {
   build(b: Builder, w: number, d: number, paint: OutpostPaint): void;
 }
 
-/** A plain block standing in for a family not yet built. */
-const placeholder = (
-  id: string,
-  lots: [number, number],
-  height: number,
-): OutpostModel => ({
-  id,
-  family: "placeholder",
-  lots,
-  height,
-  build(b, w, d, paint) {
-    b.add(box(w, height, d, 0, 0.4), paint.hull, at(0, 0, 0), {
-      kind: 11,
-      top: paint.top,
-      topCover: paint.topCover,
-      stains: paint.dust,
-    });
-  },
-});
-
 export const OUTPOSTS: readonly OutpostModel[] = [
   ...OUTPOST_DOMES,
   ...OUTPOST_INDUSTRY,
   ...OUTPOST_TOWERS,
-  placeholder("outpost-low", [1, 1], 0.18),
-  placeholder("outpost-low-slab", [2, 1], 0.3),
-  placeholder("outpost-mid", [1, 1], 0.375),
-  placeholder("outpost-mid-tall", [1, 1], 0.675),
-  placeholder("outpost-podium", [2, 2], 0.75),
-  placeholder("outpost-slab", [2, 1], 0.9),
-  placeholder("outpost-tower", [1, 1], 1.2),
-  placeholder("outpost-tall-tower", [1, 1], 1.8),
-  placeholder("outpost-great-tower", [2, 2], 2.4),
-  placeholder("outpost-supertall", [2, 2], 3.6),
 ];
 
 /** One structure in one colourway as a geometry. The caller owns it. */
