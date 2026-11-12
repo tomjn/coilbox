@@ -16,27 +16,28 @@ use std::time::{Duration, Instant};
 
 const TOKEN: &str = "a-token-for-the-serve-tests";
 
-/// The stand-in library, which `cargo test` builds beside the test binaries:
-/// they are in `target/<profile>/deps` and examples in `target/<profile>/examples`.
+/// The stand-in library, which `cargo test` builds into `target/<profile>/examples`.
+/// The test binary is in a folder below `target/<profile>`: `deps` up to cargo
+/// 1.99, and `build/<package>/<hash>/out` from 1.100.
 fn fake_library() -> PathBuf {
-    let mut path = std::env::current_exe().expect("a test binary knows where it is");
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.push("examples");
-    path.push(format!(
+    let exe = std::env::current_exe().expect("a test binary knows where it is");
+    let name = format!(
         "{}fake_unitsync{}",
         std::env::consts::DLL_PREFIX,
         std::env::consts::DLL_SUFFIX
-    ));
-    assert!(
-        path.exists(),
-        "no stand-in library at {}. A whole `cargo test` builds it, and a run narrowed to \
-         `--test serve` does not: `cargo build -p coilbox-unitsync-worker --example fake_unitsync`",
-        path.display()
     );
-    path
+    let found = exe
+        .ancestors()
+        .map(|dir| dir.join("examples").join(&name))
+        .find(|path| path.is_file());
+    found.unwrap_or_else(|| {
+        panic!(
+            "no stand-in library in an `examples` folder above {}. A whole `cargo test` builds \
+             it, and a run narrowed to `--test serve` does not: `cargo build -p \
+             coilbox-unitsync-worker --example fake_unitsync`",
+            exe.display()
+        )
+    })
 }
 
 /// A data directory with one map in it, and a log for the stand-in to write.
