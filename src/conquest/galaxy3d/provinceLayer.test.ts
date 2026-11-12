@@ -45,7 +45,11 @@ const colors: Record<string, number> = { red: 0xff0000, blue: 0x0000ff };
 const ownerColor = (owner: string | undefined) =>
   new THREE.Color(owner && owner in colors ? colors[owner] : 0x808080);
 
-function build(galaxy: GalaxyDoc = doc(nodes), dims?: Record<string, number>) {
+function build(
+  galaxy: GalaxyDoc = doc(nodes),
+  dims?: Record<string, number>,
+  townTops?: ReadonlyMap<number, number>,
+) {
   const scene = new THREE.Scene();
   const ownersRef = { current: {} as Record<string, string> };
   const labels = galaxy.nodes.map(() => new THREE.Object3D());
@@ -58,6 +62,7 @@ function build(galaxy: GalaxyDoc = doc(nodes), dims?: Record<string, number>) {
     ownersRef,
     labels,
     dims && ((id) => dims[id] ?? 1),
+    townTops,
   );
   const fill = (id: string) =>
     (scene.getObjectByName(`province-fill:${id}`) as THREE.Mesh)
@@ -266,6 +271,20 @@ describe("buildProvinceLayer", () => {
     // Same spot east to west, and past the star's southern edge.
     expect(label.position.x).toBe(star?.position.x);
     expect(label.position.z).toBeGreaterThan((star?.position.z ?? 0) + 1.3);
+  });
+
+  it("stands a capital's star above its town's tallest building", () => {
+    const flat = build().scene.getObjectByName("province-capital:west");
+    const lifted = build(doc(nodes), undefined, new Map([[0, 3]]));
+    const star = lifted.scene.getObjectByName("province-capital:west");
+    expect(star?.position.y).toBeCloseTo(3.15, 6);
+    // With no town tops the star sits on the ground plus the lift.
+    expect(flat?.position.y).toBeCloseTo(0.15, 6);
+    // A town lower than the ground the star clears leaves it where it was.
+    const low = build(doc(nodes), undefined, new Map([[0, -5]]));
+    expect(
+      low.scene.getObjectByName("province-capital:west")?.position.y,
+    ).toBeCloseTo(0.15, 6);
   });
 
   it("hangs a CSS label below its point", () => {

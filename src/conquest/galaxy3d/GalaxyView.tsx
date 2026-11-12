@@ -996,6 +996,7 @@ export function GalaxyView({
           ownersRef,
           labelObjects,
           dimOf,
+          townModels?.tops,
         )
       : undefined;
 

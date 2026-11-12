@@ -117,6 +117,12 @@ export function buildProvinceLayer(
    * pushes its scenery back with this. Left out, every province is at 1.
    */
   dimOf: (nodeId: string) => number = () => 1,
+  /**
+   * The height of each town's tallest building in world units, by node
+   * index. A capital's star stands above its town's top. Left out, the star
+   * sits on the ground.
+   */
+  townTops?: ReadonlyMap<number, number>,
 ): ProvinceLayer | undefined {
   const index = provinceIndexFor(galaxy);
   if (!index) return undefined;
@@ -207,7 +213,14 @@ export function buildProvinceLayer(
     }
     const star = new THREE.Mesh(capitalGeo, capitalMat);
     star.name = `province-capital:${galaxy.nodes[i].id}`;
-    star.position.set(x, ground + CAPITAL_LIFT, z);
+    star.position.set(
+      x,
+      Math.max(
+        ground + CAPITAL_LIFT,
+        (townTops?.get(i) ?? -Infinity) + CAPITAL_LIFT,
+      ),
+      z,
+    );
     star.renderOrder = -1;
     star.raycast = () => {};
     scene.add(star);
