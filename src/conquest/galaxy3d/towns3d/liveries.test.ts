@@ -38,6 +38,7 @@ describe("liveries", () => {
     for (let i = 0; i < 1000; i++) {
       expect(liveryFor(i / 1000, 0.18).wall.kind).not.toBe(3);
       expect(liveryFor(i / 1000, 2.4).wall.kind).not.toBe(1);
+      expect(liveryFor(i / 1000, 2.4).alt.kind).not.toBe(1);
     }
     expect(liveryFor(0.999999, 3.6)).toBeDefined();
   });
@@ -69,5 +70,17 @@ describe("liveries", () => {
     const b = shaded.getAttribute("color");
     for (let i = 0; i < a.array.length; i++)
       expect(b.array[i]).toBeCloseTo(a.array[i] * 0.5, 6);
+  });
+
+  it("gives a livery's trim its own finish", () => {
+    const plain = tower();
+    const dressed = tower();
+    dress(dressed, 1, livery("black-and-white"));
+    expect(kinds(plain).get(13)).toBeGreaterThan(0);
+    expect(kinds(dressed).get(13)).toBeUndefined();
+  });
+
+  it("gives every livery a unique id", () => {
+    expect(new Set(LIVERIES.map((l) => l.id)).size).toBe(LIVERIES.length);
   });
 });

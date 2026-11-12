@@ -141,7 +141,8 @@ export const OPEN_TOWN: readonly BuildingModel[] = [
   // A broad lower half and a narrower ribbed upper half set to one side, with
   // a painted panel on the lower.
   model("split", [1, 1], 1.5, (t, w, d, h) => {
-    t.wall(column(chamfered(w, d, 0.12 * w), 0, 0.5 * h));
+    // A little narrower than the lot, so the panel stands proud of it.
+    t.wall(column(chamfered(0.96 * w, d, 0.12 * w), 0, 0.5 * h));
     t.dark(plate(0.8 * w, 0.8 * d, 0.5 * h, 0.54 * h));
     t.ribs(
       column(

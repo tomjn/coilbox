@@ -31,12 +31,18 @@ export interface Livery {
   alt: Finish;
   /** Its roofs, which keep the concrete and what has settled on it. */
   roof: Tint;
+  /** The dark metal of its bands and recesses, and its painted panels. Left out to keep them. */
+  trim?: Finish;
+  accent?: Finish;
 }
 
 /** The kinds a model's walls are built in, as `openTown.ts` paints them. */
 const WALL: Kind = 8;
 const RIBS: Kind = 6;
 const ALT: Kind = 5;
+
+const TRIM: Kind = 13;
+const ACCENT: Kind = 7;
 
 const BRICK: Kind = 1;
 const GLASS: Kind = 3;
@@ -109,24 +115,199 @@ const brick = (id: string, share: number, tint: Tint, to: number): Livery => ({
   roof: BRICK_ROOF,
 });
 
+const cast = (tint: Tint): Finish => ({ tint });
+/** Cast concrete with no ribs, for a ribbed mass that is to read as plain bands. */
+const flat = (tint: Tint): Finish => ({ kind: WALL, tint });
+const ribbed = (tint: Tint): Finish => ({ kind: RIBS, tint });
+const glazed = (tint: Tint): Finish => ({ kind: GLASS, tint });
+const bricked = (tint: Tint): Finish => ({ kind: BRICK, tint });
+
+const WHITE: Tint = [1.12, 1.12, 1.12];
+const SAND: Tint = [0.96, 0.84, 0.66];
+const SLATE: Tint = [0.5, 0.53, 0.58];
+const CHARCOAL: Tint = [0.27, 0.28, 0.31];
+const BLUE: Tint = [0.26, 0.44, 0.72];
+const TEAL: Tint = [0.26, 0.52, 0.5];
+const SMOKE: Tint = [0.17, 0.21, 0.27];
+const BRONZE: Tint = [0.52, 0.4, 0.27];
+const RED: Tint = [0.7, 0.38, 0.3];
+const TERRACOTTA: Tint = [0.82, 0.52, 0.36];
+const VERDIGRIS: Tint = [0.46, 0.7, 0.62];
+
+/** A building whose masses are of different materials. */
+const mixed = (
+  id: string,
+  share: number,
+  heights: { from?: number; to?: number },
+  parts: Pick<Livery, "wall" | "ribs" | "alt" | "roof" | "trim" | "accent">,
+): Livery => ({ id, share, ...heights, ...parts });
+
 /**
  * The liveries of an open town. Brick is for the lower buildings and glass for
- * the towers, as in a city that grew over a century.
+ * the towers, as in a city that grew over a century. The mixed ones give one
+ * model's masses different materials, so two copies of a model can share
+ * nothing but their outline.
  */
 export const LIVERIES: readonly Livery[] = [
   concrete("pale", 0.14, PLAIN),
   concrete("cool", 0.12, [0.84, 0.86, 0.9]),
-  concrete("sand", 0.1, [0.96, 0.84, 0.66]),
+  concrete("sand", 0.1, SAND),
   concrete("ochre", 0.06, [0.84, 0.64, 0.46]),
-  concrete("slate", 0.1, [0.5, 0.53, 0.58]),
-  stone("charcoal", 0.1, [0.27, 0.28, 0.31], 0.5),
-  glass("blue-glass", 0.16, [0.26, 0.44, 0.72], 0.6),
-  glass("green-glass", 0.09, [0.26, 0.52, 0.5], 0.6),
-  glass("smoke-glass", 0.1, [0.17, 0.21, 0.27], 0.9),
-  glass("bronze-glass", 0.05, [0.52, 0.4, 0.27], 0.9),
-  brick("red-brick", 0.2, [0.7, 0.38, 0.3], 0.9),
+  concrete("slate", 0.1, SLATE),
+  stone("charcoal", 0.1, CHARCOAL, 0.5),
+  glass("blue-glass", 0.16, BLUE, 0.6),
+  glass("green-glass", 0.09, TEAL, 0.6),
+  glass("smoke-glass", 0.1, SMOKE, 0.9),
+  glass("bronze-glass", 0.05, BRONZE, 0.9),
+  brick("red-brick", 0.2, RED, 0.9),
   brick("brown-brick", 0.12, [0.74, 0.55, 0.38], 0.9),
   brick("dark-brick", 0.08, [0.46, 0.29, 0.25], 1.2),
+  // Concrete with glass where the model is ribbed: strip windows.
+  mixed(
+    "strip-glass",
+    0.08,
+    {},
+    {
+      wall: cast(PLAIN),
+      ribs: glazed(BLUE),
+      alt: cast([0.8, 0.82, 0.86]),
+      roof: PLAIN,
+    },
+  ),
+  // Ribs over every wall, pale and dark.
+  mixed(
+    "ribbed-pale",
+    0.07,
+    {},
+    {
+      wall: ribbed(PLAIN),
+      ribs: ribbed(SAND),
+      alt: cast(SLATE),
+      roof: PLAIN,
+    },
+  ),
+  mixed(
+    "ribbed-dark",
+    0.06,
+    { from: 0.5 },
+    {
+      wall: ribbed(SLATE),
+      ribs: ribbed(CHARCOAL),
+      alt: cast(WHITE),
+      roof: roofOf(SLATE),
+    },
+  ),
+  // Pale walls with dark bands where the model is ribbed.
+  mixed(
+    "banded",
+    0.07,
+    {},
+    {
+      wall: cast(WHITE),
+      ribs: flat(CHARCOAL),
+      alt: cast(SLATE),
+      roof: PLAIN,
+    },
+  ),
+  // A glass tower on a brick podium, as one built over an older block.
+  mixed(
+    "glass-on-brick",
+    0.07,
+    { from: 0.6, to: 1.8 },
+    {
+      wall: glazed(BLUE),
+      ribs: glazed(SMOKE),
+      alt: bricked(RED),
+      roof: GLASS_ROOF,
+    },
+  ),
+  // Brick with dark glass where the model is ribbed.
+  mixed(
+    "brick-and-glass",
+    0.08,
+    { to: 1.2 },
+    {
+      wall: bricked(RED),
+      ribs: glazed(SMOKE),
+      alt: cast(WHITE),
+      roof: BRICK_ROOF,
+    },
+  ),
+  // Terracotta with plain pale bands and teal panels.
+  mixed(
+    "terracotta",
+    0.07,
+    { to: 1.5 },
+    {
+      wall: bricked(TERRACOTTA),
+      ribs: flat(WHITE),
+      alt: cast(WHITE),
+      roof: BRICK_ROOF,
+      accent: { tint: [0.45, 0.95, 1.2] },
+    },
+  ),
+  // White walls, black glass and a dark podium.
+  mixed(
+    "white-and-black",
+    0.07,
+    { from: 0.5 },
+    {
+      wall: cast(WHITE),
+      ribs: glazed(SMOKE),
+      alt: cast(CHARCOAL),
+      roof: PLAIN,
+    },
+  ),
+  // Black glass with pale bands in place of the dark metal.
+  mixed(
+    "black-and-white",
+    0.06,
+    { from: 0.9 },
+    {
+      wall: glazed(SMOKE),
+      ribs: glazed(SMOKE),
+      alt: cast(WHITE),
+      roof: GLASS_ROOF,
+      trim: { kind: ACCENT, tint: [3.2, 3.2, 3.1] },
+    },
+  ),
+  // Pale stone under copper gone green: its plates and its roofs.
+  mixed(
+    "verdigris",
+    0.07,
+    {},
+    {
+      wall: cast([0.98, 0.93, 0.82]),
+      ribs: cast(SAND),
+      alt: cast(VERDIGRIS),
+      roof: VERDIGRIS,
+    },
+  ),
+  // Teal glass with sand plates and mustard panels.
+  mixed(
+    "teal-and-sand",
+    0.05,
+    { from: 0.6 },
+    {
+      wall: glazed(TEAL),
+      ribs: ribbed(SAND),
+      alt: cast(SAND),
+      roof: GLASS_ROOF,
+      accent: { tint: [1.25, 1.25, 0.7] },
+    },
+  ),
+  // Dark stone with bronze glass where the model is ribbed.
+  mixed(
+    "bronze-frame",
+    0.05,
+    { from: 0.5 },
+    {
+      wall: cast(CHARCOAL),
+      ribs: glazed(BRONZE),
+      alt: cast([0.84, 0.64, 0.46]),
+      roof: roofOf(CHARCOAL),
+    },
+  ),
 ];
 
 /** The livery for a number from 0 to 1 and a model of `height`. */
@@ -169,8 +350,14 @@ export function dress(
           ? livery.ribs
           : built === ALT
             ? livery.alt
-            : undefined;
-    const roof = normal.getY(i) > ROOF_TILT;
+            : built === TRIM
+              ? livery.trim
+              : built === ACCENT
+                ? livery.accent
+                : undefined;
+    // Trim has no roof to speak of, so it is one finish all over.
+    const roof =
+      built !== TRIM && built !== ACCENT && normal.getY(i) > ROOF_TILT;
     if (finish?.kind !== undefined && !roof) kind.setX(i, finish.kind);
     const tint = !finish ? PLAIN : roof && livery ? livery.roof : finish.tint;
     for (let c = 0; c < 3; c++) colour.array[i * size + c] *= shade * tint[c];
