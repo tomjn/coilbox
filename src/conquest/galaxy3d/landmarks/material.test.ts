@@ -23,6 +23,14 @@ describe("landmarkMaterial", () => {
     expect(m.vertexShader).not.toMatch(/vLocal\s*=.*modelMatrix/);
   });
 
+  it("draws hazard stripes as painted metal", () => {
+    const { fragmentShader } = landmarkMaterial();
+    expect(fragmentShader).toMatch(/vKind > 13\.5/);
+    expect(fragmentShader).toMatch(
+      /step\(12\.5, vKind\)\s*\*\s*step\(vKind, 13\.5\)/,
+    );
+  });
+
   it("goes grey under fog", () => {
     const m = landmarkMaterial();
     setLandmarkState(m, { hidden: true });

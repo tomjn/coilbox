@@ -57,6 +57,10 @@ const RIB_DARK = 0.42;
 const PANE = [0.035, 0.05];
 const BRICK = [0.018, 0.007];
 
+/** A hazard stripe's period along the surface, and how dark its dark band is. */
+const STRIPE = 0.06;
+const STRIPE_DARK = 0.12;
+
 const FRAGMENT = /* glsl */ `
 uniform vec3 uSun;
 uniform vec3 uSunLight;
@@ -212,8 +216,20 @@ void main() {
     float seam = 1.0 - smoothstep(0.001, 0.004, edge);
     float fade = clamp(1.0 - max(fwidth(b.x), fwidth(b.y)) * 1.6, 0.0, 1.0);
     base *= mix(1.0, (0.96 + 0.07 * lmHash(floor(b))) * (1.0 - 0.3 * seam), fade);
+  } else if (vKind > 13.5) {
+    // Hazard stripes: diagonal bands of the paint and near black. Too far off
+    // to draw one band, the surface takes their average.
+    float u = abs(n.y) < 0.75
+      ? (abs(n.x) > abs(n.z) ? vLocal.z : vLocal.x) + vLocal.y
+      : vLocal.x + vLocal.z;
+    float b = u / ${STRIPE.toFixed(3)};
+    float w = fwidth(b);
+    float f = fract(b);
+    float band = smoothstep(0.5 - w, 0.5 + w, f) * (1.0 - smoothstep(1.0 - w, 1.0, f));
+    float fade = clamp(1.6 - w * 2.2, 0.0, 1.0);
+    base *= mix(${(1 - (1 - STRIPE_DARK) / 2).toFixed(3)}, mix(1.0, ${STRIPE_DARK.toFixed(3)}, band), fade);
   }
-  if (vKind > 10.5 && vKind < 12.5) {
+  if ((vKind > 10.5 && vKind < 12.5) || vKind > 13.5) {
     // Paint worn through to the primer and the steel, in scuffs and at chips.
     float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
     float near = clamp(1.0 - foot * 30.0, 0.0, 1.0);
@@ -225,7 +241,7 @@ void main() {
   vec3 w = normalize(vWorldNormal);
   vec3 hemi = mix(uGroundBounce, uSky, w.y * 0.5 + 0.5);
   float facing = max(dot(w, uSun), 0.0);
-  if (vKind > 8.5) {
+  if (vKind > 8.5 && vKind < 13.5) {
     // A worn skin: relief the light catches, dark in its cracks and hollows.
     float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
     float fine = clamp(1.0 - foot * 45.0, 0.0, 1.0);
@@ -262,7 +278,7 @@ void main() {
   if (vKind > 10.5) {
     // Metal: the sun glints off it and the sky shows at a glancing angle.
     // Bare metal is the shinier, paint the duller.
-    float bare = step(12.5, vKind);
+    float bare = step(12.5, vKind) * step(vKind, 13.5);
     vec3 view = normalize(cameraPosition - vWorld);
     float glint = pow(max(dot(w, normalize(uSun + view)), 0.0), mix(24.0, 48.0, bare));
     float glance = pow(1.0 - max(dot(w, view), 0.0), 4.0);
