@@ -136,7 +136,7 @@ Each copy of a model is then dressed in one livery from `liveries.ts`, which cha
 
 ### Street ground and street trees
 
-`streetGround.ts` draws the town's grid on its street sheet, worked out for each pixel from the sum `streetGap` in `layout.ts` does: asphalt with a dashed centre line on a street, two carriageways and a planted strip on an avenue and on each main street, and paving with a joint at each lot's edge everywhere else. A sealed outpost has paving in place of the planting. The sheet keeps its fade at the town's edge and its dimming under fog.
+`streetGround.ts` draws the town's grid on its street sheet, worked out for each pixel from the sum `streetGap` in `layout.ts` does: asphalt with a dashed centre line on a street, two carriageways and a planted strip on an avenue and on each main street, and paving with a joint at each lot's edge everywhere else. A sealed outpost has paving in place of the planting. A moon has no air and so no streets: its sheet stays one plain colour. The sheet keeps its fade at the town's edge and its dimming under fog.
 
 `streetTrees.ts` stands a row of trees down each side of every main street, on the strip its cleared lots leave, and a row down every avenue's median, every 0.15, with 15% of places left empty. A tree is 0.08 to 0.12 high and stands clear of every building. They are the forest's own shapes and material: oak and beech on a planet with forest, spruce on one with frost, palms on one with scrub and no forest. A sealed outpost and a planet where nothing grows have none. They cast no shadow and take none.
 

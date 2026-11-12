@@ -10,6 +10,7 @@
  * the gaps the buildings leave.
  */
 import * as THREE from "three";
+import type { PlanetId } from "../../planets";
 import type { Rgb } from "../landmarks/kit";
 import type { TownPalette } from "../landmarks/palettes";
 import { MAX_STREETS, type Town } from "../towns";
@@ -93,6 +94,14 @@ vec3 townGround() {
   return col;
 }
 `;
+
+/**
+ * Whether a planet's towns have streets at all. A moon has no air, so
+ * nothing there is driven on tarmac between its modules, and its ground stays
+ * the one plain sheet.
+ */
+export const hasStreets = (planet: PlanetId | undefined): boolean =>
+  planet !== "moon";
 
 const linear = (c: Rgb) =>
   new THREE.Color().setRGB(

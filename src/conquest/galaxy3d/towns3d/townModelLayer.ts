@@ -36,7 +36,7 @@ import {
   type TownGround,
 } from "./layout";
 import { dress, liveryFor } from "./liveries";
-import { applyStreetGround } from "./streetGround";
+import { applyStreetGround, hasStreets } from "./streetGround";
 import { streetTrees } from "./streetTrees";
 
 export interface TownModelLayer {
@@ -281,13 +281,14 @@ export function buildTownModelLayer(
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -2,
     });
-    applyStreetGround(
-      sheetMaterial,
-      town,
-      grid,
-      palette,
-      treeShapes.length > 0,
-    );
+    if (hasStreets(planet))
+      applyStreetGround(
+        sheetMaterial,
+        town,
+        grid,
+        palette,
+        treeShapes.length > 0,
+      );
 
     // Street trees, down the main streets and the avenues.
     const treeMaterials: THREE.ShaderMaterial[] = [];

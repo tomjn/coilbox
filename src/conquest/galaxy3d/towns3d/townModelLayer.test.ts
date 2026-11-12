@@ -256,6 +256,18 @@ describe("buildTownModelLayer", () => {
     }
   });
 
+  it("draws no streets on a moon, which has no air to drive in", () => {
+    for (const sheet of sheets(build({ planet: "moon" }).scene)) {
+      const m = sheet.material as THREE.MeshBasicMaterial;
+      expect(m.customProgramCacheKey()).not.toBe("town-street-ground");
+    }
+    // The other sealed planets keep theirs.
+    for (const sheet of sheets(build({ planet: "red" }).scene)) {
+      const m = sheet.material as THREE.MeshBasicMaterial;
+      expect(m.customProgramCacheKey()).toBe("town-street-ground");
+    }
+  });
+
   it("dims a hidden town's street trees with it", () => {
     const { scene, layer } = build();
     layer.setStyle(0, { hidden: true });
