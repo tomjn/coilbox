@@ -100,7 +100,9 @@ export interface OutpostGrid {
   lot: number;
   /** How far a structure stands back from its lot's edge. */
   setback: number;
-  /** 0 to 1: how many lots are built on at the outpost's edge. The centre is full. */
+  /** 0 to 1: how many lots are built on at the outpost's centre, so even its middle has bare ground. */
+  fill: number;
+  /** 0 to 1: how many of those are still built on at the outpost's edge. */
   edgeDensity: number;
   /** The most a structure on a plate of its own is pulled off its lot's centre. */
   jitter: number;
@@ -119,7 +121,8 @@ export interface OutpostGrid {
 export const OUTPOST_GRID: OutpostGrid = {
   lot: 0.75,
   setback: 0.12,
-  edgeDensity: 0.7,
+  fill: 0.8,
+  edgeDensity: 0.4,
   jitter: 0.06,
   join: 0.5,
   plateMargin: 0.04,
@@ -520,7 +523,7 @@ export function layoutOutpost(
         wants.push(null);
         continue;
       }
-      if (rand() > 1 - (1 - grid.edgeDensity) * t * t) {
+      if (rand() > grid.fill * (1 - (1 - grid.edgeDensity) * t * t)) {
         wants.push(SPARE);
         continue;
       }
