@@ -20,7 +20,8 @@ const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
 // The chain terrainGen.ts used before planets existed, copied here as the reference.
 const BEACH: Rgb = [214, 200, 150];
 const DRY: Rgb = [182, 168, 116];
-const GRASS: Rgb = [122, 154, 84];
+// Deeper than the chain's [122, 154, 84], which drew meadows a pale flat green.
+const GRASS: Rgb = [92, 122, 62];
 const FOREST: Rgb = [58, 98, 56];
 const TUNDRA: Rgb = [146, 146, 122];
 const ROCK: Rgb = [122, 106, 90];

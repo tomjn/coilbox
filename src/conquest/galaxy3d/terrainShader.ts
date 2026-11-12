@@ -680,24 +680,35 @@ const DETAIL = /* glsl */ `
       float conifer = clamp(max(taiga, smoothstep(0.2, 0.32, nh.a + broad.x * 0.06) * 0.85), 0.0, 1.0);
       vec3 leaf = mix(uForest[1], uForest[0], 0.5);
       vec3 needle = mix(uForest[3], uForest[2], 0.4);
-      // A glade shows the clearing ground. Under a cold forest it is snow.
-      vec3 glade = mix(albedo, uBiomeClearing, smoothstep(0.3, 0.85, s));
+      // A glade shows the clearing ground, a little darker than open
+      // grassland for the damp and the shade. Under a cold forest it is snow.
+      vec3 glade = mix(albedo, uBiomeClearing * mix(0.88, 1.0, taiga), smoothstep(0.3, 0.85, s));
       vec3 litter = mix(mix(leaf, needle, conifer) * 0.4, uBiomeClearing * 0.85, taiga);
       // Lighter and darker in patches larger than a crown.
       float grove = tField(p + 19.0, 0.7, 2, footprint).x;
       albedo = mix(glade, litter * (1.0 + grove * 0.18), trees.r);
+      // A glade is grass, and is drawn as grass is, not as one flat colour.
+      // A cold forest's is snow.
+      pw[${P.grass}] += smoothstep(0.3, 0.85, s) * (1.0 - trees.r) * (1.0 - taiga);
     }
     // A tree's shadow falls on whatever ground lies beyond it. Shade on snow
     // is blue, lit by the sky.
     float treeShade = trees.g * (1.0 - 0.5 * trees.r) * land;
     albedo *= 1.0 - 0.45 * treeShade;
     albedo *= mix(vec3(1.0), vec3(0.82, 0.92, 1.12), uTerrainFrost * treeShade);
-    // Grass: lighter and darker patches with a fine grain.
+    // Grass: lighter and darker patches with a fine grain. No meadow is one
+    // green: it runs from lush, dark and a little blue, to dry and olive, in
+    // patches a few fields across and smaller ones within them.
     if (pw[${P.grass}] > 0.02) {
-      float s = pw[${P.grass}];
+      float s = min(pw[${P.grass}], 1.0);
       shadeMul += s * (broad.x * 0.2 + fine.x * 0.16);
       bump += s * fine.yz * 0.05;
-      albedo = mix(albedo, albedo * vec3(1.12, 1.05, 0.8), s * smoothstep(0.0, 0.5, broad.x));
+      float field = tField(p + 43.0, 1.3, 3, footprint).x;
+      // And smaller ones still, so a glade a field wide is not one tone.
+      float small = tField(p + 87.0, 0.35, 3, footprint).x;
+      float dryness = smoothstep(-0.4, 0.5, broad.x * 0.5 + field * 0.45 + small * 0.4);
+      vec3 meadow = mix(albedo * vec3(0.74, 0.88, 0.72), albedo * vec3(1.12, 1.03, 0.76), dryness);
+      albedo = mix(albedo, meadow, s);
     }
     // Scrub: bare ground. Its bushes are real shapes standing on it (forest3d).
     if (pw[${P.scrub}] > 0.02) {
