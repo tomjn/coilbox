@@ -24,6 +24,7 @@ import { buildCityLayer } from "./cityLayer";
 import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
+import { buildForestLayer, type ForestLayer } from "./forest3d/forestLayer";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { type GroundLayer, paintGround } from "./groundLayer";
 import {
@@ -68,6 +69,7 @@ import {
 } from "./terrainLoad";
 import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
+import { CAPITAL_RADIUS } from "./towns";
 import { riverEdgeReader } from "./towns3d/layout";
 import {
   buildTownModelLayer,
@@ -779,6 +781,8 @@ export function GalaxyView({
     // A stronghold on every enemy capital, and a run's ruin, in place of the
     // town. See landmarks/landmarkLayer.ts.
     let landmarks: LandmarkLayer | undefined;
+    // The trees of a generated map. See forest3d/forestLayer.ts.
+    let forest: ForestLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
     // the roads. See crossingPlan.ts.
     const crossingPlan = map.crossingPlan;
@@ -807,6 +811,14 @@ export function GalaxyView({
         terrainBiomes?.planet,
         terrainColourReader(terrainColor, surface),
       );
+      const riverEdge = map.extension
+        ? riverEdgeReader(
+            map.extension.rivers,
+            map.extension.image,
+            map.extension.margin,
+            surface,
+          )
+        : undefined;
       if (map.towns) {
         townModels = buildTownModelLayer(
           scene,
@@ -815,15 +827,27 @@ export function GalaxyView({
           map.towns,
           landmarks.nodes,
           terrainBiomes?.planet,
-          map.extension
-            ? riverEdgeReader(
-                map.extension.rivers,
-                map.extension.image,
-                map.extension.margin,
-                surface,
-              )
-            : undefined,
+          riverEdge,
         );
+      }
+      // Trees, on a generated map with its detail on. See forest3d.
+      if (!performanceMode && map.extension && terrainBiomes) {
+        const at = galaxy.nodes.map((n) =>
+          surface.mapToWorldXZ(n.pos[0], n.pos[1]),
+        );
+        forest = buildForestLayer(scene, disposables, surface, map.extension, {
+          planet: terrainBiomes.planet,
+          seed: hashString(galaxy.id),
+          towns: map.towns,
+          // A landmark stands in place of a town, on a site as wide as one.
+          cleared: [...landmarks.nodes].map((i) => ({
+            x: at[i][0],
+            z: at[i][1],
+            radius: CAPITAL_RADIUS,
+          })),
+          roads: map.plan.roads,
+          riverEdge,
+        });
       }
       terrainSheet = buildTerrainMesh(
         scene,
@@ -836,6 +860,7 @@ export function GalaxyView({
         map.extension,
         ground.shading,
         terrainBiomes,
+        forest?.cover,
       );
       // Scenery. It loads in the background and never holds the map up.
       const models = galaxy.models;
@@ -1255,6 +1280,7 @@ export function GalaxyView({
       // One tile of the ground's bake a frame, until it is done.
       townModels?.prepare(renderer);
       landmarks?.prepare(renderer);
+      forest?.update(camera, renderer.domElement.height);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;
       renderer.render(scene, camera);
