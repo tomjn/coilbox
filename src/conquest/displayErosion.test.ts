@@ -139,6 +139,23 @@ describe("erodeRelief", () => {
     }
   });
 
+  it("leaves the shore the height it was, with no lip along the water line", () => {
+    const input = hills();
+    const out = erodeRelief(input, SIDE, SIDE, 4);
+    // The sea is the six columns down the left, and the land drains to it.
+    let shore = 0;
+    let inland = 0;
+    for (let y = 8; y < SIDE - 8; y++) {
+      for (let x = 6; x < 60; x++) {
+        const moved = Math.abs(out[y * SIDE + x] - input[y * SIDE + x]);
+        if (x < 9) shore = Math.max(shore, moved);
+        else if (x >= 30) inland = Math.max(inland, moved);
+      }
+    }
+    expect(inland).toBeGreaterThan(0);
+    expect(shore).toBeLessThan(inland / 10);
+  });
+
   it("leaves flat land flat", () => {
     const flat = new Float32Array(SIDE * SIDE).fill(0.3);
     const out = erodeRelief(flat, SIDE, SIDE, 5);
