@@ -1,30 +1,28 @@
 /**
  * What a conquest land map stands on its locations besides plain towns, so
  * that no two maps and no two capitals look alike. It is dressing only: a
- * location with a spire, an anomaly or an outpost plays as any other.
+ * location with a spire, an anomaly or a depot plays as any other.
  *
  * It is dealt from the map alone and never from who is playing, so picking
  * another faction changes nothing that is built.
  */
 import type { GalaxyDoc } from "../../model";
 import { NEUTRAL } from "../../model";
-import { type PlanetId, planetOf } from "../../planets";
+import type { PlanetId } from "../../planets";
 import { hashString, mulberry32, shuffled } from "../../rng";
 import { ANOMALY_KINDS, type RunLandmark } from "./kinds";
 
 export interface Dressing {
   /** What stands in place of the town. A capital with none has a stronghold. */
   landmark?: RunLandmark;
-  /** The location is a sealed outpost, though its planet builds open towns. */
-  outpost?: boolean;
 }
 
 /** The forms a capital is dealt in turn. No landmark is the stronghold. */
 const CAPITAL_FORMS = [undefined, "spire", "landing"] as const;
 /** One ordinary location in this many is an anomaly. */
 const ANOMALY_EVERY = 8;
-/** The share of the other ordinary locations that are outposts, on an open planet. */
-const OUTPOST_SHARE = 0.3;
+/** The share of the other ordinary locations that are depots. */
+const DEPOT_SHARE = 0.2;
 
 /** Deal a conquest map's dressing, by location id. */
 export function conquestDressing(
@@ -61,12 +59,9 @@ export function conquestDressing(
   for (let k = 0; k < anomalies; k++)
     out.set(ordinary[k].id, { landmark: kinds[k] });
 
-  // On a planet of open towns, some of the rest are outposts. A sealed
-  // planet builds nothing else.
-  if (planetOf(planet ?? "temperate").settlement.style === "organic") {
-    const rest = ordinary.slice(anomalies);
-    const outposts = Math.round(rest.length * OUTPOST_SHARE);
-    for (let k = 0; k < outposts; k++) out.set(rest[k].id, { outpost: true });
-  }
+  // Some of the rest are depots, as a run's supply stops are.
+  const rest = ordinary.slice(anomalies);
+  const depots = Math.round(rest.length * DEPOT_SHARE);
+  for (let k = 0; k < depots; k++) out.set(rest[k].id, { landmark: "depot" });
   return out;
 }

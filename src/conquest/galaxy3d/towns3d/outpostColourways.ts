@@ -244,27 +244,6 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
     ],
   };
 
-/**
- * The sealed planet whose colourways an outpost wears on a planet of open
- * towns. A map with no planet is drawn as Temperate.
- */
-const OPEN_PLANET_COLOURWAYS: Record<
-  Exclude<PlanetId, SealedPlanetId>,
-  SealedPlanetId
-> = {
-  temperate: "moon",
-  ice: "moon",
-  desert: "red",
-};
-
-/** The planet whose colourways an outpost on `planet` is painted in. */
-export const outpostColourwaysOn = (
-  planet: PlanetId | undefined,
-): SealedPlanetId =>
-  isSealedPlanet(planet)
-    ? planet
-    : OPEN_PLANET_COLOURWAYS[planet ?? "temperate"];
-
 export const isSealedPlanet = (
   planet: PlanetId | undefined,
 ): planet is SealedPlanetId =>
@@ -290,16 +269,12 @@ export function colourwayFor(
   return allowed[allowed.length - 1];
 }
 
-/** A colourway as it is painted on `planet`, under what settles there. */
+/** A colourway as it is painted on `planet`, under its dust. */
 export function outpostPaint(
-  planet: PlanetId,
+  planet: SealedPlanetId,
   colourway: Colourway,
 ): OutpostPaint {
   const { top, topCover } = townPalette(planet);
-  // Dust, sand and snow lie as a film and drift against a wall. What settles
-  // on Temperate is moss, which does neither, so an outpost there stays clean.
-  if (planet === "temperate")
-    return { ...colourway, top, topCover: { even: 0 }, dust: [] };
   return {
     ...colourway,
     top,

@@ -32,7 +32,6 @@ const build = (
     omit?: ReadonlySet<number>;
     planet?: Parameters<typeof buildTownModelLayer>[5];
     riverEdge?: (x: number, z: number) => number;
-    outposts?: ReadonlySet<number>;
   } = {},
 ) => {
   const surface = surfaceAt(opts.level ?? 0.5);
@@ -59,7 +58,6 @@ const build = (
     opts.omit ?? new Set(),
     opts.planet,
     opts.riverEdge,
-    opts.outposts,
   );
   return { scene, disposables, layer, surface, towns };
 };
@@ -271,24 +269,6 @@ describe("buildTownModelLayer", () => {
       expect(layer.nodes.size, planet).toBeGreaterThan(0);
       expect(sheets(scene), planet).toHaveLength(0);
     }
-  });
-
-  it("builds an outpost among open towns where the map asks for one", () => {
-    const { scene, layer } = build({ outposts: new Set([1]) });
-    expect(layer.nodes.size).toBe(3);
-    // The two open towns keep their street sheets. The outpost has none, and
-    // stands on striped plates in fresh paint.
-    expect(sheets(scene)).toHaveLength(2);
-    const groups = scene.children.filter((o) => o instanceof THREE.Group);
-    const kinds = groups.map((g) =>
-      Array.from(
-        (g.children[0] as THREE.Mesh).geometry.getAttribute("kind").array,
-      ),
-    );
-    expect(kinds.map((k) => k.includes(14))).toEqual([false, true, false]);
-    expect(materialOf(scene, 1).defines).toEqual({ OUTPOST: 1 });
-    expect(materialOf(scene, 0).defines).toEqual({});
-    expect(layer.rings.get(1)).toBeGreaterThan(0);
   });
 
   it("stands a sealed outpost on striped plates", () => {

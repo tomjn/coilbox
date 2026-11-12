@@ -51,33 +51,34 @@ describe("conquestDressing", () => {
 
   it("makes a few ordinary locations an anomaly, each kind once", () => {
     const kinds = [...deal("one", ["a", "b"]).entries()]
-      .filter(([id, v]) => id.startsWith("n") && v.landmark)
+      .filter(([id, v]) => id.startsWith("n") && v.landmark !== "depot")
       .map(([, v]) => v.landmark);
     expect(kinds).toHaveLength(3);
     expect(new Set(kinds).size).toBe(3);
     for (const k of kinds) expect(ANOMALY_KINDS).toContain(k);
     // A big map runs out of kinds before it runs out of locations.
-    const many = [...deal("one", ["a"], undefined, 200).values()].filter(
-      (v) => v.landmark,
+    const many = [...deal("one", [], undefined, 200).values()].filter(
+      (v) => v.landmark !== "depot",
     );
     expect(many).toHaveLength(ANOMALY_KINDS.length);
   });
 
   it("deals a moon no ruin", () => {
-    const kinds = [...deal("one", [], "moon", 200).values()].map(
-      (v) => v.landmark,
-    );
+    const kinds = [...deal("one", [], "moon", 200).values()]
+      .map((v) => v.landmark)
+      .filter((k) => k !== "depot");
     expect(kinds).toHaveLength(ANOMALY_KINDS.length - 1);
     expect(kinds).not.toContain("ruin");
   });
 
-  it("makes some of the rest outposts where towns are open to the air", () => {
-    const outposts = (planet?: Parameters<typeof conquestDressing>[1]) =>
-      [...deal("one", ["a", "b"], planet).values()].filter((v) => v.outpost);
-    // 24 ordinary locations less 3 anomalies leaves 21, and 0.3 of that is 6.
-    expect(outposts("temperate")).toHaveLength(6);
-    expect(outposts()).toHaveLength(6);
-    expect(outposts("moon")).toHaveLength(0);
-    for (const v of outposts("desert")) expect(v.landmark).toBeUndefined();
+  it("makes some of the rest depots, on every planet", () => {
+    const depots = (planet?: Parameters<typeof conquestDressing>[1]) =>
+      [...deal("one", ["a", "b"], planet).values()].filter(
+        (v) => v.landmark === "depot",
+      );
+    // 24 ordinary locations less 3 anomalies leaves 21, and a fifth of that is 4.
+    expect(depots("temperate")).toHaveLength(4);
+    expect(depots()).toHaveLength(4);
+    expect(depots("moon")).toHaveLength(4);
   });
 });

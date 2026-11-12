@@ -250,9 +250,11 @@ Added on 12 November 2026, because every enemy capital on a conquest map had the
 
 - Each capital a faction holds takes a stronghold, a spire or a landing pad in turn, in an order the map shuffles, so three capitals show all three. This replaces the rule in "Scope of stops" that the player's capital keeps its town.
 - One ordinary location in eight is an anomaly, each kind once at most. A moon is dealt no ruin.
-- On a planet of open towns (Temperate, Desert, Ice) three in ten of the remaining ordinary locations are sealed outposts. They wear a sealed planet's colourways, the Moon's on Temperate and Ice and Red's on Desert, under the sand or snow of their own planet. Moss does not lie as a film, so a Temperate outpost stays clean. A sealed planet builds nothing but outposts, so there it changes nothing.
+- One in five of the remaining ordinary locations is a depot, the landmark a run's supply stop has. Depots wear the same paint on every planet, so every planet is dealt them.
 
-The deal reads the map and never the player. `landmarkKinds` no longer takes the player's faction, and nothing `GalaxyView` builds depends on it. Picking another faction in the setup preview used to build the whole scene again. It now moves the home ring to the new capital's landmark, restyles the lanes and the frontier, and eases the camera to the new faction's territory.
+The deal reads the map and never the player. `landmarkKinds` no longer takes the player's faction, and nothing `GalaxyView` builds depends on it. Picking another faction in the setup preview used to build the whole scene again. It now moves the home ring to the new capital's landmark, restyles the lanes and the frontier, and eases the camera to the new faction's territory. The home ring is drawn round where the landmark stands, which is a little off its location.
 
 A run is unchanged: it passes its own identities, and a conquest map's dressing is dealt only when none are given.
+
+A first version built the sealed planets' habitat structures on open planets. The user ruled that out the same day: the outposts meant were depots.
 
