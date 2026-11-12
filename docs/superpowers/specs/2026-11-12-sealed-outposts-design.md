@@ -75,7 +75,7 @@ There is no fixed triangle budget per preset. The sealed version of the harness 
 
 ### Colour slots
 
-A part is painted with a slot, not a colour: `hull`, `hull2`, `accent`, `trim`, `metal`, `glass` and `stripe`. Hull, second hull and accent are all painted metal, so the open towns' remap by kind cannot tell them apart. Each pair of preset and colourway is built once, when an outpost first needs it, and cached for the layer's life.
+A preset paints each part from a slot of the colourway it is given: `hull`, `hull2`, `accent`, `trim`, `metal`, `glass` and `stripe`. Hull, second hull and accent are all painted metal, so the open towns' remap by kind after building cannot tell them apart. So a preset's build function takes the colourway, and each pair of preset and colourway is built once, when an outpost first needs it, and cached for the layer's life.
 
 ## Families
 
