@@ -87,6 +87,16 @@ export function column(
   );
 }
 
+/** A flat block of `w` by `d` from `y0` to `y1` round `cx, cz`. */
+export const plate = (
+  w: number,
+  d: number,
+  y0: number,
+  y1: number,
+  cx = 0,
+  cz = 0,
+): THREE.BufferGeometry => column(rect(w, d, cx, cz), y0, y1);
+
 /**
  * A slab from `y0` to `y1`, `w` wide, whose top corners are cut back by `c` in
  * two steps, so its shoulders read as round. It runs from `from` to `to` along

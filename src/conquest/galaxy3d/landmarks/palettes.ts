@@ -232,6 +232,10 @@ export interface TownPalette {
   building: Rgb;
   /** The streets, darker than the walls. */
   street: Rgb;
+  /** Recesses, cores and bands: the dark metal between two masses. */
+  dark: Rgb;
+  /** A few painted panels, the planet's wall colour pulled towards rust. */
+  accent: Rgb;
   /** What settles on the roofs: moss, sand, snow, ash. */
   top: Rgb;
   topCover: number;
@@ -240,8 +244,13 @@ export interface TownPalette {
 /** How far a town's walls are lifted from the stronghold's concrete towards white. */
 const TOWN_PALE = 0.35;
 
+/** The paint a town's accent panels start from, and how far they are pulled to it. */
+const TOWN_RUST: Rgb = [170, 88, 56];
+const TOWN_ACCENT = 0.6;
+
 const townFrom = ({
   concrete,
+  trim,
   top,
   topCover,
 }: StrongholdPalette): TownPalette => ({
@@ -249,6 +258,12 @@ const townFrom = ({
     Math.round(concrete[0] + (255 - concrete[0]) * TOWN_PALE),
     Math.round(concrete[1] + (255 - concrete[1]) * TOWN_PALE),
     Math.round(concrete[2] + (255 - concrete[2]) * TOWN_PALE),
+  ],
+  dark: trim,
+  accent: [
+    Math.round(concrete[0] + (TOWN_RUST[0] - concrete[0]) * TOWN_ACCENT),
+    Math.round(concrete[1] + (TOWN_RUST[1] - concrete[1]) * TOWN_ACCENT),
+    Math.round(concrete[2] + (TOWN_RUST[2] - concrete[2]) * TOWN_ACCENT),
   ],
   street: [
     Math.round(concrete[0] * 0.42),
