@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "../terrain";
 import { CAPITAL_RADIUS, planTowns, withStreets } from "../towns";
 import { OPEN_GRID, RIVER_BANK, SEALED_GRID } from "./layout";
-import { buildTownModelLayer, shadowSide } from "./townModelLayer";
+import { buildTownModelLayer, liveryFor, shadowSide } from "./townModelLayer";
 
 const SIDE = 101;
 const surfaceAt = (level: number) => {
@@ -209,6 +209,17 @@ describe("buildTownModelLayer", () => {
       // One lot, and at most half a building's diagonal of slack.
       expect(layer.rings.get(town.node)).toBeLessThan(far + 1);
     }
+  });
+
+  it("deals every livery out and the plain one most often", () => {
+    const seen = new Map<string, number>();
+    for (let i = 0; i < 1000; i++) {
+      const key = liveryFor(i / 1000).join();
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    expect(seen.size).toBe(6);
+    expect(seen.get("1,1,1")).toBe(Math.max(...seen.values()));
+    expect(liveryFor(0.999999)).toHaveLength(3);
   });
 
   it("dims a town hidden by fog", () => {

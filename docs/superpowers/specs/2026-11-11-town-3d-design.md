@@ -109,6 +109,8 @@ The lot sizes are decided. The other widths are the spike's and are tuned on scr
 
 The first entries are ten cuboids from 0.12 to 2.4 high, drawn at 1.5 times those heights, used for both kinds of settlement. A real model replaces a cuboid by taking its footprint and height. When no placeholder is left the list is the inventory.
 
+An open town's real models are in `openTown.ts`: twenty, from 0.18 to 3.6 high, on one, two and four lots. The layout picks the model nearest the height a lot wants, so each model has its own height. A model is built from the cheap parts in `parts.ts` in four finishes of the planet's one colour: pale cast walls, the same walls in broad ribs, a darker cast and dark metal, with a rust panel on a few. The town layer gives each building one of six muted liveries, so neighbours differ. A sealed outpost still uses the cuboids.
+
 ### Town layer
 
 `buildTownModelLayer` builds one group per town.

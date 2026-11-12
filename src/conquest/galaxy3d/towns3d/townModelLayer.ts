@@ -71,6 +71,31 @@ const MAX_SHADOW = 1024;
 const FOUNDATION_MIN = 0.001;
 /** How much a building's shade may drift from the kit's own. */
 const SHADE_DRIFT = 0.14;
+/**
+ * The paints an open town's buildings come in: what the planet's wall colour
+ * is multiplied by, and the share of buildings that take it. All are muted, so
+ * a town still reads as one material on its planet.
+ */
+const LIVERIES: readonly { tint: [number, number, number]; share: number }[] = [
+  { tint: [1, 1, 1], share: 0.38 },
+  { tint: [0.84, 0.86, 0.9], share: 0.2 },
+  { tint: [1, 0.92, 0.79], share: 0.12 },
+  { tint: [0.78, 0.87, 0.98], share: 0.1 },
+  { tint: [0.5, 0.53, 0.58], share: 0.12 },
+  { tint: [0.8, 0.89, 0.76], share: 0.08 },
+];
+/** A sealed outpost is one paint throughout. */
+const PLAIN: [number, number, number] = [1, 1, 1];
+
+/** The livery for a number from 0 to 1. */
+export function liveryFor(pick: number): [number, number, number] {
+  let upTo = 0;
+  for (const { tint, share } of LIVERIES) {
+    upTo += share;
+    if (pick < upTo) return tint;
+  }
+  return LIVERIES[0].tint;
+}
 
 /**
  * The shadow picture's side for a town, in proportion to its radius. A full
@@ -164,8 +189,10 @@ export function buildTownModelLayer(
       const copy = geometries[placement.model].clone();
       copy.applyMatrix4(at(x, top - y0, z, placement.turn));
       const shade = 1 + (rand() - 0.5) * SHADE_DRIFT;
+      const tint = style === "organic" ? liveryFor(rand()) : PLAIN;
       const colour = copy.getAttribute("color");
-      for (let i = 0; i < colour.array.length; i++) colour.array[i] *= shade;
+      for (let i = 0; i < colour.array.length; i++)
+        colour.array[i] *= shade * tint[i % 3];
       parts.push(copy);
       // Fill the gap under a building on a slope, so no side shows daylight.
       if (top - lo > FOUNDATION_MIN) {
