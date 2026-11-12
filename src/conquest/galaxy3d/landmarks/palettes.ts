@@ -237,12 +237,19 @@ export interface TownPalette {
   topCover: number;
 }
 
+/** How far a town's walls are lifted from the stronghold's concrete towards white. */
+const TOWN_PALE = 0.35;
+
 const townFrom = ({
   concrete,
   top,
   topCover,
 }: StrongholdPalette): TownPalette => ({
-  building: concrete,
+  building: [
+    Math.round(concrete[0] + (255 - concrete[0]) * TOWN_PALE),
+    Math.round(concrete[1] + (255 - concrete[1]) * TOWN_PALE),
+    Math.round(concrete[2] + (255 - concrete[2]) * TOWN_PALE),
+  ],
   street: [
     Math.round(concrete[0] * 0.42),
     Math.round(concrete[1] * 0.42),
