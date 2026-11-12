@@ -85,11 +85,11 @@ Object.defineProperty(THREE.WebGLRenderer.prototype, "render", {
         camera = c;
         const t0 = performance.now();
         fn.call(this, s, c);
-        recordTownShadowBytes(s as THREE.Scene);
         if (Number.isNaN(firstMainFrameMs)) {
           firstMainFrameMs = performance.now() - t0;
           timeToFirstMain = performance.now();
         }
+        if (townCost) recordTownShadowBytes(s as THREE.Scene);
         return;
       }
       if (bake.length > 400) {
@@ -112,12 +112,16 @@ OrbitControls.prototype.update = function (dt?: number | null) {
 };
 
 // The bytes of shadow texture the 3D towns hold, left on `window` to read by
-// hand. A town's shadow is baked on the first frames, so this is tried on each
-// main frame until a texture is found. Four bytes a texel for colour and four
-// for depth.
+// hand. The town layer bakes every shadow in its first `prepare`, which the
+// view calls on its first frames, so a few main frames are enough to find the
+// textures. After that a map with no 3D towns stops being traversed. Four bytes
+// a texel for colour and four for depth.
+const SHADOW_TRIES = 5;
+let townShadowTries = 0;
 let townShadowBytesSet = false;
 function recordTownShadowBytes(root: THREE.Scene) {
-  if (townShadowBytesSet) return;
+  if (townShadowBytesSet || townShadowTries >= SHADOW_TRIES) return;
+  townShadowTries++;
   const seen = new Set<THREE.Texture>();
   let bytes = 0;
   root.traverse((o) => {
