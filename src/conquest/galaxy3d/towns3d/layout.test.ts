@@ -392,7 +392,7 @@ describe("layoutOutpost", () => {
   });
 
   it("joins neighbours on one plate, each at its lot's centre", () => {
-    const grid = { ...OUTPOST_GRID, join: 1 };
+    const grid = { ...OUTPOST_GRID, join: 1, pads: 0 };
     const { placements, plates } = layoutOutpost(town(3), grid, outposts, flat);
     const bridges = plates.slice(placements.length);
     expect(bridges.length).toBeGreaterThan(0);
@@ -413,9 +413,54 @@ describe("layoutOutpost", () => {
   });
 
   it("gives each structure a plate of its own when none are joined", () => {
-    const grid = { ...OUTPOST_GRID, join: 0 };
+    const grid = { ...OUTPOST_GRID, join: 0, pads: 0 };
     const { placements, plates } = layoutOutpost(town(3), grid, outposts, flat);
     expect(plates).toHaveLength(placements.length);
+  });
+
+  it("builds on every lot near the centre", () => {
+    const { placements } = layoutOutpost(town(3), OUTPOST_GRID, outposts, flat);
+    const covered = new Set(placements.flatMap(lotsOf));
+    for (const key of ["-1,-1", "-1,0", "0,-1", "0,0"])
+      expect(covered.has(key), key).toBe(true);
+  });
+
+  it("lays empty plates on bare lots beside a structure, joined to it", () => {
+    const grid = { ...OUTPOST_GRID, pads: 1 };
+    const { placements, plates } = layoutOutpost(town(3), grid, outposts, flat);
+    const none = layoutOutpost(town(3), { ...grid, pads: 0 }, outposts, flat);
+    // The same structures are built with no empty plates.
+    expect(placements.map((p) => p.model)).toEqual(
+      none.placements.map((p) => p.model),
+    );
+    const built = new Set(placements.flatMap(lotsOf));
+    const pads = plates
+      .slice(placements.length)
+      .filter((p) => Math.abs(p.w - p.d) < 1e-9 && p.w > lot / 2);
+    expect(pads.length).toBeGreaterThan(0);
+    for (const pad of pads) {
+      const i = Math.round(pad.x / lot - 0.5);
+      const j = Math.round(pad.z / lot - 0.5);
+      expect(built.has(`${i},${j}`)).toBe(false);
+      expect(
+        [
+          [i - 1, j],
+          [i + 1, j],
+          [i, j - 1],
+          [i, j + 1],
+        ].some(([a, b]) => built.has(`${a},${b}`)),
+      ).toBe(true);
+      // A bridge reaches the pad's plate.
+      expect(
+        plates.some(
+          (b) =>
+            b !== pad &&
+            Math.abs(b.x - pad.x) <= lot / 2 + 1e-9 &&
+            Math.abs(b.z - pad.z) <= lot / 2 + 1e-9 &&
+            (b.w < lot / 2 || b.d < lot / 2),
+        ),
+      ).toBe(true);
+    }
   });
 
   it("builds across the lines a road arrives on", () => {
