@@ -20,12 +20,13 @@ describe("building inventory", () => {
     expect(b.max.z).toBeLessThanOrEqual(0.15 + 1e-6);
   });
 
-  it.each([
-    "organic",
-    "sealed",
-  ] as const)("has a single-lot model for a %s settlement", (style) => {
+  it("has a single-lot model for an open town", () => {
     expect(
-      modelsFor(style).some((m) => m.lots[0] === 1 && m.lots[1] === 1),
+      modelsFor("organic").some((m) => m.lots[0] === 1 && m.lots[1] === 1),
     ).toBe(true);
+  });
+
+  it("leaves a sealed outpost's structures to their own inventory", () => {
+    expect(modelsFor("sealed")).toEqual([]);
   });
 });

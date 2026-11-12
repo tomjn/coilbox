@@ -30,13 +30,24 @@ import { buildModel, modelsFor } from "./buildings";
 import {
   BUILD_FIT,
   footprint,
-  gridFor,
+  layoutOutpost,
   layoutTown,
+  OPEN_GRID,
+  OUTPOST_GRID,
   RIVER_BANK,
   type TownGround,
 } from "./layout";
 import { dress, liveryFor } from "./liveries";
-import { applyStreetGround, hasStreets } from "./streetGround";
+import {
+  type Colourway,
+  colourwayFor,
+  isSealedPlanet,
+  outpostPaint,
+  type SealedPlanetId,
+} from "./outpostColourways";
+import { foundationPlate, PLATE_DECK } from "./outpostParts";
+import { buildOutpost, OUTPOSTS } from "./outposts";
+import { applyStreetGround } from "./streetGround";
 import { streetTrees } from "./streetTrees";
 
 export interface TownModelLayer {
@@ -75,8 +86,6 @@ const SHEET_ORDER = -2.45;
 const RING_AT = 0.92;
 /** The side of the largest shadow picture. */
 const MAX_SHADOW = 1024;
-/** A gap under a building smaller than this needs no foundation. */
-const FOUNDATION_MIN = 0.001;
 /** How much a building's shade may drift from the kit's own. */
 const SHADE_DRIFT = 0.14;
 /** How far the slab under a lot stands above the ground, clear of the street sheet. */
@@ -93,6 +102,44 @@ export function shadowSide(radius: number): number {
   );
 }
 
+/**
+ * The lowest and highest ground under the corners of a rectangle `w` by `d`
+ * centred on `x, z` and turned `turn`, as the layout turns a building.
+ */
+export function groundUnder(
+  height: (x: number, z: number) => number,
+  x: number,
+  z: number,
+  w: number,
+  d: number,
+  turn: number,
+): { lo: number; top: number } {
+  // A rotation by `turn` about y sends the model's +x and +z here.
+  const ex = [Math.cos(turn), -Math.sin(turn)];
+  const ez = [Math.sin(turn), Math.cos(turn)];
+  let lo = Number.POSITIVE_INFINITY;
+  let top = Number.NEGATIVE_INFINITY;
+  for (const [a, b] of [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ]) {
+    const gh = height(
+      x + (a * w * ex[0]) / 2 + (b * d * ez[0]) / 2,
+      z + (a * w * ex[1]) / 2 + (b * d * ez[1]) / 2,
+    );
+    lo = Math.min(lo, gh);
+    top = Math.max(top, gh);
+  }
+  return { lo, top };
+}
+
+/** How far a plate's sides reach below the lowest ground under it, so no edge shows daylight. */
+const PLATE_SINK = 0.02;
+/** How far outside an outpost's furthest plate its ring is drawn. A first guess, tuned on screen. */
+const OUTPOST_RING_CLEAR = 0.25;
+
 /** A street tree's height, shortest and tallest, and how far it stands clear of a wall. */
 const STREET_TREE: [number, number] = [0.08, 0.12];
 const STREET_TREE_CLEAR = 0.035;
@@ -100,7 +147,8 @@ const STREET_TREE_CLEAR = 0.035;
 interface Placed {
   material: THREE.ShaderMaterial;
   trees: THREE.ShaderMaterial[];
-  sheet: THREE.MeshBasicMaterial;
+  /** The street sheet, which a sealed outpost has none of. */
+  sheet: THREE.MeshBasicMaterial | null;
   decal: ReturnType<typeof groundDecal>;
 }
 
@@ -116,9 +164,12 @@ export function buildTownModelLayer(
   riverEdge?: TownGround["riverEdge"],
 ): TownModelLayer {
   const style = planetOf(planet ?? "temperate").settlement.style;
-  const grid = gridFor(style);
+  /** The sealed planet a sealed outpost stands on, or null for an open town. */
+  const sealed: SealedPlanetId | null =
+    style === "sealed" && isSealedPlanet(planet) ? planet : null;
+  const grid = OPEN_GRID;
   const palette = townPalette(planet);
-  const models = modelsFor(style);
+  const models = sealed ? [] : modelsFor(style);
   const sun = new THREE.Vector3(...TERRAIN_SUN);
   // A heightmap pixel of 1 in 255 is the lowest land, so half that is sea.
   const sea = (0.5 / 255) * surface.heightScale * surface.scale;
@@ -155,54 +206,38 @@ export function buildTownModelLayer(
     return { species, shape };
   });
 
-  const placed = new Map<number, Placed>();
-  const tops = new Map<number, number>();
-  const rings = new Map<number, number>();
-  const bakes: (() => void)[] = [];
-  let shadowBytes = 0;
-  let renderer: THREE.WebGLRenderer | null = null;
+  /** A town's buildings before they are merged, how far they reach and their footprints. */
+  interface Body {
+    parts: THREE.BufferGeometry[];
+    /** How far the furthest corner of any building lies from the centre. */
+    built: number;
+    /** Each building's footprint, for keeping the street trees off the walls. */
+    walls: { x: number; z: number; w: number; d: number; turn: number }[];
+  }
 
-  for (const town of towns) {
-    if (omit.has(town.node)) continue;
+  /** An open town's buildings, each on a slab of pavement, or null for none. */
+  const buildOpenBody = (
+    town: Town,
+    y0: number,
+    rand: () => number,
+  ): Body | null => {
     const placements = layoutTown(town, grid, models, ground);
-    if (placements.length === 0) continue;
-
-    const y0 = height(town.x, town.z);
-    const rand = seeded(Math.floor(town.seed * 1e9) + 1);
+    if (placements.length === 0) return null;
     const foundations = new Builder();
-    let foundationCount = 0;
-    // How far the furthest corner of any building lies from the centre.
     let built = 0;
     const parts: THREE.BufferGeometry[] = [];
-    // Each building's footprint, for keeping the street trees off the walls.
-    const walls: {
-      x: number;
-      z: number;
-      w: number;
-      d: number;
-      turn: number;
-    }[] = [];
+    const walls: Body["walls"] = [];
     for (const placement of placements) {
       const model = models[placement.model];
       const [w, d] = footprint(model, grid);
-      // A rotation by `turn` about y sends the model's +x and +z here.
-      const ex = [Math.cos(placement.turn), -Math.sin(placement.turn)];
-      const ez = [Math.sin(placement.turn), Math.cos(placement.turn)];
-      let lo = Number.POSITIVE_INFINITY;
-      let top = Number.NEGATIVE_INFINITY;
-      for (const [a, b] of [
-        [-1, -1],
-        [1, -1],
-        [1, 1],
-        [-1, 1],
-      ]) {
-        const gh = height(
-          placement.x + (a * w * ex[0]) / 2 + (b * d * ez[0]) / 2,
-          placement.z + (a * w * ex[1]) / 2 + (b * d * ez[1]) / 2,
-        );
-        lo = Math.min(lo, gh);
-        top = Math.max(top, gh);
-      }
+      const { lo, top } = groundUnder(
+        height,
+        placement.x,
+        placement.z,
+        w,
+        d,
+        placement.turn,
+      );
       const x = placement.x - town.x;
       const z = placement.z - town.z;
       walls.push({
@@ -213,10 +248,7 @@ export function buildTownModelLayer(
         turn: placement.turn,
       });
       // An open town's lot is paved to its edge, past the building's own walls.
-      const [sw, sd] =
-        style === "organic"
-          ? [model.lots[0] * grid.lot, model.lots[1] * grid.lot]
-          : [w, d];
+      const [sw, sd] = [model.lots[0] * grid.lot, model.lots[1] * grid.lot];
       built = Math.max(built, Math.hypot(x, z) + Math.hypot(sw, sd) / 2);
       const copy = geometries[placement.model].clone();
       copy.scale(1, placement.stretch, 1);
@@ -226,32 +258,122 @@ export function buildTownModelLayer(
       dress(
         copy,
         shade,
-        style === "organic" && !model.filler
-          ? liveryFor(pick, model.height)
-          : undefined,
+        model.filler ? undefined : liveryFor(pick, model.height),
       );
       parts.push(copy);
-      if (style === "organic") {
-        // An open town's lot is a slab of pavement, so the streets between
-        // read as streets. It reaches down to the lowest ground under it.
-        foundations.add(
-          box(sw, top - lo + PAVEMENT, sd, 0, 0.4),
-          palette.pavement,
-          at(x, lo - y0, z, placement.turn),
-          { kind: 7, clean: true },
-        );
-        foundationCount++;
-      } else if (top - lo > FOUNDATION_MIN) {
-        // Fill the gap under a building on a slope, so no side shows daylight.
-        foundations.add(
-          box(w, top - lo, d, 0, 0.4),
-          palette.building,
-          at(x, lo - y0, z, placement.turn),
-        );
-        foundationCount++;
-      }
+      // An open town's lot is a slab of pavement, so the streets between
+      // read as streets. It reaches down to the lowest ground under it.
+      foundations.add(
+        box(sw, top - lo + PAVEMENT, sd, 0, 0.4),
+        palette.pavement,
+        at(x, lo - y0, z, placement.turn),
+        { kind: 7, clean: true },
+      );
     }
-    if (foundationCount > 0) parts.push(foundations.build().solid);
+    parts.push(foundations.build().solid);
+    return { parts, built, walls };
+  };
+
+  /** Each structure in each colourway, built once for the map. */
+  const outpostGeometries = new Map<string, THREE.BufferGeometry>();
+  const outpostGeometry = (
+    k: number,
+    planet: SealedPlanetId,
+    colourway: Colourway,
+  ): THREE.BufferGeometry => {
+    const model = OUTPOSTS[k];
+    const key = `${model.id}:${colourway.id}`;
+    let g = outpostGeometries.get(key);
+    if (!g) {
+      const [w, d] = footprint(model, OUTPOST_GRID);
+      g = buildOutpost(model, w, d, outpostPaint(planet, colourway));
+      outpostGeometries.set(key, g);
+      disposables.push(g);
+    }
+    return g;
+  };
+
+  /** A sealed outpost's structures on their plates, or null for none. */
+  const buildOutpostBody = (
+    town: Town,
+    planet: SealedPlanetId,
+    y0: number,
+    rand: () => number,
+  ): Body | null => {
+    const { placements, plates } = layoutOutpost(
+      town,
+      OUTPOST_GRID,
+      OUTPOSTS,
+      ground,
+    );
+    if (placements.length === 0) return null;
+    // An outpost's plates are all of one make.
+    const plating = outpostPaint(planet, colourwayFor(planet, "deck", rand()));
+    const foundations = new Builder();
+    let built = 0;
+    // The height of each plate's deck above the town's level.
+    const decks = plates.map((plate) => {
+      const { lo, top } = groundUnder(
+        height,
+        plate.x,
+        plate.z,
+        plate.w,
+        plate.d,
+        plate.turn,
+      );
+      const x = plate.x - town.x;
+      const z = plate.z - town.z;
+      foundationPlate(
+        foundations,
+        plate.w,
+        plate.d,
+        top - lo + PLATE_SINK,
+        plating,
+        at(x, top - y0, z, plate.turn),
+      );
+      built = Math.max(
+        built,
+        Math.hypot(x, z) + Math.hypot(plate.w, plate.d) / 2,
+      );
+      return top - y0 + PLATE_DECK;
+    });
+    const parts: THREE.BufferGeometry[] = [];
+    placements.forEach((placement, i) => {
+      const model = OUTPOSTS[placement.model];
+      const colourway = colourwayFor(planet, model.family, rand());
+      const copy = outpostGeometry(placement.model, planet, colourway).clone();
+      // Each structure stands on its own plate, which the layout lists first.
+      copy.applyMatrix4(
+        at(
+          placement.x - town.x,
+          decks[i],
+          placement.z - town.z,
+          placement.turn,
+        ),
+      );
+      dress(copy, 1 + (rand() - 0.5) * SHADE_DRIFT);
+      parts.push(copy);
+    });
+    parts.push(foundations.build().solid);
+    return { parts, built, walls: [] };
+  };
+
+  const placed = new Map<number, Placed>();
+  const tops = new Map<number, number>();
+  const rings = new Map<number, number>();
+  const bakes: (() => void)[] = [];
+  let shadowBytes = 0;
+  let renderer: THREE.WebGLRenderer | null = null;
+
+  for (const town of towns) {
+    if (omit.has(town.node)) continue;
+    const y0 = height(town.x, town.z);
+    const rand = seeded(Math.floor(town.seed * 1e9) + 1);
+    const body = sealed
+      ? buildOutpostBody(town, sealed, y0, rand)
+      : buildOpenBody(town, y0, rand);
+    if (!body) continue;
+    const { parts, built, walls } = body;
     const merged = mergeGeometries(parts);
     if (!merged)
       throw new Error(
@@ -271,24 +393,6 @@ export function buildTownModelLayer(
     scene.add(group);
     group.updateMatrixWorld(true);
     disposables.push(merged, material);
-
-    // The street surface: a plain sheet draped on the ground, fading at the edge.
-    const sheetMaterial = new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      transparent: true,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -2,
-    });
-    if (hasStreets(planet))
-      applyStreetGround(
-        sheetMaterial,
-        town,
-        grid,
-        palette,
-        treeShapes.length > 0,
-      );
 
     // Street trees, down the main streets and the avenues.
     const treeMaterials: THREE.ShaderMaterial[] = [];
@@ -335,19 +439,39 @@ export function buildTownModelLayer(
         treeMaterials.push(m);
       });
     }
-    const sheetGeometry = streetSheet(
-      town,
-      palette.street,
-      height,
-      buildable,
-      riverEdge,
-    );
-    const sheet = new THREE.Mesh(sheetGeometry, sheetMaterial);
-    sheet.name = TOWN_NAME;
-    sheet.renderOrder = SHEET_ORDER;
-    sheet.raycast = () => {};
-    scene.add(sheet);
-    disposables.push(sheetGeometry, sheetMaterial);
+    // An open town's street surface: a sheet draped on the ground, fading at
+    // its edge. A sealed outpost stands on bare ground.
+    let sheetMaterial: THREE.MeshBasicMaterial | null = null;
+    if (!sealed) {
+      sheetMaterial = new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -2,
+      });
+      applyStreetGround(
+        sheetMaterial,
+        town,
+        grid,
+        palette,
+        treeShapes.length > 0,
+      );
+      const sheetGeometry = streetSheet(
+        town,
+        palette.street,
+        height,
+        buildable,
+        riverEdge,
+      );
+      const sheet = new THREE.Mesh(sheetGeometry, sheetMaterial);
+      sheet.name = TOWN_NAME;
+      sheet.renderOrder = SHEET_ORDER;
+      sheet.raycast = () => {};
+      scene.add(sheet);
+      disposables.push(sheetGeometry, sheetMaterial);
+    }
 
     const site: LandmarkSite = {
       x: town.x,
@@ -357,9 +481,10 @@ export function buildTownModelLayer(
       facing: 0,
       ground: (lx, lz) => height(town.x + lx, town.z + lz) - y0,
     };
-    // The ring lies one lot outside the furthest building. A town's edge can
-    // reach well past that, where the ground is too steep or wet to build on.
-    const reach = (built + grid.lot) / RING_AT;
+    // The ring lies one lot outside the furthest building, or a little way
+    // outside an outpost's furthest plate. A town's edge can reach well past
+    // that, where the ground is too steep or wet to build on.
+    const reach = (built + (sealed ? OUTPOST_RING_CLEAR : grid.lot)) / RING_AT;
     // The longest shadow the tallest building throws on level ground.
     const shadowReach =
       reach + (local.max.y * Math.hypot(sun.x, sun.z)) / sun.y;
@@ -411,7 +536,7 @@ export function buildTownModelLayer(
       if (!town) return;
       setLandmarkState(town.material, { hidden: state.hidden });
       // The sheet's colours are in its vertices, so the material dims them.
-      town.sheet.color.setScalar(state.hidden ? 0.7 : 1);
+      town.sheet?.color.setScalar(state.hidden ? 0.7 : 1);
       for (const m of town.trees) m.uniforms.uDim.value = state.hidden ? 1 : 0;
       town.decal.setHidden(state.hidden);
       town.decal.setRing(state.ring);

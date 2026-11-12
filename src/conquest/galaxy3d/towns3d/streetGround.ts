@@ -10,7 +10,6 @@
  * the gaps the buildings leave.
  */
 import * as THREE from "three";
-import type { PlanetId } from "../../planets";
 import type { Rgb } from "../landmarks/kit";
 import type { TownPalette } from "../landmarks/palettes";
 import { MAX_STREETS, type Town } from "../towns";
@@ -95,14 +94,6 @@ vec3 townGround() {
 }
 `;
 
-/**
- * Whether a planet's towns have streets at all. A moon has no air, so
- * nothing there is driven on tarmac between its modules, and its ground stays
- * the one plain sheet.
- */
-export const hasStreets = (planet: PlanetId | undefined): boolean =>
-  planet !== "moon";
-
 const linear = (c: Rgb) =>
   new THREE.Color().setRGB(
     c[0] / 255,
@@ -115,7 +106,7 @@ const linear = (c: Rgb) =>
  * Draw `town`'s ground on `material`, the unlit material of its street sheet.
  * The sheet's vertex colours still give its fade at the town's edge, and the
  * material's own colour still dims it. `planted` puts grass down the middle
- * of the wide streets. A sealed outpost has paving there.
+ * of the wide streets. Without it they are paved there.
  */
 export function applyStreetGround(
   material: THREE.MeshBasicMaterial,

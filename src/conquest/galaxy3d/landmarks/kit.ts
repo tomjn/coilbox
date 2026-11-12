@@ -18,9 +18,10 @@ export type Rgb = [number, number, number];
  * 0 masonry, 1 brick, 2 rock, 3 glass, 5 a second cast concrete drawn as 8 is,
  * 6 cast concrete in broad ribs, 7 bare trim, 8 cast concrete panels, 9 an
  * anomaly's worn skin, 10 the same skin worn smooth, 11 painted metal plate with seams, 12
- * painted metal with none, as on a tank or a dome, 13 bare metal.
+ * painted metal with none, as on a tank or a dome, 13 bare metal, 14 painted
+ * metal in diagonal hazard stripes of the colour and near black.
  */
-export type Kind = 0 | 1 | 2 | 3 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+export type Kind = 0 | 1 | 2 | 3 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
 
 /** What a part is, so a test can find it. */
 export type PartTag = "body" | "tower" | "mast" | "crag";
