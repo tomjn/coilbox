@@ -116,16 +116,13 @@ describe("buildTownModelLayer", () => {
     for (const s of sheets(scene)) expect(s.name).toBe("town-models");
   });
 
-  it("draws the ring one lot outside the town's furthest edge", () => {
-    for (const [planet, grid] of [
-      [undefined, OPEN_GRID],
-      ["moon", SEALED_GRID],
-    ] as const) {
-      const { scene, towns } = build({ planet });
+  it("draws the ring at the radius it reports", () => {
+    for (const planet of [undefined, "moon"] as const) {
+      const { scene, layer, towns } = build({ planet });
       towns.forEach((town, n) => {
         const u = decalOf(scene, n).uniforms;
         expect(u.uRingRadius.value).toBeCloseTo(
-          town.radius * 1.27 + grid.lot,
+          layer.rings.get(town.node) as number,
           6,
         );
       });
@@ -190,6 +187,27 @@ describe("buildTownModelLayer", () => {
     for (const town of towns) {
       const ground = surface.groundHeightAtWorld(town.x, town.z);
       expect(layer.tops.get(town.node)).toBeGreaterThan(ground);
+    }
+  });
+
+  it("reports a ring outside each town's furthest building", () => {
+    const { scene, layer, towns } = build();
+    for (const town of towns) {
+      const group = scene.children.find(
+        (o) =>
+          o instanceof THREE.Group &&
+          o.position.x === town.x &&
+          o.position.z === town.z,
+      );
+      const pos = (group?.children[0] as THREE.Mesh).geometry.getAttribute(
+        "position",
+      );
+      let far = 0;
+      for (let i = 0; i < pos.count; i++)
+        far = Math.max(far, Math.hypot(pos.getX(i), pos.getZ(i)));
+      expect(layer.rings.get(town.node)).toBeGreaterThan(far + 0.25 - 1e-6);
+      // One lot, and at most half a building's diagonal of slack.
+      expect(layer.rings.get(town.node)).toBeLessThan(far + 1);
     }
   });
 

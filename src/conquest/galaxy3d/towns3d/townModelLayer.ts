@@ -36,6 +36,8 @@ export interface TownModelLayer {
   nodes: ReadonlySet<number>;
   /** The height of each town's tallest building, in world units, by node index. */
   tops: ReadonlyMap<number, number>;
+  /** The radius each town's ring is drawn at, in world units, by node index. */
+  rings: ReadonlyMap<number, number>;
   /** Show a town's fog and ring. Mist is not drawn. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
@@ -118,6 +120,7 @@ export function buildTownModelLayer(
 
   const placed = new Map<number, Placed>();
   const tops = new Map<number, number>();
+  const rings = new Map<number, number>();
   const bakes: (() => void)[] = [];
   let shadowBytes = 0;
   let renderer: THREE.WebGLRenderer | null = null;
@@ -131,6 +134,8 @@ export function buildTownModelLayer(
     const rand = seeded(Math.floor(town.seed * 1e9) + 1);
     const foundations = new Builder();
     let foundationCount = 0;
+    // How far the furthest corner of any building lies from the centre.
+    let built = 0;
     const parts: THREE.BufferGeometry[] = [];
     for (const placement of placements) {
       const model = models[placement.model];
@@ -155,6 +160,7 @@ export function buildTownModelLayer(
       }
       const x = placement.x - town.x;
       const z = placement.z - town.z;
+      built = Math.max(built, Math.hypot(x, z) + Math.hypot(w, d) / 2);
       const copy = geometries[placement.model].clone();
       copy.applyMatrix4(at(x, top - y0, z, placement.turn));
       const shade = 1 + (rand() - 0.5) * SHADE_DRIFT;
@@ -223,8 +229,9 @@ export function buildTownModelLayer(
       facing: 0,
       ground: (lx, lz) => height(town.x + lx, town.z + lz) - y0,
     };
-    // The ring lies one lot outside the furthest edge, clear of the buildings.
-    const reach = (town.radius * EDGE_MAX + grid.lot) / RING_AT;
+    // The ring lies one lot outside the furthest building. A town's edge can
+    // reach well past that, where the ground is too steep or wet to build on.
+    const reach = (built + grid.lot) / RING_AT;
     // The longest shadow the tallest building throws on level ground.
     const shadowReach =
       reach + (local.max.y * Math.hypot(sun.x, sun.z)) / sun.y;
@@ -258,11 +265,13 @@ export function buildTownModelLayer(
 
     placed.set(town.node, { material, sheet: sheetMaterial, decal });
     tops.set(town.node, bounds.max.y);
+    rings.set(town.node, reach * RING_AT);
   }
 
   return {
     nodes: new Set(placed.keys()),
     tops,
+    rings,
     shadowBytes,
     setStyle(i, state) {
       const town = placed.get(i);

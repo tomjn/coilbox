@@ -14,6 +14,7 @@ import type {
   NodeIdentity,
   StarSystem,
 } from "./GalaxyView";
+import { buildHomeRing } from "./homeRing";
 import type { WorldPos } from "./layout";
 import { hashString, trimLane } from "./layout";
 import type { ChevronPlacement } from "./routeChevrons";
@@ -202,6 +203,8 @@ export function buildPlayLayer(
   applyBurstRef: { current: (() => void) | null },
   /** Set for a terrain map only. */
   surface?: TerrainSurface,
+  /** The radius of each town's own ring on a terrain map, by node index. */
+  townRings?: ReadonlyMap<number, number>,
 ) {
   // Lanes: thick translucent capsule quads connecting ring edge to ring
   // edge (each end trimmed back from the node centre and drawn at that
@@ -1922,7 +1925,24 @@ export function buildPlayLayer(
   const homeworld = galaxy.nodes.find(
     (n) => n.kind === "capital" && n.owner === playerFactionId,
   );
-  if (homeworld) {
+  const homeTownRing = homeworld
+    ? townRings?.get(galaxy.nodes.indexOf(homeworld))
+    : undefined;
+  if (homeworld && surface && homeTownRing !== undefined) {
+    // A town of buildings stands here, so the ring lies on the ground just
+    // outside it. A flat ring of a fixed size would cut through the buildings.
+    const [x, z] = surface.mapToWorldXZ(homeworld.pos[0], homeworld.pos[1]);
+    const home = buildHomeRing(
+      surface,
+      x,
+      z,
+      homeTownRing,
+      factionSides(galaxy, playerFactionId),
+      ownerColor(playerFactionId),
+    );
+    disposables.push(home.geometry, home.material);
+    scene.add(home);
+  } else if (homeworld) {
     const p = positions.get(homeworld.id);
     const homeGeo = new THREE.RingGeometry(
       2.5,
