@@ -2,12 +2,14 @@ import * as THREE from "three";
 import {
   BIOME_SLOTS,
   type BiomePattern,
+  GROUND_SEAS,
   LIQUID_SEAS,
   type PlanetId,
   planetOf,
   type Rgb,
   type SeaLook,
 } from "../planets";
+import { BED_FADE, BED_SHOWS, BED_WET, SEA_FADE } from "../terrainGen";
 import {
   GROUND_BODY,
   GROUND_HEAD,
@@ -15,7 +17,7 @@ import {
   type GroundShading,
   groundUniforms,
 } from "./groundShader";
-import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
+import { SHADE_AMBIENT, SHORE_RANGE, TERRAIN_SUN } from "./terrain";
 
 /**
  * Surface detail for the terrain sheet, added to its unlit material in the
@@ -59,6 +61,13 @@ export interface TerrainShading {
    * which draws gullies along it. Left out, no gullies are drawn.
    */
   drainage?: THREE.Texture | null;
+  /**
+   * {@link terrainShorePixels} as a texture: the distance from the water line
+   * and the sea's depth. Read only by the bake, which draws the coast along
+   * the line and colours the sea by its depth. Left out, the coast follows
+   * the heights' pixels and the sea keeps the picture's colour.
+   */
+  shore?: THREE.Texture | null;
   /** The generator's weights and its planet. Null for a hand-made map, which gets no detail. */
   biomes: { a: THREE.Texture; b: THREE.Texture; planet: PlanetId } | null;
   /** Draw the detail. Off in performance mode. */
@@ -145,6 +154,13 @@ uniform vec3 uBiomeSteep[2];
 uniform vec3 uBiomeClearing;
 uniform vec3 uBiomeColour[8];
 uniform float uSeaLiquid;
+uniform sampler2D uTerrainShore;
+uniform float uShoreOn;
+// The sea's colours as the generator has them, in sRGB: shallow, deep, and
+// the wet bed a liquid sea shows at the water line.
+uniform vec3 uSeaShallow;
+uniform vec3 uSeaDeep;
+uniform vec3 uSeaBed;
 uniform float uTerrainFrost;
 uniform float uSeaPattern;
 uniform vec3 uTerrainSun;
@@ -479,18 +495,35 @@ const DETAIL = /* glsl */ `
     // Sea is height 0 and land at least 1 in 255, so this is the coastline.
     float coast = nh.a * 255.0;
     float sea = 1.0 - smoothstep(0.35, 0.65, coast);
-    float land = 1.0 - sea;
-    float liquid = sea * uSeaLiquid;
+    // With the generator's shore field: map pixels from the water line, above
+    // 0 on land, and the sea's depth.
+    float shoreAt = 0.0;
+    float seaDepth = 0.0;
+    if (uShoreOn > 0.5) {
+      vec2 shoreHere = tSmooth(uTerrainShore, vTerrainUv).rg;
+      shoreAt = (shoreHere.r * 255.0 - 128.0) / 127.0 * ${SHORE_RANGE.toFixed(1)};
+      seaDepth = shoreHere.g / max(1.0 - shoreHere.g, 0.004);
+    }
 
     // Broad patches, then fine grain. Open water needs neither. Each block
     // below runs only where its share is worth drawing: biomes lie in large
     // patches, so the GPU skips them together and the cost stays low.
     vec3 broad = vec3(0.0);
     vec3 fine = vec3(0.0);
-    if (liquid < 0.99 || coast > 0.01) {
+    if (uShoreOn > 0.5 ? (uSeaLiquid < 0.5 || shoreAt > -3.0) : (sea * uSeaLiquid < 0.99 || coast > 0.01)) {
       broad = tField(p, 4.0, 3, footprint);
       fine = tField(p + 31.0, 0.5, 5, footprint);
     }
+    // The heights change only at a pixel's centre, so a coast drawn from them
+    // follows the pixels' steps. The shore field's line is smooth, and a
+    // little noise keeps it from running as ruled as a drawn curve.
+    float shoreLine = shoreAt + fine.x * 0.14 + broad.x * 0.22;
+    if (uShoreOn > 0.5) {
+      float edge = max(fwidth(shoreAt) * 0.75, 0.06);
+      sea = 1.0 - smoothstep(-edge, edge, shoreLine);
+    }
+    float land = 1.0 - sea;
+    float liquid = sea * uSeaLiquid;
     // A slow push to bend the plates and cracks below, whose edges are
     // otherwise ruled straight.
     vec2 bend = vec2(broad.x, tSimplex(p / 2.7 + 77.0).x) * 0.35 + vec2(fine.x, -fine.x) * 0.05;
@@ -503,6 +536,21 @@ const DETAIL = /* glsl */ `
     for (int k = 0; k < 8; k++) {
       sum += w[k];
       soft += w[k] * uBiomeColour[k];
+    }
+    if (uShoreOn > 0.5) {
+      // Beside the coast the picture is a blend of land and sea, and the
+      // line drawn here is not the picture's. The land takes its colour from
+      // the weights, which hold no sea, and the sea from its depth.
+      if (sum > 0.02) albedo = mix(soft / sum, albedo, smoothstep(0.85, 0.995, sum));
+      float fade = 1.0 + seaDepth * ${SEA_FADE.toFixed(3)};
+      fade *= fade;
+      vec3 water = mix(uSeaDeep, uSeaShallow, 1.0 / (fade * fade));
+      float bedFade = 1.0 + seaDepth * ${BED_FADE.toFixed(3)};
+      bedFade *= bedFade;
+      water = mix(water, uSeaBed, uSeaLiquid * ${BED_SHOWS.toFixed(3)} / (bedFade * bedFade));
+      // The generator blends these in sRGB, and the picture is linear here.
+      water = mix(water / 12.92, pow((water + 0.055) / 1.055, vec3(2.4)), step(0.04045, water));
+      albedo = mix(albedo, water, sea);
     }
     if (sum > 0.5) {
       float sharp = 1e-6;
@@ -1054,7 +1102,9 @@ const DETAIL = /* glsl */ `
 
     // Water: ripples, a glint of the sun, and foam where it meets the land.
     vec3 wave = liquid > 0.01 ? tField(p + 11.0, 0.6, 3, footprint) : vec3(0.0);
-    float foam = smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
+    float foam = uShoreOn > 0.5
+      ? smoothstep(-0.5, -0.15, shoreLine) * (1.0 - smoothstep(-0.08, 0.04, shoreLine))
+      : smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
     foam *= smoothstep(-0.3, 0.4, fine.x);
     // Only a liquid sea ripples, foams and glints.
     foam *= uSeaLiquid;
@@ -1063,9 +1113,11 @@ const DETAIL = /* glsl */ `
     // Coasts past the edge are drawn at half the map's resolution, and foam
     // traces their steps, so it thins out there.
     foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
-    bump = mix(bump, wave.yz * 0.03, liquid);
+    // The water is calmer in the shallows, where the bed shows through.
+    float swell = uShoreOn > 0.5 ? mix(0.3, 1.0, smoothstep(0.0, 1.2, seaDepth)) : 1.0;
+    bump = mix(bump, wave.yz * 0.03 * swell, liquid);
     bump3 *= 1.0 - liquid;
-    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
+    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08 * swell, liquid);
     form = mix(form, 1.0, liquid);
     // The pattern evens out along a gully, which reads a little darker and
     // cooler, as damp ground in shade. Only along the middle of a course that
@@ -1085,7 +1137,7 @@ const DETAIL = /* glsl */ `
     albedo *= max(shadeMul, 0.2) * pow(clamp(form, 0.3, 1.6), 2.2);
     // Wet ground at the water line: darker and a little bluer, with a ragged
     // upper edge.
-    float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
+    float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.8 * steep);
     albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), wet * 0.85);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
     if (river + riverBank + riverGreen > 0.001) {
@@ -1292,6 +1344,29 @@ export function applyTerrainShader(
     };
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
+    };
+    // A sea that is ground has no water line, and keeps the picture's colour.
+    const shore =
+      weighs && planet && !GROUND_SEAS.includes(planet.sea.look)
+        ? (shading.shore ?? null)
+        : null;
+    shader.uniforms.uTerrainShore = { value: shore ?? dry };
+    shader.uniforms.uShoreOn = { value: shore ? 1 : 0 };
+    const srgb = (rgb: Rgb, scale = 1) =>
+      new THREE.Vector3(
+        (rgb[0] * scale) / 255,
+        (rgb[1] * scale) / 255,
+        (rgb[2] * scale) / 255,
+      );
+    shader.uniforms.uSeaShallow = {
+      value: srgb(planet?.sea.shallow ?? [0, 0, 0]),
+    };
+    shader.uniforms.uSeaDeep = { value: srgb(planet?.sea.deep ?? [0, 0, 0]) };
+    shader.uniforms.uSeaBed = {
+      value: srgb(
+        planet ? planet.biomes[planet.shore].colour : [0, 0, 0],
+        BED_WET,
+      ),
     };
     shader.uniforms.uTerrainFrost = { value: planet?.frost ?? 0 };
     shader.uniforms.uSeaPattern = {

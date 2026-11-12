@@ -273,6 +273,34 @@ describe("generatedTerrainPixels", { timeout: 30_000 }, () => {
     );
   });
 
+  it("hands the view the water line and the sea's depth, at the wide picture's size", () => {
+    const px = generatedTerrainPixels(generateTerritories(base));
+    const image = px?.extension?.image;
+    const shore = px?.extension?.shore;
+    const count = (image?.width ?? 0) * (image?.height ?? 0);
+    expect(count).toBeGreaterThan(0);
+    expect(shore?.width).toBe(image?.width);
+    expect(shore?.height).toBe(image?.height);
+    expect(shore?.distance).toHaveLength(count);
+    expect(shore?.depth).toHaveLength(count);
+    // Land is above the line and has no depth. The sea is below it.
+    const heights = px?.extension?.heights.data;
+    let wrong = 0;
+    let sea = 0;
+    for (let i = 0; i < count; i++) {
+      const land = (heights?.[i] ?? 0) > 0;
+      if (!land) sea++;
+      // The margin's land is blended up from coarser pixels, so only pixels
+      // well clear of the line are checked.
+      const d = shore?.distance[i] ?? 0;
+      if (d > 2 && !land) wrong++;
+      if (d < -2 && land) wrong++;
+      if (d > 2 && (shore?.depth[i] ?? 0) !== 0) wrong++;
+    }
+    expect(sea).toBeGreaterThan(0);
+    expect(wrong).toBe(0);
+  });
+
   describe("display erosion", () => {
     const land = () => generateTerritories({ ...base, planet: "temperate" });
     /** The land as the generator makes it, before any erosion. */
