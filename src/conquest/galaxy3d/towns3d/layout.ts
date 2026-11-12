@@ -113,10 +113,36 @@ const STRETCH_DRIFT = 0.12;
 /** A lot inside the town that nothing is built on. */
 const SPARE = -1;
 
+/** How a sealed outpost is laid out: lots on bare ground, with no streets. */
+export interface OutpostGrid {
+  /** The side of one lot. */
+  lot: number;
+  /** How far a structure stands back from its lot's edge. */
+  setback: number;
+  /** 0 to 1: how many lots are built on at the outpost's edge. The centre is full. */
+  edgeDensity: number;
+  /** The most a structure on a plate of its own is pulled off its lot's centre. */
+  jitter: number;
+  /** The share of neighbours on lots side by side that share one plate. */
+  join: number;
+  /** How far a plate reaches past the footprint it carries. */
+  plateMargin: number;
+}
+
+/** A sealed outpost's grid. All but the lot are starting values, tuned on screen. */
+export const OUTPOST_GRID: OutpostGrid = {
+  lot: 0.75,
+  setback: 0.12,
+  edgeDensity: 0.7,
+  jitter: 0.06,
+  join: 0.5,
+  plateMargin: 0.04,
+};
+
 /** The footprint of a model on a grid, in world units: its lots less the setback each side. */
 export function footprint(
-  model: Pick<BuildingModel, "lots">,
-  grid: TownGrid,
+  model: { lots: readonly [number, number] },
+  grid: Pick<TownGrid, "lot" | "setback">,
 ): [number, number] {
   return [
     model.lots[0] * grid.lot - 2 * grid.setback,
