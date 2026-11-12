@@ -1,11 +1,12 @@
 import { t as coreT } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
+  CircuitBoard,
+  Gauge,
   Heart,
   HelpCircle,
   Layers,
-  ListTree,
-  Sparkles,
+  Store,
   Wrench,
 } from "lucide-react";
 import {
@@ -16,12 +17,13 @@ import {
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { clamp } from "@/lib/clamp";
+import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
 import { toRoman } from "../../../conquest/names";
 import {
   BracketFrame,
-  HUD_ACCENT_INK,
+  HUD_DIM_INK_CLASS,
+  HUD_INK_CLASS,
   type HudAccent,
-  MAP_BAND_CLASS,
   StatCard,
 } from "../../../conquest/pages/components/hudChrome";
 import type { RogueliteRun } from "../../model";
@@ -85,12 +87,17 @@ export function RunHud({
   /** The run's chosen faction emblem, shown as a leading tile when resolved. */
   logo?: FactionLogoSrc;
   side?: string;
-  /** Open the read-only arsenal tech-tree. Adds an inspect control when given. */
+  /** Open the arsenal panel. Makes the Arsenal tile a button when given. */
   onInspectArsenal?: () => void;
 }) {
   const { t } = useLingui();
   const p = run.progress;
-  const maxCol = Math.max(...run.nodes.map((n) => n.col), 1);
+  // The warlord's column, since a side trip can lie further from the start.
+  const maxCol = Math.max(
+    run.nodes.find((n) => n.type === "boss")?.col ??
+      Math.max(...run.nodes.map((n) => n.col)),
+    1,
+  );
   const depth = Math.max(
     ...run.nodes.filter((n) => p.visited.includes(n.id)).map((n) => n.col),
     0,
@@ -99,26 +106,24 @@ export function RunHud({
   const hull = hullStatus(hullPct);
 
   const unlocked = p.unlockedUnits.length;
-  const tier = arsenalTotal
-    ? clamp(Math.ceil((unlocked / arsenalTotal) * 5), 1, 5)
-    : null;
 
   const difficulty = run.settings.difficulty;
   const ascension = run.settings.ascension;
   const sectorNumeral = toRoman(Math.max(1, depth));
-  const techNumeral = tier ? toRoman(tier) : "";
   const diffWord = difficultyWord(difficulty);
 
   return (
     <div className="flex flex-wrap items-stretch gap-3">
-      {logo && (
-        <BracketFrame className="flex min-w-[4rem] items-center justify-center px-3 py-2 text-foreground">
-          <FactionLogo logo={logo} sideName={side} size={32} />
-        </BracketFrame>
-      )}
-
       <StatCard
-        icon={<Heart className="size-3.5 text-cyan-400" aria-hidden />}
+        grow={false}
+        lead={
+          logo ? (
+            <span className="flex shrink-0 items-center justify-center text-foreground">
+              <FactionLogo logo={logo} sideName={side} size={32} />
+            </span>
+          ) : undefined
+        }
+        icon={<Heart className="size-3.5 text-red-300" aria-hidden />}
         label={t`Hull`}
         meta={`${p.hull} / ${p.maxHull}`}
         value={hull.word}
@@ -130,7 +135,7 @@ export function RunHud({
           />
         }
       >
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="mt-1.5 h-1.5 w-40 overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full transition-all ${HULL_FILL[hull.accent]}`}
             style={{ width: `${clamp(hullPct, 0, 100)}%` }}
@@ -139,6 +144,7 @@ export function RunHud({
       </StatCard>
 
       <StatCard
+        grow={false}
         icon={<Layers className="size-3.5 text-amber-400" aria-hidden />}
         label={t`Depth`}
         meta={`${depth} / ${maxCol}`}
@@ -151,7 +157,7 @@ export function RunHud({
           />
         }
       >
-        <div className="mt-1.5 flex items-center gap-1">
+        <div className="mt-1.5 flex w-40 items-center gap-1">
           {Array.from({ length: maxCol }, (_, i) => {
             const col = i + 1;
             const state =
@@ -168,66 +174,75 @@ export function RunHud({
       </StatCard>
 
       <StatCard
-        icon={<Sparkles className="size-3.5 text-yellow-300" aria-hidden />}
+        grow={false}
+        icon={<Gauge className="size-3.5 text-amber-400" aria-hidden />}
+        label={t`Difficulty`}
+        meta={ascension > 0 ? `A${ascension}` : undefined}
+        value={diffWord}
+        accent="amber"
+      >
+        <div className="mt-1.5">
+          <DifficultyPips filled={difficulty} />
+        </div>
+      </StatCard>
+
+      {onInspectArsenal ? (
+        <BracketFrame className="flex-none p-0">
+          <button
+            type="button"
+            onClick={onInspectArsenal}
+            aria-label={t`Open arsenal`}
+            className="pointer-events-auto flex h-full cursor-pointer flex-col justify-start px-3 py-2 text-left transition-colors hover:bg-foreground/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <span
+              className={`flex items-center gap-1.5 font-display text-[10px] font-medium uppercase tracking-[0.18em] ${HUD_DIM_INK_CLASS}`}
+            >
+              <Wrench className="size-3.5" aria-hidden />
+              <Trans>Arsenal</Trans>
+            </span>
+            <span
+              className={`mt-1 block font-display text-xl font-semibold leading-none tracking-wide tabular-nums ${HUD_INK_CLASS}`}
+            >
+              {arsenalTotal ? `${unlocked} / ${arsenalTotal}` : `${unlocked}`}
+            </span>
+          </button>
+        </BracketFrame>
+      ) : (
+        <StatCard
+          grow={false}
+          icon={
+            <Wrench className="size-3.5 text-muted-foreground" aria-hidden />
+          }
+          label={t`Arsenal`}
+          value={arsenalTotal ? `${unlocked} / ${arsenalTotal}` : `${unlocked}`}
+          accent="neutral"
+        />
+      )}
+
+      <StatCard
+        grow={false}
+        icon={<CircuitBoard className="size-3.5 text-yellow-300" aria-hidden />}
         label={t`Salvage`}
+        labelInk="text-yellow-300"
         value={`${p.salvage}`}
         accent="neutral"
         action={
           <HelpDot
             label={t`Salvage`}
-            help={t`Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs.`}
+            help={t`Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs.`}
           />
         }
       >
         <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Trans>Spend at depots</Trans>
+          <Trans>
+            Spend at{" "}
+            <span className="inline-flex items-center gap-1 align-middle text-emerald-300">
+              <Store className="size-3" aria-hidden />
+              depots
+            </span>
+          </Trans>
         </p>
       </StatCard>
-
-      <StatCard
-        icon={<Wrench className="size-3.5 text-muted-foreground" aria-hidden />}
-        label={t`Arsenal`}
-        meta={arsenalTotal ? `${unlocked} / ${arsenalTotal}` : undefined}
-        value={tier ? t`Tech ${techNumeral}` : `${unlocked}`}
-        accent="neutral"
-        action={
-          <div className="flex items-center gap-1">
-            {onInspectArsenal && (
-              <button
-                type="button"
-                onClick={onInspectArsenal}
-                aria-label={t`View the arsenal tech tree`}
-                title={t`View arsenal tree`}
-                className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                <ListTree className="size-3" aria-hidden />
-              </button>
-            )}
-            <HelpDot
-              label={t`Arsenal`}
-              help={t`The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks.`}
-            />
-          </div>
-        }
-      >
-        <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Trans>Shared ceiling</Trans>
-        </p>
-      </StatCard>
-
-      <div className="flex items-center">
-        {/* The one thing in this row that is not a framed tile, so it is the one
-            thing with the node map straight behind it. Its amber measured
-            1.0:1 there, since ink and canvas can be the same colour, and the
-            band is the answer the conquest map's loose labels already take
-            (#1052, #1801). */}
-        <span
-          className={`${MAP_BAND_CLASS} border border-dashed border-amber-400/80 px-3 py-2 font-display text-xs font-semibold uppercase tracking-[0.2em] ${HUD_ACCENT_INK.amber}`}
-        >
-          {diffWord}
-          {ascension > 0 && <span className="ml-1">A{ascension}</span>}
-        </span>
-      </div>
     </div>
   );
 }

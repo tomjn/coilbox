@@ -125,7 +125,8 @@ async function flush(): Promise<void> {
 /**
  * One answer as the picture ladder takes it, or null for no picture.
  *
- * The hub's own `url` is dropped rather than used. `./tier.ts` joins the path to
+ * The hub's `url` is carried but only a `bucket` answer is loaded from it, which
+ * the hub serves itself. For a `static` one `./tier.ts` joins the path to
  * whichever durable base this session is configured with, and a distributor
  * serving assets from their own is the reason that override exists, so taking
  * the hub's URL would quietly ignore it.
@@ -137,6 +138,7 @@ export function heldMapAsset(
   return {
     tier: picture.tier,
     path: picture.path,
+    url: picture.url,
     width: picture.width,
     height: picture.height,
   };

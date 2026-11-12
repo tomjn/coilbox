@@ -154,6 +154,23 @@ describe("buildEndMarkerLayer", () => {
     expect(inside.marker("end-marker:goal:keep")).toBeDefined();
   });
 
+  it("draws no goal pole where a stronghold stands on the goal", () => {
+    const scene = new THREE.Scene();
+    buildEndMarkerLayer(
+      scene,
+      [],
+      galaxy(),
+      surface,
+      ends,
+      ownerColor,
+      undefined,
+      undefined,
+      [{ pos: [90, 10] }],
+    );
+    expect(scene.getObjectByName("end-marker:goal:keep")).toBeUndefined();
+    expect(scene.getObjectByName("end-marker:start:gate")).toBeDefined();
+  });
+
   it("keeps the marker beside a model placed just outside its reach", () => {
     const reach = endMarkerReach(surface);
     const outside = build([model(50 + reach + 0.01, 50)]);

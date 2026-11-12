@@ -14,8 +14,10 @@ import type {
   NodeIdentity,
   StarSystem,
 } from "./GalaxyView";
+import { buildHomeRing } from "./homeRing";
 import type { WorldPos } from "./layout";
 import { hashString, trimLane } from "./layout";
+import type { ChevronPlacement } from "./routeChevrons";
 import type { TerrainSurface } from "./terrain";
 import {
   accretionTexture,
@@ -179,7 +181,6 @@ export function buildPlayLayer(
   galaxy: GalaxyDoc,
   skin: "galaxy" | "theatre",
   positions: Map<string, WorldPos>,
-  playerFactionId: string,
   reduceMotion: boolean,
   effects: boolean,
   performanceMode: boolean,
@@ -196,11 +197,15 @@ export function buildPlayLayer(
   ownersRef: { current: Record<string, string> },
   incursionRef: { current: Incursion | undefined },
   onSelectRef: { current: ((nodeId: string | null) => void) | undefined },
-  prevFactionRef: { current: string | undefined },
   burstRef: { current: string | null | undefined },
   applyBurstRef: { current: (() => void) | null },
   /** Set for a terrain map only. */
   surface?: TerrainSurface,
+  /**
+   * Each town's or landmark's own ring on a terrain map, by node index: its
+   * radius and its centre in world units.
+   */
+  townRings?: ReadonlyMap<number, { radius: number; x: number; z: number }>,
 ) {
   // Lanes: thick translucent capsule quads connecting ring edge to ring
   // edge (each end trimmed back from the node centre and drawn at that
@@ -345,11 +350,27 @@ export function buildPlayLayer(
       chevrons.push({ mesh, mat, t: 0 });
     }
   };
+  // Put chevrons at `placements`, one pooled mesh each, and hide the rest.
+  // `scale` resizes them: the terrain map is drawn at a smaller scale than the
+  // galaxy plane.
+  const placeChevrons = (placements: ChevronPlacement[], scale = 1) => {
+    if (!flowEnabled) return;
+    ensureChevrons(placements.length);
+    let k = 0;
+    for (const p of placements) {
+      const chev = chevrons[k++];
+      chev.t = p.t;
+      chev.mesh.position.set(p.x, p.y, p.z);
+      chev.mesh.rotation.y = p.heading;
+      chev.mesh.scale.set(scale, 1, scale);
+      chev.mesh.visible = true;
+      chev.mat.opacity = 0.55; // static base; the loop waves it when motion on
+    }
+    for (; k < chevrons.length; k++) chevrons[k].mesh.visible = false;
+  };
   // Lay chevrons out along the current open routes (called from owners.ts).
   const layoutChevrons = (routes: LaneSeg[]) => {
-    if (!flowEnabled) return;
-    ensureChevrons(routes.length * CHEVRONS_PER_ROUTE);
-    let k = 0;
+    const placements: ChevronPlacement[] = [];
     for (const [x1, y1, z1, x2, y2, z2] of routes) {
       // The chevron's local +x is world +x, a Y-rotation of θ sends it to
       // (cosθ, 0, -sinθ), so to aim it along (dx, dz) we need θ=atan2(-dz, dx).
@@ -357,19 +378,16 @@ export function buildPlayLayer(
       for (let c = 0; c < CHEVRONS_PER_ROUTE; c++) {
         // Space them across the middle of the lane, marching toward +choice.
         const t = 0.28 + (c / (CHEVRONS_PER_ROUTE - 1)) * 0.44;
-        const chev = chevrons[k++];
-        chev.t = t;
-        chev.mesh.position.set(
-          x1 + (x2 - x1) * t,
-          y1 + (y2 - y1) * t + 0.12,
-          z1 + (z2 - z1) * t,
-        );
-        chev.mesh.rotation.y = heading;
-        chev.mesh.visible = true;
-        chev.mat.opacity = 0.55; // static base; the loop waves it when motion on
+        placements.push({
+          x: x1 + (x2 - x1) * t,
+          y: y1 + (y2 - y1) * t + 0.12,
+          z: z1 + (z2 - z1) * t,
+          heading,
+          t,
+        });
       }
     }
-    for (; k < chevrons.length; k++) chevrons[k].mesh.visible = false;
+    placeChevrons(placements);
   };
 
   // Node hit targets: one invisible InstancedMesh gives the raycaster a
@@ -568,11 +586,7 @@ export function buildPlayLayer(
 
   // Intro warp-in: sprites pop from zero to their target scale (staggered by
   // node), lanes fade up, and the camera eases in. Only when motion is on.
-  const factionOnlyRebuild =
-    prevFactionRef.current !== undefined &&
-    prevFactionRef.current !== playerFactionId;
-  prevFactionRef.current = playerFactionId;
-  const animateIntro = !reduceMotion && effects && !factionOnlyRebuild;
+  const animateIntro = !reduceMotion && effects;
   interface IntroSprite {
     sprite: THREE.Object3D;
     target: number;
@@ -1904,11 +1918,39 @@ export function buildPlayLayer(
   }
 
   // The player's homeworld gets a second, wider ring so "this is you, guard
-  // it" is always legible at a glance.
-  const homeworld = galaxy.nodes.find(
-    (n) => n.kind === "capital" && n.owner === playerFactionId,
-  );
-  if (homeworld) {
+  // it" is always legible at a glance. It is drawn again when the player
+  // picks another faction, which changes nothing else that is built.
+  let home: THREE.Mesh<THREE.BufferGeometry, THREE.Material> | undefined;
+  const clearHome = () => {
+    if (!home) return;
+    scene.remove(home);
+    home.geometry.dispose();
+    home.material.dispose();
+    home = undefined;
+  };
+  disposables.push({ dispose: clearHome });
+  const setHome = (playerFactionId: string) => {
+    clearHome();
+    const homeworld = galaxy.nodes.find(
+      (n) => n.kind === "capital" && n.owner === playerFactionId,
+    );
+    if (!homeworld) return;
+    const homeTownRing = townRings?.get(galaxy.nodes.indexOf(homeworld));
+    if (surface && homeTownRing !== undefined) {
+      // A town or a landmark stands here, so the ring lies on the ground just
+      // outside it, round the same centre as its own ring. A flat ring of a
+      // fixed size would cut through it.
+      home = buildHomeRing(
+        surface,
+        homeTownRing.x,
+        homeTownRing.z,
+        homeTownRing.radius,
+        factionSides(galaxy, playerFactionId),
+        ownerColor(playerFactionId),
+      );
+      scene.add(home);
+      return;
+    }
     const p = positions.get(homeworld.id);
     const homeGeo = new THREE.RingGeometry(
       2.5,
@@ -1924,13 +1966,12 @@ export function buildPlayLayer(
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    disposables.push(homeGeo, homeMat);
-    const home = new THREE.Mesh(homeGeo, homeMat);
+    home = new THREE.Mesh(homeGeo, homeMat);
     home.rotation.x = -Math.PI / 2;
     if (p) home.position.set(p[0], p[1] - 0.4, p[2]);
     home.raycast = () => {};
     scene.add(home);
-  }
+  };
 
   // Incursion marker: an unambiguous warning symbol floating above the
   // threatened star (a pulsing ring read as decoration, a warning triangle
@@ -1967,6 +2008,7 @@ export function buildPlayLayer(
     flowEnabled,
     chevrons,
     layoutChevrons,
+    placeChevrons,
     cores,
     coronaSprites,
     ownerRingMats,
@@ -1982,7 +2024,7 @@ export function buildPlayLayer(
     variablePulses,
     spinners,
     structureDims,
-    factionOnlyRebuild,
+    setHome,
     animateIntro,
     introSprites,
     introLaneMats,

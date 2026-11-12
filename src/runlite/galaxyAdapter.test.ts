@@ -1,4 +1,15 @@
+import {
+  CircuitBoard,
+  HandFist,
+  ShieldQuestionMark,
+  Split,
+  Store,
+} from "lucide-react";
 import { describe, expect, it } from "vitest";
+import {
+  ANOMALY_KINDS,
+  landmarkKinds,
+} from "../conquest/galaxy3d/landmarks/kinds";
 import { mapCues } from "../conquest/galaxy3d/mapCues";
 import type { GalaxyDoc } from "../conquest/model";
 import {
@@ -94,7 +105,7 @@ describe("runIdentities", () => {
 
   it("danger-tints battle and elite sites but gives them no body", () => {
     const ids = runIdentities(run());
-    expect(ids.get("b1")).toEqual({ starTint: "#e0473a" });
+    expect(ids.get("b1")).toEqual({ starTint: "#e0473a", icon: HandFist });
     expect(ids.get("b2")?.body).toBeUndefined();
     expect(ids.get("b2")?.starTint).toBe("#e0473a");
   });
@@ -331,17 +342,20 @@ describe("mapRunToGalaxyDoc", () => {
     }
   });
 
-  it("writes each step forward and scenery first, and keeps the link between two of one rank", () => {
+  it("writes each step forward, and keeps the link between two of one rank", () => {
     expect(doc.links).toEqual([
       ["gate", "north"],
       ["gate", "south"],
       ["north", "east"],
       ["south", "east"],
       ["north", "south"],
-      ["far", "east"],
       ["far", "isle"],
     ]);
     expect(doc.linkKinds).toEqual(landMap().linkKinds);
+  });
+
+  it("blocks the border from the route into scenery in place of its link", () => {
+    expect(doc.blockedBorders).toEqual([["east", "far"]]);
   });
 
   it("names the link between two of one rank as closed, and no other", () => {
@@ -389,12 +403,140 @@ describe("a land run's live state", () => {
 
   it("marks the start and the goal, by location", () => {
     const ids = mapRunIdentities(moved, located(moved));
-    expect(ids.get("gate")).toEqual({ body: "beacon", end: "start" });
-    expect(ids.get("east")).toEqual({ body: warlordBodyFor(1), end: "goal" });
+    expect(ids.get("gate")).toEqual({
+      body: "beacon",
+      end: "start",
+      landmark: "landing",
+    });
+    // This run's seed stands a spire on the boss in place of the stronghold.
+    expect(ids.get("east")).toEqual({
+      body: warlordBodyFor(1),
+      end: "goal",
+      landmark: "spire",
+    });
     expect(ids.has("far")).toBe(false);
     // The two battle sites keep their tint and are not an end.
     expect(ids.get("north")?.end).toBeUndefined();
     expect(ids.get("north")?.starTint).toBeDefined();
+  });
+
+  it("puts an icon before each node's name saying what happens there", () => {
+    const types = ["battle", "elite", "event", "reward", "shop"] as const;
+    const nodes: RunNode[] = types.map((type, i) => ({
+      id: type,
+      type,
+      col: 1,
+      row: i,
+    }));
+    const ids = runIdentities({ ...run(), nodes: [run().nodes[0], ...nodes] });
+    expect(ids.get("battle")?.icon).toBe(HandFist);
+    expect(ids.get("elite")?.icon).toBe(HandFist);
+    expect(ids.get("event")?.icon).toBe(Split);
+    expect(ids.get("reward")?.icon).toBe(CircuitBoard);
+    expect(ids.get("shop")?.icon).toBe(Store);
+    expect(ids.get(run().nodes[0].id)?.icon).toBeUndefined();
+  });
+
+  it("deals each kind of anomaly to one event stop at most, by the seed", () => {
+    const odd = (n: number): RunNode => ({
+      id: `odd${n}`,
+      type: "event",
+      col: 1,
+      row: 9 + n,
+    });
+    const standing = ANOMALY_KINDS.filter((k) => k !== "ruin");
+    const stops = Array.from({ length: 16 }, (_, n) => odd(n));
+    const r = { ...run(), nodes: [...run().nodes, ...stops] };
+    const at = new Map(stops.map((n) => [n.id, `place-${n.id}`]));
+    const dealt = (
+      ids: Map<string, { landmark?: string; landmarkGroup?: boolean }>,
+      group = false,
+    ) =>
+      [...ids].flatMap(([k, v]) =>
+        v.landmark &&
+        v.landmark !== "landing" &&
+        v.landmark !== "spire" &&
+        !!v.landmarkGroup === group
+          ? [`${k}:${v.landmark}`]
+          : [],
+      );
+    const once = dealt(mapRunIdentities(r, at));
+    expect(once.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...ANOMALY_KINDS].sort(),
+    );
+    // Stops beyond the kinds get each standing kind once more, as a group.
+    const groups = dealt(mapRunIdentities(r, at), true);
+    expect(groups.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...standing].sort(),
+    );
+    expect(dealt(mapRunIdentities(r, at))).toEqual(once);
+    // The stops left over keep their town.
+    const ids = mapRunIdentities(r, at);
+    const plain = stops.filter((n) => !ids.get(`place-${n.id}`)?.landmark);
+    expect(plain).toHaveLength(
+      stops.length - ANOMALY_KINDS.length - standing.length,
+    );
+    expect(dealt(mapRunIdentities(run(), new Map()))).toEqual([]);
+    // A moon never had a castle, so it is dealt only the kinds that stand there.
+    const moon = dealt(mapRunIdentities(r, at, undefined, "moon"));
+    expect(moon.map((d) => d.split(":")[1]).sort()).toEqual(
+      [...standing].sort(),
+    );
+  });
+
+  it("makes every supply stop a depot on a land map", () => {
+    const shops: RunNode[] = [1, 2, 3].map((n) => ({
+      id: `shop${n}`,
+      type: "shop",
+      col: 1,
+      row: 9 + n,
+    }));
+    const r = { ...run(), nodes: [...run().nodes, ...shops] };
+    const at = new Map(shops.map((n) => [n.id, `place-${n.id}`]));
+    const ids = mapRunIdentities(r, at);
+    for (const n of shops) {
+      expect(ids.get(`place-${n.id}`)?.landmark).toBe("depot");
+      expect(runIdentities(r).get(n.id)?.landmark).toBeUndefined();
+    }
+  });
+
+  it("gives the boss a spire or a stronghold and the start a landing pad", () => {
+    const doc = mapRunToGalaxyDoc(moved, map, located(moved));
+    const kinds = landmarkKinds(
+      doc.nodes,
+      mapRunIdentities(moved, located(moved)),
+    );
+    const at = (id: string) => doc.nodes.findIndex((n) => n.id === id);
+    // This run's seed draws the spire. The next test covers the stronghold.
+    expect(kinds.get(at("east"))).toBe("spire");
+    expect(kinds.get(at("gate"))).toBe("landing");
+    expect([...kinds.values()].sort()).toEqual(["landing", "spire"]);
+  });
+
+  it("stands a spire on the boss on some runs and not others, by the seed", () => {
+    const boss = (seed: number) => {
+      const r = { ...moved, settings: { ...moved.settings, seed } };
+      return mapRunIdentities(r, located(r)).get("east")?.landmark;
+    };
+    const seen = Array.from({ length: 40 }, (_, seed) => boss(seed));
+    expect(new Set(seen)).toEqual(new Set(["spire", undefined]));
+    expect(Array.from({ length: 40 }, (_, seed) => boss(seed))).toEqual(seen);
+    // Either way the boss gets a landmark: a run that draws no spire keeps
+    // the stronghold.
+    const kindAt = (seed: number) => {
+      const r = { ...moved, settings: { ...moved.settings, seed } };
+      const doc = mapRunToGalaxyDoc(r, map, located(r));
+      return landmarkKinds(doc.nodes, mapRunIdentities(r, located(r))).get(
+        doc.nodes.findIndex((n) => n.id === "east"),
+      );
+    };
+    expect(kindAt(seen.indexOf("spire"))).toBe("spire");
+    expect(kindAt(seen.indexOf(undefined))).toBe("stronghold");
+  });
+
+  it("marks a location on no route with a question mark", () => {
+    const ids = mapRunIdentities(run(), new Map(), new Set(["moor"]));
+    expect(ids.get("moor")?.icon).toBe(ShieldQuestionMark);
   });
 
   it("leaves a column run's start and warlord with no end marker", () => {
@@ -444,7 +586,6 @@ describe("a land run's cues on the strategic map", () => {
       "north east": "plain",
       "south east": "plain",
       "north south": "plain",
-      "far east": "plain",
       "far isle": "plain",
     });
     expect(attackable(landRun())).toEqual(["north", "south"]);
@@ -458,7 +599,6 @@ describe("a land run's cues on the strategic map", () => {
       "north east": "choice",
       "south east": "plain",
       "north south": "plain",
-      "far east": "plain",
       "far isle": "plain",
     });
     expect(attackable(moved)).toEqual(["east"]);
@@ -491,6 +631,43 @@ describe("a land run's cues on the strategic map", () => {
     );
     expect(kinds["gate north"]).toBe("border");
     expect(kinds["north south"]).toBe("border");
-    expect(kinds["far east"]).toBe("crossing");
+    expect(kinds["far isle"]).toBe("crossing");
+  });
+});
+
+describe("a land run that chose its side trips", () => {
+  it("leaves every location off the run off the map, with its links", () => {
+    const r: RogueliteRun = {
+      ...landRun(),
+      settings: { ...landRun().settings, sideTrips: false },
+    };
+    const doc = mapRunToGalaxyDoc(r, landMap(), located(r));
+    expect(doc.nodes.map((n) => n.id).sort()).toEqual(
+      ["east", "gate", "north", "south"].sort(),
+    );
+    for (const [a, b] of doc.links) {
+      expect(["far", "isle"]).not.toContain(a);
+      expect(["far", "isle"]).not.toContain(b);
+    }
+    expect(doc.blockedBorders ?? []).toEqual([]);
+  });
+
+  it("lights a choice against the link's direction, from the player's end", () => {
+    const cues = mapCues({
+      galaxy: {
+        nodes: [
+          { id: "here", owner: PLAYER_FACTION },
+          { id: "back", owner: "type-battle" },
+        ],
+        links: [["back", "here"]],
+      },
+      owners: {},
+      playerFactionId: PLAYER_FACTION,
+      run: { choices: new Set(["back"]) },
+    });
+    expect(cues.links).toEqual([
+      expect.objectContaining({ a: "here", b: "back", tone: "choice" }),
+    ]);
+    expect(cues.locations.get("back")?.attackable).toBe(true);
   });
 });

@@ -30,6 +30,8 @@ export interface FrameActivity {
   selectionPulse: boolean;
   /** Some location shows ambient combat flashes. */
   combatFlashes: boolean;
+  /** A run's travelling chevrons are showing the way to its choices. */
+  routeChevrons: boolean;
   /** Effects are on. The selection pulse and the flashes only run with them. */
   effects: boolean;
   /**
@@ -43,7 +45,7 @@ export interface FrameActivity {
 export function needsAnotherFrame(a: FrameActivity): boolean {
   if (a.alwaysMoving || a.intro || a.focusEase || a.headingEase) return true;
   if (a.cameraMoved || a.burst || a.reducedResolution) return true;
-  return a.effects && (a.selectionPulse || a.combatFlashes);
+  return a.effects && (a.selectionPulse || a.combatFlashes || a.routeChevrons);
 }
 
 export interface FrameScheduler {

@@ -80,12 +80,13 @@ describe("identityKey", () => {
 });
 
 describe("heldMapAsset", () => {
-  it("hands the ladder the tier and the path, and drops the hub's URL", () => {
+  it("hands the ladder the tier, the path and the hub's URL", () => {
     // The ladder joins the path to whichever durable base this session is
-    // configured with, which a distributor may have overridden.
+    // configured with for a static row, and loads a bucket row from the URL.
     expect(heldMapAsset(HELD)).toEqual({
       tier: "static",
       path: "maps/minimap/ccr18-abcdef.webp",
+      url: HELD.url,
       width: 1024,
       height: 1024,
     });

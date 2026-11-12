@@ -24,7 +24,7 @@ import type { MapFacts } from "../../hub/maps/lookup";
 import type { ChatMsg } from "../bindings";
 import { ChatPane } from "./ChatPane";
 
-const HUB = "https://coilbox-hub.vercel.app";
+const HUB = "https://hub.coilbox.org";
 
 const hoisted = vi.hoisted(() => ({
   maps: [] as LibraryMap[],
@@ -152,6 +152,7 @@ it("shows a missing map with the hub's picture and details, and downloads it", a
   hoisted.held = {
     tier: "static",
     path: "minimaps/comet.webp",
+    url: "https://tomjn.github.io/coilbox-assets/minimaps/comet.webp",
     width: 512,
     height: 512,
   } satisfies HeldMapAsset;

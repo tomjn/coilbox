@@ -784,3 +784,109 @@ describe("Galaxy and Theatre runs", () => {
     );
   });
 });
+
+describe("a map run with side trips", () => {
+  /** Resolve `id` whatever it holds, as the player would. */
+  const visit = (run: RogueliteRun, id: string): RogueliteRun => {
+    const node = run.nodes.find((n) => n.id === id);
+    if (!node) throw new Error(`no node ${id}`);
+    if (node.battle) return resolveBattle(run, id, "victory", NOW);
+    if (node.reward) return applyReward(run, id, 0, NOW);
+    if (node.event) return applyEvent(run, id, 0, NOW);
+    return leaveNode(run, id, NOW);
+  };
+  const at = (run: RogueliteRun, location: string): string => {
+    const id = run.nodes.find((n) => n.location === location)?.id;
+    if (!id) throw new Error(`no node at ${location}`);
+    return id;
+  };
+  const choicesAt = (run: RogueliteRun) =>
+    nextChoices(run)
+      .map((n) => n.location)
+      .sort();
+
+  //   s - a - b - z      d hangs off a and is a dead end, and c lies one rank
+  //        \     /       further from the start than b, joined to b and z.
+  //         d   c
+  const map = mapDoc(
+    ["s", "a", "b", "c", "d", "z"],
+    [
+      ["s", "a"],
+      ["a", "b"],
+      ["b", "z"],
+      ["a", "d"],
+      ["b", "c"],
+      ["c", "z"],
+    ],
+  );
+  const sideRun = () =>
+    generateMapRun(opts(map, { startId: "s", goalId: "z", sideTrips: true }));
+
+  it("makes every location a run node and every link an edge", () => {
+    const run = sideRun();
+    expect(run.nodes.map((n) => n.location).sort()).toEqual(
+      ["a", "b", "c", "d", "s", "z"].sort(),
+    );
+    expect(run.edges).toHaveLength(6);
+    expect(run.settings.sideTrips).toBe(true);
+  });
+
+  it("leaves the locations off the route out when side trips are off", () => {
+    const run = generateMapRun(
+      opts(map, { startId: "s", goalId: "z", sideTrips: false }),
+    );
+    expect(run.nodes.map((n) => n.location)).not.toContain("d");
+    expect(run.settings.sideTrips).toBe(false);
+  });
+
+  it("returns the player from a dead end to the last place with somewhere new", () => {
+    let run = visit(sideRun(), at(sideRun(), "a"));
+    expect(choicesAt(run)).toEqual(["b", "d"]);
+    run = visit(run, at(run, "d"));
+    expect(run.progress.currentNodeId).toBe(at(run, "a"));
+    expect(choicesAt(run)).toEqual(["b"]);
+  });
+
+  it("can take a detour that rejoins the way to the goal", () => {
+    let run = sideRun();
+    for (const place of ["a", "b"]) run = visit(run, at(run, place));
+    // From b the goal is one step on, and c is a detour that leads back to it.
+    expect(choicesAt(run)).toEqual(["c", "z"]);
+    run = visit(run, at(run, "c"));
+    expect(choicesAt(run)).toEqual(["z"]);
+  });
+
+  it("can step back a rank to a place not yet visited", () => {
+    //   s - a - b - z    e is as near the start as a, and b reaches it.
+    //    \     /
+    //     e ---
+    const square = mapDoc(
+      ["s", "a", "e", "b", "z"],
+      [
+        ["s", "a"],
+        ["s", "e"],
+        ["a", "b"],
+        ["e", "b"],
+        ["b", "z"],
+      ],
+    );
+    let run = generateMapRun(
+      opts(square, { startId: "s", goalId: "z", sideTrips: true }),
+    );
+    for (const place of ["a", "b"]) run = visit(run, at(run, place));
+    expect(choicesAt(run)).toEqual(["e", "z"]);
+  });
+
+  it("can always be played to a win, whichever choice the player takes", () => {
+    for (const pick of [0, -1]) {
+      let run = sideRun();
+      for (let guard = 0; run.progress.status === "active"; guard++) {
+        if (guard > 20) throw new Error("the run never ended");
+        const choices = nextChoices(run);
+        expect(choices.length).toBeGreaterThan(0);
+        run = visit(run, choices.at(pick)?.id ?? "");
+      }
+      expect(run.progress.status).toBe("won");
+    }
+  });
+});

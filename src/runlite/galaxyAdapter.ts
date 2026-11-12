@@ -1,13 +1,24 @@
 import { t } from "@lingui/core/macro";
+import {
+  CircuitBoard,
+  HandFist,
+  type LucideIcon,
+  ShieldQuestionMark,
+  Split,
+  Store,
+} from "lucide-react";
 import type {
   NodeBodyKind,
   NodeEmphasis,
   NodeIdentity,
 } from "../conquest/galaxy3d/GalaxyView";
+import { ANOMALY_KINDS } from "../conquest/galaxy3d/landmarks/kinds";
 import { hashString } from "../conquest/galaxy3d/layout";
 import { type Faction, type GalaxyDoc, NEUTRAL } from "../conquest/model";
+import type { PlanetId } from "../conquest/planets";
+import { mulberry32, shuffled } from "../conquest/rng";
 import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
-import { successors } from "./progress";
+import { hasSideTrips, openFrom, successors } from "./progress";
 
 /**
  * Adapt a run into a conquest {@link GalaxyDoc} so the run map renders through
@@ -44,9 +55,9 @@ function typeLabel(type: RunNodeType): string {
     case "elite":
       return t`Elite`;
     case "event":
-      return t`Event`;
+      return t`Anomaly`;
     case "reward":
-      return t`Salvage`;
+      return t`Collect salvage`;
     case "shop":
       return t`Depot`;
     case "boss":
@@ -55,6 +66,15 @@ function typeLabel(type: RunNodeType): string {
 }
 
 const RUN_TYPES = Object.keys(TYPE_COLOR) as RunNodeType[];
+
+/** The icon before a node's name, saying what happens there. */
+const TYPE_ICON: Partial<Record<RunNodeType, LucideIcon>> = {
+  battle: HandFist,
+  elite: HandFist,
+  event: Split,
+  reward: CircuitBoard,
+  shop: Store,
+};
 
 /**
  * Curated per-run backdrop palettes. A run picks one by its seed so every run
@@ -208,13 +228,20 @@ export function runPathLinks(run: RogueliteRun): Set<string> {
 /** The steps behind {@link runPathLinks}, as pairs of run node ids. */
 function runPathSteps(run: RogueliteRun): [string, string][] {
   const edges = new Set(run.edges.map(([a, b]) => linkKey(a, b)));
-  const visited = run.nodes
-    .filter((n) => run.progress.visited.includes(n.id))
-    .sort((a, b) => a.col - b.col);
+  // A side trip can step back a rank, so its path is the order of the visits.
+  const sideTrips = hasSideTrips(run);
+  const visited = sideTrips
+    ? run.progress.visited
+    : run.nodes
+        .filter((n) => run.progress.visited.includes(n.id))
+        .sort((a, b) => a.col - b.col)
+        .map((n) => n.id);
   const out: [string, string][] = [];
   for (let i = 0; i + 1 < visited.length; i++) {
-    const step: [string, string] = [visited[i].id, visited[i + 1].id];
-    if (edges.has(linkKey(...step))) out.push(step);
+    const [a, b] = [visited[i], visited[i + 1]];
+    // Each step as its edge is written, which is how the view's links are.
+    if (edges.has(linkKey(a, b))) out.push([a, b]);
+    else if (sideTrips && edges.has(linkKey(b, a))) out.push([b, a]);
   }
   return out;
 }
@@ -286,6 +313,10 @@ export function runIdentities(run: RogueliteRun): Map<string, NodeIdentity> {
       out.set(n.id, { body });
     }
   }
+  for (const n of run.nodes) {
+    const icon = TYPE_ICON[n.type];
+    if (icon) out.set(n.id, { ...out.get(n.id), icon });
+  }
   return out;
 }
 
@@ -309,6 +340,7 @@ export function forwardReachable(
   run: RogueliteRun,
   fromId: string,
 ): Set<string> {
+  if (hasSideTrips(run)) return openFrom(run, fromId);
   const adj = new Map<string, string[]>();
   for (const [a, b] of run.edges) {
     const list = adj.get(a);
@@ -404,11 +436,15 @@ export function runLocations(
  *
  * The view lights a lane as a way forward when its first end is the player's,
  * so each step of the run is written from the earlier location to the later.
- * A link from a route location to scenery is written scenery first, which
- * never lights. A link between two route locations that is not a step joins
+ * A link between two route locations that is not a step joins
  * two of the same rank. It cannot be travelled in this run, and it would
  * light as a choice whichever way round it was written, so it stays as the
  * map has it and {@link mapRunClosedLinks} names it for the view.
+ *
+ * A road from a route location into scenery would look like a way on, so it
+ * is left out and the border between the two is drawn blocked instead. A run
+ * that chose whether to take side trips has no scenery to show: every
+ * location off the run is left off the map, with its links.
  */
 export function mapRunToGalaxyDoc(
   run: RogueliteRun,
@@ -419,9 +455,23 @@ export function mapRunToGalaxyDoc(
     run.nodes.map((n) => [locations.get(n.id) ?? n.id, n]),
   );
   const steps = stepKeys(run, locations);
+  const shown =
+    run.settings.sideTrips === undefined
+      ? map
+      : {
+          ...map,
+          nodes: map.nodes.filter((place) => nodeAt.has(place.id)),
+          links: map.links.filter(([a, b]) => nodeAt.has(a) && nodeAt.has(b)),
+          linkKinds: map.linkKinds?.filter(
+            ([a, b]) => nodeAt.has(a) && nodeAt.has(b),
+          ),
+          blockedBorders: map.blockedBorders?.filter(
+            ([a, b]) => nodeAt.has(a) && nodeAt.has(b),
+          ),
+        };
 
   return {
-    ...map,
+    ...shown,
     title: t`Warpath`,
     game: run.settings.game,
     playerFactionId: PLAYER_FACTION,
@@ -431,7 +481,7 @@ export function mapRunToGalaxyDoc(
       ...runFactions(),
       { id: TAKEN_FACTION, name: t`Taken`, color: TYPE_COLOR.start },
     ],
-    nodes: map.nodes.map((place) => {
+    nodes: shown.nodes.map((place) => {
       const n = nodeAt.get(place.id);
       if (!n) {
         return {
@@ -443,6 +493,9 @@ export function mapRunToGalaxyDoc(
       }
       return {
         ...place,
+        // A cache is collected by moving onto it, so it says so in place of
+        // the town's name.
+        name: n.type === "reward" ? typeLabel(n.type) : place.name,
         owner: typeFaction(n.type),
         kind:
           n.type === "boss" || n.type === "start"
@@ -452,11 +505,15 @@ export function mapRunToGalaxyDoc(
         battle: { mapName: n.battle?.mapName ?? "" },
       };
     }),
-    links: map.links.map(([a, b]): [string, string] =>
-      steps.has(linkKey(b, a)) || (nodeAt.has(a) && !nodeAt.has(b))
-        ? [b, a]
-        : [a, b],
-    ),
+    links: shown.links
+      .filter(([a, b]) => nodeAt.has(a) === nodeAt.has(b))
+      .map(([a, b]): [string, string] =>
+        steps.has(linkKey(b, a)) ? [b, a] : [a, b],
+      ),
+    blockedBorders: [
+      ...(shown.blockedBorders ?? []),
+      ...shown.links.filter(([a, b]) => nodeAt.has(a) !== nodeAt.has(b)),
+    ],
   };
 }
 
@@ -566,15 +623,57 @@ export function mapRunEmphasis(
 export function mapRunIdentities(
   run: RogueliteRun,
   locations: Map<string, string>,
+  /** Locations on no route, from {@link mapRunScenery}. Their names carry a
+   * question mark, so they read as somewhere the run does not go. */
+  scenery?: Set<string>,
+  /** The planet the map is of. A moon is dealt no ruin, which it never had. */
+  planet?: PlanetId,
 ): Map<string, NodeIdentity> {
   const out = new Map(byLocation(runIdentities(run), locations));
+  for (const at of scenery ?? []) {
+    out.set(at, { ...out.get(at), icon: ShieldQuestionMark });
+  }
   for (const n of run.nodes) {
-    if (n.type !== "start" && n.type !== "boss") continue;
     const at = locations.get(n.id) ?? n.id;
+    // Every supply stop is a depot. They are not one of a kind.
+    if (n.type === "shop") out.set(at, { ...out.get(at), landmark: "depot" });
+    if (n.type !== "start" && n.type !== "boss") continue;
     out.set(at, {
       ...out.get(at),
       end: n.type === "start" ? "start" : "goal",
+      // The run sets out from a landing pad. The boss is a capital, which
+      // gets its stronghold without being asked. On half of all runs, by the
+      // run's seed, a spire stands there in its place.
+      ...(n.type === "start" && { landmark: "landing" as const }),
+      ...(n.type === "boss" &&
+        hashString(`${run.settings.seed}-finale`) % 2 === 0 && {
+          landmark: "spire" as const,
+        }),
     });
+  }
+  // Each kind of anomaly is one of a kind. The run's seed deals them out, one
+  // to a stop, and any stop still left over keeps its town.
+  const rng = mulberry32(run.settings.seed);
+  const events = shuffled(
+    rng,
+    run.nodes.filter((n) => n.type === "event"),
+  );
+  const standing = ANOMALY_KINDS.filter((k) => k !== "ruin");
+  const kinds = shuffled(rng, planet === "moon" ? standing : ANOMALY_KINDS);
+  // A bigger run has more stops than kinds. Those get each standing kind
+  // once more, as a group of smaller ones.
+  const deal: Pick<NodeIdentity, "landmark" | "landmarkGroup">[] = [
+    ...kinds.map((landmark) => ({ landmark })),
+    ...shuffled(rng, standing).map((landmark) => ({
+      landmark,
+      landmarkGroup: true,
+    })),
+  ];
+  for (const [k, dealt] of deal.entries()) {
+    const n = events[k];
+    if (!n) break;
+    const at = locations.get(n.id) ?? n.id;
+    out.set(at, { ...out.get(at), ...dealt });
   }
   return out;
 }

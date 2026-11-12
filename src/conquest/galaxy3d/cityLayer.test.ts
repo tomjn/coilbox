@@ -6,6 +6,7 @@ import { NEUTRAL } from "../model";
 import {
   BADGE_RADIUS,
   buildCityLayer,
+  LANDMARK_RING,
   type MapItemState,
   markerLook,
   markerZoom,
@@ -50,7 +51,11 @@ const FILL = 1;
 const STAR = 2;
 const BRACKETS = 3;
 
-function build(labels = true) {
+/**
+ * `landmarkRise` stands a landmark that tall on the middle city, and
+ * `townRise` gives its 3D town that tall a top.
+ */
+function build(labels = true, landmarkRise?: number, townRise?: number) {
   const galaxy = {
     factions: [
       { id: "red", color: RED },
@@ -99,6 +104,7 @@ function build(labels = true) {
   // The ground the roads and towns are painted on, recording their styles.
   const styles: RoadStyle[] = [];
   const towns: TownStyle[] = [];
+  const landmarks: TownStyle[] = [];
   let commits = 0;
   const ground = {
     setRoadStyle: (k: number, style: RoadStyle) => {
@@ -106,6 +112,9 @@ function build(labels = true) {
     },
     setTownStyle: (i: number, style: TownStyle) => {
       towns[i] = style;
+    },
+    setLandmarkStyle: (i: number, style: TownStyle) => {
+      landmarks[i] = style;
     },
     // The middle city's town reaches 3 world units.
     towns: galaxy.nodes.map((_, i) => ({
@@ -123,6 +132,14 @@ function build(labels = true) {
     commit: () => {
       commits++;
     },
+    landmarkTops:
+      landmarkRise === undefined
+        ? undefined
+        : new Map([[1, surface.mapToWorld(50, 50)[1] + landmarkRise]]),
+    townTops:
+      townRise === undefined
+        ? undefined
+        : new Map([[1, surface.mapToWorld(50, 50)[1] + townRise]]),
   };
   const layer = buildCityLayer(
     scene,
@@ -158,6 +175,7 @@ function build(labels = true) {
     sidesOf,
     road: (k: number) => styles[k],
     town: (i: number) => towns[i],
+    landmark: (i: number) => landmarks[i],
     commits: () => commits,
     ownersRef,
     labelObjects,
@@ -242,6 +260,74 @@ describe("buildCityLayer", () => {
     expect(hex(part(groups[1], FILL).color)).toBe(RED);
     expect(town(1).ring).toBeUndefined();
     expect(town(2).ring).toBeUndefined();
+  });
+
+  it("rings a landmark as it rings a town", () => {
+    const { layer, landmark } = build();
+    layer.select("mid");
+    expect(landmark(1).ring?.thick).toBe(true);
+    layer.select(null);
+    expect(landmark(1).ring).toBeUndefined();
+  });
+
+  it("draws no badge on a landmark, and rings it in its owner's colour", () => {
+    const { layer, groups, landmark, cores, surface, ownersRef } = build(
+      true,
+      4,
+    );
+    expect(groups[1].visible).toBe(false);
+    expect(groups[0].visible).toBe(true);
+    expect(hex(landmark(1).ring?.color as THREE.Color)).toBe(RED);
+    expect(landmark(1).ring?.strength).toBe(LANDMARK_RING);
+    // Red is the first faction, which is round. Blue is a hexagon.
+    expect(landmark(1).ring?.sides).toBe(0);
+    expect(landmark(1).ring?.weight).toBeGreaterThan(1);
+    ownersRef.current = { mid: "blue" };
+    layer.apply();
+    expect(landmark(1).ring?.sides).toBe(6);
+    ownersRef.current = {};
+    layer.apply();
+    expect(landmark(1).ring?.thick).toBe(false);
+    layer.select("mid");
+    expect(hex(landmark(1).ring?.color as THREE.Color)).toBe(RED);
+    expect(landmark(1).ring?.thick).toBe(true);
+    layer.select(null);
+    layer.hover("mid");
+    expect(hex(landmark(1).ring?.color as THREE.Color)).not.toBe(RED);
+    layer.hover(null);
+    // Fog leaves the model dim and takes the ring with the owner.
+    layer.setLocationState("mid", { hidden: true });
+    layer.apply();
+    expect(landmark(1).ring).toBeUndefined();
+    // The hit target reaches the model's top.
+    const m = new THREE.Matrix4();
+    const at = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    cores.getMatrixAt(1, m);
+    m.decompose(at, new THREE.Quaternion(), size);
+    const y = surface.mapToWorld(50, 50)[1];
+    expect(at.y + size.y).toBeGreaterThanOrEqual(y + 4);
+  });
+
+  it("raises a badge above its 3D town, and leaves a plain one where it was", () => {
+    const plain = build();
+    const tall = build(true, undefined, 3);
+    tall.layer.fitToCamera(GALAXY_MIN_DISTANCE * 4);
+    plain.layer.fitToCamera(GALAXY_MIN_DISTANCE * 4);
+    const b = tall.badge(tall.groups[1]);
+    expect(b.position.y).toBeGreaterThanOrEqual(3 + b.scale.x);
+    // The other markers have no town top and keep their pole.
+    expect(tall.badge(tall.groups[2]).position.y).toBe(
+      plain.badge(plain.groups[2]).position.y,
+    );
+    // The hit target still reaches the badge.
+    const m = new THREE.Matrix4();
+    const at = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    tall.cores.getMatrixAt(1, m);
+    m.decompose(at, new THREE.Quaternion(), size);
+    const y = tall.surface.mapToWorld(50, 50)[1];
+    expect(at.y + size.y).toBeGreaterThanOrEqual(y + b.position.y + b.scale.x);
   });
 
   it("fades roads with the lane dimming the view passes in", () => {

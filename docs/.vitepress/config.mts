@@ -9,7 +9,7 @@ const downloads = await resolveDownloads();
 // constant because it is linked from the nav, the sidebar and two places on the
 // homepage. Matches DEFAULT_HUB_URL in src/hub/config.ts, which is where the app
 // itself points.
-const HUB_URL = "https://coilbox-hub.vercel.app";
+const HUB_URL = "https://hub.coilbox.org";
 
 // Notes on formats and protocols other projects own are kept in the repo for
 // people working on coilbox and are not published. Their old addresses forward
@@ -45,21 +45,21 @@ const MOVED: Record<string, string> = {
 };
 
 // The public documentation site (issue #168), published to GitHub Pages at
-// tomjn.github.io/coilbox/. It renders the user guides in `docs/`; internal design
+// coilbox.org. It renders the user guides in `docs/`; internal design
 // artifacts (superpowers plans/specs), mockups, and idea drafts are excluded.
 // Kept separate from the Tauri app build — this is driven by the `docs:*` scripts.
 export default defineConfig({
   title: "Coilbox",
   description:
     "Desktop tooling for the Recoil RTS engine and the Beyond All Reason community.",
-  // Project pages live under a repo-named path.
-  base: "/coilbox/",
+  // Served at the root of the coilbox.org custom domain.
+  base: "/",
   lang: "en-US",
   cleanUrls: true,
   // The guides cross-link to repo files (CONTRIBUTING.md, source paths) that aren't
   // part of the site; don't fail the build on those.
   ignoreDeadLinks: true,
-  head: [["link", { rel: "icon", href: "/coilbox/favicon.ico" }]],
+  head: [["link", { rel: "icon", href: "/favicon.ico" }]],
   // Keep internal/design docs off the public site.
   srcExclude: [
     "**/superpowers/**",

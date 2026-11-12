@@ -33,6 +33,12 @@ import {
   type RunSkin,
   type ShopSpec,
 } from "./model";
+import {
+  type KitGraph,
+  starterKit,
+  type UnitFacts,
+  withWhatTheyBring,
+} from "./starterKit";
 
 /**
  * Deterministic roguelite-run generator. Everything below is a pure function of
@@ -66,6 +72,10 @@ export interface GenBuildGraph {
   edges: Map<string, string[]>;
   /** Display names by lowercased internal name. */
   names: Map<string, string>;
+  /** What each unit does, from `unitFactsFor`. With it the starting build list
+   * and each unlock are chosen by role (see `./starterKit.ts`). Without it the
+   * player starts with the shallowest units of the build tree. */
+  facts?: Map<string, UnitFacts>;
 }
 
 export interface GenerateRunOpts {
@@ -90,6 +100,8 @@ export interface GenerateRunOpts {
   loadoutBranch?: number;
   /** Injected timestamp (tests); defaults to now. */
   now?: string;
+  /** A land run's side trips. See `RunSettings.sideTrips`. */
+  sideTrips?: boolean;
 }
 
 /** Column count per run length. Column 0 = start, last column = boss. */
@@ -99,7 +111,8 @@ const COLUMNS: Record<RunLength, number> = {
   long: 13,
 };
 
-/** How many BFS-shallow units the player starts able to build. */
+/** How many BFS-shallow units the player starts able to build, for a build
+ * graph with no unit facts. */
 const STARTER_UNIT_COUNT = 12;
 
 /** Tech tiers spread across the run (drives map size + enemy scaling). */
@@ -197,6 +210,12 @@ export interface UnlockPlanner {
   /** parent -> children in the BFS spanning tree. */
   children: Map<string, string[]>;
   names: Map<string, string>;
+  /** The start units the role rules work from. */
+  roots: string[];
+  /** The build graph with unit facts, when the rules apply. */
+  kit?: KitGraph;
+  /** What the player starts able to build. */
+  starter: string[];
 }
 
 export function planUnlocks(build: GenBuildGraph): UnlockPlanner {
@@ -222,6 +241,18 @@ export function planUnlocks(build: GenBuildGraph): UnlockPlanner {
     if (kids) kids.push(e.child);
     else children.set(e.parent, [e.child]);
   }
+  const roots = derived ?? [build.startUnit];
+  const kit: KitGraph | undefined = build.facts
+    ? { edges: build.edges, facts: build.facts, order: graph.order }
+    : undefined;
+  // A dataset with no stats, read by an older worker, matches no role, so the
+  // shallow units stand in rather than a start with nothing to build.
+  const byRole = kit
+    ? [...starterKit(kit, roots)].filter((u) => !skip.has(u))
+    : [];
+  const starter = byRole.some((u) => !roots.includes(u))
+    ? byRole
+    : order.slice(0, STARTER_UNIT_COUNT);
   return {
     order,
     start: derived ? derived[0] : order[0],
@@ -229,6 +260,9 @@ export function planUnlocks(build: GenBuildGraph): UnlockPlanner {
     parent,
     children,
     names: build.names,
+    roots,
+    kit,
+    starter,
   };
 }
 
@@ -248,7 +282,10 @@ function unlockBranch(planner: UnlockPlanner, unit: string): string[] {
     cur = planner.parent.get(cur);
   }
   for (const child of planner.children.get(unit) ?? []) set.add(child);
-  return [...set];
+  if (!planner.kit) return [...set];
+  return [...withWhatTheyBring(set, planner.kit, planner.roots)].filter(
+    (u) => !planner.skipped.has(u),
+  );
 }
 
 function unitName(planner: UnlockPlanner, unit: string): string {
@@ -264,7 +301,8 @@ function drawUnlock(
 ): RewardOption | null {
   // Candidates are the not-yet-offered units past the starter kit, windowed by
   // tier so deeper unlocks appear later.
-  const frontier = planner.order.slice(STARTER_UNIT_COUNT);
+  const starter = new Set(planner.starter);
+  const frontier = planner.order.filter((u) => !starter.has(u));
   const candidates = frontier.filter((u) => !used.has(u));
   if (candidates.length === 0) return null;
   const span = candidates.length;
@@ -321,6 +359,14 @@ function drawPerk(rng: Rng, tier: number): Perk {
   return { ...base, value: Math.round(value * 100) / 100 };
 }
 
+/**
+ * The price of a depot's cheapest offer at `tier`. A cache pays this much and
+ * the player starts with the tier 1 price, so no depot is a wasted stop.
+ */
+function depotFloor(tier: number): number {
+  return 20 + tier * 10;
+}
+
 function makeReward(
   rng: Rng,
   planner: UnlockPlanner | null,
@@ -336,7 +382,7 @@ function makeReward(
     }
   }
   options.push({ kind: "perk", perk: drawPerk(rng, tier) });
-  return { title: t`Salvage Cache`, options };
+  return { title: t`Salvage Cache`, options, salvage: depotFloor(tier) };
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +454,7 @@ function makeShop(
   // the fight leading in always affords at least this. Drawn a tier softer than
   // the headline perk so the low price reads as a modest boon, not a discount.
   offers.push({
-    cost: 20 + tier * 10,
+    cost: depotFloor(tier),
     option: {
       kind: "perk",
       perk: drawPerk(rng, Math.max(1, tier - 1)),
@@ -681,12 +727,10 @@ export function assembleRun(
   startId: string,
   map?: RunMapRef,
 ): RogueliteRun {
-  // Seed the arsenal with the shallowest connected build subtree, so the first
+  // Seed the arsenal with the planner's starting build list, so the first
   // encounter is playable before any unlock. A loadout pre-unlocks one of the
   // commander's build branches on top, opening the run committed to a doctrine.
-  let unlockedUnits: string[] = planner
-    ? planner.order.slice(0, STARTER_UNIT_COUNT)
-    : [];
+  let unlockedUnits: string[] = planner ? [...planner.starter] : [];
   if (planner && opts.loadoutBranch != null && opts.loadoutBranch >= 0) {
     const roots = planner.children.get(planner.start) ?? [];
     const root = roots[opts.loadoutBranch];
@@ -716,6 +760,9 @@ export function assembleRun(
       side: opts.side,
       skin: opts.skin,
       ...(map ? { map } : {}),
+      ...(map && opts.sideTrips !== undefined
+        ? { sideTrips: opts.sideTrips }
+        : {}),
     },
     startUnit: opts.build?.startUnit,
     nodes,
@@ -725,7 +772,7 @@ export function assembleRun(
       visited: [startId],
       hull: maxHull,
       maxHull,
-      salvage: 0,
+      salvage: depotFloor(1),
       unlockedUnits,
       perks: [],
       status: "active",

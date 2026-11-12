@@ -56,11 +56,15 @@ export type BiomePattern =
 export interface Biome {
   name: string;
   colour: Rgb;
-  farm: boolean;
   pattern: BiomePattern;
 }
 
 export type SeaLook = "water" | "acid" | "lava" | "ice" | "basin" | "maria";
+
+/** Seas that ripple, foam and glint, and show their bed through the shallows. */
+export const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
+/** Seas that are ground, which the land beside them runs into with no shore. */
+export const GROUND_SEAS: readonly SeaLook[] = ["basin", "maria"];
 
 /**
  * How a planet's settlements are laid out. `organic` is a town in the open
@@ -74,18 +78,6 @@ export type SettlementStyle = "organic" | "sealed";
  */
 export interface Settlement {
   style: SettlementStyle;
-  /** For `sealed`: the share of structures that are domes, 0 to 1. */
-  domes: number;
-  /** Most roofs and hulls. */
-  hull: Rgb;
-  /** The second colour: glass, a dome's skin, a shed's roof. */
-  trim: Rgb;
-  /**
-   * What lies round a settlement: `farms` where the ground can be farmed,
-   * `works` for solar arrays, greenhouses and pads on any flat ground, or
-   * `none`.
-   */
-  outskirts: "farms" | "works" | "none";
   roads: {
     /**
      * `open` is a dirt track, a minor road and a surfaced main road.
@@ -152,22 +144,6 @@ export interface Planet {
   settlement: Settlement;
 }
 
-/**
- * Patterns of ground too dry to farm without water brought to it. Fields on
- * a farm slot with one of these are drawn as dry country's are: irrigated
- * plots, fallow ones, groves and vines, on levelled earth.
- */
-const DRY_PATTERNS: readonly BiomePattern[] = [
-  // Not dunes. Nothing is farmed on them.
-  "scrub",
-  "sand",
-  "dust",
-];
-
-/** True for a farm slot whose ground is dry. */
-export const farmsDry = (biome: Biome): boolean =>
-  biome.farm && DRY_PATTERNS.includes(biome.pattern);
-
 /** Scale every share by `1 - t` and add `t` to `slot`. */
 export function blend(out: Float64Array, slot: number, t: number): void {
   for (let i = 0; i < out.length; i++) out[i] *= 1 - t;
@@ -184,15 +160,9 @@ const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const ramp = (v: number, start: number, span: number) =>
   clamp01((v - start) / span);
 
-const biome = (
-  name: string,
-  colour: Rgb,
-  pattern: BiomePattern,
-  farm = false,
-): Biome => ({
+const biome = (name: string, colour: Rgb, pattern: BiomePattern): Biome => ({
   name,
   colour,
-  farm,
   pattern,
 });
 
@@ -203,7 +173,7 @@ const TEMPERATE: Planet = {
     return t`Temperate`;
   },
   biomes: [
-    biome("grass", [122, 154, 84], "grass", true),
+    biome("grass", [92, 122, 62], "grass"),
     biome("dry", [182, 168, 116], "dunes"),
     biome("forest", [58, 98, 56], "forest"),
     biome("tundra", [146, 146, 122], "tundra"),
@@ -217,7 +187,7 @@ const TEMPERATE: Planet = {
     [122, 106, 90],
     [152, 146, 140],
   ],
-  clearing: [122, 154, 84],
+  clearing: [92, 122, 62],
   forest: {
     broadleaf: [
       [96, 130, 56],
@@ -261,10 +231,6 @@ const TEMPERATE: Planet = {
   rivers: { look: "water", drained: 420 },
   settlement: {
     style: "organic",
-    domes: 0,
-    hull: [140, 134, 128],
-    trim: [104, 106, 112],
-    outskirts: "farms",
     roads: {
       look: "open",
       track: [222, 206, 170],
@@ -283,7 +249,7 @@ const DESERT: Planet = {
     biome("dunes", [214, 186, 128], "dunes"),
     biome("rock flats", [168, 138, 104], "scree"),
     biome("mesa", [150, 96, 70], "mesa"),
-    biome("scrub", [150, 148, 96], "scrub", true),
+    biome("scrub", [150, 148, 96], "scrub"),
     biome("salt pan", [226, 220, 204], "salt"),
     biome("beach", [222, 206, 160], "sand"),
   ],
@@ -322,10 +288,6 @@ const DESERT: Planet = {
   rivers: { look: "water", drained: 420 },
   settlement: {
     style: "organic",
-    domes: 0,
-    hull: [214, 198, 172],
-    trim: [176, 140, 110],
-    outskirts: "farms",
     roads: {
       look: "open",
       track: [232, 214, 176],
@@ -396,10 +358,6 @@ const ICE: Planet = {
   rivers: { look: "frozen", drained: 800 },
   settlement: {
     style: "organic",
-    domes: 0,
-    hull: [146, 148, 152],
-    trim: [120, 124, 130],
-    outskirts: "none",
     roads: {
       look: "open",
       track: [176, 194, 208],
@@ -444,10 +402,6 @@ const RED: Planet = {
   craters: false,
   settlement: {
     style: "sealed",
-    domes: 0.7,
-    hull: [228, 224, 214],
-    trim: [150, 190, 204],
-    outskirts: "works",
     roads: {
       look: "sealed",
       track: [120, 64, 46],
@@ -489,10 +443,6 @@ const MOON: Planet = {
   craters: true,
   settlement: {
     style: "sealed",
-    domes: 0.7,
-    hull: [232, 232, 236],
-    trim: [124, 152, 184],
-    outskirts: "works",
     roads: {
       look: "sealed",
       track: [104, 104, 108],
@@ -540,10 +490,6 @@ const VOLCANIC: Planet = {
   craters: false,
   settlement: {
     style: "sealed",
-    domes: 0.2,
-    hull: [126, 130, 136],
-    trim: [240, 150, 60],
-    outskirts: "works",
     roads: {
       look: "sealed",
       track: [96, 86, 80],
@@ -608,10 +554,6 @@ const ACID: Planet = {
   craters: false,
   settlement: {
     style: "sealed",
-    domes: 0.6,
-    hull: [208, 212, 192],
-    trim: [120, 172, 112],
-    outskirts: "works",
     roads: {
       look: "sealed",
       track: [100, 84, 62],

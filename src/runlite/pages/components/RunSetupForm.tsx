@@ -4,6 +4,7 @@ import { Loader2, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { StartingUnits } from "@/campaign/pages/components/StartingUnits";
 import { carryUnits, discardUnits } from "@/campaign/units";
+import { CheckField } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -136,6 +137,7 @@ export function RunSetupForm({
   const difficulty = choices.difficulty ?? 2;
   const skin: RunSkin = choices.skin ?? "galaxy";
   const planet = choices.planet ?? "random";
+  const sideTrips = choices.sideTrips ?? true;
   // The hand-made map picked in place of a generated style, by its id.
   const pickedMapId = choices.mapId ?? null;
   const pickedLoadoutId = choices.loadout ?? "standard";
@@ -319,6 +321,7 @@ export function RunSetupForm({
       difficulty,
       ascension,
       loadout: loadoutId,
+      sideTrips,
     });
     const opts: GenerateRunOpts = {
       seed: Math.floor(Math.random() * 1e9),
@@ -335,6 +338,7 @@ export function RunSetupForm({
       side: sideName || undefined,
       skin,
       ...(landSizes ? { planet: planet as GenerateRunOpts["planet"] } : {}),
+      ...(landSizes || handmadeMap ? { sideTrips } : {}),
       maps: genMaps,
       build,
       enemyAiKey,
@@ -559,6 +563,14 @@ export function RunSetupForm({
           </Field>
         )}
       </div>
+
+      {(landSizes || handmadeMap) && (
+        <CheckField
+          label={t`Side trips to every town`}
+          checked={sideTrips}
+          onChange={(v) => choose({ sideTrips: v })}
+        />
+      )}
 
       <StartingUnits
         label={

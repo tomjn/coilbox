@@ -19,6 +19,7 @@ const MAPS = {
   temperate: "skin=territories&planet=temperate",
   desert: "skin=territories&planet=desert",
   ice: "skin=territories&planet=ice",
+  red: "skin=territories&planet=red",
   cities: "skin=cities&nodes=30",
 };
 

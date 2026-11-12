@@ -14,7 +14,7 @@ import { getProfile, isHubEnabled } from "../profile/profile";
  */
 
 /** The public hub, live at this address. */
-export const DEFAULT_HUB_URL = "https://coilbox-hub.vercel.app";
+export const DEFAULT_HUB_URL = "https://hub.coilbox.org";
 
 /** The user's hub URL override, persisted under `hub.url`. Empty means unset. */
 export function useHubUrlSetting() {
@@ -79,8 +79,8 @@ export function useTrustedHubUrl(): string | null {
 /**
  * Is `url` served by `hubUrl`? Compares parsed origins - scheme, host and port -
  * never string prefixes, because a prefix test hands the hub's name to anybody who
- * can register a longer one. `https://coilbox-hub.vercel.app.evil.test/` is a
- * different host, `https://coilbox-hub.vercel.app@evil.test/` is `evil.test` with
+ * can register a longer one. `https://hub.coilbox.org.evil.test/` is a
+ * different host, `https://hub.coilbox.org@evil.test/` is `evil.test` with
  * the hub's name as a username, and `http://` is not `https://`. All three are a
  * different origin, so all three are false.
  *
@@ -104,6 +104,37 @@ export function isHubOrigin(
 }
 
 /**
+ * The hub's first address. Links to items were shared from it before the hub
+ * moved to {@link DEFAULT_HUB_URL}, and item ids are the same on both. It now
+ * answers 402, so an item has to load from the new address.
+ */
+export const LEGACY_HUB_ORIGIN = "https://coilbox-hub.vercel.app";
+
+/**
+ * `url` with the old Vercel address swapped for the hub's own, when `hubUrl` is
+ * the default hub. A fixed alias of that one hub, matched on parsed origins like
+ * {@link isHubOrigin}: a player or distribution that set its own hub address gets
+ * `url` back unchanged, so the old address is never trusted there.
+ *
+ * Only {@link hubItemIdFromUrl} calls this. An item opens through the hub's own
+ * route, which fetches from the configured hub, so nothing is ever requested from
+ * the old address. Every other old link is left as it was, and {@link isHubOrigin}
+ * still refuses it.
+ */
+function withLegacyHubOriginRewritten(url: string, hubUrl: string): string {
+  try {
+    const hub = new URL(hubUrl);
+    if (hub.origin !== new URL(DEFAULT_HUB_URL).origin) return url;
+    const target = new URL(url);
+    if (target.origin !== LEGACY_HUB_ORIGIN) return url;
+    return new URL(`${target.pathname}${target.search}${target.hash}`, hub)
+      .href;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Which hub item `url` is the share address of, or null when it is not one
  * (issue #1366). The website's Import button emits
  * `coilbox://import?url=<hub>/i/<id>`, and coilbox opens its own page for that
@@ -120,6 +151,9 @@ export function isHubOrigin(
  * so it is the address that actually gets pasted into a chat and then back into
  * coilbox.
  *
+ * On the default hub, an item address on {@link LEGACY_HUB_ORIGIN} reads the
+ * same way (issue #5214).
+ *
  * Every other address on the hub, its home page, its gallery, its API, is not an
  * item address and gets null, which leaves the caller on the flow it would have
  * taken anyway.
@@ -128,9 +162,11 @@ export function hubItemIdFromUrl(
   url: string,
   hubUrl: string | null | undefined,
 ): string | null {
-  if (!hubUrl || !isHubOrigin(url, hubUrl)) return null;
+  if (!hubUrl) return null;
+  const address = withLegacyHubOriginRewritten(url, hubUrl);
+  if (!isHubOrigin(address, hubUrl)) return null;
   try {
-    const target = new URL(url);
+    const target = new URL(address);
     const base = new URL(hubUrl).pathname.replace(/\/+$/, "");
     for (const prefix of [`${base}/i/`, `${base}/item/`]) {
       if (!target.pathname.startsWith(prefix)) continue;

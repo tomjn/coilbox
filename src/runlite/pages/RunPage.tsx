@@ -1,8 +1,16 @@
 import { t as coreT } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, useDrawer, useHideSidebar } from "@picoframe/frame";
-import { ArrowLeft, Check, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { Button, useHideSidebar } from "@picoframe/frame";
+import {
+  ArrowLeft,
+  Check,
+  CircuitBoard,
+  HandFist,
+  Split,
+  Store,
+  X,
+} from "lucide-react";
+import { type CSSProperties, useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
@@ -26,7 +34,6 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
 import { resolveGameDownload } from "../../play/gameOffer";
 import { resolveGameByShortname } from "../../play/installedGames";
@@ -42,6 +49,7 @@ import { runGameNotice } from "../runContent";
 import { useRun } from "../runs";
 import { reachableFromAll, startSetFor } from "../unitLimit";
 import { useAwardFinishedRuns } from "../useAwardFinishedRuns";
+import { ArsenalOverlay } from "./components/ArsenalOverlay";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
   EventOverlay,
@@ -76,7 +84,7 @@ export default function RunPage() {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // The node id to celebrate with a win burst (cleared after the burst plays).
   const [burstId, setBurstId] = useState<string | null>(null);
-  const drawer = useDrawer();
+  const [arsenalOpen, setArsenalOpen] = useState(false);
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
   const {
@@ -174,39 +182,9 @@ export default function RunPage() {
     return dataset.units.filter((u) => reachable.has(u.name.toLowerCase()));
   }, [run?.startUnit, dataset, startSet]);
 
-  // Read-only lit-tree of the run's unlocked arsenal, opened from the HUD's
-  // Arsenal tile. The unlocked-unit set lights up against the faction's full
-  // tree, so the shared tech ceiling is visible without changing unlock rules.
-  const openArsenalTree =
-    run && dataset && run.startUnit
-      ? () =>
-          drawer.open({
-            title: t`Arsenal`,
-            description: t`Units unlocked into your shared arsenal, lit up against the faction's full build tree.`,
-            width: "40rem",
-            content: (
-              <UnitPicker
-                units={arsenalUnits}
-                factions={
-                  run.startUnit
-                    ? [
-                        {
-                          startUnit: startSet?.derived
-                            ? startSet.roots[0]
-                            : run.startUnit,
-                        },
-                      ]
-                    : []
-                }
-                selected={run.progress.unlockedUnits}
-                selectedLabel={t`unlocked`}
-                enginePath={target?.enginePath}
-                dataDir={target?.dataDir}
-                gameArchive={game?.primaryArchive.name}
-              />
-            ),
-          })
-      : undefined;
+  // The arsenal panel is opened from the HUD's Arsenal tile.
+  const openArsenal =
+    run && dataset && run.startUnit ? () => setArsenalOpen(true) : undefined;
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
 
@@ -276,6 +254,7 @@ export default function RunPage() {
   };
 
   const closeOverlay = () => setActiveNodeId(null);
+  const closeArsenal = () => setArsenalOpen(false);
   const applyAndSave = async (next: typeof run) => {
     await save(next);
   };
@@ -377,10 +356,44 @@ export default function RunPage() {
               arsenalTotal={arsenalTotal}
               logo={factionLogo}
               side={run.settings.side}
-              onInspectArsenal={openArsenalTree}
+              onInspectArsenal={openArsenal}
             />
           </div>
         </div>
+        {!ended && !active && choices.length > 0 && (
+          <nav
+            aria-label={t`Next`}
+            className="pointer-events-auto flex flex-wrap items-center gap-2"
+          >
+            <span
+              className={`${MAP_BAND_CLASS} px-2 py-1 text-xs font-semibold ${MAP_DIM_INK_CLASS}`}
+            >
+              <Trans>Next:</Trans>
+            </span>
+            {choices.map((node) => (
+              <button
+                key={node.id}
+                type="button"
+                onClick={() => onSelect(node.id)}
+                style={{ "--tint": NODE_TINT[node.type] } as CSSProperties}
+                className={`flex cursor-pointer items-center gap-1.5 px-2 py-1 text-xs transition-colors hover:border-[var(--tint)] hover:text-foreground hover:ring-1 hover:ring-[var(--tint)] hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--tint)] ${HUD_CARD_CLASS}`}
+              >
+                <NodeGlyph type={node.type} tint={NODE_TINT[node.type]} />
+                <span
+                  className="font-semibold"
+                  style={{ color: NODE_TINT[node.type] }}
+                >
+                  {nodeTitle(node.type)}
+                </span>
+                {node.battle && (
+                  <span className="text-muted-foreground">
+                    {node.battle.mapName}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        )}
         {/* A battle's briefing has its own gate for a missing game, so this one
             stays out of its way. Only it can offer an engine. */}
         {(!active || gameNotice.kind === "no-engine") && (
@@ -409,6 +422,11 @@ export default function RunPage() {
             <InspectPanel
               node={run.nodes.find((n) => n.id === selectedId)}
               isChoice={choiceIds.has(selectedId)}
+              outOfReach={
+                !choiceIds.has(selectedId) &&
+                !run.progress.visited.includes(selectedId) &&
+                run.progress.currentNodeId !== selectedId
+              }
               chosen={run.history
                 .filter((h) => h.nodeId === selectedId && h.note)
                 .at(-1)
@@ -434,6 +452,17 @@ export default function RunPage() {
             onRestoreMap={restoreMap}
             onClose={closeOverlay}
             onCelebrate={() => celebrate(active.id)}
+          />
+        )}
+        {arsenalOpen && !active && (
+          <ArsenalOverlay
+            units={arsenalUnits}
+            unlocked={run.progress.unlockedUnits}
+            total={arsenalTotal}
+            enginePath={target?.enginePath}
+            dataDir={target?.dataDir}
+            gameArchive={game?.primaryArchive.name}
+            onClose={closeArsenal}
           />
         )}
         {active?.type === "reward" && (
@@ -482,9 +511,35 @@ function nodeTitle(type: RunNodeType): string {
     case "reward":
       return coreT`Salvage cache`;
     case "event":
-      return coreT`Signal`;
+      return coreT`Anomaly`;
     case "shop":
       return coreT`Depot`;
+  }
+}
+
+/** The node type's icon in its tint, or the tint as a dot where it has none. */
+function NodeGlyph({ type, tint }: { type: RunNodeType; tint: string }) {
+  const cls = "size-3.5 shrink-0";
+  switch (type) {
+    case "battle":
+    case "elite":
+      return <HandFist aria-hidden className={cls} style={{ color: tint }} />;
+    case "event":
+      return <Split aria-hidden className={cls} style={{ color: tint }} />;
+    case "reward":
+      return (
+        <CircuitBoard aria-hidden className={cls} style={{ color: tint }} />
+      );
+    case "shop":
+      return <Store aria-hidden className={cls} style={{ color: tint }} />;
+    default:
+      return (
+        <span
+          aria-hidden
+          className="size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: tint }}
+        />
+      );
   }
 }
 
@@ -510,9 +565,9 @@ function nodeDescription(type: RunNodeType): string {
     case "boss":
       return coreT`The sector warlord. Break it to win the run.`;
     case "reward":
-      return coreT`Recover a schematic to widen the arsenal, or a field upgrade for yourself.`;
+      return coreT`Move here to collect it: a schematic that unlocks units, or a field upgrade for you.`;
     case "event":
-      return coreT`A choice on the wire — no battle.`;
+      return coreT`Something strange is here. Make a choice, with no battle.`;
     case "shop":
       return coreT`Spend salvage on unlocks, perks, and repairs.`;
   }
@@ -543,9 +598,12 @@ function previewRows(node: RunNode): [string, string][] {
       (o) => o.kind === "unlock",
     ).length;
     const perks = node.reward.options.length - unlocks;
-    return [[coreT`Choose one of`, coreT`${unlocks} unlock, ${perks} perk`]];
+    const salvage = node.reward.salvage;
+    return [
+      [coreT`Choose one of`, coreT`${unlocks} unlock, ${perks} perk`],
+      ...(salvage ? [[coreT`Salvage`, coreT`+${salvage} salvage`]] : []),
+    ] as [string, string][];
   }
-  if (node.event) return [[coreT`A choice awaits`, coreT`no battle`]];
   if (node.shop) {
     const cheapest = Math.min(...node.shop.offers.map((o) => o.cost));
     const restHull = node.shop.restHull;
@@ -563,6 +621,7 @@ function previewRows(node: RunNode): [string, string][] {
 function InspectPanel({
   node,
   isChoice,
+  outOfReach,
   chosen,
   runId,
   dataDir,
@@ -572,6 +631,8 @@ function InspectPanel({
 }: {
   node: RunNode | undefined;
   isChoice: boolean;
+  /** Not a choice, not visited and not where the player stands. */
+  outOfReach: boolean;
   /** For a resolved node, what the player took here (from run history). */
   chosen?: string;
   /** For a battle node's replay history — the run's opaque id + the target's
@@ -665,6 +726,11 @@ function InspectPanel({
           <Button size="sm" onClick={onEnter} className="w-full">
             <Trans>Chart a course here</Trans>
           </Button>
+        )}
+        {outOfReach && (
+          <p className="text-xs text-muted-foreground">
+            <Trans>Out of reach from here</Trans>
+          </p>
         )}
       </div>
     </BracketFrame>

@@ -1545,24 +1545,20 @@ mod tests {
         // test in this crate either: `build_archive_*_args` would not be
         // reachable from outside it. Found the same way
         // `tauri-plugin-coilbox-multiplayer`'s `agent_binary` finds a sidecar
-        // that lives in a different package: test binaries sit in
-        // `target/<profile>/deps`, ordinary binaries one level up.
+        // that lives in a different package: ordinary binaries sit in
+        // `target/<profile>`, and test binaries in a folder below it.
         let worker = {
-            let mut path = std::env::current_exe().expect("a test binary knows where it is");
-            path.pop();
-            if path.ends_with("deps") {
-                path.pop();
-            }
-            path.push(format!(
-                "coilbox-unitsync-worker{}",
-                std::env::consts::EXE_SUFFIX
-            ));
-            assert!(
-                path.exists(),
-                "no worker at {}. Build it first with `cargo build -p coilbox-unitsync-worker`",
-                path.display()
-            );
-            path
+            let exe = std::env::current_exe().expect("a test binary knows where it is");
+            let name = format!("coilbox-unitsync-worker{}", std::env::consts::EXE_SUFFIX);
+            exe.ancestors()
+                .map(|dir| dir.join(&name))
+                .find(|path| path.is_file())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "no worker in a folder above {}. Build it first with `cargo build -p coilbox-unitsync-worker`",
+                        exe.display()
+                    )
+                })
         };
         let run = |args: Vec<String>| {
             let output = Command::new(&worker)

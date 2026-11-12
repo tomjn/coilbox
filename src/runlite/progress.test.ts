@@ -222,6 +222,30 @@ describe("applyReward", () => {
     const next = applyReward(r, "rw", 0, "now");
     expect(next.progress.perks).toHaveLength(1);
   });
+
+  const cache = (): RunNode => ({
+    id: "rw",
+    type: "reward",
+    col: 1,
+    row: 0,
+    reward: {
+      title: "Cache",
+      options: [
+        { kind: "perk", perk: { kind: "income", value: 0.2, label: "p" } },
+      ],
+      salvage: 40,
+    },
+  });
+
+  it("banks the cache's salvage with the option taken", () => {
+    const next = applyReward(nodeRun(cache(), 10), "rw", 0, "now");
+    expect(next.progress.salvage).toBe(50);
+  });
+
+  it("banks the cache's salvage when the player leaves it", () => {
+    const next = leaveNode(nodeRun(cache(), 10), "rw", "now");
+    expect(next.progress.salvage).toBe(50);
+  });
 });
 
 describe("applyEvent", () => {

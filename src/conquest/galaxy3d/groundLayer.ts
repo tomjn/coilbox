@@ -62,10 +62,26 @@ export interface GroundLayer {
 const scratch = new THREE.Color();
 const byte = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255);
 
-export function buildGroundLayer(
-  disposables: { dispose(): void }[],
+/** What {@link planGround} decides about a map's roads, before any painting. */
+export interface GroundPlan {
+  /** The roads as painted, after `shape` and straightening. */
+  roads: RoadLine[];
+  /** How many road states there are: one per planned road, before `shape` cut any. */
+  states: number;
+  provinceRoads: RoadLink[];
+  firstProvince: number;
+  firstExtra: number;
+}
+
+/** The parts of a terrain surface that road planning reads. */
+export type GroundFrame = Pick<
+  TerrainSurface,
+  "width" | "height" | "heightScale" | "scale"
+>;
+
+export function planGround(
   galaxy: GalaxyDoc,
-  surface: TerrainSurface,
+  surface: GroundFrame,
   heights: HeightGrid | undefined,
   /**
    * Tracks painted after the roads, each with a state of its own, such as a
@@ -88,17 +104,12 @@ export function buildGroundLayer(
    */
   landLinks: readonly RoadLink[] = [],
   /**
-   * The planet, whose roads these are. Left out for a map with none, which
-   * is a hand-made one, and gets Temperate's.
-   */
-  planet: PlanetId = "temperate",
-  /**
    * The land drawn past the map's edge, whose rivers the roads cross on
    * bridges. Left out where rivers are not drawn, as in performance mode, so
    * nothing routes round them there.
    */
   extension?: TerrainExtension,
-): GroundLayer {
+): GroundPlan {
   const grid = routeGrid(
     surface.width,
     surface.height,
@@ -146,6 +157,28 @@ export function buildGroundLayer(
     courses,
     surface.scale,
   );
+  return {
+    roads,
+    states: planned.length,
+    provinceRoads: between.links,
+    firstProvince,
+    firstExtra,
+  };
+}
+
+export function paintGround(
+  disposables: { dispose(): void }[],
+  surface: TerrainSurface,
+  plan: GroundPlan,
+  /**
+   * The planet, whose roads these are. Left out for a map with none, which
+   * is a hand-made one, and gets Temperate's.
+   */
+  planet: PlanetId = "temperate",
+  extension?: TerrainExtension,
+): GroundLayer {
+  const { roads } = plan;
+  const rivers = extension?.rivers;
   let river: GroundRivers | undefined;
   if (rivers && extension) {
     const field = new THREE.DataTexture(
@@ -209,7 +242,7 @@ export function buildGroundLayer(
   roadMask.needsUpdate = true;
 
   // One state per planned road, whatever pieces it was cut into.
-  const columns = Math.max(1, planned.length);
+  const columns = Math.max(1, plan.states);
   const state = new Uint8Array(columns * ROAD_STATE_ROWS * 4);
   // Every road starts drawn and plain.
   for (let k = 0; k < columns; k++) state[(columns + k) * 4] = 255;
@@ -227,9 +260,9 @@ export function buildGroundLayer(
 
   return {
     roads,
-    provinceRoads: between.links,
-    firstProvince,
-    firstExtra,
+    provinceRoads: plan.provinceRoads,
+    firstProvince: plan.firstProvince,
+    firstExtra: plan.firstExtra,
     shading: {
       roadDistance,
       roadMask,
@@ -246,7 +279,7 @@ export function buildGroundLayer(
       ),
     },
     setRoadStyle: (k, style) => {
-      if (k < 0 || k >= planned.length) return;
+      if (k < 0 || k >= plan.states) return;
       const top = k * 4;
       scratch.copy(style.color).convertLinearToSRGB();
       state[top] = byte(scratch.r);
@@ -263,4 +296,34 @@ export function buildGroundLayer(
       roadState.needsUpdate = true;
     },
   };
+}
+
+export function buildGroundLayer(
+  disposables: { dispose(): void }[],
+  galaxy: GalaxyDoc,
+  surface: TerrainSurface,
+  heights: HeightGrid | undefined,
+  extra: readonly Omit<RoadLine, "index">[] = [],
+  shape?: (roads: RoadLine[]) => RoadLine[],
+  provinceRoads = false,
+  landLinks: readonly RoadLink[] = [],
+  planet: PlanetId = "temperate",
+  extension?: TerrainExtension,
+): GroundLayer {
+  return paintGround(
+    disposables,
+    surface,
+    planGround(
+      galaxy,
+      surface,
+      heights,
+      extra,
+      shape,
+      provinceRoads,
+      landLinks,
+      extension,
+    ),
+    planet,
+    extension,
+  );
 }

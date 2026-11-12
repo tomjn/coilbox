@@ -22,6 +22,8 @@ export interface SetupChoices {
   difficulty: number;
   ascension: number;
   loadout: string;
+  /** A land map only: whether every location is a place the run can go. */
+  sideTrips: boolean;
 }
 
 const STYLES: string[] = MAP_STYLE_OPTIONS.map((o) => o.value);
@@ -52,5 +54,6 @@ export function readSetupChoices(stored: unknown): Partial<SetupChoices> {
     out.ascension = s.ascension as number;
   }
   if (typeof s.loadout === "string") out.loadout = s.loadout;
+  if (typeof s.sideTrips === "boolean") out.sideTrips = s.sideTrips;
   return out;
 }

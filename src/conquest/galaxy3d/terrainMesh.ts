@@ -19,6 +19,7 @@ import {
   type TerrainSurface,
   terrainCavityPixels,
   terrainNormalPixels,
+  terrainShorePixels,
   terrainTriangles,
 } from "./terrain";
 import {
@@ -149,6 +150,18 @@ export interface TerrainExtension {
   };
   /** The generator's weights at this picture's size. */
   biomes?: BiomePixels;
+  /**
+   * How far each pixel is from the water line, in map pixels and above 0 on
+   * land, and how deep the sea is there, as the generator's `shore` and
+   * `seaDepth`. The bake draws the coast and colours the sea from them. Left
+   * out, the coast is drawn from the heights and the sea from the picture.
+   */
+  shore?: {
+    distance: Float32Array;
+    depth: Float32Array;
+    width: number;
+    height: number;
+  };
 }
 
 /**
@@ -250,6 +263,8 @@ export function buildTerrainMesh(
   ground?: GroundShading,
   /** The map's own weights, which go with `color` when it is pixels. */
   biomes?: BiomePixels,
+  /** Where the trees stand, from the forest layer. */
+  forestCover?: THREE.Texture,
 ): TerrainSheet {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
@@ -384,6 +399,23 @@ export function buildTerrainMesh(
     drainage.needsUpdate = true;
   }
 
+  // The water line and the sea's depth, which the bake draws the coast from.
+  let shore: THREE.Texture | null = null;
+  if (cavity && ext?.shore) {
+    shore = new THREE.DataTexture(
+      terrainShorePixels(ext.shore.distance, ext.shore.depth),
+      ext.shore.width,
+      ext.shore.height,
+      THREE.RGFormat,
+    );
+    shore.flipY = false;
+    shore.unpackAlignment = 2;
+    shore.magFilter = THREE.LinearFilter;
+    shore.minFilter = THREE.LinearMipmapLinearFilter;
+    shore.generateMipmaps = true;
+    shore.needsUpdate = true;
+  }
+
   let frame: TerrainFrame | undefined;
   // The haze's colour, and the background's. An apron round a picture still
   // loading takes the placeholder's until the picture arrives.
@@ -417,10 +449,12 @@ export function buildTerrainMesh(
     normals,
     cavity,
     drainage,
+    shore,
     biomes: biomeTextures,
     detail: detail && isColorPixels(color),
     frame,
     ground,
+    forestCover,
   };
   // Every material that shows the map picture.
   const pictured: THREE.MeshBasicMaterial[] = [mat];
@@ -474,6 +508,7 @@ export function buildTerrainMesh(
       biomeTextures.b,
       ...(cavity ? [cavity] : []),
       ...(drainage ? [drainage] : []),
+      ...(shore ? [shore] : []),
     ]);
     disposables.push(bake);
   } else {

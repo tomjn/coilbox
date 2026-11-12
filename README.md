@@ -8,9 +8,9 @@
 <h1 align="center">Coilbox</h1>
 
 <p align="center">
-  <a href="https://coilbox-hub.vercel.app">Coilbox Hub</a> ·
+  <a href="https://hub.coilbox.org">Coilbox Hub</a> ·
   <a href="https://discord.gg/GUpRg6Wz3e">Discord</a> ·
-  <a href="https://tomjn.github.io/coilbox/">Documentation</a>
+  <a href="https://coilbox.org/">Documentation</a>
 </p>
 
 <p align="center">

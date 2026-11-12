@@ -82,6 +82,18 @@ describe("readImport: the four things somebody can hand it", () => {
   it("turns a pasted https address into a fetch the handler confirms", () => {
     // Coilbox Hub serves a share's container JSON off its item URL.
     const r = readImport(
+      "https://hub.coilbox.org/i/9638778b-b619-4339-8d85-7432af1eb984",
+    );
+    expect(r).toEqual({
+      outcome: "link",
+      url: "coilbox://import?url=https%3A%2F%2Fhub.coilbox.org%2Fi%2F9638778b-b619-4339-8d85-7432af1eb984",
+    });
+  });
+
+  it("passes an old Vercel hub address through for the handler to classify", () => {
+    // readImport knows nothing about which hub is configured. The handler
+    // decides, through hubItemIdFromUrl, whether this is an item on the hub.
+    const r = readImport(
       "https://coilbox-hub.vercel.app/i/9638778b-b619-4339-8d85-7432af1eb984",
     );
     expect(r).toEqual({
@@ -201,7 +213,7 @@ describe("clipboardOffer", () => {
 
   it("does not offer to download a web address it happens to find", () => {
     expect(clipboardOffer("https://example.com/anything")).toBeNull();
-    expect(clipboardOffer("https://coilbox-hub.vercel.app/i/abc")).toBeNull();
+    expect(clipboardOffer("https://hub.coilbox.org/i/abc")).toBeNull();
   });
 
   it("says nothing about a campaign, which the box cannot take anyway", () => {

@@ -6,6 +6,7 @@ import { morphEdgeMap } from "../content/morphGraph";
 import { disabledUnitsFor, playerUnitsFor } from "./build";
 import type { GenBuildGraph } from "./generate";
 import type { RogueliteRun } from "./model";
+import { unitFactsFor } from "./starterKit";
 
 /**
  * Whether coilbox can work out a warpath's unit limit, and what it does when it
@@ -135,6 +136,7 @@ export function buildGraphFor(
     ...(set.derived ? { roots: set.roots } : {}),
     edges: buildEdgeMap(units),
     names,
+    facts: unitFactsFor(units),
   };
 }
 

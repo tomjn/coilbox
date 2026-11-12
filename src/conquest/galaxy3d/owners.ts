@@ -56,7 +56,8 @@ export interface Owners {
 
 export function createOwners(
   galaxy: GalaxyDoc,
-  playerFactionId: string,
+  /** The faction played as now. Read on every restyle, as it can change. */
+  player: () => string,
   laneFlow: boolean,
   ownersRef: { current: Record<string, string> },
   pathLinksRef: { current: Set<string> | undefined },
@@ -99,7 +100,7 @@ export function createOwners(
     );
     mat.color.copy(ownerColor(owner));
     mat.opacity =
-      (owner === playerFactionId ? 1 : owner === NEUTRAL ? 0.3 : 0.75) *
+      (owner === player() ? 1 : owner === NEUTRAL ? 0.3 : 0.75) *
       dimOf(galaxy.nodes[i].id);
     // Theatre region markers fill with a dark shade of the owner colour.
     const disc = discMats[i];
@@ -153,8 +154,8 @@ export function createOwners(
       }
       const ownerA = current[a] ?? NEUTRAL;
       const ownerB = current[b] ?? NEUTRAL;
-      const aPlayer = ownerA === playerFactionId;
-      const bPlayer = ownerB === playerFactionId;
+      const aPlayer = ownerA === player();
+      const bPlayer = ownerB === player();
       if (laneFlow) {
         // Run lanes: the route already travelled is a bright green trail.
         // Forward lanes out of the current node (you -> a choice) are

@@ -10,7 +10,7 @@ Measures what one frame of the whole strategic map costs, so a terrain change ca
 - Each pose is the best of 6 batches of 30 renders of the whole scene. The renders are queued back to back and waited on once, so one number is what a frame costs the GPU with the CPU work overlapped. It is not the time between frames, because Chrome skips presenting frames when it can.
 - The CSS labels are not in it. They cost 0.16 to 0.32 ms of CPU a frame on 29 labels when #3652 measured them.
 - The poses are far (distance 118, 0.48 rad from vertical, over the middle of the map), close (distance 25, 0.48 rad, over the player's capital) and tilted (distance 60, 1.25 rad, over the middle).
-- The maps are the temperate, desert and ice planets as Territories maps, and a 30 city Cities map, all from seed 54785. Temperate has rivers, towns and fields. Ice has taiga.
+- The maps are the temperate, desert and ice planets as Territories maps, and a 30 city Cities map, all from seed 54785. Temperate has rivers and towns. Ice has taiga. `--maps red` measures a red planet, whose towns are sealed outposts. It is not in the default set.
 - `--perf 1` turns on performance mode. It also draws at a pixel ratio of 1, so the buffer is 1285 by 1003 and those numbers are not comparable pixel for pixel.
 - The first page load of a map also records its startup: the time to make the land on the main thread (the app does that in a worker) and the ground's bake, one tile a frame. Each bake tile is timed to the end of its GPU work, so the first one or two include shader compiling. These are in the `.jsonl` file under `startup`.
 
@@ -51,7 +51,7 @@ You need `agent-browser` on `PATH`. Measure with the machine quiet. `run.mjs` wi
 
 ## The towns' share
 
-`--towns 1` times the towns and their fields on their own. It measures far, close and tilted over both the map centre and the capital, six views. In each, batches with the towns and fields shown and hidden take turns, and the towns' share is the best shown batch less the best hidden one. Output goes to `<label>-towns.jsonl`, and `summary.mjs` prints the share first.
+`--towns 1` times the 3D towns on their own. It measures far, close and tilted over both the map centre and the capital, six views. In each, batches with the 3D towns shown and hidden take turns, and the towns' share is the best shown batch less the best hidden one. With `towns=1` the probe also sets `window.__townShadowBytes` to the bytes of shadow texture the towns hold, once the shadows are baked. Output goes to `<label>-towns.jsonl`, and `summary.mjs` prints the share first.
 
 ```sh
 node scripts/map-frame-timing/run.mjs --label new --runs 1 --towns 1 --maps cities,temperate

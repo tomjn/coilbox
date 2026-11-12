@@ -1,5 +1,7 @@
 import { t } from "@lingui/core/macro";
-import { useEffect, useRef } from "react";
+import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
@@ -19,12 +21,12 @@ import {
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
-import { planCrossings } from "./crossingPlan";
 import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
+import { buildForestLayer, type ForestLayer } from "./forest3d/forestLayer";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
-import { buildGroundLayer, type GroundLayer } from "./groundLayer";
+import { type GroundLayer, paintGround } from "./groundLayer";
 import {
   type LabelElement,
   type LabelInput,
@@ -32,7 +34,16 @@ import {
   placeLabels,
   sameNumbers,
 } from "./labelDeclutter";
+import { conquestDressing, type Dressing } from "./landmarks/dressing";
+import type { RunLandmark } from "./landmarks/kinds";
+import {
+  buildLandmarkLayer,
+  type LandmarkLayer,
+  landmarkNodes,
+  terrainColourReader,
+} from "./landmarks/landmarkLayer";
 import { hashString } from "./layout";
+import { layoutLevelledMap } from "./levelledMap";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
 import {
@@ -47,7 +58,6 @@ import {
   cameraFloorAt,
   clampPanToSheet,
   createMarginSurface,
-  layoutStrategicMap,
   TERRAIN_MAX_SEGMENTS,
   terrainCameraLimits,
   terrainSpecOf,
@@ -60,8 +70,12 @@ import {
 } from "./terrainLoad";
 import { buildTerrainMesh, type TerrainSheet } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
-import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
-import type { Town } from "./towns";
+import { CAPITAL_RADIUS } from "./towns";
+import { riverEdgeReader } from "./towns3d/layout";
+import {
+  buildTownModelLayer,
+  type TownModelLayer,
+} from "./towns3d/townModelLayer";
 import { createVisibility } from "./visibility";
 
 /**
@@ -132,6 +146,21 @@ export interface NodeIdentity {
    * only, where it draws a marker over the location. See endMarkerLayer.ts.
    */
   end?: "start" | "goal";
+  /** Drawn before the node's name, in the name's colour. */
+  icon?: LucideIcon;
+  /**
+   * Read on a terrain map only, where an anomaly's model stands in place of
+   * the town. See landmarks/landmarkLayer.ts.
+   */
+  landmark?: RunLandmark;
+  /** The anomaly is a group of smaller ones of its kind, not the one. */
+  landmarkGroup?: boolean;
+}
+
+/** A label's icon slot and the icon React draws into it. */
+interface LabelIcon {
+  host: HTMLElement;
+  Icon: LucideIcon;
 }
 
 interface GalaxyViewProps {
@@ -184,6 +213,12 @@ interface GalaxyViewProps {
    * honoured with {@link laneFlow}. Default-off.
    */
   closedLinks?: Set<string>;
+  /**
+   * The locations the player may step to now. Given, a terrain map's choices
+   * are these, whichever way a link is written. A run with side trips can
+   * step against a link's direction. Only honoured with {@link laneFlow}.
+   */
+  choiceIds?: Set<string>;
   /**
    * Locations the pointer ignores: no hover, no pointer cursor, and a click
    * on one selects nothing. A run across a land map lists its scenery here.
@@ -561,6 +596,7 @@ export function GalaxyView({
   laneFlow = false,
   pathLinks,
   closedLinks,
+  choiceIds,
   inertIds,
   burstNodeId,
   spaceMaps,
@@ -574,6 +610,9 @@ export function GalaxyView({
   className,
 }: GalaxyViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // The label icons the scene build asks for, drawn through portals because
+  // the labels are DOM the build makes itself.
+  const [labelIcons, setLabelIcons] = useState<LabelIcon[]>([]);
 
   // Live-mutation channels into the built scene (no rebuild on change).
   const ownersRef = useRef(owners);
@@ -584,6 +623,7 @@ export function GalaxyView({
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
   const closedLinksRef = useRef<Set<string> | undefined>(closedLinks);
+  const choiceIdsRef = useRef<Set<string> | undefined>(choiceIds);
   const inertRef = useRef<Set<string> | undefined>(inertIds);
   const burstRef = useRef<string | null | undefined>(burstNodeId);
   const applyBurstRef = useRef<(() => void) | null>(null);
@@ -600,16 +640,10 @@ export function GalaxyView({
     ((sources: PlacedModelSources | undefined) => void) | null
   >(null);
   const renderRef = useRef<(() => void) | null>(null);
-  // The warp-in plays on a fresh mount but not when only the previewed faction
-  // changes. Comparing against the previous faction is robust to StrictMode's
-  // throwaway first mount (a persistent "played" flag would be consumed by it).
-  const prevFactionRef = useRef<string | undefined>(undefined);
-  // The camera pose carried across a faction-switch rebuild, so recentring on
-  // the new faction's worlds eases instead of snapping.
-  const camPoseRef = useRef<{
-    pos: THREE.Vector3;
-    target: THREE.Vector3;
-  } | null>(null);
+  // The faction played as. Nothing that is built depends on it, so picking
+  // another restyles the scene that is there. See `applyPlayerRef`.
+  const playerRef = useRef(playerFactionId);
+  const applyPlayerRef = useRef<(() => void) | null>(null);
 
   onSelectRef.current = onSelect;
   modelSourcesRef.current = modelSources;
@@ -635,6 +669,13 @@ export function GalaxyView({
   );
   const terrainExtension = terrainPixels?.extension ?? surroundLand;
 
+  // Declared before the scene's own effect, so a scene built in the same
+  // commit reads the new faction.
+  useEffect(() => {
+    playerRef.current = playerFactionId;
+    applyPlayerRef.current?.();
+  }, [playerFactionId]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -653,11 +694,26 @@ export function GalaxyView({
 
     // `surface` is set for a terrain map only. A galaxy or theatre map has
     // none and takes the same layout it always has.
-    const { skin, extent, positions, bounds, surface } = layoutStrategicMap(
-      galaxy,
-      terrainHeights,
-      performanceMode ? TERRAIN_MAX_SEGMENTS / 2 : TERRAIN_MAX_SEGMENTS,
-    );
+    // Towns on a generated map, and on a hand-made map whose manifest asks
+    // for them, since the author's picture may show its own. Performance
+    // mode goes without. The ground is levelled under each town the map
+    // draws, so everything below stands on `map.heights`, not the raw grid.
+    const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
+    // What stands in place of a town, and where. A run says so itself. A
+    // conquest map is dealt its own, from the map and not from the player.
+    const dressing: ReadonlyMap<string, NodeIdentity & Dressing> =
+      identities ?? conquestDressing(galaxy, terrainBiomes?.planet);
+    const map = layoutLevelledMap(galaxy, terrainHeights, terrainExtension, {
+      maxSegments: performanceMode
+        ? TERRAIN_MAX_SEGMENTS / 2
+        : TERRAIN_MAX_SEGMENTS,
+      drawTowns,
+      // Rivers are drawn with the detail, which performance mode leaves
+      // out, so there no road goes round them and none is bridged.
+      routeRivers: !performanceMode,
+      skip: landmarkNodes(galaxy.nodes, dressing, terrainBiomes?.planet),
+    });
+    const { skin, extent, positions, bounds, surface } = map.layout;
     const nodeIds = galaxy.nodes.map((n) => n.id);
     const factionColor = new Map(
       galaxy.factions.map((f) => [f.id, new THREE.Color(f.color)]),
@@ -721,54 +777,78 @@ export function GalaxyView({
     let ground: GroundLayer | undefined;
     // The ground itself, whose detail is baked over the first frames.
     let terrainSheet: TerrainSheet | undefined;
-    // A town at every location. See townLayer.ts.
-    let towns: TownLayer | undefined;
+    // A town of buildings at every location. See towns3d/townModelLayer.ts.
+    let townModels: TownModelLayer | undefined;
+    // A stronghold, a spire or a landing pad on every held capital, and an
+    // anomaly or a depot where the map asks, in place of the town. See
+    // landmarks/landmarkLayer.ts.
+    let landmarks: LandmarkLayer | undefined;
+    // The trees of a generated map. See forest3d/forestLayer.ts.
+    let forest: ForestLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
     // the roads. See crossingPlan.ts.
-    const crossingPlan = surface ? planCrossings(galaxy, surface) : undefined;
+    const crossingPlan = map.crossingPlan;
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
-    if (surface && terrainSpec) {
-      // Towns on a generated map, and on a hand-made map whose manifest asks
-      // for them, since the author's picture may show its own. Performance
-      // mode goes without.
+    if (surface && terrainSpec && map.plan) {
       // The towns are planned from the roads, and the roads then stop at
       // each town's edge.
       // Neighbouring provinces' towns are joined by roads where there are
       // towns to join.
-      const planned: { towns?: Town[] } = {};
       const terrain = surface;
-      const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
-      ground = buildGroundLayer(
+      ground = paintGround(
         disposables,
-        galaxy,
         surface,
-        terrainHeights,
-        crossingPlan?.tracks,
-        drawTowns
-          ? (roads) => {
-              const shaped = townsOnRoads(galaxy, terrain, roads);
-              planned.towns = shaped.towns;
-              return shaped.roads;
-            }
-          : undefined,
-        drawTowns,
-        crossingPlan?.landLinks,
+        map.plan,
         terrainBiomes?.planet,
-        // Rivers are drawn with the detail, which performance mode leaves
-        // out, so there no road goes round them and none is bridged.
-        performanceMode ? undefined : terrainExtension,
+        performanceMode ? undefined : map.extension,
       );
-      if (planned.towns) {
-        towns = buildTownLayer(
+      landmarks = buildLandmarkLayer(
+        scene,
+        disposables,
+        surface,
+        galaxy,
+        dressing,
+        terrainBiomes?.planet,
+        terrainColourReader(terrainColor, surface),
+      );
+      const riverEdge = map.extension
+        ? riverEdgeReader(
+            map.extension.rivers,
+            map.extension.image,
+            map.extension.margin,
+            surface,
+          )
+        : undefined;
+      if (map.towns) {
+        townModels = buildTownModelLayer(
           scene,
           disposables,
           surface,
-          ground,
-          planned.towns,
-          terrainBiomes,
-          !terrainColor,
+          map.towns,
+          landmarks.nodes,
+          terrainBiomes?.planet,
+          riverEdge,
         );
+      }
+      // Trees, on a generated map with its detail on. See forest3d.
+      if (!performanceMode && map.extension && terrainBiomes) {
+        const at = galaxy.nodes.map((n) =>
+          surface.mapToWorldXZ(n.pos[0], n.pos[1]),
+        );
+        forest = buildForestLayer(scene, disposables, surface, map.extension, {
+          planet: terrainBiomes.planet,
+          seed: hashString(galaxy.id),
+          towns: map.towns,
+          // A landmark stands in place of a town, on a site as wide as one.
+          cleared: [...landmarks.nodes].map((i) => ({
+            x: at[i][0],
+            z: at[i][1],
+            radius: CAPITAL_RADIUS,
+          })),
+          roads: map.plan.roads,
+          riverEdge,
+        });
       }
       terrainSheet = buildTerrainMesh(
         scene,
@@ -776,11 +856,12 @@ export function GalaxyView({
         surface,
         terrainColor ?? terrainSpec.image,
         renderRef,
-        terrainHeights,
+        map.heights,
         !performanceMode,
-        terrainExtension,
+        map.extension,
         ground.shading,
         terrainBiomes,
+        forest?.cover,
       );
       // Scenery. It loads in the background and never holds the map up.
       const models = galaxy.models;
@@ -834,6 +915,7 @@ export function GalaxyView({
       flowEnabled,
       chevrons,
       layoutChevrons,
+      placeChevrons,
       cores,
       coronaSprites,
       ownerRingMats,
@@ -849,7 +931,7 @@ export function GalaxyView({
       variablePulses,
       spinners,
       structureDims,
-      factionOnlyRebuild,
+      setHome,
       animateIntro,
       introSprites,
       introLaneMats,
@@ -866,7 +948,6 @@ export function GalaxyView({
       galaxy,
       skin,
       positions,
-      playerFactionId,
       reduceMotion,
       effects,
       performanceMode,
@@ -879,10 +960,23 @@ export function GalaxyView({
       ownersRef,
       incursionRef,
       onSelectRef,
-      prevFactionRef,
       burstRef,
       applyBurstRef,
       surface,
+      // A capital is a landmark, which stands a little off its location, or
+      // a town, which stands on it.
+      new Map([
+        ...(surface
+          ? [...(townModels?.rings ?? [])].map(([i, radius]) => {
+              const [x, z] = surface.mapToWorldXZ(
+                galaxy.nodes[i].pos[0],
+                galaxy.nodes[i].pos[1],
+              );
+              return [i, { radius, x, z }] as const;
+            })
+          : []),
+        ...(landmarks?.rings ?? []),
+      ]),
     );
 
     /* ------------------------------- labels -------------------------------- */
@@ -897,12 +991,22 @@ export function GalaxyView({
         .getHexString()}`;
 
     const labelObjects: CSS2DObject[] = [];
+    const iconHosts: LabelIcon[] = [];
     if (!performanceMode) {
       galaxy.nodes.forEach((n) => {
         const p = positions.get(n.id);
         if (!p) return;
         const el = document.createElement("div");
-        el.textContent = n.name;
+        const Icon = identities?.get(n.id)?.icon;
+        if (Icon) {
+          const host = document.createElement("span");
+          host.style.cssText =
+            "display:inline-flex;vertical-align:-2px;margin-right:4px;";
+          el.append(host, n.name);
+          iconHosts.push({ host, Icon });
+        } else {
+          el.textContent = n.name;
+        }
         el.style.cssText =
           "pointer-events:none;font-size:10px;font-weight:600;" +
           "letter-spacing:0.14em;text-transform:uppercase;" +
@@ -914,6 +1018,7 @@ export function GalaxyView({
         scene.add(label);
       });
     }
+    setLabelIcons(iconHosts);
 
     // Nodes with an outline, drawn as areas on the terrain. `undefined` on a
     // galaxy or theatre map, and on a terrain map of point locations only.
@@ -927,6 +1032,7 @@ export function GalaxyView({
           ownersRef,
           labelObjects,
           dimOf,
+          townModels?.tops,
         )
       : undefined;
 
@@ -946,11 +1052,13 @@ export function GalaxyView({
             cores,
             {
               setRoadStyle: ground.setRoadStyle,
-              setTownStyle: towns?.setTownStyle,
-              towns: towns?.towns,
+              setTownStyle: townModels?.setStyle,
+              setLandmarkStyle: landmarks?.setStyle,
+              landmarkTops: landmarks?.tops,
+              townTops: townModels?.tops,
+              towns: map.towns,
               commit: () => {
                 ground?.commit();
-                towns?.commit();
               },
             },
           )
@@ -968,6 +1076,7 @@ export function GalaxyView({
             ownerColor,
             placedForMarkers,
             renderRef,
+            landmarks?.anchors,
           )
         : undefined;
 
@@ -986,7 +1095,7 @@ export function GalaxyView({
             provinces,
             () => ({
               owners: ownersRef.current,
-              playerFactionId,
+              playerFactionId: playerRef.current,
               selectedId: selectedRef.current,
               attackable: attackableRef.current,
               incursionNodeId: incursionRef.current?.nodeId,
@@ -995,12 +1104,18 @@ export function GalaxyView({
                 ? {
                     pathLinks: pathLinksRef.current,
                     closedLinks: closedLinksRef.current,
+                    choices: choiceIdsRef.current,
                   }
                 : undefined,
             }),
             crossingPlan && ground ? { plan: crossingPlan, ground } : undefined,
             terrainBiomes?.planet !== undefined &&
               planetOf(terrainBiomes.planet).sea.crossing === "solid",
+            // A run's open choices get travelling chevrons along their road
+            // or crossing. A terrain map has no straight lanes to lay them on.
+            laneFlow && ground
+              ? { roads: ground.roads, place: placeChevrons }
+              : undefined,
           )
         : undefined;
 
@@ -1029,13 +1144,13 @@ export function GalaxyView({
     // Centre the view on the player's own territory (the previewed faction
     // during setup), so switching faction recentres on that faction's worlds
     // rather than always framing the whole galaxy from the origin.
-    const focus = new THREE.Vector3(0, 0, 0);
-    {
+    const centreOf = (player: string) => {
+      const focus = new THREE.Vector3(0, 0, 0);
       let sx = 0;
       let sz = 0;
       let count = 0;
       for (const n of galaxy.nodes) {
-        if ((ownersRef.current[n.id] ?? n.owner) !== playerFactionId) continue;
+        if ((ownersRef.current[n.id] ?? n.owner) !== player) continue;
         const p = positions.get(n.id);
         if (!p) continue;
         sx += p[0];
@@ -1049,17 +1164,19 @@ export function GalaxyView({
       focus.x += extent * focusBiasX;
       // On a terrain the view pivots on the ground, not on sea level.
       if (surface) focus.y = surface.groundHeightAtWorld(focus.x, focus.z);
-    }
+      return focus;
+    };
+    const focus = centreOf(playerRef.current);
 
     const camera = new THREE.PerspectiveCamera(VIEW_FOV_DEGREES, 1, 0.1, 2500);
     // The land drawn past a generated map's edge, which the camera must clear
     // when it looks in from outside the map.
     const marginGround =
-      surface && terrainExtension && surface.maxHeight > 0
+      surface && map.extension && surface.maxHeight > 0
         ? createMarginSurface(
             surface,
-            terrainExtension.heights,
-            terrainExtension.margin,
+            map.extension.heights,
+            map.extension.margin,
           )
         : undefined;
     // Start high above the plane (~27° from vertical), pulled back to frame the
@@ -1175,7 +1292,9 @@ export function GalaxyView({
         endMarkers?.fitToCamera(distance);
       }
       // One tile of the ground's bake a frame, until it is done.
-      towns?.prepare(renderer);
+      townModels?.prepare(renderer);
+      landmarks?.prepare(renderer);
+      forest?.update(camera, renderer.domElement.height);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;
       renderer.render(scene, camera);
@@ -1245,7 +1364,7 @@ export function GalaxyView({
     // (below) can put a ring they were overriding back to its plain style.
     const owners = createOwners(
       galaxy,
-      playerFactionId,
+      () => playerRef.current,
       laneFlow,
       ownersRef,
       pathLinksRef,
@@ -1389,7 +1508,7 @@ export function GalaxyView({
           input.pinned =
             i === hovered ||
             i === selectedIndex ||
-            (ownersRef.current[node.id] ?? node.owner) === playerFactionId;
+            (ownersRef.current[node.id] ?? node.owner) === playerRef.current;
           input.ndc = { x: projected.x, y: projected.y };
         });
         placeLabels(inputs, w, h, keptSizes, remeasure);
@@ -1541,11 +1660,21 @@ export function GalaxyView({
       framedTarget,
       framedPos,
       reduceMotion,
-      factionOnlyRebuild,
-      camPoseRef.current,
     );
     applyFocusRef.current = () => {
       cameraFocus.apply(false);
+      requestRender();
+    };
+    // Another faction: its home ring, its colours on the lanes and the
+    // frontier, and the view framed on its own territory.
+    setHome(playerRef.current);
+    applyPlayerRef.current = () => {
+      setHome(playerRef.current);
+      const centre = centreOf(playerRef.current);
+      framedPos.add(centre).sub(framedTarget);
+      framedTarget.copy(centre);
+      applyOwners();
+      cameraFocus.recentre();
       requestRender();
     };
     // A burst starts from a prop change, so it asks for the frames it plays in.
@@ -1750,6 +1879,8 @@ export function GalaxyView({
           // A selected city holds still, so it asks for no frames.
           selectionPulse: selectedIdx >= 0 && !!ownerRings[selectedIdx],
           combatFlashes: visibility.isFlashing(),
+          routeChevrons:
+            flowEnabled && chevrons.some((chev) => chev.mesh.visible),
           effects,
           reducedResolution: resolution.reduced(),
         });
@@ -1787,11 +1918,6 @@ export function GalaxyView({
       unregisterStats();
       frames.cancel();
       displayClock.cancel();
-      // Remember the final pose so a faction-switch rebuild can ease from here.
-      camPoseRef.current = {
-        pos: camera.position.clone(),
-        target: controls ? controls.target.clone() : new THREE.Vector3(),
-      };
       observer?.disconnect();
       renderer?.domElement.removeEventListener("pointermove", onPointerMove);
       renderer?.domElement.removeEventListener("pointerdown", onPointerDown);
@@ -1799,6 +1925,7 @@ export function GalaxyView({
       detachWheel();
       controls?.dispose();
       for (const label of labelObjects) label.removeFromParent();
+      setLabelIcons([]);
       disposeLanePair(lanes);
       disposeLanePair(factionLanes);
       disposeLanePair(frontier);
@@ -1811,6 +1938,7 @@ export function GalaxyView({
       }
       renderRef.current = null;
       applyOwnersRef.current = null;
+      applyPlayerRef.current = null;
       applySelectionRef.current = null;
       applyVisibilityRef.current = null;
       applyFocusRef.current = null;
@@ -1819,7 +1947,6 @@ export function GalaxyView({
     };
   }, [
     galaxy,
-    playerFactionId,
     reduceMotion,
     effects,
     performanceMode,
@@ -1850,6 +1977,7 @@ export function GalaxyView({
     emphasisRef.current = emphasis;
     pathLinksRef.current = pathLinks;
     closedLinksRef.current = closedLinks;
+    choiceIdsRef.current = choiceIds;
     inertRef.current = inertIds;
     attackableRef.current = attackableIds;
     applyOwnersRef.current?.();
@@ -1861,6 +1989,7 @@ export function GalaxyView({
     emphasis,
     pathLinks,
     closedLinks,
+    choiceIds,
     inertIds,
     attackableIds,
   ]);
@@ -1890,6 +2019,11 @@ export function GalaxyView({
       ref={containerRef}
       className={className}
       style={{ overflow: "hidden" }}
-    />
+    >
+      {labelIcons.map(({ host, Icon }, i) =>
+        // biome-ignore lint/suspicious/noArrayIndexKey: one slot per label, rebuilt with the scene
+        createPortal(<Icon size={12} strokeWidth={2.5} aria-hidden />, host, i),
+      )}
+    </div>
   );
 }

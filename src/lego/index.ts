@@ -48,7 +48,7 @@ const legoPlugin: FramePlugin = {
         {
           id: "lego.builder-guide",
           label: lazyText(msg`Unit builder guide`),
-          href: "https://tomjn.github.io/coilbox/developers/lego-builder",
+          href: "https://coilbox.org/developers/lego-builder",
           icon: CoilMark,
           sidebar: false,
           order: 2,
@@ -57,7 +57,7 @@ const legoPlugin: FramePlugin = {
         {
           id: "lego.parts-pack-guide",
           label: lazyText(msg`Parts pack format`),
-          href: "https://tomjn.github.io/coilbox/reference/lego-parts-pack",
+          href: "https://coilbox.org/reference/lego-parts-pack",
           icon: CoilMark,
           sidebar: false,
           order: 3,

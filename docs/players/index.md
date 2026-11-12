@@ -29,4 +29,4 @@ Guides for people who play games through coilbox. To install it, see [Install](.
 ## Share
 
 - [The Coilbox hub](hub.md). Find and import what other players have shared, publish your own challenges, scenarios, blueprints and setup packs, and see what coilbox sends to the hub.
-- [Community hub](https://coilbox-hub.vercel.app). Browse presets, challenges, scenarios and blueprints other players have shared, and import them.
+- [Community hub](https://hub.coilbox.org). Browse presets, challenges, scenarios and blueprints other players have shared, and import them.

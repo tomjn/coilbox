@@ -2,11 +2,21 @@ import * as THREE from "three";
 import {
   BIOME_SLOTS,
   type BiomePattern,
+  GROUND_SEAS,
+  LIQUID_SEAS,
   type PlanetId,
   planetOf,
   type Rgb,
   type SeaLook,
 } from "../planets";
+import {
+  ABYSS_DARK,
+  ABYSS_FADE,
+  BED_FADE,
+  BED_SHOWS,
+  BED_WET,
+  SEA_FADE,
+} from "../terrainGen";
 import {
   GROUND_BODY,
   GROUND_HEAD,
@@ -14,7 +24,7 @@ import {
   type GroundShading,
   groundUniforms,
 } from "./groundShader";
-import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
+import { SHADE_AMBIENT, SHORE_RANGE, TERRAIN_SUN } from "./terrain";
 
 /**
  * Surface detail for the terrain sheet, added to its unlit material in the
@@ -58,6 +68,13 @@ export interface TerrainShading {
    * which draws gullies along it. Left out, no gullies are drawn.
    */
   drainage?: THREE.Texture | null;
+  /**
+   * {@link terrainShorePixels} as a texture: the distance from the water line
+   * and the sea's depth. Read only by the bake, which draws the coast along
+   * the line and colours the sea by its depth. Left out, the coast follows
+   * the heights' pixels and the sea keeps the picture's colour.
+   */
+  shore?: THREE.Texture | null;
   /** The generator's weights and its planet. Null for a hand-made map, which gets no detail. */
   biomes: { a: THREE.Texture; b: THREE.Texture; planet: PlanetId } | null;
   /** Draw the detail. Off in performance mode. */
@@ -71,6 +88,12 @@ export interface TerrainShading {
   frame?: TerrainFrame;
   /** Roads painted into the ground. See `groundShader.ts`. */
   ground?: GroundShading;
+  /**
+   * Where the trees stand and where their shadows fall, over the same picture
+   * as the weights (`forest3d/forestLayer.ts`). Left out, the forest's ground
+   * is drawn with no trees on it.
+   */
+  forestCover?: THREE.Texture | null;
   /**
    * The detail drawn once into a picture and read from it (`terrainBake.ts`).
    * Left out, the detail is worked out for every pixel of every frame.
@@ -138,6 +161,13 @@ uniform vec3 uBiomeSteep[2];
 uniform vec3 uBiomeClearing;
 uniform vec3 uBiomeColour[8];
 uniform float uSeaLiquid;
+uniform sampler2D uTerrainShore;
+uniform float uShoreOn;
+// The sea's colours as the generator has them, in sRGB: shallow, deep, and
+// the wet bed a liquid sea shows at the water line.
+uniform vec3 uSeaShallow;
+uniform vec3 uSeaDeep;
+uniform vec3 uSeaBed;
 uniform float uTerrainFrost;
 uniform float uSeaPattern;
 uniform vec3 uTerrainSun;
@@ -152,18 +182,18 @@ uniform sampler2D uRiverField;
 uniform float uRiverOn;
 uniform float uRiverFrozen;
 uniform vec2 uRiverSpan;
+// Where the trees stand (forest3d): canopy in red and their shadow in
+// green, over the same picture as vTerrainUv.
+uniform sampler2D uForestCover;
 uniform vec3 uForest[6];
-uniform float uForestAutumn;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
 TERRAIN_NOISE_HERE
-FOREST_HERE
 `;
 
 /**
  * Hashes, noise and the helpers that fade a pattern out with distance, for
- * any shader that draws on the ground: the terrain's own, and the towns'
- * (`townShader.ts`).
+ * any shader that draws on the ground: the terrain's own.
  */
 export const TERRAIN_NOISE = /* glsl */ `
 float tHash(vec2 p) {
@@ -458,71 +488,6 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
 BAKE_ALPHA_HERE
 `;
 
-/** Tree crowns for the forest in {@link DETAIL}. */
-const FOREST = /* glsl */ `
-// One tree of the canopy at q, in cells of the crown grid: its height 0 to 1,
-// its slope, and a random 0 to 1 for the tree. A cell holds a tree when its
-// random number is below density. cone 0 is a rounded broadleaf crown, 1 a
-// pointed conifer. reach is the crown's radius in cells. star 0 to 1 gives
-// the crown the ragged outline of a spruce's branches seen from above.
-vec4 tCrown(vec2 q, float density, float cone, float reach, float star) {
-  vec4 cell = tCell(q);
-  float r0 = reach * (0.75 + 0.5 * fract(cell.w * 13.7));
-  float angle = atan(cell.z, cell.y) * 7.0 + cell.w * 40.0;
-  float r = r0 * (1.0 + star * 0.22 * sin(angle));
-  float u = cell.x / r;
-  if (cell.w >= density || u >= 1.0) return vec4(0.0, 0.0, 0.0, cell.w);
-  float dome = sqrt(1.0 - u * u);
-  float h = mix(dome, 1.0 - u, cone);
-  float dh = mix(-u / max(dome, 0.3), -1.0, cone) / r;
-  // A ragged cone also slopes round the crown, so each branch is lit apart.
-  float dr = r0 * star * 0.22 * 7.0 * cos(angle);
-  return vec4(h, cell.yz * dh + vec2(-cell.z, cell.y) * cone * dr / (r * r), cell.w);
-}
-
-// The canopy's colour at q, in cells of one crown grid, lit by the sun: each
-// crown its own colour, bright on its sunward side, with the shadows of the
-// crowns toward the sun cast over it or over the ground between. kind is 0
-// for broadleaf and 1 for conifer. between is the ground under the trees.
-vec3 tCanopy(vec2 q, float density, float kind, vec3 between, float turning, float frost) {
-  float reach = mix(0.62, 0.5 + 0.28 * frost, kind);
-  // How tall a crown stands against its width, for its shadow and slope.
-  float tall = mix(0.7, 1.5, kind);
-  vec2 sunAt = normalize(uTerrainSun.xz);
-  float sunRise = uTerrainSun.y / length(uTerrainSun.xz);
-  vec4 crown = tCrown(q, density, kind, reach, frost * kind);
-  float pick = fract(crown.w * 31.7);
-  vec3 own = mix(mix(uForest[1], uForest[0], pick), mix(uForest[3], uForest[2], pick), kind);
-  // In a turning stand most crowns turn, each its own shade of it.
-  own = mix(own, mix(uForest[4], uForest[5], fract(crown.w * 7.3)), turning * step(fract(crown.w * 3.9), 0.85));
-  vec3 cn = normalize(vec3(-crown.y * tall, 1.0, -crown.z * tall));
-  float lightC = clamp(dot(cn, uTerrainSun) / uTerrainSun.y, 0.25, 1.4);
-  float shadow = 0.0;
-  for (int j = 1; j <= 2; j++) {
-    float t = float(j) * 0.32;
-    vec4 other = tCrown(q + sunAt * t, density, kind, reach, frost * kind);
-    shadow = max(shadow, smoothstep(0.0, 0.15, other.x - crown.x - t * sunRise / tall));
-  }
-  float isCrown = smoothstep(0.0, 0.08, crown.x);
-  // On a cold world snow lies thickest at the top and sunward side of a
-  // conifer's crown, so each crown is white over its dark needles, warm where
-  // the sun lights it and blue on its shaded side. A bare broadleaf tree is
-  // twigs over the snow.
-  float snowy = smoothstep(0.5, 0.9, crown.x * 0.6 + lightC * 0.35 + (fract(crown.w * 5.1) - 0.5) * 0.35 + tSimplex(q * 2.3).x * 0.12);
-  vec3 snowCol = mix(vec3(0.78, 0.87, 1.05), vec3(1.14, 1.0, 0.78), smoothstep(0.75, 1.25, lightC));
-  own = mix(own, snowCol, frost * kind * snowy * 0.75);
-  isCrown *= 1.0 - frost * (1.0 - kind) * 0.35;
-  // Low on a crown and in the gaps the light is cut by the crowns round.
-  float occlude = mix(mix(0.55, 0.8, frost * kind), 1.0, sqrt(crown.x));
-  // Under a closed cold canopy the snow lies in the trees' shade.
-  vec3 floorLit = between * mix(0.7, 1.0, 1.0 - density * 0.6) * mix(1.0, 0.5, frost * kind * density);
-  vec3 near = mix(floorLit, own * lightC * occlude, isCrown);
-  near *= 1.0 - shadow * mix(0.55, 0.4, isCrown);
-  // Shade on snow is blue, lit by the sky.
-  return near * mix(vec3(1.0), vec3(0.82, 0.92, 1.12), frost * max(shadow, 1.0 - isCrown));
-}
-`;
-
 /** Procedural detail by biome. Drawn once into the baked picture. */
 const DETAIL = /* glsl */ `
   if (uTerrainDetail > 0.5) {
@@ -537,18 +502,35 @@ const DETAIL = /* glsl */ `
     // Sea is height 0 and land at least 1 in 255, so this is the coastline.
     float coast = nh.a * 255.0;
     float sea = 1.0 - smoothstep(0.35, 0.65, coast);
-    float land = 1.0 - sea;
-    float liquid = sea * uSeaLiquid;
+    // With the generator's shore field: map pixels from the water line, above
+    // 0 on land, and the sea's depth.
+    float shoreAt = 0.0;
+    float seaDepth = 0.0;
+    if (uShoreOn > 0.5) {
+      vec2 shoreHere = tSmooth(uTerrainShore, vTerrainUv).rg;
+      shoreAt = (shoreHere.r * 255.0 - 128.0) / 127.0 * ${SHORE_RANGE.toFixed(1)};
+      seaDepth = shoreHere.g / max(1.0 - shoreHere.g, 0.004);
+    }
 
     // Broad patches, then fine grain. Open water needs neither. Each block
     // below runs only where its share is worth drawing: biomes lie in large
     // patches, so the GPU skips them together and the cost stays low.
     vec3 broad = vec3(0.0);
     vec3 fine = vec3(0.0);
-    if (liquid < 0.99 || coast > 0.01) {
+    if (uShoreOn > 0.5 ? (uSeaLiquid < 0.5 || shoreAt > -3.0) : (sea * uSeaLiquid < 0.99 || coast > 0.01)) {
       broad = tField(p, 4.0, 3, footprint);
       fine = tField(p + 31.0, 0.5, 5, footprint);
     }
+    // The heights change only at a pixel's centre, so a coast drawn from them
+    // follows the pixels' steps. The shore field's line is smooth, and a
+    // little noise keeps it from running as ruled as a drawn curve.
+    float shoreLine = shoreAt + fine.x * 0.14 + broad.x * 0.22;
+    if (uShoreOn > 0.5) {
+      float edge = max(fwidth(shoreAt) * 0.75, 0.06);
+      sea = 1.0 - smoothstep(-edge, edge, shoreLine);
+    }
+    float land = 1.0 - sea;
+    float liquid = sea * uSeaLiquid;
     // A slow push to bend the plates and cracks below, whose edges are
     // otherwise ruled straight.
     vec2 bend = vec2(broad.x, tSimplex(p / 2.7 + 77.0).x) * 0.35 + vec2(fine.x, -fine.x) * 0.05;
@@ -561,6 +543,24 @@ const DETAIL = /* glsl */ `
     for (int k = 0; k < 8; k++) {
       sum += w[k];
       soft += w[k] * uBiomeColour[k];
+    }
+    if (uShoreOn > 0.5) {
+      // Beside the coast the picture is a blend of land and sea, and the
+      // line drawn here is not the picture's. The land takes its colour from
+      // the weights, which hold no sea, and the sea from its depth.
+      if (sum > 0.02) albedo = mix(soft / sum, albedo, smoothstep(0.85, 0.995, sum));
+      float fade = 1.0 + seaDepth * ${SEA_FADE.toFixed(3)};
+      fade *= fade;
+      vec3 water = mix(uSeaDeep, uSeaShallow, 1.0 / (fade * fade));
+      float abyss = 1.0 + seaDepth * ${ABYSS_FADE.toFixed(3)};
+      abyss *= abyss;
+      water *= 1.0 - uSeaLiquid * ${ABYSS_DARK.toFixed(3)} * (1.0 - 1.0 / (abyss * abyss));
+      float bedFade = 1.0 + seaDepth * ${BED_FADE.toFixed(3)};
+      bedFade *= bedFade;
+      water = mix(water, uSeaBed, uSeaLiquid * ${BED_SHOWS.toFixed(3)} / (bedFade * bedFade));
+      // The generator blends these in sRGB, and the picture is linear here.
+      water = mix(water / 12.92, pow((water + 0.055) / 1.055, vec3(2.4)), step(0.04045, water));
+      albedo = mix(albedo, water, sea);
     }
     if (sum > 0.5) {
       float sharp = 1e-6;
@@ -726,104 +726,54 @@ const DETAIL = /* glsl */ `
     vec3 view = normalize(cameraPosition - vTerrainPos);
     float glint = max(dot(n, normalize(view + uTerrainSun)), 0.0);
 
-    // Forest: a canopy drawn as a height field of tree crowns, not as a
-    // colour. Each crown is lit on its sunward side and casts a shadow on the
-    // crowns or the ground beyond it, so the canopy's texture is light and
-    // shade. A slow density field thins the trees into open stands, clearings
-    // and lone trees, and the crowns thin out at the forest's edge too.
+    // Forest: the trees are real shapes standing on the ground (forest3d).
+    // The picture draws only what lies under them, read from where they
+    // stand: the litter in a canopy's shade, the open ground of a glade, and
+    // the shadow each tree throws.
+    vec2 trees = texture2D(uForestCover, vTerrainUv).rg;
     float woods = pw[${P.forest}] + pw[${P.taiga}];
     if (woods > 0.02) {
       float s = min(woods, 1.0);
       float taiga = pw[${P.taiga}] / max(woods, 1e-3);
-      // Conifers take the higher ground and some stands of their own. A
-      // cold forest is all conifers.
-      float stands = tSimplex(p / 7.0 + 23.0).x;
-      float conifer = max(taiga, smoothstep(0.2, 0.32, nh.a + broad.x * 0.06) * 0.85 + smoothstep(0.35, 0.6, stands) * 0.7);
-      // A cold forest has patches of bare birch among its conifers.
-      conifer = min(conifer, 1.0 - taiga * smoothstep(0.35, 0.55, tSimplex(p / 2.2 + 31.0).x + fine.x * 0.2));
-      conifer = clamp(conifer, 0.0, 1.0);
-      // Patches of broadleaf trees turning colour, as in autumn.
-      float turning = uForestAutumn * (1.0 - conifer) * smoothstep(0.2, 0.45, tSimplex(p / 3.2 + 5.0).x + fine.x * 0.15);
-
-      // How many cells hold a tree: thick in the gullies, thinner on ridges,
-      // with clearings, thinning to single trees at the edge of the forest.
-      vec3 dens = tField(p + 53.0, 2.6, 3, footprint);
-      float density = 0.95 + dens.x * 0.9 - smoothstep(0.15, 0.55, cavFine) * 0.45 + smoothstep(0.0, -0.3, cavFine) * 0.2;
-      // Firebreaks through some conifer stands, as in a plantation.
-      vec2 cut = vec2(dot(p, vec2(0.8, 0.6)), dot(p, vec2(-0.6, 0.8))) / 3.1;
-      vec2 off = abs(fract(cut + fine.x * 0.04) - 0.5);
-      float lane = smoothstep(0.03 + footprint / 3.1, 0.015, min(off.x, off.y) - 0.0);
-      density -= lane * conifer * (1.0 - taiga) * smoothstep(0.45, 0.7, stands);
-      // Cold forest is a mostly closed canopy, thinner on ridges, with small
-      // snowy clearings.
-      float glade = 1.0 - smoothstep(-0.65, -0.45, tField(p + 71.0, 0.9, 2, footprint).x + fine.x * 0.15);
-      density = mix(density, 0.95 + dens.x * 0.3 - smoothstep(0.15, 0.55, cavFine) * 0.25 - glade * 0.75, taiga);
-      density = clamp(density, 0.0, 0.97) * smoothstep(0.05, mix(0.75, 0.4, taiga), s);
-
-      // Broadleaf and conifer crowns lie on grids of their own sizes, since
-      // a grid whose size changed from place to place would stretch its
-      // crowns into swirls.
-      float cone = smoothstep(0.3, 0.7, conifer);
-            float keepLeaf = tKeep(0.14, footprint);
-      float keepNeedle = tKeep(0.1, footprint);
-      float keep = mix(keepLeaf, keepNeedle, cone);
-
-      // The palette: lit and deep colours for broadleaf and conifer crowns,
-      // and the colours broadleaf trees turn.
+      // Conifers take the higher ground. A cold forest is all conifers.
+      float conifer = clamp(max(taiga, smoothstep(0.2, 0.32, nh.a + broad.x * 0.06) * 0.85), 0.0, 1.0);
       vec3 leaf = mix(uForest[1], uForest[0], 0.5);
       vec3 needle = mix(uForest[3], uForest[2], 0.4);
-      vec3 turn = mix(uForest[4], uForest[5], 0.5);
-      vec3 meanCrown = mix(mix(leaf, turn, turning * 0.6), needle, conifer);
-      // The forest floor between crowns is dark, and clearings show the
-      // clearing ground. At the edge it is the ground beside the forest.
-      vec3 floorCol = mix(meanCrown * 0.4, uBiomeClearing, smoothstep(0.5, 0.15, density));
-      // Under a cold forest the floor is snow.
-      floorCol = mix(floorCol, uBiomeClearing * 0.85, taiga);
-      vec3 between = mix(albedo, floorCol, smoothstep(0.3, 0.85, s));
-
-      // Far off, a crown is smaller than a pixel: the canopy averages to its
-      // cover, its tone and the share of it in shade. A cold forest averages
-      // to dark needles with some snow on them.
-      float meanCover = density * mix(0.8, mix(0.6, 0.85, taiga), cone);
-      vec3 farCrown = mix(meanCrown, mix(needle, uBiomeClearing * 0.8, 0.3), taiga * cone);
-      vec3 farCol = mix(between, farCrown * (1.0 - 0.3 * density), meanCover);
-      vec3 col = farCol;
-      if (keep > 0.0) {
-        vec3 near = vec3(0.0);
-        if (cone < 0.99) near += (1.0 - cone) * mix(farCol, tCanopy(p / 0.14, density, 0.0, between, turning, uTerrainFrost * taiga), keepLeaf);
-        if (cone > 0.01) near += cone * mix(farCol, tCanopy(p / 0.1 + 17.0, density, 1.0, between, turning, uTerrainFrost * taiga), keepNeedle);
-        col = near;
-      }
-      // Groves: the canopy is lighter and darker in patches larger than a
-      // crown, so it keeps a grain when the crowns are too small to draw.
+      // A glade shows the clearing ground, a little darker than open
+      // grassland for the damp and the shade. Under a cold forest it is snow.
+      vec3 glade = mix(albedo, uBiomeClearing * mix(0.88, 1.0, taiga), smoothstep(0.3, 0.85, s));
+      vec3 litter = mix(mix(leaf, needle, conifer) * 0.4, uBiomeClearing * 0.85, taiga);
+      // Lighter and darker in patches larger than a crown.
       float grove = tField(p + 19.0, 0.7, 2, footprint).x;
-      col *= 1.0 + grove * 0.18 * density;
-      // On a slope turned from the sun the crowns shade each other more, and
-      // on one facing it more of each crown is lit, so a thick canopy shows
-      // the shape of the ground under it more than bare ground does.
-      float faceSun = clamp(dot(n, uTerrainSun) / uTerrainSun.y, 0.5, 1.25);
-      col *= mix(1.0, faceSun, 0.6 * density);
-      albedo = col;
+      albedo = mix(glade, litter * (1.0 + grove * 0.18), trees.r);
+      // A glade is grass, and is drawn as grass is, not as one flat colour.
+      // A cold forest's is snow.
+      pw[${P.grass}] += smoothstep(0.3, 0.85, s) * (1.0 - trees.r) * (1.0 - taiga);
     }
-    // Grass: lighter and darker patches with a fine grain.
+    // A tree's shadow falls on whatever ground lies beyond it. Shade on snow
+    // is blue, lit by the sky.
+    float treeShade = trees.g * (1.0 - 0.5 * trees.r) * land;
+    albedo *= 1.0 - 0.45 * treeShade;
+    albedo *= mix(vec3(1.0), vec3(0.82, 0.92, 1.12), uTerrainFrost * treeShade);
+    // Grass: lighter and darker patches with a fine grain. No meadow is one
+    // green: it runs from lush, dark and a little blue, to dry and olive, in
+    // patches a few fields across and smaller ones within them.
     if (pw[${P.grass}] > 0.02) {
-      float s = pw[${P.grass}];
+      float s = min(pw[${P.grass}], 1.0);
       shadeMul += s * (broad.x * 0.2 + fine.x * 0.16);
       bump += s * fine.yz * 0.05;
-      albedo = mix(albedo, albedo * vec3(1.12, 1.05, 0.8), s * smoothstep(0.0, 0.5, broad.x));
+      float field = tField(p + 43.0, 1.3, 3, footprint).x;
+      // And smaller ones still, so a glade a field wide is not one tone.
+      float small = tField(p + 87.0, 0.35, 3, footprint).x;
+      float dryness = smoothstep(-0.4, 0.5, broad.x * 0.5 + field * 0.45 + small * 0.4);
+      vec3 meadow = mix(albedo * vec3(0.74, 0.88, 0.72), albedo * vec3(1.12, 1.03, 0.76), dryness);
+      albedo = mix(albedo, meadow, s);
     }
-    // Scrub: bare ground with dark bushes dotted over it.
+    // Scrub: bare ground. Its bushes are real shapes standing on it (forest3d).
     if (pw[${P.scrub}] > 0.02) {
       float s = pw[${P.scrub}];
       shadeMul += s * (broad.x * 0.15 + fine.x * 0.14);
       bump += s * fine.yz * 0.04;
-      float keep = tShow(0.1, footprint);
-      if (keep > 0.0) {
-        vec4 cell = tCell(p / 0.3 + 3.7);
-        float bush = (1.0 - smoothstep(0.1, 0.28, cell.x)) * step(0.4, cell.w) * keep;
-        albedo = mix(albedo, albedo * vec3(0.42, 0.55, 0.38), s * bush);
-        bump += s * bush * (1.0 - bush) * cell.yz * 1.2;
-      }
     }
     // Sand: smooth, with wind ripples.
     if (pw[${P.sand}] > 0.02) {
@@ -1162,7 +1112,9 @@ const DETAIL = /* glsl */ `
 
     // Water: ripples, a glint of the sun, and foam where it meets the land.
     vec3 wave = liquid > 0.01 ? tField(p + 11.0, 0.6, 3, footprint) : vec3(0.0);
-    float foam = smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
+    float foam = uShoreOn > 0.5
+      ? smoothstep(-0.5, -0.15, shoreLine) * (1.0 - smoothstep(-0.08, 0.04, shoreLine))
+      : smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
     foam *= smoothstep(-0.3, 0.4, fine.x);
     // Only a liquid sea ripples, foams and glints.
     foam *= uSeaLiquid;
@@ -1171,15 +1123,21 @@ const DETAIL = /* glsl */ `
     // Coasts past the edge are drawn at half the map's resolution, and foam
     // traces their steps, so it thins out there.
     foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
-    bump = mix(bump, wave.yz * 0.03, liquid);
+    // The water is calmer in the shallows, where the bed shows through.
+    float swell = uShoreOn > 0.5 ? mix(0.3, 1.0, smoothstep(0.0, 1.2, seaDepth)) : 1.0;
+    bump = mix(bump, wave.yz * 0.03 * swell, liquid);
     bump3 *= 1.0 - liquid;
-    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08, liquid);
+    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.08 * swell, liquid);
     form = mix(form, 1.0, liquid);
-    // The pattern evens out along a gully, which reads darker and a little
-    // cooler, as damp ground in shade.
-    shadeMul = mix(shadeMul, 1.0, gully * 0.5);
-    form -= gully * 0.3;
-    albedo = mix(albedo, albedo * vec3(0.82, 0.86, 0.92), gully * 0.6);
+    // The pattern evens out along a gully, which reads a little darker and
+    // cooler, as damp ground in shade. Only along the middle of a course that
+    // has gathered some water, and lightly: the carved relief already lights
+    // one side and shades the other, and a darker, wider band reads as a
+    // stain on the ground.
+    float gullyShade = gully * smoothstep(0.1, 0.24, drain.r);
+    shadeMul = mix(shadeMul, 1.0, gullyShade * 0.5);
+    form -= gullyShade * 0.14;
+    albedo = mix(albedo, albedo * vec3(0.82, 0.86, 0.92), gullyShade * 0.4);
     // A cut in the snow: its sides lit and shaded by the sun, its floor in
     // shade with dark rock showing.
     bump += gullySlope * (1.0 - liquid);
@@ -1189,7 +1147,7 @@ const DETAIL = /* glsl */ `
     albedo *= max(shadeMul, 0.2) * pow(clamp(form, 0.3, 1.6), 2.2);
     // Wet ground at the water line: darker and a little bluer, with a ragged
     // upper edge.
-    float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.5 * steep);
+    float wet = smoothstep(0.06, 0.3 + 0.12 * fine.x, seaNear) * land * uSeaLiquid * (1.0 - 0.8 * steep);
     albedo = mix(albedo, albedo * vec3(0.34, 0.38, 0.44), wet * 0.85);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
     if (river + riverBank + riverGreen > 0.001) {
@@ -1302,9 +1260,6 @@ const BAKE_VERTEX = /* glsl */ `
 gl_Position = vec4((uv - uBakeRect.xy) / uBakeRect.zw * 2.0 - 1.0, 0.0, 1.0);
 `;
 
-/** Seas that ripple, foam and glint. The rest are drawn as the picture has them. */
-const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
-
 /**
  * Add the terrain's lighting and detail to `material`, an unlit material
  * carrying the map picture. The material must not also use vertex shading.
@@ -1394,9 +1349,34 @@ export function applyTerrainShader(
         : Array.from({ length: 6 }, (): Rgb => [0, 0, 0])
       ).map(colour),
     };
-    shader.uniforms.uForestAutumn = { value: forest?.turning ?? 0 };
+    shader.uniforms.uForestCover = {
+      value: weighs ? (shading.forestCover ?? dry) : dry,
+    };
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
+    };
+    // A sea that is ground has no water line, and keeps the picture's colour.
+    const shore =
+      weighs && planet && !GROUND_SEAS.includes(planet.sea.look)
+        ? (shading.shore ?? null)
+        : null;
+    shader.uniforms.uTerrainShore = { value: shore ?? dry };
+    shader.uniforms.uShoreOn = { value: shore ? 1 : 0 };
+    const srgb = (rgb: Rgb, scale = 1) =>
+      new THREE.Vector3(
+        (rgb[0] * scale) / 255,
+        (rgb[1] * scale) / 255,
+        (rgb[2] * scale) / 255,
+      );
+    shader.uniforms.uSeaShallow = {
+      value: srgb(planet?.sea.shallow ?? [0, 0, 0]),
+    };
+    shader.uniforms.uSeaDeep = { value: srgb(planet?.sea.deep ?? [0, 0, 0]) };
+    shader.uniforms.uSeaBed = {
+      value: srgb(
+        planet ? planet.biomes[planet.shore].colour : [0, 0, 0],
+        BED_WET,
+      ),
     };
     shader.uniforms.uTerrainFrost = { value: planet?.frost ?? 0 };
     shader.uniforms.uSeaPattern = {
@@ -1461,7 +1441,7 @@ export function applyTerrainShader(
       .replace("GROUND_LIT_HERE", ground ? GROUND_LIT : "")
       .replace("HAZE_HERE", drawing ? "" : HAZE)
       .replace("BAKE_ALPHA_HERE", drawing ? "diffuseColor.a = sheen;" : "");
-    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE).replace("FOREST_HERE", bake?.kind === "read" ? "" : FOREST)}${bakeHead}${ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
+    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${bakeHead}${ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>\n${body}`,
     )}`;

@@ -1249,7 +1249,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "reaches the live hub, so it cannot run in CI"]
     async fn live_discovery() {
-        let config = discover("https://coilbox-hub.vercel.app")
+        let config = discover("https://hub.coilbox.org")
             .await
             .expect("discovery failed");
         println!("account service: {}", config.supabase_url);
@@ -1267,7 +1267,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "opens a browser and needs a real account, so it cannot run in CI"]
     async fn live_sign_in() {
-        let config = discover("https://coilbox-hub.vercel.app")
+        let config = discover("https://hub.coilbox.org")
             .await
             .expect("discovery failed");
         println!("opening your browser, sign in there within a minute");
