@@ -54,18 +54,21 @@ const SHEET_ORDER = -2.45;
 /** The decal's reach, in radii, that puts its ring at the town's furthest edge. */
 const DECAL_REACH = 1.38;
 /** The side of the largest shadow picture. */
-const MAX_SHADOW = 2048;
+const MAX_SHADOW = 1024;
 /** A gap under a building smaller than this needs no foundation. */
 const FOUNDATION_MIN = 0.001;
 /** How much a building's shade may drift from the kit's own. */
 const SHADE_DRIFT = 0.14;
 
-/** The shadow picture's side for a town: as fine as a full capital's at 2048. */
+/**
+ * The shadow picture's side for a town, in proportion to its radius. A full
+ * capital gets 1024, the texel density a stronghold's shadow already has.
+ */
 export function shadowSide(radius: number): number {
-  const want = (MAX_SHADOW * radius) / CAPITAL_RADIUS;
-  let side = 1;
-  while (side < want && side < MAX_SHADOW) side *= 2;
-  return side;
+  return Math.min(
+    MAX_SHADOW,
+    Math.ceil((MAX_SHADOW * radius) / CAPITAL_RADIUS),
+  );
 }
 
 interface Placed {

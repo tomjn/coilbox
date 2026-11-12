@@ -220,8 +220,9 @@ describe("buildTownModelLayer", () => {
 
 describe("shadowSide", () => {
   it("sizes a town's shadow by its radius", () => {
-    expect(shadowSide(CAPITAL_RADIUS)).toBe(2048);
-    expect(shadowSide(CAPITAL_RADIUS * 2)).toBe(2048);
-    expect(shadowSide(0.9)).toBe(512);
+    expect(shadowSide(CAPITAL_RADIUS)).toBe(1024);
+    expect(shadowSide(CAPITAL_RADIUS * 2)).toBe(1024);
+    expect(shadowSide(0.9)).toBe(256);
+    expect(shadowSide(1.3)).toBe(370);
   });
 });
