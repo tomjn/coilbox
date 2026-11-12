@@ -49,7 +49,7 @@ const tools = (b: Builder, palette: TownPalette): Tools => {
   return {
     wall: add(palette.building, settled),
     ribs: add(palette.building, { ...settled, kind: 6 }),
-    alt: add(palette.building, { ...settled, tint: () => PLATE_TONE }),
+    alt: add(palette.building, { ...settled, kind: 5, tint: () => PLATE_TONE }),
     // Bare metal takes the sun's glint and none of painted metal's scuffs,
     // which are drawn for a model many times a building's size.
     dark: add(palette.dark, { kind: 13, clean: true }),

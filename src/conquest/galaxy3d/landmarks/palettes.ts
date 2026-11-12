@@ -239,7 +239,26 @@ export interface TownPalette {
   /** What settles on the roofs: moss, sand, snow, ash. */
   top: Rgb;
   topCover: number;
+  /** The slab each lot stands on, paler than the streets. */
+  pavement: Rgb;
+  /** Grass in a park or on a pitch, and the trees over it. */
+  grass: Rgb;
+  tree: Rgb;
 }
+
+/** How dark the streets and the pavements are beside the stronghold's concrete. */
+const TOWN_STREET = 0.42;
+const TOWN_PAVEMENT = 0.8;
+
+/**
+ * What grows in a town on the planets whose towns stand in the open: grass and
+ * the trees over it. The other planets' towns are sealed and have no parks.
+ */
+const TOWN_PLANTS: Partial<Record<PlanetId, { grass: Rgb; tree: Rgb }>> = {
+  temperate: { grass: [104, 138, 74], tree: [76, 114, 62] },
+  desert: { grass: [150, 146, 92], tree: [108, 124, 72] },
+  ice: { grass: [206, 214, 216], tree: [84, 112, 100] },
+};
 
 /** How far a town's walls are lifted from the stronghold's concrete towards white. */
 const TOWN_PALE = 0.35;
@@ -248,12 +267,10 @@ const TOWN_PALE = 0.35;
 const TOWN_RUST: Rgb = [170, 88, 56];
 const TOWN_ACCENT = 0.6;
 
-const townFrom = ({
-  concrete,
-  trim,
-  top,
-  topCover,
-}: StrongholdPalette): TownPalette => ({
+const townFrom = (
+  { concrete, trim, top, topCover }: StrongholdPalette,
+  plants: { grass: Rgb; tree: Rgb } = { grass: top, tree: trim },
+): TownPalette => ({
   building: [
     Math.round(concrete[0] + (255 - concrete[0]) * TOWN_PALE),
     Math.round(concrete[1] + (255 - concrete[1]) * TOWN_PALE),
@@ -266,18 +283,24 @@ const townFrom = ({
     Math.round(concrete[2] + (TOWN_RUST[2] - concrete[2]) * TOWN_ACCENT),
   ],
   street: [
-    Math.round(concrete[0] * 0.42),
-    Math.round(concrete[1] * 0.42),
-    Math.round(concrete[2] * 0.44),
+    Math.round(concrete[0] * TOWN_STREET),
+    Math.round(concrete[1] * TOWN_STREET),
+    Math.round(concrete[2] * (TOWN_STREET + 0.02)),
+  ],
+  pavement: [
+    Math.round(concrete[0] * TOWN_PAVEMENT),
+    Math.round(concrete[1] * TOWN_PAVEMENT),
+    Math.round(concrete[2] * TOWN_PAVEMENT),
   ],
   top,
   topCover,
+  ...plants,
 });
 
 export const TOWN_PALETTES: Record<PlanetId, TownPalette> = {
-  temperate: townFrom(STRONGHOLD_PALETTES.temperate),
-  desert: townFrom(STRONGHOLD_PALETTES.desert),
-  ice: townFrom(STRONGHOLD_PALETTES.ice),
+  temperate: townFrom(STRONGHOLD_PALETTES.temperate, TOWN_PLANTS.temperate),
+  desert: townFrom(STRONGHOLD_PALETTES.desert, TOWN_PLANTS.desert),
+  ice: townFrom(STRONGHOLD_PALETTES.ice, TOWN_PLANTS.ice),
   red: townFrom(STRONGHOLD_PALETTES.red),
   moon: townFrom(STRONGHOLD_PALETTES.moon),
   volcanic: townFrom(STRONGHOLD_PALETTES.volcanic),

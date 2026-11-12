@@ -206,4 +206,19 @@ describe("riverEdgeReader", () => {
     expect(read?.(-4.9, 0)).toBeCloseTo(-0.12);
     expect(read?.(4.9, 0)).toBeCloseTo(0.9);
   });
+
+  it("puts parks and courts on lots an open town leaves unbuilt", () => {
+    const open = models.filter((m) => m.settlements.includes("organic"));
+    const placed = layoutTown(town(3), OPEN_GRID, open, flat);
+    const fillers = placed.filter((p) => open[p.model].filler);
+    const buildings = placed.filter((p) => !open[p.model].filler);
+    expect(fillers.length).toBeGreaterThan(0);
+    expect(buildings.length).toBeGreaterThan(fillers.length);
+    // A block is four lots long, so a filler in a block with a building is
+    // within that of one.
+    for (const f of fillers)
+      expect(
+        Math.min(...buildings.map((b) => Math.hypot(b.x - f.x, b.z - f.z))),
+      ).toBeLessThan(4 * OPEN_GRID.lot);
+  });
 });

@@ -83,6 +83,13 @@ export const BUILD_FIT = 0.85;
 /** A building keeps this far from a river's edge, as the painted towns did. */
 export const RIVER_BANK = 0.05;
 
+/** The share of an open town's unbuilt lots that take a park, a court or the like. */
+export const FILLED = 0.8;
+/** The share of its built lots given up to one, so the centre has its squares. */
+export const CLEARED = 0.05;
+/** A lot inside the town that nothing is built on. */
+const SPARE = -1;
+
 /** The footprint of a model on a grid, in world units: its lots less the setback each side. */
 export function footprint(
   model: Pick<BuildingModel, "lots">,
@@ -122,26 +129,37 @@ function buildableAt(ground: TownGround, x: number, z: number): boolean {
 /**
  * Lay a town out as lots on a street grid. Each lot is judged once at its
  * centre, then takes the model nearest the height wanted there whose lots are
- * all free. A town with no lot to build on gets its lowest single lot model at
- * its centre, if the ground there allows it.
+ * all free. A lot left unbuilt inside the town may then take one of the
+ * models marked as fillers, picked from a second run of numbers so that the
+ * buildings stand where they would with no fillers. A town with no lot to
+ * build on gets its lowest single lot model at its centre, if the ground
+ * there allows it.
  */
 export function layoutTown(
   town: Town,
   grid: TownGrid,
-  models: readonly Pick<BuildingModel, "lots" | "height">[],
+  models: readonly Pick<BuildingModel, "lots" | "height" | "filler">[],
   ground: TownGround,
 ): Placement[] {
   const out: Placement[] = [];
   const rand = seeded(Math.floor(town.seed * 1e9));
+  const spareRand = seeded(Math.floor(town.seed * 1e9) + 7);
+  const fillers = models.flatMap((m, k) => (m.filler ? [k] : []));
   const cos = Math.cos(town.axis);
   const sin = Math.sin(town.axis);
   const reach = town.radius * 1.3;
   const [nu, nv] = grid.blockLots;
   // A village is lower than a capital.
   const stature = Math.min(1, town.radius / CAPITAL_RADIUS) ** 0.7;
-  const tallest = Math.max(...models.map((m) => m.height));
+  const tallest = Math.max(
+    ...models.filter((m) => !m.filler).map((m) => m.height),
+  );
 
-  /** The height wanted on the lot at `u, v` in the town's frame, or null to leave it empty. */
+  /**
+   * The height wanted on the lot at `u, v` in the town's frame, `SPARE` for a
+   * lot the town leaves unbuilt, or null for one outside it or on a street,
+   * a slope or water.
+   */
   const wantAt = (u: number, v: number): number | null => {
     const dx = u * cos - v * sin;
     const dz = u * sin + v * cos;
@@ -155,9 +173,10 @@ export function layoutTown(
       if (along > 0 && across < (grid.boulevard + grid.lot) / 2) return null;
     }
     if (!buildableAt(ground, town.x + dx, town.z + dz)) return null;
-    if (rand() > 1 - (1 - grid.edgeDensity) * t * t) return null;
+    if (rand() > 1 - (1 - grid.edgeDensity) * t * t) return SPARE;
     const profile = 0.06 + 0.94 * (1 - t) ** 1.8;
-    return tallest * stature * profile * (0.45 + 0.9 * rand());
+    const want = tallest * stature * profile * (0.45 + 0.9 * rand());
+    return fillers.length > 0 && spareRand() < CLEARED ? SPARE : want;
   };
 
   for (const bu of blockStarts(nu * grid.lot, reach, grid))
@@ -174,13 +193,14 @@ export function layoutTown(
         for (let b = 0; b < nv; b++) {
           if (taken[a * nv + b]) continue;
           const want = wants[a * nv + b];
-          if (want === null) continue;
+          if (want === null || want === SPARE) continue;
           // The model nearest the wanted height whose lots are all free and
           // all inside the town.
           let best = -1;
           let bestTurned = false;
           let bestOff = Number.POSITIVE_INFINITY;
           models.forEach((m, k) => {
+            if (m.filler) return;
             for (const turned of [false, true]) {
               // A square model looks the same either way round.
               if (turned && m.lots[0] === m.lots[1]) continue;
@@ -191,7 +211,8 @@ export function layoutTown(
                 for (let j = 0; j < lb && free; j++)
                   if (
                     taken[(a + i) * nv + b + j] ||
-                    wants[(a + i) * nv + b + j] === null
+                    wants[(a + i) * nv + b + j] === null ||
+                    wants[(a + i) * nv + b + j] === SPARE
                   )
                     free = false;
               if (!free) continue;
@@ -217,12 +238,51 @@ export function layoutTown(
             turn: bestTurned ? -town.axis + Math.PI / 2 : -town.axis,
           });
         }
+      // What the buildings left: a filler on most spare lots, a wide one where
+      // two spare lots lie side by side. A block with no building gets none,
+      // so no park stands alone outside the town.
+      const built = taken.some((t) => t === 1);
+      for (let a = 0; a < nu && built && fillers.length > 0; a++)
+        for (let b = 0; b < nv; b++) {
+          const spare = (i: number, j: number) =>
+            i < nu &&
+            j < nv &&
+            !taken[i * nv + j] &&
+            wants[i * nv + j] === SPARE;
+          if (!spare(a, b) || spareRand() > FILLED) continue;
+          const k = fillers[Math.floor(spareRand() * fillers.length)];
+          const m = models[k];
+          const wide = m.lots[0] !== m.lots[1];
+          const turned = wide && !spare(a + 1, b);
+          const [la, lb] = turned ? [m.lots[1], m.lots[0]] : m.lots;
+          let free = true;
+          for (let i = 0; i < la; i++)
+            for (let j = 0; j < lb; j++) if (!spare(a + i, b + j)) free = false;
+          // A wide filler with no second lot gives way to the first that fits.
+          const fit = free
+            ? k
+            : fillers.find(
+                (f) => models[f].lots[0] === 1 && models[f].lots[1] === 1,
+              );
+          if (fit === undefined) continue;
+          const [fa, fb] = fit === k ? [la, lb] : [1, 1];
+          for (let i = 0; i < fa; i++)
+            for (let j = 0; j < fb; j++) taken[(a + i) * nv + b + j] = 1;
+          const u = bu + (a + fa / 2) * grid.lot;
+          const v = bv + (b + fb / 2) * grid.lot;
+          out.push({
+            model: fit,
+            x: town.x + u * cos - v * sin,
+            z: town.z + u * sin + v * cos,
+            turn: fit === k && turned ? -town.axis + Math.PI / 2 : -town.axis,
+          });
+        }
     }
 
   if (out.length === 0 && buildableAt(ground, town.x, town.z)) {
     let lowest = -1;
     models.forEach((m, k) => {
-      if (m.lots[0] !== 1 || m.lots[1] !== 1) return;
+      if (m.filler || m.lots[0] !== 1 || m.lots[1] !== 1) return;
       if (lowest < 0 || m.height < models[lowest].height) lowest = k;
     });
     if (lowest >= 0)

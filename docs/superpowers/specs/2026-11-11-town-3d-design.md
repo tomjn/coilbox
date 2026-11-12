@@ -109,7 +109,11 @@ The lot sizes are decided. The other widths are the spike's and are tuned on scr
 
 The first entries are ten cuboids from 0.12 to 2.4 high, drawn at 1.5 times those heights, used for both kinds of settlement. A real model replaces a cuboid by taking its footprint and height. When no placeholder is left the list is the inventory.
 
-An open town's real models are in `openTown.ts`: twenty, from 0.18 to 3.6 high, on one, two and four lots. The layout picks the model nearest the height a lot wants, so each model has its own height. A model is built from the cheap parts in `parts.ts` in four finishes of the planet's one colour: pale cast walls, the same walls in broad ribs, a darker cast and dark metal, with a rust panel on a few. The town layer gives each building one of six muted liveries, so neighbours differ. A sealed outpost still uses the cuboids.
+An open town's real models are in `openTown.ts`: twenty, from 0.18 to 3.6 high, on one, two and four lots. The layout picks the model nearest the height a lot wants, so each model has its own height. A model is built from the cheap parts in `parts.ts` in the planet's concrete: pale cast walls, the same walls in broad ribs, a darker cast and dark metal, with a rust panel on a few. A sealed outpost still uses the cuboids.
+
+Each copy of a model is then dressed in one livery from `liveries.ts`, which changes the surface and colour of its walls and leaves its trim. There are concrete liveries in six colours, four of glass and three of brick. Brick is for buildings up to 0.9 high, or 1.2 for the dark brick, and glass for those from 0.6 up, so a town has brick at its edge and glass towers in its middle. Roofs keep their concrete and what has settled on it. Every livery colour multiplies the planet's wall colour, so a town still belongs to its planet.
+
+`fillers.ts` holds what an open town puts on a lot it does not build on: a park, a garden with a pond, two courts, a car park, a playground, a paved square, and on two lots a pitch inside a running track and a long park. The layout puts one on 80% of the lots the town leaves unbuilt in a block that has a building, and gives up 5% of the built lots to one, so the centre has squares. It picks them from a second run of random numbers, so adding a filler does not move a building. A sealed outpost has none.
 
 ### Town layer
 
@@ -118,6 +122,7 @@ An open town's real models are in `openTown.ts`: twenty, from 0.18 to 3.6 high, 
 - Each model is built once. A town's mesh is the models copied to their placements and merged, so a town is one draw. Each copy takes its own shade so no two neighbours match.
 - The material is the landmark material, lit by the terrain's sun, with the cast panel pattern.
 - The street sheet is a mesh draped on the ground inside the town's edge, in one colour from the palette, fading out at the edge. It draws where the painted town drew, over a province's tint.
+- In an open town each lot stands on a slab of pavement, paler than the street sheet, that reaches down to the lowest ground under the lot. The streets between the blocks then read as streets.
 - Each town bakes one shadow map from the sun, as a landmark does, and its buildings and the ground read it. The map's side follows the town's radius, up to 1024 for a full capital, which is the texel density a stronghold's shadow has. The spike's 2048 for every town would have held about 200 MB on the 18 location test map. The PR reports the texture memory the test map takes.
 - The ground decal gets two changes: ground beyond the shadow map's far side is not drawn as shadowed, and a town's decal leaves out the darkening at the foot, which was drawn for a single model.
 - `setStyle(nodeIndex, TownStyle)` takes the same style the painted towns take. Hidden by fog draws the town dim and grey. The ring is drawn on the decal, one lot outside the town's furthest building. A town's edge can reach well past its buildings where the ground is too steep or wet to build on, so the ring follows the buildings and not the edge.
