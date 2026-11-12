@@ -250,6 +250,8 @@ export function buildTerrainMesh(
   ground?: GroundShading,
   /** The map's own weights, which go with `color` when it is pixels. */
   biomes?: BiomePixels,
+  /** Where the trees stand, from the forest layer. */
+  forestCover?: THREE.Texture,
 ): TerrainSheet {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
@@ -421,6 +423,7 @@ export function buildTerrainMesh(
     detail: detail && isColorPixels(color),
     frame,
     ground,
+    forestCover,
   };
   // Every material that shows the map picture.
   const pictured: THREE.MeshBasicMaterial[] = [mat];
