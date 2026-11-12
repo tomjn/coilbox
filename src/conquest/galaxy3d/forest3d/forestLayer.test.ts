@@ -106,13 +106,40 @@ describe("buildForestLayer", () => {
     expect(near).toBe((layer?.count ?? 0) * 2);
   });
 
-  it("builds nothing without weights, on a planet with no trees, or where no forest grows", () => {
+  it("builds nothing without weights", () => {
     expect(build({ biomes: false }).layer).toBeUndefined();
-    expect(build({ planet: "moon" }).layer).toBeUndefined();
-    // Slot 4 is rock on a temperate planet.
-    const rock = build({ slot: 4 });
-    expect(rock.layer?.count).toBe(0);
-    expect(rock.meshes.length).toBe(0);
+  });
+
+  /** How many trees each mesh's material draws as rock, and as anything else. */
+  const rockAndOther = (meshes: THREE.Mesh[]) => {
+    let rock = 0;
+    let other = 0;
+    for (const m of meshes) {
+      const n = (m.geometry as THREE.InstancedBufferGeometry).instanceCount;
+      if ((m.material as THREE.ShaderMaterial).uniforms.uRock.value) rock += n;
+      else other += n;
+    }
+    return { rock, other };
+  };
+
+  it("scatters rocks and nothing else on a dead world", () => {
+    // Slot 2 is rock on a moon, and slot 0 its regolith.
+    const rock = rockAndOther(build({ planet: "moon", slot: 2 }).meshes);
+    expect(rock.rock).toBeGreaterThan(1000);
+    expect(rock.other).toBe(0);
+    const regolith = rockAndOther(build({ planet: "moon", slot: 0 }).meshes);
+    expect(regolith.rock).toBeGreaterThan(0);
+    expect(regolith.rock).toBeLessThan(rock.rock / 3);
+    expect(regolith.other).toBe(0);
+  });
+
+  it("grows a desert's scrub without a forest palette", () => {
+    // Slot 3 is scrub on a desert.
+    const { rock, other } = rockAndOther(
+      build({ planet: "desert", slot: 3 }).meshes,
+    );
+    expect(other).toBeGreaterThan(1000);
+    expect(rock).toBe(0);
   });
 
   it("stands back from a town, a landmark's site and a road", () => {

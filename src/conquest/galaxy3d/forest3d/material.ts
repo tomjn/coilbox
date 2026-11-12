@@ -66,6 +66,8 @@ uniform vec3 uTrunk;
 uniform vec3 uTwig;
 uniform float uConifer;
 uniform float uBare;
+uniform float uRock;
+uniform vec3 uRockCol[2];
 uniform float uFrost;
 uniform vec3 uSun;
 uniform vec4 uFrame;
@@ -121,6 +123,18 @@ void main() {
   vec3 base = mix(uTrunk, leaf, vFoliage);
   // The sky lights what the sun does not, bluer than the sun.
   vec3 colour = base * (vec3(0.3, 0.34, 0.4) + vec3(1.18, 1.1, 0.96) * light);
+  if (uRock > 0.5) {
+    // Rock is hard edged: each face takes the light whole, with no wrap, and
+    // its colour runs in bands of grain.
+    vec3 face = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+    vec3 rn = normalize(mix(normalize(vNormal), face, 0.75));
+    float hard = max(dot(rn, uSun), 0.0) * mix(0.22, 1.0, sunlit) * mix(0.7, 1.0, vUp);
+    float band = vnoise(vec3(vWorld.x * 9.0, vWorld.y * 70.0, vWorld.z * 9.0));
+    vec3 rock = mix(uRockCol[0], uRockCol[1], clamp(vTree.x * 0.7 + band * 0.3, 0.0, 1.0)) * mix(0.82, 1.1, clump);
+    colour = rock * (vec3(0.3, 0.34, 0.4) + vec3(1.18, 1.1, 0.96) * hard);
+    light = hard;
+    n = rn;
+  }
 
   // Snow lies on what faces up, on a cold world, and little of it on twigs.
   float snow = uFrost * vFoliage * mix(1.0, 0.3, uBare) * smoothstep(0.25, 0.75, n.y * 0.7 + vUp * 0.35 + (clump - 0.5) * 0.5);
@@ -166,26 +180,60 @@ const PALE_BARK: [number, number, number] = [176, 172, 160];
 /** A bare crown's twigs. */
 const TWIG: [number, number, number] = [112, 98, 90];
 
-/** The material for one kind of tree on `planet`. */
+/**
+ * The colours of what grows on a planet with no forest of its own, such as a
+ * desert: sage bushes, then a cactus's green. First guesses, in sRGB.
+ */
+const DRY_PLANTS: NonNullable<Planet["forest"]> = {
+  broadleaf: [
+    [152, 150, 92],
+    [88, 94, 58],
+  ],
+  conifer: [
+    [118, 140, 88],
+    [64, 88, 60],
+  ],
+  autumn: [
+    [152, 150, 92],
+    [88, 94, 58],
+  ],
+  turning: 0,
+};
+/** A cactus's flesh and a dead tree's weathered wood, in sRGB. */
+export const CACTUS_STEM: [number, number, number] = [92, 118, 76];
+export const DEAD_WOOD: [number, number, number] = [124, 114, 104];
+
+/** The material for one kind of tree, plant or rock on `planet`. */
 export function treeMaterial(
   planet: Planet,
-  kind: { conifer: boolean; pale: boolean },
+  kind: {
+    conifer: boolean;
+    /** A birch: pale bark, and bare on a cold world. */
+    pale?: boolean;
+    rock?: boolean;
+    /** The colour of its stem, in place of bark. */
+    stem?: [number, number, number];
+  },
   frame: ForestFrame | undefined,
 ): THREE.ShaderMaterial {
-  const forest = planet.forest;
-  const colours = forest
-    ? [...forest.broadleaf, ...forest.conifer, ...forest.autumn].map(linear)
-    : Array.from({ length: 6 }, () => new THREE.Color());
+  const forest = planet.forest ?? DRY_PLANTS;
+  const colours = [
+    ...forest.broadleaf,
+    ...forest.conifer,
+    ...forest.autumn,
+  ].map(linear);
   return new THREE.ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
     uniforms: {
       uForest: { value: colours },
-      uTrunk: { value: linear(kind.pale ? PALE_BARK : BARK) },
+      uTrunk: { value: linear(kind.stem ?? (kind.pale ? PALE_BARK : BARK)) },
       uTwig: { value: linear(TWIG) },
       uConifer: { value: kind.conifer ? 1 : 0 },
       // A birch stands bare on a cold world and in leaf on a mild one.
       uBare: { value: kind.pale && planet.frost ? 1 : 0 },
+      uRock: { value: kind.rock ? 1 : 0 },
+      uRockCol: { value: planet.steep.map(linear) },
       uFrost: { value: planet.frost ?? 0 },
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uFrame: {

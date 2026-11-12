@@ -10,7 +10,7 @@
  * the ground and the trees always agree.
  */
 import * as THREE from "three";
-import { type PlanetId, planetOf } from "../../planets";
+import { type BiomePattern, type PlanetId, planetOf } from "../../planets";
 import type { RoadLine } from "../roadMask";
 import {
   createMarginSurface,
@@ -21,7 +21,12 @@ import {
 import { outerRingColor, type TerrainExtension } from "../terrainMesh";
 import { type Town, townEdge } from "../towns";
 import type { TownGround } from "../towns3d/layout";
-import { type ForestFrame, treeMaterial } from "./material";
+import {
+  CACTUS_STEM,
+  DEAD_WOOD,
+  type ForestFrame,
+  treeMaterial,
+} from "./material";
 import {
   type Forest,
   type ForestGround,
@@ -82,13 +87,23 @@ export function buildForestLayer(
 ): ForestLayer | undefined {
   const planet = planetOf(opts.planet);
   const biomes = extension.biomes;
-  if (!biomes || !planet.forest || surface.maxHeight <= 0) return undefined;
-  const slots = (pattern: string) =>
-    planet.biomes.flatMap((b, k) => (b.pattern === pattern ? [k] : []));
-  const forestSlots = slots("forest");
-  const taigaSlots = slots("taiga");
-  const grassSlots = slots("grass");
-  if (forestSlots.length + taigaSlots.length === 0) return undefined;
+  if (!biomes || surface.maxHeight <= 0) return undefined;
+  const slots = (...patterns: BiomePattern[]) =>
+    planet.biomes.flatMap((b, k) => (patterns.includes(b.pattern) ? [k] : []));
+  // In the order `ForestGround.cover` fills them.
+  const shareSlots = [
+    slots("forest"),
+    slots("taiga"),
+    slots("grass"),
+    slots("scrub"),
+    slots("rock", "scree", "mesa", "basalt", "flows"),
+    slots("tundra", "regolith", "ash", "dust", "earth", "cracked"),
+    slots("tundra"),
+  ];
+  // Something grows where there is forest or scrub. A world with scrub and
+  // no forest is a dry one.
+  const wooded = shareSlots[0].length + shareSlots[1].length > 0;
+  const alive = wooded || shareSlots[3].length > 0;
 
   // The rectangle the extension's picture covers, as the sheet's picture
   // coordinates place it in buildTerrainMesh.
@@ -201,14 +216,11 @@ export function buildForestLayer(
         cubed[s] = w * w * w;
         total += cubed[s];
       }
-      const share = (list: number[]) => {
+      shareSlots.forEach((list, n) => {
         let sum = 0;
         for (const s of list) sum += cubed[s];
-        return total > 0 ? sum / total : 0;
-      };
-      out[0] = share(forestSlots);
-      out[1] = share(taigaSlots);
-      out[2] = share(grassSlots);
+        out[n] = total > 0 ? sum / total : 0;
+      });
     },
     riverEdge: opts.riverEdge,
     blocked(x, z) {
@@ -229,12 +241,11 @@ export function buildForestLayer(
     },
   };
 
-  const forest = plantForest(
-    ground,
-    opts.seed,
-    TERRAIN_SUN,
-    planet.forest.turning,
-  );
+  const forest = plantForest(ground, opts.seed, TERRAIN_SUN, {
+    autumn: planet.forest?.turning,
+    alive,
+    arid: alive && !wooded,
+  });
 
   const long = Math.max(
     picture.maxX - picture.minX,
@@ -296,7 +307,17 @@ function buildTiles(
     const far = treeGeometry(s, true);
     const material = treeMaterial(
       planet,
-      { conifer: s.conifer, pale: s.id === "birch" },
+      {
+        conifer: s.conifer,
+        pale: s.id === "birch",
+        rock: s.look === "rock",
+        stem:
+          s.look === "cactus"
+            ? CACTUS_STEM
+            : s.look === "wood"
+              ? DEAD_WOOD
+              : undefined,
+      },
       frame,
     );
     disposables.push(near, far, material);
