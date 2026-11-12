@@ -6,7 +6,6 @@
  * without a scene. Which model goes on which lot is decided here, how a model
  * is drawn is not.
  */
-import type { SettlementStyle } from "../../planets";
 import {
   RIVER_FIELD_INSIDE,
   RIVER_FIELD_OUTSIDE,
@@ -56,24 +55,6 @@ export const OPEN_GRID: TownGrid = {
   stretch: 0.18,
   gaps: 0.16,
 };
-
-/** A sealed outpost's planet: lots three times the side, for a few big structures. */
-export const SEALED_GRID: TownGrid = {
-  lot: 0.75,
-  blockLots: [2, 2],
-  street: 0.2,
-  avenue: 0.3,
-  avenueEvery: 2,
-  boulevard: 0.35,
-  setback: 0.05,
-  edgeDensity: 0.7,
-  choice: 0,
-  stretch: 0,
-  gaps: 0,
-};
-
-export const gridFor = (style: SettlementStyle): TownGrid =>
-  style === "sealed" ? SEALED_GRID : OPEN_GRID;
 
 export interface Placement {
   /** Index into the models the layout was given. */
@@ -127,6 +108,11 @@ export interface OutpostGrid {
   join: number;
   /** How far a plate reaches past the footprint it carries. */
   plateMargin: number;
+  /**
+   * How far from the wanted height a structure may be and still be picked, as
+   * a share of that height. 0 picks the nearest every time.
+   */
+  choice: number;
 }
 
 /** A sealed outpost's grid. All but the lot are starting values, tuned on screen. */
@@ -137,7 +123,27 @@ export const OUTPOST_GRID: OutpostGrid = {
   jitter: 0.06,
   join: 0.5,
   plateMargin: 0.04,
+  choice: 0.2,
 };
+
+/**
+ * A foundation plate on the ground: its centre in world x and z, its turn, and
+ * its size along its own x and z.
+ */
+export interface Plate {
+  x: number;
+  z: number;
+  turn: number;
+  w: number;
+  d: number;
+}
+
+/** How a lot's wanted height falls from a town's centre, `t` 0, to its edge, `t` 1. */
+const heightProfile = (t: number): number => 0.06 + 0.94 * (1 - t) ** 1.8;
+
+/** How many landmarks a town of `radius` takes: two for a capital, one for a city. */
+const landmarksFor = (radius: number): number =>
+  radius >= CAPITAL_RADIUS ? 2 : radius >= CITY_RADIUS ? 1 : 0;
 
 /** The footprint of a model on a grid, in world units: its lots less the setback each side. */
 export function footprint(
@@ -224,14 +230,7 @@ export function layoutTown(
   const pickRand = seeded(Math.floor(town.seed * 1e9) + 13);
   const fillers = models.flatMap((m, k) => (m.filler ? [k] : []));
   const landmarks = models.flatMap((m, k) => (m.landmark ? [k] : []));
-  let landmarksLeft =
-    landmarks.length === 0
-      ? 0
-      : town.radius >= CAPITAL_RADIUS
-        ? 2
-        : town.radius >= CITY_RADIUS
-          ? 1
-          : 0;
+  let landmarksLeft = landmarks.length === 0 ? 0 : landmarksFor(town.radius);
   /** The central block the first landmark stands in. */
   let landmarkBlock: [number, number] | null = null;
   const cos = Math.cos(town.axis);
@@ -263,7 +262,7 @@ export function layoutTown(
     }
     if (!buildableAt(ground, town.x + dx, town.z + dz)) return null;
     if (rand() > 1 - (1 - grid.edgeDensity) * t * t) return SPARE;
-    const profile = 0.06 + 0.94 * (1 - t) ** 1.8;
+    const profile = heightProfile(t);
     const want = tallest * stature * profile * (0.45 + 0.9 * rand());
     if (fillers.length > 0 && spareRand() < CLEARED) return SPARE;
     return want > TOWER_FROM * tallest * stature && pickRand() < grid.gaps
@@ -446,6 +445,259 @@ export function layoutTown(
       });
   }
   return out;
+}
+
+/** How far past its radius a town.s lots are judged, as `layoutTown` reaches. */
+const EDGE_REACH = 1.3;
+
+/** One structure an outpost's layout has placed, in lots of the outpost's own frame. */
+interface Sited {
+  model: number;
+  /** Its first lot along the axis and across it, and how many it covers each way. */
+  i: number;
+  j: number;
+  la: number;
+  lb: number;
+  /** Set when its lots run across the model's own, a quarter turn from the axis. */
+  across: boolean;
+  /** Set when it shares a plate with a neighbour, which holds it at its lot's centre. */
+  joined: boolean;
+}
+
+/**
+ * Lay a sealed outpost out on bare ground. Lots tile the outpost with no
+ * streets between them. Each lot, nearest the centre first, takes a structure
+ * near the height wanted there whose lots are all free, and a city or a
+ * capital first takes its centrepieces. Every structure stands on a plate of
+ * its own, and some neighbours share one, with a bridge across the gap
+ * between them. A structure on a plate of its own is pulled a little off its
+ * lot's centre and turned, so the outpost does not read as a grid.
+ *
+ * The plates come back with each structure's own first, in the order of the
+ * placements, then the bridges.
+ */
+export function layoutOutpost(
+  town: Town,
+  grid: OutpostGrid,
+  models: readonly {
+    lots: readonly [number, number];
+    height: number;
+    landmark?: boolean;
+    round?: boolean;
+  }[],
+  ground: TownGround,
+): { placements: Placement[]; plates: Plate[] } {
+  const seed = Math.floor(town.seed * 1e9);
+  const rand = seeded(seed);
+  const pickRand = seeded(seed + 13);
+  const joinRand = seeded(seed + 29);
+  const cos = Math.cos(town.axis);
+  const sin = Math.sin(town.axis);
+  const { lot } = grid;
+  const n = Math.ceil((town.radius * EDGE_REACH) / lot);
+  const stature = Math.min(1, town.radius / CAPITAL_RADIUS) ** 0.7;
+  const plain = models.flatMap((m, k) => (m.landmark ? [] : [k]));
+  const tallest = Math.max(...plain.map((k) => models[k].height));
+
+  /** A point in the outpost's frame, `u` along its axis, in world x and z. */
+  const world = (u: number, v: number): [number, number] => [
+    town.x + u * cos - v * sin,
+    town.z + u * sin + v * cos,
+  ];
+
+  // Each lot is judged once, at its centre: null outside the outpost or where
+  // nothing can be built, SPARE where the outpost leaves it bare.
+  const side = 2 * n;
+  const wants: (number | null)[] = [];
+  for (let i = -n; i < n; i++)
+    for (let j = -n; j < n; j++) {
+      const u = (i + 0.5) * lot;
+      const v = (j + 0.5) * lot;
+      const [x, z] = world(u, v);
+      const dist = Math.hypot(x - town.x, z - town.z);
+      const t = dist / townEdge(town, Math.atan2(z - town.z, x - town.x));
+      if (t > 1 || !buildableAt(ground, x, z)) {
+        wants.push(null);
+        continue;
+      }
+      if (rand() > 1 - (1 - grid.edgeDensity) * t * t) {
+        wants.push(SPARE);
+        continue;
+      }
+      wants.push(tallest * stature * heightProfile(t) * (0.45 + 0.9 * rand()));
+    }
+  const at = (i: number, j: number) =>
+    i < -n || j < -n || i >= n || j >= n ? null : wants[(i + n) * side + j + n];
+  const taken = new Set<string>();
+  const open = (i: number, j: number) => {
+    const want = at(i, j);
+    return want !== null && want !== SPARE && !taken.has(`${i},${j}`);
+  };
+  const fits = (i: number, j: number, la: number, lb: number) => {
+    for (let a = 0; a < la; a++)
+      for (let b = 0; b < lb; b++) if (!open(i + a, j + b)) return false;
+    return true;
+  };
+
+  // Lots nearest the centre first, so the centrepieces and the tallest
+  // structures take the middle.
+  const order: [number, number][] = [];
+  for (let i = -n; i < n; i++) for (let j = -n; j < n; j++) order.push([i, j]);
+  order.sort(
+    ([ai, aj], [bi, bj]) =>
+      Math.hypot(ai + 0.5, aj + 0.5) - Math.hypot(bi + 0.5, bj + 0.5),
+  );
+
+  const sited: Sited[] = [];
+  const site = (k: number, i: number, j: number, across: boolean) => {
+    const [la, lb] = across
+      ? [models[k].lots[1], models[k].lots[0]]
+      : models[k].lots;
+    for (let a = 0; a < la; a++)
+      for (let b = 0; b < lb; b++) taken.add(`${i + a},${j + b}`);
+    sited.push({ model: k, i, j, la, lb, across, joined: false });
+  };
+  /** Both ways round for a model longer one way than the other. */
+  const ways = (k: number) =>
+    models[k].lots[0] === models[k].lots[1] ? [false] : [false, true];
+
+  const landmarks = models.flatMap((m, k) => (m.landmark ? [k] : []));
+  let landmarksLeft = landmarks.length === 0 ? 0 : landmarksFor(town.radius);
+  for (const [i, j] of order) {
+    if (landmarksLeft === 0) break;
+    const k = landmarks[Math.floor(pickRand() * landmarks.length)];
+    const way = ways(k).find((across) => {
+      const [la, lb] = across
+        ? [models[k].lots[1], models[k].lots[0]]
+        : models[k].lots;
+      return fits(i, j, la, lb);
+    });
+    if (way === undefined) continue;
+    site(k, i, j, way);
+    landmarksLeft--;
+  }
+
+  for (const [i, j] of order) {
+    const want = at(i, j);
+    if (want === null || want === SPARE || !open(i, j)) continue;
+    const options: { k: number; across: boolean }[] = [];
+    for (const k of plain)
+      for (const across of ways(k)) {
+        const [la, lb] = across
+          ? [models[k].lots[1], models[k].lots[0]]
+          : models[k].lots;
+        if (fits(i, j, la, lb)) options.push({ k, across });
+      }
+    if (options.length === 0) continue;
+    // A lot that wants more than any structure that fits is judged against
+    // the tallest that does.
+    const target = Math.min(
+      want,
+      Math.max(...options.map((o) => models[o.k].height)),
+    );
+    const off = (o: (typeof options)[number]) =>
+      Math.abs(models[o.k].height - target);
+    const nearest = Math.min(...options.map(off));
+    const near = options.filter(
+      (o) => off(o) <= Math.max(nearest, grid.choice * target),
+    );
+    const pick = near[Math.floor(pickRand() * near.length)];
+    site(pick.k, i, j, pick.across);
+  }
+
+  if (sited.length === 0) {
+    if (!buildableAt(ground, town.x, town.z))
+      return { placements: [], plates: [] };
+    let lowest = -1;
+    for (const k of plain) {
+      const m = models[k];
+      if (m.lots[0] !== 1 || m.lots[1] !== 1) continue;
+      if (lowest < 0 || m.height < models[lowest].height) lowest = k;
+    }
+    if (lowest < 0) return { placements: [], plates: [] };
+    // Centred on the anchor, so its lot runs from half a lot either side.
+    sited.push({
+      model: lowest,
+      i: -0.5,
+      j: -0.5,
+      la: 1,
+      lb: 1,
+      across: false,
+      // Held on the anchor, as a joined structure is held on its lot.
+      joined: true,
+    });
+  }
+
+  // Neighbours whose lots share an edge may share a plate. The bridge spans
+  // the gap between their own plates, as wide as the side they share.
+  const inset = grid.setback - grid.plateMargin;
+  const bridges: Plate[] = [];
+  for (let a = 0; a < sited.length; a++)
+    for (let b = a + 1; b < sited.length; b++) {
+      const p = sited[a];
+      const q = sited[b];
+      const alongU = p.i + p.la === q.i || q.i + q.la === p.i;
+      const alongV = p.j + p.lb === q.j || q.j + q.lb === p.j;
+      const shareV = Math.min(p.j + p.lb, q.j + q.lb) - Math.max(p.j, q.j);
+      const shareU = Math.min(p.i + p.la, q.i + q.la) - Math.max(p.i, q.i);
+      let bridge: { u: number; v: number; w: number; d: number } | null = null;
+      if (alongU && shareV > 0) {
+        const edge = p.i + p.la === q.i ? q.i : p.i;
+        const from = Math.max(p.j, q.j);
+        bridge = {
+          u: edge * lot,
+          v: (from + shareV / 2) * lot,
+          w: 2 * inset,
+          d: shareV * lot - 2 * inset,
+        };
+      } else if (alongV && shareU > 0) {
+        const edge = p.j + p.lb === q.j ? q.j : p.j;
+        const from = Math.max(p.i, q.i);
+        bridge = {
+          u: (from + shareU / 2) * lot,
+          v: edge * lot,
+          w: shareU * lot - 2 * inset,
+          d: 2 * inset,
+        };
+      }
+      if (!bridge || joinRand() >= grid.join) continue;
+      p.joined = true;
+      q.joined = true;
+      const [x, z] = world(bridge.u, bridge.v);
+      bridges.push({ x, z, turn: -town.axis, w: bridge.w, d: bridge.d });
+    }
+
+  const placements: Placement[] = [];
+  const plates: Plate[] = [];
+  for (const s of sited) {
+    const m = models[s.model];
+    let u = (s.i + s.la / 2) * lot;
+    let v = (s.j + s.lb / 2) * lot;
+    if (!s.joined) {
+      u += (2 * rand() - 1) * grid.jitter;
+      v += (2 * rand() - 1) * grid.jitter;
+    }
+    const base = -town.axis + (s.across ? Math.PI / 2 : 0);
+    // A square structure may face any side, a long one either end, and a
+    // round one any way at all.
+    const square = m.lots[0] === m.lots[1];
+    const spin =
+      square && m.round
+        ? rand() * Math.PI * 2
+        : square
+          ? Math.floor(rand() * 4) * (Math.PI / 2)
+          : Math.floor(rand() * 2) * Math.PI;
+    const [x, z] = world(u, v);
+    placements.push({ model: s.model, x, z, turn: base + spin, stretch: 1 });
+    plates.push({
+      x,
+      z,
+      turn: -town.axis,
+      w: s.la * lot - 2 * inset,
+      d: s.lb * lot - 2 * inset,
+    });
+  }
+  return { placements, plates: [...plates, ...bridges] };
 }
 
 /**
