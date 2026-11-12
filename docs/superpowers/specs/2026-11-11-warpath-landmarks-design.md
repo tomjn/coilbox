@@ -233,3 +233,13 @@ The pad is a wide eight-sided deck with blue painted markings, a kerb, and pods,
 It also picks which side the main tower stands and where the dish points.
 
 Like a depot it is painted metal and wears the same paint on every planet. Only the foundation's stone and what settles on top come from the planet. The mast carries one small red beacon and nothing else is lit. It takes a capital's share of the gap to its neighbours, because the start is a capital.
+
+## Spire
+
+A second form for a run's last stop, built from a reference image the user gave on 12 November 2026. On half of all runs, by the run's seed, it stands on the boss in place of the stronghold. `mapRunIdentities` gives the boss `landmark: "spire"`, and `landmarkKinds` honours that only on a location that would get a stronghold. Conquest never asks for one, so its enemy capitals keep the stronghold.
+
+The spire is a dark core inside a ring of eight tall plates with rounded heads. Four of them sweep out at the foot into buttresses, with a dark wall filling in under each. The four between them are shorter and rounded at both ends, over a dark eight-sided hall. A dark crown with a lid and three masts stands inside the plates' heads. It stands on a round cast hardstand, level with the highest ground under it, with a few low drums on the open ground between the buttresses.
+
+Like a depot it is painted metal and wears the same paint on every planet. Where the stop lies picks one of the five in `SPIRE_LIVERIES`: white and gold as in the image, graphite and orange, sand and oxblood, olive and gold, navy and white. Only the hardstand's stone and what settles on top come from the planet. One mast carries a small red beacon and nothing else is lit.
+
+It leaves out what the image has at a human scale: the ships, the signs and the small buildings at the foot.

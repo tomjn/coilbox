@@ -17,9 +17,10 @@ export type AnomalyKind = (typeof ANOMALY_KINDS)[number];
 
 /**
  * What a run can ask to stand on one of its stops: an anomaly, a depot on a
- * supply stop, or the landing pad on its start.
+ * supply stop, the landing pad on its start, or a spire in place of the
+ * stronghold on its last.
  */
-export type RunLandmark = AnomalyKind | "depot" | "landing";
+export type RunLandmark = AnomalyKind | "depot" | "landing" | "spire";
 
 /** What stands on a location in place of its town. */
 export type LandmarkKind = "stronghold" | RunLandmark;
@@ -34,7 +35,9 @@ export type LandmarkKind = "stronghold" | RunLandmark;
  * identity.
  *
  * An anomaly, a depot or a landing pad goes where a run's identities ask for
- * one. A stronghold wins if a location is asked for both.
+ * one. A stronghold wins if a location is asked for both, unless what is
+ * asked for is a spire, which stands in the stronghold's place and nowhere
+ * else.
  */
 export function landmarkKinds(
   nodes: Pick<GalaxyNode, "id" | "kind" | "owner">[],
@@ -49,8 +52,9 @@ export function landmarkKinds(
       n.owner !== playerFactionId &&
       n.owner !== NEUTRAL;
     if (n.kind === "capital" && enemy && identity?.end !== "start")
-      out.set(i, "stronghold");
-    else if (identity?.landmark) out.set(i, identity.landmark);
+      out.set(i, identity?.landmark === "spire" ? "spire" : "stronghold");
+    else if (identity?.landmark && identity.landmark !== "spire")
+      out.set(i, identity.landmark);
   });
   return out;
 }

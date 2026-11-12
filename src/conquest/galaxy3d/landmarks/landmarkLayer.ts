@@ -29,11 +29,14 @@ import {
   depotPalette,
   landingPalette,
   ruinPalette,
+  SPIRE_LIVERIES,
+  spirePalette,
   strongholdPalette,
 } from "./palettes";
 import { buildRuin, RUIN_REACH } from "./ruin";
 import { createLandmarkShadow, groundDecal } from "./shadow";
 import { pickSite } from "./site";
+import { buildSpire, SPIRE_REACH } from "./spire";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
 
 /** The ground's own colour at a world position, or undefined where unknown. */
@@ -133,22 +136,27 @@ export function buildLandmarkLayer(
   for (const [i, kind] of kinds) {
     if (!expected.has(i)) continue;
     const stronghold = kind === "stronghold";
+    const spire = kind === "spire";
     const depot = kind === "depot";
     const landing = kind === "landing";
     const ruin = kind === "ruin" ? ruinPalette(planet) : undefined;
-    // A stronghold and a landing pad take a capital's room, an anomaly an
-    // ordinary town's.
+    // A stronghold, a spire and a landing pad take a capital's room, an
+    // anomaly an ordinary town's.
     const reach = stronghold
       ? STRONGHOLD_REACH
-      : ruin
-        ? RUIN_REACH
-        : depot
-          ? DEPOT_REACH
-          : landing
-            ? LANDING_REACH
-            : ANOMALY_REACH;
+      : spire
+        ? SPIRE_REACH
+        : ruin
+          ? RUIN_REACH
+          : depot
+            ? DEPOT_REACH
+            : landing
+              ? LANDING_REACH
+              : ANOMALY_REACH;
     const share =
-      stronghold || landing ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE;
+      stronghold || spire || landing
+        ? CAPITAL_NEIGHBOUR_SHARE
+        : NEIGHBOUR_SHARE;
     const node = galaxy.nodes[i];
     const link = galaxy.links.find(([a, b]) => a === node.id || b === node.id);
     const other = link && index.get(link[0] === node.id ? link[1] : link[0]);
@@ -177,20 +185,27 @@ export function buildLandmarkLayer(
     const placedSeed = hashString(`${node.id}:${node.pos[0]}:${node.pos[1]}`);
     const { built } = stronghold
       ? buildStronghold(site.ground, strongholdPalette(planet), seed, edge)
-      : ruin
-        ? buildRuin(site.ground, ruin, seed, edge)
-        : depot
-          ? buildDepot(site.ground, depotPalette(planet), placedSeed)
-          : landing
-            ? buildLanding(site.ground, landingPalette(planet), placedSeed)
-            : buildAnomaly(
-                kind as Exclude<AnomalyKind, "ruin">,
-                site.ground,
-                anomalyPalette(planet),
-                placedSeed,
-                edge,
-                identities?.get(node.id)?.landmarkGroup,
-              );
+      : spire
+        ? buildSpire(
+            site.ground,
+            spirePalette(planet),
+            SPIRE_LIVERIES[placedSeed % SPIRE_LIVERIES.length],
+            placedSeed,
+          )
+        : ruin
+          ? buildRuin(site.ground, ruin, seed, edge)
+          : depot
+            ? buildDepot(site.ground, depotPalette(planet), placedSeed)
+            : landing
+              ? buildLanding(site.ground, landingPalette(planet), placedSeed)
+              : buildAnomaly(
+                  kind as Exclude<AnomalyKind, "ruin">,
+                  site.ground,
+                  anomalyPalette(planet),
+                  placedSeed,
+                  edge,
+                  identities?.get(node.id)?.landmarkGroup,
+                );
 
     const group = new THREE.Group();
     group.position.set(site.x, site.y, site.z);
@@ -214,13 +229,18 @@ export function buildLandmarkLayer(
     group.updateMatrixWorld(true);
 
     // A standing anomaly is far taller than it is wide, and so is its shadow.
-    // A depot's mast and a landing pad's tower are as tall.
+    // A depot's mast and a landing pad's tower are as tall. A spire stands as
+    // tall as a stronghold on a smaller foot, so its shadow falls as far.
     const decal = groundDecal(
       surface,
       site,
       reach,
       null,
-      stronghold || ruin ? reach : ANOMALY_SHADOW_REACH,
+      stronghold || ruin
+        ? reach
+        : spire
+          ? STRONGHOLD_REACH
+          : ANOMALY_SHADOW_REACH,
     );
     scene.add(decal.mesh);
     disposables.push(

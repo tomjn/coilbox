@@ -45,4 +45,17 @@ describe("landmarkKinds", () => {
     const ids = new Map([["their", { landmark: "ruin" as const }]]);
     expect(landmarkKinds(nodes, "me", ids).get(1)).toBe("stronghold");
   });
+
+  it("puts a spire in the stronghold's place when a run asks for one", () => {
+    const ids = new Map([["their", { landmark: "spire" as const }]]);
+    expect([...landmarkKinds(nodes, "me", ids)]).toEqual([[1, "spire"]]);
+  });
+
+  it("puts a spire nowhere a stronghold would not stand", () => {
+    const ids = new Map([
+      ["odd", { landmark: "spire" as const }],
+      ["home", { landmark: "spire" as const }],
+    ]);
+    expect([...landmarkKinds(nodes, "me", ids)]).toEqual([[1, "stronghold"]]);
+  });
 });

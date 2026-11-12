@@ -122,6 +122,17 @@ describe("buildLandmarkLayer", () => {
     expect([...layer.nodes].sort()).toEqual([1, 2]);
   });
 
+  it("raises a spire in the stronghold's place where a run asks for one", () => {
+    const stronghold = build();
+    const spire = build(
+      0.5,
+      new Map([["their", { landmark: "spire" as const }]]),
+    );
+    expect([...spire.layer.nodes]).toEqual([1]);
+    // The two stand on the same location and are not the same model.
+    expect(spire.layer.tops.get(1)).not.toBe(stronghold.layer.tops.get(1));
+  });
+
   it("raises no ruin on a moon, where the anomaly keeps its town", () => {
     const layer = buildLandmarkLayer(
       new THREE.Scene(),
