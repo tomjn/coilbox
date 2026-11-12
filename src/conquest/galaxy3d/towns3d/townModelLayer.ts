@@ -14,6 +14,10 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { PlanetId } from "../../planets";
 import { planetOf } from "../../planets";
+import { instancedTrees, type TreeInstance } from "../forest3d/forestLayer";
+import { treeMaterial } from "../forest3d/material";
+import { SPECIES } from "../forest3d/placement";
+import { treeGeometry } from "../forest3d/trees";
 import { at, Builder, box, seeded } from "../landmarks/kit";
 import { landmarkMaterial, setLandmarkState } from "../landmarks/material";
 import { townPalette } from "../landmarks/palettes";
@@ -24,6 +28,7 @@ import type { TownStyle } from "../townLayer";
 import { buildableAt, CAPITAL_RADIUS, type Town, townEdge } from "../towns";
 import { buildModel, modelsFor } from "./buildings";
 import {
+  BUILD_FIT,
   footprint,
   gridFor,
   layoutTown,
@@ -31,6 +36,8 @@ import {
   type TownGround,
 } from "./layout";
 import { dress, liveryFor } from "./liveries";
+import { applyStreetGround, hasStreets } from "./streetGround";
+import { streetTrees } from "./streetTrees";
 
 export interface TownModelLayer {
   /** The towns that were built, by node index. */
@@ -86,8 +93,13 @@ export function shadowSide(radius: number): number {
   );
 }
 
+/** A street tree's height, shortest and tallest, and how far it stands clear of a wall. */
+const STREET_TREE: [number, number] = [0.08, 0.12];
+const STREET_TREE_CLEAR = 0.035;
+
 interface Placed {
   material: THREE.ShaderMaterial;
+  trees: THREE.ShaderMaterial[];
   sheet: THREE.MeshBasicMaterial;
   decal: ReturnType<typeof groundDecal>;
 }
@@ -121,6 +133,28 @@ export function buildTownModelLayer(
     return g;
   });
 
+  // The kinds of tree an open town's streets are planted with: the planet's
+  // own, and palms where it has scrub and no forest. A sealed outpost and a
+  // planet where nothing grows have none.
+  const world = planetOf(planet ?? "temperate");
+  const treeKinds =
+    style !== "organic"
+      ? []
+      : world.forest
+        ? world.frost
+          ? ["spruce"]
+          : ["oak", "beech"]
+        : world.biomes.some((b) => b.pattern === "scrub")
+          ? ["palm"]
+          : [];
+  const treeShapes = treeKinds.map((id) => {
+    const species = SPECIES.find((s) => s.id === id);
+    if (!species) throw new Error(`No tree called ${id}.`);
+    const shape = treeGeometry(species, false);
+    disposables.push(shape);
+    return { species, shape };
+  });
+
   const placed = new Map<number, Placed>();
   const tops = new Map<number, number>();
   const rings = new Map<number, number>();
@@ -140,6 +174,14 @@ export function buildTownModelLayer(
     // How far the furthest corner of any building lies from the centre.
     let built = 0;
     const parts: THREE.BufferGeometry[] = [];
+    // Each building's footprint, for keeping the street trees off the walls.
+    const walls: {
+      x: number;
+      z: number;
+      w: number;
+      d: number;
+      turn: number;
+    }[] = [];
     for (const placement of placements) {
       const model = models[placement.model];
       const [w, d] = footprint(model, grid);
@@ -163,6 +205,13 @@ export function buildTownModelLayer(
       }
       const x = placement.x - town.x;
       const z = placement.z - town.z;
+      walls.push({
+        x: placement.x,
+        z: placement.z,
+        w,
+        d,
+        turn: placement.turn,
+      });
       // An open town's lot is paved to its edge, past the building's own walls.
       const [sw, sd] =
         style === "organic"
@@ -232,6 +281,60 @@ export function buildTownModelLayer(
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -2,
     });
+    if (hasStreets(planet))
+      applyStreetGround(
+        sheetMaterial,
+        town,
+        grid,
+        palette,
+        treeShapes.length > 0,
+      );
+
+    // Street trees, down the main streets and the avenues.
+    const treeMaterials: THREE.ShaderMaterial[] = [];
+    if (treeShapes.length > 0) {
+      const clearOf = (px: number, pz: number) =>
+        buildable(px, pz) >= BUILD_FIT &&
+        (!riverEdge || riverEdge(px, pz) >= RIVER_BANK) &&
+        !walls.some((b) => {
+          // The point in the building's own frame.
+          const dx = px - b.x;
+          const dz = pz - b.z;
+          const lx = dx * Math.cos(b.turn) - dz * Math.sin(b.turn);
+          const lz = dx * Math.sin(b.turn) + dz * Math.cos(b.turn);
+          return (
+            Math.abs(lx) < b.w / 2 + STREET_TREE_CLEAR &&
+            Math.abs(lz) < b.d / 2 + STREET_TREE_CLEAR
+          );
+        });
+      const lists: TreeInstance[][] = treeShapes.map(() => []);
+      for (const spot of streetTrees(town, grid, clearOf)) {
+        const k = Math.floor(rand() * treeShapes.length);
+        const h = STREET_TREE[0] + (STREET_TREE[1] - STREET_TREE[0]) * rand();
+        lists[k].push({
+          x: spot.x,
+          y: height(spot.x, spot.z),
+          z: spot.z,
+          height: h,
+          width: h * treeShapes[k].species.spread,
+          turn: rand() * Math.PI * 2,
+          pick: rand(),
+        });
+      }
+      lists.forEach((list, k) => {
+        if (list.length === 0) return;
+        const m = treeMaterial(
+          world,
+          { conifer: treeShapes[k].species.conifer },
+          undefined,
+        );
+        const mesh = instancedTrees(treeShapes[k].shape, m, list);
+        mesh.name = TOWN_NAME;
+        scene.add(mesh);
+        disposables.push(mesh.geometry, m);
+        treeMaterials.push(m);
+      });
+    }
     const sheetGeometry = streetSheet(
       town,
       palette.street,
@@ -288,7 +391,12 @@ export function buildTownModelLayer(
       decal.takeShadow(shadow);
     });
 
-    placed.set(town.node, { material, sheet: sheetMaterial, decal });
+    placed.set(town.node, {
+      material,
+      trees: treeMaterials,
+      sheet: sheetMaterial,
+      decal,
+    });
     tops.set(town.node, bounds.max.y);
     rings.set(town.node, reach * RING_AT);
   }
@@ -304,6 +412,7 @@ export function buildTownModelLayer(
       setLandmarkState(town.material, { hidden: state.hidden });
       // The sheet's colours are in its vertices, so the material dims them.
       town.sheet.color.setScalar(state.hidden ? 0.7 : 1);
+      for (const m of town.trees) m.uniforms.uDim.value = state.hidden ? 1 : 0;
       town.decal.setHidden(state.hidden);
       town.decal.setRing(state.ring);
     },

@@ -211,6 +211,76 @@ describe("buildTownModelLayer", () => {
     }
   });
 
+  /** The meshes that draw street trees: the ones a tree material draws. */
+  const streetTreeMeshes = (scene: THREE.Scene) =>
+    scene.children.filter(
+      (o) =>
+        o instanceof THREE.Mesh &&
+        (o.material as THREE.ShaderMaterial).uniforms?.uForest,
+    ) as THREE.Mesh[];
+
+  it("plants an open town's streets, and leaves a sealed outpost's bare", () => {
+    const open = build();
+    const trees = streetTreeMeshes(open.scene);
+    expect(trees.length).toBeGreaterThan(0);
+    let count = 0;
+    for (const m of trees) {
+      expect(m.name).toBe("town-models");
+      count += (m.geometry as THREE.InstancedBufferGeometry).instanceCount;
+    }
+    expect(count).toBeGreaterThan(50);
+    expect(streetTreeMeshes(build({ planet: "moon" }).scene)).toHaveLength(0);
+  });
+
+  it("draws the town's grid on its street sheet", () => {
+    const { scene } = build();
+    for (const sheet of sheets(scene)) {
+      const m = sheet.material as THREE.MeshBasicMaterial;
+      expect(m.customProgramCacheKey()).toBe("town-street-ground");
+      const shader = {
+        uniforms: {} as Record<string, { value: unknown }>,
+        vertexShader: "#include <project_vertex>",
+        fragmentShader: "#include <color_fragment>",
+      };
+      m.onBeforeCompile(shader as never, null as never);
+      expect(shader.fragmentShader).toContain("townGround()");
+      expect(shader.vertexShader).toContain("vTownWorld =");
+      expect(shader.uniforms.uTownGrid.value).toEqual(
+        new THREE.Vector4(
+          OPEN_GRID.lot,
+          OPEN_GRID.street,
+          OPEN_GRID.avenue,
+          OPEN_GRID.boulevard,
+        ),
+      );
+    }
+  });
+
+  it("draws no streets on a moon, which has no air to drive in", () => {
+    for (const sheet of sheets(build({ planet: "moon" }).scene)) {
+      const m = sheet.material as THREE.MeshBasicMaterial;
+      expect(m.customProgramCacheKey()).not.toBe("town-street-ground");
+    }
+    // The other sealed planets keep theirs.
+    for (const sheet of sheets(build({ planet: "red" }).scene)) {
+      const m = sheet.material as THREE.MeshBasicMaterial;
+      expect(m.customProgramCacheKey()).toBe("town-street-ground");
+    }
+  });
+
+  it("dims a hidden town's street trees with it", () => {
+    const { scene, layer } = build();
+    layer.setStyle(0, { hidden: true });
+    const dim = streetTreeMeshes(scene).map(
+      (m) => (m.material as THREE.ShaderMaterial).uniforms.uDim.value,
+    );
+    expect(dim).toContain(1);
+    expect(dim).toContain(0);
+    layer.setStyle(0, { hidden: false });
+    for (const m of streetTreeMeshes(scene))
+      expect((m.material as THREE.ShaderMaterial).uniforms.uDim.value).toBe(0);
+  });
+
   it("dims a town hidden by fog", () => {
     const { scene, layer } = build();
     layer.setStyle(0, { hidden: true });

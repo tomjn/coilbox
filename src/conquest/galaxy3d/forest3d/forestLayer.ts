@@ -287,6 +287,52 @@ export function buildForestLayer(
   };
 }
 
+/** One tree to draw: where it stands, its size and turn, and its own shade 0 to 1. */
+export interface TreeInstance {
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  height: number;
+  turn: number;
+  pick: number;
+}
+
+/**
+ * One mesh that draws `trees` as copies of `shape`, for a few trees outside
+ * the forest such as a town's street trees. The caller disposes the geometry.
+ */
+export function instancedTrees(
+  shape: THREE.BufferGeometry,
+  material: THREE.Material,
+  trees: readonly TreeInstance[],
+): THREE.Mesh {
+  const g = new THREE.InstancedBufferGeometry();
+  for (const name of ["position", "normal", "up", "foliage"])
+    g.setAttribute(name, shape.getAttribute(name));
+  const at = new Float32Array(trees.length * 3);
+  const size = new Float32Array(trees.length * 3);
+  const tree = new Float32Array(trees.length * 4);
+  const box = new THREE.Box3();
+  trees.forEach((t, k) => {
+    at.set([t.x, t.y, t.z], k * 3);
+    size.set([t.width, t.height, t.turn], k * 3);
+    tree.set([t.pick, 0, 0, (t.pick * 7.31 + t.turn) % 1], k * 4);
+    box.expandByPoint(new THREE.Vector3(t.x - t.width, t.y, t.z - t.width));
+    box.expandByPoint(
+      new THREE.Vector3(t.x + t.width, t.y + t.height * 1.2, t.z + t.width),
+    );
+  });
+  g.setAttribute("aAt", new THREE.InstancedBufferAttribute(at, 3));
+  g.setAttribute("aSize", new THREE.InstancedBufferAttribute(size, 3));
+  g.setAttribute("aTree", new THREE.InstancedBufferAttribute(tree, 4));
+  g.instanceCount = trees.length;
+  g.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+  const mesh = new THREE.Mesh(g, material);
+  mesh.raycast = () => {};
+  return mesh;
+}
+
 interface Tile {
   centre: THREE.Vector3;
   radius: number;
