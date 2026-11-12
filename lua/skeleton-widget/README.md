@@ -63,7 +63,7 @@ The skeleton showing because of the test is not written to the widget's config. 
 4. Ties between axes of the same length go to the one whose far face lies farther from the origin, then z, y, x. Ties between two faces as far from the origin as each other go to the positive side.
 5. A box that is a point at the origin gives no bone.
 
-`boneStart` gives the other end of a piece that reaches both ways. When the box has the origin between its two faces on the bone's axis, it is the middle of the nearer face. Otherwise there is none. The widget then draws the bone from one face to the other, widest at the point of that line nearest the origin. `boneEnd` is unchanged, so the builder's copy in `src/lego/boneEnd.ts` still matches it. The builder does not draw the other end.
+`boneStart` gives the other end of a piece that reaches both ways. When the box has the origin between its two faces on the bone's axis, it is the middle of the nearer face. Between two faces as far from the origin as each other it is the negative one, since `boneEnd` takes the positive one. Otherwise there is none. The widget then draws the bone from one face to the other, widest at the point of that line nearest the origin. `boneEnd` is unchanged, so the builder's copy in `src/lego/boneEnd.ts` still matches it. The builder does not draw the other end.
 
 `src/lego/boneEnd.ts` is the same rule, and its test reads the `ends(...)` cases of `tests/skeleton_test.lua`, a box in and a point out.
 
