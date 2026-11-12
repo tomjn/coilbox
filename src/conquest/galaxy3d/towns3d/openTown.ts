@@ -66,10 +66,13 @@ export const model = (
   height: number,
   /** Add the parts. `h` is the model's height. */
   parts: (t: Tools, w: number, d: number, h: number) => void,
+  /** Set for one of a town's one or two tallest towers. */
+  landmark?: boolean,
 ): BuildingModel => ({
   id,
   lots,
   height,
+  landmark,
   settlements: OPEN,
   build(b, w, d, palette) {
     parts(tools(b, palette), w, d, height);

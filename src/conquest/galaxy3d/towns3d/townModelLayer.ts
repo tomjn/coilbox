@@ -170,6 +170,7 @@ export function buildTownModelLayer(
           : [w, d];
       built = Math.max(built, Math.hypot(x, z) + Math.hypot(sw, sd) / 2);
       const copy = geometries[placement.model].clone();
+      copy.scale(1, placement.stretch, 1);
       copy.applyMatrix4(at(x, top - y0, z, placement.turn));
       const shade = 1 + (rand() - 0.5) * SHADE_DRIFT;
       const pick = rand();
