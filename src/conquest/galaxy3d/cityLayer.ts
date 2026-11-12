@@ -7,7 +7,8 @@ import type { GroundLayer, RoadStyle } from "./groundLayer";
 import { ROAD_MODE } from "./groundShader";
 import { pairKey, roadLinks } from "./roads";
 import { GALAXY_MIN_DISTANCE, type TerrainSurface } from "./terrain";
-import type { TownLayer, TownStyle } from "./townLayer";
+import type { TownStyle } from "./townLayer";
+import type { Town } from "./towns";
 
 /**
  * Point locations and roads on a terrain map. A point location is a node with
@@ -398,16 +399,19 @@ export function buildCityLayer(
   cores: THREE.InstancedMesh,
   /** Where the roads and towns are painted, and their state with them. */
   ground: Pick<GroundLayer, "setRoadStyle" | "commit"> &
-    Partial<Pick<TownLayer, "setTownStyle" | "towns">> & {
+    Partial<{
+      /** Restyle the town of node `i`. */
+      setTownStyle: (i: number, style: TownStyle) => void;
+      /** The towns by node index. */
+      towns: Town[];
+    }> & {
       /** Where a landmark stands in place of a town, it takes the town's state. */
-      setLandmarkStyle?: TownLayer["setTownStyle"];
+      setLandmarkStyle?: (i: number, style: TownStyle) => void;
       /** The height of each landmark's top, in world units, by node index. */
       landmarkTops?: ReadonlyMap<number, number>;
       /** The height of each 3D town's top, in world units, by node index. */
       townTops?: ReadonlyMap<number, number>;
     },
-  /** Whether a location's town is drawn in an anomaly's haze. */
-  misty: (id: string) => boolean = () => false,
 ): CityLayer {
   const nodeById = new Map(galaxy.nodes.map((n) => [n.id, n]));
   const ownerOf = (id: string): string =>
@@ -543,7 +547,7 @@ export function buildCityLayer(
     m.look = look.scale;
     const label = labelObjects[m.i];
     if (label) label.visible = look.label;
-    const town = misty(m.id) ? { ...look.town, mist: true } : look.town;
+    const { town } = look;
     ground.setTownStyle?.(m.i, town);
     ground.setLandmarkStyle?.(
       m.i,

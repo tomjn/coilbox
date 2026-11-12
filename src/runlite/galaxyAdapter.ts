@@ -635,8 +635,6 @@ export function mapRunIdentities(
   }
   for (const n of run.nodes) {
     const at = locations.get(n.id) ?? n.id;
-    // An anomaly's town stands in a haze, so it reads as somewhere strange.
-    if (n.type === "event") out.set(at, { ...out.get(at), mist: true });
     // Every supply stop is a depot. They are not one of a kind.
     if (n.type === "shop") out.set(at, { ...out.get(at), landmark: "depot" });
     if (n.type !== "start" && n.type !== "boss") continue;
@@ -649,7 +647,7 @@ export function mapRunIdentities(
     });
   }
   // Each kind of anomaly is one of a kind. The run's seed deals them out, one
-  // to a stop, and any stop still left over keeps its town in the haze.
+  // to a stop, and any stop still left over keeps its town.
   const rng = mulberry32(run.settings.seed);
   const events = shuffled(
     rng,

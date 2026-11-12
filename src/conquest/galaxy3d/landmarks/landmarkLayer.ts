@@ -4,7 +4,7 @@
  * asks for one.
  *
  * Each is built once, placed on the ground, turned to its road and kept clear
- * of its neighbours. It follows its location's fog, selection and haze the
+ * of its neighbours. It follows its location's fog and selection the
  * way a town does, through {@link LandmarkLayer.setStyle}, and is never
  * picked: the location's own hit target carries the pointer.
  *
@@ -66,7 +66,7 @@ export interface LandmarkLayer {
   anchors: { pos: [number, number] }[];
   /** The height of each landmark's top, in world units, by node index. */
   tops: ReadonlyMap<number, number>;
-  /** Show a location's fog, ring and haze, as a town would. */
+  /** Show a location's fog and ring, as a town would. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
   prepare(renderer: THREE.WebGLRenderer): void;
