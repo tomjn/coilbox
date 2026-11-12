@@ -8,7 +8,7 @@ import { faceOut } from "../landmarks/kit";
 
 /** A point on a plan or a profile. */
 export type Pt = [number, number];
-type Xyz = [number, number, number];
+export type Xyz = [number, number, number];
 
 /**
  * A skin between two rings of the same number of points, each convex and
@@ -128,4 +128,40 @@ export function shouldered(
       ([u, y]): Xyz => (alongX ? [along, y, at + u] : [at + u, y, along]),
     );
   return loft(ring(from), ring(to), true);
+}
+
+/** A round plan of `n` sides, `w` by `d` across, round `cx, cz`. */
+export const round = (w: number, d: number, n = 12, cx = 0, cz = 0): Pt[] =>
+  Array.from({ length: n }, (_, i): Pt => {
+    const a = ((i + 0.5) / n) * Math.PI * 2 - Math.PI;
+    return [cx + (w / 2) * Math.cos(a), cz + (d / 2) * Math.sin(a)];
+  });
+
+/** A mast `s` across at its foot that narrows to its tip, from `y0` to `y1`. */
+export const mast = (
+  s: number,
+  y0: number,
+  y1: number,
+  cx = 0,
+  cz = 0,
+): THREE.BufferGeometry =>
+  column(rect(s, s, cx, cz), y0, y1, rect(0.4 * s, 0.4 * s, cx, cz));
+
+/**
+ * A straight bar from `a` up to `b`, `wx` by `wz` across, for a brace. Its
+ * ends are cut level, so it is not for a bar that lies flat.
+ */
+export function beam(
+  a: Xyz,
+  b: Xyz,
+  wx: number,
+  wz: number,
+): THREE.BufferGeometry {
+  const ring = ([x, y, z]: Xyz): Xyz[] => [
+    [x - wx / 2, y, z - wz / 2],
+    [x + wx / 2, y, z - wz / 2],
+    [x + wx / 2, y, z + wz / 2],
+    [x - wx / 2, y, z + wz / 2],
+  ];
+  return loft(ring(a), ring(b), true);
 }

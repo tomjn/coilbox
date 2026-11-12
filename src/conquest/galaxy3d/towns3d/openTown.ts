@@ -22,10 +22,10 @@ const OPEN = ["organic"] as const;
 /** How dark the second finish is beside the walls. */
 const PLATE_TONE = 0.72;
 
-type Add = (g: THREE.BufferGeometry) => void;
+export type Add = (g: THREE.BufferGeometry) => void;
 
 /** The finishes a model's parts are added in. */
-interface Tools {
+export interface Tools {
   /** Pale cast concrete: a building's main masses. */
   wall: Add;
   /** The same concrete in broad ribs. */
@@ -36,6 +36,8 @@ interface Tools {
   dark: Add;
   /** A painted panel in the planet's rust. */
   accent: Add;
+  /** A roof garden or a court's grass. No livery repaints it. */
+  green: Add;
 }
 
 const tools = (b: Builder, palette: TownPalette): Tools => {
@@ -54,10 +56,11 @@ const tools = (b: Builder, palette: TownPalette): Tools => {
     // which are drawn for a model many times a building's size.
     dark: add(palette.dark, { kind: 13, clean: true }),
     accent: add(palette.accent, { kind: 7, clean: true }),
+    green: add(palette.grass, { kind: 2, clean: true }),
   };
 };
 
-const model = (
+export const model = (
   id: string,
   lots: [number, number],
   height: number,

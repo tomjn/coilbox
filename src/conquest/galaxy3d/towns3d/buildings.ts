@@ -11,6 +11,7 @@ import { at, Builder, box } from "../landmarks/kit";
 import type { TownPalette } from "../landmarks/palettes";
 import { FILLERS } from "./fillers";
 import { OPEN_TOWN } from "./openTown";
+import { OPEN_TOWN_DETAIL } from "./openTownDetail";
 
 export interface BuildingModel {
   id: string;
@@ -47,6 +48,7 @@ const cuboid = (
 
 export const BUILDINGS: readonly BuildingModel[] = [
   ...OPEN_TOWN,
+  ...OPEN_TOWN_DETAIL,
   ...FILLERS,
   cuboid("outpost-low", [1, 1], 0.18),
   cuboid("outpost-low-slab", [2, 1], 0.3),
