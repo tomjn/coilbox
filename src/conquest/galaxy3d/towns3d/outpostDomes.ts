@@ -75,9 +75,10 @@ const tools = (b: Builder, paint: OutpostPaint): Tools => {
 
 /**
  * A closed skin over rings of the same number of points, each convex and
- * flat, capped at both ends.
+ * flat, capped at both ends. A skin whose ends are buried in another part
+ * can go without its caps.
  */
-function skin(rings: Xyz[][]): THREE.BufferGeometry {
+function skin(rings: Xyz[][], capped = true): THREE.BufferGeometry {
   const n = rings[0].length;
   const idx: number[] = [];
   for (let r = 0; r < rings.length - 1; r++)
@@ -87,8 +88,9 @@ function skin(rings: Xyz[][]): THREE.BufferGeometry {
       idx.push(a, c, a + n, c, c + n, a + n);
     }
   const last = (rings.length - 1) * n;
-  for (let i = 1; i < n - 1; i++)
-    idx.push(0, i + 1, i, last, last + i, last + i + 1);
+  if (capped)
+    for (let i = 1; i < n - 1; i++)
+      idx.push(0, i + 1, i, last, last + i, last + i + 1);
   const g = new THREE.BufferGeometry();
   g.setAttribute(
     "position",
@@ -397,7 +399,11 @@ function annex(
   );
 }
 
-/** A rounded section `hh` high and `dd` deep at `x`, its corners turned to `rr`. */
+/**
+ * A rounded section `hh` high and `dd` deep at `x`, its corners turned to `rr`.
+ * A `fine` section has enough points round its corners to look round close up,
+ * more on the upper pair, which the map's camera looks down on.
+ */
 const pill = (
   x: number,
   yMid: number,
@@ -406,6 +412,7 @@ const pill = (
   dd: number,
   rr: number,
   inset: number,
+  fine = false,
 ): Xyz[] => {
   const a = dd / 2 - inset;
   const b = hh / 2 - inset;
@@ -413,19 +420,24 @@ const pill = (
   const out: Xyz[] = [];
   const sz = [1, 1, -1, -1];
   const sy = [-1, 1, 1, -1];
-  for (let k = 0; k < 4; k++)
-    for (let j = 0; j < 3; j++) {
-      const th = ((-90 + 90 * k + 45 * j) * Math.PI) / 180;
+  for (let k = 0; k < 4; k++) {
+    const steps = fine ? (sy[k] > 0 ? 5 : 3) : 2;
+    for (let j = 0; j <= steps; j++) {
+      const th = ((-90 + 90 * k + (90 * j) / steps) * Math.PI) / 180;
       out.push([
         x,
         yMid + sy[k] * (b - q) + q * Math.sin(th),
         cz + sz[k] * (a - q) + q * Math.cos(th),
       ]);
     }
+  }
   return out;
 };
 
-/** A long hull with a rounded section and rounded ends, lying along x on `y0`. */
+/**
+ * A long hull with a rounded section and rounded ends, lying along x on `y0`.
+ * A `fine` hull is round enough to be looked at close up.
+ */
 function capsule(
   cx: number,
   cz: number,
@@ -433,24 +445,33 @@ function capsule(
   len: number,
   hh: number,
   dd: number,
+  fine = false,
 ): THREE.BufferGeometry {
   const rr = Math.min(0.32 * hh, 0.45 * dd);
   const yMid = y0 + hh / 2;
-  const ends: [number, number][] = [
-    [len / 2, 0.6 * rr],
-    [len / 2 - 0.35 * rr, 0.15 * rr],
-    [len / 2 - rr, 0],
-  ];
+  // Each end is a ring at its tip, then rings back to the full section.
+  const ends: [number, number][] = fine
+    ? [75, 50, 25, 0].map((deg) => {
+        const a = (deg * Math.PI) / 180;
+        return [len / 2 - rr * (1 - Math.sin(a)), rr * (1 - Math.cos(a))];
+      })
+    : [
+        [len / 2, 0.6 * rr],
+        [len / 2 - 0.35 * rr, 0.15 * rr],
+        [len / 2 - rr, 0],
+      ];
   const rings = [
-    ...ends.map(([x, inset]) => pill(cx - x, yMid, cz, hh, dd, rr, inset)),
+    ...ends.map(([x, inset]) =>
+      pill(cx - x, yMid, cz, hh, dd, rr, inset, fine),
+    ),
     ...ends
       .reverse()
-      .map(([x, inset]) => pill(cx + x, yMid, cz, hh, dd, rr, inset)),
+      .map(([x, inset]) => pill(cx + x, yMid, cz, hh, dd, rr, inset, fine)),
   ];
   return skin(rings);
 }
 
-/** A band round a capsule at `x`, `wide` along it and a little proud. */
+/** A band round a fine capsule at `x`, `wide` along it and a little proud. */
 const collar = (
   x: number,
   cz: number,
@@ -461,10 +482,14 @@ const collar = (
 ) => {
   const rr = Math.min(0.32 * hh, 0.45 * dd);
   const yMid = y0 + hh / 2;
-  return skin([
-    pill(x - wide / 2, yMid, cz, hh, dd, rr, -0.005),
-    pill(x + wide / 2, yMid, cz, hh, dd, rr, -0.005),
-  ]);
+  // Its ends are inside the hull, so it has no caps.
+  return skin(
+    [
+      pill(x - wide / 2, yMid, cz, hh, dd, rr, -0.005, true),
+      pill(x + wide / 2, yMid, cz, hh, dd, rr, -0.005, true),
+    ],
+    false,
+  );
 };
 
 /**
@@ -481,7 +506,7 @@ function hullPart(
   dd: number,
   end: number,
 ): void {
-  t.hull(capsule(cx, cz, y0, len, hh, dd));
+  t.hull(capsule(cx, cz, y0, len, hh, dd, true));
   for (const f of [-0.22, 0.1])
     t.hull2(collar(cx + end * f * len, cz, y0, hh, dd, 0.02));
   t.accent(collar(cx + end * (len / 2 - 0.7 * hh), cz, y0, hh, dd, 0.045));
@@ -722,6 +747,161 @@ function greatDome(
   // entry gets a canopy block instead.
   t.hull2(
     plate(0.36, 0.1, deck + 0.19 * k, deck + 0.19 * k + 0.02, 0, r + 0.02),
+  );
+}
+
+/**
+ * Three domes of stepped size round a court on one plinth, joined by halls,
+ * with a plant block at the fourth corner.
+ */
+function domeCluster(t: Tools, w: number, d: number, h: number): void {
+  const deck = 0.05;
+  t.trim(column(chamfered(w, d, 0.14), 0, 0.035));
+  t.hull2(column(chamfered(w - 0.04, d - 0.04, 0.13), 0.035, deck));
+
+  // The main dome stands off centre, with a lower dome along each axis.
+  const main = { x: -0.15 * w, z: -0.15 * d, r: 0.3 };
+  const mid = { x: 0.31 * w, z: -0.2 * d, r: 0.185 };
+  const low = { x: -0.2 * w, z: 0.32 * d, r: 0.16 };
+  const block = { x: 0.33 * w, z: 0.33 * d, size: 0.3 };
+
+  // The halls between them, drawn first so the domes' drums close their ends.
+  const hall = (
+    wide: number,
+    top: number,
+    from: number,
+    to: number,
+    at: number,
+    alongX: boolean,
+  ) => {
+    t.hull(shouldered(wide, deck, top, 0.3 * wide, from, to, at, alongX));
+    const m = (from + to) / 2;
+    t.hull2(
+      shouldered(
+        wide + 0.014,
+        deck,
+        top + 0.007,
+        0.3 * wide,
+        m - 0.012,
+        m + 0.012,
+        at,
+        alongX,
+      ),
+    );
+  };
+  const edge = block.size / 2 - 0.01;
+  hall(
+    0.16,
+    deck + 0.1,
+    main.x + 0.8 * main.r,
+    mid.x - 0.8 * mid.r,
+    -0.18 * d,
+    true,
+  );
+  hall(
+    0.16,
+    deck + 0.1,
+    main.z + 0.8 * main.r,
+    low.z - 0.8 * low.r,
+    -0.175 * w,
+    false,
+  );
+  hall(0.13, deck + 0.08, mid.z + 0.8 * mid.r, block.z - edge, mid.x, false);
+  hall(0.13, deck + 0.08, low.x + 0.8 * low.r, block.x - edge, low.z, true);
+
+  dome(t, {
+    cx: main.x,
+    cz: main.z,
+    r: main.r,
+    y0: deck,
+    drum: 0.11,
+    top: h,
+    crown: 0.075,
+    ribs: 12,
+    sides: 24,
+    glazed: true,
+  });
+  dome(t, {
+    cx: mid.x,
+    cz: mid.z,
+    r: mid.r,
+    y0: deck,
+    drum: 0.08,
+    top: 0.67 * h,
+    crown: 0.05,
+    ribs: 8,
+    sides: 16,
+    glazed: true,
+    capped: true,
+  });
+  dome(t, {
+    cx: low.x,
+    cz: low.z,
+    r: low.r,
+    y0: deck,
+    drum: 0.06,
+    top: 0.57 * h,
+    crown: 0.04,
+    ribs: 8,
+    sides: 16,
+  });
+
+  // The plant block with its mast, and tanks in the court.
+  annex(t, block.x, block.z, block.size, block.size, deck, deck + 0.2);
+  t.metal(mast(0.03, deck + 0.2, deck + 0.36, block.x + 0.08, block.z + 0.08));
+  t.accent(tank(0.055, deck, deck + 0.2, 0.12, 0.17));
+  t.smooth2(tank(0.045, deck, deck + 0.15, 0.22, 0.1));
+
+  // An entry out of each dome to the plinth's edge.
+  const reachX = 0.5 * w - 0.003;
+  const reachZ = 0.5 * d - 0.003;
+  vestibule(
+    t,
+    main.x,
+    main.z,
+    0,
+    -1,
+    0.9 * main.r,
+    reachZ + main.z,
+    0.26,
+    deck,
+    deck + 0.17,
+  );
+  vestibule(
+    t,
+    main.x,
+    main.z,
+    -1,
+    0,
+    0.9 * main.r,
+    reachX + main.x,
+    0.2,
+    deck,
+    deck + 0.14,
+  );
+  vestibule(
+    t,
+    mid.x,
+    mid.z,
+    0,
+    -1,
+    0.9 * mid.r,
+    reachZ + mid.z,
+    0.16,
+    deck,
+    deck + 0.11,
+  );
+  vestibule(
+    t,
+    low.x,
+    low.z,
+    0,
+    1,
+    0.9 * low.r,
+    reachZ - low.z,
+    0.14,
+    deck,
+    deck + 0.1,
   );
 }
 
@@ -1269,9 +1449,7 @@ export const OUTPOST_DOMES: OutpostModel[] = [
   ),
   model("dome-twin", "dome", [2, 1], 0.36, twinDomes),
   model("dome-wings", "dome", [2, 1], 0.42, wingedDome),
-  model("dome-hall", "dome", [2, 2], 0.62, (t, w, d, h) =>
-    greatDome(t, w, d, h, 0.46, 0.1, 0.085),
-  ),
+  model("dome-hall", "dome", [2, 2], 0.62, domeCluster),
   model("dome-great", "dome", [2, 2], 0.9, (t, w, d, h) =>
     greatDome(t, w, d, h, 0.44, 0.2, 0.12),
   ),
