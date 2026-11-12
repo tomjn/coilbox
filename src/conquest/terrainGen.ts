@@ -778,6 +778,28 @@ const SHELF_CELL = 70;
  * the distances to two coasts meet. */
 const SHELF_SMOOTH = 3;
 
+/** How deep the coast's shelf runs before the seabed takes over. */
+const SHELF_EDGE = 1.3;
+/** How deep the sea is where its bed is as far down as half the sea's is. */
+const BED_DEPTH = 2.2;
+/** How widely the shelf and the bed are rounded into each other, as a share of their depths. */
+const BED_JOIN = 0.2;
+
+/**
+ * How far down half of a map's seabed lies, in the elevation's own units,
+ * which differ from one layout to the next. `level` is the elevation less the
+ * sea level, so the bed is as far down as it is below 0. 1 for a map with no
+ * sea.
+ */
+function seabedScale(land: Uint8Array, level: Float64Array): number {
+  const down: number[] = [];
+  for (let i = 0; i < land.length; i++) if (!land[i]) down.push(-level[i]);
+  if (down.length === 0) return 1;
+  down.sort((a, b) => a - b);
+  const half = down[Math.floor((down.length - 1) / 2)];
+  return half > 0 ? half : 1;
+}
+
 /**
  * The mean of `src` over the square reaching `r` pixels each way, cut off at
  * the grid's edge. Sums run in a fixed order, so the result is the same on
@@ -819,9 +841,16 @@ function boxBlur(
  * How deep the sea is at each pixel of a `w` by `h` grid, as
  * {@link GeneratedTerrain.seaDepth}. The bed falls away from the coast, slowly
  * off low ground and quickly off high ground, and a slow noise widens the
- * shallows in some places and narrows them in others. `coast` is the grid's
- * own {@link coastDistanceOf}, `scale` the map pixels to one of its pixels and
- * `vary` the noise at a pixel, from 0 to 1.
+ * shallows in some places and narrows them in others. That shelf runs down
+ * to {@link SHELF_EDGE} and no further. Past it the sea is as deep as its bed,
+ * the elevation the land was cut from carried on under the water, so a shelf
+ * follows a sunken ridge out to sea and joins islands that stand close, and
+ * the open sea is darker over a basin than over a bank.
+ *
+ * `coast` is the grid's own {@link coastDistanceOf}, `scale` the map pixels
+ * to one of its pixels and `vary` the noise at a pixel, from 0 to 1. `level`
+ * is the elevation less the sea level and `bedScale` the map's
+ * {@link seabedScale}.
  */
 export function seaDepthOf(
   land: Uint8Array,
@@ -831,6 +860,8 @@ export function seaDepthOf(
   h: number,
   scale: number,
   vary: (x: number, y: number) => number,
+  level: Float64Array,
+  bedScale: number,
 ): Float32Array {
   const heights = Float32Array.from(heightmap);
   const reach = Math.max(1, Math.round(SHELF_BACKING / scale));
@@ -845,12 +876,28 @@ export function seaDepthOf(
         (SHELF_LOW + (SHELF_HIGH - SHELF_LOW) * high) *
         (0.45 + 1.1 * vary(x, y));
       // The pixel beside the land is 3, and stands at the water line.
-      raw[o] = ((coast[o] - 3) * scale) / 3 / shelf;
+      const offShore = ((coast[o] - 3) * scale) / 3 / shelf;
+      raw[o] = offShore < SHELF_EDGE ? offShore : SHELF_EDGE;
     }
   }
+  // Only the shelf is smoothed. The bed is smooth as it comes, and a blur
+  // on the map cannot see past its edge, where the bed falls away, so a
+  // blurred bed would step where the map meets the land drawn past it.
   const smooth = Math.max(1, Math.round(SHELF_SMOOTH / scale));
   const depth = boxBlur(boxBlur(raw, w, h, smooth), w, h, smooth);
-  for (let o = 0; o < depth.length; o++) if (land[o]) depth[o] = 0;
+  for (let o = 0; o < depth.length; o++) {
+    if (land[o]) {
+      depth[o] = 0;
+      continue;
+    }
+    // The deeper of the two, rounded off where they cross so no line shows.
+    const onShelf = depth[o];
+    const bed = (-level[o] / bedScale) * BED_DEPTH;
+    const sum = onShelf + bed;
+    const apart = onShelf - bed;
+    const round = BED_JOIN * sum;
+    depth[o] = 0.5 * (sum + Math.sqrt(apart * apart + round * round));
+  }
   return depth;
 }
 
@@ -908,6 +955,11 @@ export const SEA_FADE = 0.4;
 export const BED_FADE = 1.6;
 /** The bed's colour as a share of the dry shore's: wet ground under water. */
 export const BED_WET = 0.62;
+/** How much darker a liquid sea is over its deepest basins than its colours say. */
+export const ABYSS_DARK = 0.25;
+/** How fast a liquid sea darkens towards that with depth. Slowly, so the
+ * shelves stay the colour they were and only the basins go dark. */
+export const ABYSS_FADE = 0.05;
 /** The most of a liquid sea's colour its bed gives, at the water line. */
 export const BED_SHOWS = 0.65;
 
@@ -924,17 +976,21 @@ function seenThrough(depth: number, fade: number): number {
  * The colour of a sea that is not ground at `depth`, as
  * {@link GeneratedTerrain.seaDepth}. It goes from the planet's shallow colour
  * to its deep one. A liquid sea shows its bed at the water line, the colour of
- * the planet's shore when wet, so the water starts where the land leaves off.
+ * the planet's shore when wet, so the water starts where the land leaves off,
+ * and goes darker still over its deepest basins.
  */
 export function seaColourAtDepth(planet: Planet, depth: number): Rgb {
   const { shallow, deep } = planet.sea;
   const far = 1 - seenThrough(depth, SEA_FADE);
   const liquid = LIQUID_SEAS.includes(planet.sea.look);
   const bed = liquid ? BED_SHOWS * seenThrough(depth, BED_FADE) : 0;
+  const abyss = liquid
+    ? 1 - ABYSS_DARK * (1 - seenThrough(depth, ABYSS_FADE))
+    : 1;
   const shore = planet.biomes[planet.shore].colour;
   const rgb: Rgb = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
-    const open = shallow[c] + (deep[c] - shallow[c]) * far;
+    const open = (shallow[c] + (deep[c] - shallow[c]) * far) * abyss;
     rgb[c] = open + (shore[c] * BED_WET - open) * bed;
   }
   return rgb;
@@ -1386,6 +1442,8 @@ interface TerrainContext {
   shelfSeed: number;
   /** The elevation the land was cut from, nudged to agree with it. */
   elevation: Float64Array;
+  /** The map's {@link seabedScale}. */
+  bedScale: number;
 }
 
 /** Build the land for a seed and a layout. */
@@ -1531,6 +1589,9 @@ function buildTerrain(opts: TerrainOptions): {
     mulberry32(hashString(`shelf:${opts.seed >>> 0}`)),
   );
   const shelf = coarseNoise(S, S, SHELF_CELL, shelfSeed, 3);
+  const level = new Float64Array(S * S);
+  for (let i = 0; i < level.length; i++) level[i] = elevation[i] - seaLevel;
+  const bedScale = seabedScale(land, level);
   const seaDepth = seaDepthOf(
     land,
     heightmap,
@@ -1539,9 +1600,9 @@ function buildTerrain(opts: TerrainOptions): {
     S,
     1,
     (x, y) => shelf[y * S + x],
+    level,
+    bedScale,
   );
-  const level = new Float64Array(S * S);
-  for (let i = 0; i < level.length; i++) level[i] = elevation[i] - seaLevel;
   const shore = shoreOf(land, coastDistance, level, S, S, 1);
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
@@ -1632,6 +1693,7 @@ function buildTerrain(opts: TerrainOptions): {
       shoreSeed,
       shelfSeed,
       elevation,
+      bedScale,
     },
   };
 }
@@ -1763,6 +1825,7 @@ export function generateTerrainWithMargin(
     shoreSeed,
     shelfSeed,
     elevation,
+    bedScale,
   } = context;
   const seaRamp = seaRampOf(planet);
   const k = MARGIN_SCALE;
@@ -1888,14 +1951,22 @@ export function generateTerrainWithMargin(
       }
     }
   }
-  const seaDepth = seaDepthOf(land, heightmap, coast, W, W, k, (i, j) =>
-    shelf(at(i), at(j)),
-  );
   // The clean-up moved some pixels across the coast, as on the map.
   for (let o = 0; o < count; o++) {
     if (land[o] && level[o] <= 0) level[o] = NUDGE;
     if (!land[o] && level[o] > 0) level[o] = -NUDGE;
   }
+  const seaDepth = seaDepthOf(
+    land,
+    heightmap,
+    coast,
+    W,
+    W,
+    k,
+    (i, j) => shelf(at(i), at(j)),
+    level,
+    bedScale,
+  );
   const shore = shoreOf(land, coast, level, W, W, k);
   const image = new Uint8ClampedArray(count * 4);
   const biomes: TerrainBiomes = {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { PLANETS, planetOf } from "./planets";
+import { LIQUID_SEAS, PLANETS, planetOf } from "./planets";
 import { mulberry32 } from "./rng";
 import {
+  ABYSS_DARK,
   coastDistanceOf,
   extendTerrain,
   generateTerrain,
@@ -144,7 +145,20 @@ describe("planet terrain", () => {
       }
     }
     const coast = coastDistanceOf(land, W, H);
-    const depth = seaDepthOf(land, heightmap, coast, W, H, 1, () => 0.5);
+    // A bed at the surface, so the shelf alone sets the depth.
+    const flatBed = (mask: Uint8Array) =>
+      Float64Array.from(mask, (v) => (v ? 1 : -1e-9));
+    const depth = seaDepthOf(
+      land,
+      heightmap,
+      coast,
+      W,
+      H,
+      1,
+      () => 0.5,
+      flatBed(land),
+      1,
+    );
     // Ten pixels out, well clear of where the two halves meet.
     const offLow = depth[50 * W + 30];
     const offHigh = depth[50 * W + 170];
@@ -167,6 +181,8 @@ describe("planet terrain", () => {
       H / 2,
       2,
       () => 0.5,
+      flatBed(half),
+      1,
     );
     const coarseLow = coarse[25 * (W / 2) + 15];
     expect(Math.abs(coarseLow - offLow)).toBeLessThan(offLow * 0.25);
@@ -244,7 +260,51 @@ describe("planet terrain", () => {
     expect(wide.seaDepth[o]).toBe(terrain.seaDepth[100 * terrain.width + 200]);
   }, 60_000);
 
-  it("fades the sea from its shallow colour to its deep one with no edge", () => {
+  it("makes the sea as deep as its bed past the shelf, and never shallower than the shelf", () => {
+    // Land across the top, level ground, and a bed that is a bank on the
+    // left half and a basin on the right.
+    const W = 200;
+    const H = 160;
+    const land = new Uint8Array(W * H);
+    const heightmap = new Uint8Array(W * H);
+    const level = new Float64Array(W * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const o = y * W + x;
+        if (y < 30) {
+          land[o] = 1;
+          heightmap[o] = 2;
+          level[o] = 1;
+        } else {
+          level[o] = x < W / 2 ? -0.2 : -4;
+        }
+      }
+    }
+    const coast = coastDistanceOf(land, W, H);
+    const depth = seaDepthOf(
+      land,
+      heightmap,
+      coast,
+      W,
+      H,
+      1,
+      () => 0.5,
+      level,
+      1,
+    );
+    // Far out, clear of where the halves meet.
+    const overBank = depth[140 * W + 40];
+    const overBasin = depth[140 * W + 160];
+    expect(overBasin).toBeGreaterThan(overBank * 2);
+    // The bank is nearer the surface than the shelf's edge, so the shelf
+    // carries on over it at the depth of its edge.
+    const besideCoast = depth[33 * W + 40];
+    expect(overBank).toBeGreaterThan(besideCoast);
+    const nearer = depth[100 * W + 40];
+    expect(Math.abs(nearer - overBank)).toBeLessThan(overBank * 0.01);
+  });
+
+  it("fades the sea from its shallow colour to its deep one, or darker, with no edge", () => {
     for (const planet of ["temperate", "ice", "acid"] as const) {
       const p = planetOf(planet);
       const { shallow, deep } = p.sea;
@@ -265,7 +325,14 @@ describe("planet terrain", () => {
       }
       // No step of a twentieth of a depth changes the colour by much.
       expect(largest, planet).toBeLessThan(span * 0.05);
-      expect(Math.abs(last - deep[c]), planet).toBeLessThan(span * 0.01);
+      if (LIQUID_SEAS.includes(p.sea.look)) {
+        // A liquid sea goes darker than its deep colour over its basins, by
+        // no more than the abyss takes.
+        expect(last, planet).toBeLessThan(deep[c]);
+        expect(last, planet).toBeGreaterThan(deep[c] * (1 - ABYSS_DARK));
+      } else {
+        expect(Math.abs(last - deep[c]), planet).toBeLessThan(span * 0.01);
+      }
     }
   });
 

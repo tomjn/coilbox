@@ -9,7 +9,14 @@ import {
   type Rgb,
   type SeaLook,
 } from "../planets";
-import { BED_FADE, BED_SHOWS, BED_WET, SEA_FADE } from "../terrainGen";
+import {
+  ABYSS_DARK,
+  ABYSS_FADE,
+  BED_FADE,
+  BED_SHOWS,
+  BED_WET,
+  SEA_FADE,
+} from "../terrainGen";
 import {
   GROUND_BODY,
   GROUND_HEAD,
@@ -545,6 +552,9 @@ const DETAIL = /* glsl */ `
       float fade = 1.0 + seaDepth * ${SEA_FADE.toFixed(3)};
       fade *= fade;
       vec3 water = mix(uSeaDeep, uSeaShallow, 1.0 / (fade * fade));
+      float abyss = 1.0 + seaDepth * ${ABYSS_FADE.toFixed(3)};
+      abyss *= abyss;
+      water *= 1.0 - uSeaLiquid * ${ABYSS_DARK.toFixed(3)} * (1.0 - 1.0 / (abyss * abyss));
       float bedFade = 1.0 + seaDepth * ${BED_FADE.toFixed(3)};
       bedFade *= bedFade;
       water = mix(water, uSeaBed, uSeaLiquid * ${BED_SHOWS.toFixed(3)} / (bedFade * bedFade));

@@ -295,7 +295,9 @@ describe("generatedTerrainPixels", { timeout: 30_000 }, () => {
       const d = shore?.distance[i] ?? 0;
       if (d > 2 && !land) wrong++;
       if (d < -2 && land) wrong++;
-      if (d > 2 && (shore?.depth[i] ?? 0) !== 0) wrong++;
+      // A blend reaches one coarse pixel further for the depth, which is
+      // large beside a coast where the bed falls away.
+      if (d > 4 && (shore?.depth[i] ?? 0) !== 0) wrong++;
     }
     expect(sea).toBeGreaterThan(0);
     expect(wrong).toBe(0);
