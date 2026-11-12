@@ -20,7 +20,7 @@ These came from the brief and the review of the spike on 11 November 2026. They 
 - Buildings are procedural geometry built in code with the landmark kit, as the landmarks are.
 - A standard lot is 0.25 world units a side.
 - A planet whose settlements are sealed outposts (red, moon, volcanic, acid) uses a lot three times that, 0.75, so an outpost is a few large structures.
-- The street surface is plain. One flat colour is enough.
+- The street surface is plain. One flat colour is enough. Changed on 12 November 2026: the gaps between buildings read as holes in a grey sheet, so the sheet now draws the grid. See "Street ground and street trees" below.
 - Fields round a town are dropped.
 - The ground under a town is levelled.
 - The reference for the real models is the dense pale sci-fi city in the memory `town-3d-reference`. Nothing is taken from the painted towns' colours or style.
@@ -133,6 +133,14 @@ Each copy of a model is then dressed in one livery from `liveries.ts`, which cha
 - On a Territories map a capital is marked by a star, not a badge. It stands above its town's tallest building too, and faces the camera there. A capital with no town under it keeps its star flat on the ground.
 - The player's home ring lies on the ground just outside the capital's own ring, so no building stands through it. A capital with no town of buildings keeps the flat ring of a fixed size.
 - The meshes are never picked. The location's own hit target carries the pointer.
+
+### Street ground and street trees
+
+`streetGround.ts` draws the town's grid on its street sheet, worked out for each pixel from the sum `streetGap` in `layout.ts` does: asphalt with a dashed centre line on a street, two carriageways and a planted strip on an avenue and on each main street, and paving with a joint at each lot's edge everywhere else. A sealed outpost has paving in place of the planting. A moon has no air and so no streets: its sheet stays one plain colour. The sheet keeps its fade at the town's edge and its dimming under fog.
+
+`streetTrees.ts` stands a row of trees down each side of every main street, on the strip its cleared lots leave, and a row down every avenue's median, every 0.15, with 15% of places left empty. A tree is 0.08 to 0.12 high and stands clear of every building. They are the forest's own shapes and material: oak and beech on a planet with forest, spruce on one with frost, palms on one with scrub and no forest. A sealed outpost and a planet where nothing grows have none. They cast no shadow and take none.
+
+The lot size, block layout and street widths are unchanged. Nothing but the trees fills the slivers beside a main street.
 
 ### Palettes
 

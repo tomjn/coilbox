@@ -3,6 +3,7 @@ import { type Town, townEdge } from "../towns";
 import { BUILDINGS } from "./buildings";
 import {
   BUILD_FIT,
+  blockStart,
   footprint,
   gridFor,
   layoutTown,
@@ -11,6 +12,7 @@ import {
   RIVER_BANK,
   riverEdgeReader,
   SEALED_GRID,
+  streetGap,
   type TownGrid,
 } from "./layout";
 
@@ -265,4 +267,32 @@ describe("riverEdgeReader", () => {
         Math.min(...buildings.map((b) => Math.hypot(b.x - f.x, b.z - f.z))),
       ).toBeLessThan(4 * OPEN_GRID.lot);
   });
+});
+
+describe("streetGap", () => {
+  for (const [name, grid] of [
+    ["open", OPEN_GRID],
+    ["sealed", SEALED_GRID],
+  ] as const)
+    it(`finds the blocks of an ${name} grid where blockStart puts them`, () => {
+      const block = grid.blockLots[0] * grid.lot;
+      // The middle of the grid is an avenue.
+      expect(streetGap(0, block, grid)).toEqual({ width: grid.avenue, off: 0 });
+      for (let i = 0; i < 9; i++) {
+        const start = blockStart(i, block, grid);
+        for (const t of [start + 1e-6, start + block / 2, start + block - 1e-6])
+          for (const side of [1, -1])
+            expect(streetGap(side * t, block, grid).width, `block ${i}`).toBe(
+              0,
+            );
+        // What follows a block is a street, or an avenue after every few.
+        const width = blockStart(i + 1, block, grid) - start - block;
+        const gap = streetGap(start + block + width / 2, block, grid);
+        expect(gap.width).toBeCloseTo(width, 9);
+        expect(gap.off).toBeCloseTo(0, 9);
+        expect(
+          streetGap(start + block + width - 1e-6, block, grid).off,
+        ).toBeCloseTo(width / 2, 5);
+      }
+    });
 });

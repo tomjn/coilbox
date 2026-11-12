@@ -69,6 +69,7 @@ uniform float uBare;
 uniform float uRock;
 uniform vec3 uRockCol[2];
 uniform float uFrost;
+uniform float uDim;
 uniform vec3 uSun;
 uniform vec4 uFrame;
 uniform float uHaze;
@@ -151,6 +152,9 @@ void main() {
     colour *= 1.0 - 0.12 * beyond;
     colour = mix(colour, uFar, smoothstep(0.0, uHaze, past));
   }
+  // Hidden by fog, a town's trees are drawn dim and grey as the town is.
+  if (uDim > 0.5)
+    colour = mix(colour, vec3(dot(colour, vec3(0.2126, 0.7152, 0.0722))), 0.6) * 0.55;
   gl_FragColor = vec4(colour, 1.0);
   #include <colorspace_fragment>
 }
@@ -235,6 +239,7 @@ export function treeMaterial(
       uRock: { value: kind.rock ? 1 : 0 },
       uRockCol: { value: planet.steep.map(linear) },
       uFrost: { value: planet.frost ?? 0 },
+      uDim: { value: 0 },
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uFrame: {
         value: frame
