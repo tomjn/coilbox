@@ -829,6 +829,11 @@ export function GalaxyView({
           landmarks.nodes,
           terrainBiomes?.planet,
           riverEdge,
+          new Set(
+            galaxy.nodes.flatMap((n, i) =>
+              dressing.get(n.id)?.outpost ? [i] : [],
+            ),
+          ),
         );
       }
       // Trees, on a generated map with its detail on. See forest3d.

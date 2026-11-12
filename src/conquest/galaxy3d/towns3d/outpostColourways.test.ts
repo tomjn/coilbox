@@ -5,6 +5,7 @@ import {
   isSealedPlanet,
   OUTPOST_COLOURWAYS,
   type OutpostFamily,
+  outpostColourwaysOn,
   outpostPaint,
   type SealedPlanetId,
 } from "./outpostColourways";
@@ -74,5 +75,23 @@ describe("outpost colourways", () => {
     expect(paint.dust[0].colour).toEqual(townPalette("red").top);
     expect(paint.dust[0].at(0, 0, 0)).toBeCloseTo(1);
     expect(paint.dust[0].at(0, 0.3, 0)).toBeCloseTo(0);
+  });
+
+  it("paints an outpost on an open planet in a sealed planet's colourways", () => {
+    expect(outpostColourwaysOn("moon")).toBe("moon");
+    for (const planet of [undefined, "temperate", "desert", "ice"] as const)
+      expect(PLANETS, String(planet)).toContain(outpostColourwaysOn(planet));
+  });
+
+  it("settles sand and snow on an outpost, and no moss", () => {
+    const c = OUTPOST_COLOURWAYS.moon[0];
+    for (const planet of ["desert", "ice"] as const) {
+      const paint = outpostPaint(planet, c);
+      expect(paint.topCover.even, planet).toBeGreaterThan(0);
+      expect(paint.dust, planet).toHaveLength(1);
+    }
+    const clean = outpostPaint("temperate", c);
+    expect(clean.topCover.even).toBe(0);
+    expect(clean.dust).toHaveLength(0);
   });
 });

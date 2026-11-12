@@ -42,6 +42,7 @@ import {
   type Colourway,
   colourwayFor,
   isSealedPlanet,
+  outpostColourwaysOn,
   outpostPaint,
   type SealedPlanetId,
 } from "./outpostColourways";
@@ -162,6 +163,11 @@ export function buildTownModelLayer(
   omit: ReadonlySet<number>,
   planet: PlanetId | undefined,
   riverEdge?: TownGround["riverEdge"],
+  /**
+   * Towns, by node index, built as a sealed outpost on a planet of open
+   * towns. A sealed planet builds nothing else, so there it changes nothing.
+   */
+  outposts?: ReadonlySet<number>,
 ): TownModelLayer {
   const style = planetOf(planet ?? "temperate").settlement.style;
   /** The sealed planet a sealed outpost stands on, or null for an open town. */
@@ -274,11 +280,15 @@ export function buildTownModelLayer(
     return { parts, built, walls };
   };
 
+  /** The planet whose dust, sand or snow settles on an outpost. */
+  const settles = planet ?? "temperate";
+  /** The planet whose colourways an outpost wears. */
+  const colours = outpostColourwaysOn(planet);
+
   /** Each structure in each colourway, built once for the map. */
   const outpostGeometries = new Map<string, THREE.BufferGeometry>();
   const outpostGeometry = (
     k: number,
-    planet: SealedPlanetId,
     colourway: Colourway,
   ): THREE.BufferGeometry => {
     const model = OUTPOSTS[k];
@@ -286,7 +296,7 @@ export function buildTownModelLayer(
     let g = outpostGeometries.get(key);
     if (!g) {
       const [w, d] = footprint(model, OUTPOST_GRID);
-      g = buildOutpost(model, w, d, outpostPaint(planet, colourway));
+      g = buildOutpost(model, w, d, outpostPaint(settles, colourway));
       outpostGeometries.set(key, g);
       disposables.push(g);
     }
@@ -296,7 +306,6 @@ export function buildTownModelLayer(
   /** A sealed outpost's structures on their plates, or null for none. */
   const buildOutpostBody = (
     town: Town,
-    planet: SealedPlanetId,
     y0: number,
     rand: () => number,
   ): Body | null => {
@@ -308,7 +317,10 @@ export function buildTownModelLayer(
     );
     if (placements.length === 0) return null;
     // An outpost's plates are all of one make.
-    const plating = outpostPaint(planet, colourwayFor(planet, "deck", rand()));
+    const plating = outpostPaint(
+      settles,
+      colourwayFor(colours, "deck", rand()),
+    );
     const foundations = new Builder();
     let built = 0;
     // The height of each plate's deck above the town's level.
@@ -340,8 +352,8 @@ export function buildTownModelLayer(
     const parts: THREE.BufferGeometry[] = [];
     placements.forEach((placement, i) => {
       const model = OUTPOSTS[placement.model];
-      const colourway = colourwayFor(planet, model.family, rand());
-      const copy = outpostGeometry(placement.model, planet, colourway).clone();
+      const colourway = colourwayFor(colours, model.family, rand());
+      const copy = outpostGeometry(placement.model, colourway).clone();
       // Each structure stands on its own plate, which the layout lists first.
       copy.applyMatrix4(
         at(
@@ -369,8 +381,9 @@ export function buildTownModelLayer(
     if (omit.has(town.node)) continue;
     const y0 = height(town.x, town.z);
     const rand = seeded(Math.floor(town.seed * 1e9) + 1);
-    const body = sealed
-      ? buildOutpostBody(town, sealed, y0, rand)
+    const outpost = sealed !== null || !!outposts?.has(town.node);
+    const body = outpost
+      ? buildOutpostBody(town, y0, rand)
       : buildOpenBody(town, y0, rand);
     if (!body) continue;
     const { parts, built, walls } = body;
@@ -386,7 +399,7 @@ export function buildTownModelLayer(
     const group = new THREE.Group();
     group.name = TOWN_NAME;
     group.position.set(town.x, y0, town.z);
-    const material = landmarkMaterial({ outpost: sealed !== null });
+    const material = landmarkMaterial({ outpost });
     const mesh = new THREE.Mesh(merged, material);
     mesh.raycast = () => {};
     group.add(mesh);
@@ -396,7 +409,7 @@ export function buildTownModelLayer(
 
     // Street trees, down the main streets and the avenues.
     const treeMaterials: THREE.ShaderMaterial[] = [];
-    if (treeShapes.length > 0) {
+    if (treeShapes.length > 0 && !outpost) {
       const clearOf = (px: number, pz: number) =>
         buildable(px, pz) >= BUILD_FIT &&
         (!riverEdge || riverEdge(px, pz) >= RIVER_BANK) &&
@@ -442,7 +455,7 @@ export function buildTownModelLayer(
     // An open town's street surface: a sheet draped on the ground, fading at
     // its edge. A sealed outpost stands on bare ground.
     let sheetMaterial: THREE.MeshBasicMaterial | null = null;
-    if (!sealed) {
+    if (!outpost) {
       sheetMaterial = new THREE.MeshBasicMaterial({
         vertexColors: true,
         transparent: true,
@@ -484,7 +497,7 @@ export function buildTownModelLayer(
     // The ring lies one lot outside the furthest building, or a little way
     // outside an outpost's furthest plate. A town's edge can reach well past
     // that, where the ground is too steep or wet to build on.
-    const reach = (built + (sealed ? OUTPOST_RING_CLEAR : grid.lot)) / RING_AT;
+    const reach = (built + (outpost ? OUTPOST_RING_CLEAR : grid.lot)) / RING_AT;
     // The longest shadow the tallest building throws on level ground.
     const shadowReach =
       reach + (local.max.y * Math.hypot(sun.x, sun.z)) / sun.y;
