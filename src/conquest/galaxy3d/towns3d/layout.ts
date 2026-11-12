@@ -100,10 +100,10 @@ export interface OutpostGrid {
   lot: number;
   /** How far a structure stands back from its lot's edge. */
   setback: number;
-  /** 0 to 1: how many lots are built on at the outpost's centre, so even its middle has bare ground. */
-  fill: number;
-  /** 0 to 1: how many of those are still built on at the outpost's edge. */
+  /** 0 to 1: how many lots are built on at the outpost's edge. The centre is full. */
   edgeDensity: number;
+  /** The share of bare lots beside a structure that take an empty plate joined to it. */
+  pads: number;
   /** The most a structure on a plate of its own is pulled off its lot's centre. */
   jitter: number;
   /** The share of neighbours on lots side by side that share one plate. */
@@ -121,8 +121,8 @@ export interface OutpostGrid {
 export const OUTPOST_GRID: OutpostGrid = {
   lot: 0.75,
   setback: 0.12,
-  fill: 0.8,
-  edgeDensity: 0.4,
+  edgeDensity: 0.6,
+  pads: 0.35,
   jitter: 0.06,
   join: 0.5,
   plateMargin: 0.04,
@@ -453,8 +453,12 @@ export function layoutTown(
 /** How far past its radius a town.s lots are judged, as `layoutTown` reaches. */
 const EDGE_REACH = 1.3;
 
-/** One structure an outpost's layout has placed, in lots of the outpost's own frame. */
+/** The model of an empty plate on a lot of its own. */
+const PAD = -1;
+
+/** One structure or empty plate an outpost's layout has placed, in lots of the outpost's own frame. */
 interface Sited {
+  /** The structure's model, or `PAD` for an empty plate. */
   model: number;
   /** Its first lot along the axis and across it, and how many it covers each way. */
   i: number;
@@ -473,11 +477,12 @@ interface Sited {
  * near the height wanted there whose lots are all free, and a city or a
  * capital first takes its centrepieces. Every structure stands on a plate of
  * its own, and some neighbours share one, with a bridge across the gap
- * between them. A structure on a plate of its own is pulled a little off its
- * lot's centre and turned, so the outpost does not read as a grid.
+ * between them. Some bare lots beside a structure take an empty plate joined
+ * to it. A structure on a plate of its own is pulled a little off its lot's
+ * centre and turned, so the outpost does not read as a grid.
  *
  * The plates come back with each structure's own first, in the order of the
- * placements, then the bridges.
+ * placements, then the empty plates, then the bridges.
  */
 export function layoutOutpost(
   town: Town,
@@ -494,6 +499,7 @@ export function layoutOutpost(
   const rand = seeded(seed);
   const pickRand = seeded(seed + 13);
   const joinRand = seeded(seed + 29);
+  const padRand = seeded(seed + 41);
   const cos = Math.cos(town.axis);
   const sin = Math.sin(town.axis);
   const { lot } = grid;
@@ -523,7 +529,7 @@ export function layoutOutpost(
         wants.push(null);
         continue;
       }
-      if (rand() > grid.fill * (1 - (1 - grid.edgeDensity) * t * t)) {
+      if (rand() > 1 - (1 - grid.edgeDensity) * t * t) {
         wants.push(SPARE);
         continue;
       }
@@ -631,6 +637,22 @@ export function layoutOutpost(
     });
   }
 
+  // Some bare lots beside a structure take an empty plate, which always
+  // joins its neighbours, so the clusters run together over the gaps.
+  const built = new Set(taken);
+  for (const [i, j] of order) {
+    if (at(i, j) !== SPARE) continue;
+    const beside = [
+      [i - 1, j],
+      [i + 1, j],
+      [i, j - 1],
+      [i, j + 1],
+    ].some(([a, b]) => built.has(`${a},${b}`));
+    if (!beside || padRand() >= grid.pads) continue;
+    taken.add(`${i},${j}`);
+    sited.push({ model: PAD, i, j, la: 1, lb: 1, across: false, joined: true });
+  }
+
   // Neighbours whose lots share an edge may share a plate. The bridge spans
   // the gap between their own plates, as wide as the side they share.
   const inset = grid.setback - grid.plateMargin;
@@ -663,7 +685,9 @@ export function layoutOutpost(
           d: 2 * inset,
         };
       }
-      if (!bridge || joinRand() >= grid.join) continue;
+      if (!bridge) continue;
+      const pad = p.model === PAD || q.model === PAD;
+      if (!pad && joinRand() >= grid.join) continue;
       p.joined = true;
       q.joined = true;
       const [x, z] = world(bridge.u, bridge.v);
@@ -672,7 +696,19 @@ export function layoutOutpost(
 
   const placements: Placement[] = [];
   const plates: Plate[] = [];
+  const pads: Plate[] = [];
   for (const s of sited) {
+    if (s.model === PAD) {
+      const [x, z] = world((s.i + 0.5) * lot, (s.j + 0.5) * lot);
+      pads.push({
+        x,
+        z,
+        turn: -town.axis,
+        w: lot - 2 * inset,
+        d: lot - 2 * inset,
+      });
+      continue;
+    }
     const m = models[s.model];
     let u = (s.i + s.la / 2) * lot;
     let v = (s.j + s.lb / 2) * lot;
@@ -700,7 +736,7 @@ export function layoutOutpost(
       d: s.lb * lot - 2 * inset,
     });
   }
-  return { placements, plates: [...plates, ...bridges] };
+  return { placements, plates: [...plates, ...pads, ...bridges] };
 }
 
 /**

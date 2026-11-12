@@ -31,6 +31,27 @@ describe("landmarkMaterial", () => {
     );
   });
 
+  it("wears painted metal and pales glass except on an outpost", () => {
+    const worn = landmarkMaterial();
+    expect(worn.defines).toEqual({});
+    const fresh = landmarkMaterial({ outpost: true });
+    expect(fresh.defines).toEqual({ OUTPOST: 1 });
+    // The scuffs and metal's share of the relief both hang on the one switch.
+    expect(fresh.fragmentShader).toMatch(
+      /#ifndef OUTPOST\s+if \(\(vKind > 10\.5 && vKind < 12\.5\) \|\| vKind > 13\.5\)/,
+    );
+    expect(fresh.fragmentShader).toMatch(
+      /#ifdef OUTPOST\s+#define RELIEF_BELOW 10\.5[\s\S]*#else\s+#define RELIEF_BELOW 13\.5/,
+    );
+    // An outpost's glass takes no white from the sky, so it stays dark.
+    expect(fresh.fragmentShader).toMatch(
+      /#ifdef OUTPOST[\s\S]*#define GLASS_WHITE 0\.0[\s\S]*#else[\s\S]*#define GLASS_WHITE 0\.25/,
+    );
+    expect(fresh.fragmentShader).toMatch(
+      /vKind > 8\.5 && vKind < RELIEF_BELOW/,
+    );
+  });
+
   it("goes grey under fog", () => {
     const m = landmarkMaterial();
     setLandmarkState(m, { hidden: true });

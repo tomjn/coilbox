@@ -31,8 +31,11 @@ export interface Paint {
   kind?: Kind;
   /** What settles on upward faces: moss, snow, ash. */
   top?: Rgb;
-  /** 0 to 1: how much of the upward faces it covers. */
-  topCover?: number;
+  /**
+   * 0 to 1: how much of the upward faces it covers, in patches. Given as
+   * `even`, that much of it lies over every upward face as a thin film.
+   */
+  topCover?: number | { even: number };
   /** Skip the grime at the part's foot, for parts that stand on other parts. */
   clean?: boolean;
   /** A multiplier on the colour at a point. */
@@ -321,8 +324,9 @@ export class Builder {
           const settled = noise3(x * 2.2, y * 2.2, z * 2.2) * 0.7 + fine * 0.3;
           c.lerp(
             top,
-            smooth(1 - cover - 0.15, 1 - cover + 0.15, settled) *
-              smooth(0.4, 0.9, ny),
+            (typeof cover === "number"
+              ? smooth(1 - cover - 0.15, 1 - cover + 0.15, settled)
+              : cover.even) * smooth(0.4, 0.9, ny),
           );
         }
       }

@@ -40,6 +40,10 @@ export interface Colourway {
   trim: Rgb;
   /** Bare metal: masts, rails, pipes. */
   metal: Rgb;
+  /**
+   * Near black. The material adds the sky's reflection on top, so anything
+   * lighter draws a window as a pale line on a dark hull.
+   */
   glass: Rgb;
   /** The paint of the hazard stripes, laid over near black. */
   stripe: Rgb;
@@ -48,7 +52,8 @@ export interface Colourway {
 /** A colourway with what settles on a structure on its planet. */
 export interface OutpostPaint extends Colourway {
   top: Rgb;
-  topCover: number;
+  /** An even film, as patches of dust read as stains on a painted roof. */
+  topCover: { even: number };
   /** Dust drifted against the foot of each wall. */
   dust: Stain[];
 }
@@ -64,7 +69,7 @@ const WHITE_ORANGE: Colourway = {
   accent: [214, 112, 40],
   trim: [62, 64, 68],
   metal: [150, 152, 156],
-  glass: [70, 90, 110],
+  glass: [18, 22, 28],
   stripe: [222, 150, 40],
 };
 
@@ -76,7 +81,7 @@ const COPPER: Colourway = {
   accent: [214, 196, 170],
   trim: [64, 50, 44],
   metal: [160, 120, 90],
-  glass: [60, 74, 86],
+  glass: [15, 18, 22],
   stripe: [214, 170, 60],
 };
 
@@ -92,7 +97,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [92, 112, 138],
         trim: [58, 62, 70],
         metal: [146, 150, 156],
-        glass: [64, 86, 112],
+        glass: [16, 22, 28],
         stripe: [220, 170, 50],
       },
       {
@@ -103,7 +108,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [222, 178, 48],
         trim: [52, 54, 58],
         metal: [140, 142, 146],
-        glass: [60, 80, 96],
+        glass: [15, 20, 24],
         stripe: [226, 182, 44],
       },
       {
@@ -114,7 +119,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [220, 118, 40],
         trim: [40, 42, 46],
         metal: [130, 132, 136],
-        glass: [80, 100, 120],
+        glass: [20, 25, 30],
         stripe: [226, 130, 40],
       },
     ],
@@ -127,7 +132,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [176, 84, 52],
         trim: [70, 58, 52],
         metal: [150, 140, 130],
-        glass: [70, 84, 96],
+        glass: [18, 21, 24],
         stripe: [210, 140, 50],
       },
       { ...COPPER, share: 2, families: ["dome", "capsule"] },
@@ -140,7 +145,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [150, 74, 46],
         trim: [58, 54, 52],
         metal: [138, 132, 126],
-        glass: [64, 78, 90],
+        glass: [16, 20, 22],
         stripe: [204, 150, 52],
       },
       {
@@ -151,7 +156,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [218, 206, 180],
         trim: [52, 44, 36],
         metal: [170, 140, 100],
-        glass: [74, 82, 90],
+        glass: [18, 20, 22],
         stripe: [214, 170, 60],
       },
     ],
@@ -164,7 +169,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [226, 184, 40],
         trim: [40, 40, 42],
         metal: [128, 130, 134],
-        glass: [70, 80, 90],
+        glass: [18, 20, 22],
         stripe: [228, 186, 38],
       },
       {
@@ -175,7 +180,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [212, 110, 38],
         trim: [48, 48, 50],
         metal: [136, 138, 142],
-        glass: [70, 84, 96],
+        glass: [18, 21, 24],
         stripe: [226, 150, 40],
       },
       {
@@ -186,7 +191,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [176, 44, 36],
         trim: [30, 30, 32],
         metal: [120, 118, 118],
-        glass: [90, 70, 60],
+        glass: [22, 18, 15],
         stripe: [220, 170, 44],
       },
       {
@@ -197,7 +202,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [212, 110, 38],
         trim: [56, 56, 58],
         metal: [150, 152, 154],
-        glass: [70, 84, 96],
+        glass: [18, 21, 24],
         stripe: [226, 182, 44],
       },
     ],
@@ -210,7 +215,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [40, 140, 140],
         trim: [54, 62, 60],
         metal: [146, 152, 148],
-        glass: [60, 96, 96],
+        glass: [15, 24, 24],
         stripe: [222, 200, 60],
       },
       {
@@ -221,7 +226,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [222, 190, 48],
         trim: [58, 62, 62],
         metal: [148, 150, 150],
-        glass: [64, 90, 96],
+        glass: [16, 22, 24],
         stripe: [224, 192, 44],
       },
       {
@@ -232,7 +237,7 @@ export const OUTPOST_COLOURWAYS: Record<SealedPlanetId, readonly Colourway[]> =
         accent: [150, 196, 60],
         trim: [38, 42, 42],
         metal: [128, 134, 132],
-        glass: [70, 96, 90],
+        glass: [18, 24, 22],
         stripe: [170, 206, 60],
       },
       COPPER,
@@ -273,7 +278,7 @@ export function outpostPaint(
   return {
     ...colourway,
     top,
-    topCover,
+    topCover: { even: topCover },
     dust: [{ colour: top, at: (_x, y) => 1 - smooth(0, DUST_HEIGHT, y) }],
   };
 }
