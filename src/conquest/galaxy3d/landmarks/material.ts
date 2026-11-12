@@ -48,6 +48,11 @@ void main() {
 }
 `;
 
+/** A ribbed wall's courses: their height, the share of each a groove takes, and how dark it is. */
+const RIB_PERIOD = 0.11;
+const RIB_GROOVE = 0.34;
+const RIB_DARK = 0.42;
+
 const FRAGMENT = /* glsl */ `
 uniform vec3 uSun;
 uniform vec3 uSunLight;
@@ -155,6 +160,21 @@ void main() {
     float shade = hh > 0.9 ? 0.85 : 0.95 + 0.09 * hh;
     float fade = clamp(1.0 - max(fwidth(b.x), fwidth(b.y)) * 1.6, 0.0, 1.0);
     base *= mix(1.0, shade * (1.0 - 0.16 * seam), fade);
+  } else if (vKind > 5.5 && vKind < 6.5) {
+    // Ribs round a wall: broad courses with a dark groove under each. They are
+    // wide enough to show from as far off as a town is seen, and far apart
+    // enough not to read as storeys.
+    float duty = ${RIB_GROOVE.toFixed(3)};
+    float dark = ${RIB_DARK.toFixed(3)};
+    if (abs(n.y) < 0.75) {
+      float b = vLocal.y / ${RIB_PERIOD.toFixed(3)};
+      float w = fwidth(b);
+      float f = fract(b);
+      float groove = smoothstep(0.0, w, f) * (1.0 - smoothstep(duty, duty + w, f));
+      // Too far off to draw one groove, the wall takes their average shade.
+      float fade = clamp(1.6 - w * 2.2, 0.0, 1.0);
+      base *= 1.0 - dark * mix(duty, groove, fade);
+    }
   } else if (vKind > 10.5 && vKind < 11.5) {
     // Painted plate: small sheets with a dark joint between them.
     vec2 size = vec2(0.09, 0.075);
