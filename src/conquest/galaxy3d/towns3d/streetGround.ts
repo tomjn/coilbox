@@ -17,6 +17,8 @@ import type { TownGrid } from "./layout";
 
 /** Half the width of the planted strip down an avenue or a main street. */
 export const MEDIAN_HALF = 0.024;
+/** Half the width of the line down the middle of a street: a twentieth of an open town's street across. */
+const LINE_HALF = 0.0025;
 /** The paint down the middle of a street, in sRGB. */
 const PAINT: Rgb = [206, 200, 176];
 
@@ -53,14 +55,15 @@ vec3 townGap(float t, float block) {
 // A road w wide, off from its middle and along it, px world units a pixel.
 vec3 townRoad(float w, float off, float along, float px) {
   vec3 c = uTownAsphalt;
-  // Detail finer than a pixel is left out, where it would only flicker.
-  float fine = 1.0 - smoothstep(0.008, 0.02, px);
   if (w > uTownGrid.y * 1.5) {
     // Wide enough for two carriageways and a planted strip between them.
     c = mix(c, uTownMedian, 1.0 - smoothstep(${MEDIAN_HALF}, ${MEDIAN_HALF} + px, off));
   } else {
     float dash = step(0.5, fract(along / 0.09));
-    c = mix(c, uTownPaint, (1.0 - smoothstep(0.004, 0.004 + px, off)) * dash * 0.55 * fine);
+    // A line thinner than a pixel is drawn a pixel wide and that much
+    // fainter, so it never looks wider than it is.
+    float line = 1.0 - smoothstep(max(${LINE_HALF} - px * 0.5, 0.0), ${LINE_HALF} + px * 0.5, off);
+    c = mix(c, uTownPaint, line * dash * 0.7 * min(1.0, ${LINE_HALF} * 2.0 / px));
   }
   return c;
 }
