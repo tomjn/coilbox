@@ -164,7 +164,11 @@ export function buildTownModelLayer(
       }
     }
     if (foundationCount > 0) parts.push(foundations.build().solid);
-    const merged = mergeGeometries(parts) as THREE.BufferGeometry;
+    const merged = mergeGeometries(parts);
+    if (!merged)
+      throw new Error(
+        `Town at node ${town.node} cannot merge its buildings: the building models' attributes differ.`,
+      );
     for (const part of parts) part.dispose();
     merged.computeBoundingBox();
     const local = merged.boundingBox as THREE.Box3;
