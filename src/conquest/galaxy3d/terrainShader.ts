@@ -699,18 +699,11 @@ const DETAIL = /* glsl */ `
       bump += s * fine.yz * 0.05;
       albedo = mix(albedo, albedo * vec3(1.12, 1.05, 0.8), s * smoothstep(0.0, 0.5, broad.x));
     }
-    // Scrub: bare ground with dark bushes dotted over it.
+    // Scrub: bare ground. Its bushes are real shapes standing on it (forest3d).
     if (pw[${P.scrub}] > 0.02) {
       float s = pw[${P.scrub}];
       shadeMul += s * (broad.x * 0.15 + fine.x * 0.14);
       bump += s * fine.yz * 0.04;
-      float keep = tShow(0.1, footprint);
-      if (keep > 0.0) {
-        vec4 cell = tCell(p / 0.3 + 3.7);
-        float bush = (1.0 - smoothstep(0.1, 0.28, cell.x)) * step(0.4, cell.w) * keep;
-        albedo = mix(albedo, albedo * vec3(0.42, 0.55, 0.38), s * bush);
-        bump += s * bush * (1.0 - bush) * cell.yz * 1.2;
-      }
     }
     // Sand: smooth, with wind ripples.
     if (pw[${P.sand}] > 0.02) {

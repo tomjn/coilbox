@@ -56,10 +56,23 @@ On the test map (temperate, seed 35058, 18 locations, 100 by 100 world units), t
 - A frame at the closest zoom, 2880 by 1800, drew 4.53 million triangles in 301 calls, towns and terrain included. With near shapes starting at 6 pixels in place of 12 it drew 6.85 million.
 - No frame time was measured. The harness's timing read under 1 ms, which cannot be right, and the machine was under load.
 
+## Rocks, bushes, desert plants and dead trees
+
+Added on `feat/scatter-3d`, on top of the trees. The same planting pass and the same layer draw them, so they are six more kinds and no new system.
+
+- Boulders and crags on stony ground (rock, scree, mesa, basalt, flows), and a few on bare ground (tundra, regolith, ash, dust, earth, cracked). None on a slope steeper than 0.4, which the terrain picture already draws as bare rock. They take the planet's two steep-ground colours, so every planet has them, including the four where nothing grows.
+- Bushes on scrub, in place of the dark dots the terrain picture painted there, and a few on tundra.
+- On a dry world, which is one with scrub and no forest: cactus and flat-topped acacia among the bushes, and palms within 0.3 of a river. Its plants take a sage and cactus palette held in `material.ts`, since the planet has no forest colours.
+- Dead trees at a cold forest's edge and a few on dry scrub.
+- A rock is 0.03 to 0.14 high. Anything smaller is under two pixels at the closest zoom. A cactus is drawn stouter than a real one for the same reason.
+
+Counts on the test map after these were cut to a quarter at review: desert 24,581, temperate 90,838, ice 115,467.
+
+A world where nothing grows (moon, red, volcanic) then got its rocks raised again at review, since they are all that stands on it: four times on stony ground and twelve on bare. That gives the moon 14,839, the volcanic planet 29,393 and the red planet 9,349.
+
 ## Not done
 
 - Frame timing with `scripts/map-frame-timing` on a quiet machine.
 - Moving the planting off the main thread, if 2 seconds at map open is too long.
 - Trees in a town's parks and along its streets.
-- Scrub, which is still dark dots painted on the ground.
 - Any tuning of sizes, colours or densities. Every value is a first pick.

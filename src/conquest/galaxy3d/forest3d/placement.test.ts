@@ -140,8 +140,10 @@ describe("plantForest", () => {
   });
 
   it("turns some broadleaf trees only when asked", () => {
-    const green = plantForest(ground({ maxX: 20, maxZ: 20 }), 5, SUN, 0);
-    const autumn = plantForest(ground({ maxX: 20, maxZ: 20 }), 5, SUN, 0.3);
+    const green = plantForest(ground({ maxX: 20, maxZ: 20 }), 5, SUN);
+    const autumn = plantForest(ground({ maxX: 20, maxZ: 20 }), 5, SUN, {
+      autumn: 0.3,
+    });
     expect(green.turning.reduce((a, b) => a + b, 0)).toBe(0);
     const turned = autumn.turning.reduce((a, b) => a + b, 0);
     expect(turned).toBeGreaterThan(0);
@@ -149,6 +151,104 @@ describe("plantForest", () => {
     for (let t = 0; t < autumn.count; t++)
       if (autumn.turning[t])
         expect(SPECIES[autumn.species[t]].conifer).toBe(false);
+  });
+
+  /** Ground that is all one share of `ForestGround.cover`. */
+  const all = (share: number, over: Partial<ForestGround> = {}) =>
+    ground({
+      maxX: 20,
+      maxZ: 20,
+      cover: (_x, _z, out) => {
+        out.fill(0);
+        out[share] = 1;
+      },
+      ...over,
+    });
+  const kinds = (f: ReturnType<typeof plantForest>) => {
+    const out: Record<string, number> = {};
+    for (const k of f.species)
+      out[SPECIES[k].id] = (out[SPECIES[k].id] ?? 0) + 1;
+    return out;
+  };
+
+  it("scatters rocks on stony ground, and far fewer on bare ground", () => {
+    const stony = kinds(plantForest(all(4), 5, SUN));
+    const bare = kinds(plantForest(all(5), 5, SUN));
+    expect(Object.keys(stony).sort()).toEqual(["boulder", "crag"]);
+    expect(stony.boulder).toBeGreaterThan(stony.crag);
+    expect(stony.boulder).toBeGreaterThan(100);
+    expect(bare.boulder).toBeGreaterThan(0);
+    expect(bare.boulder).toBeLessThan(stony.boulder / 3);
+  });
+
+  it("lays no rock on a cliff or a steep hillside", () => {
+    const level = plantForest(all(4), 5, SUN);
+    const gentle = plantForest(all(4, { height: (x) => 1 + x * 0.15 }), 5, SUN);
+    const steep = plantForest(all(4, { height: (x) => 1 + x * 0.5 }), 5, SUN);
+    expect(gentle.count).toBe(level.count);
+    expect(steep.count).toBe(0);
+  });
+
+  it("grows nothing on a dead world but leaves its rocks", () => {
+    expect(plantForest(all(0), 5, SUN, { alive: false }).count).toBe(0);
+    expect(plantForest(all(3), 5, SUN, { alive: false }).count).toBe(0);
+    expect(plantForest(all(4), 5, SUN, { alive: false }).count).toBeGreaterThan(
+      100,
+    );
+  });
+
+  it("lays more rocks on a dead world, and most of all on its bare ground", () => {
+    const count = (share: number, alive: boolean) =>
+      plantForest(all(share), 5, SUN, { alive }).count;
+    const stony = count(4, false) / count(4, true);
+    const bare = count(5, false) / count(5, true);
+    // Four and twelve times as likely to a cell, less the ones crowded out.
+    expect(stony).toBeGreaterThan(3);
+    expect(stony).toBeLessThan(4.5);
+    expect(bare).toBeGreaterThan(8);
+    expect(bare).toBeLessThan(12.5);
+  });
+
+  it("grows bushes on scrub, with cactus and acacia on a dry world alone", () => {
+    const mild = kinds(plantForest(all(3), 5, SUN));
+    const dry = kinds(plantForest(all(3), 5, SUN, { arid: true }));
+    expect(mild.shrub).toBeGreaterThan(100);
+    expect(mild.cactus).toBeUndefined();
+    expect(mild.acacia).toBeUndefined();
+    expect(dry.shrub).toBeGreaterThan(dry.cactus);
+    expect(dry.cactus).toBeGreaterThan(dry.acacia);
+    expect(dry.acacia).toBeGreaterThan(0);
+    expect(dry.snag).toBeGreaterThan(0);
+  });
+
+  it("lines a dry world's rivers with palms, and no other world's", () => {
+    const river = { riverEdge: (x: number) => Math.abs(x - 10) - 0.1 };
+    const dry = plantForest(all(5, river), 5, SUN, { arid: true });
+    let palms = 0;
+    for (let t = 0; t < dry.count; t++)
+      if (SPECIES[dry.species[t]].id === "palm") {
+        palms++;
+        expect(Math.abs(dry.x[t] - 10)).toBeLessThan(0.41);
+        expect(Math.abs(dry.x[t] - 10)).toBeGreaterThanOrEqual(0.13);
+      }
+    expect(palms).toBeGreaterThan(20);
+    expect(kinds(plantForest(all(5, river), 5, SUN)).palm).toBeUndefined();
+  });
+
+  it("stands dead trees at a cold forest's edge", () => {
+    const f = plantForest(
+      ground({
+        maxX: 20,
+        maxZ: 20,
+        cover: (_x, _z, out) => {
+          out.fill(0);
+          out[1] = 0.4;
+        },
+      }),
+      5,
+      SUN,
+    );
+    expect(kinds(f).snag).toBeGreaterThan(0);
   });
 
   it("shades the trees inside a forest and not the ones on its sunward edge", () => {
@@ -187,6 +287,16 @@ describe("forestCoverPixels", () => {
     expect(at(3, 3, 0)).toBe(255);
     expect(at(3.5, 3, 0)).toBe(0);
     expect(at(1, 1, 0)).toBe(0);
+  });
+
+  it("leaves no litter under a rock, which still throws a shadow", () => {
+    const rock = { ...one, species: Uint8Array.of(6) };
+    expect(SPECIES[6].look).toBe("rock");
+    const p = forestCoverPixels(rock, ground(), 120, 120, SUN);
+    const read = (x: number, z: number, channel: number) =>
+      p[(Math.floor(z * 20) * 120 + Math.floor(x * 20)) * 2 + channel];
+    expect(read(3, 3, 0)).toBe(0);
+    expect(read(3.1, 3.1, 1)).toBeGreaterThan(200);
   });
 
   it("throws the shadow away from the sun", () => {
