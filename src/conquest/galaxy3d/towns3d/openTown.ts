@@ -22,10 +22,10 @@ const OPEN = ["organic"] as const;
 /** How dark the second finish is beside the walls. */
 const PLATE_TONE = 0.72;
 
-type Add = (g: THREE.BufferGeometry) => void;
+export type Add = (g: THREE.BufferGeometry) => void;
 
 /** The finishes a model's parts are added in. */
-interface Tools {
+export interface Tools {
   /** Pale cast concrete: a building's main masses. */
   wall: Add;
   /** The same concrete in broad ribs. */
@@ -36,6 +36,8 @@ interface Tools {
   dark: Add;
   /** A painted panel in the planet's rust. */
   accent: Add;
+  /** A roof garden or a court's grass. No livery repaints it. */
+  green: Add;
 }
 
 const tools = (b: Builder, palette: TownPalette): Tools => {
@@ -49,24 +51,28 @@ const tools = (b: Builder, palette: TownPalette): Tools => {
   return {
     wall: add(palette.building, settled),
     ribs: add(palette.building, { ...settled, kind: 6 }),
-    alt: add(palette.building, { ...settled, tint: () => PLATE_TONE }),
+    alt: add(palette.building, { ...settled, kind: 5, tint: () => PLATE_TONE }),
     // Bare metal takes the sun's glint and none of painted metal's scuffs,
     // which are drawn for a model many times a building's size.
     dark: add(palette.dark, { kind: 13, clean: true }),
     accent: add(palette.accent, { kind: 7, clean: true }),
+    green: add(palette.grass, { kind: 2, clean: true }),
   };
 };
 
-const model = (
+export const model = (
   id: string,
   lots: [number, number],
   height: number,
   /** Add the parts. `h` is the model's height. */
   parts: (t: Tools, w: number, d: number, h: number) => void,
+  /** Set for one of a town's one or two tallest towers. */
+  landmark?: boolean,
 ): BuildingModel => ({
   id,
   lots,
   height,
+  landmark,
   settlements: OPEN,
   build(b, w, d, palette) {
     parts(tools(b, palette), w, d, height);
@@ -141,7 +147,8 @@ export const OPEN_TOWN: readonly BuildingModel[] = [
   // A broad lower half and a narrower ribbed upper half set to one side, with
   // a painted panel on the lower.
   model("split", [1, 1], 1.5, (t, w, d, h) => {
-    t.wall(column(chamfered(w, d, 0.12 * w), 0, 0.5 * h));
+    // A little narrower than the lot, so the panel stands proud of it.
+    t.wall(column(chamfered(0.96 * w, d, 0.12 * w), 0, 0.5 * h));
     t.dark(plate(0.8 * w, 0.8 * d, 0.5 * h, 0.54 * h));
     t.ribs(
       column(

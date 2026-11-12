@@ -1,5 +1,6 @@
 /**
- * The models a town is built from. An open town's are in `openTown.ts`. A
+ * The models a town is built from. An open town's are in `openTown.ts`, and
+ * what it puts on a lot it leaves unbuilt is in `fillers.ts`. A
  * sealed outpost's are still plain cuboids that stand in for the real models
  * to come. A model carries no foundation, the layer adds one where the ground
  * drops under a building.
@@ -8,7 +9,10 @@ import type * as THREE from "three";
 import type { SettlementStyle } from "../../planets";
 import { at, Builder, box } from "../landmarks/kit";
 import type { TownPalette } from "../landmarks/palettes";
+import { FILLERS } from "./fillers";
 import { OPEN_TOWN } from "./openTown";
+import { OPEN_TOWN_DETAIL } from "./openTownDetail";
+import { OPEN_TOWN_TALL } from "./openTownTall";
 
 export interface BuildingModel {
   id: string;
@@ -17,6 +21,10 @@ export interface BuildingModel {
   /** Height in world units. */
   height: number;
   settlements: readonly SettlementStyle[];
+  /** Set on what fills a lot nothing is built on: a park, a court, a car park. */
+  filler?: boolean;
+  /** Set on a town's one or two tallest towers, which only a city or a capital has. */
+  landmark?: boolean;
   /** Add the model's parts round its own origin, standing on y = 0, inside `w` by `d`. */
   build(b: Builder, w: number, d: number, palette: TownPalette): void;
 }
@@ -43,6 +51,9 @@ const cuboid = (
 
 export const BUILDINGS: readonly BuildingModel[] = [
   ...OPEN_TOWN,
+  ...OPEN_TOWN_DETAIL,
+  ...OPEN_TOWN_TALL,
+  ...FILLERS,
   cuboid("outpost-low", [1, 1], 0.18),
   cuboid("outpost-low-slab", [2, 1], 0.3),
   cuboid("outpost-mid", [1, 1], 0.375),

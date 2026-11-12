@@ -167,6 +167,50 @@ describe("layoutTown", () => {
     expect(layoutTown(town(0.3, []), SEALED_GRID, models, fit)).toHaveLength(1);
     expect(layoutTown(town(0.3, []), SEALED_GRID, models, unfit)).toEqual([]);
   });
+
+  it("gives a capital a landmark, a city at most one and a town none", () => {
+    const open = models.filter((m) => m.settlements.includes("organic"));
+    const landmarks = (radius: number) =>
+      layoutTown(town(radius), OPEN_GRID, open, flat).filter(
+        (p) => open[p.model].landmark,
+      ).length;
+    expect(landmarks(3.8)).toBeGreaterThanOrEqual(1);
+    expect(landmarks(3.8)).toBeLessThanOrEqual(2);
+    expect(landmarks(3.2)).toBeLessThanOrEqual(1);
+    expect(landmarks(2)).toBe(0);
+  });
+
+  it("draws an open town's buildings taller or lower than their models", () => {
+    const open = models.filter((m) => m.settlements.includes("organic"));
+    const placed = layoutTown(town(3.8), OPEN_GRID, open, flat);
+    const stretches = placed
+      .filter((p) => !open[p.model].filler)
+      .map((p) => p.stretch);
+    expect(new Set(stretches).size).toBeGreaterThan(stretches.length / 2);
+    // The stretch a lot asks for, less the drift of 0.12 that keeps two level.
+    for (const s of stretches) {
+      expect(s).toBeGreaterThan((1 - OPEN_GRID.stretch) * 0.88 - 1e-9);
+      expect(s).toBeLessThanOrEqual(1 + OPEN_GRID.stretch);
+    }
+    for (const p of placed.filter((p) => open[p.model].filler))
+      expect(p.stretch).toBe(1);
+  });
+
+  it("leaves a sealed outpost's buildings as they were modelled", () => {
+    const sealed = models.filter((m) => m.settlements.includes("sealed"));
+    for (const p of layoutTown(town(3.8), SEALED_GRID, sealed, flat))
+      expect(p.stretch).toBe(1);
+  });
+
+  it("does not build a capital's middle from one model", () => {
+    const open = models.filter((m) => m.settlements.includes("organic"));
+    const placed = layoutTown(town(3.8), OPEN_GRID, open, flat);
+    const tall = placed.filter((p) => open[p.model].height >= 2.3);
+    const counts = new Map<number, number>();
+    for (const p of tall) counts.set(p.model, (counts.get(p.model) ?? 0) + 1);
+    expect(counts.size).toBeGreaterThan(3);
+    expect(Math.max(...counts.values())).toBeLessThan(tall.length / 2);
+  });
 });
 
 describe("riverEdgeReader", () => {
@@ -205,5 +249,20 @@ describe("riverEdgeReader", () => {
     // The map's left edge is at 1/6 of the picture, in the field's first texel.
     expect(read?.(-4.9, 0)).toBeCloseTo(-0.12);
     expect(read?.(4.9, 0)).toBeCloseTo(0.9);
+  });
+
+  it("puts parks and courts on lots an open town leaves unbuilt", () => {
+    const open = models.filter((m) => m.settlements.includes("organic"));
+    const placed = layoutTown(town(3), OPEN_GRID, open, flat);
+    const fillers = placed.filter((p) => open[p.model].filler);
+    const buildings = placed.filter((p) => !open[p.model].filler);
+    expect(fillers.length).toBeGreaterThan(0);
+    expect(buildings.length).toBeGreaterThan(fillers.length);
+    // A block is four lots long, so a filler in a block with a building is
+    // within that of one.
+    for (const f of fillers)
+      expect(
+        Math.min(...buildings.map((b) => Math.hypot(b.x - f.x, b.z - f.z))),
+      ).toBeLessThan(4 * OPEN_GRID.lot);
   });
 });
