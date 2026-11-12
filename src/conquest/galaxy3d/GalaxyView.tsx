@@ -34,6 +34,7 @@ import {
   placeLabels,
   sameNumbers,
 } from "./labelDeclutter";
+import { conquestDressing, type Dressing } from "./landmarks/dressing";
 import type { RunLandmark } from "./landmarks/kinds";
 import {
   buildLandmarkLayer,
@@ -697,6 +698,10 @@ export function GalaxyView({
     // mode goes without. The ground is levelled under each town the map
     // draws, so everything below stands on `map.heights`, not the raw grid.
     const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
+    // What stands in place of a town, and where. A run says so itself. A
+    // conquest map is dealt its own, from the map and not from the player.
+    const dressing: ReadonlyMap<string, NodeIdentity & Dressing> =
+      identities ?? conquestDressing(galaxy, terrainBiomes?.planet);
     const map = layoutLevelledMap(galaxy, terrainHeights, terrainExtension, {
       maxSegments: performanceMode
         ? TERRAIN_MAX_SEGMENTS / 2
@@ -705,12 +710,7 @@ export function GalaxyView({
       // Rivers are drawn with the detail, which performance mode leaves
       // out, so there no road goes round them and none is bridged.
       routeRivers: !performanceMode,
-      skip: landmarkNodes(
-        galaxy.nodes,
-        playerFactionId,
-        identities,
-        terrainBiomes?.planet,
-      ),
+      skip: landmarkNodes(galaxy.nodes, dressing, terrainBiomes?.planet),
     });
     const { skin, extent, positions, bounds, surface } = map.layout;
     const nodeIds = galaxy.nodes.map((n) => n.id);
@@ -778,8 +778,9 @@ export function GalaxyView({
     let terrainSheet: TerrainSheet | undefined;
     // A town of buildings at every location. See towns3d/townModelLayer.ts.
     let townModels: TownModelLayer | undefined;
-    // A stronghold on every enemy capital, and a run's ruin, in place of the
-    // town. See landmarks/landmarkLayer.ts.
+    // A stronghold, a spire or a landing pad on every held capital, and an
+    // anomaly or a depot where the map asks, in place of the town. See
+    // landmarks/landmarkLayer.ts.
     let landmarks: LandmarkLayer | undefined;
     // The trees of a generated map. See forest3d/forestLayer.ts.
     let forest: ForestLayer | undefined;
@@ -806,8 +807,7 @@ export function GalaxyView({
         disposables,
         surface,
         galaxy,
-        playerFactionId,
-        identities,
+        dressing,
         terrainBiomes?.planet,
         terrainColourReader(terrainColor, surface),
       );
@@ -964,7 +964,8 @@ export function GalaxyView({
       burstRef,
       applyBurstRef,
       surface,
-      townModels?.rings,
+      // The player's capital is a landmark, and a neutral one a town.
+      new Map([...(townModels?.rings ?? []), ...(landmarks?.rings ?? [])]),
     );
 
     /* ------------------------------- labels -------------------------------- */

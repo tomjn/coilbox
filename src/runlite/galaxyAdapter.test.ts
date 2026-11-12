@@ -504,7 +504,6 @@ describe("a land run's live state", () => {
     const doc = mapRunToGalaxyDoc(moved, map, located(moved));
     const kinds = landmarkKinds(
       doc.nodes,
-      doc.playerFactionId,
       mapRunIdentities(moved, located(moved)),
     );
     const at = (id: string) => doc.nodes.findIndex((n) => n.id === id);
@@ -527,11 +526,9 @@ describe("a land run's live state", () => {
     const kindAt = (seed: number) => {
       const r = { ...moved, settings: { ...moved.settings, seed } };
       const doc = mapRunToGalaxyDoc(r, map, located(r));
-      return landmarkKinds(
-        doc.nodes,
-        doc.playerFactionId,
-        mapRunIdentities(r, located(r)),
-      ).get(doc.nodes.findIndex((n) => n.id === "east"));
+      return landmarkKinds(doc.nodes, mapRunIdentities(r, located(r))).get(
+        doc.nodes.findIndex((n) => n.id === "east"),
+      );
     };
     expect(kindAt(seen.indexOf("spire"))).toBe("spire");
     expect(kindAt(seen.indexOf(undefined))).toBe("stronghold");

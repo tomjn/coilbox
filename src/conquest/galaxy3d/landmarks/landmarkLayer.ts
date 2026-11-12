@@ -1,7 +1,7 @@
 /**
- * The landmarks that stand on a terrain map in place of a town: a stronghold
- * on every enemy capital, and an anomaly, a depot or a landing pad where a run
- * asks for one.
+ * The landmarks that stand on a terrain map in place of a town: a stronghold,
+ * a spire or a landing pad on every capital a faction holds, and an anomaly
+ * or a depot where the map asks for one.
  *
  * Each is built once, placed on the ground, turned to its road and kept clear
  * of its neighbours. It follows its location's fog and selection the
@@ -34,7 +34,7 @@ import {
   strongholdPalette,
 } from "./palettes";
 import { buildRuin, RUIN_REACH } from "./ruin";
-import { createLandmarkShadow, groundDecal } from "./shadow";
+import { createLandmarkShadow, groundDecal, RING_AT } from "./shadow";
 import { pickSite } from "./site";
 import { buildSpire, SPIRE_REACH } from "./spire";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
@@ -69,6 +69,8 @@ export interface LandmarkLayer {
   anchors: { pos: [number, number] }[];
   /** The height of each landmark's top, in world units, by node index. */
   tops: ReadonlyMap<number, number>;
+  /** The radius of the ring each landmark's decal draws, by node index. */
+  rings: ReadonlyMap<number, number>;
   /** Show a location's fog and ring, as a town would. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
@@ -86,13 +88,12 @@ interface Placed {
  */
 export function landmarkNodes(
   nodes: GalaxyDoc["nodes"],
-  playerFactionId: string,
-  identities: Parameters<typeof landmarkKinds>[2],
+  identities: Parameters<typeof landmarkKinds>[1],
   planet: PlanetId | undefined,
 ): Set<number> {
   const hasRuin = ruinPalette(planet) !== undefined;
   const out = new Set<number>();
-  for (const [i, kind] of landmarkKinds(nodes, playerFactionId, identities)) {
+  for (const [i, kind] of landmarkKinds(nodes, identities)) {
     if (kind === "ruin" && !hasRuin) continue;
     out.add(i);
   }
@@ -105,7 +106,6 @@ export function buildLandmarkLayer(
   disposables: { dispose(): void }[],
   surface: TerrainSurface,
   galaxy: Pick<GalaxyDoc, "nodes" | "links">,
-  playerFactionId: string,
   identities:
     | ReadonlyMap<
         string,
@@ -123,16 +123,12 @@ export function buildLandmarkLayer(
   const placed = new Map<number, Placed>();
   const anchors: { pos: [number, number] }[] = [];
   const tops = new Map<number, number>();
+  const rings = new Map<number, number>();
   const bakes: (() => void)[] = [];
   let renderer: THREE.WebGLRenderer | null = null;
 
-  const kinds = landmarkKinds(galaxy.nodes, playerFactionId, identities);
-  const expected = landmarkNodes(
-    galaxy.nodes,
-    playerFactionId,
-    identities,
-    planet,
-  );
+  const kinds = landmarkKinds(galaxy.nodes, identities);
+  const expected = landmarkNodes(galaxy.nodes, identities, planet);
   for (const [i, kind] of kinds) {
     if (!expected.has(i)) continue;
     const stronghold = kind === "stronghold";
@@ -274,6 +270,7 @@ export function buildLandmarkLayer(
 
     placed.set(i, { materials, decal });
     tops.set(i, bounds.max.y);
+    rings.set(i, reach * RING_AT * site.scale);
     anchors.push({ pos: surface.worldToMap(site.x, site.z) });
   }
 
@@ -281,6 +278,7 @@ export function buildLandmarkLayer(
     nodes: new Set(placed.keys()),
     anchors,
     tops,
+    rings,
     setStyle(i, style) {
       const at = placed.get(i);
       if (!at) return;
