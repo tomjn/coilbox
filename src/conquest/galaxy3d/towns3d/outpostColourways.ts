@@ -23,8 +23,7 @@ export type OutpostFamily =
   | "fortress"
   | "capsule"
   | "research"
-  | "utility"
-  | "placeholder";
+  | "utility";
 
 export interface Colourway {
   id: string;
