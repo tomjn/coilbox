@@ -80,6 +80,15 @@ describe("buildLandmarkLayer", () => {
     expect(layer.tops.get(1)).toBeGreaterThan(0);
   });
 
+  it("reports its ring round where it stands, not round its location", () => {
+    const { layer, scene } = build();
+    const ring = layer.rings.get(1);
+    const group = scene.children.find((o) => o instanceof THREE.Group);
+    expect(ring?.radius).toBeGreaterThan(0);
+    expect(ring?.x).toBe(group?.position.x);
+    expect(ring?.z).toBe(group?.position.z);
+  });
+
   it("stands no bigger than its design, and is never picked", () => {
     const { scene } = build();
     const groups = scene.children.filter((o) => o instanceof THREE.Group);

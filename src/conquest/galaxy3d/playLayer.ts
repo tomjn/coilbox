@@ -201,8 +201,11 @@ export function buildPlayLayer(
   applyBurstRef: { current: (() => void) | null },
   /** Set for a terrain map only. */
   surface?: TerrainSurface,
-  /** The radius of each town's or landmark's own ring on a terrain map, by node index. */
-  townRings?: ReadonlyMap<number, number>,
+  /**
+   * Each town's or landmark's own ring on a terrain map, by node index: its
+   * radius and its centre in world units.
+   */
+  townRings?: ReadonlyMap<number, { radius: number; x: number; z: number }>,
 ) {
   // Lanes: thick translucent capsule quads connecting ring edge to ring
   // edge (each end trimmed back from the node centre and drawn at that
@@ -1935,13 +1938,13 @@ export function buildPlayLayer(
     const homeTownRing = townRings?.get(galaxy.nodes.indexOf(homeworld));
     if (surface && homeTownRing !== undefined) {
       // A town or a landmark stands here, so the ring lies on the ground just
-      // outside it. A flat ring of a fixed size would cut through it.
-      const [x, z] = surface.mapToWorldXZ(homeworld.pos[0], homeworld.pos[1]);
+      // outside it, round the same centre as its own ring. A flat ring of a
+      // fixed size would cut through it.
       home = buildHomeRing(
         surface,
-        x,
-        z,
-        homeTownRing,
+        homeTownRing.x,
+        homeTownRing.z,
+        homeTownRing.radius,
         factionSides(galaxy, playerFactionId),
         ownerColor(playerFactionId),
       );

@@ -69,8 +69,12 @@ export interface LandmarkLayer {
   anchors: { pos: [number, number] }[];
   /** The height of each landmark's top, in world units, by node index. */
   tops: ReadonlyMap<number, number>;
-  /** The radius of the ring each landmark's decal draws, by node index. */
-  rings: ReadonlyMap<number, number>;
+  /**
+   * The ring each landmark's decal draws, by node index: its radius and its
+   * centre in world units. A landmark stands on the flattest ground near its
+   * location, so the centre is not the location's own position.
+   */
+  rings: ReadonlyMap<number, { radius: number; x: number; z: number }>;
   /** Show a location's fog and ring, as a town would. */
   setStyle(i: number, style: TownStyle): void;
   /** Call with the renderer before each draw. The first call draws the shadows. */
@@ -123,7 +127,7 @@ export function buildLandmarkLayer(
   const placed = new Map<number, Placed>();
   const anchors: { pos: [number, number] }[] = [];
   const tops = new Map<number, number>();
-  const rings = new Map<number, number>();
+  const rings = new Map<number, { radius: number; x: number; z: number }>();
   const bakes: (() => void)[] = [];
   let renderer: THREE.WebGLRenderer | null = null;
 
@@ -270,7 +274,11 @@ export function buildLandmarkLayer(
 
     placed.set(i, { materials, decal });
     tops.set(i, bounds.max.y);
-    rings.set(i, reach * RING_AT * site.scale);
+    rings.set(i, {
+      radius: reach * RING_AT * site.scale,
+      x: site.x,
+      z: site.z,
+    });
     anchors.push({ pos: surface.worldToMap(site.x, site.z) });
   }
 

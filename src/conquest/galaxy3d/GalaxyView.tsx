@@ -968,8 +968,20 @@ export function GalaxyView({
       burstRef,
       applyBurstRef,
       surface,
-      // The player's capital is a landmark, and a neutral one a town.
-      new Map([...(townModels?.rings ?? []), ...(landmarks?.rings ?? [])]),
+      // A capital is a landmark, which stands a little off its location, or
+      // a town, which stands on it.
+      new Map([
+        ...(surface
+          ? [...(townModels?.rings ?? [])].map(([i, radius]) => {
+              const [x, z] = surface.mapToWorldXZ(
+                galaxy.nodes[i].pos[0],
+                galaxy.nodes[i].pos[1],
+              );
+              return [i, { radius, x, z }] as const;
+            })
+          : []),
+        ...(landmarks?.rings ?? []),
+      ]),
     );
 
     /* ------------------------------- labels -------------------------------- */
