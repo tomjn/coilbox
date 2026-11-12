@@ -178,6 +178,12 @@ const SLOPE_TO = 0.85;
 /** The slopes rocks give out over. Steeper ground is drawn as bare rock. */
 const ROCK_SLOPE_FROM = 0.2;
 const ROCK_SLOPE_TO = 0.4;
+/**
+ * How many times the rocks a world where nothing grows has, on stony ground
+ * and on bare. They are all that stands on it, and most of a moon is bare.
+ */
+const DEAD_WORLD_STONY = 4;
+const DEAD_WORLD_BARE = 12;
 /** How far a neighbour's shadow is looked for, in world units. */
 const SHADE_REACH = 0.42;
 
@@ -264,7 +270,8 @@ export function plantForest(
     // open ground between. None lies on a cliff or a steep hillside, which
     // is bare rock already.
     const rocks =
-      (shares[4] * 0.025 + shares[5] * 0.0075) *
+      (shares[4] * 0.025 * (alive ? 1 : DEAD_WORLD_STONY) +
+        shares[5] * 0.0075 * (alive ? 1 : DEAD_WORLD_BARE)) *
       (0.25 + 1.5 * smooth(0.4, 0.75, field(x, z, 1.3, 9))) *
       (1 - smooth(ROCK_SLOPE_FROM, ROCK_SLOPE_TO, slope));
     // Brush: bushes on scrub, and a few low ones on tundra.

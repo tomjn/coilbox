@@ -66,7 +66,9 @@ Added on `feat/scatter-3d`, on top of the trees. The same planting pass and the 
 - Dead trees at a cold forest's edge and a few on dry scrub.
 - A rock is 0.03 to 0.14 high. Anything smaller is under two pixels at the closest zoom. A cactus is drawn stouter than a real one for the same reason.
 
-Counts on the test map after these were cut to a quarter at review: desert 24,581, moon 1,510, temperate 90,838, ice 115,467.
+Counts on the test map after these were cut to a quarter at review: desert 24,581, temperate 90,838, ice 115,467.
+
+A world where nothing grows (moon, red, volcanic) then got its rocks raised again at review, since they are all that stands on it: four times on stony ground and twelve on bare. That gives the moon 14,839, the volcanic planet 29,393 and the red planet 9,349.
 
 ## Not done
 
