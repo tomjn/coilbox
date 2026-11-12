@@ -212,7 +212,7 @@ export const OPEN_TOWN_DETAIL: readonly BuildingModel[] = [
   /* ------------------------------ four lots ---------------------------- */
 
   // An arena: a bowl that flares to its rim, dark stands, a pitch and a
-  // light mast at each corner.
+  // light mast on each side of its rim.
   model("arena", [2, 2], 0.36, (t, w, d, h) => {
     const m = Math.min(w, d);
     const rim = chamfered(0.96 * w, 0.96 * d, 0.3 * m);
@@ -220,7 +220,10 @@ export const OPEN_TOWN_DETAIL: readonly BuildingModel[] = [
     t.alt(column(rim, 0.7 * h, 0.8 * h));
     t.dark(column(chamfered(0.76 * w, 0.76 * d, 0.22 * m), 0.8 * h, 0.83 * h));
     t.green(plate(0.44 * w, 0.3 * d, 0.83 * h, 0.86 * h));
-    corners(0.44 * w, 0.44 * d, (x, z) => t.dark(mast(0.05 * m, 0, h, x, z)));
+    for (const side of [-1, 1]) {
+      t.dark(mast(0.04 * m, 0.8 * h, h, side * 0.43 * w, 0));
+      t.dark(mast(0.04 * m, 0.8 * h, h, 0, side * 0.43 * d));
+    }
   }),
 
   // A hall whose walls slope in to a glazed lantern, a buttress up each side.
