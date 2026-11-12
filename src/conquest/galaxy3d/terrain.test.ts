@@ -12,12 +12,14 @@ import {
   layoutStrategicMap,
   MARKER_LIFT,
   marginGeometry,
+  SHORE_RANGE,
   sampleHeightGrid,
   TERRAIN_SUN,
   terrainCameraLimits,
   terrainCavityPixels,
   terrainMarginPixels,
   terrainNormalPixels,
+  terrainShorePixels,
   terrainSpecOf,
   terrainTriangles,
   VIEW_FOV_DEGREES,
@@ -351,6 +353,48 @@ describe("terrainCavityPixels", () => {
     const bytes = terrainCavityPixels(surface, grid, undefined, gully);
     expect(at(bytes, 20, 20)[0]).toBeLessThan(128);
     expect(at(bytes, 20, 20)[3]).toBe(0);
+  });
+});
+
+describe("terrainShorePixels", () => {
+  it("puts the water line at 128 and tells either side apart to the range", () => {
+    const distance = new Float32Array([
+      0,
+      1,
+      -1,
+      SHORE_RANGE,
+      -SHORE_RANGE,
+      SHORE_RANGE * 3,
+      -SHORE_RANGE * 3,
+    ]);
+    const bytes = terrainShorePixels(distance, new Float32Array(7));
+    const red = Array.from({ length: 7 }, (_, i) => bytes[i * 2]);
+    expect(red[0]).toBe(128);
+    expect(red[1]).toBeGreaterThan(128);
+    expect(red[2]).toBeLessThan(128);
+    expect(red[3]).toBe(255);
+    expect(red[4]).toBe(1);
+    expect(red[5]).toBe(255);
+    expect(red[6]).toBe(1);
+    // As the shader reads it back.
+    const back = (byte: number) => ((byte - 128) / 127) * SHORE_RANGE;
+    expect(Math.abs(back(red[1]) - 1)).toBeLessThan(SHORE_RANGE / 127);
+    expect(Math.abs(back(red[2]) + 1)).toBeLessThan(SHORE_RANGE / 127);
+  });
+
+  it("keeps the fine steps of depth for the shallows", () => {
+    const depth = new Float32Array([0, 0.05, 0.1, 1, 8, 1000, -2]);
+    const bytes = terrainShorePixels(new Float32Array(7), depth);
+    const green = Array.from({ length: 7 }, (_, i) => bytes[i * 2 + 1]);
+    expect(green[0]).toBe(0);
+    expect(green[6]).toBe(0);
+    expect(green[2]).toBeGreaterThan(green[1]);
+    expect(green[1]).toBeGreaterThan(green[0]);
+    expect(green[5]).toBeGreaterThan(green[4]);
+    // As the shader reads it back: depth is the share over what is left.
+    const back = (byte: number) => byte / 255 / (1 - byte / 255);
+    expect(Math.abs(back(green[1]) - 0.05)).toBeLessThan(0.005);
+    expect(Math.abs(back(green[3]) - 1)).toBeLessThan(0.02);
   });
 });
 

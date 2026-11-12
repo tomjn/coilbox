@@ -215,6 +215,12 @@ export function generatedTerrainPixels(
       relief: { data: relief, width: wide.width, height: wide.height },
       drainage: eroded?.drainage,
       rivers,
+      shore: {
+        distance: wide.shore,
+        depth: wide.seaDepth,
+        width: wide.width,
+        height: wide.height,
+      },
       biomes: {
         ...wide.biomes,
         width: wide.width,

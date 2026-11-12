@@ -561,6 +561,35 @@ export function terrainCavityPixels(
   return out;
 }
 
+/**
+ * Map pixels either side of the water line that {@link terrainShorePixels}
+ * tells apart. Further off, a pixel reads as this far.
+ */
+export const SHORE_RANGE = 8;
+
+/**
+ * The water line and the sea's depth as two bytes a pixel, for a texture laid
+ * over the sheet like {@link terrainNormalPixels}'.
+ *
+ * - Red: `distance` from the water line in map pixels, above 0 on land. 128
+ *   is the line and each step is {@link SHORE_RANGE} over 127 of a pixel.
+ * - Green: `depth` over `depth` plus 1, so the shallows, where the sea's
+ *   colour changes fastest, get the fine steps.
+ */
+export function terrainShorePixels(
+  distance: Float32Array,
+  depth: Float32Array,
+): Uint8Array {
+  const out = new Uint8Array(distance.length * 2);
+  for (let i = 0; i < distance.length; i++) {
+    const d = Math.min(1, Math.max(-1, distance[i] / SHORE_RANGE));
+    out[i * 2] = Math.round(128 + d * 127);
+    const deep = Math.max(0, depth[i]);
+    out[i * 2 + 1] = Math.round((deep / (deep + 1)) * 255);
+  }
+  return out;
+}
+
 /** The strategic view's vertical field of view, in degrees. */
 export const VIEW_FOV_DEGREES = 50;
 

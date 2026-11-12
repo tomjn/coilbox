@@ -50,6 +50,9 @@ const DEPOSIT_PASSES = 2;
 /** The blur whose result is taken back out, so only fine detail is left. */
 const BROAD_BLUR = 6;
 const BROAD_PASSES = 2;
+/** The blur of the land that fades the change out towards the sea. */
+const SHORE_BLUR = 4;
+const SHORE_PASSES = 2;
 
 /** Half resolution cells that must drain through a cell before a gully starts. */
 const GULLY_HEAD = 16;
@@ -564,6 +567,18 @@ export function erodeLand(
   // change the shape of whole hills, which belongs to the pinned heightmap.
   const broad = blur(change, hw, hh, BROAD_BLUR, BROAD_PASSES);
   for (let i = 0; i < change.length; i++) change[i] -= broad[i];
+  // The drops leave what they carried on the low ground by the sea, and the
+  // sea itself stays where it is, so that ground would end in a lip along the
+  // water line. The change fades out towards the sea, and the shore keeps the
+  // slope it had.
+  const onLand = new Float32Array(half.length);
+  for (let i = 0; i < half.length; i++) if (half[i] > 0) onLand[i] = 1;
+  const inland = blur(onLand, hw, hh, SHORE_BLUR, SHORE_PASSES);
+  for (let i = 0; i < change.length; i++) {
+    // Half the cells round one on a straight coast are sea.
+    const t = Math.min(1, Math.max(0, inland[i] * 2 - 1));
+    change[i] *= t * t * (3 - 2 * t);
+  }
 
   // Back up to full resolution, bilinear between half resolution cell centres.
   const out = new Float32Array(relief.length);
