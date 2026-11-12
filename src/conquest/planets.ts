@@ -61,6 +61,9 @@ export interface Biome {
 
 export type SeaLook = "water" | "acid" | "lava" | "ice" | "basin" | "maria";
 
+/** Seas that ripple, foam and glint, and show their bed through the shallows. */
+export const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
+
 /**
  * How a planet's settlements are laid out. `organic` is a town in the open
  * air. `sealed` is domes and modules joined by tubes.

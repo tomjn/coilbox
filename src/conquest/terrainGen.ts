@@ -1,5 +1,6 @@
 import {
   BIOME_SLOTS,
+  LIQUID_SEAS,
   type Planet,
   type PlanetId,
   planetOf,
@@ -170,6 +171,11 @@ export interface GeneratedTerrain {
    * distance). 0 never appears: a pixel next to the other side is 3.
    */
   coastDistance: Uint16Array;
+  /**
+   * How deep the sea is at each pixel, for colour alone: 0 at the water line
+   * and on land, about 1 at the outer edge of the shallows, and more beyond.
+   */
+  seaDepth: Float32Array;
 }
 
 const S = TERRAIN_PIXELS;
@@ -714,10 +720,10 @@ function labelRegions(
   return { labels, sizes, edge };
 }
 
-/** Coast distance, in thirds of a pixel, at which the sea is fully deep. */
+/** Coast distance, in thirds of a pixel, at which a ground sea has its deep colour. */
 const SEA_DEPTH = 108;
 const SEA_RAMPS = new Map<PlanetId, Rgb[]>();
-/** A planet's sea colours by distance from the coast, worked out once per planet. */
+/** A ground sea's colours by distance from the coast, worked out once per planet. */
 export function seaRampOf(planet: Planet): Rgb[] {
   let ramp = SEA_RAMPS.get(planet.id);
   if (!ramp) {
@@ -752,24 +758,153 @@ function reliefShoreStep(planet: Planet): number {
   return GROUND_SEAS.includes(planet.sea.look) ? 1 : 0;
 }
 
+/** Map pixels the shallows run out from low ground, and from high ground. */
+const SHELF_LOW = 20;
+const SHELF_HIGH = 5;
+/** Map pixels over which the land behind a coast is averaged for its height. */
+const SHELF_BACKING = 14;
+/** The averaged height byte at which a coast counts as backed by high ground. */
+const SHELF_HIGH_AT = 42;
+/** Pixels across the patches that widen and narrow the shallows. */
+const SHELF_CELL = 70;
+/** Map pixels the depth is smoothed over, which takes out the creases where
+ * the distances to two coasts meet. */
+const SHELF_SMOOTH = 3;
+
 /**
- * The colour of sea `coastDist` thirds of a pixel from the coast, at pixel
- * `x`, `y`, which may be past the map's edge. A sea that is ground has no
- * shoreline: the land's shore colour runs out into it and gives way to the
- * sea's along a ragged line, nearer the coast in some places than others,
- * from a noise field seeded by `shoreSeed`.
+ * The mean of `src` over the square reaching `r` pixels each way, cut off at
+ * the grid's edge. Sums run in a fixed order, so the result is the same on
+ * every platform.
+ */
+function boxBlur(
+  src: Float32Array,
+  w: number,
+  h: number,
+  r: number,
+): Float32Array {
+  const sums = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let row = 0;
+    for (let x = 0; x < w; x++) {
+      row += src[y * w + x];
+      sums[(y + 1) * (w + 1) + x + 1] = sums[y * (w + 1) + x + 1] + row;
+    }
+  }
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - r);
+    const y1 = Math.min(h, y + r + 1);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - r);
+      const x1 = Math.min(w, x + r + 1);
+      const sum =
+        sums[y1 * (w + 1) + x1] -
+        sums[y0 * (w + 1) + x1] -
+        sums[y1 * (w + 1) + x0] +
+        sums[y0 * (w + 1) + x0];
+      out[y * w + x] = sum / ((x1 - x0) * (y1 - y0));
+    }
+  }
+  return out;
+}
+
+/**
+ * How deep the sea is at each pixel of a `w` by `h` grid, as
+ * {@link GeneratedTerrain.seaDepth}. The bed falls away from the coast, slowly
+ * off low ground and quickly off high ground, and a slow noise widens the
+ * shallows in some places and narrows them in others. `coast` is the grid's
+ * own {@link coastDistanceOf}, `scale` the map pixels to one of its pixels and
+ * `vary` the noise at a pixel, from 0 to 1.
+ */
+export function seaDepthOf(
+  land: Uint8Array,
+  heightmap: Uint8Array,
+  coast: Uint16Array,
+  w: number,
+  h: number,
+  scale: number,
+  vary: (x: number, y: number) => number,
+): Float32Array {
+  const heights = Float32Array.from(heightmap);
+  const reach = Math.max(1, Math.round(SHELF_BACKING / scale));
+  const backing = boxBlur(boxBlur(heights, w, h, reach), w, h, reach);
+  const raw = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = y * w + x;
+      if (land[o]) continue;
+      const high = clamp01(backing[o] / SHELF_HIGH_AT);
+      const shelf =
+        (SHELF_LOW + (SHELF_HIGH - SHELF_LOW) * high) *
+        (0.45 + 1.1 * vary(x, y));
+      // The pixel beside the land is 3, and stands at the water line.
+      raw[o] = ((coast[o] - 3) * scale) / 3 / shelf;
+    }
+  }
+  const smooth = Math.max(1, Math.round(SHELF_SMOOTH / scale));
+  const depth = boxBlur(boxBlur(raw, w, h, smooth), w, h, smooth);
+  for (let o = 0; o < depth.length; o++) if (land[o]) depth[o] = 0;
+  return depth;
+}
+
+/** How fast the sea's colour goes from shallow to deep with depth. */
+const SEA_FADE = 0.4;
+/** How fast the bed is lost under a liquid sea with depth. */
+const BED_FADE = 1.6;
+/** The bed's colour as a share of the dry shore's: wet ground under water. */
+const BED_WET = 0.62;
+/** The most of a liquid sea's colour its bed gives, at the water line. */
+const BED_SHOWS = 0.65;
+
+/** What is left of a colour at `depth` for a rate of `fade`: 1 at the water
+ * line, falling fast and then ever more slowly, and never an edge. Light is
+ * lost in water as an exponential, which the generator may not use. */
+function seenThrough(depth: number, fade: number): number {
+  const d = 1 + depth * fade;
+  const d2 = d * d;
+  return 1 / (d2 * d2);
+}
+
+/**
+ * The colour of a sea that is not ground at `depth`, as
+ * {@link GeneratedTerrain.seaDepth}. It goes from the planet's shallow colour
+ * to its deep one. A liquid sea shows its bed at the water line, the colour of
+ * the planet's shore when wet, so the water starts where the land leaves off.
+ */
+export function seaColourAtDepth(planet: Planet, depth: number): Rgb {
+  const { shallow, deep } = planet.sea;
+  const far = 1 - seenThrough(depth, SEA_FADE);
+  const liquid = LIQUID_SEAS.includes(planet.sea.look);
+  const bed = liquid ? BED_SHOWS * seenThrough(depth, BED_FADE) : 0;
+  const shore = planet.biomes[planet.shore].colour;
+  const rgb: Rgb = [0, 0, 0];
+  for (let c = 0; c < 3; c++) {
+    const open = shallow[c] + (deep[c] - shallow[c]) * far;
+    rgb[c] = open + (shore[c] * BED_WET - open) * bed;
+  }
+  return rgb;
+}
+
+/**
+ * The colour of sea at pixel `x`, `y`, which may be past the map's edge,
+ * `depth` deep and `coastDist` thirds of a pixel from the coast. A sea that is
+ * ground has no shoreline and no depth: the land's shore colour runs out into
+ * it and gives way to the sea's along a ragged line, nearer the coast in some
+ * places than others, from a noise field seeded by `shoreSeed`.
  */
 function seaColour(
   planet: Planet,
   ramp: Rgb[],
   coastDist: number,
+  depth: number,
   x: number,
   y: number,
   shoreSeed: number,
 ): Rgb {
+  if (!GROUND_SEAS.includes(planet.sea.look))
+    return seaColourAtDepth(planet, depth);
   const sea = ramp[Math.min(SEA_DEPTH, coastDist)];
-  if (!GROUND_SEAS.includes(planet.sea.look) || coastDist >= GROUND_SHORE)
-    return sea;
+  if (coastDist >= GROUND_SHORE) return sea;
   const noise = fractalNoise(
     (x + 0.5) / GROUND_SHORE_CELL,
     (y + 0.5) / GROUND_SHORE_CELL,
@@ -1193,6 +1328,7 @@ interface TerrainContext {
   warmSpread: number;
   seaLevel: number;
   shoreSeed: number;
+  shelfSeed: number;
 }
 
 /** Build the land for a seed and a layout. */
@@ -1333,6 +1469,20 @@ function buildTerrain(opts: TerrainOptions): {
   const shoreSeed = noiseSeed(
     mulberry32(hashString(`shore:${opts.seed >>> 0}`)),
   );
+  // And one for the shallows, for the same reason.
+  const shelfSeed = noiseSeed(
+    mulberry32(hashString(`shelf:${opts.seed >>> 0}`)),
+  );
+  const shelf = coarseNoise(S, S, SHELF_CELL, shelfSeed, 3);
+  const seaDepth = seaDepthOf(
+    land,
+    heightmap,
+    coastDistance,
+    S,
+    S,
+    1,
+    (x, y) => shelf[y * S + x],
+  );
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -1344,7 +1494,7 @@ function buildTerrain(opts: TerrainOptions): {
         // A pixel the coast runs through: land and sea mixed by how much of
         // the pixel lies above sea level.
         const lnd = land[i] ? landColour(planet, biomes, i * 4) : beach;
-        const shallows = seaColour(planet, seaRamp, 3, x, y, shoreSeed);
+        const shallows = seaColour(planet, seaRamp, 3, 0, x, y, shoreSeed);
         rgb = [
           shallows[0] + (lnd[0] - shallows[0]) * cover,
           shallows[1] + (lnd[1] - shallows[1]) * cover,
@@ -1359,7 +1509,15 @@ function buildTerrain(opts: TerrainOptions): {
         shade = 1 + (se - nw) * 0.03;
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
-        rgb = seaColour(planet, seaRamp, coastDistance[i], x, y, shoreSeed);
+        rgb = seaColour(
+          planet,
+          seaRamp,
+          coastDistance[i],
+          seaDepth[i],
+          x,
+          y,
+          shoreSeed,
+        );
         if (maria) {
           // The maria are lit the same way, from their crater relief.
           const nw = maria[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
@@ -1391,6 +1549,7 @@ function buildTerrain(opts: TerrainOptions): {
       relief,
       image,
       coastDistance,
+      seaDepth,
     },
     context: {
       planet,
@@ -1410,6 +1569,7 @@ function buildTerrain(opts: TerrainOptions): {
       warmSpread,
       seaLevel,
       shoreSeed,
+      shelfSeed,
     },
   };
 }
@@ -1535,6 +1695,7 @@ export function generateTerrainWithMargin(
     warmSpread,
     seaLevel,
     shoreSeed,
+    shelfSeed,
   } = context;
   const seaRamp = seaRampOf(planet);
   const k = MARGIN_SCALE;
@@ -1550,6 +1711,7 @@ export function generateTerrainWithMargin(
   const ridges = noiseSampler(80, seeds.ridge, 5, 2, from, to);
   const wetField = noiseSampler(130, seeds.wet, 3, 4, from, to);
   const warmField = noiseSampler(160, seeds.warm, 2, 4, from, to);
+  const shelf = noiseSampler(SHELF_CELL, shelfSeed, 3, 4, from, to);
 
   // A margin pixel covers k by k map pixels. Its sample point, as a fractional
   // map pixel index, is the middle of them.
@@ -1655,6 +1817,9 @@ export function generateTerrainWithMargin(
       }
     }
   }
+  const seaDepth = seaDepthOf(land, heightmap, coast, W, W, k, (i, j) =>
+    shelf(at(i), at(j)),
+  );
   const image = new Uint8ClampedArray(count * 4);
   const biomes: TerrainBiomes = {
     a: new Uint8Array(count * 4),
@@ -1696,7 +1861,15 @@ export function generateTerrainWithMargin(
         shade = 1 + ((se - nw) * 0.03) / k;
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
-        rgb = seaColour(planet, seaRamp, coast[o] * k, at(i), at(j), shoreSeed);
+        rgb = seaColour(
+          planet,
+          seaRamp,
+          coast[o] * k,
+          seaDepth[o],
+          at(i),
+          at(j),
+          shoreSeed,
+        );
       }
       image[o * 4] = rgb[0] * shade;
       image[o * 4 + 1] = rgb[1] * shade;

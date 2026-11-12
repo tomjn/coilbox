@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {
   BIOME_SLOTS,
   type BiomePattern,
+  LIQUID_SEAS,
   type PlanetId,
   planetOf,
   type Rgb,
@@ -1192,9 +1193,6 @@ uniform float uBakeReady;
 const BAKE_VERTEX = /* glsl */ `
 gl_Position = vec4((uv - uBakeRect.xy) / uBakeRect.zw * 2.0 - 1.0, 0.0, 1.0);
 `;
-
-/** Seas that ripple, foam and glint. The rest are drawn as the picture has them. */
-const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
 
 /**
  * Add the terrain's lighting and detail to `material`, an unlit material

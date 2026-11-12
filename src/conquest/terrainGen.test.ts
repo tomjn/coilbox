@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PLANETS, planetOf } from "./planets";
 import { mulberry32 } from "./rng";
 import {
+  coastDistanceOf,
   generateTerrain,
   LAND_LAYOUTS,
   labelLandMasses,
@@ -9,6 +10,8 @@ import {
   landLayoutsFor,
   mariaCraterDelta,
   resolveLandLayout,
+  seaColourAtDepth,
+  seaDepthOf,
   seaRampOf,
 } from "./terrainGen";
 
@@ -78,17 +81,16 @@ describe("planet terrain", () => {
     expect(mariaCraterDelta(2)).toBe(0);
   });
 
-  it("does not shade the sea on a planet without craters", () => {
+  it("colours the sea by its depth alone on a planet without craters", () => {
     const S = 512;
     for (const planet of ["temperate", "ice"] as const) {
-      const ramp = seaRampOf(planetOf(planet));
       const t = generateTerrain({ seed: 11, shape: "continents", planet });
       let open = 0;
       let wrong = 0;
       for (let i = 0; i < S * S; i++) {
         if (t.land[i] || t.coastDistance[i] <= 6) continue;
         open++;
-        const rgb = ramp[Math.min(108, t.coastDistance[i])];
+        const rgb = seaColourAtDepth(planetOf(planet), t.seaDepth[i]);
         const want = new Uint8ClampedArray(3);
         want[0] = rgb[0];
         want[1] = rgb[1];
@@ -99,6 +101,111 @@ describe("planet terrain", () => {
       expect(wrong, planet).toBe(0);
     }
   }, 60_000);
+
+  it("gives the land no depth, and the sea more the further out it is", () => {
+    const S = 512;
+    const t = generateTerrain({ seed: 11, shape: "continents" });
+    let onLand = 0;
+    let near = 0;
+    let nearCount = 0;
+    let far = 0;
+    let farCount = 0;
+    for (let i = 0; i < S * S; i++) {
+      if (t.land[i]) {
+        if (t.seaDepth[i] !== 0) onLand++;
+      } else if (t.coastDistance[i] <= 9) {
+        near += t.seaDepth[i];
+        nearCount++;
+      } else if (t.coastDistance[i] >= 90) {
+        far += t.seaDepth[i];
+        farCount++;
+      }
+    }
+    expect(onLand).toBe(0);
+    expect(nearCount).toBeGreaterThan(0);
+    expect(farCount).toBeGreaterThan(0);
+    expect(far / farCount).toBeGreaterThan(near / nearCount);
+  }, 60_000);
+
+  it("runs the shallows further out from low ground than from high ground", () => {
+    // Land across the top with a straight coast: low on the left half, high
+    // on the right.
+    const W = 200;
+    const H = 100;
+    const land = new Uint8Array(W * H);
+    const heightmap = new Uint8Array(W * H);
+    for (let y = 0; y < 40; y++) {
+      for (let x = 0; x < W; x++) {
+        land[y * W + x] = 1;
+        heightmap[y * W + x] = x < W / 2 ? 2 : 200;
+      }
+    }
+    const coast = coastDistanceOf(land, W, H);
+    const depth = seaDepthOf(land, heightmap, coast, W, H, 1, () => 0.5);
+    // Ten pixels out, well clear of where the two halves meet.
+    const offLow = depth[50 * W + 30];
+    const offHigh = depth[50 * W + 170];
+    expect(offLow).toBeGreaterThan(0);
+    expect(offHigh).toBeGreaterThan(offLow * 2);
+    // The same coast at half the resolution is as deep at the same place.
+    const half = new Uint8Array((W / 2) * (H / 2));
+    const halfHeights = new Uint8Array(half.length);
+    for (let y = 0; y < H / 2; y++) {
+      for (let x = 0; x < W / 2; x++) {
+        half[y * (W / 2) + x] = land[y * 2 * W + x * 2];
+        halfHeights[y * (W / 2) + x] = heightmap[y * 2 * W + x * 2];
+      }
+    }
+    const coarse = seaDepthOf(
+      half,
+      halfHeights,
+      coastDistanceOf(half, W / 2, H / 2),
+      W / 2,
+      H / 2,
+      2,
+      () => 0.5,
+    );
+    const coarseLow = coarse[25 * (W / 2) + 15];
+    expect(Math.abs(coarseLow - offLow)).toBeLessThan(offLow * 0.25);
+  });
+
+  it("fades the sea from its shallow colour to its deep one with no edge", () => {
+    for (const planet of ["temperate", "ice", "acid"] as const) {
+      const p = planetOf(planet);
+      const { shallow, deep } = p.sea;
+      // The channel the two colours differ in most.
+      let c = 0;
+      for (let k = 1; k < 3; k++)
+        if (Math.abs(shallow[k] - deep[k]) > Math.abs(shallow[c] - deep[c]))
+          c = k;
+      const span = Math.abs(shallow[c] - deep[c]);
+      const towards = Math.sign(deep[c] - shallow[c]);
+      let last = seaColourAtDepth(p, 1)[c];
+      let largest = 0;
+      for (let d = 1.05; d <= 40; d += 0.05) {
+        const now = seaColourAtDepth(p, d)[c];
+        expect((now - last) * towards, planet).toBeGreaterThanOrEqual(0);
+        largest = Math.max(largest, Math.abs(now - last));
+        last = now;
+      }
+      // No step of a twentieth of a depth changes the colour by much.
+      expect(largest, planet).toBeLessThan(span * 0.05);
+      expect(Math.abs(last - deep[c]), planet).toBeLessThan(span * 0.01);
+    }
+  });
+
+  it("starts a liquid sea at its bed and any other sea at its shallow colour", () => {
+    const ice = planetOf("ice");
+    expect(seaColourAtDepth(ice, 0)).toEqual(ice.sea.shallow);
+    const temperate = planetOf("temperate");
+    const shore = temperate.biomes[temperate.shore].colour;
+    const line = seaColourAtDepth(temperate, 0);
+    const out = seaColourAtDepth(temperate, 3);
+    // Sand is redder than water, so the water line is redder than open sea.
+    expect(shore[0]).toBeGreaterThan(temperate.sea.shallow[0]);
+    expect(line[0]).toBeGreaterThan(temperate.sea.shallow[0]);
+    expect(out[0]).toBeLessThan(temperate.sea.shallow[0]);
+  });
 
   it("leaves the Moon's edge rows and columns as they were", () => {
     const S = 512;
