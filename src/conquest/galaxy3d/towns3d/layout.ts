@@ -125,12 +125,35 @@ export function footprint(
 }
 
 /** Where block `i` starts along one axis of the grid, for `i` from 0 up. */
-function blockStart(i: number, block: number, grid: TownGrid): number {
+export function blockStart(i: number, block: number, grid: TownGrid): number {
   return (
     grid.avenue / 2 +
     i * (block + grid.street) +
     Math.floor(i / grid.avenueEvery) * (grid.avenue - grid.street)
   );
+}
+
+/**
+ * What lies at `t` along one axis of the grid, for blocks `block` long: the
+ * width of the street there and how far `t` is from its middle, or a width
+ * of 0 inside a block. The street ground's shader works the same sum out for
+ * every pixel, so the two must agree.
+ */
+export function streetGap(
+  t: number,
+  block: number,
+  grid: TownGrid,
+): { width: number; off: number } {
+  const a = Math.abs(t) - grid.avenue / 2;
+  if (a < 0) return { width: grid.avenue, off: Math.abs(t) };
+  const pitch = block + grid.street;
+  const period = grid.avenueEvery * pitch + grid.avenue - grid.street;
+  const r = a % period;
+  const j = Math.min(Math.floor(r / pitch), grid.avenueEvery - 1);
+  const q = r - j * pitch;
+  if (q < block) return { width: 0, off: 0 };
+  const width = j === grid.avenueEvery - 1 ? grid.avenue : grid.street;
+  return { width, off: Math.abs(q - block - width / 2) };
 }
 
 /** Every block's start along one axis, both sides of the centre, out to `reach`. */
