@@ -5578,6 +5578,10 @@ msgstr "{thing}, facing {way}, at {spot}."
 msgid "{tier} weight"
 msgstr "{tier} weight"
 
+#: src/conquest/galaxy3d/MapLoading.tsx
+msgid "{tilesDone} of {tilesTotal}"
+msgstr "{tilesDone} of {tilesTotal}"
+
 #: src/lego/pages/components/UnitCheckResult.tsx
 msgid "{times, plural, one {# time} other {# times}}"
 msgstr "{times, plural, one {# time} other {# times}}"
@@ -11297,6 +11301,7 @@ msgstr "building orders"
 msgid "Building sound"
 msgstr "Building sound"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/RunMapView.tsx
 msgid "Building the land…"
@@ -13840,6 +13845,10 @@ msgstr "Compiled unit script"
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Compiles the mission, checks it loads, then starts the engine."
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Compiling shaders…"
+msgstr "Compiling shaders…"
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 msgid "Compiling the mission"
@@ -19074,6 +19083,10 @@ msgstr "forced"
 msgid "Forces the direction the scar decal is projected from, as if from a projector at that world-space vector. All zeroes uses the ground normal instead; '{'0, 1, 0'}' suits orbital-type weapons."
 msgstr "Forces the direction the scar decal is projected from, as if from a projector at that world-space vector. All zeroes uses the ground normal instead; '{'0, 1, 0'}' suits orbital-type weapons."
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Forest planted"
+msgstr "Forest planted"
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Forget"
 msgstr "Forget"
@@ -22661,6 +22674,10 @@ msgstr "Kinds of unit"
 #: src/lego/animPresets.ts
 msgid "Knee bend"
 msgstr "Knee bend"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Land built"
+msgstr "Land built"
 
 #: src/lego/animPresets.ts
 msgid "Landing gear"
@@ -29849,6 +29866,10 @@ msgstr "Packs this project into `!bset` lines for the game's numbered tweak slot
 msgid "Page {current} of {lastPage}"
 msgstr "Page {current} of {lastPage}"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Painting the ground…"
+msgstr "Painting the ground…"
+
 #: src/scenario/pages/components/modes.tsx
 msgid "Pan"
 msgstr "Pan"
@@ -30541,6 +30562,10 @@ msgstr "Planet"
 #: src/multiplayer/debriefing.ts
 msgid "Planet Wars"
 msgstr "Planet Wars"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Planting the forest…"
+msgstr "Planting the forest…"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Plates"
@@ -35795,6 +35820,10 @@ msgstr "Several"
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Shaded: {activityLabel}"
 msgstr "Shaded: {activityLabel}"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Shaders compiled"
+msgstr "Shaders compiled"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/lego/pages/components/TexturePicker.tsx

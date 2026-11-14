@@ -6829,6 +6829,10 @@ msgstr "{thing}, напрямок {way}, позиція {spot}."
 msgid "{tier} weight"
 msgstr "Вага {tier}"
 
+#: src/conquest/galaxy3d/MapLoading.tsx
+msgid "{tilesDone} of {tilesTotal}"
+msgstr ""
+
 #: src/lego/pages/components/UnitCheckResult.tsx
 #, fuzzy
 msgid "{times, plural, one {# time} other {# times}}"
@@ -13861,6 +13865,7 @@ msgstr "накази будівництва"
 msgid "Building sound"
 msgstr "Звук будівництва"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/RunMapView.tsx
 #, fuzzy
@@ -16941,6 +16946,10 @@ msgstr "Скомпільований скрипт юніта"
 #, fuzzy
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Компілює місію, перевіряє, що вона завантажується, а потім запускає рушій."
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Compiling shaders…"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #, fuzzy
@@ -23326,6 +23335,10 @@ msgstr "примусово"
 msgid "Forces the direction the scar decal is projected from, as if from a projector at that world-space vector. All zeroes uses the ground normal instead; '{'0, 1, 0'}' suits orbital-type weapons."
 msgstr "Задає напрямок, з якого проєктується наклейка сліду, ніби з проєктора в цьому векторі світового простору. Усі нулі – натомість використовується нормаль ґрунту. '{'0, 1, 0'}' підходить для орбітальної зброї."
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Forest planted"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "Forget"
@@ -27721,6 +27734,10 @@ msgstr "Типи юнітів"
 #, fuzzy
 msgid "Knee bend"
 msgstr "Згин коліна"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Land built"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -36504,6 +36521,10 @@ msgstr "Пакує цей проєкт у рядки `!bset` для нумеро
 msgid "Page {current} of {lastPage}"
 msgstr "Сторінка {current} з {lastPage}"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Painting the ground…"
+msgstr ""
+
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -37357,6 +37378,10 @@ msgstr "Планета"
 #, fuzzy
 msgid "Planet Wars"
 msgstr "Planet Wars"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Planting the forest…"
+msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Plates"
@@ -43751,6 +43776,10 @@ msgstr "Кілька"
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "Затінено: {activityLabel}"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Shaders compiled"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/lego/pages/components/TexturePicker.tsx

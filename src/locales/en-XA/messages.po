@@ -5577,6 +5577,10 @@ msgstr ""
 msgid "{tier} weight"
 msgstr ""
 
+#: src/conquest/galaxy3d/MapLoading.tsx
+msgid "{tilesDone} of {tilesTotal}"
+msgstr ""
+
 #: src/lego/pages/components/UnitCheckResult.tsx
 msgid "{times, plural, one {# time} other {# times}}"
 msgstr ""
@@ -11296,6 +11300,7 @@ msgstr ""
 msgid "Building sound"
 msgstr ""
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/RunMapView.tsx
 msgid "Building the land…"
@@ -13838,6 +13843,10 @@ msgstr ""
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Compiles the mission, checks it loads, then starts the engine."
+msgstr ""
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Compiling shaders…"
 msgstr ""
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
@@ -19073,6 +19082,10 @@ msgstr ""
 msgid "Forces the direction the scar decal is projected from, as if from a projector at that world-space vector. All zeroes uses the ground normal instead; '{'0, 1, 0'}' suits orbital-type weapons."
 msgstr ""
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Forest planted"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Forget"
 msgstr ""
@@ -22659,6 +22672,10 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 msgid "Knee bend"
+msgstr ""
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Land built"
 msgstr ""
 
 #: src/lego/animPresets.ts
@@ -29848,6 +29865,10 @@ msgstr ""
 msgid "Page {current} of {lastPage}"
 msgstr ""
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Painting the ground…"
+msgstr ""
+
 #: src/scenario/pages/components/modes.tsx
 msgid "Pan"
 msgstr ""
@@ -30539,6 +30560,10 @@ msgstr ""
 
 #: src/multiplayer/debriefing.ts
 msgid "Planet Wars"
+msgstr ""
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Planting the forest…"
 msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
@@ -35793,6 +35818,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Shaded: {activityLabel}"
+msgstr ""
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Shaders compiled"
 msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx

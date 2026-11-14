@@ -1108,6 +1108,7 @@ describe("no importer outside the two dark routes", () => {
 
   /** The rest, each rendered inside one of those two. */
   const INSIDE_A_ROOT = [
+    "conquest/galaxy3d/MapLoading.tsx",
     "conquest/pages/components/BackToMapButton.tsx",
     "conquest/pages/components/BattleOverlay.tsx",
     "conquest/pages/components/BattleOverlayParts.tsx",

@@ -47,7 +47,7 @@ import {
 } from "./landmarks/landmarkLayer";
 import { hashString } from "./layout";
 import { layoutLevelledMap } from "./levelledMap";
-import { MapLoading } from "./MapLoading";
+import { MapLoading, useMapLoadingFade } from "./MapLoading";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
 import {
@@ -57,6 +57,7 @@ import {
 import { buildPlacedModels, type PlacedModelsLayer } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
 import { buildProvinceLayer } from "./provinceLayer";
+import { reliefPixels } from "./relief";
 import { createSelection } from "./selection";
 import {
   cameraFloorAt,
@@ -764,6 +765,51 @@ export function GalaxyView({
   const { pending: forestPending, planted: plantedForest } =
     usePlantedForest(forestInput);
 
+  // How far the scene is from its first finished picture, for the loading
+  // screen: its shaders compiling, then the ground's bake tile by tile.
+  const [drawn, setDrawn] = useState<
+    | { stage: "shaders" }
+    | { stage: "ground"; done: number; total: number }
+    // `total` is the bake's tiles, on a map with a bake.
+    | { stage: "ready"; total?: number }
+  >({ stage: "shaders" });
+  const relief = useMemo(
+    () =>
+      terrainColor &&
+      typeof terrainColor === "object" &&
+      "data" in terrainColor &&
+      terrainHeights
+        ? reliefPixels(terrainColor, terrainHeights)
+        : undefined,
+    [terrainColor, terrainHeights],
+  );
+  const loading =
+    !!terrainSpec && (!levelled || forestPending || drawn.stage !== "ready");
+  const fade = useMapLoadingFade(loading, reduceMotion);
+  // The stages done and the one under way. Once ready, the last stage stays
+  // up, finished, while the screen fades.
+  const stagesDone: string[] = [];
+  let stage = t`Building the land…`;
+  let progress: { done: number; total: number } | undefined;
+  if (levelled) {
+    stagesDone.push(t`Land built`);
+    stage = t`Planting the forest…`;
+  }
+  if (levelled && !forestPending) {
+    if (forestInput) stagesDone.push(t`Forest planted`);
+    stage = t`Compiling shaders…`;
+  }
+  const bakeTotal =
+    drawn.stage === "ground" || drawn.stage === "ready"
+      ? drawn.total
+      : undefined;
+  if (levelled && !forestPending && bakeTotal !== undefined) {
+    stagesDone.push(t`Shaders compiled`);
+    stage = t`Painting the ground…`;
+    progress =
+      drawn.stage === "ground" ? drawn : { done: bakeTotal, total: bakeTotal };
+  }
+
   // Declared before the scene's own effect, so a scene built in the same
   // commit reads the new faction.
   useEffect(() => {
@@ -775,6 +821,7 @@ export function GalaxyView({
     const container = containerRef.current;
     if (!container) return;
     if (!levelled || forestPending) return;
+    setDrawn({ stage: "shaders" });
 
     // Unlike MapPreview3D there is no async asset load here — the whole scene
     // builds synchronously — so no `cancelled` flag is needed.
@@ -1351,6 +1398,20 @@ export function GalaxyView({
 
     // Until the last tile of the ground's bake is drawn.
     let baking = !!terrainSheet?.bake;
+    // Tell the loading screen how far the bake is, until it is done.
+    let bakeReported = false;
+    const reportBake = () => {
+      const bake = terrainSheet?.bake;
+      if (!bake || bakeReported) return;
+      const { done, total } = bake.progress();
+      if (total === 0) return;
+      if (done < total) {
+        setDrawn({ stage: "ground", done, total });
+        return;
+      }
+      bakeReported = true;
+      setDrawn({ stage: "ready", total });
+    };
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
@@ -1364,6 +1425,7 @@ export function GalaxyView({
       forest?.update(camera, renderer.domElement.height);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;
+      reportBake();
       renderer.render(scene, camera);
       declutter?.();
       labelRenderer.render(scene, camera);
@@ -1991,6 +2053,7 @@ export function GalaxyView({
       if (disposed) return;
       compiling = false;
       holdFrames();
+      if (!terrainSheet?.bake) setDrawn({ stage: "ready" });
     };
     // A failed compile is reported by the first draw, as it was before.
     renderer.compileAsync(scene, camera).then(compiled, compiled);
@@ -2118,10 +2181,15 @@ export function GalaxyView({
         // biome-ignore lint/suspicious/noArrayIndexKey: one slot per label, rebuilt with the scene
         createPortal(<Icon size={12} strokeWidth={2.5} aria-hidden />, host, i),
       )}
-      {forestPending && (
+      {fade.shown && (
         <MapLoading
-          label={t`Building the land…`}
-          className="absolute inset-0"
+          label={stage}
+          done={stagesDone}
+          progress={progress}
+          relief={relief}
+          leaving={fade.leaving}
+          // Above the canvas and the labels, which the scene adds after it.
+          className="absolute inset-0 z-10"
         />
       )}
     </div>

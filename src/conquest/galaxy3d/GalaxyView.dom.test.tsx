@@ -5,7 +5,7 @@
  * terrain being built again. Its ground detail is baked over the first frames
  * (issue #3992).
  */
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GalaxyDoc } from "../model";
 import type { PlacedModelSources } from "./placedModelLoaders";
@@ -234,6 +234,39 @@ describe("GalaxyView baking the ground", () => {
     const renderer = prepare.mock.calls[0][0];
     expect(renderer.render).toBeTypeOf("function");
     expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts the bake's tiles on the loading screen, then gives way to the map", async () => {
+    let next = 0;
+    const total = 3;
+    const prepare = vi.fn(() => ++next < total);
+    h.terrainBuilds.mockReturnValue({
+      prepare,
+      bake: { progress: () => ({ done: next, total }) },
+    });
+    const queued: (() => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      queued.push(cb);
+      return queued.length;
+    });
+    render(
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain("Compiling shaders…");
+    await act(async () => {});
+    act(() => queued.shift()?.());
+    expect(screen.getByRole("status").textContent).toContain("Painting the ground…");
+    expect(screen.getByRole("status").textContent).toContain("1 of 3");
+    act(() => {
+      for (let i = 0; i < 10 && queued.length > 0; i++) queued.shift()?.();
+    });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("draws nothing while paused, and catches up once when let go", async () => {
