@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -25,6 +25,8 @@ import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { buildForestLayer, type ForestLayer } from "./forest3d/forestLayer";
+import type { ForestPlantInput } from "./forest3d/plant";
+import { sendable, usePlantedForest } from "./forest3d/usePlantedForest";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { type GroundLayer, paintGround } from "./groundLayer";
 import {
@@ -40,10 +42,12 @@ import {
   buildLandmarkLayer,
   type LandmarkLayer,
   landmarkNodes,
+  placeLandmarks,
   terrainColourReader,
 } from "./landmarks/landmarkLayer";
 import { hashString } from "./layout";
 import { layoutLevelledMap } from "./levelledMap";
+import { MapLoading } from "./MapLoading";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
 import {
@@ -678,29 +682,10 @@ export function GalaxyView({
   );
   const terrainExtension = terrainPixels?.extension ?? surroundLand;
 
-  // Declared before the scene's own effect, so a scene built in the same
-  // commit reads the new faction.
-  useEffect(() => {
-    playerRef.current = playerFactionId;
-    applyPlayerRef.current?.();
-  }, [playerFactionId]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    if (!terrainReady || !surroundReady) return;
-
-    // Unlike MapPreview3D there is no async asset load here — the whole scene
-    // builds synchronously — so no `cancelled` flag is needed.
-    const disposables: { dispose(): void }[] = [];
-    let renderer: THREE.WebGLRenderer | undefined;
-    let labelRenderer: CSS2DRenderer | undefined;
-    let controls: OrbitControls | undefined;
-    let observer: ResizeObserver | undefined;
-
-    const scene = new THREE.Scene();
-    const uTime = { value: 0 };
-
+  // The map's layout, before the scene, because the forest is planted from it
+  // in the land worker and the scene waits for the trees.
+  const levelled = useMemo(() => {
+    if (!terrainReady || !surroundReady) return undefined;
     // `surface` is set for a terrain map only. A galaxy or theatre map has
     // none and takes the same layout it always has.
     // Towns on a generated map, and on a hand-made map whose manifest asks
@@ -722,6 +707,87 @@ export function GalaxyView({
       routeRivers: !performanceMode,
       skip: landmarkNodes(galaxy.nodes, dressing, terrainBiomes?.planet),
     });
+    const surface = map.layout.surface;
+    const landmarkSites =
+      surface && map.plan
+        ? placeLandmarks(surface, galaxy, dressing, terrainBiomes?.planet)
+        : undefined;
+    return { dressing, map, landmarkSites };
+  }, [
+    galaxy,
+    identities,
+    terrainReady,
+    surroundReady,
+    terrainHeights,
+    terrainExtension,
+    terrainColor,
+    terrainBiomes,
+    performanceMode,
+  ]);
+
+  // Trees, on a generated map with its detail on. See forest3d.
+  const forestInput = useMemo((): ForestPlantInput | undefined => {
+    if (!levelled || performanceMode || !terrainSpec || !terrainBiomes)
+      return undefined;
+    const { map, landmarkSites } = levelled;
+    const surface = map.layout.surface;
+    const extension = map.extension;
+    if (!surface || !map.plan || !map.heights || !extension) return undefined;
+    return {
+      sheet: {
+        spec: {
+          width: terrainSpec.width,
+          height: terrainSpec.height,
+          heightScale: terrainSpec.heightScale,
+        },
+        extent: map.layout.extent,
+        heights: sendable(map.heights),
+        maxSegments: TERRAIN_MAX_SEGMENTS,
+      },
+      extensionHeights: sendable(extension.heights),
+      margin: extension.margin,
+      biomes: extension.biomes && sendable(extension.biomes),
+      picture: { width: extension.image.width, height: extension.image.height },
+      rivers: extension.rivers && { field: sendable(extension.rivers.field) },
+      planet: terrainBiomes.planet,
+      seed: hashString(galaxy.id),
+      towns: map.towns ?? [],
+      // A landmark stands in place of a town, on a site as wide as one.
+      cleared: [...(landmarkSites?.keys() ?? [])].map((i) => {
+        const [px, py] = galaxy.nodes[i].pos;
+        const [x, z] = surface.mapToWorldXZ(px, py);
+        return { x, z, radius: CAPITAL_RADIUS };
+      }),
+      roads: map.plan.roads,
+    };
+  }, [levelled, performanceMode, terrainSpec, terrainBiomes, galaxy]);
+  const { pending: forestPending, planted: plantedForest } =
+    usePlantedForest(forestInput);
+
+  // Declared before the scene's own effect, so a scene built in the same
+  // commit reads the new faction.
+  useEffect(() => {
+    playerRef.current = playerFactionId;
+    applyPlayerRef.current?.();
+  }, [playerFactionId]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (!levelled || forestPending) return;
+
+    // Unlike MapPreview3D there is no async asset load here — the whole scene
+    // builds synchronously — so no `cancelled` flag is needed.
+    const disposables: { dispose(): void }[] = [];
+    let renderer: THREE.WebGLRenderer | undefined;
+    let labelRenderer: CSS2DRenderer | undefined;
+    let controls: OrbitControls | undefined;
+    let observer: ResizeObserver | undefined;
+
+    const scene = new THREE.Scene();
+    const uTime = { value: 0 };
+
+    const { dressing, map, landmarkSites } = levelled;
     const { skin, extent, positions, bounds, surface } = map.layout;
     const nodeIds = galaxy.nodes.map((n) => n.id);
     const factionColor = new Map(
@@ -820,6 +886,7 @@ export function GalaxyView({
         dressing,
         terrainBiomes?.planet,
         terrainColourReader(terrainColor, surface),
+        landmarkSites,
       );
       const riverEdge = map.extension
         ? riverEdgeReader(
@@ -840,24 +907,15 @@ export function GalaxyView({
           riverEdge,
         );
       }
-      // Trees, on a generated map with its detail on. See forest3d.
-      if (!performanceMode && map.extension && terrainBiomes) {
-        const at = galaxy.nodes.map((n) =>
-          surface.mapToWorldXZ(n.pos[0], n.pos[1]),
+      if (plantedForest && map.extension && terrainBiomes) {
+        forest = buildForestLayer(
+          scene,
+          disposables,
+          surface,
+          map.extension,
+          terrainBiomes.planet,
+          plantedForest,
         );
-        forest = buildForestLayer(scene, disposables, surface, map.extension, {
-          planet: terrainBiomes.planet,
-          seed: hashString(galaxy.id),
-          towns: map.towns,
-          // A landmark stands in place of a town, on a site as wide as one.
-          cleared: [...landmarks.nodes].map((i) => ({
-            x: at[i][0],
-            z: at[i][1],
-            radius: CAPITAL_RADIUS,
-          })),
-          roads: map.plan.roads,
-          riverEdge,
-        });
       }
       terrainSheet = buildTerrainMesh(
         scene,
@@ -1972,12 +2030,11 @@ export function GalaxyView({
     depthMood,
     focusBiasX,
     terrainSpec,
-    terrainReady,
-    surroundReady,
-    terrainHeights,
     terrainColor,
-    terrainExtension,
     terrainBiomes,
+    levelled,
+    forestPending,
+    plantedForest,
   ]);
 
   useEffect(() => {
@@ -2044,6 +2101,12 @@ export function GalaxyView({
       {labelIcons.map(({ host, Icon }, i) =>
         // biome-ignore lint/suspicious/noArrayIndexKey: one slot per label, rebuilt with the scene
         createPortal(<Icon size={12} strokeWidth={2.5} aria-hidden />, host, i),
+      )}
+      {forestPending && (
+        <MapLoading
+          label={t`Building the land…`}
+          className="absolute inset-0"
+        />
       )}
     </div>
   );

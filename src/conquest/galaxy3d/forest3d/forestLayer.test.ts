@@ -1,14 +1,21 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { PlanetId } from "../../planets";
-import { createTerrainSurface, type HeightGrid } from "../terrain";
+import {
+  createTerrainSurface,
+  type HeightGrid,
+  TERRAIN_MAX_SEGMENTS,
+} from "../terrain";
 import type { TerrainExtension } from "../terrainMesh";
 import { planTowns, withStreets } from "../towns";
 import { buildForestLayer, FOREST_NAME } from "./forestLayer";
+import { plantMapForest } from "./plant";
 
 const SIDE = 41;
 const MARGIN = 4;
 const WIDE = SIDE + 2 * MARGIN;
+const SPEC = { width: 100, height: 100, heightScale: 10 };
+const EXTENT = 20;
 
 const flat = (side: number): HeightGrid => ({
   data: new Float32Array(side * side).fill(0.5),
@@ -25,11 +32,7 @@ const build = (
     biomes?: boolean;
   } = {},
 ) => {
-  const surface = createTerrainSurface(
-    { width: 100, height: 100, heightScale: 10 },
-    20,
-    flat(SIDE),
-  );
+  const surface = createTerrainSurface(SPEC, EXTENT, flat(SIDE));
   const a = new Uint8Array(WIDE * WIDE * 4);
   const b = new Uint8Array(WIDE * WIDE * 4);
   // Slot 2 is forest on a temperate planet.
@@ -57,11 +60,21 @@ const build = (
     : undefined;
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
-  const layer = buildForestLayer(scene, disposables, surface, extension, {
+  const planted = plantMapForest({
+    sheet: {
+      spec: SPEC,
+      extent: EXTENT,
+      heights: flat(SIDE),
+      maxSegments: TERRAIN_MAX_SEGMENTS,
+    },
+    extensionHeights: extension.heights,
+    margin: MARGIN,
+    biomes: extension.biomes,
+    picture: extension.image,
     planet,
     seed: 3,
-    towns,
-    cleared: opts.towns ? [{ x: 6, z: 6, radius: 2 }] : undefined,
+    towns: towns ?? [],
+    cleared: opts.towns ? [{ x: 6, z: 6, radius: 2 }] : [],
     roads: opts.towns
       ? [
           {
@@ -72,8 +85,11 @@ const build = (
             surface: "paved",
           },
         ]
-      : undefined,
+      : [],
   });
+  const layer =
+    planted &&
+    buildForestLayer(scene, disposables, surface, extension, planet, planted);
   const meshes: THREE.Mesh[] = [];
   scene.traverse((o) => {
     if (o.name === FOREST_NAME) meshes.push(o as THREE.Mesh);
