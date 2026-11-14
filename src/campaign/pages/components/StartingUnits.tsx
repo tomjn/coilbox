@@ -10,7 +10,7 @@ import {
 import type { LegoProject } from "@/lego/model";
 import { useLegoProjects } from "@/lego/projects";
 import type { CampaignUnit } from "../../model";
-import { UnitPickerList } from "./CampaignUnits";
+import { UnitPickerList, UnitThumbnail } from "./CampaignUnits";
 
 /** The entries a pick list stands for, so the picker can refuse a clash. */
 function pickedEntries(picked: readonly LegoProject[]): CampaignUnit[] {
@@ -56,12 +56,10 @@ export function StartingUnits({
                 key={p.id}
                 className="flex items-center gap-2 rounded-md border border-border/50 bg-card px-2.5 py-1.5"
               >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium">{p.name}</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">
-                    {p.unitName}
-                  </span>
-                </div>
+                <UnitThumbnail projectId={p.id} className="size-10" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {p.name}
+                </span>
                 <Button
                   size="sm"
                   variant="ghost"
