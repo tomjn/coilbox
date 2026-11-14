@@ -241,4 +241,86 @@ describe("createFrameScheduler", () => {
     frames.tick();
     expect(drawn).toBe(1);
   });
+
+  it("draws nothing while held, then one frame on release", () => {
+    const frames = fakeFrames();
+    let drawn = 0;
+    const s = createFrameScheduler(
+      () => {
+        drawn++;
+        return false;
+      },
+      frames.schedule,
+      frames.unschedule,
+    );
+    s.hold(true);
+    s.request();
+    s.request();
+    frames.tick();
+    expect(drawn).toBe(0);
+    expect(frames.queued()).toBe(0);
+    s.hold(false);
+    frames.tick();
+    frames.tick();
+    expect(drawn).toBe(1);
+  });
+
+  it("drops a pending frame when held and stops an animation", () => {
+    const frames = fakeFrames();
+    let drawn = 0;
+    const s = createFrameScheduler(
+      () => {
+        drawn++;
+        return true;
+      },
+      frames.schedule,
+      frames.unschedule,
+    );
+    s.request();
+    frames.tick();
+    expect(drawn).toBe(1);
+    s.hold(true);
+    for (let t = 0; t < 5; t++) frames.tick();
+    expect(drawn).toBe(1);
+    s.hold(false);
+    frames.tick();
+    frames.tick();
+    expect(drawn).toBe(3);
+  });
+
+  it("draws nothing on release when nothing was asked for", () => {
+    const frames = fakeFrames();
+    let drawn = 0;
+    const s = createFrameScheduler(
+      () => {
+        drawn++;
+        return false;
+      },
+      frames.schedule,
+      frames.unschedule,
+    );
+    s.hold(true);
+    s.hold(false);
+    frames.tick();
+    expect(drawn).toBe(0);
+  });
+
+  it("forgets a held request on cancel", () => {
+    const frames = fakeFrames();
+    let drawn = 0;
+    const s = createFrameScheduler(
+      () => {
+        drawn++;
+        return false;
+      },
+      frames.schedule,
+      frames.unschedule,
+    );
+    s.hold(true);
+    s.request();
+    s.cancel();
+    s.hold(false);
+    frames.tick();
+    expect(drawn).toBe(0);
+  });
 });

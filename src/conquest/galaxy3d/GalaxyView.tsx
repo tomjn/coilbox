@@ -274,6 +274,12 @@ interface GalaxyViewProps {
    */
   modelSources?: PlacedModelSources;
   display?: Partial<GalaxyDisplay>;
+  /**
+   * Draw nothing while set, so a game in progress has the GPU to itself.
+   * The scene stays built, and one frame draws when it clears if anything
+   * changed meanwhile.
+   */
+  paused?: boolean;
   className?: string;
 }
 
@@ -607,6 +613,7 @@ export function GalaxyView({
   terrainPixels,
   modelSources,
   display,
+  paused = false,
   className,
 }: GalaxyViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -640,6 +647,8 @@ export function GalaxyView({
     ((sources: PlacedModelSources | undefined) => void) | null
   >(null);
   const renderRef = useRef<(() => void) | null>(null);
+  const pausedRef = useRef(paused);
+  const holdRef = useRef<((held: boolean) => void) | null>(null);
   // The faction played as. Nothing that is built depends on it, so picking
   // another restyles the scene that is there. See `applyPlayerRef`.
   const playerRef = useRef(playerFactionId);
@@ -1351,6 +1360,12 @@ export function GalaxyView({
       frames.request();
     };
     renderRef.current = requestRender;
+    holdRef.current = (held) => {
+      if (held) displayClock.cancel();
+      frames.hold(held);
+    };
+    // A scene rebuilt while paused stays paused.
+    holdRef.current(pausedRef.current);
     controls.addEventListener("change", () => {
       clampTarget();
       requestRender();
@@ -1937,6 +1952,7 @@ export function GalaxyView({
         renderer.dispose();
       }
       renderRef.current = null;
+      holdRef.current = null;
       applyOwnersRef.current = null;
       applyPlayerRef.current = null;
       applySelectionRef.current = null;
@@ -1963,6 +1979,11 @@ export function GalaxyView({
     terrainExtension,
     terrainBiomes,
   ]);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+    holdRef.current?.(paused);
+  }, [paused]);
 
   // Models added to the scene that is already built.
   useEffect(() => {

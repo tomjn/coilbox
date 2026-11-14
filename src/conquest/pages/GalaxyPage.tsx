@@ -44,6 +44,7 @@ import type { LegoProject } from "../../lego/model";
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { resolveGameByShortname } from "../../play/installedGames";
+import { useYieldToGame } from "../../play/useYieldToGame";
 import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -528,6 +529,7 @@ function GalaxyScreen({
   handmade?: HandmadeSetup;
 }) {
   const { t } = useLingui();
+  const yieldToGame = useYieldToGame();
   const {
     loading,
     error: stateError,
@@ -758,6 +760,7 @@ function GalaxyScreen({
           spaceMaps={spaceMaps}
           focusNodeId={battleNodeId ?? factionFocus}
           focusBiasX={state ? 0 : 0.13}
+          paused={yieldToGame}
           modelSources={modelSources}
           terrainPixels={terrain.pixels}
           display={{ reduceMotion, effects, performanceMode }}
