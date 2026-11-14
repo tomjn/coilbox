@@ -84,7 +84,6 @@ import { conquestDelete, conquestSave } from "../bindings";
 import {
   encodeConquestChallenge,
   encodeConquestChallengeFile,
-  galaxyFromChallenge,
   substitutedMapCount,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -128,7 +127,11 @@ import {
   useHandmadeMaps,
 } from "../handmade/useHandmadeMaps";
 import type { LandPicture } from "../landJob";
-import { generateMapOffThread, landPreviewOffThread } from "../landJobs";
+import {
+  challengeGalaxyOffThread,
+  generateMapOffThread,
+  landPreviewOffThread,
+} from "../landJobs";
 import { generateMap, locationNounKey, MAP_STYLE_OPTIONS } from "../mapStyle";
 import {
   type ConquestState,
@@ -2124,7 +2127,7 @@ function ImportChallengeForm({
     );
 
     const id = `generated-${crypto.randomUUID()}`;
-    const doc = galaxyFromChallenge(settings, { maps, names }, id);
+    const doc = await challengeGalaxyOffThread(settings, { maps, names }, id);
     await conquestSave({
       id,
       json: JSON.stringify({ ...doc, importedChallenge: true }),

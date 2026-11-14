@@ -1,4 +1,8 @@
 import {
+  type ConquestChallengeSettings,
+  galaxyFromChallenge,
+} from "./challenge";
+import {
   type ForestPlantInput,
   type PlantedForest,
   plantMapForest,
@@ -25,7 +29,13 @@ export type LandJob =
   | { kind: "preview"; opts: GenerateOptions }
   | { kind: "regenerate"; galaxy: GalaxyDoc; env: RegenerateEnv; seed: number }
   | { kind: "pixels"; doc: GalaxyDoc }
-  | { kind: "forest"; input: ForestPlantInput };
+  | { kind: "forest"; input: ForestPlantInput }
+  | {
+      kind: "challenge";
+      settings: ConquestChallengeSettings;
+      env: Pick<GenerateOptions, "maps" | "names">;
+      id: string;
+    };
 
 /** The picture of a land map, RGBA row by row from the top left. */
 export interface LandPicture {
@@ -46,6 +56,7 @@ export interface LandJobResults {
   regenerate: GalaxyDoc | null;
   pixels: TerrainPixels | undefined;
   forest: PlantedForest | undefined;
+  challenge: GalaxyDoc;
 }
 
 export function runLandJob(job: LandJob): LandJobResults[LandJob["kind"]] {
@@ -70,6 +81,8 @@ export function runLandJob(job: LandJob): LandJobResults[LandJob["kind"]] {
       return generatedTerrainPixels(job.doc);
     case "forest":
       return plantMapForest(job.input);
+    case "challenge":
+      return galaxyFromChallenge(job.settings, job.env, job.id);
   }
 }
 
