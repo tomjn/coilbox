@@ -63,6 +63,9 @@ export function getCachedGalaxy(id: string): LoadedGalaxy | undefined {
   return galaxyStore.getCached()?.find((l) => l.galaxy.id === id);
 }
 
+/** Call `onChange` whenever the galaxies change. Returns the unsubscribe. */
+export const subscribeGalaxies = galaxyStore.subscribe;
+
 /** The empty state document, matching the plugin's default. */
 const emptyStateFile: ConquestStateFile = { schemaVersion: 1, conquests: {} };
 

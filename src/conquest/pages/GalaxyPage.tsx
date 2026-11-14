@@ -788,18 +788,6 @@ function GalaxyScreen({
               <ArrowLeft className="size-5" aria-hidden />
             </Link>
           </BracketFrame>
-          {/* Galaxy title. The share action for a procedurally generated
-              galaxy lives on the Conquest list now (issue #499), not here. */}
-          <BracketFrame className="pointer-events-auto flex items-center gap-2 px-3 py-2">
-            <span className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">
-              {galaxy.title}
-            </span>
-            {galaxy.importedChallenge && (
-              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <Trans>Imported challenge</Trans>
-              </span>
-            )}
-          </BracketFrame>
           {/* Turn — its own card with a large number, sized to content. */}
           {state && (
             <BracketFrame className="pointer-events-auto flex flex-col justify-center px-3 py-1.5">

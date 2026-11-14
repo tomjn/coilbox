@@ -38,6 +38,9 @@ export interface DocumentStore<T> {
    *  when no load has succeeded this session, because a write built on the
    *  empty `initial` would replace the real document with almost nothing. */
   getForWrite(): T;
+  /** Call `onChange` after every refresh and publish, for non-React callers
+   *  such as a route's breadcrumb. Returns the unsubscribe. */
+  subscribe(onChange: () => void): () => void;
 }
 
 /** A save was refused because the document it would replace has not loaded.
@@ -146,5 +149,13 @@ export function createDocumentStore<T>(
     return cache;
   }
 
-  return { useStore, refresh, publish, getCached, getForWrite };
+  function subscribe(onChange: () => void): () => void {
+    const listener = () => onChange();
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }
+
+  return { useStore, refresh, publish, getCached, getForWrite, subscribe };
 }

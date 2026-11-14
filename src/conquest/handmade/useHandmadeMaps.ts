@@ -231,6 +231,9 @@ export function getCachedHandmadeMap(
   return mapStore.getCached()?.maps.find((m) => m.id === id);
 }
 
+/** Call `onChange` whenever the hand-made maps change. Returns the unsubscribe. */
+export const subscribeHandmadeMaps = mapStore.subscribe;
+
 /**
  * Read one hand-made map into a galaxy document. `id` undefined reads nothing,
  * for a caller that only sometimes has a hand-made map to load. `result` is

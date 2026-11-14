@@ -91,6 +91,18 @@ describe("createDocumentStore", () => {
     expect(result.current.data).toEqual([]);
   });
 
+  it("tells a subscriber outside React about every refresh and publish, until it stops", async () => {
+    const store = createDocumentStore(async () => "loaded", "initial");
+    const onChange = vi.fn();
+    const stop = store.subscribe(onChange);
+    await store.refresh();
+    store.publish("written");
+    expect(onChange).toHaveBeenCalledTimes(2);
+    stop();
+    store.publish("again");
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
   it("getCached answers null before anything has loaded, then the last value", async () => {
     const fetch = vi.fn(async () => ["a"]);
     const store = createDocumentStore<string[]>(fetch, []);

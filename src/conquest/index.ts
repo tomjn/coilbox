@@ -4,8 +4,11 @@ import { Orbit } from "lucide-react";
 import { lazyText } from "../i18n/pluginText";
 import { NeedsGameNavBadge } from "../play/navBadges";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
-import { getCachedGalaxy } from "./conquests";
-import { getCachedHandmadeMap } from "./handmade/useHandmadeMaps";
+import { getCachedGalaxy, subscribeGalaxies } from "./conquests";
+import {
+  getCachedHandmadeMap,
+  subscribeHandmadeMaps,
+} from "./handmade/useHandmadeMaps";
 
 /**
  * The Galactic Conquest plugin's frontend half — a single-player strategy
@@ -72,6 +75,15 @@ const conquestPlugin: FramePlugin = {
           (getCachedGalaxy(c.params.id)?.galaxy.title ??
             getCachedHandmadeMap(c.params.id)?.title)) ||
         t`Galaxy`,
+      // Either list can be the one that names the map.
+      crumbSubscribe: (onChange) => {
+        const galaxies = subscribeGalaxies(onChange);
+        const maps = subscribeHandmadeMaps(onChange);
+        return () => {
+          galaxies();
+          maps();
+        };
+      },
     },
   ],
 };

@@ -259,3 +259,12 @@ export function scenarioRoute(id: string): string {
 export function getCachedScenario(id: string): LoadedScenario | undefined {
   return cache?.find((l) => l.scenario.id === id);
 }
+
+/** Call `onChange` whenever the session cache changes. Returns the unsubscribe. */
+export function subscribeScenarios(onChange: () => void): () => void {
+  const listener = () => onChange();
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}

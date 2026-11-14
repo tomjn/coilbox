@@ -227,6 +227,9 @@ export function getCachedProject(id: string): LegoProject | undefined {
   return store.getCached()?.projects.find((p) => p.id === id);
 }
 
+/** Call `onChange` whenever the projects change. Returns the unsubscribe. */
+export const subscribeProjects = store.subscribe;
+
 /**
  * Every saved unit and saved module, or null before the list has loaded. For a
  * caller outside React deciding which stored textures are still named: a null

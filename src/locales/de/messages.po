@@ -26183,7 +26183,6 @@ msgstr "Unverändert importiert. Bearbeitbar und vom Export geschrieben."
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunListPage.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Imported challenge"
 msgstr "Importierte Herausforderung"
