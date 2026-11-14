@@ -652,7 +652,7 @@ export function GalaxyView({
   >(null);
   const renderRef = useRef<(() => void) | null>(null);
   const pausedRef = useRef(paused);
-  const holdRef = useRef<((held: boolean) => void) | null>(null);
+  const holdRef = useRef<(() => void) | null>(null);
   // The faction played as. Nothing that is built depends on it, so picking
   // another restyles the scene that is there. See `applyPlayerRef`.
   const playerRef = useRef(playerFactionId);
@@ -1418,12 +1418,17 @@ export function GalaxyView({
       frames.request();
     };
     renderRef.current = requestRender;
-    holdRef.current = (held) => {
+    // Nothing draws until the scene's shaders are compiled, which the driver
+    // does off the main thread where it can (KHR_parallel_shader_compile).
+    let compiling = true;
+    const holdFrames = () => {
+      const held = compiling || pausedRef.current;
       if (held) displayClock.cancel();
       frames.hold(held);
     };
+    holdRef.current = holdFrames;
     // A scene rebuilt while paused stays paused.
-    holdRef.current(pausedRef.current);
+    holdFrames();
     controls.addEventListener("change", () => {
       clampTarget();
       requestRender();
@@ -1974,11 +1979,21 @@ export function GalaxyView({
       labelRenderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      render();
+      // Held frames draw when they are let go.
+      if (compiling || pausedRef.current) requestRender();
+      else render();
     };
     observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
+    let disposed = false;
+    const compiled = () => {
+      if (disposed) return;
+      compiling = false;
+      holdFrames();
+    };
+    // A failed compile is reported by the first draw, as it was before.
+    renderer.compileAsync(scene, camera).then(compiled, compiled);
     // The map makes its own renderer rather than going through useCanvas3D,
     // so it joins the list of 3D views here.
     const unregisterStats = registerCanvas3D({
@@ -1988,6 +2003,7 @@ export function GalaxyView({
     });
 
     return () => {
+      disposed = true;
       unregisterStats();
       frames.cancel();
       displayClock.cancel();
@@ -2039,7 +2055,7 @@ export function GalaxyView({
 
   useEffect(() => {
     pausedRef.current = paused;
-    holdRef.current?.(paused);
+    holdRef.current?.();
   }, [paused]);
 
   // Models added to the scene that is already built.
