@@ -1,3 +1,5 @@
+import type { ConquestChallengeSettings } from "./challenge";
+import type { ForestPlantInput } from "./galaxy3d/forest3d/plant";
 import type { TerrainPixels } from "./galaxy3d/terrainLoad";
 import type { GenerateOptions } from "./generate";
 import {
@@ -96,6 +98,17 @@ export const regenerateOffThread = (
   env: RegenerateEnv,
   seed: number,
 ) => run({ kind: "regenerate", galaxy, env, seed });
+
+/** {@link galaxyFromChallenge}, off the main thread. */
+export const challengeGalaxyOffThread = (
+  settings: ConquestChallengeSettings,
+  env: Pick<GenerateOptions, "maps" | "names">,
+  id: string,
+) => run({ kind: "challenge", settings, env, id });
+
+/** {@link plantMapForest}, off the main thread. */
+export const plantForestOffThread = (input: ForestPlantInput) =>
+  run({ kind: "forest", input });
 
 let lastPixels:
   | { key: string; pixels: Promise<TerrainPixels | undefined> }

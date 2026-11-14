@@ -15,6 +15,7 @@ import {
   usePerformanceMode,
   useReduceMotion,
 } from "../general/display";
+import { useYieldToGame } from "../play/useYieldToGame";
 import {
   mapRunClosedLinks,
   mapRunEmphasis,
@@ -210,6 +211,7 @@ export function RunMapView({
   const effects = useEffectsEnabled();
   const { t } = useLingui();
   const performanceMode = usePerformanceMode();
+  const yieldToGame = useYieldToGame();
 
   const landError = terrain.error;
   if (handmadeMap?.loading) return <div className={className} />;
@@ -243,6 +245,7 @@ export function RunMapView({
       selectedId={toView(selectedId)}
       onSelect={onViewSelect}
       focusNodeId={toView(focusId)}
+      paused={yieldToGame}
       terrainPixels={terrain.pixels}
       spaceMaps={spaceMaps}
       modelSources={modelSources}

@@ -5,7 +5,7 @@
  * terrain being built again. Its ground detail is baked over the first frames
  * (issue #3992).
  */
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GalaxyDoc } from "../model";
 import type { PlacedModelSources } from "./placedModelLoaders";
@@ -33,6 +33,7 @@ vi.mock("three", async (orig) => {
     }
     setSize() {}
     render() {}
+    async compileAsync() {}
     getRenderTarget() {
       return null;
     }
@@ -204,7 +205,7 @@ describe("GalaxyView with placed models", () => {
 });
 
 describe("GalaxyView baking the ground", () => {
-  it("prepares the ground before each draw and asks for frames until it is done", () => {
+  it("prepares the ground before each draw and asks for frames until it is done", async () => {
     const prepare = vi.fn();
     prepare.mockReturnValueOnce(true).mockReturnValueOnce(true);
     prepare.mockReturnValue(false);
@@ -223,12 +224,81 @@ describe("GalaxyView baking the ground", () => {
         display={{ reduceMotion: true, effects: false }}
       />,
     );
+    // Nothing draws until the shaders are compiled.
+    expect(prepare).not.toHaveBeenCalled();
+    await act(async () => {});
     // Each frame drawn runs whatever the last one asked for.
     for (let i = 0; i < 10 && queued.length > 0; i++) queued.shift()?.();
     expect(queued).toHaveLength(0);
     expect(prepare).toHaveBeenCalledTimes(3);
     const renderer = prepare.mock.calls[0][0];
     expect(renderer.render).toBeTypeOf("function");
+    expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts the bake's tiles on the loading screen, then gives way to the map", async () => {
+    let next = 0;
+    const total = 3;
+    const prepare = vi.fn(() => ++next < total);
+    h.terrainBuilds.mockReturnValue({
+      prepare,
+      bake: { progress: () => ({ done: next, total }) },
+    });
+    const queued: (() => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      queued.push(cb);
+      return queued.length;
+    });
+    render(
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain(
+      "Compiling shaders…",
+    );
+    await act(async () => {});
+    act(() => queued.shift()?.());
+    expect(screen.getByRole("status").textContent).toContain(
+      "Painting the ground…",
+    );
+    expect(screen.getByRole("status").textContent).toContain("1 of 3");
+    act(() => {
+      for (let i = 0; i < 10 && queued.length > 0; i++) queued.shift()?.();
+    });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("draws nothing while paused, and catches up once when let go", async () => {
+    const prepare = vi.fn().mockReturnValue(false);
+    h.terrainBuilds.mockReturnValue({ prepare });
+    const queued: (() => void)[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      queued.push(cb);
+      return queued.length;
+    });
+    const bare = { ...galaxy, models: undefined };
+    const view = (paused: boolean) => (
+      <GalaxyView
+        galaxy={bare}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+        paused={paused}
+      />
+    );
+    const { rerender } = render(view(true));
+    await act(async () => {});
+    expect(queued).toHaveLength(0);
+    expect(prepare).not.toHaveBeenCalled();
+    rerender(view(false));
+    for (let i = 0; i < 10 && queued.length > 0; i++) queued.shift()?.();
+    expect(prepare).toHaveBeenCalledTimes(1);
     expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
   });
 });

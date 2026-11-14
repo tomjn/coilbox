@@ -53,6 +53,12 @@ export interface FrameScheduler {
   request: () => void;
   /** Drop a frame that was asked for and not yet drawn. */
   cancel: () => void;
+  /**
+   * Hold every frame back, or let them through again. While held, requests
+   * are remembered and nothing draws. Letting go draws one frame if any
+   * request came in, or if a frame was waiting when the hold began.
+   */
+  hold: (held: boolean) => void;
 }
 
 /**
@@ -74,7 +80,13 @@ export function createFrameScheduler(
   let pending: number | undefined;
   let due = 0;
   let runningSince: number | undefined;
+  let held = false;
+  let wanted = false;
   const request = () => {
+    if (held) {
+      wanted = true;
+      return;
+    }
     if (pending !== undefined) return;
     due = runningSince ?? now();
     pending = schedule(run);
@@ -92,6 +104,23 @@ export function createFrameScheduler(
     cancel: () => {
       if (pending !== undefined) unschedule(pending);
       pending = undefined;
+      wanted = false;
+    },
+    hold: (next) => {
+      if (next === held) return;
+      held = next;
+      if (held) {
+        if (pending !== undefined) {
+          unschedule(pending);
+          pending = undefined;
+          wanted = true;
+        }
+        return;
+      }
+      if (wanted) {
+        wanted = false;
+        request();
+      }
     },
   };
 }

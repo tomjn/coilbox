@@ -12,6 +12,7 @@ import { GalaxyView } from "@/conquest/galaxy3d/GalaxyView";
 import { generatedTerrainPixels, generateMap } from "@/conquest/mapStyle";
 import type { GalaxyDoc } from "@/conquest/model";
 import type { PlanetId } from "@/conquest/planets";
+import { loadLocale } from "@/i18n";
 
 const q = new URLSearchParams(location.search);
 const skin = (q.get("skin") ?? "territories") as "territories" | "cities";
@@ -368,4 +369,6 @@ function Probe() {
 }
 const root = document.getElementById("root");
 if (!root) throw new Error("no root");
+// The view says what it is waiting on, as the app does.
+await loadLocale("en");
 createRoot(root).render(<Probe />);

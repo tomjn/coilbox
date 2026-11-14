@@ -308,7 +308,9 @@ export default function RunPage() {
             2.3:1 over a bright node (#1812). A card that thin is not a backdrop
             anyway. On screen the chip read as loose text on the starfield, which
             is what the band is for. */}
-        <div className="pointer-events-auto flex items-center gap-2">
+        {/* `self-start` keeps each row to its contents. A row as wide as the
+            map took the press meant for the map beside its labels. */}
+        <div className="pointer-events-auto flex items-center gap-2 self-start">
           <span
             className={`${MAP_BAND_CLASS} px-2 py-1 font-display text-sm font-semibold uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
           >
@@ -363,7 +365,7 @@ export default function RunPage() {
         {!ended && !active && choices.length > 0 && (
           <nav
             aria-label={t`Next`}
-            className="pointer-events-auto flex flex-wrap items-center gap-2"
+            className="pointer-events-auto flex flex-wrap items-center gap-2 self-start"
           >
             <span
               className={`${MAP_BAND_CLASS} px-2 py-1 text-xs font-semibold ${MAP_DIM_INK_CLASS}`}
