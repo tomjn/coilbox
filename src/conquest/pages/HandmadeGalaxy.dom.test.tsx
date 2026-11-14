@@ -125,6 +125,7 @@ vi.mock("./components/RunSetup", () => ({
   SidePicker: () => null,
 }));
 vi.mock("./components/BattleOverlay", () => ({ BattleOverlay: () => null }));
+vi.mock("../../play/useYieldToGame", () => ({ useYieldToGame: () => false }));
 
 import {
   heldHandmadeChallenge,

@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -25,6 +25,8 @@ import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { buildForestLayer, type ForestLayer } from "./forest3d/forestLayer";
+import type { ForestPlantInput } from "./forest3d/plant";
+import { sendable, usePlantedForest } from "./forest3d/usePlantedForest";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { type GroundLayer, paintGround } from "./groundLayer";
 import {
@@ -40,10 +42,12 @@ import {
   buildLandmarkLayer,
   type LandmarkLayer,
   landmarkNodes,
+  placeLandmarks,
   terrainColourReader,
 } from "./landmarks/landmarkLayer";
 import { hashString } from "./layout";
 import { layoutLevelledMap } from "./levelledMap";
+import { MapLoading, useMapLoadingFade } from "./MapLoading";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
 import {
@@ -53,6 +57,7 @@ import {
 import { buildPlacedModels, type PlacedModelsLayer } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
 import { buildProvinceLayer } from "./provinceLayer";
+import { reliefPixels } from "./relief";
 import { createSelection } from "./selection";
 import {
   cameraFloorAt,
@@ -274,6 +279,12 @@ interface GalaxyViewProps {
    */
   modelSources?: PlacedModelSources;
   display?: Partial<GalaxyDisplay>;
+  /**
+   * Draw nothing while set, so a game in progress has the GPU to itself.
+   * The scene stays built, and one frame draws when it clears if anything
+   * changed meanwhile.
+   */
+  paused?: boolean;
   className?: string;
 }
 
@@ -607,6 +618,7 @@ export function GalaxyView({
   terrainPixels,
   modelSources,
   display,
+  paused = false,
   className,
 }: GalaxyViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -640,6 +652,8 @@ export function GalaxyView({
     ((sources: PlacedModelSources | undefined) => void) | null
   >(null);
   const renderRef = useRef<(() => void) | null>(null);
+  const pausedRef = useRef(paused);
+  const holdRef = useRef<(() => void) | null>(null);
   // The faction played as. Nothing that is built depends on it, so picking
   // another restyles the scene that is there. See `applyPlayerRef`.
   const playerRef = useRef(playerFactionId);
@@ -669,29 +683,10 @@ export function GalaxyView({
   );
   const terrainExtension = terrainPixels?.extension ?? surroundLand;
 
-  // Declared before the scene's own effect, so a scene built in the same
-  // commit reads the new faction.
-  useEffect(() => {
-    playerRef.current = playerFactionId;
-    applyPlayerRef.current?.();
-  }, [playerFactionId]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    if (!terrainReady || !surroundReady) return;
-
-    // Unlike MapPreview3D there is no async asset load here — the whole scene
-    // builds synchronously — so no `cancelled` flag is needed.
-    const disposables: { dispose(): void }[] = [];
-    let renderer: THREE.WebGLRenderer | undefined;
-    let labelRenderer: CSS2DRenderer | undefined;
-    let controls: OrbitControls | undefined;
-    let observer: ResizeObserver | undefined;
-
-    const scene = new THREE.Scene();
-    const uTime = { value: 0 };
-
+  // The map's layout, before the scene, because the forest is planted from it
+  // in the land worker and the scene waits for the trees.
+  const levelled = useMemo(() => {
+    if (!terrainReady || !surroundReady) return undefined;
     // `surface` is set for a terrain map only. A galaxy or theatre map has
     // none and takes the same layout it always has.
     // Towns on a generated map, and on a hand-made map whose manifest asks
@@ -713,6 +708,133 @@ export function GalaxyView({
       routeRivers: !performanceMode,
       skip: landmarkNodes(galaxy.nodes, dressing, terrainBiomes?.planet),
     });
+    const surface = map.layout.surface;
+    const landmarkSites =
+      surface && map.plan
+        ? placeLandmarks(surface, galaxy, dressing, terrainBiomes?.planet)
+        : undefined;
+    return { dressing, map, landmarkSites };
+  }, [
+    galaxy,
+    identities,
+    terrainReady,
+    surroundReady,
+    terrainHeights,
+    terrainExtension,
+    terrainColor,
+    terrainBiomes,
+    performanceMode,
+  ]);
+
+  // Trees, on a generated map with its detail on. See forest3d.
+  const forestInput = useMemo((): ForestPlantInput | undefined => {
+    if (!levelled || performanceMode || !terrainSpec || !terrainBiomes)
+      return undefined;
+    const { map, landmarkSites } = levelled;
+    const surface = map.layout.surface;
+    const extension = map.extension;
+    if (!surface || !map.plan || !map.heights || !extension) return undefined;
+    return {
+      sheet: {
+        spec: {
+          width: terrainSpec.width,
+          height: terrainSpec.height,
+          heightScale: terrainSpec.heightScale,
+        },
+        extent: map.layout.extent,
+        heights: sendable(map.heights),
+        maxSegments: TERRAIN_MAX_SEGMENTS,
+      },
+      extensionHeights: sendable(extension.heights),
+      margin: extension.margin,
+      biomes: extension.biomes && sendable(extension.biomes),
+      picture: { width: extension.image.width, height: extension.image.height },
+      rivers: extension.rivers && { field: sendable(extension.rivers.field) },
+      planet: terrainBiomes.planet,
+      seed: hashString(galaxy.id),
+      towns: map.towns ?? [],
+      // A landmark stands in place of a town, on a site as wide as one.
+      cleared: [...(landmarkSites?.keys() ?? [])].map((i) => {
+        const [px, py] = galaxy.nodes[i].pos;
+        const [x, z] = surface.mapToWorldXZ(px, py);
+        return { x, z, radius: CAPITAL_RADIUS };
+      }),
+      roads: map.plan.roads,
+    };
+  }, [levelled, performanceMode, terrainSpec, terrainBiomes, galaxy]);
+  const { pending: forestPending, planted: plantedForest } =
+    usePlantedForest(forestInput);
+
+  // How far the scene is from its first finished picture, for the loading
+  // screen: its shaders compiling, then the ground's bake tile by tile.
+  const [drawn, setDrawn] = useState<
+    | { stage: "shaders" }
+    | { stage: "ground"; done: number; total: number }
+    // `total` is the bake's tiles, on a map with a bake.
+    | { stage: "ready"; total?: number }
+  >({ stage: "shaders" });
+  const relief = useMemo(
+    () =>
+      terrainColor &&
+      typeof terrainColor === "object" &&
+      "data" in terrainColor &&
+      terrainHeights
+        ? reliefPixels(terrainColor, terrainHeights)
+        : undefined,
+    [terrainColor, terrainHeights],
+  );
+  const loading =
+    !!terrainSpec && (!levelled || forestPending || drawn.stage !== "ready");
+  const fade = useMapLoadingFade(loading, reduceMotion);
+  // The stages done and the one under way. Once ready, the last stage stays
+  // up, finished, while the screen fades.
+  const stagesDone: string[] = [];
+  let stage = t`Building the land…`;
+  let progress: { done: number; total: number } | undefined;
+  if (levelled) {
+    stagesDone.push(t`Land built`);
+    stage = t`Planting the forest…`;
+  }
+  if (levelled && !forestPending) {
+    if (forestInput) stagesDone.push(t`Forest planted`);
+    stage = t`Compiling shaders…`;
+  }
+  const bakeTotal =
+    drawn.stage === "ground" || drawn.stage === "ready"
+      ? drawn.total
+      : undefined;
+  if (levelled && !forestPending && bakeTotal !== undefined) {
+    stagesDone.push(t`Shaders compiled`);
+    stage = t`Painting the ground…`;
+    progress =
+      drawn.stage === "ground" ? drawn : { done: bakeTotal, total: bakeTotal };
+  }
+
+  // Declared before the scene's own effect, so a scene built in the same
+  // commit reads the new faction.
+  useEffect(() => {
+    playerRef.current = playerFactionId;
+    applyPlayerRef.current?.();
+  }, [playerFactionId]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (!levelled || forestPending) return;
+    setDrawn({ stage: "shaders" });
+
+    // Unlike MapPreview3D there is no async asset load here — the whole scene
+    // builds synchronously — so no `cancelled` flag is needed.
+    const disposables: { dispose(): void }[] = [];
+    let renderer: THREE.WebGLRenderer | undefined;
+    let labelRenderer: CSS2DRenderer | undefined;
+    let controls: OrbitControls | undefined;
+    let observer: ResizeObserver | undefined;
+
+    const scene = new THREE.Scene();
+    const uTime = { value: 0 };
+
+    const { dressing, map, landmarkSites } = levelled;
     const { skin, extent, positions, bounds, surface } = map.layout;
     const nodeIds = galaxy.nodes.map((n) => n.id);
     const factionColor = new Map(
@@ -811,6 +933,7 @@ export function GalaxyView({
         dressing,
         terrainBiomes?.planet,
         terrainColourReader(terrainColor, surface),
+        landmarkSites,
       );
       const riverEdge = map.extension
         ? riverEdgeReader(
@@ -831,24 +954,15 @@ export function GalaxyView({
           riverEdge,
         );
       }
-      // Trees, on a generated map with its detail on. See forest3d.
-      if (!performanceMode && map.extension && terrainBiomes) {
-        const at = galaxy.nodes.map((n) =>
-          surface.mapToWorldXZ(n.pos[0], n.pos[1]),
+      if (plantedForest && map.extension && terrainBiomes) {
+        forest = buildForestLayer(
+          scene,
+          disposables,
+          surface,
+          map.extension,
+          terrainBiomes.planet,
+          plantedForest,
         );
-        forest = buildForestLayer(scene, disposables, surface, map.extension, {
-          planet: terrainBiomes.planet,
-          seed: hashString(galaxy.id),
-          towns: map.towns,
-          // A landmark stands in place of a town, on a site as wide as one.
-          cleared: [...landmarks.nodes].map((i) => ({
-            x: at[i][0],
-            z: at[i][1],
-            radius: CAPITAL_RADIUS,
-          })),
-          roads: map.plan.roads,
-          riverEdge,
-        });
       }
       terrainSheet = buildTerrainMesh(
         scene,
@@ -1284,6 +1398,20 @@ export function GalaxyView({
 
     // Until the last tile of the ground's bake is drawn.
     let baking = !!terrainSheet?.bake;
+    // Tell the loading screen how far the bake is, until it is done.
+    let bakeReported = false;
+    const reportBake = () => {
+      const bake = terrainSheet?.bake;
+      if (!bake || bakeReported) return;
+      const { done, total } = bake.progress();
+      if (total === 0) return;
+      if (done < total) {
+        setDrawn({ stage: "ground", done, total });
+        return;
+      }
+      bakeReported = true;
+      setDrawn({ stage: "ready", total });
+    };
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
@@ -1297,6 +1425,7 @@ export function GalaxyView({
       forest?.update(camera, renderer.domElement.height);
       if (terrainSheet?.prepare(renderer)) requestRender();
       else baking = false;
+      reportBake();
       renderer.render(scene, camera);
       declutter?.();
       labelRenderer.render(scene, camera);
@@ -1351,6 +1480,17 @@ export function GalaxyView({
       frames.request();
     };
     renderRef.current = requestRender;
+    // Nothing draws until the scene's shaders are compiled, which the driver
+    // does off the main thread where it can (KHR_parallel_shader_compile).
+    let compiling = true;
+    const holdFrames = () => {
+      const held = compiling || pausedRef.current;
+      if (held) displayClock.cancel();
+      frames.hold(held);
+    };
+    holdRef.current = holdFrames;
+    // A scene rebuilt while paused stays paused.
+    holdFrames();
     controls.addEventListener("change", () => {
       clampTarget();
       requestRender();
@@ -1901,11 +2041,22 @@ export function GalaxyView({
       labelRenderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      render();
+      // Held frames draw when they are let go.
+      if (compiling || pausedRef.current) requestRender();
+      else render();
     };
     observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
+    let disposed = false;
+    const compiled = () => {
+      if (disposed) return;
+      compiling = false;
+      holdFrames();
+      if (!terrainSheet?.bake) setDrawn({ stage: "ready" });
+    };
+    // A failed compile is reported by the first draw, as it was before.
+    renderer.compileAsync(scene, camera).then(compiled, compiled);
     // The map makes its own renderer rather than going through useCanvas3D,
     // so it joins the list of 3D views here.
     const unregisterStats = registerCanvas3D({
@@ -1915,6 +2066,7 @@ export function GalaxyView({
     });
 
     return () => {
+      disposed = true;
       unregisterStats();
       frames.cancel();
       displayClock.cancel();
@@ -1937,6 +2089,7 @@ export function GalaxyView({
         renderer.dispose();
       }
       renderRef.current = null;
+      holdRef.current = null;
       applyOwnersRef.current = null;
       applyPlayerRef.current = null;
       applySelectionRef.current = null;
@@ -1956,13 +2109,17 @@ export function GalaxyView({
     depthMood,
     focusBiasX,
     terrainSpec,
-    terrainReady,
-    surroundReady,
-    terrainHeights,
     terrainColor,
-    terrainExtension,
     terrainBiomes,
+    levelled,
+    forestPending,
+    plantedForest,
   ]);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+    holdRef.current?.();
+  }, [paused]);
 
   // Models added to the scene that is already built.
   useEffect(() => {
@@ -2023,6 +2180,17 @@ export function GalaxyView({
       {labelIcons.map(({ host, Icon }, i) =>
         // biome-ignore lint/suspicious/noArrayIndexKey: one slot per label, rebuilt with the scene
         createPortal(<Icon size={12} strokeWidth={2.5} aria-hidden />, host, i),
+      )}
+      {fade.shown && (
+        <MapLoading
+          label={stage}
+          done={stagesDone}
+          progress={progress}
+          relief={relief}
+          leaving={fade.leaving}
+          // Above the canvas and the labels, which the scene adds after it.
+          className="absolute inset-0 z-10"
+        />
       )}
     </div>
   );

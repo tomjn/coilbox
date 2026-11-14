@@ -95,6 +95,8 @@ export interface TerrainBake {
    * another frame. Does nothing once the bake is done.
    */
   step(renderer: THREE.WebGLRenderer): boolean;
+  /** Tiles drawn and tiles in all. Both are 0 until the first step. */
+  progress(): { done: number; total: number };
   dispose(): void;
 }
 
@@ -189,6 +191,7 @@ export function createTerrainBake(
       }
       return !done;
     },
+    progress: () => ({ done: next, total: tiles.length }),
     dispose() {
       for (const pass of passes) pass.target.dispose();
       if (!done) finish();

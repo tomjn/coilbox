@@ -334,7 +334,7 @@ export default function RunPage() {
         {!ended && !active && choices.length > 0 && (
           <nav
             aria-label={t`Next`}
-            className="pointer-events-auto flex flex-wrap items-center gap-2"
+            className="pointer-events-auto flex flex-wrap items-center gap-2 self-start"
           >
             <span
               className={`${MAP_BAND_CLASS} px-2 py-1 text-xs font-semibold ${MAP_DIM_INK_CLASS}`}

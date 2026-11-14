@@ -20,7 +20,12 @@ import type { TownStyle } from "../townLayer";
 import { CAPITAL_NEIGHBOUR_SHARE, NEIGHBOUR_SHARE } from "../towns";
 import { ANOMALY_REACH, ANOMALY_SHADOW_REACH, buildAnomaly } from "./anomalies";
 import { buildDepot, DEPOT_REACH } from "./depot";
-import { type AnomalyKind, landmarkKinds, type RunLandmark } from "./kinds";
+import {
+  type AnomalyKind,
+  type LandmarkKind,
+  landmarkKinds,
+  type RunLandmark,
+} from "./kinds";
 import type { Rgb } from "./kit";
 import { buildLanding, LANDING_REACH } from "./landing";
 import { glowMaterial, landmarkMaterial, setLandmarkState } from "./material";
@@ -35,7 +40,7 @@ import {
 } from "./palettes";
 import { buildRuin, RUIN_REACH } from "./ruin";
 import { createLandmarkShadow, groundDecal, RING_AT } from "./shadow";
-import { pickSite } from "./site";
+import { type LandmarkSite, pickSite } from "./site";
 import { buildSpire, SPIRE_REACH } from "./spire";
 import { buildStronghold, STRONGHOLD_REACH } from "./stronghold";
 
@@ -104,59 +109,55 @@ export function landmarkNodes(
   return out;
 }
 
-/** Build every landmark on a terrain map into `scene`. */
-export function buildLandmarkLayer(
-  scene: THREE.Scene,
-  disposables: { dispose(): void }[],
+type LandmarkIdentities =
+  | ReadonlyMap<
+      string,
+      { landmark?: RunLandmark; landmarkGroup?: boolean; end?: string }
+    >
+  | undefined;
+
+/** Where one landmark stands, and how much room it takes. */
+export interface LandmarkPlacement {
+  kind: LandmarkKind;
+  reach: number;
+  site: LandmarkSite;
+}
+
+/**
+ * Pick the ground each landmark stands on, by node index. A location with
+ * only sea round it gets none. Pure, so the sites are known before the scene
+ * is built: the forest is planted round them.
+ */
+export function placeLandmarks(
   surface: TerrainSurface,
   galaxy: Pick<GalaxyDoc, "nodes" | "links">,
-  identities:
-    | ReadonlyMap<
-        string,
-        { landmark?: RunLandmark; landmarkGroup?: boolean; end?: string }
-      >
-    | undefined,
+  identities: LandmarkIdentities,
   planet: PlanetId | undefined,
-  colour: TerrainColourReader | undefined,
-): LandmarkLayer {
+): Map<number, LandmarkPlacement> {
   const world = galaxy.nodes.map((n) =>
     surface.mapToWorldXZ(n.pos[0], n.pos[1]),
   );
   const index = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
-  const sun = new THREE.Vector3(...TERRAIN_SUN);
-  const placed = new Map<number, Placed>();
-  const anchors: { pos: [number, number] }[] = [];
-  const tops = new Map<number, number>();
-  const rings = new Map<number, { radius: number; x: number; z: number }>();
-  const bakes: (() => void)[] = [];
-  let renderer: THREE.WebGLRenderer | null = null;
-
-  const kinds = landmarkKinds(galaxy.nodes, identities);
+  const out = new Map<number, LandmarkPlacement>();
   const expected = landmarkNodes(galaxy.nodes, identities, planet);
-  for (const [i, kind] of kinds) {
+  for (const [i, kind] of landmarkKinds(galaxy.nodes, identities)) {
     if (!expected.has(i)) continue;
-    const stronghold = kind === "stronghold";
-    const spire = kind === "spire";
-    const depot = kind === "depot";
-    const landing = kind === "landing";
-    const ruin = kind === "ruin" ? ruinPalette(planet) : undefined;
+    const capital =
+      kind === "stronghold" || kind === "spire" || kind === "landing";
     // A stronghold, a spire and a landing pad take a capital's room, an
     // anomaly an ordinary town's.
-    const reach = stronghold
-      ? STRONGHOLD_REACH
-      : spire
-        ? SPIRE_REACH
-        : ruin
-          ? RUIN_REACH
-          : depot
-            ? DEPOT_REACH
-            : landing
-              ? LANDING_REACH
-              : ANOMALY_REACH;
-    const share =
-      stronghold || spire || landing
-        ? CAPITAL_NEIGHBOUR_SHARE
-        : NEIGHBOUR_SHARE;
+    const reach =
+      kind === "stronghold"
+        ? STRONGHOLD_REACH
+        : kind === "spire"
+          ? SPIRE_REACH
+          : kind === "ruin"
+            ? RUIN_REACH
+            : kind === "depot"
+              ? DEPOT_REACH
+              : kind === "landing"
+                ? LANDING_REACH
+                : ANOMALY_REACH;
     const node = galaxy.nodes[i];
     const link = galaxy.links.find(([a, b]) => a === node.id || b === node.id);
     const other = link && index.get(link[0] === node.id ? link[1] : link[0]);
@@ -166,9 +167,47 @@ export function buildLandmarkLayer(
       world.filter((_, k) => k !== i),
       other === undefined ? undefined : world[other],
       reach,
-      share,
+      capital ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE,
     );
-    if (!site) continue;
+    if (site) out.set(i, { kind, reach, site });
+  }
+  return out;
+}
+
+/**
+ * Build every landmark on a terrain map into `scene`, on the sites
+ * {@link placeLandmarks} picks.
+ */
+export function buildLandmarkLayer(
+  scene: THREE.Scene,
+  disposables: { dispose(): void }[],
+  surface: TerrainSurface,
+  galaxy: Pick<GalaxyDoc, "nodes" | "links">,
+  identities: LandmarkIdentities,
+  planet: PlanetId | undefined,
+  colour: TerrainColourReader | undefined,
+  sites: ReadonlyMap<number, LandmarkPlacement> = placeLandmarks(
+    surface,
+    galaxy,
+    identities,
+    planet,
+  ),
+): LandmarkLayer {
+  const sun = new THREE.Vector3(...TERRAIN_SUN);
+  const placed = new Map<number, Placed>();
+  const anchors: { pos: [number, number] }[] = [];
+  const tops = new Map<number, number>();
+  const rings = new Map<number, { radius: number; x: number; z: number }>();
+  const bakes: (() => void)[] = [];
+  let renderer: THREE.WebGLRenderer | null = null;
+
+  for (const [i, { kind, reach, site }] of sites) {
+    const stronghold = kind === "stronghold";
+    const spire = kind === "spire";
+    const depot = kind === "depot";
+    const landing = kind === "landing";
+    const ruin = kind === "ruin" ? ruinPalette(planet) : undefined;
+    const node = galaxy.nodes[i];
 
     const cos = Math.cos(site.facing);
     const sin = Math.sin(site.facing);

@@ -6829,6 +6829,10 @@ msgstr "{thing}，朝向 {way}，位于 {spot}。"
 msgid "{tier} weight"
 msgstr "{tier} 权重"
 
+#: src/conquest/galaxy3d/MapLoading.tsx
+msgid "{tilesDone} of {tilesTotal}"
+msgstr ""
+
 #: src/lego/pages/components/UnitCheckResult.tsx
 #, fuzzy
 msgid "{times, plural, one {# time} other {# times}}"
@@ -13861,6 +13865,7 @@ msgstr "建造命令"
 msgid "Building sound"
 msgstr "建造音效"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/RunMapView.tsx
 #, fuzzy
@@ -16941,6 +16946,10 @@ msgstr "编译后的单位脚本"
 #, fuzzy
 msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "编译任务，检查能否加载，然后启动引擎。"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Compiling shaders…"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #, fuzzy
@@ -23326,6 +23335,10 @@ msgstr "强制"
 msgid "Forces the direction the scar decal is projected from, as if from a projector at that world-space vector. All zeroes uses the ground normal instead; '{'0, 1, 0'}' suits orbital-type weapons."
 msgstr "强制弹痕贴花的投射方向，如同从世界空间中该向量处的投影器投射。全为零时改用地面法线，'{'0, 1, 0'}' 适合轨道类武器。"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Forest planted"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "Forget"
@@ -27720,6 +27733,10 @@ msgstr "单位种类"
 #, fuzzy
 msgid "Knee bend"
 msgstr "膝部弯曲"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Land built"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -36503,6 +36520,10 @@ msgstr "将此项目打包成用于游戏编号调整槽位的 `!bset` 行。对
 msgid "Page {current} of {lastPage}"
 msgstr "第 {current} / {lastPage} 页"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Painting the ground…"
+msgstr ""
+
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -37356,6 +37377,10 @@ msgstr "行星"
 #, fuzzy
 msgid "Planet Wars"
 msgstr "Planet Wars"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Planting the forest…"
+msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Plates"
@@ -43750,6 +43775,10 @@ msgstr "多个"
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "阴影：{activityLabel}"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "Shaders compiled"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/lego/pages/components/TexturePicker.tsx
