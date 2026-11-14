@@ -21396,7 +21396,6 @@ msgstr "Imported as it is. Editable, and written by the export."
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunListPage.tsx
-#: src/runlite/pages/RunPage.tsx
 msgid "Imported challenge"
 msgstr "Imported challenge"
 

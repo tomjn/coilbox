@@ -26170,7 +26170,6 @@ msgstr "按原样导入。可编辑，并会由导出写出。"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunListPage.tsx
-#: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Imported challenge"
 msgstr "已导入的挑战"
