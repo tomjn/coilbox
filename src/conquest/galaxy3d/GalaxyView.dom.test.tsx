@@ -258,10 +258,14 @@ describe("GalaxyView baking the ground", () => {
         display={{ reduceMotion: true, effects: false }}
       />,
     );
-    expect(screen.getByRole("status").textContent).toContain("Compiling shaders…");
+    expect(screen.getByRole("status").textContent).toContain(
+      "Compiling shaders…",
+    );
     await act(async () => {});
     act(() => queued.shift()?.());
-    expect(screen.getByRole("status").textContent).toContain("Painting the ground…");
+    expect(screen.getByRole("status").textContent).toContain(
+      "Painting the ground…",
+    );
     expect(screen.getByRole("status").textContent).toContain("1 of 3");
     act(() => {
       for (let i = 0; i < 10 && queued.length > 0; i++) queued.shift()?.();
