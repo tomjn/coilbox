@@ -2,12 +2,12 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import type { GameItem } from "@/content/bindings";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { GameItem } from "@/content/bindings";
 import type { LegoProject } from "@/lego/model";
 import { useLegoProjects } from "@/lego/projects";
 import { forGame, unitGame } from "@/lego/unitGame";
