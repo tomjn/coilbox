@@ -4,7 +4,11 @@ import { Flag, Target } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
 import { lazyText } from "../i18n/pluginText";
-import { getCachedScenario, useHasScenarios } from "./scenarios";
+import {
+  getCachedScenario,
+  subscribeScenarios,
+  useHasScenarios,
+} from "./scenarios";
 
 /**
  * The Scenarios plugin's frontend half: an advanced-mode **Scenario builder**
@@ -91,6 +95,7 @@ const scenarioPlugin: FramePlugin = {
       crumb: (c) =>
         (c.params.id && getCachedScenario(c.params.id)?.scenario.name) ||
         t`Scenario`,
+      crumbSubscribe: subscribeScenarios,
     },
   ],
 };

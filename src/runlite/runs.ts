@@ -54,6 +54,9 @@ export function getCachedRun(id: string): RogueliteRun | undefined {
   return store.getCached()?.[id];
 }
 
+/** Call `onChange` whenever the runs change. Returns the unsubscribe. */
+export const subscribeRuns = store.subscribe;
+
 /** Write the keyed collection back and push it to every mounted consumer. */
 async function persist(next: Record<string, RogueliteRun>): Promise<void> {
   store.publish(next);

@@ -4,7 +4,7 @@ import { Rocket } from "lucide-react";
 import { lazyText } from "../i18n/pluginText";
 import { NeedsGameNavBadge } from "../play/navBadges";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
-import { getCachedRun } from "./runs";
+import { getCachedRun, subscribeRuns } from "./runs";
 
 /**
  * The single-player roguelite Run plugin's frontend half — a forward-only node
@@ -59,6 +59,8 @@ const runlitePlugin: FramePlugin = {
       lazy: gateProfileHidden("runlite.list", () => import("./pages/RunPage")),
       crumb: (c) =>
         (c.params.runId && getCachedRun(c.params.runId)?.name) || t`Warpath`,
+      // The run loads after the bar first draws, and its name is the crumb.
+      crumbSubscribe: subscribeRuns,
     },
   ],
 };

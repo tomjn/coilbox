@@ -5,7 +5,7 @@ import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
 import { insideSection } from "../general/nav";
 import { lazyText } from "../i18n/pluginText";
-import { getCachedProject } from "./projects";
+import { getCachedProject, subscribeProjects } from "./projects";
 
 /**
  * The unit builder: assemble Spring/Recoil units from a library of pre-textured
@@ -100,6 +100,7 @@ const legoPlugin: FramePlugin = {
       lazy: gateAdvanced(() => import("./pages/BuilderPage")),
       crumb: (c) =>
         (c.params.id && getCachedProject(c.params.id)?.name) || t`Model`,
+      crumbSubscribe: subscribeProjects,
     },
   ],
   settings: [],
