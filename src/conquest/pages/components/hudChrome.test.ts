@@ -209,22 +209,11 @@ describe("the labels that sit straight on the canvas", () => {
  * The warpath map's own loose chrome (#1812).
  *
  * The block above covers GalaxyPage, which is where the band started. The warpath
- * map has a HUD block of its own at the top of RunPage, and two things in it were
- * still hand-written.
- *
- * Both were wrong the same way and neither needs a sweep of its own, because the
- * fix for each is an ink this file already measures:
- *
- * - The imported-challenge chip beside the run name. `bg-card/70` under
- *   `text-muted-foreground`, which is 2.3:1 over a white node on a neutral base
- *   and 2.0:1 on the worst one. A card at 70% is not a backdrop, it is a tint,
- *   and on screen the chip read as loose text on the starfield. So it takes the
- *   band its neighbour the run name already wears, and the band's quiet ink with
- *   it. 5.03:1, from the sweep above.
- * - The two back controls under it. Those are boxes rather than loose labels, so
- *   they take {@link HUD_CARD_CLASS}, which is the same box at 78% and which
- *   points `--muted-foreground` at the card's own ink for its subtree. 4.56:1,
- *   from the card sweep below.
+ * map has a HUD block of its own at the top of RunPage, and its two back controls
+ * were still hand-written. They are boxes rather than loose labels, so they take
+ * {@link HUD_CARD_CLASS}, which is the same box at 78% and which points
+ * `--muted-foreground` at the card's own ink for its subtree. 4.56:1, from the
+ * card sweep below.
  *
  * What is checked is which class each one carries. Measuring the same pair of
  * colours a second time here would only give the two measurements a way to
@@ -253,13 +242,6 @@ describe("the chrome on the warpath map that is not in a frame", () => {
     }
     return page.slice(start, page.indexOf(">", at));
   }
-
-  it("bands the imported-challenge chip, as the run name beside it is banded", () => {
-    const chip = tagAround("Imported challenge");
-    expect(chip).toContain("MAP_BAND_CLASS");
-    expect(chip).toContain("MAP_DIM_INK_CLASS");
-    expect(chip).not.toContain("text-muted-foreground");
-  });
 
   for (const control of [
     "aria-label={t`Back to map`}",
@@ -546,8 +528,8 @@ describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
 /**
  * The accent inks over the band rather than over the card (#1801).
  *
- * The warpath's run name is not on a card at all: it sits straight on the node
- * map. It takes {@link MAP_BAND_CLASS}, so what is behind its ink is 78% of
+ * A label that sits straight on the map, as the warpath's run name once did,
+ * takes {@link MAP_BAND_CLASS}, so what is behind its ink is 78% of
  * `--background` rather than 78% of `--card`.
  *
  * Those are different surfaces, so the card's measurement does not carry over on

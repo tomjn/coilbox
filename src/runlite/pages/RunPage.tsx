@@ -13,14 +13,11 @@ import {
 import { type CSSProperties, useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
-import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
-import { runIdentity } from "../../challenge/identity";
 import { warpathRunResult } from "../../challenge/result";
 import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
 import { useRecordChallengeRun } from "../../challenge/useChallengeRecords";
 import {
   BracketFrame,
-  HUD_ACCENT_INK,
   HUD_CARD_CLASS,
   MAP_BAND_CLASS,
   MAP_DIM_INK_CLASS,
@@ -298,34 +295,8 @@ export default function RunPage() {
           hides the sidebar nav. The inspect panel flows below the gauges in the
           same column, so it shares the gauges' gap and never overlaps them. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
-        {/* The run's name and the chip beside it are the two labels on this page
-            with nothing but the node map behind them, so both take the band the
-            conquest map's own loose labels take (#1052). The name was a drop
-            shadow, which softens an edge but decides no contrast ratio, so over
-            a pale node the ink and what it sat on measured 1.0:1 (#1801). The
-            chip was a card at 70% carrying `text-muted-foreground`, which is a
-            60% grey the theme calibrates against a flat surface, so it measured
-            2.3:1 over a bright node (#1812). A card that thin is not a backdrop
-            anyway. On screen the chip read as loose text on the starfield, which
-            is what the band is for. */}
-        <div className="pointer-events-auto flex items-center gap-2">
-          <span
-            className={`${MAP_BAND_CLASS} px-2 py-1 font-display text-sm font-semibold uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
-          >
-            {run.name}
-          </span>
-          {run.importedChallenge && (
-            <span
-              className={`${MAP_BAND_CLASS} px-1.5 py-0.5 text-[10px] tracking-wide ${MAP_DIM_INK_CLASS}`}
-            >
-              <Trans>Imported challenge</Trans>
-            </span>
-          )}
-          <ChallengeRecordLine
-            identity={runIdentity(run)}
-            className={`${MAP_BAND_CLASS} px-2 py-1 ${MAP_DIM_INK_CLASS}`}
-          />
-        </div>
+        {/* The run's name is the last crumb in the top bar, so the HUD starts
+            with the gauges. */}
         <div className="flex items-stretch gap-3">
           {selectedId && !active ? (
             // A node is selected (read-only inspect): the left control steps

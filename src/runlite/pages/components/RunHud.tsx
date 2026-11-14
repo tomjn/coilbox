@@ -9,6 +9,8 @@ import {
   Store,
   Wrench,
 } from "lucide-react";
+import { ChallengeRecordLine } from "@/challenge/ChallengeRecordLine";
+import { runIdentity } from "@/challenge/identity";
 import {
   Popover,
   PopoverContent,
@@ -24,6 +26,8 @@ import {
   HUD_DIM_INK_CLASS,
   HUD_INK_CLASS,
   type HudAccent,
+  MAP_BAND_CLASS,
+  MAP_DIM_INK_CLASS,
   StatCard,
 } from "../../../conquest/pages/components/hudChrome";
 import type { RogueliteRun } from "../../model";
@@ -243,6 +247,10 @@ export function RunHud({
           </Trans>
         </p>
       </StatCard>
+      <ChallengeRecordLine
+        identity={runIdentity(run)}
+        className={`pointer-events-auto self-center px-2 py-1 ${MAP_BAND_CLASS} ${MAP_DIM_INK_CLASS}`}
+      />
     </div>
   );
 }
