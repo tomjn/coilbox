@@ -1,16 +1,18 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Plus, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import type { GameItem } from "@/content/bindings";
 import type { LegoProject } from "@/lego/model";
 import { useLegoProjects } from "@/lego/projects";
+import { forGame, unitGame } from "@/lego/unitGame";
 import type { CampaignUnit } from "../../model";
-import { UnitPickerList } from "./CampaignUnits";
+import { UnitPickerList, UnitThumbnail } from "./CampaignUnits";
 
 /** The entries a pick list stands for, so the picker can refuse a clash. */
 function pickedEntries(picked: readonly LegoProject[]): CampaignUnit[] {
@@ -25,23 +27,41 @@ function pickedEntries(picked: readonly LegoProject[]): CampaignUnit[] {
 
 /**
  * The units from the unit builder a conquest or warpath run begins with (issue
- * #4518). Each is copied when it begins. Nothing shows when the library has no
- * units, so a player who never builds one sees the setup as it was.
+ * #4518). Each is copied when it begins. Only units for the run's game, or for
+ * no game, are offered. Nothing shows when the library has none of those, so a
+ * player who never builds one sees the setup as it was.
  */
 export function StartingUnits({
   label,
+  game,
+  installed,
   picked,
   onChange,
   disabled = false,
 }: {
   label: ReactNode;
+  /** The game the run plays, or null before it is known. */
+  game: GameItem | null;
+  installed: readonly GameItem[];
   picked: readonly LegoProject[];
   onChange: (next: LegoProject[]) => void;
   disabled?: boolean;
 }) {
   const { t } = useLingui();
-  const { projects } = useLegoProjects();
+  const { projects: all } = useLegoProjects();
   const [open, setOpen] = useState(false);
+  const fits = (p: LegoProject) =>
+    game ? forGame(p, game, installed) : !unitGame(p);
+  const projects = all.filter(fits);
+  const kept = picked.filter(fits);
+  const dropped = kept.length !== picked.length;
+
+  // A warpath's game can change after units are picked. Units for the old game
+  // go, rather than sit in the list and fail when the run starts.
+  useEffect(() => {
+    if (dropped) onChange(kept);
+  }, [dropped, kept, onChange]);
+
   if (projects.length === 0) return null;
 
   return (
@@ -56,12 +76,10 @@ export function StartingUnits({
                 key={p.id}
                 className="flex items-center gap-2 rounded-md border border-border/50 bg-card px-2.5 py-1.5"
               >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium">{p.name}</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">
-                    {p.unitName}
-                  </span>
-                </div>
+                <UnitThumbnail projectId={p.id} className="size-10" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {p.name}
+                </span>
                 <Button
                   size="sm"
                   variant="ghost"

@@ -318,6 +318,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
                   name: unitsBase.name,
                   archive: unitsBase.primaryArchive.name,
                 },
+            { game: unitsBase, installed: games },
           )
         : null;
       if (units) setLeftOut(units.leftOut);

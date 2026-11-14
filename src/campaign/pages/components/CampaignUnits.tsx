@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { Plus, RefreshCw, X } from "lucide-react";
+import { ImageOff, Plus, RefreshCw, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { describeError } from "@/i18n/uiError";
@@ -8,6 +8,7 @@ import type { LegoProject } from "@/lego/model";
 import { loadPack } from "@/lego/pack";
 import { useLegoProjects } from "@/lego/projects";
 import { loadRawGeometryIfAny } from "@/lego/rawGeometry";
+import { legoThumbUrl } from "@/lib/assetUrl";
 import { useModProjects } from "@/workshop/project";
 import type { Campaign } from "../../model";
 import {
@@ -21,6 +22,36 @@ import {
   withoutUnit,
   withUnit,
 } from "../../units";
+
+/**
+ * A builder unit's saved picture, so a player can tell units apart by sight. A
+ * unit that has never been drawn has no picture, and shows an empty tile.
+ */
+export function UnitThumbnail({
+  projectId,
+  className,
+}: {
+  projectId: string;
+  className: string;
+}) {
+  const [missing, setMissing] = useState(false);
+  const tile = `shrink-0 rounded bg-muted ${className}`;
+  if (missing) {
+    return (
+      <span className={`flex items-center justify-center ${tile}`}>
+        <ImageOff className="size-4 text-muted-foreground" aria-hidden />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={legoThumbUrl(projectId)}
+      alt=""
+      className={`object-cover ${tile}`}
+      onError={() => setMissing(true)}
+    />
+  );
+}
 
 /**
  * The unit builder's saved units, so one can be attached. A unit already
@@ -88,17 +119,17 @@ export function UnitPickerList({
                 type="button"
                 disabled={!!refusal}
                 onClick={() => onPick(p)}
-                className="flex w-full flex-col gap-0.5 rounded-md border border-border/50 bg-card p-3 text-left enabled:hover:border-border enabled:hover:bg-muted/40 disabled:opacity-60"
+                className="flex w-full items-center gap-3 rounded-md border border-border/50 bg-card p-2 text-left enabled:hover:border-border enabled:hover:bg-muted/40 disabled:opacity-60"
               >
-                <span className="truncate text-sm font-medium">{p.name}</span>
-                <span className="truncate font-mono text-xs text-muted-foreground">
-                  {p.unitName}
+                <UnitThumbnail projectId={p.id} className="size-14" />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-sm font-medium">{p.name}</span>
+                  {refusal && (
+                    <span className="text-xs text-muted-foreground">
+                      {refusal}
+                    </span>
+                  )}
                 </span>
-                {refusal && (
-                  <span className="text-xs text-muted-foreground">
-                    {refusal}
-                  </span>
-                )}
               </button>
             </li>
           );

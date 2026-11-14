@@ -56,6 +56,16 @@ const target = {
   executable: "/engine/spring",
 } as PlayTarget;
 
+const played = {
+  game: {
+    name: "Splinter Faction",
+    primaryArchive: { name: "sf.sdz", path: "/games/sf.sdz" },
+    dependencyArchives: [],
+    info: { shortname: "SF" },
+  },
+  installed: [],
+};
+
 function project(unitName: string, extra: Partial<LegoProject> = {}) {
   return {
     ...newProject({
@@ -230,6 +240,7 @@ describe("composing a run's mutator", () => {
       },
       target,
       { name: "Splinter Faction", archive: "sf.sdz" },
+      played,
     );
 
     expect(campaignUnitList).toHaveBeenCalledWith({
@@ -262,6 +273,7 @@ describe("composing a run's mutator", () => {
         },
         target,
         { name: "Splinter Faction", archive: "sf.sdz" },
+        played,
       ),
     ).rejects.toThrow("This conquest's copy of The tank is missing.");
   });

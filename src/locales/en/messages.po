@@ -4069,6 +4069,10 @@ msgstr "{name} has no unit name a game can load. Give it one in the unit builder
 msgid "{name} has only a compiled script, with no source to read."
 msgstr "{name} has only a compiled script, with no source to read."
 
+#: src/lego/unitGame.ts
+msgid "{name} has pieces from {ownName}, so it cannot play in {gameName}."
+msgstr "{name} has pieces from {ownName}, so it cannot play in {gameName}."
+
 #: src/lego/movement.ts
 msgid "{name} is a ship class, which has no maxSlope."
 msgstr "{name} is a ship class, which has no maxSlope."
