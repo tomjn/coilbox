@@ -16,6 +16,7 @@ vi.mock("../workshop/config", () => ({
   loadUnitDefs: vi.fn(),
 }));
 
+import type { GameItem } from "../content/bindings";
 import { type ExportTextures, legoScratchRemove } from "../lego/bindings";
 import { type LegoProject, newProject } from "../lego/model";
 import {
@@ -25,6 +26,7 @@ import {
 } from "../lego/mutator";
 import type { LoadedPack } from "../lego/pack";
 import { renderUnitDef } from "../lego/unitDef";
+import { gameRecordFor } from "../lego/unitGame";
 import type { PlayTarget } from "../play/config";
 import { loadUnitDefs } from "../workshop/config";
 import {
@@ -52,6 +54,20 @@ const target = {
 } as PlayTarget;
 
 const pack = {} as LoadedPack;
+
+function game(name: string, archive: string, shortname: string): GameItem {
+  return {
+    name,
+    primaryArchive: { name: archive, path: `/games/${archive}` },
+    dependencyArchives: [],
+    info: { shortname },
+  };
+}
+
+const played = {
+  game: game("Splinter Faction", "sf.sdz", "SF"),
+  installed: [],
+};
 
 function project(
   unitName: string,
@@ -424,6 +440,7 @@ describe("a unit built to move", () => {
       campaign([entry("walker"), entry("rover")]),
       target,
       base,
+      played,
     );
 
     const [walker, rover] =
@@ -446,6 +463,7 @@ describe("a unit built to move", () => {
       campaign([entry("walker")]),
       target,
       base,
+      played,
     );
 
     const [walker] = vi.mocked(writePreparedMutator).mock.calls[0][0].prepared;
@@ -461,7 +479,12 @@ describe("a unit built to move", () => {
       units: [building("rover", "wheel")],
     });
 
-    const result = await composeUnits(campaign([entry("rover")]), target, base);
+    const result = await composeUnits(
+      campaign([entry("rover")]),
+      target,
+      base,
+      played,
+    );
 
     expect(result?.leftOut).toHaveLength(1);
     expect(result?.leftOut[0]).toContain("The rover");
@@ -482,6 +505,7 @@ describe("a unit built to move", () => {
       campaign([entry("turret"), entry("picked")]),
       target,
       base,
+      played,
     );
 
     const [turret, picked] =
@@ -509,10 +533,12 @@ describe("composing a mission's mutator", () => {
 
   it("writes nothing for a campaign with no units", async () => {
     expect(
-      await composeUnits(campaign(), target, {
-        name: "BA",
-        archive: "ba.sdz",
-      }),
+      await composeUnits(
+        campaign(),
+        target,
+        { name: "BA", archive: "ba.sdz" },
+        played,
+      ),
     ).toBeNull();
     expect(writePreparedMutator).not.toHaveBeenCalled();
   });
@@ -529,6 +555,7 @@ describe("composing a mission's mutator", () => {
       campaign([entry("tank", { builtBy: ["armlab"] }), entry("jeep")]),
       target,
       { name: "Splinter Faction v0.1.86", archive: "sf.sdz" },
+      played,
     );
 
     expect(result).toEqual({
@@ -560,12 +587,43 @@ describe("composing a mission's mutator", () => {
   it("refuses when a unit's copy is missing", async () => {
     vi.mocked(campaignUnitList).mockResolvedValue({ units: [] });
     await expect(
-      composeUnits(campaign([entry("tank")]), target, {
-        name: "BA",
-        archive: "ba.sdz",
-      }),
+      composeUnits(
+        campaign([entry("tank")]),
+        target,
+        { name: "BA", archive: "ba.sdz" },
+        played,
+      ),
     ).rejects.toThrow(
       "This campaign's copy of The tank is missing. Attach it again from the unit builder.",
+    );
+    expect(writePreparedMutator).not.toHaveBeenCalled();
+  });
+
+  it("refuses a unit holding another game's pieces", async () => {
+    const xta = game("XTA 9.8", "xta.sdz", "XTA");
+    const copy = stored("tank", false);
+    const parsed = JSON.parse(copy.json) as CampaignUnitCopy;
+    const from = gameRecordFor(xta, []);
+    parsed.source = {
+      ...parsed.source,
+      game: from,
+      pieces: parsed.source.pieces.map((p) => ({
+        ...p,
+        lifted: { game: from, member: "objects3d/a.s3o" },
+      })),
+    };
+    vi.mocked(campaignUnitList).mockResolvedValue({
+      units: [{ ...copy, json: JSON.stringify(parsed) }],
+    });
+    await expect(
+      composeUnits(
+        campaign([entry("tank")]),
+        target,
+        { name: "Splinter Faction", archive: "sf.sdz" },
+        played,
+      ),
+    ).rejects.toThrow(
+      "The tank has pieces from XTA 9.8, so it cannot play in Splinter Faction.",
     );
     expect(writePreparedMutator).not.toHaveBeenCalled();
   });
@@ -575,10 +633,12 @@ describe("composing a mission's mutator", () => {
       units: [stored("tank", false)],
     });
     vi.mocked(loadUnitDefs).mockRejectedValue(new Error("no"));
-    await composeUnits(campaign([entry("tank")]), target, {
-      name: "BA",
-      archive: "ba.sdz",
-    });
+    await composeUnits(
+      campaign([entry("tank")]),
+      target,
+      { name: "BA", archive: "ba.sdz" },
+      played,
+    );
     expect(vi.mocked(writePreparedMutator).mock.calls[0][0].gameMovement).toBe(
       null,
     );

@@ -1476,6 +1476,8 @@ export function RunSetupPanel({
             <Trans>Units from the builder</Trans>
           </span>
         }
+        game={installedGame ?? null}
+        installed={scan.data?.games ?? []}
         picked={units}
         onChange={setUnits}
         disabled={busy}

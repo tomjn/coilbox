@@ -1,7 +1,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Plus, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import type { GameItem } from "@/content/bindings";
 import {
   Popover,
   PopoverContent,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import type { LegoProject } from "@/lego/model";
 import { useLegoProjects } from "@/lego/projects";
+import { forGame, unitGame } from "@/lego/unitGame";
 import type { CampaignUnit } from "../../model";
 import { UnitPickerList, UnitThumbnail } from "./CampaignUnits";
 
@@ -25,23 +27,41 @@ function pickedEntries(picked: readonly LegoProject[]): CampaignUnit[] {
 
 /**
  * The units from the unit builder a conquest or warpath run begins with (issue
- * #4518). Each is copied when it begins. Nothing shows when the library has no
- * units, so a player who never builds one sees the setup as it was.
+ * #4518). Each is copied when it begins. Only units for the run's game, or for
+ * no game, are offered. Nothing shows when the library has none of those, so a
+ * player who never builds one sees the setup as it was.
  */
 export function StartingUnits({
   label,
+  game,
+  installed,
   picked,
   onChange,
   disabled = false,
 }: {
   label: ReactNode;
+  /** The game the run plays, or null before it is known. */
+  game: GameItem | null;
+  installed: readonly GameItem[];
   picked: readonly LegoProject[];
   onChange: (next: LegoProject[]) => void;
   disabled?: boolean;
 }) {
   const { t } = useLingui();
-  const { projects } = useLegoProjects();
+  const { projects: all } = useLegoProjects();
   const [open, setOpen] = useState(false);
+  const fits = (p: LegoProject) =>
+    game ? forGame(p, game, installed) : !unitGame(p);
+  const projects = all.filter(fits);
+  const kept = picked.filter(fits);
+  const dropped = kept.length !== picked.length;
+
+  // A warpath's game can change after units are picked. Units for the old game
+  // go, rather than sit in the list and fail when the run starts.
+  useEffect(() => {
+    if (dropped) onChange(kept);
+  }, [dropped, kept, onChange]);
+
   if (projects.length === 0) return null;
 
   return (

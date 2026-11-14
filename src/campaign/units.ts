@@ -23,6 +23,7 @@
  */
 
 import { select, t } from "@lingui/core/macro";
+import type { GameItem } from "../content/bindings";
 import { loadContentState } from "../content/contentState";
 import { legoScratchRemove } from "../lego/bindings";
 import type { BuiltBy } from "../lego/buildList";
@@ -41,6 +42,7 @@ import { type LoadedPack, loadPack } from "../lego/pack";
 import { buildPlayerLimitGadget } from "../lego/playerLimit";
 import { loadRawGeometryIfAny, type RawGeometry } from "../lego/rawGeometry";
 import { footprintSteps, movedUnitDef, renderUnitDef } from "../lego/unitDef";
+import { piecesElsewhereRefusal } from "../lego/unitGame";
 import { playerLimitFolder, unitsFolder } from "../lib/generatedGames";
 import { readStoredSetting } from "../lib/storedSetting";
 import type { PlayTarget } from "../play/config";
@@ -443,6 +445,12 @@ export interface UnitsBaseGame {
   archive: string;
 }
 
+export interface PlayedGame {
+  game: GameItem;
+  /** Every installed game, so a mutator is matched to the game it builds on. */
+  installed: readonly GameItem[];
+}
+
 export interface ComposedUnits {
   /** The mutator's name, which the start script asks for. */
   name: string;
@@ -531,6 +539,8 @@ export async function composeUnits(
   owner: UnitsOwner,
   target: PlayTarget,
   base: UnitsBaseGame,
+  /** The installed game the battle plays, which `base` may be a mutator over. */
+  played: PlayedGame,
   /** Also hold the player to their unlocked units (issue #5005). */
   limitsPlayer = false,
 ): Promise<ComposedUnits | null> {
@@ -567,6 +577,12 @@ export async function composeUnits(
         }),
       );
     }
+    const refusal = piecesElsewhereRefusal(
+      stored.copy.source,
+      played.game,
+      played.installed,
+    );
+    if (refusal) throw new Error(refusal);
     const moving = withGameMovement(
       unit,
       stored.copy,

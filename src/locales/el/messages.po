@@ -5013,6 +5013,10 @@ msgstr "Το {name} δεν έχει όνομα μονάδας που να μπο
 msgid "{name} has only a compiled script, with no source to read."
 msgstr ""
 
+#: src/lego/unitGame.ts
+msgid "{name} has pieces from {ownName}, so it cannot play in {gameName}."
+msgstr ""
+
 #: src/lego/movement.ts
 #, fuzzy
 msgid "{name} is a ship class, which has no maxSlope."

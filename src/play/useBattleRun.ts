@@ -357,7 +357,13 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
               archive: installedGame.primaryArchive.name,
             };
       const composed = units
-        ? await composeUnits(units, target, base, !!playerUnits)
+        ? await composeUnits(
+            units,
+            target,
+            base,
+            { game: installedGame, installed: games },
+            !!playerUnits,
+          )
         : null;
       setLeftOut(composed?.leftOut ?? []);
       if (composed) return composed.name;

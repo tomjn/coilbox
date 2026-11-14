@@ -392,6 +392,10 @@ describe("a campaign with units from the unit builder", () => {
       campaign,
       { enginePath: "/engine", dataDir: "/data", executable: "/engine/spring" },
       { name: "BA", archive: "ba.sdz" },
+      {
+        game: expect.objectContaining({ name: "BA" }),
+        installed: expect.any(Array),
+      },
     );
     expect(vi.mocked(toBattleConfig).mock.calls[0][0].gameType).toBe(
       "Coilbox campaign c1",

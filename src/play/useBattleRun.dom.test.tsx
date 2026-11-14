@@ -842,7 +842,7 @@ describe("a battle on a game with compatibility mode", () => {
         units: { id: "r1", scope: "warpath", units: [{}] } as never,
       });
 
-      expect(composeUnits.mock.calls[0][3]).toBe(true);
+      expect(composeUnits.mock.calls[0][4]).toBe(true);
       expect(composePlayerLimit).not.toHaveBeenCalled();
       expect(launch.mock.calls[0][1].config.gameType).toBe("Coilbox run r1");
     });

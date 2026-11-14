@@ -218,7 +218,7 @@ describe("a Warpath run carrying units from the unit builder", () => {
     const [owner, , base] = composeUnits.mock.calls[0];
     expect(owner).toEqual({ scope: "warpath", id: "run-1", units: [skyfort] });
     expect(base).toEqual({ name: "SplinterFaction 2.0", archive: "tg.sdz" });
-    expect(composeUnits.mock.calls[0][3]).toBe(true);
+    expect(composeUnits.mock.calls[0][4]).toBe(true);
     expect(engineLaunch.mock.calls[0][1].config.gameType).toBe(
       "Coilbox run units",
     );
@@ -229,7 +229,7 @@ describe("a Warpath run carrying units from the unit builder", () => {
     await act(() => result.current.start());
     expect(launchScenario.mock.calls[0][0].unitsGame).toBe("Coilbox run units");
     // A scenario plays as its author set it up, without the unit limit.
-    expect(composeUnits.mock.calls[0][3]).toBe(false);
+    expect(composeUnits.mock.calls[0][4]).toBe(false);
   });
 
   it("locks a carried unit its builder builds until the run unlocks it", async () => {

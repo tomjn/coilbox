@@ -141,6 +141,38 @@ export function sameGame(
 }
 
 /**
+ * Whether a unit belongs in a run of `game`: it is for that game, or for no
+ * game. Another game's unit would load, but its builders are that game's units,
+ * so nothing in this one would build it.
+ */
+export function forGame(
+  project: LegoProject,
+  game: GameItem,
+  installed: readonly GameItem[],
+): boolean {
+  const own = unitGame(project);
+  return !own || sameGame(own, gameRecordFor(game, installed), installed);
+}
+
+/**
+ * Why a unit cannot play in `game`, or null when it can. Pieces taken from a
+ * game stay in that game, the same rule the builder holds them to.
+ */
+export function piecesElsewhereRefusal(
+  project: LegoProject,
+  game: GameItem,
+  installed: readonly GameItem[],
+): string | null {
+  if (forGame(project, game, installed)) return null;
+  const lifted = liftedPieces(project);
+  if (lifted.length === 0) return null;
+  const name = project.name;
+  const ownName = unitGame(project)?.name ?? "";
+  const gameName = game.name;
+  return t`${name} has pieces from ${ownName}, so it cannot play in ${gameName}.`;
+}
+
+/**
  * The installed game to read for a unit's game: the exact build when it is
  * installed, else the newest installed version of the same game. A mutator of
  * it is only used when the game itself is not installed, since the mutator

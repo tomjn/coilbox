@@ -578,6 +578,8 @@ export function RunSetupForm({
             <Trans>Units from the builder</Trans>
           </span>
         }
+        game={game}
+        installed={scanned ?? []}
         picked={units}
         onChange={setUnits}
       />

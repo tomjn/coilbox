@@ -12,7 +12,9 @@ vi.mock("@/lego/projects", () => ({
   useLegoProjects: () => ({ projects, loading: false, error: null }),
 }));
 
+import type { GameItem } from "@/content/bindings";
 import { type LegoProject, newProject } from "@/lego/model";
+import { gameRecordFor } from "@/lego/unitGame";
 import { StartingUnits } from "./StartingUnits";
 
 function project(id: string, unitName: string, name: string): LegoProject {
@@ -29,20 +31,42 @@ function project(id: string, unitName: string, name: string): LegoProject {
   };
 }
 
+function game(name: string, archive: string, shortname: string): GameItem {
+  return {
+    name,
+    primaryArchive: { name: archive, path: `/games/${archive}` },
+    dependencyArchives: [],
+    info: { shortname },
+  };
+}
+
+const sf = game("Splinter Faction 0.1.89", "sf.sdz", "SF");
+const xta = game("XTA 9.8", "xta.sdz", "XTA");
+
 const tank = project("p-tank", "tank", "Tank");
 const other = project("p-other", "tank", "Other tank");
 const jeep = project("p-jeep", "jeep", "Jeep");
+const sfBot = {
+  ...project("p-sfbot", "sfbot", "SF bot"),
+  game: gameRecordFor(sf, []),
+};
+const xtaBot = {
+  ...project("p-xtabot", "xtabot", "XTA bot"),
+  game: gameRecordFor(xta, []),
+};
 
 afterEach(() => {
   cleanup();
   projects.length = 0;
 });
 
-function mount(picked: LegoProject[]) {
+function mount(picked: LegoProject[], played: GameItem | null = sf) {
   const onChange = vi.fn();
   render(
     <StartingUnits
       label={<span>Units from the builder</span>}
+      game={played}
+      installed={[sf, xta]}
       picked={picked}
       onChange={onChange}
     />,
@@ -77,6 +101,27 @@ describe("the units a conquest or run begins with", () => {
     projects.push(tank, jeep);
     const onChange = mount([tank, jeep]);
     fireEvent.click(screen.getByRole("button", { name: "Remove Tank" }));
+    expect(onChange).toHaveBeenCalledWith([jeep]);
+  });
+
+  it("offers only units for the run's game and units for no game", () => {
+    projects.push(jeep, sfBot, xtaBot);
+    mount([]);
+    fireEvent.click(screen.getByRole("button", { name: /Add unit/ }));
+    expect(screen.getByText("Jeep")).toBeTruthy();
+    expect(screen.getByText("SF bot")).toBeTruthy();
+    expect(screen.queryByText("XTA bot")).toBeNull();
+  });
+
+  it("shows nothing when every unit is for another game", () => {
+    projects.push(xtaBot);
+    mount([]);
+    expect(screen.queryByText("Units from the builder")).toBeNull();
+  });
+
+  it("drops picked units when the run's game changes to another", () => {
+    projects.push(jeep, sfBot, xtaBot);
+    const onChange = mount([jeep, sfBot], xta);
     expect(onChange).toHaveBeenCalledWith([jeep]);
   });
 });

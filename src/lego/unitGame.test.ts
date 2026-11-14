@@ -4,10 +4,12 @@ import { rememberShortnames, resetShortnames } from "../container/shortnames";
 import { type LegoProject, newProject } from "./model";
 import {
   baseGameOf,
+  forGame,
   gameChangeRefusal,
   gameRecordFor,
   installedGameFor,
   liftRefusal,
+  piecesElsewhereRefusal,
   sameGame,
   unitGame,
 } from "./unitGame";
@@ -356,5 +358,59 @@ describe("liftRefusal", () => {
     expect(liftRefusal(unit, null)).toBe(
       "This piece does not say which game it is from.",
     );
+  });
+});
+
+describe("forGame", () => {
+  it("takes a unit for no game in any game", () => {
+    expect(forGame(project({ game: null }), xta, installed)).toBe(true);
+  });
+
+  it("takes a unit for another version of the game", () => {
+    const unit = project({ game: gameRecordFor(sf86, installed) });
+    expect(forGame(unit, sf89, installed)).toBe(true);
+  });
+
+  it("takes a unit for the game a mutator builds on", () => {
+    const unit = project({ game: gameRecordFor(sf86, installed) });
+    expect(forGame(unit, mutator, installed)).toBe(true);
+  });
+
+  it("leaves out a unit for a different game", () => {
+    const unit = project({ game: gameRecordFor(xta, installed) });
+    expect(forGame(unit, sf89, installed)).toBe(false);
+  });
+});
+
+describe("piecesElsewhereRefusal", () => {
+  const lifted = (game: GameItem) => {
+    const base = project({ game: gameRecordFor(game, installed) });
+    return {
+      ...base,
+      pieces: [
+        {
+          ...base.pieces[0],
+          lifted: {
+            game: gameRecordFor(game, installed),
+            member: "objects3d/a.s3o",
+          },
+        },
+      ],
+    };
+  };
+
+  it("refuses a unit with another game's pieces", () => {
+    expect(piecesElsewhereRefusal(lifted(xta), sf89, installed)).toBe(
+      "Rover has pieces from XTA 9.8, so it cannot play in Splinter Faction 0.1.89.",
+    );
+  });
+
+  it("lets a unit with the game's own pieces play in it", () => {
+    expect(piecesElsewhereRefusal(lifted(sf86), sf89, installed)).toBeNull();
+  });
+
+  it("lets another game's unit of parts play anywhere", () => {
+    const unit = project({ game: gameRecordFor(xta, installed) });
+    expect(piecesElsewhereRefusal(unit, sf89, installed)).toBeNull();
   });
 });
