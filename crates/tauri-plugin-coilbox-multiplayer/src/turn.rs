@@ -22,7 +22,7 @@
 //! is sent at all, and an ask still ends in [`NoCredential::NoRelay`] without
 //! one going out.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use coilbox_lobby_protocol::{command, Delta, LobbyState, TurnCredentials};
@@ -59,6 +59,11 @@ pub enum TurnAnswer {
 /// A connection's slot for [`TurnAnswer`], watched rather than locked so a
 /// caller can wait on the next answer rather than poll for it.
 pub type TurnSlot = watch::Receiver<TurnAnswer>;
+
+/// A connection's lock on asking the lobby for a credential. Two callers that
+/// both find nothing held would otherwise both send `TURNCREDENTIALS`, and the
+/// lobby rations them per account.
+pub type TurnAsk = Arc<tokio::sync::Mutex<()>>;
 
 /// How much life a credential has to have left, on top of the game itself,
 /// before it is worth taking to the relay.
@@ -217,23 +222,16 @@ pub async fn credentials(
     now_ms: u64,
     patience: Duration,
 ) -> Result<Credential, NoCredential> {
+    let ask = askable(registry, server_key)?;
+    // Whoever got here first may be asking right now. Waiting for them means
+    // their answer is found held below rather than asked for a second time.
+    let _asking = ask.lock().await;
     let held = {
         let map = lock_or_recover(registry);
         let conn = map
             .get(server_key)
             .ok_or_else(|| NoCredential::NotConnected(server_key.to_string()))?;
-        if conn.protocol != ConnProtocol::TasServer {
-            return Err(NoCredential::WrongProtocol);
-        }
         let state = lock_or_recover(&conn.state);
-        // Whether there is a relay at all is settled before login, so it is
-        // known by the time anybody asks. A server without one is not asked:
-        // the command means nothing to it, the answer would be silence, and the
-        // caller would wait out the whole patience budget to learn what its own
-        // state could have told it straight away.
-        if !state.relay_hosting_available() {
-            return Err(NoCredential::NoRelay);
-        }
         state.live_turn_credentials(usable_until(now_ms)).cloned()
     };
 
@@ -392,20 +390,34 @@ pub async fn renewed(
     server_key: &str,
     patience: Duration,
 ) -> Result<Credential, NoCredential> {
-    {
-        let map = lock_or_recover(registry);
-        let conn = map
-            .get(server_key)
-            .ok_or_else(|| NoCredential::NotConnected(server_key.to_string()))?;
-        if conn.protocol != ConnProtocol::TasServer {
-            return Err(NoCredential::WrongProtocol);
-        }
-        if !lock_or_recover(&conn.state).relay_hosting_available() {
-            return Err(NoCredential::NoRelay);
-        }
-    }
+    let ask = askable(registry, server_key)?;
+    // Taken so a [`credentials`] call that arrives mid-renewal waits and then
+    // reuses the renewed credential.
+    let _asking = ask.lock().await;
     let minted = ask_the_lobby(registry, server_key, patience).await?;
     usable(&minted)
+}
+
+/// The connection's [`TurnAsk`], once it is known the lobby can be asked at
+/// all.
+///
+/// Whether there is a relay is settled before login, so it is known by the
+/// time anybody asks. A server without one is not asked: the command means
+/// nothing to it, the answer would be silence, and the caller would wait out
+/// the whole patience budget to learn what its own state could have told it
+/// straight away.
+fn askable(registry: &Registry, server_key: &str) -> Result<TurnAsk, NoCredential> {
+    let map = lock_or_recover(registry);
+    let conn = map
+        .get(server_key)
+        .ok_or_else(|| NoCredential::NotConnected(server_key.to_string()))?;
+    if conn.protocol != ConnProtocol::TasServer {
+        return Err(NoCredential::WrongProtocol);
+    }
+    if !lock_or_recover(&conn.state).relay_hosting_available() {
+        return Err(NoCredential::NoRelay);
+    }
+    Ok(conn.turn_ask.clone())
 }
 
 /// Send `TURNCREDENTIALS` and wait for what comes back.
@@ -602,6 +614,7 @@ pub(crate) mod tests {
                 tachyon: TachyonHandle::default(),
                 started: StartedBattle::default(),
                 turn,
+                turn_ask: TurnAsk::default(),
                 relay: crate::conn::HostedRelay::default(),
                 opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
                 relay_refused: crate::relay_host::RefusedRelayAddress::default(),
@@ -673,6 +686,45 @@ pub(crate) mod tests {
             w.sent.try_recv(),
             Ok(Outbound::Line(line)) if line == "TURNCREDENTIALS"
         ));
+    }
+
+    /// Two callers that both find nothing held send one ask between them, and
+    /// the second reuses what the first brought back. React's StrictMode runs
+    /// the Host a battle drawer's ping twice on mount, which sent two in a row.
+    #[tokio::test]
+    async fn two_callers_at_once_ask_the_lobby_once() {
+        let Wired {
+            registry,
+            mut sent,
+            answers,
+            state,
+        } = wired(ConnProtocol::TasServer);
+        let answer_the_first_ask = async {
+            assert!(matches!(
+                sent.recv().await,
+                Some(Outbound::Line(line)) if line == "TURNCREDENTIALS"
+            ));
+            let _ = answers.send(TurnAnswer::Granted(minted(&state, 86_400, NOW)));
+        };
+
+        let (first, second, ()) = tokio::join!(
+            credentials(&registry, "alice@bar:8200", NOW, PATIENCE),
+            credentials(&registry, "alice@bar:8200", NOW, PATIENCE),
+            answer_the_first_ask,
+        );
+
+        assert_eq!(
+            first.expect("the first caller got one").turn.user,
+            "1786086400:alice"
+        );
+        assert_eq!(
+            second.expect("the second caller got one").turn.user,
+            "1786086400:alice"
+        );
+        assert!(
+            sent.try_recv().is_err(),
+            "a second TURNCREDENTIALS went out"
+        );
     }
 
     /// A credential already in hand is used rather than asked for again, so

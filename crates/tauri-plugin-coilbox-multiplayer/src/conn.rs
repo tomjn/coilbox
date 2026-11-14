@@ -29,7 +29,7 @@ use crate::lock_or_recover;
 use crate::relay_host::{OpenAnswer, OpenSlot};
 use crate::tachyon_rpc::TachyonClient;
 use crate::tls::AsyncReadWrite;
-use crate::turn::{TurnAnswer, TurnSlot};
+use crate::turn::{TurnAnswer, TurnAsk, TurnSlot};
 
 /// Unix-millis now, saturating to 0 on the (impossible) pre-epoch case.
 pub(crate) fn now_ms() -> u64 {
@@ -338,6 +338,10 @@ pub struct ServerConn {
     /// [`TurnAnswer::Unasked`] on a connection to a server without the command,
     /// which today is all of them.
     pub turn: TurnSlot,
+    /// Held while this connection asks the lobby for a relay credential, so a
+    /// second caller waits for the first answer instead of spending another of
+    /// the account's rationed credentials.
+    pub turn_ask: TurnAsk,
     /// The relay this connection's battle is being hosted through, if it is
     /// being hosted through one. See [`HostedRelay`].
     pub relay: HostedRelay,
@@ -509,6 +513,7 @@ fn spawn_connection_within(
             // the battle it joined carries the host's address.
             started: StartedBattle::default(),
             turn,
+            turn_ask: TurnAsk::default(),
             relay,
             opened,
             relay_refused,

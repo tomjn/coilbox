@@ -208,6 +208,7 @@ fn spawn_connection_within(
             // Zero-K hosts its own battles on its own servers, so there is no
             // relay credential to ask it for and nothing ever fills this.
             turn: watch::channel(TurnAnswer::Unasked).1,
+            turn_ask: Default::default(),
             // And so nothing here is ever relayed, and no `OPENBATTLE` of ours
             // is ever answered on this connection.
             relay: crate::conn::HostedRelay::default(),
