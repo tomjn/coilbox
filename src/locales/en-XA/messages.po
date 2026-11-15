@@ -33345,16 +33345,13 @@ msgstr ""
 msgid "replays"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
 #: src/play/index.ts
 msgid "Replays"
-msgstr ""
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Replays on this map"
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx

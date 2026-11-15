@@ -33346,6 +33346,7 @@ msgstr "Replay unit lists"
 msgid "replays"
 msgstr "replays"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -33353,10 +33354,6 @@ msgstr "replays"
 #: src/play/index.ts
 msgid "Replays"
 msgstr "Replays"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Replays on this map"
-msgstr "Replays on this map"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

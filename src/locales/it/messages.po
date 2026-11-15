@@ -41030,6 +41030,7 @@ msgstr "Elenchi di unità dei replay"
 msgid "replays"
 msgstr "replay"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -41038,11 +41039,6 @@ msgstr "replay"
 #, fuzzy
 msgid "Replays"
 msgstr "Replay"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "Replay su questa mappa"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

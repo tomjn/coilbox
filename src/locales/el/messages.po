@@ -41030,6 +41030,7 @@ msgstr "Λίστες μονάδων επαναλήψεων"
 msgid "replays"
 msgstr "επαναλήψεις"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -41038,11 +41039,6 @@ msgstr "επαναλήψεις"
 #, fuzzy
 msgid "Replays"
 msgstr "Επαναλήψεις"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "Επαναλήψεις σε αυτόν τον χάρτη"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

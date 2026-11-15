@@ -40755,6 +40755,7 @@ msgstr "Listas de unidades de repeticiones"
 msgid "replays"
 msgstr "repeticiones"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -40763,11 +40764,6 @@ msgstr "repeticiones"
 #, fuzzy
 msgid "Replays"
 msgstr "Repeticiones"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "Repeticiones en este mapa"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

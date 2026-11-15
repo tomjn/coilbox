@@ -40755,6 +40755,7 @@ msgstr "リプレイのユニット一覧"
 msgid "replays"
 msgstr "リプレイ"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -40763,11 +40764,6 @@ msgstr "リプレイ"
 #, fuzzy
 msgid "Replays"
 msgstr "リプレイ"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "このマップのリプレイ"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

@@ -40755,6 +40755,7 @@ msgstr "回放单位列表"
 msgid "replays"
 msgstr "回放"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -40763,11 +40764,6 @@ msgstr "回放"
 #, fuzzy
 msgid "Replays"
 msgstr "回放"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "此地图上的回放"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

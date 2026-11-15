@@ -40755,6 +40755,7 @@ msgstr "Listy jednostek powtórek"
 msgid "replays"
 msgstr "powtórki"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -40763,11 +40764,6 @@ msgstr "powtórki"
 #, fuzzy
 msgid "Replays"
 msgstr "Powtórki"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "Powtórki na tej mapie"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx

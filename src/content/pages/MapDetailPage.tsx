@@ -376,7 +376,7 @@ export default function MapDetailPage() {
             navigate(`/play/replays?map=${encodeURIComponent(map.name)}`)
           }
         >
-          <Clapperboard className="size-4" /> <Trans>Replays on this map</Trans>
+          <Clapperboard className="size-4" /> <Trans>Replays</Trans>
         </Button>
         <CopyMapLinkButton mapName={map.name} labelled />
         <HubSendControl
