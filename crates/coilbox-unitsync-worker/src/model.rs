@@ -221,6 +221,24 @@ pub struct MapMinimapRow {
     /// The encoded picture, only when this pass was asked for assets.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<MapOverlayAsset>,
+    /// The map's metal, type and height layers that could be read. A layer the
+    /// map does not have is absent rather than an error.
+    #[serde(default)]
+    pub overlays: Vec<MapLayerRow>,
+}
+
+/// One of a map's three overlay layers in the `--map-minimaps` walk: its
+/// identity, and the encoded asset when the caller asked for one.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MapLayerRow {
+    /// `overlay:metal`, `overlay:type` or `overlay:height`.
+    pub variant: String,
+    /// sha256 over the infomap samples, framed by variant and grid. Known before
+    /// any encode, like the minimap's.
+    pub source_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<MapOverlayAsset>,
 }
 
 /// Why a map in the walk produced no row. The first six are one picture's
@@ -264,12 +282,16 @@ impl From<MapOverlaySkip> for MapMinimapSkip {
     }
 }
 
-/// One map the walk did not produce a row for, and why.
+/// One map the walk did not produce a row for, or one overlay layer it could
+/// not offer, and why.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct MapMinimapSkipped {
     pub map_name: String,
     pub reason: MapMinimapSkip,
+    /// The overlay layer this is about. Absent when the whole map was skipped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<String>,
 }
 
 /// Output of the batch `--map-minimaps` mode: one row per map that has a picture

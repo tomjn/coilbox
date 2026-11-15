@@ -19,13 +19,17 @@
 //!
 //! The `unitsync_minimap` command still never passes one: what a page draws is
 //! the picture, not the hub's asset. What does is [`assets`], the batch walk
-//! behind "Send pictures of your maps" (#2379), and [`crate::seed`]. The two
+//! behind "Send pictures of your maps" (#2379), and [`crate::seed`]. The walk
+//! offers the map's metal, type and height layers beside the minimap, so a map
+//! sent from coilbox has the same four layers a seeded one has. The two
 //! produce the same bytes for the same map by construction, since both go through
 //! [`encode_asset`], which is what lets a seeded map and an uploaded one answer
 //! the same have check.
 
 use crate::ffi::Unitsync;
-use crate::model::{MapMinimapRow, MapMinimapSkip, MapMinimapSkipped, MapMinimapsOutput};
+use crate::model::{
+    MapLayerRow, MapMinimapRow, MapMinimapSkip, MapMinimapSkipped, MapMinimapsOutput,
+};
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};
 use crate::model::{Thumbnail, ThumbnailsOutput};
 use base64::Engine;
@@ -35,6 +39,7 @@ use coilbox_unitsync_worker::cached::{
 use coilbox_unitsync_worker::cachekey;
 use image::{DynamicImage, ImageFormat, RgbImage};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
@@ -411,15 +416,27 @@ pub(crate) fn asset_in_session(
     )
 }
 
-/// What a map's minimap came to last time it was read, beside its picture in the
-/// thumb cache. `hash` absent is a texture that was one colour.
+/// The hub's variant names for a map's three overlay layers, which the walk
+/// offers beside the minimap. A test below checks these and [`MINIMAP_VARIANT`]
+/// are the vocabulary's whole list of map variants.
+const OVERLAY_VARIANTS: [&str; 3] = ["overlay:height", "overlay:metal", "overlay:type"];
+
+/// Each overlay layer's identity, or why it has none, by variant.
+type OverlayIds = BTreeMap<String, Result<String, MapOverlaySkip>>;
+
+/// What a map's layers came to last time they were read, beside its picture in
+/// the thumb cache. `hash` absent is a minimap texture that was one colour.
 #[derive(Serialize, Deserialize)]
 struct CachedIdentity {
     #[serde(skip_serializing_if = "Option::is_none")]
     hash: Option<String>,
+    /// Absent on a record written before the walk offered the overlays, which
+    /// reads them on its next survey rather than reading the minimap again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    overlays: Option<OverlayIds>,
 }
 
-/// Cache file for a map's minimap identity: `<cache_dir>/<key>-mmid.json`.
+/// Cache file for a map's layer identities: `<cache_dir>/<key>-mmid.json`.
 ///
 /// Mip independent in name only: what it holds is the identity at
 /// [`ASSET_MINIMAP_MIP`], which is the one size the hub stores, and no other
@@ -433,23 +450,14 @@ fn identity_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf>
 }
 
 /// The identity of one map's minimap, read from the texture, and the texture it
-/// was read off.
+/// was read off. The identity is `None` for a texture of one colour.
 ///
 /// The texture comes back with it because the sending pass encodes the same words
 /// it hashed. Reading it twice would be two `GetMinimap` calls for one picture.
-///
-/// A blank texture is refused here rather than in the encoder, so a map that
-/// ships no minimap is never asked about either. Asking would mint an identity
-/// for a picture the walk would then decline to make.
-///
-/// The answer is written down for [`cached_identity`], including a blank one:
-/// what the survey needs to know next time is what this map came to, and "no
-/// picture in it" is an answer.
-fn read_identity(
+fn read_minimap(
     us: &Unitsync,
     map_name: &str,
-    file: Option<PathBuf>,
-) -> Result<(String, Vec<u16>), MapMinimapSkip> {
+) -> Result<(Option<String>, Vec<u16>), MapMinimapSkip> {
     let pixels = us
         .minimap(map_name, ASSET_MINIMAP_MIP)
         .ok_or(MapMinimapSkip::NoSource)?;
@@ -457,18 +465,49 @@ fn read_identity(
     if pixels.len() != (side * side) as usize {
         return Err(MapMinimapSkip::ReadFailed);
     }
-    let blank = is_blank(&pixels);
-    let hash = (!blank).then(|| {
+    let hash = (!is_blank(&pixels)).then(|| {
         crate::assetencode::map_source_hash(MINIMAP_VARIANT, side, side, &source_bytes(&pixels))
     });
-    write_identity(file, &CachedIdentity { hash: hash.clone() });
-    match hash {
-        Some(hash) => Ok((hash, pixels)),
-        None => Err(MapMinimapSkip::Blank),
+    Ok((hash, pixels))
+}
+
+/// One overlay layer's identity, read from the map's infomap without encoding.
+fn overlay_identity(
+    us: &Unitsync,
+    map_name: &str,
+    variant: &str,
+) -> Result<String, MapOverlaySkip> {
+    match variant {
+        "overlay:metal" => crate::metalmap::identity_in_session(us, map_name),
+        "overlay:type" => crate::typemap::identity_in_session(us, map_name),
+        _ => crate::heightmap::identity_in_session(us, map_name),
     }
 }
 
-/// Store what a map's minimap came to. An unwritable cache dir costs a re-read
+/// One overlay layer encoded as the hub's asset, written into `asset_dir`.
+fn overlay_asset(
+    us: &Unitsync,
+    map_name: &str,
+    variant: &str,
+    asset_dir: &Path,
+) -> Result<MapOverlayAsset, MapOverlaySkip> {
+    let (asset, skip) = match variant {
+        "overlay:metal" => crate::metalmap::asset_in_session(us, map_name, asset_dir),
+        "overlay:type" => crate::typemap::asset_in_session(us, map_name, asset_dir),
+        _ => crate::heightmap::asset_in_session(us, map_name, asset_dir),
+    };
+    asset.ok_or(skip.unwrap_or(MapOverlaySkip::EncodeFailed))
+}
+
+/// Every overlay layer's identity for one map.
+fn read_overlays(us: &Unitsync, map_name: &str) -> OverlayIds {
+    OVERLAY_VARIANTS
+        .iter()
+        .map(|&variant| (variant.to_string(), overlay_identity(us, map_name, variant)))
+        .collect()
+}
+
+/// Store what a map's layers came to. An unwritable cache dir costs a re-read
 /// next time and nothing else, so nothing here is worth failing over.
 fn write_identity(file: Option<PathBuf>, identity: &CachedIdentity) {
     let Some(file) = file else { return };
@@ -480,36 +519,65 @@ fn write_identity(file: Option<PathBuf>, identity: &CachedIdentity) {
     }
 }
 
-/// The identity of one map's minimap, from the cache where it is known and from
-/// the texture otherwise (issue #2379).
+/// The identity of one map's minimap and of its overlays, from the cache where
+/// they are known and from the map otherwise (issue #2379).
 ///
 /// This is what makes pressing the button a second time bearable. The survey is
-/// over the whole library and `GetMinimap` at mip 1 is about 300ms a map, so 120
-/// maps is 37 seconds of decoding textures to ask about pictures that mostly did
-/// not move. The cache key is the archive's file identity, the same one the
-/// minimap PNG beside it is keyed on, so a map that has been reinstalled or
-/// updated is read again.
+/// over the whole library, `GetMinimap` at mip 1 is about 300ms a map, and the
+/// height overlay is the largest read the worker makes. The cache key is the
+/// archive's file identity, the same one the minimap PNG beside it is keyed on, so
+/// a map that has been reinstalled or updated is read again.
 ///
-/// Only the survey reads this. The sending pass reads the texture whatever the
-/// cache says, so what it declares to the hub is always over the bytes it
-/// encoded, and a stale entry can cost a wasted question but never a wrong
-/// `source_hash`.
+/// A blank minimap is written down too, and drops the map, overlays and all: what
+/// the survey needs to know next time is what this map came to, and "no picture
+/// in it" is an answer.
+///
+/// Only the survey reads this. The sending pass reads the map whatever the cache
+/// says, so what it declares to the hub is always over the bytes it encoded, and
+/// a stale entry can cost a wasted question but never a wrong `source_hash`.
 fn cached_identity(
     us: &Unitsync,
     map_name: &str,
     cache_dir: Option<&Path>,
-) -> Result<String, MapMinimapSkip> {
+) -> Result<(String, OverlayIds), MapMinimapSkip> {
     let key = map_cache_key(us, None, map_name);
     let file = identity_file(cache_dir, key.as_deref());
     let cached = file
         .as_deref()
         .and_then(|f| std::fs::read(f).ok())
         .and_then(|raw| serde_json::from_slice::<CachedIdentity>(&raw).ok());
-    match cached {
-        Some(CachedIdentity { hash: Some(hash) }) => Ok(hash),
-        Some(CachedIdentity { hash: None }) => Err(MapMinimapSkip::Blank),
-        None => read_identity(us, map_name, file).map(|(hash, _)| hash),
-    }
+    let (hash, overlays) = match cached {
+        Some(CachedIdentity { hash: None, .. }) => return Err(MapMinimapSkip::Blank),
+        Some(CachedIdentity {
+            hash: Some(hash),
+            overlays: Some(overlays),
+        }) => return Ok((hash, overlays)),
+        Some(CachedIdentity {
+            hash: Some(hash),
+            overlays: None,
+        }) => (hash, read_overlays(us, map_name)),
+        None => match read_minimap(us, map_name)?.0 {
+            Some(hash) => (hash, read_overlays(us, map_name)),
+            None => {
+                write_identity(
+                    file,
+                    &CachedIdentity {
+                        hash: None,
+                        overlays: None,
+                    },
+                );
+                return Err(MapMinimapSkip::Blank);
+            }
+        },
+    };
+    write_identity(
+        file,
+        &CachedIdentity {
+            hash: Some(hash.clone()),
+            overlays: Some(overlays.clone()),
+        },
+    );
+    Ok((hash, overlays))
 }
 
 /// The maps this walk covers, and the ones dropped before any texture is read.
@@ -559,6 +627,7 @@ fn choose_maps(
         skipped.push(MapMinimapSkipped {
             map_name: name,
             reason,
+            variant: None,
         });
     }
     (kept, skipped)
@@ -602,13 +671,17 @@ pub fn assets(
 
     let mut maps = Vec::with_capacity(wanted.len());
     for map_name in wanted {
-        let row = one_map(&us, &map_name, cache_dir, asset_dir);
+        let row = one_map(&us, &map_name, cache_dir, asset_dir, &mut skipped);
         // Whatever unitsync said while reading this map belongs to this map, and
         // the next one starts from nothing.
         let _ = us.drain_errors();
         match row {
             Ok(row) => maps.push(row),
-            Err(reason) => skipped.push(MapMinimapSkipped { map_name, reason }),
+            Err(reason) => skipped.push(MapMinimapSkipped {
+                map_name,
+                reason,
+                variant: None,
+            }),
         }
     }
 
@@ -622,39 +695,107 @@ pub fn assets(
     }
 }
 
-/// One map's row: its identity, its size in elmos, and the encoded picture when
-/// this pass is the one that sends.
+/// One map's row: its identity, its size in elmos, its overlay layers, and the
+/// encoded pictures when this pass is the one that sends.
 ///
 /// The extent is read whichever pass this is, because a map that cannot say how
 /// big it is has no row on the hub at all: `map_width` and `map_height` are
 /// required on a map asset and refused on a unit one. Finding that out in the
 /// first pass is what stops the second one encoding a picture that would be
 /// turned away.
+///
+/// An overlay layer that could not be offered goes into `skipped` with its
+/// variant, and the map's row carries on without it. A map with no infomap of a
+/// kind is ordinary and is not reported. Each failure is reported by the pass that
+/// finds it, so a read failure the survey reported is not reported again by the
+/// sending pass.
 fn one_map(
     us: &Unitsync,
     map_name: &str,
     cache_dir: Option<&Path>,
     asset_dir: Option<&Path>,
+    skipped: &mut Vec<MapMinimapSkipped>,
 ) -> Result<MapMinimapRow, MapMinimapSkip> {
-    let (source_hash, pixels) = match asset_dir {
-        Some(_) => {
-            let file = identity_file(cache_dir, map_cache_key(us, None, map_name).as_deref());
-            let (hash, pixels) = read_identity(us, map_name, file)?;
-            (hash, Some(pixels))
+    let file = identity_file(cache_dir, map_cache_key(us, None, map_name).as_deref());
+    let (source_hash, pixels, surveyed) = match asset_dir {
+        Some(_) => match read_minimap(us, map_name)? {
+            (Some(hash), pixels) => (hash, Some(pixels), None),
+            (None, _) => {
+                write_identity(
+                    file,
+                    &CachedIdentity {
+                        hash: None,
+                        overlays: None,
+                    },
+                );
+                return Err(MapMinimapSkip::Blank);
+            }
+        },
+        None => {
+            let (hash, overlays) = cached_identity(us, map_name, cache_dir)?;
+            (hash, None, Some(overlays))
         }
-        None => (cached_identity(us, map_name, cache_dir)?, None),
     };
     let (width, height) = map_elmos(us, map_name, cache_dir);
     let (Some(map_width), Some(map_height)) = (width, height) else {
         return Err(MapMinimapSkip::NoExtent);
     };
     let source_archive = crate::archive::archive_name_for_map(us, map_name);
-    let asset = match (asset_dir, &pixels) {
-        (Some(dir), Some(pixels)) => Some(
-            encode_asset(dir, pixels, mip_side(ASSET_MINIMAP_MIP), &source_archive)
-                .map_err(MapMinimapSkip::from)?,
-        ),
-        _ => None,
+    let mut skip_layer = |variant: &str, why: MapOverlaySkip| {
+        skipped.push(MapMinimapSkipped {
+            map_name: map_name.to_string(),
+            reason: why.into(),
+            variant: Some(variant.to_string()),
+        })
+    };
+    let (asset, overlays) = match (asset_dir, pixels) {
+        (Some(dir), Some(pixels)) => {
+            let asset = encode_asset(dir, &pixels, mip_side(ASSET_MINIMAP_MIP), &source_archive)
+                .map_err(MapMinimapSkip::from)?;
+            let mut ids = OverlayIds::new();
+            let mut overlays = Vec::new();
+            for variant in OVERLAY_VARIANTS {
+                match overlay_asset(us, map_name, variant, dir) {
+                    Ok(layer) => {
+                        ids.insert(variant.to_string(), Ok(layer.source_hash.clone()));
+                        overlays.push(MapLayerRow {
+                            variant: variant.to_string(),
+                            source_hash: layer.source_hash.clone(),
+                            asset: Some(layer),
+                        });
+                    }
+                    Err(why) => {
+                        ids.insert(variant.to_string(), Err(why));
+                        if found_by_encoding(why) {
+                            skip_layer(variant, why);
+                        }
+                    }
+                }
+            }
+            write_identity(
+                file,
+                &CachedIdentity {
+                    hash: Some(source_hash.clone()),
+                    overlays: Some(ids),
+                },
+            );
+            (Some(asset), overlays)
+        }
+        _ => {
+            let mut overlays = Vec::new();
+            for (variant, id) in surveyed.unwrap_or_default() {
+                match id {
+                    Ok(layer_hash) => overlays.push(MapLayerRow {
+                        variant,
+                        source_hash: layer_hash,
+                        asset: None,
+                    }),
+                    Err(MapOverlaySkip::NoSource) => {}
+                    Err(why) => skip_layer(&variant, why),
+                }
+            }
+            (None, overlays)
+        }
     };
     Ok(MapMinimapRow {
         map_name: map_name.to_string(),
@@ -663,7 +804,17 @@ fn one_map(
         map_width,
         map_height,
         asset,
+        overlays,
     })
+}
+
+/// Whether an overlay skip is one only the sending pass can find. The rest are
+/// read failures, which the survey has already reported for the same map.
+fn found_by_encoding(why: MapOverlaySkip) -> bool {
+    matches!(
+        why,
+        MapOverlaySkip::EncodeFailed | MapOverlaySkip::TooLarge | MapOverlaySkip::NotWritten
+    )
 }
 
 /// Report a failure that stopped the walk running at all, in the walk's own
@@ -1142,6 +1293,22 @@ mod tests {
             .any(|v| v == MINIMAP_VARIANT));
     }
 
+    /// The picture walk offers every map variant the hub keeps, so a map sent
+    /// from coilbox has the same layers as a seeded one.
+    #[test]
+    fn the_walk_offers_every_map_variant_the_hub_keeps() {
+        let mut walked: Vec<&str> = OVERLAY_VARIANTS.to_vec();
+        walked.push(MINIMAP_VARIANT);
+        walked.sort();
+        let mut kept: Vec<&str> = coilbox_assets::vocabulary()
+            .map_variants
+            .iter()
+            .map(String::as_str)
+            .collect();
+        kept.sort();
+        assert_eq!(walked, kept);
+    }
+
     /// The asset is square and the map is not, so what the consumer needs to
     /// stretch it back is in the same output rather than a second call away
     /// (issue #1629).
@@ -1407,6 +1574,7 @@ mod tests {
             Some(file.clone()),
             &CachedIdentity {
                 hash: Some("deadbeef".into()),
+                overlays: None,
             },
         );
 
@@ -1422,7 +1590,13 @@ mod tests {
     fn a_blank_map_is_remembered_as_blank() {
         let dir = temp_dir("identity-blank");
         let file = identity_file(Some(dir.as_path()), Some("abc")).expect("identity file");
-        write_identity(Some(file.clone()), &CachedIdentity { hash: None });
+        write_identity(
+            Some(file.clone()),
+            &CachedIdentity {
+                hash: None,
+                overlays: None,
+            },
+        );
 
         let raw = std::fs::read(&file).expect("identity written");
         let back: CachedIdentity = serde_json::from_slice(&raw).expect("identity parses");
@@ -1441,6 +1615,79 @@ mod tests {
 
         assert_eq!(asset.source_hash, surveyed);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A record written before the walk offered overlays still reads, and says
+    /// it has none, which is what sends the next survey to read them.
+    #[test]
+    fn a_record_from_before_the_overlays_reads_as_having_none() {
+        let back: CachedIdentity =
+            serde_json::from_slice(br#"{"hash":"deadbeef"}"#).expect("identity parses");
+        assert_eq!(back.hash.as_deref(), Some("deadbeef"));
+        assert!(back.overlays.is_none());
+    }
+
+    // ---- the overlay layers in the picture walk
+
+    /// The survey names the height layer without encoding it, under the hash the
+    /// sending pass then declares. The stub map's metal read fails, which is
+    /// reported against that layer, and it has no type map, which is not.
+    #[test]
+    fn the_survey_names_each_overlay_the_sending_pass_encodes() {
+        let (us, cache) = stub_session("overlay-survey");
+        let mut skipped = Vec::new();
+        let row = one_map(&us, World::MAP, Some(&cache), None, &mut skipped).expect("a row");
+
+        let layers: Vec<&str> = row.overlays.iter().map(|l| l.variant.as_str()).collect();
+        assert_eq!(layers, ["overlay:height"]);
+        assert!(row.overlays[0].asset.is_none());
+        assert_eq!(skipped.len(), 1, "{skipped:?}");
+        assert_eq!(skipped[0].variant.as_deref(), Some("overlay:metal"));
+        assert_eq!(skipped[0].reason, MapMinimapSkip::ReadFailed);
+
+        let assets = cache.parent().unwrap().join("assets");
+        let mut sent_skips = Vec::new();
+        let sent = one_map(
+            &us,
+            World::MAP,
+            Some(&cache),
+            Some(&assets),
+            &mut sent_skips,
+        )
+        .expect("a row");
+        assert!(
+            sent_skips.is_empty(),
+            "the survey already said: {sent_skips:?}"
+        );
+        let height = sent
+            .overlays
+            .iter()
+            .find(|l| l.variant == "overlay:height")
+            .and_then(|l| l.asset.as_ref())
+            .expect("a height asset");
+        assert_eq!(height.source_hash, row.overlays[0].source_hash);
+        assert!(height.min_height.is_some() && height.max_height.is_some());
+        assert!(sent.asset.is_some(), "the minimap is still encoded");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    /// A second survey over an unchanged map reads its layers out of the cache
+    /// rather than out of the map.
+    #[test]
+    fn a_second_survey_reads_no_infomaps() {
+        let (us, cache) = stub_session("overlay-cache");
+        let first = one_map(&us, World::MAP, Some(&cache), None, &mut Vec::new()).expect("a row");
+        let reads = calls("GetInfoMap");
+        assert!(reads > 0, "the first survey read the layers");
+
+        let second = one_map(&us, World::MAP, Some(&cache), None, &mut Vec::new()).expect("a row");
+        assert_eq!(calls("GetInfoMap"), reads, "a hit read an infomap again");
+        assert_eq!(calls("GetMinimap"), 1, "a hit decoded the texture again");
+        assert_eq!(
+            first.overlays[0].source_hash,
+            second.overlays[0].source_hash
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 
     // ---- a cached read mounts nothing (issue #3724)

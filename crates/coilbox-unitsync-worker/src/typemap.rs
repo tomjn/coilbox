@@ -6,10 +6,9 @@
 //! coilbox draws a type map, so this mode exists only to feed the seed walk at
 //! #1638, and without `--asset-dir` it has nothing to do.
 //!
-//! The seed is the only caller that asks this layer or either of the other two
-//! overlays for an asset, and none of the three has a client upload path
-//! (#1685). Only the minimap has one, at #2379, because what a map is missing on
-//! the hub is a picture of itself.
+//! Two callers ask this layer for an asset: [`crate::seed`] and the map picture
+//! walk in [`crate::minimap`], which sends a map's minimap and all three
+//! overlays from coilbox.
 //!
 //! A type sample is a label, not an amount: it indexes the `terrainTypes` table
 //! in the map's `mapinfo.lua`, which is what gives speed, hardness and
@@ -119,6 +118,21 @@ pub(crate) fn asset_in_session(
             }
         }
     }
+}
+
+/// The `source_hash` the hub's `overlay:type` asset for this map would carry,
+/// without encoding it. The survey half of the map picture walk (issue #2379).
+pub(crate) fn identity_in_session(us: &Unitsync, map_name: &str) -> Result<String, MapOverlaySkip> {
+    let (w, h) = us.typemap_size(map_name).ok_or(MapOverlaySkip::NoSource)?;
+    let raw = us
+        .typemap_data(map_name, w, h)
+        .ok_or(MapOverlaySkip::ReadFailed)?;
+    Ok(crate::assetencode::map_source_hash(
+        TYPE_OVERLAY_VARIANT,
+        w,
+        h,
+        &raw,
+    ))
 }
 
 /// Read `map_name`'s type infomap and store it as the hub's `overlay:type`
