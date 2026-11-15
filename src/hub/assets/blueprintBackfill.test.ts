@@ -1161,7 +1161,7 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
 
     const first = watch.shownWhileDrawing[0];
     expect(first).toHaveLength(1);
-    expect(first[0].game).toBe("bar");
+    expect(first[0].subject).toBe("bar");
     expect(first[0].phase).toBe("drawing");
     expect(first[0].total).toBe(12 * ANGLES);
   });
@@ -1291,7 +1291,7 @@ describe("a run that only has build pics to send (issue #1768)", () => {
 
     expect(watch.draws).toBe(0);
     expect(shownWhileSending).toHaveLength(1);
-    expect(shownWhileSending[0].game).toBe("bar");
+    expect(shownWhileSending[0].subject).toBe("bar");
     expect(shownWhileSending[0].phase).toBe("sending");
     expect(shownWhileSending[0].total).toBe(12);
   });

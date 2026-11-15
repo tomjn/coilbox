@@ -477,7 +477,7 @@ export async function backfillBlueprintUnits(
   const opId = target.opId ?? crypto.randomUUID();
   let announced = drawing.length > 0;
   if (announced) {
-    showUploadRun({ opId, game: target.game, total: drawing.length });
+    showUploadRun({ opId, subject: target.game, total: drawing.length });
   }
 
   try {
@@ -573,7 +573,7 @@ export async function backfillBlueprintUnits(
             announced = true;
             showUploadRun({
               opId,
-              game: target.game,
+              subject: target.game,
               phase: "sending",
               total: sample.total,
             });

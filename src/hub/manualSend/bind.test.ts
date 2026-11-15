@@ -84,7 +84,7 @@ describe("a game send's tools", () => {
   it("stops at the next call once somebody has pressed Stop", async () => {
     const { r, tools } = base();
     const bound = bindGameTools(RUN, tools);
-    showUploadRun({ opId: "op1", game: "sf", total: 0 });
+    showUploadRun({ opId: "op1", subject: "sf", total: 0 });
     updateUploadRun("op1", { stopping: true });
     expect(() => bound.ask("h", [])).toThrow(SendStopped);
     expect(() => bound.publishFacts("h", {} as never)).toThrow(SendStopped);
