@@ -76,6 +76,16 @@ describe("unitPicLookup", () => {
     });
   });
 
+  /** Voidborn writes `buildPic`, and the engine reads a key in any case. */
+  it("reads the buildpic key whatever case the game wrote it in", () => {
+    const clones = clone("myaap", "armaap", { buildPic: "ARMAAP.DDS" });
+    const lookup = look(clones, {
+      armaap: { buildPic: "ARMAAP.DDS" },
+      myaap: clones.myaap.def,
+    });
+    expect(lookup("myaap")).toEqual({ iconFile: "armaap.png" });
+  });
+
   /** The engine would look for `unitpics/myaap.dds`, which the game does not
    *  ship, so the copy draws nothing there and nothing here. */
   it("gives a copy of a unit that declares no picture no picture either", () => {

@@ -72,8 +72,8 @@ use coilbox_unitsync_worker::Mode;
 use coilbox_unitsync_worker::{beforepost, model};
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
-use std::collections::HashSet;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 const LIST_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -2133,7 +2133,52 @@ fn fmt_num(v: f32) -> String {
     }
 }
 
+/// Every archive file under each data folder's `maps`, keyed by the versioned
+/// name unitsync lists it as. A map's archives are listed only by that name,
+/// which `GetArchivePath` cannot resolve, and asking about the file name is the
+/// one way back to it. A file unitsync does not know answers with its own name
+/// and is left out.
+fn map_archive_files(us: &Unitsync) -> HashMap<String, PathBuf> {
+    let mut found = HashMap::new();
+    let mut pending: Vec<PathBuf> = us
+        .data_dirs()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|dir| dir.join("maps"))
+        .collect();
+    while let Some(folder) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&folder) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_archive = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| {
+                    ["sd7", "sdz", "sdd"].contains(&ext.to_ascii_lowercase().as_str())
+                });
+            if !is_archive {
+                if path.is_dir() {
+                    pending.push(path);
+                }
+                continue;
+            }
+            let Some(file) = path.file_name().and_then(|f| f.to_str()) else {
+                continue;
+            };
+            if let Some(name) = us.map_archives(file).into_iter().next() {
+                if name != file {
+                    found.entry(name).or_insert(path);
+                }
+            }
+        }
+    }
+    found
+}
+
 fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
+    let files = map_archive_files(us);
     let count = us.map_count();
     let mut maps = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
@@ -2143,7 +2188,16 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
         let archives = us
             .map_archives(&name)
             .into_iter()
-            .map(|a| archive(us, a))
+            .map(|a| {
+                let mut found = archive(us, a);
+                if found.path.is_none() {
+                    if let Some(file) = files.get(&found.name) {
+                        found.size = entry_size(file);
+                        found.path = Some(file.to_string_lossy().into_owned());
+                    }
+                }
+                found
+            })
             .collect();
         maps.push(MapItem {
             file_name: us.map_file_name(i),
@@ -2444,4 +2498,36 @@ mod tests {
     // fields or none) moved with the mode to
     // `coilbox_unitsync_worker::UnitRenderArgs::from_args`, and its test moved
     // there too (issue #2448).
+
+    /// unitsync lists a map's archive by its versioned name, `Voidborn Rift 1.0`,
+    /// and that name has no path. Only the file name, `voidborn_rift.sd7`, leads
+    /// back to it, so the scan finds the file by asking about each one in `maps`.
+    #[test]
+    fn a_map_archive_listed_by_its_versioned_name_gets_its_files_path() {
+        use crate::ffi::stub::{install, World};
+
+        let dir = std::env::temp_dir().join(format!("coilbox-map-file-{}", std::process::id()));
+        let file = dir.join("maps/sub/voidborn_rift.sd7");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, b"a map archive").unwrap();
+        let mut world = World::with_map(&dir.join("content"));
+        world.map_name = "Voidborn Rift 1.0".into();
+        world.map_archive = "Voidborn Rift 1.0".into();
+        world.archives.clear();
+        world.data_dirs = vec![dir.clone()];
+        world.games = vec![("voidborn_rift.sd7".into(), vec!["Voidborn Rift 1.0".into()])];
+        install(world);
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let maps = collect_maps(&us);
+        let archive = &maps[0].archives[0];
+        assert_eq!(archive.name, "Voidborn Rift 1.0");
+        assert_eq!(
+            archive.path.as_deref(),
+            Some(file.to_string_lossy().as_ref())
+        );
+        assert_eq!(archive.size, Some(13));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

@@ -580,7 +580,13 @@ function buildMaps(
   for (const m of input.scan?.maps ?? []) {
     const r = record(m.name);
     r.installed ??= m;
-    for (const a of m.archives) link(lc(a.name), lc(m.name));
+    for (const a of m.archives) {
+      link(lc(a.name), lc(m.name));
+      // unitsync names a map's archive by its versioned name, and only the path
+      // carries the file name, which need not match: voidborn_rift.sd7.
+      const file = a.path?.split(/[\\/]/).pop();
+      if (file) link(lc(file), lc(m.name));
+    }
     if (m.fileName) link(lc(m.fileName), lc(m.name));
   }
 
