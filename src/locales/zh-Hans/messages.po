@@ -3740,6 +3740,10 @@ msgstr "{LARGE_STEP_SECONDS, plural, other {后退 # 秒}}"
 msgid "{LARGE_STEP_SECONDS, plural, one {Forward # second} other {Forward # seconds}}"
 msgstr "{LARGE_STEP_SECONDS, plural, other {前进 # 秒}}"
 
+#: src/hub/maps/pictureSweep.ts
+msgid "{layerCount, plural, one {Coilbox could not send one map's terrain, metal or type layer.} other {Coilbox could not send # terrain, metal or type layers.}}"
+msgstr ""
+
 #: src/content/mapImage.ts
 #, fuzzy
 msgid "{layerLabel}. {layerSentence}."
@@ -15955,9 +15959,8 @@ msgid "Coilbox can read the maps on this computer and tell the hub what is in th
 msgstr "Coilbox 可以读取此电脑上的地图，并告诉中心其中的内容：每张地图的大小、地面高度、水下面积、风力和潮汐能源，以及玩家的出生位置。它不发送任何图片或文件，只发送这些测量数据。"
 
 #: src/hub/pages/components/MapPicturesControl.tsx
-#, fuzzy
-msgid "Coilbox can read the minimap out of every map on this computer and send it to the hub, so a map somebody is looking at there has a picture of it rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
-msgstr "Coilbox 可以读取此电脑上每张地图的小地图并发送到中心，这样别人在那里查看地图时能看到图片，而不是只有名称。它会先询问中心已有哪些内容，因此别人已覆盖的地图只需一次查询。"
+msgid "Coilbox can read the minimap, terrain, metal and ground types out of every map on this computer and send them to the hub, so a map somebody is looking at there has a picture and terrain rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
+msgstr ""
 
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy

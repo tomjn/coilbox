@@ -1,6 +1,8 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg, plural, t } from "@lingui/core/macro";
 import type {
+  MapLayerRow,
+  MapMinimapAsset,
   MapMinimapRow,
   MapMinimapSkip,
   MapMinimapsResult,
@@ -72,6 +74,19 @@ import {
  * So the ration is one bucket over every map: the same number of map pictures an
  * hour from this machine, whichever maps they are. The hub counts every map as
  * one subject too, so this keeps a large library under the hub's own cap.
+ *
+ * ## The overlays go too
+ *
+ * Section 4.6.1 kept the metal, type and height layers to the seed walk on the
+ * grounds that they were the expensive part of the corpus. That stopped being
+ * true when the height layer became a capped 8 bit WebP: on the five seeded maps
+ * checked on 2026-11-15 the three overlays came to 40,894 bytes a map against
+ * the minimap's 36,390. A map sent from here now has the same four layers a
+ * seeded one has, so the hub can draw its terrain.
+ *
+ * The allowance is counted in pictures, so a map can take up to four of it. It
+ * is spent in survey order, and a map the hour cuts short is finished by the next
+ * press, which asks again and hears only what is still missing.
  */
 
 /**
@@ -88,6 +103,9 @@ export type MapPictureSweepProgress = HubSweepProgress<
  *  that produced no picture, and why. */
 export interface MapPictureSweepReport
   extends HubSweepReport<MapMinimapsResult["skipped"][number]> {
+  /** Overlay layers coilbox could not offer, on maps whose other pictures it
+   *  could. */
+  layersSkipped: MapMinimapsResult["skipped"];
   /** Maps the library offered a picture for, after duplicates, working folders
    *  and maps with no minimap in them. */
   read: number;
@@ -145,51 +163,70 @@ const nothing: MapPictureSweepReport = {
   sent: 0,
   left: 0,
   skipped: [],
+  layersSkipped: [],
   errors: [],
 };
 
+/** One picture a surveyed map offers: its minimap or one of its overlays. */
+export interface MapPicture {
+  row: MapMinimapRow;
+  variant: string;
+  sourceHash: string;
+}
+
+/** Every picture the survey offers, each map's minimap then its overlays. */
+export function picturesOffered(rows: readonly MapMinimapRow[]): MapPicture[] {
+  return rows.flatMap((row) => [
+    { row, variant: MINIMAP_VARIANT, sourceHash: row.sourceHash },
+    ...(row.overlays ?? []).map((layer: MapLayerRow) => ({
+      row,
+      variant: layer.variant,
+      sourceHash: layer.sourceHash,
+    })),
+  ]);
+}
+
 /**
- * The maps the hub still wants a picture of, in the survey's order.
+ * The pictures the hub still wants, in the survey's order.
  *
  * Zipped by index, which is what the have check promises. A short answer means
  * the two cannot be lined up, and lining them up wrongly would send the wrong
  * pictures under the wrong names, so it sends none.
  *
  * Exported for its own test, since this is the whole of what makes a second run
- * reach maps the first one did not.
+ * reach pictures the first one did not.
  */
-export function mapsTheHubHasNoPictureOf(
-  rows: readonly MapMinimapRow[],
+export function picturesTheHubWants(
+  pictures: readonly MapPicture[],
   answers: readonly HaveResult[],
-): MapMinimapRow[] {
-  if (answers.length !== rows.length) return [];
-  return rows.filter((_, at) => answers[at].status !== "have");
+): MapPicture[] {
+  if (answers.length !== pictures.length) return [];
+  return pictures.filter((_, at) => answers[at].status !== "have");
 }
 
-/** The have check's question for one surveyed map. */
-export function minimapKey(row: MapMinimapRow): AssetKey {
+/** The have check's question for one picture a map offers. */
+export function mapPictureKey(picture: MapPicture): AssetKey {
   return {
     keyed_on: "map",
-    map_name: row.mapName,
-    variant: MINIMAP_VARIANT,
-    source_hash: row.sourceHash,
+    map_name: picture.row.mapName,
+    variant: picture.variant,
+    source_hash: picture.sourceHash,
   };
 }
 
 /**
- * One encoded minimap as a declaration the upload takes.
+ * One encoded map layer as a declaration the upload takes.
  *
  * `map_width` and `map_height` are required on a map row and refused on a unit
  * one, and they are the map's size in elmos rather than the picture's pixels:
- * the texture is square and almost no map is, so they are what a consumer
- * stretches it back to.
- *
- * Null for a map the encode pass produced nothing for, which is a map that was
- * wanted and then would not encode.
+ * the minimap is square and almost no map is, so they are what a consumer
+ * stretches it back to. The world height range goes on the height layer and on
+ * nothing else, which the hub also checks.
  */
-export function minimapUpload(row: MapMinimapRow): AssetUpload | null {
-  const asset = row.asset;
-  if (!asset) return null;
+export function mapLayerUpload(
+  row: MapMinimapRow,
+  asset: MapMinimapAsset,
+): AssetUpload {
   return {
     keyed_on: "map",
     map_name: row.mapName,
@@ -203,8 +240,50 @@ export function minimapUpload(row: MapMinimapRow): AssetUpload | null {
     source_archive: asset.sourceArchive,
     map_width: row.mapWidth,
     map_height: row.mapHeight,
+    ...(asset.minHeight !== undefined && asset.maxHeight !== undefined
+      ? { world_height_min: asset.minHeight, world_height_max: asset.maxHeight }
+      : {}),
     path: asset.path,
   };
+}
+
+/**
+ * One encoded minimap as a declaration the upload takes, or null for a map the
+ * encode pass produced nothing for, which is a map that was wanted and then
+ * would not encode.
+ */
+export function minimapUpload(row: MapMinimapRow): AssetUpload | null {
+  return row.asset ? mapLayerUpload(row, row.asset) : null;
+}
+
+/** Every encoded layer on a row the hub said it wanted, as uploads. `wanted`
+ *  holds `mapPictureId`s. */
+function uploadsWanted(
+  row: MapMinimapRow,
+  wanted: ReadonlySet<string>,
+): AssetUpload[] {
+  const assets = [
+    row.asset,
+    ...(row.overlays ?? []).map((layer) => layer.asset),
+  ];
+  return assets
+    .filter(
+      (asset): asset is MapMinimapAsset =>
+        asset !== undefined &&
+        wanted.has(mapPictureId(row.mapName, asset.variant)),
+    )
+    .map((asset) => mapLayerUpload(row, asset));
+}
+
+/** One string for a map and a variant, for sets. A map name cannot hold NUL. */
+function mapPictureId(mapName: string, variant: string): string {
+  return `${mapName}\u0000${variant}`;
+}
+
+/** Whether an entry in the walk's skip list is about one overlay layer rather
+ *  than a whole map. */
+function isLayerSkip(skip: MapMinimapsResult["skipped"][number]): boolean {
+  return skip.variant !== undefined;
 }
 
 /**
@@ -246,26 +325,30 @@ async function sweep(
   const found: MapPictureSweepReport = {
     ...nothing,
     read: rows.length,
-    skipped: surveyed.skipped,
+    skipped: surveyed.skipped.filter((skip) => !isLayerSkip(skip)),
+    layersSkipped: surveyed.skipped.filter(isLayerSkip),
     errors: surveyed.errors,
   };
   if (rows.length === 0) return found;
 
   // The have check, which is what turns a library into a handful.
+  const offered = picturesOffered(rows);
   onProgress({ phase: "asking", done: 0, total: rows.length });
-  const answers = await tools.ask(hubUrl, rows.map(minimapKey));
+  const answers = await tools.ask(hubUrl, offered.map(mapPictureKey));
   onProgress({ phase: "asking", done: rows.length, total: rows.length });
-  const wanted = mapsTheHubHasNoPictureOf(rows, answers);
+  const wanted = picturesTheHubWants(offered, answers);
+  const wantedMaps = new Set(wanted.map((picture) => picture.row.mapName));
   const surveyedReport = {
     ...found,
-    wanted: wanted.length,
-    left: wanted.length,
+    wanted: wantedMaps.size,
+    left: wantedMaps.size,
   };
   if (wanted.length === 0) return surveyedReport;
 
   // The hour's allowance, spent on what came back missing rather than on the
   // library's first however many. Taken after the survey and before the encode,
-  // which is the only place it saves work rather than wasting it.
+  // which is the only place it saves work rather than wasting it. Counted in
+  // pictures, since a map can want up to four.
   const room = tools.writesLeft(MAP_PICTURES_SUBJECT);
   if (room <= 0) {
     return {
@@ -274,31 +357,44 @@ async function sweep(
     };
   }
   const sending = wanted.slice(0, room);
+  const sendingIds = new Set(
+    sending.map((picture) =>
+      mapPictureId(picture.row.mapName, picture.variant),
+    ),
+  );
+  const sendingMaps = [
+    ...new Set(sending.map((picture) => picture.row.mapName)),
+  ];
 
   // The encode, for those maps alone.
-  onProgress({ phase: "encoding", done: 0, total: sending.length });
+  onProgress({ phase: "encoding", done: 0, total: sendingMaps.length });
   const encoded = await tools.minimaps({
     enginePath,
     dataDir,
-    maps: sending.map((row) => row.mapName),
+    maps: sendingMaps,
     assets: true,
   });
-  const uploads = encoded.maps
-    .map(minimapUpload)
-    .filter((upload): upload is AssetUpload => upload !== null);
+  const uploads = encoded.maps.flatMap((row) => uploadsWanted(row, sendingIds));
   onProgress({
     phase: "encoding",
-    done: uploads.length,
-    total: sending.length,
+    done: encoded.maps.length,
+    total: sendingMaps.length,
   });
 
   const report: MapPictureSweepReport = {
     ...surveyedReport,
-    skipped: [...surveyed.skipped, ...encoded.skipped],
+    skipped: [
+      ...surveyedReport.skipped,
+      ...encoded.skipped.filter((skip) => !isLayerSkip(skip)),
+    ],
+    layersSkipped: [
+      ...surveyedReport.layersSkipped,
+      ...encoded.skipped.filter(isLayerSkip),
+    ],
     errors: [...surveyed.errors, ...encoded.errors],
     ...(wanted.length > sending.length
       ? {
-          stopped: `${sending.length} of the ${wanted.length} maps the hub is missing fit in this hour's allowance.`,
+          stopped: `${sending.length} of the ${wanted.length} map pictures the hub is missing fit in this hour's allowance.`,
         }
       : {}),
   };
@@ -317,10 +413,41 @@ async function sweep(
   });
   tools.record(MAP_PICTURES_SUBJECT, run.written);
 
+  // Outcomes come back one per upload, in order. A map is done when every
+  // picture the hub wanted of it was written.
+  const written = new Set(
+    uploads
+      .filter((_, at) => {
+        const result = run.outcomes[at]?.result;
+        return result === "uploaded" || result === "replaced";
+      })
+      .map((upload) =>
+        mapPictureId(
+          upload.keyed_on === "map" ? upload.map_name : "",
+          upload.variant,
+        ),
+      ),
+  );
+  const mapsSent = new Set(
+    wanted
+      .filter((picture) =>
+        written.has(mapPictureId(picture.row.mapName, picture.variant)),
+      )
+      .map((picture) => picture.row.mapName),
+  );
+  const mapsUnfinished = new Set(
+    wanted
+      .filter(
+        (picture) =>
+          !written.has(mapPictureId(picture.row.mapName, picture.variant)),
+      )
+      .map((picture) => picture.row.mapName),
+  );
+
   return {
     ...report,
-    sent: run.written,
-    left: Math.max(0, wanted.length - run.written),
+    sent: mapsSent.size,
+    left: mapsUnfinished.size,
   };
 }
 
@@ -388,8 +515,16 @@ export function mapPictureSkipSummary(
  */
 export function mapPictureSweepSummary(report: MapPictureSweepReport): string {
   const skipNote = mapPictureSkipSummary(report.skipped);
+  const layerCount = report.layersSkipped.length;
+  const layerNote =
+    layerCount === 0
+      ? null
+      : plural(layerCount, {
+          one: "Coilbox could not send one map's terrain, metal or type layer.",
+          other: "Coilbox could not send # terrain, metal or type layers.",
+        });
   const say = (sentence: string): string =>
-    skipNote ? `${sentence} ${skipNote}` : sentence;
+    [sentence, skipNote, layerNote].filter(Boolean).join(" ");
 
   if (report.read === 0) return say(t`Coilbox found no maps to draw.`);
   const whole = report.skipped.length === 0;

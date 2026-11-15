@@ -46,6 +46,7 @@ const REPORT: MapPictureSweepReport = {
   sent: 80,
   left: 10,
   skipped: [],
+  layersSkipped: [],
   errors: [],
 };
 

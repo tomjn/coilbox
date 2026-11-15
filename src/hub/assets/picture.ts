@@ -27,8 +27,8 @@ import { type AssetTier, assetTierUrl } from "./tier";
  * Rungs two and three fill up two ways since issue #2379: the seed export, and
  * anybody who has the archive pressing "Send pictures of your maps" in Settings.
  * A map neither has covered is drawn however many people open it. Section 4.6.1
- * of the asset pipeline design carries both decisions, including why the three
- * overlays are still the seed's alone.
+ * of the asset pipeline design carries both decisions, and the 2026-11-15
+ * change that sends the three overlays from coilbox too.
  *
  * Two and three are one row rather than two attempts, exactly as the hub says:
  * there is one row per identity and its `tier` column says which store holds it,

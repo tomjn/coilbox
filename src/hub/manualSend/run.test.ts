@@ -55,6 +55,7 @@ const mapPictureSent: MapPictureSweepReport = {
   sent: 1,
   left: 0,
   skipped: [],
+  layersSkipped: [],
   errors: [],
 };
 

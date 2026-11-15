@@ -91,11 +91,11 @@ export function MapPicturesControl({
       </h3>
       <p className="text-sm text-muted-foreground">
         <Trans>
-          Coilbox can read the minimap out of every map on this computer and
-          send it to the hub, so a map somebody is looking at there has a
-          picture of it rather than a drawing of its name. It asks the hub what
-          it already has first, so a map somebody else has covered costs one
-          question.
+          Coilbox can read the minimap, terrain, metal and ground types out of
+          every map on this computer and send them to the hub, so a map somebody
+          is looking at there has a picture and terrain rather than a drawing of
+          its name. It asks the hub what it already has first, so a map somebody
+          else has covered costs one question.
         </Trans>
       </p>
       <p className="text-sm text-muted-foreground">
