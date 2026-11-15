@@ -235,6 +235,13 @@ export interface BackfillTarget {
    * moment ago and would answer `have` to.
    */
   buildpics?: boolean;
+  /**
+   * A run the caller already has on screen, which this reports into rather than
+   * opening a second row for. The caller owns that row, so it is left on screen
+   * when this returns. Used by a manual send, whose row covers the facts and the
+   * build pics as well as this fill.
+   */
+  opId?: string;
 }
 
 /**
@@ -467,7 +474,7 @@ export async function backfillBlueprintUnits(
   // own have check, below: a run with nothing to draw and build pics the hub
   // wants is minutes of upload on a slow connection, and it was invisible until
   // issue #1768.
-  const opId = crypto.randomUUID();
+  const opId = target.opId ?? crypto.randomUUID();
   let announced = drawing.length > 0;
   if (announced) {
     showUploadRun({ opId, game: target.game, total: drawing.length });
@@ -600,7 +607,7 @@ export async function backfillBlueprintUnits(
           : {}),
     };
   } finally {
-    hideUploadRun(opId);
+    if (!target.opId) hideUploadRun(opId);
   }
 }
 

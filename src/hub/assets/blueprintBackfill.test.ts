@@ -1182,6 +1182,22 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
     expect(readRunningUploads()).toEqual([]);
   });
 
+  it("reports into a row its caller already owns, and leaves it on screen", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(
+      { ...TARGET, opId: "manual-1" },
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.shownWhileDrawing[0].map((run) => run.opId)).toEqual([
+      "manual-1",
+    ]);
+    expect(watch.uploadOpIds).toEqual(["manual-1"]);
+    expect(readRunningUploads().map((run) => run.opId)).toEqual(["manual-1"]);
+  });
+
   /** A run that threw has still finished, and a pill nothing will ever clear is
    *  worse than no pill. */
   it("leaves the topbar when the run falls over", async () => {

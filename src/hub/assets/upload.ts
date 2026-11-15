@@ -97,6 +97,7 @@ const hubUploadAssets = defineCommand<
     assets: AssetUpload[];
     opId?: string;
     onProgress: Channel<AssetUploadProgress>;
+    grant?: string;
   },
   { outcomes: AssetOutcome[]; outOfDate?: boolean }
 >("coilbox-hub", "hub_upload_assets");
@@ -147,6 +148,8 @@ export async function uploadAssetsToHub(
     /** Makes the run cancellable by {@link cancelAssetUpload}. */
     opId?: string;
     onProgress?: (sample: AssetUploadProgress) => void;
+    /** A manual send's grant. See `HubSweepTarget.grant`. */
+    grant?: string;
   },
 ): Promise<AssetUploadRun> {
   if (assets.length === 0) return { outcomes: [], written: 0, error: null };
@@ -161,6 +164,7 @@ export async function uploadAssetsToHub(
       hubUrl,
       assets,
       ...(options.opId ? { opId: options.opId } : {}),
+      ...(options.grant ? { grant: options.grant } : {}),
       onProgress,
     });
     reportAssetUploadOutcomes(outcomes, options.startedBy, {
