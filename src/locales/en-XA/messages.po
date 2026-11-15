@@ -15510,6 +15510,7 @@ msgstr ""
 msgid "Decoding…"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 msgid "Decompile"
@@ -29290,10 +29291,6 @@ msgstr ""
 
 #: src/content/pages/components/OpenInEngineButton.tsx
 msgid "Open in engine"
-msgstr ""
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Open in mapconv decompile"
 msgstr ""
 
 #: src/content/pages/components/ArchiveModelPreview.tsx

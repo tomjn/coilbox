@@ -18959,6 +18959,7 @@ msgstr "Dekodowanie"
 msgid "Decoding…"
 msgstr "Dekodowanie…"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -35813,11 +35814,6 @@ msgstr ""
 #, fuzzy
 msgid "Open in engine"
 msgstr "Otwórz w silniku"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Open in mapconv decompile"
-msgstr "Otwórz w dekompilacji mapconv"
 
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx

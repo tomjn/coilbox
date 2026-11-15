@@ -18959,6 +18959,7 @@ msgstr "解码中"
 msgid "Decoding…"
 msgstr "正在解码…"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -35813,11 +35814,6 @@ msgstr ""
 #, fuzzy
 msgid "Open in engine"
 msgstr "在引擎中打开"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Open in mapconv decompile"
-msgstr "在 mapconv 反编译中打开"
 
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx

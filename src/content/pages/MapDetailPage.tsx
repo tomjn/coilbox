@@ -398,7 +398,7 @@ export default function MapDetailPage() {
             disabled={decompiling}
           >
             <PackageOpen className="size-4" />
-            {decompiling ? t`Opening…` : t`Open in mapconv decompile`}
+            {decompiling ? t`Opening…` : t`Decompile`}
           </Button>
         )}
         {archivePath && isDeletableArchive(archivePath) && (

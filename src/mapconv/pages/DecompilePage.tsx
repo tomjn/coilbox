@@ -67,7 +67,7 @@ export default function DecompilePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // A `map detail → "Open in mapconv decompile"` navigation carries the map's
+  // A `map detail → "Decompile"` navigation carries the map's
   // archive path; seed the input from it, else fall back to the persisted draft
   // so the panel and its path-driven preview survive navigation and restarts.
   const seededInput = (location.state as { inputPath?: string } | null)
