@@ -387,7 +387,7 @@ export default function MapDetailPage() {
           dataDir={selected?.rootPath}
         />
         {hubPresence.state === "present" && (
-          <HubPageButton url={hubPresence.url} label={t`Visit hub page`} />
+          <HubPageButton url={hubPresence.url} label={t`Show on hub`} />
         )}
         {advanced && archiveName && (
           <Button

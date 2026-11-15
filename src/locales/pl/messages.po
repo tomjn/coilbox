@@ -16340,7 +16340,6 @@ msgstr "Coilbox nie odczytał jednostek tej gry. Nic tutaj nie zostało sprawdzo
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox przestał wysyłać: {sendingNoun}. {already}"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44371,6 +44370,11 @@ msgstr "Pokaż wyciszenia"
 msgid "Show nano spray"
 msgstr "Pokaż strumień nano"
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Show on the chart"
@@ -54786,10 +54790,6 @@ msgstr "Pokaż szczegóły jednostki"
 #, fuzzy
 msgid "Violet"
 msgstr "Fiołkowy"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
-msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

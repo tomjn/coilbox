@@ -16452,7 +16452,6 @@ msgstr "Coilbox har inte läst det här spelets enheter. Inget här har kontroll
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox har slutat skicka {sendingNoun}. {already}"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44666,6 +44665,11 @@ msgstr "Visa tystningar"
 msgid "Show nano spray"
 msgstr "Visa nanostråle"
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Show on the chart"
@@ -55158,10 +55162,6 @@ msgstr "Visa enhetsdetaljer"
 #, fuzzy
 msgid "Violet"
 msgstr "Violett"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
-msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

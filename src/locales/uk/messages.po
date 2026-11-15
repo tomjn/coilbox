@@ -16340,7 +16340,6 @@ msgstr "Юніти цієї гри ще не прочитано. Тут нічо
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox припинив надсилати: {sendingNoun}. {already}"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44371,6 +44370,11 @@ msgstr "Показати заглушених"
 msgid "Show nano spray"
 msgstr "Показувати нанопромінь"
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Show on the chart"
@@ -54786,10 +54790,6 @@ msgstr "Переглянути подробиці юніта"
 #, fuzzy
 msgid "Violet"
 msgstr "Фіалковий"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
-msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

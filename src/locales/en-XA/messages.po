@@ -13351,7 +13351,6 @@ msgstr ""
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr ""
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -36313,6 +36312,11 @@ msgstr ""
 msgid "Show nano spray"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 msgid "Show on the chart"
 msgstr ""
@@ -44831,10 +44835,6 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Violet"
-msgstr ""
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
 msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx

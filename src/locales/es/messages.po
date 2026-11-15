@@ -16340,7 +16340,6 @@ msgstr "Coilbox no ha leído las unidades de este juego. Nada de aquí se ha com
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox ha dejado de enviar {sendingNoun}. {already}"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44371,6 +44370,11 @@ msgstr "Mostrar silenciados"
 msgid "Show nano spray"
 msgstr "Mostrar rayo nano"
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Show on the chart"
@@ -54786,10 +54790,6 @@ msgstr "Ver detalles de la unidad"
 #, fuzzy
 msgid "Violet"
 msgstr "Violeta"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
-msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

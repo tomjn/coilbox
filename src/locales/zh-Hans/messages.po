@@ -16340,7 +16340,6 @@ msgstr "Coilbox 尚未读取此游戏的单位。这里的内容都未与地面�
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox 已停止发送 {sendingNoun}。{already}"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44371,6 +44370,11 @@ msgstr "显示禁言"
 msgid "Show nano spray"
 msgstr "显示纳米喷流"
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Show on the chart"
@@ -54786,10 +54790,6 @@ msgstr "查看单位详情"
 #, fuzzy
 msgid "Violet"
 msgstr "紫罗兰色"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
-msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

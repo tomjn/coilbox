@@ -16452,7 +16452,6 @@ msgstr "Το Coilbox δεν έχει διαβάσει τις μονάδες αυ
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Το Coilbox σταμάτησε να στέλνει: {sendingNoun}. {already}"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44666,6 +44665,11 @@ msgstr "Εμφάνιση σιγάσεων"
 msgid "Show nano spray"
 msgstr "Εμφάνιση νανοψεκασμού"
 
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Show on the chart"
@@ -55158,10 +55162,6 @@ msgstr "Προβολή λεπτομερειών μονάδας"
 #, fuzzy
 msgid "Violet"
 msgstr "Βιολετί"
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Visit hub page"
-msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

@@ -507,7 +507,7 @@ export default function GameDetailPage() {
             entry={brand}
             hubLink={
               hubPresence.state === "present" && (
-                <HubPageButton url={hubPresence.url} label={t`Coilbox hub`} />
+                <HubPageButton url={hubPresence.url} label={t`Show on hub`} />
               )
             }
           />
