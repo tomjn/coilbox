@@ -18,7 +18,7 @@ The control has four states.
 | Checking, or the hub cannot be reached | Nothing |
 | Missing | Outline button "Send to hub", `CoilboxGlyph` on the left, lucide `ArrowUp` on the right |
 | Sending | The same button, disabled, reading "Sending…" |
-| On the hub | No send control. A game's Links section starts with an outline "Coilbox hub" button, and a map's action row has "Visit hub page". Both open the hub page in the browser |
+| On the hub | No send control. A game's Links section starts with an outline "Show on hub" button, and a map's action row has the same button. Both open the hub page in the browser |
 
 The control is not shown when the hub is turned off by the profile (`isHubEnabled`), for a loose `.sdd` game, or for a game install that `gamesToSend` would not pick (a snapshot build, no shortname, no release, or another install of the same shortname wins).
 

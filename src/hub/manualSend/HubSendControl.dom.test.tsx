@@ -92,10 +92,10 @@ describe("the hub control on a detail page", () => {
     render(
       <HubPageButton
         url="https://hub.test/map/tabula-3"
-        label="Visit hub page"
+        label="Show on hub"
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Visit hub page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show on hub" }));
     expect(opened).toHaveBeenCalledWith("https://hub.test/map/tabula-3");
   });
 
