@@ -15,8 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFactionLogos } from "@/factions/logos";
-import { useAdvancedMode } from "@/general/advanced";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { useFeature } from "@/general/features";
 import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
 import { useGamePresence, useSendableGame } from "@/hub/manualSend/status";
 import { generatedGameNote } from "@/lib/generatedGames";
@@ -190,7 +190,7 @@ export default function GameDetailPage() {
   useEffect(() => {
     if (wantsCompat) setTab("compat");
   }, [wantsCompat]);
-  const advanced = useAdvancedMode();
+  const archives = useFeature("archives");
   const mutators = useMemo(
     () => (lib.record ? mutatorsOf(lib.library.games, lib.record.id) : []),
     [lib.record, lib.library.games],
@@ -326,7 +326,7 @@ export default function GameDetailPage() {
       <Tabs
         className="gap-4"
         value={
-          (tab === "advanced" && !advanced) ||
+          (tab === "archives" && !archives) ||
           (tab === "mutators" && mutators.length === 0)
             ? "overview"
             : tab
@@ -354,9 +354,9 @@ export default function GameDetailPage() {
           <TabsTrigger value="compat">
             <Trans>Compatibility</Trans>
           </TabsTrigger>
-          {advanced && (
-            <TabsTrigger value="advanced">
-              <Trans>Advanced</Trans>
+          {archives && (
+            <TabsTrigger value="archives">
+              <Trans>Archives</Trans>
             </TabsTrigger>
           )}
         </TabsList>
@@ -663,8 +663,8 @@ export default function GameDetailPage() {
             </section>
           )}
         </TabsContent>
-        {advanced && (
-          <TabsContent value="advanced" className="flex flex-col gap-5">
+        {archives && (
+          <TabsContent value="archives" className="flex flex-col gap-5">
             <section className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-medium">

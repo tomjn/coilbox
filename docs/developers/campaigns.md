@@ -10,11 +10,11 @@ Everything below is about authoring and shipping those missions — the mission 
 
 ## Author a campaign
 
-The **Campaign builder** is an advanced-mode tool: turn on Advanced mode (Settings > General) to see **Campaign builder** in the sidebar. From there you can create a campaign, add missions, and edit each mission's briefing, objectives, panorama and skirmish setup.
+The **Campaign builder** is hidden until you turn on **Mission builders** in Settings > General. **Campaign builder** then appears in the sidebar. From there you can create a campaign, add missions, and edit each mission's briefing, objectives, panorama and skirmish setup.
 
 ### Step by step
 
-1. **Turn on Advanced mode** — Settings > General. **Campaign builder** now appears in the sidebar (it lives in its own group, not under Play).
+1. **Turn on Mission builders** in Settings > General. **Campaign builder** now appears in the sidebar (it lives in its own group, not under Play).
 2. **Set up a skirmish preset first.** A mission reuses a Singleplayer preset as its starting point, so go to **Play > Singleplayer**, configure the map, game, AI opponents, teams and mod options you want, and save it as a preset (the presets drawer, button next to Spectate).
 3. **Create a campaign** — Campaign builder > New. Give it a title; optionally add a campaign icon and background image.
 4. **Add a mission** and open its editor. Attach the preset from step 2 — this **snapshots** its whole setup into the mission (see the note below). Then write the mission's briefing, objectives, and add any media.

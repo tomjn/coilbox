@@ -10,7 +10,6 @@ import { pickerLocales, SYSTEM_LANGUAGE } from "../../i18n/locales";
 import { languageLabel, packOnlyLocales } from "../../i18n/packs";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
 import { requestOnboardingRerun } from "../../onboarding/rerun";
-import { useAdvancedModeSetting } from "../advanced";
 import {
   type ReduceMotionSetting,
   useEffectsSetting,
@@ -18,6 +17,7 @@ import {
   useReduceMotionSetting,
   useShowFrameRateSetting,
 } from "../display";
+import { FeatureToggles } from "../FeatureToggles";
 import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
 import { hasProfileSplash, useSplashSetting } from "../splash";
 import { useUiZoomSetting } from "../uiZoom";
@@ -25,14 +25,13 @@ import { AboutCoilbox } from "./AboutCoilbox";
 
 /**
  * The General settings section (frame settings page at `/settings/general`).
- * Owns the Advanced-mode toggle, persisted immediately via the frame settings
- * store (no Save button). Turning it off removes the developer/modding tools from
- * the sidebar and welcome screen; on brings them back.
+ * Owns the feature toggles, persisted immediately via the frame settings store
+ * (no Save button). Each one shows or hides one group of making and developer
+ * tools in the sidebar and on the welcome screen.
  */
 export default function GeneralSettings() {
   const { t } = useLingui();
   const [language, setLanguage] = useLanguageSetting();
-  const [advanced, setAdvanced] = useAdvancedModeSetting();
   const [fullscreen, setFullscreen] = useFullscreenSetting();
   const [splash, setSplash] = useSplashSetting();
   const [reduceMotion, setReduceMotion] = useReduceMotionSetting();
@@ -49,31 +48,9 @@ export default function GeneralSettings() {
     <div className="space-y-8">
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Wrench size={15} /> <Trans>Advanced tools</Trans>
+          <Wrench size={15} /> <Trans>Tools</Trans>
         </h2>
-        <Label
-          htmlFor="advanced-mode"
-          className="flex cursor-pointer items-start gap-3 font-normal"
-        >
-          <Switch
-            id="advanced-mode"
-            checked={advanced}
-            onCheckedChange={(v) => setAdvanced(v === true)}
-            className="mt-0.5"
-          />
-          <span className="space-y-1">
-            <span className="block text-sm font-medium">
-              <Trans>Advanced mode</Trans>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              <Trans>
-                Show the developer and modding tools — uberstress, mapconv,
-                animation, and the archive explorer — in the sidebar and welcome
-                screen. Off by default for a player-focused layout.
-              </Trans>
-            </span>
-          </span>
-        </Label>
+        <FeatureToggles />
       </section>
 
       <section className="space-y-3">

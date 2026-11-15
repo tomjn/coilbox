@@ -79,7 +79,7 @@ vi.mock("../mapEligibility", () => ({
   }),
 }));
 vi.mock("../usePlayMap", () => ({ usePlayMap: () => () => {} }));
-vi.mock("@/general/advanced", () => ({ useAdvancedMode: () => false }));
+vi.mock("@/general/features", () => ({ useFeature: () => false }));
 vi.mock("../replayUserState", () => ({
   useReplayUserState: () => ({ state: null }),
   refightFilenames: () => new Set(),

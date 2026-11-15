@@ -2,7 +2,7 @@
 
 Guides for people who make a game, a campaign, a map or a unit, and want coilbox to carry it to players. Apart from Translate coilbox and Write on-screen text, these are not guides to working on coilbox itself.
 
-Most of the tools here are hidden until you turn on Advanced mode in Settings > General.
+Most of the tools here are hidden until you turn them on under Tools in Settings > General. Each set of tools has its own switch.
 
 ## Ship coilbox with your game
 

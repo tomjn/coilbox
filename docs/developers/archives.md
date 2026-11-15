@@ -6,10 +6,10 @@ This page covers the Archives page, an archive's own page and the Lua console. T
 
 ## Turn on Archives
 
-Archives is hidden until you turn on Advanced mode.
+Archives is hidden until you turn on Archives and Rapid.
 
 1. Open Settings, then General.
-2. Under Advanced tools, turn on Advanced mode.
+2. Under Tools, turn on Archives and Rapid.
 
 Archives now appears in the sidebar, under Library.
 

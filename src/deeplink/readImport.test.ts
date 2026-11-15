@@ -162,7 +162,7 @@ describe("readImport: a wrong paste is a sentence, not a validation failure", ()
       "a coilbox campaign for Balanced Annihilation 12.1",
     );
     expect(r.reason).toMatch(/Campaign builder/);
-    expect(r.reason).toMatch(/Advanced mode/);
+    expect(r.reason).toMatch(/Mission builders/);
   });
 
   it("passes a broken coilbox link's own reason through", () => {

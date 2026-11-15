@@ -12,10 +12,10 @@ This page covers what is on each screen. The detail of the map format, such as h
 
 ## Turn on Mapping tools
 
-Mapping tools is hidden until you turn on Advanced mode.
+Mapping tools is hidden until you turn it on.
 
 1. Open Settings, then General.
-2. Under Advanced tools, turn on Advanced mode.
+2. Under Tools, turn on Mapping tools.
 
 Mapping tools now appears in the sidebar, with Projects, Compile and Decompile under it.
 
@@ -133,7 +133,7 @@ When it finishes, the page shows where the images went, the map's name, version,
 - Show in folder opens the folder with the images.
 - Recompile opens Compile with the decompiled texture, the other images found beside it and the same folder filled in. Output name is taken from the folder's name, so check it before you select Compile.
 
-You can also start from a map you already have. Open Library > Maps, select the map, then select Open in mapconv decompile. Decompile opens with that map chosen. The button is only there with Advanced mode on.
+You can also start from a map you already have. Open Library > Maps, select the map, then select Open in mapconv decompile. Decompile opens with that map chosen. The button is only there with Mapping tools on.
 
 ## Projects
 

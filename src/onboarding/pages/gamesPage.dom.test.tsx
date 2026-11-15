@@ -47,6 +47,7 @@ const BASE: WizardContext = {
   languageStored: true,
   profileMode: true,
   profileColours: true,
+  profileFeatures: true,
   hubEnabled: false,
   hub: { loading: false, signedIn: false, unknown: false },
   lobbyAccountCount: 1,

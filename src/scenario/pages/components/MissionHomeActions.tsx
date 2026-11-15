@@ -8,8 +8,8 @@
  * to drift apart.
  *
  * Only a loose `.sdd` is offered, because a packaged archive cannot be written
- * into at all. The advanced-mode half of the plan's condition is already met by
- * being here: the whole scenario editor route is `gateAdvanced`-wrapped
+ * into at all. The mission builders half of the plan's condition is already met
+ * by being here: the whole scenario editor route is `gateFeature`-wrapped
  * (`src/scenario/index.ts`), so a player-focused build never reaches this page.
  */
 

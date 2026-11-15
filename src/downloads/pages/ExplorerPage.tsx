@@ -5,7 +5,7 @@ import { RapidBrowser } from "./components/RapidBrowser";
 /**
  * Rapid repositories: pick a configured rapid master and browse its repositories
  * and versions, downloading a tag through the bundled sidecar into the configured
- * content root. Advanced mode only (issue #4584), beside Archives in the Library.
+ * content root. Behind the archives toggle (issue #4584), beside Archives in the Library.
  */
 export default function ExplorerPage() {
   const writePath = useWriteRootPath("games");

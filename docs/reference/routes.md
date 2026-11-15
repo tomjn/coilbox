@@ -54,32 +54,32 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 > **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/library/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
 >
-> The Downloads group went into the Library. `#/downloads` redirects to `#/library/downloads`, `#/downloads/maps` to `#/library/maps` and `#/downloads/games` to `#/library/games`, and any query string is kept, so a `coilbox://import` link for a setup pack still opens the import drawer on the Maps page. Rapid repositories moved to `#/library/rapid` (advanced mode).
+> The Downloads group went into the Library. `#/downloads` redirects to `#/library/downloads`, `#/downloads/maps` to `#/library/maps` and `#/downloads/games` to `#/library/games`, and any query string is kept, so a `coilbox://import` link for a setup pack still opens the import drawer on the Maps page. Rapid repositories moved to `#/library/rapid` (behind Archives and Rapid).
 >
 > Content became Library, so every browser path moved from `#/content/` to `#/library/`. The old ones redirect: `#/content/maps`, `#/content/maps/:name`, `#/content/games`, `#/content/games/:name`, `#/content/games/:name/units`, `#/content/games/:name/units/:unit`, `#/content/blueprints`, `#/content/blueprints/:id`, `#/content/archives`, `#/content/archives/:name` and `#/content/archives/:name/repl`.
 >
 > The nav ids moved with them. A distribution profile written against `content.maps`, `content.games`, `content.blueprints`, `content.archives` or the `content` settings section keeps working, in `hide`, `hideSettings` and the home page `art` map alike. The old names are mapped in `src/profile/renamedIds.ts`. `content.setupPacks` did not move, because it never named a nav item. The Downloads group's ids moved too: `downloads.games` and `downloads.maps` are now `library.games` and `library.maps`, `downloads.browse` is `library.rapid`, and the `downloads` settings section is `sources`.
 
-## Advanced-mode pages
+## Tool pages
 
-These are hidden unless **Advanced mode** is on (Settings > General). They're modding/authoring tools, not player-facing, so a game distribution usually leaves Advanced mode off and never sees them.
+Each of these is hidden until its switch is on under Tools in Settings > General. They're modding and authoring tools, not player-facing, so a game distribution usually leaves them off. The switch column is the key a distribution profile's [`features`](../developers/distribution-profile.md#features-object) uses.
 
-| Sidebar group    | Item        | Link (`href`)          | Nav id                 |
-| ---------------- | ----------- | ----------------------- | ----------------------- |
-| Library          | Archives    | `#/library/archives`   | `library.archives`     |
-| Library          | Rapid repositories | `#/library/rapid` | `library.rapid`      |
-| uberstress       | Run         | `#/uberstress`         | `uberstress.run`       |
-| uberstress       | History     | `#/uberstress/history` | `uberstress.history`   |
-| Campaign builder | Campaigns   | `#/campaign-builder`   | `campaign.builder`     |
-| Campaign builder | Scenarios   | `#/scenario-builder`   | `scenario.builder`     |
-| Mapping tools    | Projects    | `#/mapconv/projects`   | `mapconv.projects`     |
-| Mapping tools    | Compile     | `#/mapconv`            | `mapconv.compile`      |
-| Mapping tools    | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
-| animation        | BOS → Lua   | `#/animation`          | `animation.bos2lua`    |
-| animation        | COB tools   | `#/animation/cob`      | `animation.cob`        |
-| unit builder     | Models      | `#/lego`               | `lego.units`           |
-| unit builder     | Lego parts  | `#/lego/parts`         | `lego.parts`           |
-| workshop         | Unit tweaks | `#/workshop`           | `workshop.units`       |
+| Sidebar group    | Item        | Link (`href`)          | Nav id                 | Switch       |
+| ---------------- | ----------- | ----------------------- | ----------------------- | ------------ |
+| Library          | Archives    | `#/library/archives`   | `library.archives`     | `archives`   |
+| Library          | Rapid repositories | `#/library/rapid` | `library.rapid`      | `archives`   |
+| uberstress       | Run         | `#/uberstress`         | `uberstress.run`       | `uberstress` |
+| uberstress       | History     | `#/uberstress/history` | `uberstress.history`   | `uberstress` |
+| Campaign builder | Campaigns   | `#/campaign-builder`   | `campaign.builder`     | `missions`   |
+| Campaign builder | Scenarios   | `#/scenario-builder`   | `scenario.builder`     | `missions`   |
+| Mapping tools    | Projects    | `#/mapconv/projects`   | `mapconv.projects`     | `mapping`    |
+| Mapping tools    | Compile     | `#/mapconv`            | `mapconv.compile`      | `mapping`    |
+| Mapping tools    | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    | `mapping`    |
+| animation        | BOS → Lua   | `#/animation`          | `animation.bos2lua`    | `animation`  |
+| animation        | COB tools   | `#/animation/cob`      | `animation.cob`        | `animation`  |
+| unit builder     | Models      | `#/lego`               | `lego.units`           | `units`      |
+| unit builder     | Lego parts  | `#/lego/parts`         | `lego.parts`           | `units`      |
+| workshop         | Unit tweaks | `#/workshop`           | `workshop.units`       | `units`      |
 
 (Mapping tools and animation also add a few external-link items, wiki/tool guides, that open in the browser rather than routing in-app.)
 

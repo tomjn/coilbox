@@ -70,9 +70,6 @@ vi.mock("@/components/OptionSelect", () => ({
     </select>
   ),
 }));
-vi.mock("../../general/advanced", () => ({
-  useAdvancedModeSetting: () => [false, () => {}],
-}));
 vi.mock("../display", () => ({
   useEffectsSetting: () => [true, () => {}],
   usePerformanceModeSetting: () => [false, () => {}],

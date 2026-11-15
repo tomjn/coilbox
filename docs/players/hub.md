@@ -63,7 +63,7 @@ Coilbox opens the page where that kind of thing lives, with the item ready to ad
 | Setup pack | Library > Maps |
 | Scenario | Play > Scenarios |
 | Base blueprint | Library > Blueprints |
-| Unit tweak project | Unit tweaks, which needs Advanced mode turned on in Settings > General |
+| Unit tweak project | Unit tweaks, which needs Unit tools turned on in Settings > General |
 
 If it needs a game or a map you do not have, coilbox offers to download it before it saves anything.
 
@@ -107,7 +107,7 @@ Where the Share button is for each kind:
 | Unit tweak project | Share in a project's menu on the Unit tweaks page |
 | Setup pack | Share, then Share a pack, on the Coilbox hub page |
 
-Campaign builder and Unit tweaks are in the sidebar once Advanced mode is turned on in Settings > General.
+Campaign builder is in the sidebar once Mission builders is turned on in Settings > General, and Unit tweaks once Unit tools is.
 
 A scenario must name a game and a map before you can publish it. Something too large for the hub cannot be published, and the drawer says so in place of the form.
 

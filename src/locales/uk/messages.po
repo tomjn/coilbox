@@ -10484,16 +10484,10 @@ msgstr "Лише для адмінів"
 msgid "Admins"
 msgstr "Адміни"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/general/index.ts
 #, fuzzy
 msgid "Advanced"
 msgstr "Додатково"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced mode"
-msgstr "Розширений режим"
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -10505,11 +10499,6 @@ msgstr "Додаткові параметри"
 #, fuzzy
 msgid "Advanced options ({advancedCount})"
 msgstr "Додаткові параметри ({advancedCount})"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced tools"
-msgstr "Розширені інструменти"
 
 #: src/direct/HostRoomForm.tsx
 #, fuzzy
@@ -11355,6 +11344,10 @@ msgstr "Готові анімації та скрипт юніта. Експор
 msgid "Animation role"
 msgstr "Роль в анімації"
 
+#: src/general/FeatureToggles.tsx
+msgid "Animation tools"
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "Announced on this network."
@@ -11739,6 +11732,7 @@ msgstr "Архів не встановлено: <0>{missingName}</0>"
 #: src/content/index.ts
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
+#: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Архіви"
@@ -11747,6 +11741,10 @@ msgstr "Архіви"
 #, fuzzy
 msgid "Archives ({archiveCount})"
 msgstr "Архіви ({archiveCount})"
+
+#: src/general/FeatureToggles.tsx
+msgid "Archives and Rapid"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 msgid "Area"
@@ -13262,6 +13260,10 @@ msgstr "Бонус для кожного ШІ"
 #, fuzzy
 msgid "BOS → Lua"
 msgstr "BOS → Lua"
+
+#: src/general/FeatureToggles.tsx
+msgid "BOS to Lua, COB tools and Skeletor"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -21143,6 +21145,10 @@ msgstr "Порожній елемент: вузол ієрархії, спала
 msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr "Порожній, тож несе інші елементи й може бути точкою випуску."
 
+#: src/onboarding/pages/registry.ts
+msgid "Enable Content Dev Tools?"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
@@ -26940,9 +26946,8 @@ msgid "It is a test route and never a distribution one. For {gameName} to play s
 msgstr "Це тестовий шлях, а не шлях для поширення. Щоб {gameName} сама відтворювала сценарії, її архів має містити середовище місій, а coilbox може встановити його лише в розпаковану копію гри .sdd."
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
-msgstr "Буде додано до ваших модулів, для чого потрібно ввімкнути розширений режим у налаштуваннях."
+msgid "It is added to your modules, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 #, fuzzy
@@ -26984,9 +26989,8 @@ msgid "It is removed from every game that loads it: {0}"
 msgstr ""
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
-msgstr "Буде збережено в «Правки юнітів» і відкрито, для чого потрібно ввімкнути розширений режим у налаштуваннях."
+msgid "It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
@@ -28657,6 +28661,10 @@ msgstr "Завантажити репозиторії"
 msgid "Load style"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "Load tests for lobby servers, and their results"
+msgstr ""
+
 #: src/play/PresetLoadGate.tsx
 msgid "Load this preset"
 msgstr ""
@@ -29569,6 +29577,10 @@ msgstr "Зображення мапи"
 msgid "Map preview"
 msgstr "Попередній перегляд мапи"
 
+#: src/general/FeatureToggles.tsx
+msgid "Map projects, compiling and decompiling maps"
+msgstr ""
+
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
 msgid "Map required"
@@ -29649,6 +29661,7 @@ msgstr "mapconv"
 msgid "mapinfo.lua keys the engine warns on"
 msgstr "Ключі mapinfo.lua, щодо яких рушій попереджає"
 
+#: src/general/FeatureToggles.tsx
 #: src/mapconv/index.ts
 #, fuzzy
 msgid "Mapping tools"
@@ -30409,6 +30422,10 @@ msgstr "Місія {position} не має гри чи мапи"
 #, fuzzy
 msgid "Mission {position} has no map"
 msgstr "Місія {position} не має мапи"
+
+#: src/general/FeatureToggles.tsx
+msgid "Mission builders"
+msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
@@ -36107,6 +36124,10 @@ msgstr "Необов’язково. Показується на картці п
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Optional. Zero-K keeps it against your account and does not send a code."
 msgstr "Необов’язково. Zero-K зберігає її у вашому обліковому записі й не надсилає код."
+
+#: src/onboarding/pages/ToolsPage.tsx
+msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -44442,11 +44463,6 @@ msgstr "Показати сітку будівництва, на якій сто
 msgid "Show the collision volume, the shape the engine hits and clicks"
 msgstr "Показати об’єм зіткнення – форму, у яку влучає й на яку клацає рушій"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
-msgstr "Показувати інструменти розробника й моддингу – uberstress, mapconv, анімацію та провідник архівів – на бічній панелі й вітальному екрані. За замовчуванням вимкнено для макета, орієнтованого на гравців."
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -47471,6 +47487,10 @@ msgstr "Не вдалося прочитати анімацію: {reason}"
 msgid "The animation could not be run: {failure}"
 msgstr "Не вдалося запустити анімацію: {failure}"
 
+#: src/general/FeatureToggles.tsx
+msgid "The archive explorer and Rapid repositories"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "The assault on {nodeName} failed. Your territory holds."
@@ -49691,6 +49711,10 @@ msgstr "Сканування скасовано."
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr "Сценарій «{scenarioName}» створено для {scenarioGame}, а це інша гра, ніж {installedName}. Тут у нього грати неможливо."
 
+#: src/general/FeatureToggles.tsx
+msgid "The scenario and campaign builders"
+msgstr ""
+
 #: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
@@ -51160,9 +51184,8 @@ msgid "This import URL is not valid."
 msgstr "Цей URL для імпорту некоректний."
 
 #: src/deeplink/readImport.ts
-#, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
-msgstr "Це {campaignPhrase}. Кампанії імпортуються з файлу: увімкніть розширений режим у налаштуваннях, а потім скористайтеся редактором кампаній і його кнопкою «Імпортувати»."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button."
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -52601,6 +52624,10 @@ msgstr "\"{def}\" прибрано зі списку дозволених для
 msgid "Took \"{name}\" off the withheld list."
 msgstr "\"{name}\" прибрано зі списку утриманих."
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Tools"
+msgstr ""
+
 #: src/general/index.ts
 #, fuzzy
 msgid "Tools for making things, and for the people who ship coilbox."
@@ -53366,6 +53393,10 @@ msgstr "Власні завдання обслуговування uberserver, �
 msgid "uberstress"
 msgstr "uberstress"
 
+#: src/general/FeatureToggles.tsx
+msgid "Uberstress"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -53665,6 +53696,10 @@ msgstr "Модель юніта"
 msgid "Unit models"
 msgstr "Моделі юнітів"
 
+#: src/general/FeatureToggles.tsx
+msgid "Unit models, Lego parts and unit tweaks"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Unit name"
@@ -53719,6 +53754,10 @@ msgstr "Джерело скрипту юніта"
 #, fuzzy
 msgid "unit to build"
 msgstr "юніт для будівництва"
+
+#: src/general/FeatureToggles.tsx
+msgid "Unit tools"
+msgstr ""
 
 #: src/container/names.ts
 #, fuzzy

@@ -8,7 +8,7 @@
  * game picker already runs.
  *
  * A link rather than a callback because the two live in different plugins. The
- * builder is gated behind advanced mode and owns every piece of the import, and
+ * builder is gated behind the unit tools toggle and owns every piece of the import, and
  * a URL is the one thing the content plugin can hand it without reaching into
  * it.
  */

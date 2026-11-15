@@ -90,7 +90,7 @@ At the top of the Overview tab, a box sums up the game in your library:
 - Engine is the engine the page reads the game with.
 - Show updates decides whether coilbox offers updates for this game. Turn it off to keep the game off the Updates list and out of the count in the top bar.
 
-The page has five tabs: Overview, Versions, Sources, Options and Compatibility. Compatibility lists anything in the game that the engine no longer does. See [Compatibility mode](compatibility-mode.md). With Advanced mode on there is a sixth tab, Advanced.
+The page has five tabs: Overview, Versions, Sources, Options and Compatibility. Compatibility lists anything in the game that the engine no longer does. See [Compatibility mode](compatibility-mode.md). With [Archives and Rapid](settings.md#tools) turned on there is a sixth tab, Archives.
 
 ### Versions
 
@@ -143,9 +143,9 @@ Your record by faction, under Sides, shows how often you won with each faction.
 
 Options lists every setting the game offers, with its key and what it does.
 
-### Advanced
+### Archives
 
-The Advanced tab only shows with [Advanced mode](settings.md#advanced-mode) turned on in Settings > General.
+The Archives tab only shows with [Archives and Rapid](settings.md#tools) turned on in Settings > General.
 
 - Primary archive is the game's own file. Open folder shows it on your computer. Delete removes it after you confirm.
 - Dependencies lists the other archives the game needs.
@@ -403,7 +403,7 @@ To keep everything in one folder next to coilbox, see [Portable mode](portable-m
 
 Open Settings, then Library > Sources. It has:
 
-- Rapid repositories, the rapid servers listed on the Rapid repositories page. See [Advanced mode](settings.md#advanced-mode).
+- Rapid repositories, the rapid servers listed on the Rapid repositories page. See [Tools](settings.md#tools).
 - Download missing content automatically, under Joining a battle. When it is on, joining a battle whose game or map you do not have starts the download straight away. See [Get the map and game](multiplayer.md#get-the-map-and-game).
 - Your hub address, under Coilbox hub, to point coilbox at a different hub. Leave it blank to use the default. Clear override puts it back.
 

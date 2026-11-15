@@ -27,6 +27,8 @@ export interface WizardContext {
   languageStored: boolean;
   profileMode: boolean;
   profileColours: boolean;
+  /** The profile seeds the feature toggles, so the distributor has chosen. */
+  profileFeatures: boolean;
   hubEnabled: boolean;
   hub: { loading: boolean; signedIn: boolean; unknown: boolean };
   lobbyAccountCount: number;
@@ -46,6 +48,7 @@ export function pageRelevance(
     language: !ctx.languageStored,
     appearance: !(ctx.profileMode && ctx.profileColours),
     games: ctx.games === null ? null : ctx.games.kind === "pick",
+    tools: !ctx.profileFeatures,
     hub,
     server: ctx.lobbyAccountCount === 0,
   };

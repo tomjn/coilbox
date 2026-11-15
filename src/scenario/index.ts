@@ -1,8 +1,8 @@
 import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Flag, Target } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { featureVisible, gateFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
 import {
   getCachedScenario,
@@ -11,21 +11,21 @@ import {
 } from "./scenarios";
 
 /**
- * The Scenarios plugin's frontend half: an advanced-mode **Scenario builder**
+ * The Scenarios plugin's frontend half: a **Scenario builder**, behind the mission builders toggle,
  * for authoring the in-engine content of a mission (spawns, zones, triggers,
  * objectives, dialogue). Documents and dialogue clips are stored by the
  * `tauri-plugin-coilbox-scenario` crate (ACL id `coilbox-scenario`). The schema
  * lives in `model.ts`.
  *
  * The builder joins the shared **Campaign builder** group beside Campaigns (nav
- * groups merge by id), and its routes are `gateAdvanced`-wrapped so a deep
- * link is not reachable while advanced mode is off.
+ * groups merge by id), and its routes are `gateFeature`-wrapped so a deep
+ * link is not reachable while the toggle is off.
  *
  * The player-facing half is a Scenarios list that plays a scenario bare. It
  * joins the existing **Play** group (nav groups merge by id) beside Campaigns,
  * because a scenario is something you play rather than something you author,
  * and it is shown only once there is a scenario to play
- * ({@link useHasScenarios}). It is not advanced-gated.
+ * ({@link useHasScenarios}). It is not behind a toggle.
  */
 const scenarioPlugin: FramePlugin = {
   id: "scenario",
@@ -60,7 +60,7 @@ const scenarioPlugin: FramePlugin = {
           to: "/scenario-builder",
           order: 2,
           icon: Flag,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("missions"),
         },
         // External reference, home launcher only (sidebar: false), opened in
         // the system browser via the Tauri opener.
@@ -71,7 +71,7 @@ const scenarioPlugin: FramePlugin = {
           icon: CoilMark,
           sidebar: false,
           order: 4,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("missions"),
         },
       ],
     },
@@ -84,14 +84,17 @@ const scenarioPlugin: FramePlugin = {
     },
     {
       path: "scenario-builder",
-      lazy: gateAdvanced(() => import("./pages/ScenarioBuilderPage")),
+      lazy: gateFeature(
+        "missions",
+        () => import("./pages/ScenarioBuilderPage"),
+      ),
       crumb: lazyText(msg`Scenario builder`),
     },
     {
       // The route param is an opaque uuid, so the crumb resolves the scenario's
       // name from the session cache, falling back when the list has not loaded.
       path: "scenario-builder/:id",
-      lazy: gateAdvanced(() => import("./pages/ScenarioEditPage")),
+      lazy: gateFeature("missions", () => import("./pages/ScenarioEditPage")),
       crumb: (c) =>
         (c.params.id && getCachedScenario(c.params.id)?.scenario.name) ||
         t`Scenario`,

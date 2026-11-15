@@ -563,7 +563,7 @@ describe("the greeting and the tool grid", () => {
 
   it("draws no marker when every tool in the nav is gated off", () => {
     // The case the app cannot reach, because Skirmish is never gated. A
-    // distribution can: `useAdvancedMode` gates every item in the Animation and
+    // distribution can: `featureVisible` gates every item in the Animation and
     // Mapconv groups, and `profile.hide` gates several more.
     frame.mockReturnValue({
       title: "Coilbox",

@@ -1,5 +1,6 @@
 import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { Feature } from "../general/features";
 import { withoutGeneratedGames } from "../lib/generatedGames";
 import type { Profile } from "./profile";
 
@@ -49,8 +50,8 @@ export interface ScaffoldInputs {
   mode: ThemeMode;
   /** The accent currently in effect. */
   accent: Accent;
-  /** Whether advanced (developer/modding) mode is on. */
-  advanced: boolean;
+  /** Which feature toggles are on. */
+  features: Record<Feature, boolean>;
   /** Whether the window is set to open fullscreen. */
   fullscreen: boolean;
   /** Games the unitsync scan found, by the name a `gameFilter` would match. */
@@ -71,7 +72,7 @@ export function buildScaffoldProfile(i: ScaffoldInputs): Profile {
     title: i.title,
     mode: i.mode,
     accent: i.accent,
-    advanced: i.advanced,
+    features: i.features,
     fullscreen: i.fullscreen,
   };
   if (i.installedGames.length === 1)

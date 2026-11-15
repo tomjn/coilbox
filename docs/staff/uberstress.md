@@ -17,10 +17,10 @@ Coilbox does not check which server software is at the address you give it. Teis
 
 ## Turn on uberstress
 
-uberstress is hidden until you turn on Advanced mode.
+uberstress is hidden until you turn it on.
 
 1. Open Settings, then General.
-2. Under Advanced tools, turn on Advanced mode.
+2. Under Tools, turn on Uberstress.
 
 uberstress now appears in the sidebar, with Run and History under it.
 

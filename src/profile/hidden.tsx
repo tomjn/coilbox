@@ -7,7 +7,7 @@ import { canonicalProfileId } from "./renamedIds";
 /**
  * Nav hiding driven by the distribution profile's `hide` list. A bundled build can
  * remove top-level features it doesn't want (e.g. `library.games`) by id, without
- * a fork. Mirrors the Advanced-mode gating in `../general/advanced`, but the source
+ * a fork. Mirrors the feature-toggle gating in `../general/features`, but the source
  * is the read-once profile rather than a live user setting — so these are plain
  * predicates (not reactive hooks): the profile can't change during the session.
  *

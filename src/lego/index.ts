@@ -1,8 +1,8 @@
 import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Boxes, Code2, ToyBrick } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { featureVisible, gateFeature } from "../general/features";
 import { insideSection } from "../general/nav";
 import { lazyText } from "../i18n/pluginText";
 import { getCachedProject, subscribeProjects } from "./projects";
@@ -33,7 +33,7 @@ const legoPlugin: FramePlugin = {
           activeWhen: insideSection("/lego", ["/lego/parts"]),
           order: 0,
           icon: Boxes,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("units"),
         },
         {
           id: "lego.parts",
@@ -41,7 +41,7 @@ const legoPlugin: FramePlugin = {
           to: "/lego/parts",
           order: 1,
           icon: ToyBrick,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("units"),
         },
         // External references, home launcher only (sidebar: false), opened in
         // the system browser via the Tauri opener.
@@ -52,7 +52,7 @@ const legoPlugin: FramePlugin = {
           icon: CoilMark,
           sidebar: false,
           order: 2,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("units"),
         },
         {
           id: "lego.parts-pack-guide",
@@ -61,7 +61,7 @@ const legoPlugin: FramePlugin = {
           icon: CoilMark,
           sidebar: false,
           order: 3,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("units"),
         },
         {
           id: "lego.s3o-blender-tools",
@@ -70,7 +70,7 @@ const legoPlugin: FramePlugin = {
           icon: Code2,
           sidebar: false,
           order: 5,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("units"),
         },
       ],
     },
@@ -78,26 +78,26 @@ const legoPlugin: FramePlugin = {
   routes: [
     {
       path: "lego",
-      lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
+      lazy: gateFeature("units", () => import("./pages/ProjectsPage")),
       crumb: lazyText(msg`Models`),
     },
     {
       path: "lego/parts",
-      lazy: gateAdvanced(() => import("./pages/PartsPage")),
+      lazy: gateFeature("units", () => import("./pages/PartsPage")),
       crumb: lazyText(msg`Lego parts`),
     },
     {
       // Before the model route so the two are read in the order they are
       // written, though a static segment outranks a dynamic one either way.
       path: "lego/open",
-      lazy: gateAdvanced(() => import("./pages/OpenFromArchivePage")),
+      lazy: gateFeature("units", () => import("./pages/OpenFromArchivePage")),
       crumb: lazyText(msg`Open a model`),
     },
     {
       // The route param is an opaque uuid, so the crumb resolves the model's
       // name from the session cache, falling back when the list has not loaded.
       path: "lego/:id",
-      lazy: gateAdvanced(() => import("./pages/BuilderPage")),
+      lazy: gateFeature("units", () => import("./pages/BuilderPage")),
       crumb: (c) =>
         (c.params.id && getCachedProject(c.params.id)?.name) || t`Model`,
       crumbSubscribe: subscribeProjects,

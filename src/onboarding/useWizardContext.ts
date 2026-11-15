@@ -99,6 +99,7 @@ export function useWizardContext(hub: HubAnswer): { ctx: WizardContext } {
       readStoredSetting<string | null>(LANGUAGE_KEY, null) !== null,
     profileMode: !!profile.mode,
     profileColours: !!(profile.accent || profile.base),
+    profileFeatures: profile.advanced !== undefined || !!profile.features,
     hubEnabled: isHubEnabled(),
     hub,
     lobbyAccountCount: accounts.length,

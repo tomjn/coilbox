@@ -234,7 +234,7 @@ The "Home page" row covers the [`home`](#home-object) key: which layout drew the
 
 Settings > Distribution profile carries two authoring controls. Which one you see depends on whether a profile is loaded.
 
-**No profile yet: Create profile.json.** Writes a starter profile into `.coilbox/` beside the app, filled in from how Coilbox is set up right now: the title, colour scheme, accent, advanced mode and fullscreen you can see on screen, plus a [`gameFilter`](#gamefilter-object) when exactly one game is installed. It never overwrites a profile that is already there. Coilbox has to restart to pick the new file up, because a `.coilbox` folder with no `profile.json` in it is not a portable install yet, so the button offers the restart.
+**No profile yet: Create profile.json.** Writes a starter profile into `.coilbox/` beside the app, filled in from how Coilbox is set up right now: the title, colour scheme, accent, tool switches and fullscreen you can see on screen, plus a [`gameFilter`](#gamefilter-object) when exactly one game is installed. It never overwrites a profile that is already there. Coilbox has to restart to pick the new file up, because a `.coilbox` folder with no `profile.json` in it is not a portable install yet, so the button offers the restart.
 
 **Profile loaded: Reload profile.** Re-reads `profile.json` and applies it to the running app, so the edit loop is a reload rather than a restart. Everything applies, including the parts that otherwise only run at startup: theme, hidden nav, top bar, links, custom pages, welcome, home zones and splash. You stay on the page you were on, so you can sit on the screen you are styling and reload after each edit. Anything in progress elsewhere in the app resets, exactly as a restart would reset it.
 
@@ -316,7 +316,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 
 | id                   | Sidebar item          |
 | -------------------- | --------------------- |
-| `library.rapid`      | Library > Rapid repositories (advanced mode) |
+| `library.rapid`      | Library > Rapid repositories (Archives and Rapid) |
 | `library.games`      | Library > Games       |
 | `content.setupPacks` | Coilbox hub's "Share a pack" button |
 | `multiplayer.stats`  | Records > Player stats |
@@ -1199,13 +1199,32 @@ The lock does not hide the [`quit`](#quit-boolean) button. Set `quit` to `true` 
 
 ### `advanced` (boolean)
 
-Starts Coilbox with Advanced mode on, which shows the developer and modding tools in the sidebar: uberstress, mapconv, animation and the archive explorer. Off by default.
+Starts Coilbox with every tool switch on, which shows all the making and developer tools in the sidebar. Without it, only Unit tools starts on. `false` turns Unit tools off too. It is named after the single Advanced mode switch the tool switches replaced.
 
 ```json
 { "version": 1, "advanced": true }
 ```
 
-This sets the starting state, like [`fullscreen`](#fullscreen-boolean). The player can turn Advanced mode off in Settings > General, and their choice wins on every launch after.
+This sets the starting state, like [`fullscreen`](#fullscreen-boolean). The player can turn each tool off under Tools in Settings > General, and their choice wins on every launch after. Setting it, or [`features`](#features-object), also leaves the tools page out of the setup wizard.
+
+### `features` (object)
+
+Starts Coilbox with chosen tool switches on or off. Each key is one switch and overrides `advanced` for that switch. A key you leave out follows `advanced`.
+
+| Key          | Switch in Settings > General | What it shows |
+| ------------ | ---------------------------- | ------------- |
+| `units`      | Unit tools         | unit builder and workshop |
+| `mapping`    | Mapping tools      | Mapping tools, and Decompile on map pages |
+| `animation`  | Animation tools    | Animation |
+| `archives`   | Archives and Rapid | Library > Archives, Library > Rapid repositories, and the Archives tab on game pages |
+| `missions`   | Mission builders   | Campaign builder, and Campaign on game pages |
+| `uberstress` | Uberstress         | uberstress |
+
+```json
+{ "version": 1, "features": { "mapping": true, "missions": true } }
+```
+
+Like `advanced`, this sets the starting state, and the player's own choice wins after.
 
 ### `quit` (boolean)
 

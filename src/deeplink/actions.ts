@@ -192,7 +192,7 @@ export function prepareImport(code: string): PrepareImportResult {
     case "mod-project":
       // The projects list is where a tweak project is saved, so a shared one
       // lands there and the page opens what it made (issue #2696). That page is
-      // behind Advanced mode, which the detail says, because somebody who has it
+      // behind the unit tools toggle, which the detail says, because somebody who has it
       // off is sent home by the route's gate rather than shown the project.
       return {
         ok: true,
@@ -201,12 +201,12 @@ export function prepareImport(code: string): PrepareImportResult {
           route: importRoute("/workshop", code),
           label: containerKindName("mod-project"),
           phrase: "mod-project",
-          detail: t`It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings.`,
+          detail: t`It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings.`,
         },
       };
     case "module":
       // The parts page lists every module, so a shared one is added there
-      // (#3272). Like Unit tweaks it is behind Advanced mode.
+      // (#3272). Like Unit tweaks it is behind the unit tools toggle.
       return {
         ok: true,
         plan: {
@@ -214,7 +214,7 @@ export function prepareImport(code: string): PrepareImportResult {
           route: importRoute("/lego/parts", code),
           label: containerKindName("module"),
           phrase: "module",
-          detail: t`It is added to your modules, which needs Advanced mode turned on in Settings.`,
+          detail: t`It is added to your modules, which needs Unit tools turned on in Settings.`,
         },
       };
   }

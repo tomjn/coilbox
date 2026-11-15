@@ -37,9 +37,9 @@ vi.mock("../useCompatReport", () => ({
     read: mockRead,
   }),
 }));
-let mockAdvanced = false;
-vi.mock("@/general/advanced", () => ({
-  useAdvancedMode: () => mockAdvanced,
+let mockArchives = false;
+vi.mock("@/general/features", () => ({
+  useFeature: (feature: string) => feature === "archives" && mockArchives,
 }));
 vi.mock("./components/Convert3doDrawer", () => ({
   Convert3doDrawer: () => null,
@@ -166,7 +166,7 @@ afterEach(() => {
   mockFindings = [];
   mockChecking = false;
   mockRead = true;
-  mockAdvanced = false;
+  mockArchives = false;
   drawerOpen.mockClear();
 });
 
@@ -413,19 +413,19 @@ describe("GameDetailPage's Compatibility tab", () => {
   });
 });
 
-describe("GameDetailPage's Advanced tab", () => {
-  it("is absent with advanced mode off, and so is the archive", async () => {
+describe("GameDetailPage's Archives tab", () => {
+  it("is absent with the archives toggle off, and so is the archive", async () => {
     renderPage({ sides: [], units: [], datasetStatus: "ready" });
     await screen.findByRole("tab", { name: "Overview" });
-    expect(screen.queryByRole("tab", { name: "Advanced" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Archives" })).toBeNull();
     expect(screen.queryByText("Primary archive")).toBeNull();
   });
 
-  it("holds the archive and its dependencies with advanced mode on", async () => {
-    mockAdvanced = true;
+  it("holds the archive and its dependencies with the archives toggle on", async () => {
+    mockArchives = true;
     renderPage({ sides: [], units: [], datasetStatus: "ready" });
     expect(screen.queryByText("Primary archive")).toBeNull();
-    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Advanced" }));
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Archives" }));
     expect(screen.getByText("Primary archive")).toBeTruthy();
     expect(screen.getByText("Dependencies (0)")).toBeTruthy();
   });

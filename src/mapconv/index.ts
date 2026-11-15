@@ -7,7 +7,7 @@ import {
   Map as MapIcon,
   PackageOpen,
 } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { featureVisible, gateFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
 import MapconvSettings from "./pages/SettingsSection";
 
@@ -40,7 +40,7 @@ const mapconvPlugin: FramePlugin = {
           to: "/mapconv/projects",
           order: 0,
           icon: LayoutGrid,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("mapping"),
         },
         {
           id: "mapconv.compile",
@@ -49,7 +49,7 @@ const mapconvPlugin: FramePlugin = {
           end: true,
           order: 1,
           icon: Hammer,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("mapping"),
         },
         {
           id: "mapconv.decompile",
@@ -57,7 +57,7 @@ const mapconvPlugin: FramePlugin = {
           to: "/mapconv/decompile",
           order: 2,
           icon: PackageOpen,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("mapping"),
         },
         // External reference — home launcher only (sidebar: false), opened in
         // the system browser via the Tauri opener.
@@ -68,7 +68,7 @@ const mapconvPlugin: FramePlugin = {
           icon: BookOpen,
           sidebar: false,
           order: 3,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("mapping"),
         },
       ],
     },
@@ -76,17 +76,17 @@ const mapconvPlugin: FramePlugin = {
   routes: [
     {
       path: "mapconv/projects",
-      lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
+      lazy: gateFeature("mapping", () => import("./pages/ProjectsPage")),
       crumb: lazyText(msg`Projects`),
     },
     {
       path: "mapconv",
-      lazy: gateAdvanced(() => import("./pages/CompilePage")),
+      lazy: gateFeature("mapping", () => import("./pages/CompilePage")),
       crumb: lazyText(msg`mapconv`),
     },
     {
       path: "mapconv/decompile",
-      lazy: gateAdvanced(() => import("./pages/DecompilePage")),
+      lazy: gateFeature("mapping", () => import("./pages/DecompilePage")),
       crumb: lazyText(msg`Decompile`),
     },
   ],

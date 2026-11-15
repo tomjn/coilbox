@@ -1,15 +1,15 @@
 import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Hammer, Milestone } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { gateFeature, useFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedCampaign, useHasCampaigns } from "./campaigns";
 
 /**
  * The Campaigns plugin's frontend half — a player-facing Campaigns list plus an
- * advanced-mode **Campaign builder** for authoring sequences of skirmish missions.
+ * **Campaign builder**, behind the mission builders toggle, for authoring sequences of skirmish missions.
  * Campaign documents, imported panorama art and player progress are stored by the
  * `tauri-plugin-coilbox-campaign` crate (ACL id `coilbox-campaign`); the schema
  * lives in `model.ts`.
@@ -17,8 +17,8 @@ import { getCachedCampaign, useHasCampaigns } from "./campaigns";
  * The player-facing Campaigns item joins the existing **Play** group (nav groups
  * merge by id) and is shown only once a campaign exists ({@link useHasCampaigns}).
  * The builder joins the shared **Campaign builder** group beside Scenarios,
- * visible only in advanced mode. Its routes are additionally
- * `gateAdvanced`-wrapped so a deep link isn't reachable while hidden.
+ * visible only while that toggle is on. Its routes are additionally
+ * `gateFeature`-wrapped so a deep link isn't reachable while hidden.
  */
 const campaignPlugin: FramePlugin = {
   id: "campaign",
@@ -52,7 +52,7 @@ const campaignPlugin: FramePlugin = {
           icon: Hammer,
           // A distribution can also hide Campaign builder outright (issue #372).
           useVisible: () =>
-            useAdvancedMode() && !isProfileHidden("campaign.builder"),
+            useFeature("missions") && !isProfileHidden("campaign.builder"),
         },
         // External reference, home launcher only (sidebar: false), opened in
         // the system browser via the Tauri opener.
@@ -64,7 +64,7 @@ const campaignPlugin: FramePlugin = {
           sidebar: false,
           order: 3,
           useVisible: () =>
-            useAdvancedMode() && !isProfileHidden("campaign.builder"),
+            useFeature("missions") && !isProfileHidden("campaign.builder"),
         },
       ],
     },
@@ -108,7 +108,8 @@ const campaignPlugin: FramePlugin = {
     },
     {
       path: "campaign-builder",
-      lazy: gateAdvanced(
+      lazy: gateFeature(
+        "missions",
         gateProfileHidden(
           "campaign.builder",
           () => import("./pages/CampaignBuilderPage"),
@@ -118,7 +119,8 @@ const campaignPlugin: FramePlugin = {
     },
     {
       path: "campaign-builder/:id",
-      lazy: gateAdvanced(
+      lazy: gateFeature(
+        "missions",
         gateProfileHidden(
           "campaign.builder",
           () => import("./pages/CampaignEditPage"),

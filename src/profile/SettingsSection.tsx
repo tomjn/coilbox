@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 import { describeError } from "@/i18n/uiError";
 import { useUnitsyncScan } from "../content/config";
-import { useAdvancedModeSetting } from "../general/advanced";
+import { useFeatureStates } from "../general/features";
 import { useFullscreenSetting } from "../general/fullscreen";
 import { describeHome, resolveHome } from "../home/config";
 import { usePreferredTarget } from "../play/config";
@@ -166,7 +166,7 @@ function ProfileValidation() {
 function ProfileAuthoring() {
   const { t } = useLingui();
   const { mode, accent } = useTheme();
-  const [advanced] = useAdvancedModeSetting();
+  const features = useFeatureStates();
   const [fullscreen] = useFullscreenSetting();
   // The games a seeded `gameFilter` may name, from the same unitsync scan every
   // picker reads. A file name out of `games/` would seed a filter that matches
@@ -198,7 +198,7 @@ function ProfileAuthoring() {
         title: getProfile().title ?? "Coilbox",
         mode,
         accent,
-        advanced,
+        features,
         fullscreen,
         installedGames,
       });

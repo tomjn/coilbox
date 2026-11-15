@@ -8544,13 +8544,8 @@ msgstr ""
 msgid "Admins"
 msgstr ""
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/general/index.ts
 msgid "Advanced"
-msgstr ""
-
-#: src/general/pages/SettingsSection.tsx
-msgid "Advanced mode"
 msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
@@ -8560,10 +8555,6 @@ msgstr ""
 
 #: src/mapconv/pages/CompilePage.tsx
 msgid "Advanced options ({advancedCount})"
-msgstr ""
-
-#: src/general/pages/SettingsSection.tsx
-msgid "Advanced tools"
 msgstr ""
 
 #: src/direct/HostRoomForm.tsx
@@ -9251,6 +9242,10 @@ msgstr ""
 msgid "Animation role"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "Animation tools"
+msgstr ""
+
 #: src/direct/room.ts
 msgid "Announced on this network."
 msgstr ""
@@ -9564,11 +9559,16 @@ msgstr ""
 #: src/content/index.ts
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
+#: src/content/pages/GameDetailPage.tsx
 msgid "Archives"
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 msgid "Archives ({archiveCount})"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "Archives and Rapid"
 msgstr ""
 
 #: src/placement/TerrainControls.tsx
@@ -10807,6 +10807,10 @@ msgstr ""
 #: src/animation/index.ts
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "BOS → Lua"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "BOS to Lua, COB tools and Skeletor"
 msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
@@ -17304,6 +17308,10 @@ msgstr ""
 msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr ""
 
+#: src/onboarding/pages/registry.ts
+msgid "Enable Content Dev Tools?"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
 msgstr ""
@@ -22034,7 +22042,7 @@ msgid "It is a test route and never a distribution one. For {gameName} to play s
 msgstr ""
 
 #: src/deeplink/actions.ts
-msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
+msgid "It is added to your modules, which needs Unit tools turned on in Settings."
 msgstr ""
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
@@ -22071,7 +22079,7 @@ msgid "It is removed from every game that loads it: {0}"
 msgstr ""
 
 #: src/deeplink/actions.ts
-msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
+msgid "It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings."
 msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
@@ -23436,6 +23444,10 @@ msgstr ""
 msgid "Load style"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "Load tests for lobby servers, and their results"
+msgstr ""
+
 #: src/play/PresetLoadGate.tsx
 msgid "Load this preset"
 msgstr ""
@@ -24186,6 +24198,10 @@ msgstr ""
 msgid "Map preview"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "Map projects, compiling and decompiling maps"
+msgstr ""
+
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 msgid "Map required"
 msgstr ""
@@ -24251,6 +24267,7 @@ msgstr ""
 msgid "mapinfo.lua keys the engine warns on"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
 #: src/mapconv/index.ts
 msgid "Mapping tools"
 msgstr ""
@@ -24875,6 +24892,10 @@ msgstr ""
 #: src/campaign/listing.ts
 #: src/campaign/run.ts
 msgid "Mission {position} has no map"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "Mission builders"
 msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -29530,6 +29551,10 @@ msgstr ""
 
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr ""
+
+#: src/onboarding/pages/ToolsPage.tsx
+msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
@@ -36371,10 +36396,6 @@ msgstr ""
 msgid "Show the collision volume, the shape the engine hits and clicks"
 msgstr ""
 
-#: src/general/pages/SettingsSection.tsx
-msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
-msgstr ""
-
 #: src/content/pages/components/BindingList.tsx
 msgid "Show the file this would write"
 msgstr ""
@@ -38864,6 +38885,10 @@ msgstr ""
 msgid "The animation could not be run: {failure}"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "The archive explorer and Rapid repositories"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 msgid "The assault on {nodeName} failed. Your territory holds."
 msgstr ""
@@ -40667,6 +40692,10 @@ msgstr ""
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "The scenario and campaign builders"
+msgstr ""
+
 #: src/conquest/handmade/read.ts
 msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
 msgstr ""
@@ -41866,7 +41895,7 @@ msgid "This import URL is not valid."
 msgstr ""
 
 #: src/deeplink/readImport.ts
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button."
 msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
@@ -43045,6 +43074,10 @@ msgstr ""
 msgid "Took \"{name}\" off the withheld list."
 msgstr ""
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Tools"
+msgstr ""
+
 #: src/general/index.ts
 msgid "Tools for making things, and for the people who ship coilbox."
 msgstr ""
@@ -43665,6 +43698,10 @@ msgstr ""
 msgid "uberstress"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "Uberstress"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 msgid "Unassigned"
 msgstr ""
@@ -43912,6 +43949,10 @@ msgstr ""
 msgid "Unit models"
 msgstr ""
 
+#: src/general/FeatureToggles.tsx
+msgid "Unit models, Lego parts and unit tweaks"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "Unit name"
 msgstr ""
@@ -43955,6 +43996,10 @@ msgstr ""
 
 #: src/scenario/triggerTypes.ts
 msgid "unit to build"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "Unit tools"
 msgstr ""
 
 #: src/container/names.ts

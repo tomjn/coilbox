@@ -29,6 +29,7 @@ const base: WizardContext = {
   languageStored: false,
   profileMode: false,
   profileColours: false,
+  profileFeatures: false,
   hubEnabled: true,
   hub: { loading: false, signedIn: false, unknown: false },
   lobbyAccountCount: 0,
@@ -41,9 +42,14 @@ describe("pageRelevance", () => {
       language: true,
       appearance: true,
       games: true,
+      tools: true,
       hub: true,
       server: true,
     }));
+  it("tools: irrelevant when the profile seeds the toggles", () =>
+    expect(pageRelevance({ ...base, profileFeatures: true }).tools).toBe(
+      false,
+    ));
   it("language: stored value", () =>
     expect(pageRelevance({ ...base, languageStored: true }).language).toBe(
       false,

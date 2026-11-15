@@ -9,8 +9,8 @@ import { getProfile } from "../profile/profile";
  * Fullscreen mode is reachable three ways — F11, a top-bar button, and the
  * General-settings toggle — but they all flip a single settings key so they
  * can't drift. One effect (in `FullscreenControls`) applies the key to the OS
- * window, mirroring the `advanced.enabled` single-source-of-truth shape in
- * `./advanced`. Boot-time application (to avoid a windowed flash before the
+ * window, mirroring the one-key-per-setting shape of the feature toggles in
+ * `./features`. Boot-time application (to avoid a windowed flash before the
  * effect mounts) lives in `main.tsx`.
  */
 const FULLSCREEN_KEY = "window.fullscreen";
