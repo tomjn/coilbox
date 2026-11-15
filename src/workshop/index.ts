@@ -1,7 +1,7 @@
 import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { SlidersHorizontal } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { featureVisible, gateFeature } from "../general/features";
 import { insideSection } from "../general/nav";
 import { lazyText } from "../i18n/pluginText";
 import { cachedProjectName } from "./project";
@@ -36,7 +36,7 @@ const workshopPlugin: FramePlugin = {
           activeWhen: insideSection("/workshop"),
           order: 0,
           icon: SlidersHorizontal,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("units"),
         },
       ],
     },
@@ -44,7 +44,7 @@ const workshopPlugin: FramePlugin = {
   routes: [
     {
       path: "workshop",
-      lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
+      lazy: gateFeature("units", () => import("./pages/ProjectsPage")),
       crumb: lazyText(msg`Unit tweaks`),
     },
     {
@@ -54,7 +54,7 @@ const workshopPlugin: FramePlugin = {
       // Listed first because the breadcrumb takes the first pattern that
       // matches, and the one below matches this path too.
       path: "workshop/:id/reference",
-      lazy: gateAdvanced(() => import("./pages/ReferencePage")),
+      lazy: gateFeature("units", () => import("./pages/ReferencePage")),
       crumb: lazyText(msg`Reference`),
     },
     {
@@ -70,7 +70,7 @@ const workshopPlugin: FramePlugin = {
       // encyclopedia page sends somebody who has picked a unit and not a
       // project (see `routes.ts`).
       path: "workshop/:id/:section?",
-      lazy: gateAdvanced(() => import("./pages/UnitPage")),
+      lazy: gateFeature("units", () => import("./pages/UnitPage")),
       crumb: (c) =>
         projectSectionLabel(c.params.section) ??
         (c.params.id === "new"

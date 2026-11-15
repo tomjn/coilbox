@@ -108,13 +108,13 @@ function readContainerText(text: string): ReadImportResult {
   }
 
   // Campaigns are recognised but import from a file in the builder, which sits
-  // behind Advanced mode. Say so, rather than routing to a screen that will not
+  // behind the mission builders toggle. Say so, rather than routing to a screen that will not
   // take a code (issue #1333 keeps campaign code import out of scope).
   if (id.kind === "campaign") {
     const campaignPhrase = phraseFor("coilbox-campaign", id.game);
     return {
       outcome: "rejected",
-      reason: t`This is ${campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button.`,
+      reason: t`This is ${campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button.`,
     };
   }
 

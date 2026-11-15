@@ -16,7 +16,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { useAdvancedMode } from "@/general/advanced";
+import { useFeature } from "@/general/features";
 import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
 import { useMapPresence } from "@/hub/manualSend/status";
 import { formatDate } from "@/lib/format";
@@ -85,7 +85,7 @@ export default function MapDetailPage() {
   const decoded = name ?? "";
   const navigate = useNavigate();
   const playMap = usePlayMap();
-  const advanced = useAdvancedMode();
+  const mapping = useFeature("mapping");
   const [decompiling, setDecompiling] = useState(false);
   // The 3D preview's scene, which the picture of every match drapes over.
   const [scene, setScene] = useState<MapScene3D | null>(null);
@@ -389,7 +389,7 @@ export default function MapDetailPage() {
         {hubPresence.state === "present" && (
           <HubPageButton url={hubPresence.url} label={t`Show on hub`} />
         )}
-        {advanced && archiveName && (
+        {mapping && archiveName && (
           <Button
             size="sm"
             variant="outline"

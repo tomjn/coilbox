@@ -10484,16 +10484,10 @@ msgstr "Administrateurs uniquement"
 msgid "Admins"
 msgstr "Administrateurs"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/general/index.ts
 #, fuzzy
 msgid "Advanced"
 msgstr "Avancé"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced mode"
-msgstr "Mode avancé"
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -10505,11 +10499,6 @@ msgstr "Options avancées"
 #, fuzzy
 msgid "Advanced options ({advancedCount})"
 msgstr "Options avancées ({advancedCount})"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced tools"
-msgstr "Outils avancés"
 
 #: src/direct/HostRoomForm.tsx
 #, fuzzy
@@ -11355,6 +11344,10 @@ msgstr "Les préréglages d’animation et le script de l’unité. Un export é
 msgid "Animation role"
 msgstr "Rôle d’animation"
 
+#: src/general/FeatureToggles.tsx
+msgid "Animation tools"
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "Announced on this network."
@@ -11739,6 +11732,7 @@ msgstr "Archive non installée : <0>{missingName}</0>"
 #: src/content/index.ts
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
+#: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Archives"
@@ -11747,6 +11741,10 @@ msgstr "Archives"
 #, fuzzy
 msgid "Archives ({archiveCount})"
 msgstr "Archives ({archiveCount})"
+
+#: src/general/FeatureToggles.tsx
+msgid "Archives and Rapid"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 msgid "Area"
@@ -13262,6 +13260,10 @@ msgstr "Bonus pour chaque IA"
 #, fuzzy
 msgid "BOS → Lua"
 msgstr "BOS → Lua"
+
+#: src/general/FeatureToggles.tsx
+msgid "BOS to Lua, COB tools and Skeletor"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -15419,6 +15421,10 @@ msgstr "Choisir où écrire le .sdd"
 #: src/onboarding/pages/registry.ts
 msgid "Choose your language"
 msgstr "Choisissez votre langue"
+
+#: src/onboarding/pages/registry.ts
+msgid "Choose your tools"
+msgstr ""
 
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
@@ -21459,6 +21465,10 @@ msgstr "Moteur requis"
 msgid "Engine settings"
 msgstr "Paramètres du moteur"
 
+#: src/general/FeatureToggles.tsx
+msgid "Engine stress tests and their history"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "Engine to use"
@@ -26940,9 +26950,8 @@ msgid "It is a test route and never a distribution one. For {gameName} to play s
 msgstr "C’est une voie de test, jamais de distribution. Pour que {gameName} joue lui-même des scénarios, son archive doit intégrer le runtime, et coilbox ne peut l’installer que dans une copie .sdd décompressée du jeu."
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
-msgstr "Il est ajouté à vos modules, ce qui demande d’activer le mode avancé dans Paramètres."
+msgid "It is added to your modules, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 #, fuzzy
@@ -26984,9 +26993,8 @@ msgid "It is removed from every game that loads it: {0}"
 msgstr ""
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
-msgstr "Il est enregistré dans Ajustements d’unités et ouvert, ce qui demande d’activer le mode avancé dans Paramètres."
+msgid "It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
@@ -29569,6 +29577,10 @@ msgstr "Image de la carte"
 msgid "Map preview"
 msgstr "Aperçu de la carte"
 
+#: src/general/FeatureToggles.tsx
+msgid "Map projects, compiling and decompiling maps"
+msgstr ""
+
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
 msgid "Map required"
@@ -29649,6 +29661,7 @@ msgstr "mapconv"
 msgid "mapinfo.lua keys the engine warns on"
 msgstr "Clés de mapinfo.lua signalées par le moteur"
 
+#: src/general/FeatureToggles.tsx
 #: src/mapconv/index.ts
 #, fuzzy
 msgid "Mapping tools"
@@ -30409,6 +30422,10 @@ msgstr "La mission {position} n’a ni jeu ni carte"
 #, fuzzy
 msgid "Mission {position} has no map"
 msgstr "La mission {position} n’a pas de carte"
+
+#: src/general/FeatureToggles.tsx
+msgid "Mission builders"
+msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
@@ -44442,11 +44459,6 @@ msgstr "Afficher la grille de construction sur laquelle repose le plan"
 msgid "Show the collision volume, the shape the engine hits and clicks"
 msgstr "Afficher le volume de collision, la forme que le moteur touche et clique"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
-msgstr "Afficher les outils de développement et de modding (uberstress, mapconv, animation et explorateur d’archives) dans la barre latérale et l’écran d’accueil. Désactivé par défaut pour une disposition centrée sur le joueur."
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -47471,6 +47483,10 @@ msgstr "L’animation n’a pas pu être lue : {reason}"
 msgid "The animation could not be run: {failure}"
 msgstr "L’animation n’a pas pu être exécutée : {failure}"
 
+#: src/general/FeatureToggles.tsx
+msgid "The archive explorer and Rapid repositories"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "The assault on {nodeName} failed. Your territory holds."
@@ -49691,6 +49707,10 @@ msgstr "L’analyse a été annulée."
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr "Le scénario « {scenarioName} » a été créé pour {scenarioGame}, un autre jeu que {installedName}. Il ne peut pas être joué ici."
 
+#: src/general/FeatureToggles.tsx
+msgid "The scenario and campaign builders"
+msgstr ""
+
 #: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
@@ -51160,9 +51180,8 @@ msgid "This import URL is not valid."
 msgstr "Cette URL d’import n’est pas valide."
 
 #: src/deeplink/readImport.ts
-#, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
-msgstr "C’est {campaignPhrase}. Les campagnes s’importent depuis un fichier : activez le mode avancé dans Paramètres, puis utilisez le créateur de campagnes et son bouton Importer."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button."
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -52601,6 +52620,10 @@ msgstr "« {def} » retiré de la liste des unités constructibles."
 msgid "Took \"{name}\" off the withheld list."
 msgstr "« {name} » retiré de la liste des unités retenues."
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Tools"
+msgstr ""
+
 #: src/general/index.ts
 #, fuzzy
 msgid "Tools for making things, and for the people who ship coilbox."
@@ -53366,6 +53389,10 @@ msgstr "Les tâches de maintenance propres à uberserver, réservées aux admins
 msgid "uberstress"
 msgstr "uberstress"
 
+#: src/general/FeatureToggles.tsx
+msgid "Uberstress"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -53665,6 +53692,10 @@ msgstr "Modèle d’unité"
 msgid "Unit models"
 msgstr "Modèles d’unités"
 
+#: src/general/FeatureToggles.tsx
+msgid "Unit models, Lego parts and unit tweaks"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Unit name"
@@ -53719,6 +53750,10 @@ msgstr "Source du script d’unité"
 #, fuzzy
 msgid "unit to build"
 msgstr "unité à construire"
+
+#: src/general/FeatureToggles.tsx
+msgid "Unit tools"
+msgstr ""
 
 #: src/container/names.ts
 #, fuzzy

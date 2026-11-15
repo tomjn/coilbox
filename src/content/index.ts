@@ -19,7 +19,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { cachedBlueprint } from "../blueprint/store";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { featureVisible, gateFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import AnalysisQueueBadge from "./AnalysisQueueBadge";
@@ -134,14 +134,14 @@ const contentPlugin: FramePlugin = {
           icon: Puzzle,
         },
         {
-          // Archive explorer is a modding tool — gated behind advanced mode,
+          // Archive explorer is a modding tool, gated behind the archives toggle,
           // unlike the player-facing Maps/Games in this same group.
           id: "library.archives",
           label: lazyText(msg`Archives`),
           to: "/library/archives",
           order: 2,
           icon: ArchiveIcon,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("archives"),
         },
       ],
     },
@@ -233,17 +233,17 @@ const contentPlugin: FramePlugin = {
     },
     {
       path: "library/archives",
-      lazy: gateAdvanced(() => import("./pages/ArchivesPage")),
+      lazy: gateFeature("archives", () => import("./pages/ArchivesPage")),
       crumb: lazyText(msg`Archives`),
     },
     {
       path: "library/archives/:name",
-      lazy: gateAdvanced(() => import("./pages/ArchiveDetailPage")),
+      lazy: gateFeature("archives", () => import("./pages/ArchiveDetailPage")),
       crumb: (c) => c.params.name ?? t`Archive`,
     },
     {
       path: "library/archives/:name/repl",
-      lazy: gateAdvanced(() => import("./pages/ArchiveReplPage")),
+      lazy: gateFeature("archives", () => import("./pages/ArchiveReplPage")),
       crumb: (c) => {
         const archiveName = c.params.name;
         return archiveName ? t`${archiveName} · Lua REPL` : t`Lua REPL`;

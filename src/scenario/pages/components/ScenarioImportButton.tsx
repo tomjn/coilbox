@@ -3,8 +3,8 @@
  *
  * On both scenario surfaces, because getting hold of a scenario is not an
  * authoring step (issue #861). Import used to live on the Scenario builder
- * alone, which is advanced-only, so a player handed a `.json` had to turn on
- * Advanced mode to open a file dialog and then never used the editor.
+ * alone, which is behind a toggle, so a player handed a `.json` had to turn on
+ * the builder to open a file dialog and then never used the editor.
  *
  * The button only opens the drawer. {@link ImportScenarioForm} owns the decode,
  * the content gate and the error state, the way the setup pack import does.

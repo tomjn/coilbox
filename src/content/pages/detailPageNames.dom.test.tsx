@@ -191,7 +191,7 @@ vi.mock("../useGameLibrary", () => ({
 }));
 vi.mock("@/factions/logos", () => ({ useFactionLogos: () => ({}) }));
 vi.mock("@/profile/hidden", () => ({ isProfileHidden: () => true }));
-vi.mock("@/general/advanced", () => ({ useAdvancedMode: () => false }));
+vi.mock("@/general/features", () => ({ useFeature: () => false }));
 vi.mock("../replayUserState", () => ({
   useReplayUserState: () => ({ state: null }),
   refightFilenames: () => [],

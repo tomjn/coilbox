@@ -1660,7 +1660,7 @@ const uberstressHistory: Drawing = {
  * grounds that a fixed picture would misreport live state and that the builders
  * are not in a fresh-install screenshot. Both were revisited for issue #1036 and
  * both gave way. A card is a door, not a status display, so a drawing of a
- * doorway does not claim anyone is online. And the people who turn advanced mode
+ * doorway does not claim anyone is online. And the people who turn the tool toggles
  * on look at the same grid as everyone else.
  */
 /**

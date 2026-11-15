@@ -19,9 +19,8 @@ import { GeneralProvider } from "./uiZoom";
 /**
  * The general plugin: app-wide preferences with no routes/nav of its own, just a
  * "General" settings section (frame settings page at `/settings/general`). It
- * currently owns the Advanced-mode toggle; the predicate and route guard live in
- * `./advanced` and are imported by the plugins whose nav/routes it gates
- * (uberstress, mapconv, animation, and the content archive explorer).
+ * currently owns the feature toggles; the predicates and route guard live in
+ * `./features` and are imported by the plugins whose nav/routes they gate.
  *
  * The settings Component is imported eagerly (not lazy): the frame settings page
  * renders it directly without a Suspense boundary, so React.lazy can't be used.
@@ -122,7 +121,7 @@ const generalPlugin: FramePlugin = {
     },
     // The bottom group, for the tooling a player never needs. Declared here
     // rather than in any one tool because no tool owns the others, and this
-    // plugin already owns the Advanced-mode toggle that gates their nav.
+    // plugin already owns the feature toggles that gate their nav.
     {
       id: "advanced",
       title: lazyText(msg`Advanced`),

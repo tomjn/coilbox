@@ -21,7 +21,14 @@ const inputs = (over: Partial<ScaffoldInputs> = {}): ScaffoldInputs => ({
   title: "Coilbox",
   mode: "dark",
   accent: "orange",
-  advanced: false,
+  features: {
+    mapping: false,
+    units: false,
+    animation: false,
+    archives: false,
+    missions: false,
+    uberstress: false,
+  },
   fullscreen: false,
   installedGames: [],
   ...over,
@@ -30,14 +37,18 @@ const inputs = (over: Partial<ScaffoldInputs> = {}): ScaffoldInputs => ({
 describe("buildScaffoldProfile", () => {
   it("captures the app's current title, theme and toggles", () => {
     const p = buildScaffoldProfile(
-      inputs({ title: "Splinter Faction", advanced: true, fullscreen: true }),
+      inputs({
+        title: "Splinter Faction",
+        features: { ...inputs().features, mapping: true },
+        fullscreen: true,
+      }),
     );
     expect(p).toMatchObject({
       version: 1,
       title: "Splinter Faction",
       mode: "dark",
       accent: "orange",
-      advanced: true,
+      features: { ...inputs().features, mapping: true },
       fullscreen: true,
     });
   });

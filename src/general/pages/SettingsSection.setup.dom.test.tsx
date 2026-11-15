@@ -26,9 +26,6 @@ vi.mock("@picoframe/frame", async (importOriginal) => ({
   useSetting: <T,>(_key: string, fallback: T) => [fallback, () => {}] as const,
 }));
 vi.mock("@/components/OptionSelect", () => ({ OptionSelect: () => null }));
-vi.mock("../../general/advanced", () => ({
-  useAdvancedModeSetting: () => [false, () => {}],
-}));
 vi.mock("../display", () => ({
   useEffectsSetting: () => [true, () => {}],
   usePerformanceModeSetting: () => [false, () => {}],

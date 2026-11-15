@@ -3,6 +3,7 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import { describeError } from "@/i18n/uiError";
 import type { ConquestNames } from "../conquest/names";
 import type { MapExclusion, SuggestedMapList } from "../content/branding";
+import type { Feature } from "../general/features";
 import type { HomeConfig } from "../home/config";
 import type { GameAiConfig } from "../play/gameAi";
 import { describeJsonError } from "./jsonError";
@@ -341,11 +342,19 @@ export interface Profile {
    */
   quit?: boolean;
   /**
-   * Seed the initial "Advanced mode" state (developer/modding tools). Same
-   * default-not-force semantics as {@link fullscreen}: a user's General-settings
-   * toggle persists over the profile seed.
+   * Seed every feature toggle (the making and developer tools) on or off at
+   * once. Kept from when there was one "Advanced mode" switch, so `true` still
+   * means every tool. {@link features} overrides it per feature. Same
+   * default-not-force semantics as {@link fullscreen}: a player's toggle in
+   * General settings persists over the profile seed.
    */
   advanced?: boolean;
+  /**
+   * Seed individual feature toggles, keyed by feature (see `FEATURES` in
+   * `general/features`). Each key set here overrides {@link advanced} for that
+   * feature. A seed, not a force, like {@link advanced}.
+   */
+  features?: Partial<Record<Feature, boolean>>;
   /**
    * Whether the profile authoring tools appear in the Distribution profile settings
    * section: "Reload profile" (re-reads this file and re-applies it without an app

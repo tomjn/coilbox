@@ -2,8 +2,8 @@ import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Download, Globe, History, Package } from "lucide-react";
 import { makeLegacyRedirect } from "../content/pages/LegacyRedirect";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { gateFeature, useFeature } from "../general/features";
 import { DEFAULT_HUB_URL, useHubUrl } from "../hub/config";
 import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
@@ -29,7 +29,7 @@ export const RETIRED_DOWNLOADS_PATHS: Readonly<Record<string, string>> = {
 
 /**
  * The downloads plugin's frontend half. It contributes the download queue and its
- * history page, a rapid-repo explorer for advanced users, and the Sources settings
+ * history page, a rapid-repo explorer behind the archives toggle, and the Sources settings
  * section. Downloads are triggered through the bundled `pr-downloader` sidecar. The
  * items sit in the Library nav group the content plugin declares, because what a
  * mirror offers and what is on disk are one list there. Pair it with the
@@ -63,14 +63,14 @@ const downloadsPlugin: FramePlugin = {
         },
         {
           // Beside Archives: a tool for people who run their own rapid master,
-          // so it is behind advanced mode like the archive explorer.
+          // so it is behind the archives toggle with the archive explorer.
           id: "library.rapid",
           label: lazyText(msg`Rapid repositories`),
           to: "/library/rapid",
           order: 2.5,
           icon: Package,
           useVisible: () =>
-            useAdvancedMode() && !isProfileHidden("library.rapid"),
+            useFeature("archives") && !isProfileHidden("library.rapid"),
         },
         // External references, home launcher only (sidebar: false), opened in
         // the system browser via the Tauri opener. The hub's address is the
@@ -104,7 +104,8 @@ const downloadsPlugin: FramePlugin = {
     },
     {
       path: "library/rapid",
-      lazy: gateAdvanced(
+      lazy: gateFeature(
+        "archives",
         gateProfileHidden(
           "library.rapid",
           () => import("./pages/ExplorerPage"),

@@ -2,7 +2,7 @@ import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Milestone, Orbit, Rocket } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useAdvancedMode } from "../../../general/advanced";
+import { useFeature } from "../../../general/features";
 import { isProfileHidden } from "../../../profile/hidden";
 
 /**
@@ -11,15 +11,15 @@ import { isProfileHidden } from "../../../profile/hidden";
  * with this game preselected via a one-shot `?game=` query param (see
  * `useGamePresetParam`). Each action is hidden when the distribution profile
  * hides that mode's own nav item, matching the sidebar. Campaign creation is
- * also advanced-mode gated, like the Campaign builder nav item itself.
+ * also behind the mission builders toggle, like the Campaign builder nav item itself.
  */
 export function StartModeActions({ gameName }: { gameName: string }) {
   const navigate = useNavigate();
-  const advanced = useAdvancedMode();
+  const missions = useFeature("missions");
 
   const showConquest = !isProfileHidden("conquest.list");
   const showWarpath = !isProfileHidden("runlite.list");
-  const showCampaign = advanced && !isProfileHidden("campaign.builder");
+  const showCampaign = missions && !isProfileHidden("campaign.builder");
 
   if (!showConquest && !showWarpath && !showCampaign) return null;
 

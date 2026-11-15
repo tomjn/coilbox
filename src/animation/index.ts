@@ -1,7 +1,7 @@
 import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Binary, BookOpen, Code2, FileCode2, ScrollText } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { featureVisible, gateFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
 
 /**
@@ -26,7 +26,7 @@ const animationPlugin: FramePlugin = {
           end: true,
           order: 0,
           icon: FileCode2,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("animation"),
         },
         {
           id: "animation.cob",
@@ -34,7 +34,7 @@ const animationPlugin: FramePlugin = {
           to: "/animation/cob",
           order: 1,
           icon: Binary,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("animation"),
         },
         // External references — shown on the home launcher only (sidebar: false),
         // opened in the system browser via the Tauri opener.
@@ -45,7 +45,7 @@ const animationPlugin: FramePlugin = {
           icon: BookOpen,
           sidebar: false,
           order: 2,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("animation"),
         },
         {
           id: "animation.skeletor-s3o",
@@ -54,7 +54,7 @@ const animationPlugin: FramePlugin = {
           icon: Code2,
           sidebar: false,
           order: 3,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("animation"),
         },
         {
           id: "animation.lua-animations",
@@ -63,7 +63,7 @@ const animationPlugin: FramePlugin = {
           icon: ScrollText,
           sidebar: false,
           order: 4,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("animation"),
         },
       ],
     },
@@ -71,12 +71,12 @@ const animationPlugin: FramePlugin = {
   routes: [
     {
       path: "animation",
-      lazy: gateAdvanced(() => import("./pages/Bos2LuaPage")),
+      lazy: gateFeature("animation", () => import("./pages/Bos2LuaPage")),
       crumb: lazyText(msg`Animation`),
     },
     {
       path: "animation/cob",
-      lazy: gateAdvanced(() => import("./pages/CobPage")),
+      lazy: gateFeature("animation", () => import("./pages/CobPage")),
       crumb: lazyText(msg`COB tools`),
     },
   ],

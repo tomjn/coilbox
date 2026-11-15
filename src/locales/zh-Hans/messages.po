@@ -10484,16 +10484,10 @@ msgstr "仅限管理员"
 msgid "Admins"
 msgstr "管理员"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/general/index.ts
 #, fuzzy
 msgid "Advanced"
 msgstr "高级"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced mode"
-msgstr "高级模式"
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -10505,11 +10499,6 @@ msgstr "高级选项"
 #, fuzzy
 msgid "Advanced options ({advancedCount})"
 msgstr "高级选项（{advancedCount}）"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced tools"
-msgstr "高级工具"
 
 #: src/direct/HostRoomForm.tsx
 #, fuzzy
@@ -11355,6 +11344,10 @@ msgstr "动画预设和单位脚本。导出时会将脚本写为单独的文件
 msgid "Animation role"
 msgstr "动画作用"
 
+#: src/general/FeatureToggles.tsx
+msgid "Animation tools"
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "Announced on this network."
@@ -11739,6 +11732,7 @@ msgstr "未安装归档：<0>{missingName}</0>"
 #: src/content/index.ts
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
+#: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "归档"
@@ -11747,6 +11741,10 @@ msgstr "归档"
 #, fuzzy
 msgid "Archives ({archiveCount})"
 msgstr "归档（{archiveCount}）"
+
+#: src/general/FeatureToggles.tsx
+msgid "Archives and Rapid"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 msgid "Area"
@@ -13262,6 +13260,10 @@ msgstr "为每个 AI 加成"
 #, fuzzy
 msgid "BOS → Lua"
 msgstr "BOS → Lua"
+
+#: src/general/FeatureToggles.tsx
+msgid "BOS to Lua, COB tools and Skeletor"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -15419,6 +15421,10 @@ msgstr "选择 .sdd 的写入位置"
 #: src/onboarding/pages/registry.ts
 msgid "Choose your language"
 msgstr "选择语言"
+
+#: src/onboarding/pages/registry.ts
+msgid "Choose your tools"
+msgstr ""
 
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
@@ -21459,6 +21465,10 @@ msgstr "需要引擎"
 msgid "Engine settings"
 msgstr "引擎设置"
 
+#: src/general/FeatureToggles.tsx
+msgid "Engine stress tests and their history"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "Engine to use"
@@ -26940,9 +26950,8 @@ msgid "It is a test route and never a distribution one. For {gameName} to play s
 msgstr "这是测试路径，而不是分发路径。要让 {gameName} 自己游玩场景，其归档必须捆绑任务运行时，而 coilbox 只能把它安装到游戏的未打包 .sdd 副本中。"
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
-msgstr "它会被添加到你的模块中，这需要在设置中开启高级模式。"
+msgid "It is added to your modules, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 #, fuzzy
@@ -26984,9 +26993,8 @@ msgid "It is removed from every game that loads it: {0}"
 msgstr ""
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
-msgstr "它会保存到单位调整并打开，这需要在设置中开启高级模式。"
+msgid "It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
@@ -29569,6 +29577,10 @@ msgstr "地图图片"
 msgid "Map preview"
 msgstr "地图预览"
 
+#: src/general/FeatureToggles.tsx
+msgid "Map projects, compiling and decompiling maps"
+msgstr ""
+
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
 msgid "Map required"
@@ -29649,6 +29661,7 @@ msgstr "mapconv"
 msgid "mapinfo.lua keys the engine warns on"
 msgstr "引擎会警告的 mapinfo.lua 键"
 
+#: src/general/FeatureToggles.tsx
 #: src/mapconv/index.ts
 #, fuzzy
 msgid "Mapping tools"
@@ -30409,6 +30422,10 @@ msgstr "任务 {position} 没有游戏或地图"
 #, fuzzy
 msgid "Mission {position} has no map"
 msgstr "任务 {position} 没有地图"
+
+#: src/general/FeatureToggles.tsx
+msgid "Mission builders"
+msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
@@ -44442,11 +44459,6 @@ msgstr "显示蓝图所在的建造网格"
 msgid "Show the collision volume, the shape the engine hits and clicks"
 msgstr "显示碰撞体积，即引擎判定命中和点击的形状"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
-msgstr "在侧边栏和欢迎页面中显示开发和模组工具：uberstress、mapconv、动画和归档浏览器。默认关闭，以保持面向玩家的布局。"
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -47471,6 +47483,10 @@ msgstr "无法读取动画：{reason}"
 msgid "The animation could not be run: {failure}"
 msgstr "无法运行动画：{failure}"
 
+#: src/general/FeatureToggles.tsx
+msgid "The archive explorer and Rapid repositories"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "The assault on {nodeName} failed. Your territory holds."
@@ -49691,6 +49707,10 @@ msgstr "扫描已取消。"
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr "场景“{scenarioName}”是为 {scenarioGame} 制作的，与 {installedName} 不是同一款游戏。无法在这里游玩。"
 
+#: src/general/FeatureToggles.tsx
+msgid "The scenario and campaign builders"
+msgstr ""
+
 #: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
@@ -51160,9 +51180,8 @@ msgid "This import URL is not valid."
 msgstr "此导入 URL 无效。"
 
 #: src/deeplink/readImport.ts
-#, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
-msgstr "这是 {campaignPhrase}。战役需要从文件导入：请在设置中开启高级模式，然后使用战役编辑器及其“导入”按钮。"
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button."
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -52601,6 +52620,10 @@ msgstr "已将 \"{def}\" 从可建造列表中移除。"
 msgid "Took \"{name}\" off the withheld list."
 msgstr "已将 \"{name}\" 从暂扣列表中移除。"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Tools"
+msgstr ""
+
 #: src/general/index.ts
 #, fuzzy
 msgid "Tools for making things, and for the people who ship coilbox."
@@ -53366,6 +53389,10 @@ msgstr "uberserver 自己的维护任务，仅限管理员。"
 msgid "uberstress"
 msgstr "uberstress"
 
+#: src/general/FeatureToggles.tsx
+msgid "Uberstress"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -53665,6 +53692,10 @@ msgstr "单位模型"
 msgid "Unit models"
 msgstr "单位模型"
 
+#: src/general/FeatureToggles.tsx
+msgid "Unit models, Lego parts and unit tweaks"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Unit name"
@@ -53719,6 +53750,10 @@ msgstr "单位脚本源码"
 #, fuzzy
 msgid "unit to build"
 msgstr "要建造的单位"
+
+#: src/general/FeatureToggles.tsx
+msgid "Unit tools"
+msgstr ""
 
 #: src/container/names.ts
 #, fuzzy

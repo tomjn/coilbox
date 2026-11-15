@@ -1,7 +1,7 @@
 import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { History, Server, Zap } from "lucide-react";
-import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { featureVisible, gateFeature } from "../general/features";
 import { lazyText } from "../i18n/pluginText";
 import UberstressSettings from "./pages/SettingsSection";
 
@@ -32,7 +32,7 @@ const uberstressPlugin: FramePlugin = {
           end: true,
           order: 0,
           icon: Zap,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("uberstress"),
         },
         {
           id: "uberstress.history",
@@ -40,7 +40,7 @@ const uberstressPlugin: FramePlugin = {
           to: "/uberstress/history",
           order: 1,
           icon: History,
-          useVisible: useAdvancedMode,
+          useVisible: featureVisible("uberstress"),
         },
       ],
     },
@@ -48,12 +48,12 @@ const uberstressPlugin: FramePlugin = {
   routes: [
     {
       path: "uberstress",
-      lazy: gateAdvanced(() => import("./pages/RunPage")),
+      lazy: gateFeature("uberstress", () => import("./pages/RunPage")),
       crumb: lazyText(msg`uberstress`),
     },
     {
       path: "uberstress/history",
-      lazy: gateAdvanced(() => import("./pages/HistoryPage")),
+      lazy: gateFeature("uberstress", () => import("./pages/HistoryPage")),
       crumb: lazyText(msg`History`),
     },
   ],

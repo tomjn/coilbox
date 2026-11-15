@@ -10555,16 +10555,10 @@ msgstr "Μόνο για διαχειριστές"
 msgid "Admins"
 msgstr "Διαχειριστές"
 
-#: src/content/pages/GameDetailPage.tsx
 #: src/general/index.ts
 #, fuzzy
 msgid "Advanced"
 msgstr "Για προχωρημένους"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced mode"
-msgstr "Λειτουργία για προχωρημένους"
 
 #: src/mapconv/pages/CompilePage.tsx
 #: src/uberstress/pages/RunPage.tsx
@@ -10576,11 +10570,6 @@ msgstr "Επιλογές για προχωρημένους"
 #, fuzzy
 msgid "Advanced options ({advancedCount})"
 msgstr "Επιλογές για προχωρημένους ({advancedCount})"
-
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Advanced tools"
-msgstr "Εργαλεία για προχωρημένους"
 
 #: src/direct/HostRoomForm.tsx
 #, fuzzy
@@ -11430,6 +11419,10 @@ msgstr "Οι προρρυθμίσεις κίνησης και το script της
 msgid "Animation role"
 msgstr "Ρόλος κίνησης"
 
+#: src/general/FeatureToggles.tsx
+msgid "Animation tools"
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "Announced on this network."
@@ -11815,6 +11808,7 @@ msgstr "Η αρχειοθήκη δεν είναι εγκατεστημένη: <0
 #: src/content/index.ts
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
+#: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Αρχειοθήκες"
@@ -11823,6 +11817,10 @@ msgstr "Αρχειοθήκες"
 #, fuzzy
 msgid "Archives ({archiveCount})"
 msgstr "Αρχειοθήκες ({archiveCount})"
+
+#: src/general/FeatureToggles.tsx
+msgid "Archives and Rapid"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -13343,6 +13341,10 @@ msgstr "Μπόνους για κάθε AI"
 #, fuzzy
 msgid "BOS → Lua"
 msgstr "BOS → Lua"
+
+#: src/general/FeatureToggles.tsx
+msgid "BOS to Lua, COB tools and Skeletor"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -15518,6 +15520,10 @@ msgstr "Επιλέξτε πού θα γραφτεί το .sdd"
 #, fuzzy
 msgid "Choose your language"
 msgstr "Επιλέξτε γλώσσα"
+
+#: src/onboarding/pages/registry.ts
+msgid "Choose your tools"
+msgstr ""
 
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
@@ -21601,6 +21607,10 @@ msgstr "Απαιτείται μηχανή"
 msgid "Engine settings"
 msgstr "Ρυθμίσεις μηχανής"
 
+#: src/general/FeatureToggles.tsx
+msgid "Engine stress tests and their history"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "Engine to use"
@@ -27111,9 +27121,8 @@ msgid "It is a test route and never a distribution one. For {gameName} to play s
 msgstr "Είναι διαδρομή δοκιμής και ποτέ διαδρομή διανομής. Για να παίζει το {gameName} σενάρια μόνο του, η αρχειοθήκη του πρέπει να περιέχει το περιβάλλον εκτέλεσης, και το coilbox μπορεί να το εγκαταστήσει μόνο σε ασυμπίεστο αντίγραφο .sdd του παιχνιδιού."
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
-msgstr "Προστίθεται στις λειτουργικές μονάδες σας, κάτι που χρειάζεται ενεργή τη Λειτουργία για προχωρημένους στις Ρυθμίσεις."
+msgid "It is added to your modules, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 #, fuzzy
@@ -27156,9 +27165,8 @@ msgid "It is removed from every game that loads it: {0}"
 msgstr "Αφαιρείται από κάθε παιχνίδι που το φορτώνει: {0}"
 
 #: src/deeplink/actions.ts
-#, fuzzy
-msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
-msgstr "Αποθηκεύεται στις Τροποποιήσεις μονάδων και ανοίγει, κάτι που χρειάζεται ενεργή τη Λειτουργία για προχωρημένους στις Ρυθμίσεις."
+msgid "It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings."
+msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
@@ -29756,6 +29764,10 @@ msgstr "Εικόνα χάρτη"
 msgid "Map preview"
 msgstr "Προεπισκόπηση χάρτη"
 
+#: src/general/FeatureToggles.tsx
+msgid "Map projects, compiling and decompiling maps"
+msgstr ""
+
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
 msgid "Map required"
@@ -29836,6 +29848,7 @@ msgstr "mapconv"
 msgid "mapinfo.lua keys the engine warns on"
 msgstr "Κλειδιά του mapinfo.lua για τα οποία προειδοποιεί η μηχανή"
 
+#: src/general/FeatureToggles.tsx
 #: src/mapconv/index.ts
 #, fuzzy
 msgid "Mapping tools"
@@ -30603,6 +30616,10 @@ msgstr "Η αποστολή {position} δεν έχει παιχνίδι ή χά�
 #, fuzzy
 msgid "Mission {position} has no map"
 msgstr "Η αποστολή {position} δεν έχει χάρτη"
+
+#: src/general/FeatureToggles.tsx
+msgid "Mission builders"
+msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
@@ -44737,11 +44754,6 @@ msgstr "Εμφάνιση του πλέγματος κατασκευής πάνω
 msgid "Show the collision volume, the shape the engine hits and clicks"
 msgstr "Εμφάνιση του όγκου σύγκρουσης, του σχήματος που χτυπά και στο οποίο κάνει κλικ η μηχανή"
 
-#: src/general/pages/SettingsSection.tsx
-#, fuzzy
-msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
-msgstr "Εμφάνιση των εργαλείων ανάπτυξης και modding — uberstress, mapconv, κινήσεις και εξερεύνηση αρχειοθηκών — στην πλαϊνή στήλη και στην οθόνη υποδοχής. Ανενεργό από προεπιλογή για διάταξη εστιασμένη στον παίκτη."
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -47797,6 +47809,10 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση της κίνησης: 
 msgid "The animation could not be run: {failure}"
 msgstr "Δεν ήταν δυνατή η εκτέλεση της κίνησης: {failure}"
 
+#: src/general/FeatureToggles.tsx
+msgid "The archive explorer and Rapid repositories"
+msgstr ""
+
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
 msgid "The assault on {nodeName} failed. Your territory holds."
@@ -50034,6 +50050,10 @@ msgstr "Η σάρωση ακυρώθηκε."
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr "Το σενάριο «{scenarioName}» δημιουργήθηκε για το {scenarioGame}, που είναι διαφορετικό παιχνίδι από το {installedName}. Δεν μπορεί να παιχτεί εδώ."
 
+#: src/general/FeatureToggles.tsx
+msgid "The scenario and campaign builders"
+msgstr ""
+
 #: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
@@ -51510,9 +51530,8 @@ msgid "This import URL is not valid."
 msgstr "Αυτό το URL εισαγωγής δεν είναι έγκυρο."
 
 #: src/deeplink/readImport.ts
-#, fuzzy
-msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign builder and its Import button."
-msgstr "Πρόκειται για: {campaignPhrase}. Οι εκστρατείες εισάγονται από αρχείο: ενεργοποιήστε την Προχωρημένη λειτουργία στις Ρυθμίσεις και χρησιμοποιήστε τον Δημιουργό εκστρατειών και το κουμπί Εισαγωγή του."
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button."
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -52960,6 +52979,10 @@ msgstr "Το «{def}» αφαιρέθηκε από τη λίστα κατασκ�
 msgid "Took \"{name}\" off the withheld list."
 msgstr "Το «{name}» αφαιρέθηκε από τη λίστα αποκλεισμένων."
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Tools"
+msgstr ""
+
 #: src/general/index.ts
 #, fuzzy
 msgid "Tools for making things, and for the people who ship coilbox."
@@ -53727,6 +53750,10 @@ msgstr "Οι εργασίες συντήρησης του ίδιου του uber
 msgid "uberstress"
 msgstr "uberstress"
 
+#: src/general/FeatureToggles.tsx
+msgid "Uberstress"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
 msgid "Unassigned"
@@ -54027,6 +54054,10 @@ msgstr "Μοντέλο μονάδας"
 msgid "Unit models"
 msgstr "Μοντέλα μονάδων"
 
+#: src/general/FeatureToggles.tsx
+msgid "Unit models, Lego parts and unit tweaks"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Unit name"
@@ -54081,6 +54112,10 @@ msgstr "Πηγαίος κώδικας script μονάδας"
 #, fuzzy
 msgid "unit to build"
 msgstr "μονάδα για κατασκευή"
+
+#: src/general/FeatureToggles.tsx
+msgid "Unit tools"
+msgstr ""
 
 #: src/container/names.ts
 #, fuzzy
