@@ -599,6 +599,28 @@ describe("buildLibrary maps named by different archives (#4657)", () => {
     expect(maps[0].sources.map((s) => s.kind)).toEqual(["hakora"]);
   });
 
+  it("joins a file whose name is not the map's to the scanned map through its path", () => {
+    // Voidborn Rift 1.0 ships as voidborn_rift.sd7, with no version in the file.
+    const map: MapItem = {
+      name: "Voidborn Rift 1.0",
+      archives: [
+        {
+          name: "Voidborn Rift 1.0",
+          path: "C:\\Users\\me\\Documents\\My Games\\Spring\\maps\\Voidborn_Rift.sd7",
+        },
+      ],
+      info: {},
+    };
+    const { maps } = buildLibrary({
+      ...bare,
+      scan: { games: [], maps: [map] },
+      files: { games: [], maps: ["voidborn_rift.sd7"] },
+    });
+    expect(maps.map((m) => [m.id, m.state])).toEqual([
+      ["Voidborn Rift 1.0", "local"],
+    ]);
+  });
+
   it("leaves an unlisted second copy on disk with the scanned map", () => {
     const { maps } = buildLibrary({
       ...bare,
