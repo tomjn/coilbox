@@ -19,11 +19,11 @@
 //! samples, so asking twice would double the most expensive read the worker
 //! makes.
 //!
-//! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_heightmap`
-//! command does not, and this overlay has no client upload path (#1685). The
-//! minimap gained one at #2379 and the three overlays deliberately did not: what
-//! a map is missing on the hub is a picture of itself, and these are the
-//! expensive part of the corpus.
+//! The `unitsync_heightmap` command never passes `--asset-dir`, because what a
+//! page draws is the picture rather than the hub's asset. The hub's asset comes
+//! from [`crate::seed`] and from the map picture walk in [`crate::minimap`],
+//! which sends all four map layers from coilbox since the height layer became a
+//! capped 8 bit WebP.
 
 use crate::assetencode::{encode_height_picture, HeightWindow};
 use crate::ffi::Unitsync;
@@ -149,6 +149,29 @@ pub(crate) fn asset_in_session(
         us.height_bounds(map_name),
         &crate::archive::archive_name_for_map(us, map_name),
     )
+}
+
+/// The `source_hash` the hub's `overlay:height` asset for this map would carry,
+/// without encoding it. The survey half of the map picture walk (issue #2379),
+/// which asks the hub before anything is encoded.
+///
+/// A map with no world height bounds is refused here as it is by the encoder,
+/// so the hub is never asked about a picture the send pass would decline to make.
+pub(crate) fn identity_in_session(us: &Unitsync, map_name: &str) -> Result<String, MapOverlaySkip> {
+    use crate::assetencode::{map_source_hash, HEIGHT_OVERLAY_VARIANT};
+    let (w, h) = us
+        .heightmap_size(map_name)
+        .ok_or(MapOverlaySkip::NoSource)?;
+    let raw = us
+        .heightmap_data(map_name, w, h)
+        .ok_or(MapOverlaySkip::ReadFailed)?;
+    us.height_bounds(map_name).ok_or(MapOverlaySkip::NoBounds)?;
+    Ok(map_source_hash(
+        HEIGHT_OVERLAY_VARIANT,
+        w,
+        h,
+        &source_bytes(&raw),
+    ))
 }
 
 /// Cache file for a height picture: `<cache_dir>/<key>-h<edge>.webp`.

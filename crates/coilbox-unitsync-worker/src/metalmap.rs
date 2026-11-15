@@ -11,11 +11,9 @@
 //! a metal infomap read costs a map archive open, and asking for it twice to
 //! draw it twice would double that for nothing.
 //!
-//! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_metalmap`
-//! command does not, and this overlay has no client upload path (#1685). The
-//! minimap gained one at #2379 and the three overlays deliberately did not: what
-//! a map is missing on the hub is a picture of itself, and these are the
-//! expensive part of the corpus.
+//! The `unitsync_metalmap` command never passes `--asset-dir`, because what a
+//! page draws is the picture rather than the hub's asset. The hub's asset comes
+//! from [`crate::seed`] and from the map picture walk in [`crate::minimap`].
 
 use crate::ffi::Unitsync;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, PNG_MIME};
@@ -166,6 +164,23 @@ pub(crate) fn asset_in_session(
     let raw = dims.and_then(|(w, h)| us.metalmap_data(map_name, w, h));
     let source_archive = crate::archive::archive_name_for_map(us, map_name);
     asset_from_samples(asset_dir, dims, raw.as_deref(), &source_archive)
+}
+
+/// The `source_hash` the hub's `overlay:metal` asset for this map would carry,
+/// without encoding it. The survey half of the map picture walk (issue #2379).
+pub(crate) fn identity_in_session(us: &Unitsync, map_name: &str) -> Result<String, MapOverlaySkip> {
+    let (w, h) = us
+        .map_dimensions(map_name)
+        .ok_or(MapOverlaySkip::NoSource)?;
+    let raw = us
+        .metalmap_data(map_name, w, h)
+        .ok_or(MapOverlaySkip::ReadFailed)?;
+    Ok(crate::assetencode::map_source_hash(
+        METAL_OVERLAY_VARIANT,
+        w,
+        h,
+        &raw,
+    ))
 }
 
 /// Render `map_name`'s metal infomap to a green-on-transparent RGBA PNG data URL

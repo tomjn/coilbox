@@ -100,7 +100,7 @@ export function bindMapTools(
   };
 }
 
-/** Tools for `sweepMapPictures`, which sends a map's minimap. */
+/** Tools for `sweepMapPictures`, which sends a map's minimap and overlays. */
 export function bindMapPictureTools(
   run: ManualRun,
   base: MapPictureSweepTools = liveMapPictureSweepTools,

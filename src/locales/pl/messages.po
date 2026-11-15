@@ -3740,6 +3740,10 @@ msgstr "{LARGE_STEP_SECONDS, plural, one {Wstecz o # sekundę} few {Wstecz o # s
 msgid "{LARGE_STEP_SECONDS, plural, one {Forward # second} other {Forward # seconds}}"
 msgstr "{LARGE_STEP_SECONDS, plural, one {Naprzód o # sekundę} few {Naprzód o # sekundy} many {Naprzód o # sekund} other {Naprzód o # sekundy}}"
 
+#: src/hub/maps/pictureSweep.ts
+msgid "{layerCount, plural, one {Coilbox could not send one map's terrain, metal or type layer.} other {Coilbox could not send # terrain, metal or type layers.}}"
+msgstr ""
+
 #: src/content/mapImage.ts
 #, fuzzy
 msgid "{layerLabel}. {layerSentence}."
@@ -15955,9 +15959,8 @@ msgid "Coilbox can read the maps on this computer and tell the hub what is in th
 msgstr "Coilbox może odczytać mapy na tym komputerze i przekazać hubowi, co w nich jest: jak duża jest każda z nich, jak wysoko sięga teren, jaka część jest pod wodą, ile mają energii wiatrowej i pływowej oraz gdzie startują gracze. Nie wysyła obrazków ani plików, tylko te pomiary."
 
 #: src/hub/pages/components/MapPicturesControl.tsx
-#, fuzzy
-msgid "Coilbox can read the minimap out of every map on this computer and send it to the hub, so a map somebody is looking at there has a picture of it rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
-msgstr "Coilbox może odczytać minimapę z każdej mapy na tym komputerze i wysłać ją do hubu, aby mapa oglądana tam miała obrazek, a nie rysunek swojej nazwy. Najpierw pyta hub, co już ma, więc mapa opracowana przez kogoś innego kosztuje jedno pytanie."
+msgid "Coilbox can read the minimap, terrain, metal and ground types out of every map on this computer and send them to the hub, so a map somebody is looking at there has a picture and terrain rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
+msgstr ""
 
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy

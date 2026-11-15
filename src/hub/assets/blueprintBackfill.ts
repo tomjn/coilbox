@@ -85,7 +85,7 @@
  *
  * ## The map equivalent of this file is a button, not a lazy path
  *
- * `src/hub/maps/pictureSweep.ts` sends a map's minimap, and it only ever runs
+ * `src/hub/maps/pictureSweep.ts` sends a map's pictures, and it only ever runs
  * because somebody pressed something (issue #2379). Nothing lazy sends one, and
  * the reason is the reason this file is lazy in the first place. A blueprint
  * names its units, so a layout is an honest list of what is worth a picture. A
@@ -93,9 +93,9 @@
  * launcher, and none of those means the map is worth one. They mean somebody
  * looked at it.
  *
- * The three map overlays still reach the hub through the seed export in
- * `crates/coilbox-unitsync-worker/src/seed.rs` and through nothing else. Section
- * 4.6.1 of the asset pipeline design carries both halves.
+ * The same sweep sends the three map overlays beside the minimap, as does the
+ * seed export in `crates/coilbox-unitsync-worker/src/seed.rs`. Section 4.6.1 of
+ * the asset pipeline design carries the history.
  */
 
 import { plural, t } from "@lingui/core/macro";

@@ -6,10 +6,13 @@ import {
   MAP_PICTURES_SUBJECT,
   type MapPictureSweepProgress,
   type MapPictureSweepTools,
+  mapLayerUpload,
+  mapPictureKey,
   mapPictureSkipSummary,
   mapPictureSweepSummary,
-  mapsTheHubHasNoPictureOf,
   minimapUpload,
+  picturesOffered,
+  picturesTheHubWants,
   sweepMapPictures,
 } from "./pictureSweep";
 
@@ -29,34 +32,51 @@ const TARGET = {
   dataDir: "/data",
 };
 
-/** One map as the survey pass reports it. */
-function surveyed(name: string): MapMinimapRow {
+const HEIGHT = "overlay:height";
+const METAL = "overlay:metal";
+
+/** One map as the survey pass reports it, with the overlay layers named. */
+function surveyed(name: string, layers: string[] = []): MapMinimapRow {
   return {
     mapName: name,
     sourceHash: `src-${name}`,
     sourceArchive: name,
     mapWidth: 8192,
     mapHeight: 6144,
+    overlays: layers.map((variant) => ({
+      variant,
+      sourceHash: `src-${name}-${variant}`,
+    })),
   };
 }
 
-/** The same map as the encode pass reports it, with a picture on it. */
+/** One layer of a map as the encode pass writes it. */
+function asset(row: MapMinimapRow, variant: string, sourceHash: string) {
+  return {
+    variant,
+    origin: "extracted",
+    sourceArchive: row.sourceArchive,
+    path: `/cache/${row.mapName}-${variant}.webp`,
+    hash: `bytes-${row.mapName}-${variant}`,
+    sourceHash,
+    encodeProfile: "webp-q80-512",
+    mime: "image/webp",
+    width: 512,
+    height: 512,
+    bytes: 35458,
+    ...(variant === HEIGHT ? { minHeight: -40, maxHeight: 620.5 } : {}),
+  };
+}
+
+/** The same map as the encode pass reports it, with every layer on it. */
 function encoded(row: MapMinimapRow): MapMinimapRow {
   return {
     ...row,
-    asset: {
-      variant: "minimap",
-      origin: "extracted",
-      sourceArchive: row.sourceArchive,
-      path: `/cache/${row.mapName}.webp`,
-      hash: `bytes-${row.mapName}`,
-      sourceHash: row.sourceHash,
-      encodeProfile: "webp-q80-512",
-      mime: "image/webp",
-      width: 512,
-      height: 512,
-      bytes: 35458,
-    },
+    asset: asset(row, "minimap", row.sourceHash),
+    overlays: (row.overlays ?? []).map((layer) => ({
+      ...layer,
+      asset: asset(row, layer.variant, layer.sourceHash),
+    })),
   };
 }
 
@@ -67,6 +87,8 @@ interface Watch {
   asked: AssetKey[][];
   /** Every set of pictures offered, by the maps they were of. */
   sent: string[][];
+  /** The same sets, as `map variant`. */
+  sentLayers: string[][];
   startedBy: string[];
   recorded: { subject: string; written: number }[];
   progress: MapPictureSweepProgress[];
@@ -75,8 +97,10 @@ interface Watch {
 function watcher(
   options: {
     library?: string[];
-    /** Which maps the hub already has a picture of. */
-    hubHas?: (map: string) => boolean;
+    /** The overlay layers every map in the library offers. */
+    layers?: string[];
+    /** Which pictures the hub already has. */
+    hubHas?: (map: string, variant: string) => boolean;
     /** Which maps produce a picture when the encode pass runs. */
     encodes?: (map: string) => boolean;
     /** Writes left in the hour. */
@@ -95,6 +119,7 @@ function watcher(
     walks: [],
     asked: [],
     sent: [],
+    sentLayers: [],
     startedBy: [],
     recorded: [],
     progress: [],
@@ -104,7 +129,7 @@ function watcher(
     minimaps: async ({ maps, assets }) => {
       watch.walks.push({ maps, assets });
       const names = maps ?? library;
-      const rows = names.map(surveyed);
+      const rows = names.map((name) => surveyed(name, options.layers));
       return {
         maps: assets
           ? rows.filter((row) => encodes(row.mapName)).map(encoded)
@@ -120,15 +145,31 @@ function watcher(
         map_name: key.keyed_on === "map" ? key.map_name : "",
         variant: key.variant,
         status:
-          key.keyed_on === "map" && hubHas(key.map_name) ? "have" : "missing",
+          key.keyed_on === "map" && hubHas(key.map_name, key.variant)
+            ? "have"
+            : "missing",
       }));
     },
     upload: async (_hubUrl, assets, options) => {
       watch.sent.push(
         assets.map((asset) => (asset.keyed_on === "map" ? asset.map_name : "")),
       );
+      watch.sentLayers.push(
+        assets.map((asset) =>
+          asset.keyed_on === "map" ? `${asset.map_name} ${asset.variant}` : "",
+        ),
+      );
       watch.startedBy.push(options.startedBy);
-      return { outcomes: [], written: assets.length, error: null };
+      return {
+        outcomes: assets.map(() => ({
+          result: "uploaded" as const,
+          status: 200,
+          said: null,
+          verdict: null,
+        })),
+        written: assets.length,
+        error: null,
+      };
     },
     writesLeft: () => writesLeft,
     record: (subject, written) => {
@@ -144,7 +185,7 @@ const run = (watch: Watch) =>
 
 describe("which maps a sweep sends pictures of", () => {
   it("wants the ones the hub answered anything but have for", () => {
-    const rows = ["Alpha", "Beta", "Gamma"].map(surveyed);
+    const rows = ["Alpha", "Beta", "Gamma"].map((name) => surveyed(name));
     const answers: HaveResult[] = [
       {
         keyed_on: "map",
@@ -167,15 +208,62 @@ describe("which maps a sweep sends pictures of", () => {
     ];
 
     expect(
-      mapsTheHubHasNoPictureOf(rows, answers).map((row) => row.mapName),
+      picturesTheHubWants(picturesOffered(rows), answers).map(
+        (picture) => picture.row.mapName,
+      ),
     ).toEqual(["Beta", "Gamma"]);
   });
 
   /** Zipping by index is what the have check promises. A short answer cannot be
    *  lined up, and lining it up wrongly would send Alpha's picture as Beta's. */
   it("sends nothing at all when the answers cannot be lined up", () => {
-    const rows = ["Alpha", "Beta"].map(surveyed);
-    expect(mapsTheHubHasNoPictureOf(rows, [])).toEqual([]);
+    const rows = ["Alpha", "Beta"].map((name) => surveyed(name));
+    expect(picturesTheHubWants(picturesOffered(rows), [])).toEqual([]);
+  });
+
+  it("offers each map's minimap and then its overlay layers", () => {
+    const keys = picturesOffered([surveyed("Alpha", [HEIGHT, METAL])]).map(
+      mapPictureKey,
+    );
+    expect(keys).toEqual([
+      {
+        keyed_on: "map",
+        map_name: "Alpha",
+        variant: "minimap",
+        source_hash: "src-Alpha",
+      },
+      {
+        keyed_on: "map",
+        map_name: "Alpha",
+        variant: HEIGHT,
+        source_hash: `src-Alpha-${HEIGHT}`,
+      },
+      {
+        keyed_on: "map",
+        map_name: "Alpha",
+        variant: METAL,
+        source_hash: `src-Alpha-${METAL}`,
+      },
+    ]);
+  });
+
+  /** The hub refuses a height layer without its world range, and a range on
+   *  anything else. */
+  it("puts the world height range on the height layer alone", () => {
+    const row = encoded(surveyed("Alpha", [HEIGHT, METAL]));
+    const [height, metal] = (row.overlays ?? []).map((layer) =>
+      mapLayerUpload(row, layer.asset as NonNullable<typeof layer.asset>),
+    );
+    expect(height).toMatchObject({
+      variant: HEIGHT,
+      source_hash: `src-Alpha-${HEIGHT}`,
+      world_height_min: -40,
+      world_height_max: 620.5,
+      map_width: 8192,
+      map_height: 6144,
+    });
+    expect(metal).not.toHaveProperty("world_height_min");
+    expect(metal).not.toHaveProperty("world_height_max");
   });
 
   /** A map row is refused without both, and they are elmos rather than the
@@ -189,7 +277,7 @@ describe("which maps a sweep sends pictures of", () => {
       source_hash: "src-Alpha",
       map_width: 8192,
       map_height: 6144,
-      path: "/cache/Alpha.webp",
+      path: "/cache/Alpha-minimap.webp",
     });
   });
 
@@ -265,6 +353,54 @@ describe("a sweep over the installed maps", () => {
     expect(report.left).toBe(1);
   });
 
+  it("sends only the layers the hub is missing", async () => {
+    const watch = watcher({
+      library: ["Alpha", "Beta"],
+      layers: [HEIGHT, METAL],
+      hubHas: (map, variant) => map === "Alpha" || variant !== HEIGHT,
+    });
+    const report = await run(watch);
+
+    expect(watch.asked[0]).toHaveLength(6);
+    expect(watch.walks[1]).toEqual({ maps: ["Beta"], assets: true });
+    expect(watch.sentLayers).toEqual([[`Beta ${HEIGHT}`]]);
+    expect(report.wanted).toBe(1);
+    expect(report.sent).toBe(1);
+    expect(report.left).toBe(0);
+  });
+
+  it("counts a map still waiting until every layer it wanted is written", async () => {
+    const watch = watcher({ library: ["Alpha"], layers: [HEIGHT] });
+    watch.tools.upload = async (_hubUrl, assets) => ({
+      outcomes: assets.map((asset) => ({
+        result: asset.variant === HEIGHT ? "refused" : "uploaded",
+        status: asset.variant === HEIGHT ? 400 : 200,
+        said: null,
+        verdict: null,
+      })),
+      written: 1,
+      error: null,
+    });
+    const report = await run(watch);
+
+    expect(report.sent).toBe(1);
+    expect(report.left).toBe(1);
+  });
+
+  it("keeps a layer the walk could not offer apart from the maps it skipped", async () => {
+    const watch = watcher({
+      skipped: [
+        { mapName: "Alpha", reason: "read-failed", variant: METAL },
+        { mapName: "Delta", reason: "blank" },
+      ],
+    });
+    const report = await run(watch);
+    expect(report.skipped).toEqual([{ mapName: "Delta", reason: "blank" }]);
+    expect(report.layersSkipped).toEqual([
+      { mapName: "Alpha", reason: "read-failed", variant: METAL },
+    ]);
+  });
+
   it("reports the maps the library had no picture in", async () => {
     const watch = watcher({
       skipped: [{ mapName: "Delta", reason: "blank" }],
@@ -289,7 +425,26 @@ describe("the hour's allowance", () => {
     expect(report.wanted).toBe(2);
     expect(report.sent).toBe(1);
     expect(report.left).toBe(1);
-    expect(report.stopped).toContain("1 of the 2 maps");
+    expect(report.stopped).toContain("1 of the 2 map pictures");
+  });
+
+  /** A map can want four pictures, so the hour is counted in pictures and can
+   *  end part way through one map. The next press asks again and finishes it. */
+  it("counts pictures rather than maps, and can stop part way through a map", async () => {
+    const watch = watcher({
+      library: ["Alpha"],
+      layers: [HEIGHT, METAL],
+      writesLeft: 2,
+    });
+    const report = await run(watch);
+
+    expect(watch.sentLayers).toEqual([["Alpha minimap", `Alpha ${HEIGHT}`]]);
+    expect(watch.recorded).toEqual([
+      { subject: MAP_PICTURES_SUBJECT, written: 2 },
+    ]);
+    expect(report.sent).toBe(1);
+    expect(report.left).toBe(1);
+    expect(report.stopped).toContain("2 of the 3 map pictures");
   });
 
   /**
@@ -332,6 +487,7 @@ describe("what a sweep is reported as", () => {
         sent: 80,
         left: 10,
         skipped: [],
+        layersSkipped: [],
         errors: [],
       }),
     ).toBe(
@@ -347,6 +503,7 @@ describe("what a sweep is reported as", () => {
         sent: 0,
         left: 0,
         skipped: [],
+        layersSkipped: [],
         errors: [],
       }),
     ).toBe("The hub already has a picture of every map on this computer.");
@@ -360,6 +517,7 @@ describe("what a sweep is reported as", () => {
         sent: 0,
         left: 0,
         skipped: [],
+        layersSkipped: [],
         errors: [],
       }),
     ).toBe("Coilbox found no maps to draw.");
@@ -375,6 +533,7 @@ describe("what a sweep is reported as", () => {
         sent: 1,
         left: 0,
         skipped: [{ mapName: "Empty Quarter", reason: "no-source" }],
+        layersSkipped: [],
         errors: [],
       }),
     ).toContain("every map coilbox could draw one for");
@@ -388,9 +547,29 @@ describe("what a sweep is reported as", () => {
         sent: 1,
         left: 0,
         skipped: [],
+        layersSkipped: [],
         errors: [],
       }),
     ).toContain("every map on this computer");
+  });
+
+  it("says how many layers it could not send, apart from the maps", () => {
+    expect(
+      mapPictureSweepSummary({
+        read: 10,
+        wanted: 1,
+        sent: 1,
+        left: 0,
+        skipped: [],
+        layersSkipped: [
+          { mapName: "A", reason: "read-failed", variant: METAL },
+          { mapName: "B", reason: "no-bounds", variant: HEIGHT },
+        ],
+        errors: [],
+      }),
+    ).toBe(
+      "Sent one map's picture. The hub now has a picture of every map on this computer. Coilbox could not send 2 terrain, metal or type layers.",
+    );
   });
 });
 

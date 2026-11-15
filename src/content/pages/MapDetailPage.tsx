@@ -386,7 +386,8 @@ export default function MapDetailPage() {
           enginePath={selected?.enginePath}
           dataDir={selected?.rootPath}
         />
-        {hubPresence.state === "present" && (
+        {(hubPresence.state === "present" ||
+          hubPresence.state === "incomplete") && (
           <HubPageButton url={hubPresence.url} label={t`Show on hub`} />
         )}
         {mapping && archiveName && (

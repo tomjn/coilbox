@@ -588,7 +588,10 @@ bounded at both ends. A library walk is thousands of subjects with one picture
 each, so the hub's cap never bites and a per map ration would be none at all. The
 client keeps one bucket over every map.
 
-#### The three overlays are still seed only
+#### The three overlays went seed only, then followed the minimap
+
+**Reversed 2026-11-15.** The overlays now go through the same client walk as the
+minimap. What follows is the 2026-09-02 ruling, then what overturned it.
 
 `overlay:metal`, `overlay:type` and `overlay:height` reach the hub through the
 seed walk at `crates/coilbox-unitsync-worker/src/seed.rs` and through nothing
@@ -607,6 +610,23 @@ at all, because a type map has no display path to have one for.
 What follows from it: a map nobody has seeded and nobody has uploaded has no
 picture on the hub, and `src/hub/assets/picture.ts` falls through to a drawing of
 the map's outline, so the absence is a handled state rather than a broken one.
+
+#### What overturned it for the overlays
+
+The cost argument stopped being true. It was made when a height overlay was a
+16 bit PNG of up to 5.3 MB. Once the height layer became an 8 bit WebP capped at
+512px, the five seeded maps checked on 2026-11-15 came to 40,894 bytes a map for
+all three overlays together, against 36,390 for the minimap. At that rate the
+3,575 known maps would add about 146 MB of overlays to the 1 GB Pages ceiling, on
+the strength of a five map sample.
+
+Meanwhile the hub draws a map's terrain from its height layer, and a map sent from
+coilbox had none, so it showed a flat picture where a seeded map showed terrain.
+
+`--map-minimaps` now names each map's three overlay layers beside its minimap and
+encodes them on the sending pass, and `src/hub/maps/pictureSweep.ts` asks about
+all four and sends what the hub is missing. The hourly ration is still one bucket
+over every map, now counted in pictures rather than in maps.
 
 ### 4.7 Two-tier storage: Blob as staging, repo as durable
 
@@ -644,11 +664,9 @@ not have installed, arriving from users afterwards. **A steadily growing Blob
 footprint means the promotion job has stalled** — a useful health signal, not
 just a quota to watch.
 
-A map's overlays are not part of that long tail. One the maintainer does not
-hold is seeded by whoever does, not uploaded by whoever happened to look at it,
-because there is no client upload path for them (section 4.6.1). A map's minimap
-is part of it, since coilbox#2379: it arrives from whoever has the archive, on a
-button, rationed the same way a game's pictures are.
+A map's pictures are part of that long tail: the minimap since coilbox#2379,
+and the three overlays since 2026-11-15 (section 4.6.1). They arrive from whoever
+has the archive, on a button, rationed the same way a game's pictures are.
 
 ### 4.8 Resolution order at render time
 

@@ -3871,11 +3871,11 @@ export const unitsyncMapCatalog = defineCommand<
   MapCatalogResult
 >("coilbox-unitsync", "unitsync_map_catalog");
 
-/** A map's minimap encoded as the asset the hub takes, written to disk. Same
- *  shape as {@link UnitBuildpicAsset} without the archive member, since a map
- *  layer is produced from the map file rather than read out of one. */
+/** One of a map's layers encoded as the asset the hub takes, written to disk.
+ *  Same shape as {@link UnitBuildpicAsset} without the archive member, since a
+ *  map layer is produced from the map file rather than read out of one. */
 export interface MapMinimapAsset {
-  /** Always `minimap`. */
+  /** `minimap`, `overlay:metal`, `overlay:type` or `overlay:height`. */
   variant: string;
   /** Always `extracted`, against `rendered` for a picture coilbox drew. */
   origin: string;
@@ -3893,6 +3893,20 @@ export interface MapMinimapAsset {
   width: number;
   height: number;
   bytes: number;
+  /** The world heights in elmos the picture's darkest and lightest grey stand
+   *  for. `overlay:height` only. */
+  minHeight?: number;
+  maxHeight?: number;
+}
+
+/** One of a map's overlay layers in a minimap walk: what a have check asks
+ *  about, and the encoded layer when this pass was the one that sends. */
+export interface MapLayerRow {
+  /** `overlay:metal`, `overlay:type` or `overlay:height`. */
+  variant: string;
+  sourceHash: string;
+  /** Absent on a survey pass. */
+  asset?: MapMinimapAsset;
 }
 
 /** One map in a minimap walk: what a have check asks about, and the encoded
@@ -3908,6 +3922,9 @@ export interface MapMinimapRow {
   mapHeight: number;
   /** Absent on a survey pass. */
   asset?: MapMinimapAsset;
+  /** The map's overlay layers that could be read. A layer the map does not have
+   *  is absent. Missing altogether from a worker older than the field. */
+  overlays?: MapLayerRow[];
 }
 
 /** Why a map produced no row. The first seven are one picture's reasons and the
@@ -3926,13 +3943,15 @@ export type MapMinimapSkip =
 
 export interface MapMinimapsResult {
   maps: MapMinimapRow[];
-  skipped: { mapName: string; reason: MapMinimapSkip }[];
+  /** A map with no row, or with `variant`, one overlay layer the map's row
+   *  goes without. */
+  skipped: { mapName: string; reason: MapMinimapSkip; variant?: string }[];
   errors: string[];
 }
 
 /**
- * Name what every installed map's minimap would be called, and with `assets`
- * encode the pictures themselves (issue #2379).
+ * Name what every installed map's minimap and overlay layers would be called,
+ * and with `assets` encode them (issue #2379).
  *
  * Two passes, and the caller picks which, the same shape
  * {@link unitsyncMapCatalog} takes. A minimap's identity is over the texture

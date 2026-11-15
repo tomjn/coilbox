@@ -3,7 +3,7 @@ import type { GameItem } from "@/content/bindings";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
 import { fetchHubGames, type HubGame } from "../api";
 import { fetchHubPictures } from "../assets/pictures";
-import { MINIMAP_VARIANT } from "../assets/vocabulary";
+import { MAP_VARIANTS, MINIMAP_VARIANT } from "../assets/vocabulary";
 import { useTrustedHubUrl } from "../config";
 import { gamesToSend, type Sendable } from "../games/factsSweep";
 import { fetchMapFacts, type MapFacts } from "../maps/lookup";
@@ -15,10 +15,14 @@ import { useManualSendsFinished } from "./run";
  * `unknown` covers both "still asking" and "could not ask". Neither is a claim
  * the page can act on, and a button that appears while the hub is down would
  * offer a send that then fails.
+ *
+ * `incomplete` is a map the hub has a page for that is still missing some of
+ * its layers, such as its terrain. The page links to it and offers the send.
  */
 export type HubPresence =
   | { state: "unknown" }
   | { state: "missing" }
+  | { state: "incomplete"; url: string }
   | { state: "present"; url: string };
 
 const UNKNOWN: HubPresence = { state: "unknown" };
@@ -52,20 +56,21 @@ export function gamePresence(
 }
 
 /**
- * A map is on the hub when the hub has its facts and its minimap. Either one
- * still unanswered is unknown.
+ * A map is on the hub when the hub has its facts and its minimap, and complete
+ * when it also has every overlay layer. `held` is the variants the hub has a
+ * picture of. Either answer still out is unknown.
  */
 export function mapPresence(
   hubUrl: string,
   facts: MapFacts | null | undefined,
-  hasMinimap: boolean | undefined,
+  held: ReadonlySet<string> | undefined,
 ): HubPresence {
-  if (facts === undefined || hasMinimap === undefined) return UNKNOWN;
-  if (!facts || !hasMinimap) return MISSING;
-  return {
-    state: "present",
-    url: `${base(hubUrl)}/map/${encodeURIComponent(facts.slug)}`,
-  };
+  if (facts === undefined || held === undefined) return UNKNOWN;
+  if (!facts || !held.has(MINIMAP_VARIANT)) return MISSING;
+  const url = `${base(hubUrl)}/map/${encodeURIComponent(facts.slug)}`;
+  return MAP_VARIANTS.every((variant) => held.has(variant))
+    ? { state: "present", url }
+    : { state: "incomplete", url };
 }
 
 /**
@@ -98,17 +103,17 @@ export function useGamePresence(
   return gamePresence(hubUrl, games, shortname, release);
 }
 
-/** Ask the hub about one map's facts and minimap, and again whenever a manual
+/** Ask the hub about one map's facts and layers, and again whenever a manual
  *  send ends. */
 export function useMapPresence(mapName: string | null): HubPresence {
   const hubUrl = useTrustedHubUrl();
   const finished = useManualSendsFinished();
   const [facts, setFacts] = useState<MapFacts | null | undefined>(undefined);
-  const [minimap, setMinimap] = useState<boolean | undefined>(undefined);
+  const [held, setHeld] = useState<ReadonlySet<string> | undefined>(undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `finished` is the signal to ask again
   useEffect(() => {
     setFacts(undefined);
-    setMinimap(undefined);
+    setHeld(undefined);
     if (!hubUrl || !mapName) return;
     const abort = new AbortController();
     fetchMapFacts(hubUrl, [mapName], abort.signal)
@@ -119,19 +124,27 @@ export function useMapPresence(mapName: string | null): HubPresence {
       .catch(() => {});
     fetchHubPictures(
       hubUrl,
-      [{ keyed_on: "map", map_name: mapName, variant: MINIMAP_VARIANT }],
+      MAP_VARIANTS.map((variant) => ({
+        keyed_on: "map" as const,
+        map_name: mapName,
+        variant,
+      })),
       abort.signal,
     )
       .then((result) => {
         if (!abort.signal.aborted && result.ok) {
-          setMinimap(result.pictures[0] != null);
+          setHeld(
+            new Set(
+              MAP_VARIANTS.filter((_, at) => result.pictures[at] != null),
+            ),
+          );
         }
       })
       .catch(() => {});
     return () => abort.abort();
   }, [hubUrl, mapName, finished]);
   if (!hubUrl || !mapName) return UNKNOWN;
-  return mapPresence(hubUrl, facts, minimap);
+  return mapPresence(hubUrl, facts, held);
 }
 
 /**
