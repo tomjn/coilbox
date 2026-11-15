@@ -2978,11 +2978,6 @@ msgstr "{game} er den nøyaktige versjonen dette oppdraget ble laget for, og den
 msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
 msgstr "{game} laster spillerwidgets bare når Local Widgets Config er slått på i widgetlisten."
 
-#: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "{game} pictures"
-msgstr "Bilder for {game}"
-
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
 msgid "{game}: {left, plural, one {# unit} other {# units}} still waiting out of {units}."
@@ -3691,6 +3686,10 @@ msgstr "{label} for {unitName}, nå {text}. {before}"
 #, fuzzy
 msgid "{label} volume"
 msgstr "Volum for {label}"
+
+#: src/hub/manualSend/run.ts
+msgid "{label} was not sent to the hub"
+msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
@@ -6725,6 +6724,10 @@ msgstr "{subject} kommer fra enhetslisten som ble registrert da denne reprisen b
 #, fuzzy
 msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
 msgstr "{subject} kommer fra enhetslisten motoren skrev da denne reprisen ble analysert {date}, på {game}."
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{subject} progress"
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -16170,6 +16173,10 @@ msgstr "coilbox kunne ikke lese"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox kunne ikke lese {game}: {said}"
 
+#: src/hub/manualSend/run.ts
+msgid "Coilbox could not read the map."
+msgstr ""
+
 #: src/widgets/widgetConfig.ts
 #, fuzzy
 msgid "Coilbox could not read this file: {reason}"
@@ -16462,9 +16469,12 @@ msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {ve
 msgstr "Coilbox bygger kompatibilitetskopien av {baseName} (compat {version}) som denne kampen bruker. Den kan starte for deg når det er ferdig."
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is making pictures of {game}'s units. Nothing has been sent yet."
-msgstr "Coilbox lager bilder av enhetene i {game}. Ingenting er sendt ennå."
+msgid "Coilbox is making pictures of {subject}'s units for the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
+msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
@@ -16477,9 +16487,16 @@ msgid "Coilbox is out of date"
 msgstr "Coilbox er utdatert"
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is sending {game}'s pictures to the hub."
-msgstr "Coilbox sender bildene for {game} til huben."
+msgid "Coilbox is reading {subject} to send to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject} to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject}'s pictures to the hub."
+msgstr ""
 
 #: src/widgets/widgetSync.ts
 #, fuzzy
@@ -16541,6 +16558,10 @@ msgstr "Coilbox har ikke lenger passordet til denne kampen, så rommet i Open An
 #, fuzzy
 msgid "Coilbox on GitHub"
 msgstr "Coilbox på GitHub"
+
+#: src/hub/manualSend/run.ts
+msgid "Coilbox only sends a released version of a game."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
@@ -35479,6 +35500,10 @@ msgstr "på grunn som er for bratt for den, i gult"
 msgid "on or off"
 msgstr "på eller av"
 
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "On the hub"
+msgstr ""
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -43480,6 +43505,10 @@ msgstr "Send til et spill"
 msgid "Send to every player?"
 msgstr "Sende til alle spillere?"
 
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Send to hub"
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Send what your games say"
@@ -43553,6 +43582,14 @@ msgstr "Sender bilder av kartene dine"
 msgid "Sending pictures to the hub"
 msgstr "Sender bilder til huben"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to hub"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to the hub. Open to stop."
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Sending what your games say"
@@ -43569,6 +43606,7 @@ msgid "Sending: {game}"
 msgstr "Sender: {game}"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/manualSend/HubSendControl.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -43599,6 +43637,14 @@ msgstr "sendt"
 #, fuzzy
 msgid "Sent"
 msgstr "Sendt"
+
+#: src/hub/manualSend/run.ts
+msgid "Sent {label} to the hub"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Sent part of {label} to the hub"
+msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -46539,6 +46585,10 @@ msgstr "Stopp rommet"
 msgid "Stop searching"
 msgstr "Slutt å søke"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stop sending"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Stop sending {label} through the mutator route"
@@ -46567,6 +46617,10 @@ msgstr ""
 #, fuzzy
 msgid "Stopped following {name}"
 msgstr "Sluttet å følge {name}"
+
+#: src/hub/manualSend/run.ts
+msgid "Stopped sending {label}"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -49049,6 +49103,10 @@ msgstr "Huben tok ikke imot noen akkurat nå."
 #, fuzzy
 msgid "The hub would not take any more {anyNoun} just now."
 msgstr "Huben tok ikke imot flere {anyNoun} akkurat nå."
+
+#: src/hub/manualSend/run.ts
+msgid "The hub would not take it."
+msgstr ""
 
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
@@ -55655,6 +55713,10 @@ msgstr "Det hver deltaker åpner oppdraget med, som trefningsoppsettet ikke kan 
 #, fuzzy
 msgid "What every key does, on a keyboard you can click."
 msgstr "Hva hver tast gjør, på et tastatur du kan klikke på."
+
+#: src/hub/manualSend/run.ts
+msgid "What had already gone stays on the hub."
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
