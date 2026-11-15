@@ -198,8 +198,9 @@ async fn hub_assets_have<R: Runtime>(
     app: AppHandle<R>,
     hub_url: String,
     keys: Vec<have::AssetKey>,
+    grant: Option<String>,
 ) -> CliResult {
-    let consent = match consent::AssetUploadConsent::check(&app) {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
@@ -259,8 +260,9 @@ async fn hub_upload_assets<R: Runtime>(
     assets: Vec<AssetUpload>,
     op_id: Option<String>,
     on_progress: Channel<AssetUploadProgress>,
+    grant: Option<String>,
 ) -> CliResult {
-    let consent = match consent::AssetUploadConsent::check(&app) {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
@@ -304,8 +306,9 @@ async fn hub_maps_have<R: Runtime>(
     hub_url: String,
     keys: Vec<maps::MapHaveKey>,
     on_progress: Channel<maps::MapBatchProgress>,
+    grant: Option<String>,
 ) -> CliResult {
-    let consent = match consent::AssetUploadConsent::check(&app) {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
@@ -337,8 +340,9 @@ async fn hub_publish_maps<R: Runtime>(
     hub_url: String,
     entries: Vec<coilbox_map_catalog::MapCatalogEntry>,
     on_progress: Channel<maps::MapBatchProgress>,
+    grant: Option<String>,
 ) -> CliResult {
-    let consent = match consent::AssetUploadConsent::check(&app) {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
@@ -368,8 +372,9 @@ async fn hub_publish_game_facts<R: Runtime>(
     app: AppHandle<R>,
     hub_url: String,
     game: games::GameFacts,
+    grant: Option<String>,
 ) -> CliResult {
-    let consent = match consent::AssetUploadConsent::check(&app) {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
@@ -377,6 +382,29 @@ async fn hub_publish_game_facts<R: Runtime>(
         Ok(results) => CliResult::ok(json!({ "results": results })),
         Err(said) => CliResult::err(said),
     }
+}
+
+/// `hub_manual_send_begin`: open a grant for one send somebody asked for by
+/// pressing "Send to hub" on a map or game's page.
+///
+/// The press is the agreement, so the uploads switch is not read. The profile is,
+/// because a distribution that turned sending off turned all of it off. The id
+/// that comes back goes with every command the send makes, and admits only the
+/// subject named here. See [`consent`].
+#[tauri::command]
+fn hub_manual_send_begin(subject: consent::SendSubject) -> CliResult {
+    match consent::begin_grant(subject) {
+        Ok(grant) => CliResult::ok(json!({ "grant": grant })),
+        Err(refused) => CliResult::err(refused),
+    }
+}
+
+/// `hub_manual_send_end`: close a grant, however its send ended. A no-op for an
+/// id that is unknown or already closed.
+#[tauri::command]
+fn hub_manual_send_end(grant: String) -> CliResult {
+    consent::end_grant(&grant);
+    CliResult::ok(json!({}))
 }
 
 /// `hub_upload_cancel`: stop a running upload by its `op_id`. The run drops the
@@ -404,7 +432,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_upload_cancel,
             hub_maps_have,
             hub_publish_maps,
-            hub_publish_game_facts
+            hub_publish_game_facts,
+            hub_manual_send_begin,
+            hub_manual_send_end
         ])
         .build()
 }

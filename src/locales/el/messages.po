@@ -2980,11 +2980,6 @@ msgstr "Το {game} είναι η ακριβής έκδοση για την οπ
 msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
 msgstr "Το {game} φορτώνει widgets παικτών μόνο όταν το Local Widgets Config είναι ενεργό στη λίστα widgets του."
 
-#: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "{game} pictures"
-msgstr "Εικόνες του {game}"
-
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
 msgid "{game}: {left, plural, one {# unit} other {# units}} still waiting out of {units}."
@@ -3693,6 +3688,10 @@ msgstr "{label} για το {unitName}, τώρα {text}. {before}"
 #, fuzzy
 msgid "{label} volume"
 msgstr "Ένταση {label}"
+
+#: src/hub/manualSend/run.ts
+msgid "{label} was not sent to the hub"
+msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
@@ -6727,6 +6726,10 @@ msgstr "{subject}: προέρχονται από τη λίστα μονάδων 
 #, fuzzy
 msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
 msgstr "{subject}: προέρχονται από τη λίστα μονάδων που έγραψε η μηχανή όταν αναλύθηκε αυτή η επανάληψη στις {date}, στο {game}."
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{subject} progress"
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -16173,6 +16176,10 @@ msgstr "το coilbox δεν μπόρεσε να διαβάσει"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Το Coilbox δεν μπόρεσε να διαβάσει το {game}: {said}"
 
+#: src/hub/manualSend/run.ts
+msgid "Coilbox could not read the map."
+msgstr ""
+
 #: src/widgets/widgetConfig.ts
 #, fuzzy
 msgid "Coilbox could not read this file: {reason}"
@@ -16465,9 +16472,12 @@ msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {ve
 msgstr "Το Coilbox δημιουργεί το αντίγραφο λειτουργίας συμβατότητας του {baseName} (compat {version}) που χρησιμοποιεί αυτή η μάχη. Μπορεί να ξεκινήσει για εσάς μόλις ολοκληρωθεί."
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is making pictures of {game}'s units. Nothing has been sent yet."
-msgstr "Το Coilbox φτιάχνει εικόνες των μονάδων του {game}. Δεν έχει σταλεί τίποτα ακόμη."
+msgid "Coilbox is making pictures of {subject}'s units for the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
+msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
@@ -16480,9 +16490,16 @@ msgid "Coilbox is out of date"
 msgstr "Το Coilbox δεν είναι ενημερωμένο"
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is sending {game}'s pictures to the hub."
-msgstr "Το Coilbox στέλνει τις εικόνες του {game} στο hub."
+msgid "Coilbox is reading {subject} to send to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject} to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject}'s pictures to the hub."
+msgstr ""
 
 #: src/widgets/widgetSync.ts
 #, fuzzy
@@ -16544,6 +16561,10 @@ msgstr "Το Coilbox δεν έχει πια τον κωδικό πρόσβαση
 #, fuzzy
 msgid "Coilbox on GitHub"
 msgstr "Το Coilbox στο GitHub"
+
+#: src/hub/manualSend/run.ts
+msgid "Coilbox only sends a released version of a game."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
@@ -19072,6 +19093,7 @@ msgstr "Αποκωδικοποίηση"
 msgid "Decoding…"
 msgstr "Αποκωδικοποίηση…"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -36027,11 +36049,6 @@ msgstr ""
 msgid "Open in engine"
 msgstr "Άνοιγμα στη μηχανή"
 
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Open in mapconv decompile"
-msgstr "Άνοιγμα στην απομεταγλώττιση του mapconv"
-
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx
 #, fuzzy
@@ -41009,6 +41026,7 @@ msgstr "Λίστες μονάδων επαναλήψεων"
 msgid "replays"
 msgstr "επαναλήψεις"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -41017,11 +41035,6 @@ msgstr "επαναλήψεις"
 #, fuzzy
 msgid "Replays"
 msgstr "Επαναλήψεις"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "Επαναλήψεις σε αυτόν τον χάρτη"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx
@@ -43497,6 +43510,10 @@ msgstr "Αποστολή σε παιχνίδι"
 msgid "Send to every player?"
 msgstr "Αποστολή σε κάθε παίκτη;"
 
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Send to hub"
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Send what your games say"
@@ -43570,6 +43587,14 @@ msgstr "Αποστολή εικόνων των χαρτών σας"
 msgid "Sending pictures to the hub"
 msgstr "Αποστολή εικόνων στο hub"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to hub"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to the hub. Open to stop."
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Sending what your games say"
@@ -43586,6 +43611,7 @@ msgid "Sending: {game}"
 msgstr "Αποστολή: {game}"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/manualSend/HubSendControl.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -43616,6 +43642,14 @@ msgstr "στάλθηκε"
 #, fuzzy
 msgid "Sent"
 msgstr "Στάλθηκαν"
+
+#: src/hub/manualSend/run.ts
+msgid "Sent {label} to the hub"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Sent part of {label} to the hub"
+msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -44622,6 +44656,11 @@ msgstr "Εμφάνιση σιγάσεων"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "Εμφάνιση νανοψεκασμού"
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -46556,6 +46595,10 @@ msgstr "Διακοπή αίθουσας"
 msgid "Stop searching"
 msgstr "Διακοπή αναζήτησης"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stop sending"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Stop sending {label} through the mutator route"
@@ -46584,6 +46627,10 @@ msgstr ""
 #, fuzzy
 msgid "Stopped following {name}"
 msgstr "Τέλος ακολούθησης του {name}"
+
+#: src/hub/manualSend/run.ts
+msgid "Stopped sending {label}"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -49066,6 +49113,10 @@ msgstr "Το hub δεν δέχτηκε κανένα αυτή τη στιγμή."
 #, fuzzy
 msgid "The hub would not take any more {anyNoun} just now."
 msgstr "Το hub δεν δέχεται άλλες αποστολές ({anyNoun}) αυτή τη στιγμή."
+
+#: src/hub/manualSend/run.ts
+msgid "The hub would not take it."
+msgstr ""
 
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
@@ -55679,6 +55730,10 @@ msgstr "Με τι ξεκινά κάθε συμμετέχων την αποστο
 #, fuzzy
 msgid "What every key does, on a keyboard you can click."
 msgstr "Τι κάνει κάθε πλήκτρο, σε ένα πληκτρολόγιο στο οποίο μπορείτε να κάνετε κλικ."
+
+#: src/hub/manualSend/run.ts
+msgid "What had already gone stays on the hub."
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy

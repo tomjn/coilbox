@@ -120,7 +120,11 @@ export const liveMapPictureSweepTools: MapPictureSweepTools = {
   record: recordBackfillWrites,
 };
 
-export type MapPictureSweepTarget = HubSweepTarget;
+export type MapPictureSweepTarget = HubSweepTarget & {
+  /** A map's full name, to send that map's picture alone. Used by a manual send
+   *  from the map's page. */
+  only?: string;
+};
 
 /**
  * What the hourly allowance is counted against for map pictures.
@@ -218,7 +222,8 @@ export async function sweepMapPictures(
   const report = await sweep(target, onProgress, tools);
   // Written down whatever the sweep found, including nothing, because what it
   // answers is whether this has ever run rather than whether it sent anything.
-  rememberMapSweptAt();
+  // A send of one map is not a run over the library, so it says nothing here.
+  if (!target.only) rememberMapSweptAt();
   return report;
 }
 
@@ -227,11 +232,15 @@ async function sweep(
   onProgress: (progress: MapPictureSweepProgress) => void,
   tools: MapPictureSweepTools,
 ): Promise<MapPictureSweepReport> {
-  const { hubUrl, enginePath, dataDir } = target;
+  const { hubUrl, enginePath, dataDir, only } = target;
 
   // The survey: what every map's picture would be called, with nothing encoded.
   onProgress({ phase: "reading", done: 0, total: 0 });
-  const surveyed = await tools.minimaps({ enginePath, dataDir });
+  const surveyed = await tools.minimaps({
+    enginePath,
+    dataDir,
+    ...(only ? { maps: [only] } : {}),
+  });
   const rows = surveyed.maps;
   onProgress({ phase: "reading", done: rows.length, total: rows.length });
   const found: MapPictureSweepReport = {

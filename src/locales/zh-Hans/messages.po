@@ -2948,11 +2948,6 @@ msgstr "{game} 是此任务所针对的确切版本，但无法下载。它可�
 msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
 msgstr ""
 
-#: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "{game} pictures"
-msgstr "{game} 的图片"
-
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
 msgid "{game}: {left, plural, one {# unit} other {# units}} still waiting out of {units}."
@@ -3660,6 +3655,10 @@ msgstr "{unitName} 的 {label}，当前为 {text}。{before}"
 #, fuzzy
 msgid "{label} volume"
 msgstr "{label} 音量"
+
+#: src/hub/manualSend/run.ts
+msgid "{label} was not sent to the hub"
+msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
@@ -6677,6 +6676,10 @@ msgstr "{subject} 来自 {date} 读取此回放时记录的单位列表，来源
 #, fuzzy
 msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
 msgstr "{subject} 来自 {date} 分析此回放时引擎写入的单位列表，基于 {game}。"
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{subject} progress"
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -16068,6 +16071,10 @@ msgstr "coilbox 无法读取"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox 无法读取 {game}：{said}"
 
+#: src/hub/manualSend/run.ts
+msgid "Coilbox could not read the map."
+msgstr ""
+
 #: src/widgets/widgetConfig.ts
 msgid "Coilbox could not read this file: {reason}"
 msgstr ""
@@ -16353,9 +16360,12 @@ msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {ve
 msgstr "Coilbox 正在构建此对局所用的 {baseName}（兼容 {version}）兼容模式副本。完成后你就可以开始。"
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is making pictures of {game}'s units. Nothing has been sent yet."
-msgstr "Coilbox 正在制作 {game} 单位的图片。尚未发送任何内容。"
+msgid "Coilbox is making pictures of {subject}'s units for the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
+msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
@@ -16368,9 +16378,16 @@ msgid "Coilbox is out of date"
 msgstr "Coilbox 版本过旧"
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is sending {game}'s pictures to the hub."
-msgstr "Coilbox 正在将 {game} 的图片发送到中心。"
+msgid "Coilbox is reading {subject} to send to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject} to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject}'s pictures to the hub."
+msgstr ""
 
 #: src/widgets/widgetSync.ts
 msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
@@ -16430,6 +16447,10 @@ msgstr ""
 #, fuzzy
 msgid "Coilbox on GitHub"
 msgstr "GitHub 上的 Coilbox"
+
+#: src/hub/manualSend/run.ts
+msgid "Coilbox only sends a released version of a game."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
@@ -18938,6 +18959,7 @@ msgstr "解码中"
 msgid "Decoding…"
 msgstr "正在解码…"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -35793,11 +35815,6 @@ msgstr ""
 msgid "Open in engine"
 msgstr "在引擎中打开"
 
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Open in mapconv decompile"
-msgstr "在 mapconv 反编译中打开"
-
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx
 #, fuzzy
@@ -40734,6 +40751,7 @@ msgstr "回放单位列表"
 msgid "replays"
 msgstr "回放"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -40742,11 +40760,6 @@ msgstr "回放"
 #, fuzzy
 msgid "Replays"
 msgstr "回放"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "此地图上的回放"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx
@@ -43207,6 +43220,10 @@ msgstr "发送到游戏"
 msgid "Send to every player?"
 msgstr "发送给所有玩家？"
 
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Send to hub"
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Send what your games say"
@@ -43280,6 +43297,14 @@ msgstr "正在发送你的地图图片"
 msgid "Sending pictures to the hub"
 msgstr "正在向中心发送图片"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to hub"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to the hub. Open to stop."
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Sending what your games say"
@@ -43296,6 +43321,7 @@ msgid "Sending: {game}"
 msgstr "发送中：{game}"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/manualSend/HubSendControl.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -43326,6 +43352,14 @@ msgstr "已发送"
 #, fuzzy
 msgid "Sent"
 msgstr "已发送"
+
+#: src/hub/manualSend/run.ts
+msgid "Sent {label} to the hub"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Sent part of {label} to the hub"
+msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -44327,6 +44361,11 @@ msgstr "显示禁言"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "显示纳米喷流"
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -46246,6 +46285,10 @@ msgstr "停止房间"
 msgid "Stop searching"
 msgstr "停止搜索"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stop sending"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Stop sending {label} through the mutator route"
@@ -46274,6 +46317,10 @@ msgstr ""
 #, fuzzy
 msgid "Stopped following {name}"
 msgstr "已取消关注 {name}"
+
+#: src/hub/manualSend/run.ts
+msgid "Stopped sending {label}"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -48736,6 +48783,10 @@ msgstr "中心暂时不接收任何内容。"
 #, fuzzy
 msgid "The hub would not take any more {anyNoun} just now."
 msgstr "中心暂时不再接收更多 {anyNoun}。"
+
+#: src/hub/manualSend/run.ts
+msgid "The hub would not take it."
+msgstr ""
 
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
@@ -55305,6 +55356,10 @@ msgstr "每个参与者开始任务时拥有的内容，这是遭遇战设置无
 #, fuzzy
 msgid "What every key does, on a keyboard you can click."
 msgstr "每个按键的作用，显示在可以点击的键盘上。"
+
+#: src/hub/manualSend/run.ts
+msgid "What had already gone stays on the hub."
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy

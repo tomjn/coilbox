@@ -41,8 +41,20 @@ export default function UploadRunBadge() {
   const runs = useRunningUploads();
   if (runs.length === 0) return null;
 
+  // A send somebody pressed a button for is named for what it sends, since it
+  // carries facts as well as pictures. A backfill keeps its picture wording.
+  const manual = runs.some((run) => run.kind !== "pictures");
   const drawing = runs.some((run) => run.phase === "drawing");
-  const label = drawing ? t`Making pictures` : t`Sending pictures`;
+  const label = manual
+    ? t`Sending to hub`
+    : drawing
+      ? t`Making pictures`
+      : t`Sending pictures`;
+  const described = manual
+    ? t`Sending to the hub. Open to stop.`
+    : drawing
+      ? t`Making pictures for the hub. Open to stop.`
+      : t`Sending pictures for the hub. Open to stop.`;
 
   return (
     <Popover>
@@ -50,11 +62,7 @@ export default function UploadRunBadge() {
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={
-            drawing
-              ? t`Making pictures for the hub. Open to stop.`
-              : t`Sending pictures for the hub. Open to stop.`
-          }
+          aria-label={described}
         >
           <Images
             size={14}
@@ -77,11 +85,18 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
   const { t } = useLingui();
   const percent =
     run.total > 0 ? Math.min(100, Math.round((run.done / run.total) * 100)) : 0;
-  const { game, done, total, sent } = run;
+  const { subject, done, total, sent } = run;
+  const manual = run.kind !== "pictures";
   const doing =
-    run.phase === "drawing"
-      ? t`Coilbox is making pictures of ${game}'s units. Nothing has been sent yet.`
-      : t`Coilbox is sending ${game}'s pictures to the hub.`;
+    run.phase === "reading"
+      ? t`Coilbox is reading ${subject} to send to the hub.`
+      : run.phase === "drawing"
+        ? manual
+          ? t`Coilbox is making pictures of ${subject}'s units for the hub.`
+          : t`Coilbox is making pictures of ${subject}'s units. Nothing has been sent yet.`
+        : manual
+          ? t`Coilbox is sending ${subject} to the hub.`
+          : t`Coilbox is sending ${subject}'s pictures to the hub.`;
   const counted =
     run.phase === "drawing"
       ? t`${done} of ${total} made`
@@ -90,12 +105,18 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
   return (
     <div className="space-y-2">
       <p className="text-sm">{doing}</p>
-      <Progress
-        value={percent}
-        className="h-1.5 bg-muted"
-        aria-label={t`${game} pictures`}
-      />
-      <p className="text-xs tabular-nums text-muted-foreground">{counted}</p>
+      {total > 0 && (
+        <>
+          <Progress
+            value={percent}
+            className="h-1.5 bg-muted"
+            aria-label={t`${subject} progress`}
+          />
+          <p className="text-xs tabular-nums text-muted-foreground">
+            {counted}
+          </p>
+        </>
+      )}
       {run.sent > 0 && (
         // Above the button rather than below it. A stop is not an undo, and the
         // person who needs that is the one deciding whether to press, not the
@@ -115,7 +136,11 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
         disabled={run.stopping}
         onClick={() => void stopUploadRun(run.opId)}
       >
-        {run.stopping ? t`Stopping…` : t`Stop sending pictures`}
+        {run.stopping
+          ? t`Stopping…`
+          : manual
+            ? t`Stop sending`
+            : t`Stop sending pictures`}
       </Button>
     </div>
   );

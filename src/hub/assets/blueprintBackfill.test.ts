@@ -1161,7 +1161,7 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
 
     const first = watch.shownWhileDrawing[0];
     expect(first).toHaveLength(1);
-    expect(first[0].game).toBe("bar");
+    expect(first[0].subject).toBe("bar");
     expect(first[0].phase).toBe("drawing");
     expect(first[0].total).toBe(12 * ANGLES);
   });
@@ -1180,6 +1180,22 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
     await backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools);
 
     expect(readRunningUploads()).toEqual([]);
+  });
+
+  it("reports into a row its caller already owns, and leaves it on screen", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(
+      { ...TARGET, opId: "manual-1" },
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.shownWhileDrawing[0].map((run) => run.opId)).toEqual([
+      "manual-1",
+    ]);
+    expect(watch.uploadOpIds).toEqual(["manual-1"]);
+    expect(readRunningUploads().map((run) => run.opId)).toEqual(["manual-1"]);
   });
 
   /** A run that threw has still finished, and a pill nothing will ever clear is
@@ -1275,7 +1291,7 @@ describe("a run that only has build pics to send (issue #1768)", () => {
 
     expect(watch.draws).toBe(0);
     expect(shownWhileSending).toHaveLength(1);
-    expect(shownWhileSending[0].game).toBe("bar");
+    expect(shownWhileSending[0].subject).toBe("bar");
     expect(shownWhileSending[0].phase).toBe("sending");
     expect(shownWhileSending[0].total).toBe(12);
   });

@@ -44,15 +44,27 @@
 import { useSyncExternalStore } from "react";
 import { cancelAssetUpload } from "./upload";
 
-/** Which half of a run is going. */
-export type UploadRunPhase = "drawing" | "sending";
+/** Which part of a run is going. `reading` is a manual send reading the facts
+ *  it sends before any picture, and never appears for a picture backfill. */
+export type UploadRunPhase = "reading" | "drawing" | "sending";
+
+/**
+ * What started a run. `pictures` is a picture backfill coilbox or the sweep
+ * started. `game` and `map` are one game or map somebody pressed "Send to hub"
+ * for on its page, which `./../manualSend` runs.
+ */
+export type UploadRunKind = "pictures" | "game" | "map";
 
 /** One run somebody can see and stop. */
 export interface RunningUpload {
   /** The id `hub_upload_cancel` stops the upload half by. */
   opId: string;
-  /** The game whose pictures these are, so a person holding several knows. */
-  game: string;
+  kind: UploadRunKind;
+  /** What is being sent, by the name a person knows it by. */
+  subject: string;
+  /** What a manual send is filed under for {@link runningSendFor}: a game's
+   *  shortname or a map's full name. The subject for a picture backfill. */
+  key: string;
   phase: UploadRunPhase;
   /** Pictures decided in this phase, however they were decided. */
   done: number;
@@ -104,27 +116,43 @@ export function useRunningUploads(): readonly RunningUpload[] {
  */
 export function showUploadRun(run: {
   opId: string;
-  game: string;
+  subject: string;
   total: number;
   phase?: UploadRunPhase;
+  kind?: UploadRunKind;
+  key?: string;
 }): void {
+  // A run already on screen under this id is a manual send whose picture fill
+  // has reached its drawing half. It keeps what it is and who it is for, and
+  // the row stays where it was rather than moving to the end.
+  const held = runs.find((r) => r.opId === run.opId);
+  if (held) {
+    updateUploadRun(run.opId, {
+      phase: run.phase ?? "drawing",
+      done: 0,
+      total: run.total,
+    });
+    return;
+  }
   const entry: RunningUpload = {
     opId: run.opId,
-    game: run.game,
+    kind: run.kind ?? "pictures",
+    subject: run.subject,
+    key: run.key ?? run.subject,
     phase: run.phase ?? "drawing",
     done: 0,
     total: run.total,
     sent: 0,
     stopping: false,
   };
-  setRuns([...runs.filter((r) => r.opId !== run.opId), entry]);
+  setRuns([...runs, entry]);
 }
 
 /** Move a run on. A no-op for an id that was never shown, which is how a run
  *  below the threshold reports progress to nobody. */
 export function updateUploadRun(
   opId: string,
-  patch: Partial<Omit<RunningUpload, "opId" | "game">>,
+  patch: Partial<Omit<RunningUpload, "opId" | "kind" | "subject" | "key">>,
 ): void {
   if (!runs.some((run) => run.opId === opId)) return;
   setRuns(runs.map((run) => (run.opId === opId ? { ...run, ...patch } : run)));
@@ -164,6 +192,37 @@ export async function stopUploadRun(opId: string): Promise<void> {
     // take the call still stops at the next picture.
     console.warn("could not cancel upload", opId, e);
   }
+}
+
+/** The manual send running for this game or map, if one is. A game is matched
+ *  ignoring case, as the hub files it. */
+export function runningSendFor(
+  kind: "game" | "map",
+  subject: string,
+): RunningUpload | undefined {
+  return findSend(runs, kind, subject);
+}
+
+function findSend(
+  list: readonly RunningUpload[],
+  kind: "game" | "map",
+  subject: string,
+): RunningUpload | undefined {
+  return list.find(
+    (run) =>
+      run.kind === kind &&
+      (kind === "game"
+        ? run.key.toLowerCase() === subject.toLowerCase()
+        : run.key === subject),
+  );
+}
+
+/** Subscribe a component to the manual send for one game or map. */
+export function useRunningSendFor(
+  kind: "game" | "map",
+  subject: string,
+): RunningUpload | undefined {
+  return findSend(useRunningUploads(), kind, subject);
 }
 
 /** Forget every run. For tests, which must not inherit each other's. */

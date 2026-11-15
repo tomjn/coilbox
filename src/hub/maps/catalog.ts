@@ -60,7 +60,12 @@ export interface MapBatchProgress {
 }
 
 const hubMapsHave = defineCommand<
-  { hubUrl: string; keys: MapHaveKey[]; onProgress: Channel<MapBatchProgress> },
+  {
+    hubUrl: string;
+    keys: MapHaveKey[];
+    onProgress: Channel<MapBatchProgress>;
+    grant?: string;
+  },
   { results: MapHaveResult[] }
 >("coilbox-hub", "hub_maps_have");
 
@@ -69,6 +74,7 @@ const hubPublishMaps = defineCommand<
     hubUrl: string;
     entries: MapCatalogEntry[];
     onProgress: Channel<MapBatchProgress>;
+    grant?: string;
   },
   { results: MapSubmitResult[] }
 >("coilbox-hub", "hub_publish_maps");
@@ -85,11 +91,17 @@ export async function mapsTheHubWants(
   hubUrl: string,
   keys: MapHaveKey[],
   onProgress: (sample: MapBatchProgress) => void = () => {},
+  grant?: string,
 ): Promise<MapHaveResult[]> {
   if (keys.length === 0) return [];
   const channel = new Channel<MapBatchProgress>();
   channel.onmessage = onProgress;
-  const { results } = await hubMapsHave({ hubUrl, keys, onProgress: channel });
+  const { results } = await hubMapsHave({
+    hubUrl,
+    keys,
+    onProgress: channel,
+    ...(grant ? { grant } : {}),
+  });
   return results;
 }
 
@@ -104,6 +116,7 @@ export async function publishMapFacts(
   hubUrl: string,
   entries: MapCatalogEntry[],
   onProgress: (sample: MapBatchProgress) => void = () => {},
+  grant?: string,
 ): Promise<MapSubmitResult[]> {
   if (entries.length === 0) return [];
   const channel = new Channel<MapBatchProgress>();
@@ -112,6 +125,7 @@ export async function publishMapFacts(
     hubUrl,
     entries,
     onProgress: channel,
+    ...(grant ? { grant } : {}),
   });
   return results;
 }

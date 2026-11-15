@@ -2948,11 +2948,6 @@ msgstr "{game} es la versión exacta para la que se hizo esta misión, y no se p
 msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
 msgstr ""
 
-#: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "{game} pictures"
-msgstr "Imágenes de {game}"
-
 #: src/hub/pages/components/GamePicturesControl.tsx
 #, fuzzy
 msgid "{game}: {left, plural, one {# unit} other {# units}} still waiting out of {units}."
@@ -3660,6 +3655,10 @@ msgstr "{label} de {unitName}, ahora {text}. {before}"
 #, fuzzy
 msgid "{label} volume"
 msgstr "Volumen de {label}"
+
+#: src/hub/manualSend/run.ts
+msgid "{label} was not sent to the hub"
+msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
@@ -6677,6 +6676,10 @@ msgstr "{subject}: de la lista de unidades registrada cuando se leyó esta repet
 #, fuzzy
 msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
 msgstr "{subject}: de la lista de unidades que escribió el motor cuando se analizó esta repetición el {date}, en {game}."
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{subject} progress"
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -16068,6 +16071,10 @@ msgstr "coilbox no pudo leer"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox no pudo leer {game}: {said}"
 
+#: src/hub/manualSend/run.ts
+msgid "Coilbox could not read the map."
+msgstr ""
+
 #: src/widgets/widgetConfig.ts
 msgid "Coilbox could not read this file: {reason}"
 msgstr ""
@@ -16353,9 +16360,12 @@ msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {ve
 msgstr "Coilbox está compilando la copia en modo de compatibilidad de {baseName} (compat {version}) que usa esta partida. Podrá empezar para ti cuando termine."
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is making pictures of {game}'s units. Nothing has been sent yet."
-msgstr "Coilbox está creando imágenes de las unidades de {game}. Aún no se ha enviado nada."
+msgid "Coilbox is making pictures of {subject}'s units for the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
+msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
@@ -16368,9 +16378,16 @@ msgid "Coilbox is out of date"
 msgstr "Coilbox no está actualizado"
 
 #: src/hub/assets/UploadRunBadge.tsx
-#, fuzzy
-msgid "Coilbox is sending {game}'s pictures to the hub."
-msgstr "Coilbox está enviando las imágenes de {game} al hub."
+msgid "Coilbox is reading {subject} to send to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject} to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject}'s pictures to the hub."
+msgstr ""
 
 #: src/widgets/widgetSync.ts
 msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
@@ -16430,6 +16447,10 @@ msgstr ""
 #, fuzzy
 msgid "Coilbox on GitHub"
 msgstr "Coilbox en GitHub"
+
+#: src/hub/manualSend/run.ts
+msgid "Coilbox only sends a released version of a game."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
@@ -18938,6 +18959,7 @@ msgstr "Decodificando"
 msgid "Decoding…"
 msgstr "Decodificando…"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
@@ -35793,11 +35815,6 @@ msgstr ""
 msgid "Open in engine"
 msgstr "Abrir en el motor"
 
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Open in mapconv decompile"
-msgstr "Abrir en descompilación de mapconv"
-
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx
 #, fuzzy
@@ -40734,6 +40751,7 @@ msgstr "Listas de unidades de repeticiones"
 msgid "replays"
 msgstr "repeticiones"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -40742,11 +40760,6 @@ msgstr "repeticiones"
 #, fuzzy
 msgid "Replays"
 msgstr "Repeticiones"
-
-#: src/content/pages/MapDetailPage.tsx
-#, fuzzy
-msgid "Replays on this map"
-msgstr "Repeticiones en este mapa"
 
 #: src/general/ErrorBoundary.tsx
 #: src/general/pages/AboutCoilbox.tsx
@@ -43207,6 +43220,10 @@ msgstr "Enviar a un juego"
 msgid "Send to every player?"
 msgstr "¿Enviar a todos los jugadores?"
 
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Send to hub"
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Send what your games say"
@@ -43280,6 +43297,14 @@ msgstr "Enviando imágenes de tus mapas"
 msgid "Sending pictures to the hub"
 msgstr "Enviando imágenes al hub"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to hub"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to the hub. Open to stop."
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
 msgid "Sending what your games say"
@@ -43296,6 +43321,7 @@ msgid "Sending: {game}"
 msgstr "Enviando: {game}"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/manualSend/HubSendControl.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -43326,6 +43352,14 @@ msgstr "enviado"
 #, fuzzy
 msgid "Sent"
 msgstr "Enviados"
+
+#: src/hub/manualSend/run.ts
+msgid "Sent {label} to the hub"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Sent part of {label} to the hub"
+msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -44327,6 +44361,11 @@ msgstr "Mostrar silenciados"
 #, fuzzy
 msgid "Show nano spray"
 msgstr "Mostrar rayo nano"
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
+msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -46246,6 +46285,10 @@ msgstr "Detener sala"
 msgid "Stop searching"
 msgstr "Dejar de buscar"
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stop sending"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Stop sending {label} through the mutator route"
@@ -46274,6 +46317,10 @@ msgstr ""
 #, fuzzy
 msgid "Stopped following {name}"
 msgstr "Has dejado de seguir a {name}"
+
+#: src/hub/manualSend/run.ts
+msgid "Stopped sending {label}"
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -48736,6 +48783,10 @@ msgstr "El hub no aceptó ninguno por ahora."
 #, fuzzy
 msgid "The hub would not take any more {anyNoun} just now."
 msgstr "El hub no aceptó más {anyNoun} por ahora."
+
+#: src/hub/manualSend/run.ts
+msgid "The hub would not take it."
+msgstr ""
 
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
@@ -55305,6 +55356,10 @@ msgstr "Con qué empieza la misión cada participante, algo que la configuració
 #, fuzzy
 msgid "What every key does, on a keyboard you can click."
 msgstr "Lo que hace cada tecla, en un teclado en el que puedes hacer clic."
+
+#: src/hub/manualSend/run.ts
+msgid "What had already gone stays on the hub."
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy

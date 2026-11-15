@@ -188,7 +188,7 @@ export default function ReplaysPage() {
     selected?.rootPath,
   );
 
-  // A content map detail's "Replays on this map" links here with `?map=<name>`,
+  // A content map detail's "Replays" button links here with `?map=<name>`,
   // scoping the list to that map. Clearable via the chip below (drops the param).
   const [searchParams, setSearchParams] = useSearchParams();
   const mapFilter = searchParams.get("map") ?? "";

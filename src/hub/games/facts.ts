@@ -111,7 +111,7 @@ export interface GameFactsResult {
 }
 
 const hubPublishGameFacts = defineCommand<
-  { hubUrl: string; game: GameFacts },
+  { hubUrl: string; game: GameFacts; grant?: string },
   { results: GameFactsResult[] }
 >("coilbox-hub", "hub_publish_game_facts");
 
@@ -125,7 +125,12 @@ const hubPublishGameFacts = defineCommand<
 export async function publishGameFacts(
   hubUrl: string,
   game: GameFacts,
+  grant?: string,
 ): Promise<GameFactsResult[]> {
-  const { results } = await hubPublishGameFacts({ hubUrl, game });
+  const { results } = await hubPublishGameFacts({
+    hubUrl,
+    game,
+    ...(grant ? { grant } : {}),
+  });
   return results;
 }

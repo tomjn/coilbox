@@ -2433,10 +2433,6 @@ msgstr ""
 msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
 msgstr ""
 
-#: src/hub/assets/UploadRunBadge.tsx
-msgid "{game} pictures"
-msgstr ""
-
 #: src/hub/pages/components/GamePicturesControl.tsx
 msgid "{game}: {left, plural, one {# unit} other {# units}} still waiting out of {units}."
 msgstr ""
@@ -3005,6 +3001,10 @@ msgstr ""
 
 #: src/sound/LevelRow.tsx
 msgid "{label} volume"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "{label} was not sent to the hub"
 msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
@@ -5451,6 +5451,10 @@ msgstr ""
 
 #: src/content/replayUnitDefs.ts
 msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{subject} progress"
 msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
@@ -13125,6 +13129,10 @@ msgstr ""
 msgid "Coilbox could not read {game}: {said}"
 msgstr ""
 
+#: src/hub/manualSend/run.ts
+msgid "Coilbox could not read the map."
+msgstr ""
+
 #: src/widgets/widgetConfig.ts
 msgid "Coilbox could not read this file: {reason}"
 msgstr ""
@@ -13360,7 +13368,11 @@ msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {ve
 msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
-msgid "Coilbox is making pictures of {game}'s units. Nothing has been sent yet."
+msgid "Coilbox is making pictures of {subject}'s units for the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
 msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
@@ -13372,7 +13384,15 @@ msgid "Coilbox is out of date"
 msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
-msgid "Coilbox is sending {game}'s pictures to the hub."
+msgid "Coilbox is reading {subject} to send to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject} to the hub."
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {subject}'s pictures to the hub."
 msgstr ""
 
 #: src/widgets/widgetSync.ts
@@ -13422,6 +13442,10 @@ msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 msgid "Coilbox on GitHub"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Coilbox only sends a released version of a game."
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -15486,6 +15510,7 @@ msgstr ""
 msgid "Decoding…"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/index.ts
 #: src/mapconv/pages/DecompilePage.tsx
 msgid "Decompile"
@@ -29268,10 +29293,6 @@ msgstr ""
 msgid "Open in engine"
 msgstr ""
 
-#: src/content/pages/MapDetailPage.tsx
-msgid "Open in mapconv decompile"
-msgstr ""
-
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx
 msgid "Open in the builder"
@@ -33321,16 +33342,13 @@ msgstr ""
 msgid "replays"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #: src/content/pages/StatsPage.tsx
 #: src/play/index.ts
 msgid "Replays"
-msgstr ""
-
-#: src/content/pages/MapDetailPage.tsx
-msgid "Replays on this map"
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx
@@ -35355,6 +35373,10 @@ msgstr ""
 msgid "Send to every player?"
 msgstr ""
 
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Send to hub"
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 msgid "Send what your games say"
 msgstr ""
@@ -35414,6 +35436,14 @@ msgstr ""
 msgid "Sending pictures to the hub"
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to hub"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending to the hub. Open to stop."
+msgstr ""
+
 #: src/hub/pages/components/GameFactsControl.tsx
 msgid "Sending what your games say"
 msgstr ""
@@ -35427,6 +35457,7 @@ msgid "Sending: {game}"
 msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
+#: src/hub/manualSend/HubSendControl.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/ConsoleDrawer.tsx
 msgid "Sending…"
@@ -35450,6 +35481,14 @@ msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 msgid "Sent"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Sent {label} to the hub"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Sent part of {label} to the hub"
 msgstr ""
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
@@ -36265,6 +36304,11 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Show nano spray"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Show on hub"
 msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
@@ -37840,6 +37884,10 @@ msgstr ""
 msgid "Stop searching"
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stop sending"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Stop sending {label} through the mutator route"
 msgstr ""
@@ -37862,6 +37910,10 @@ msgstr ""
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Stopped following {name}"
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "Stopped sending {label}"
 msgstr ""
 
 #: src/content/replayAnalysis.ts
@@ -39870,6 +39922,10 @@ msgstr ""
 
 #: src/hub/uploadOutcomes.ts
 msgid "The hub would not take any more {anyNoun} just now."
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "The hub would not take it."
 msgstr ""
 
 #: src/hub/assets/pictures.ts
@@ -45242,6 +45298,10 @@ msgstr ""
 
 #: src/content/index.ts
 msgid "What every key does, on a keyboard you can click."
+msgstr ""
+
+#: src/hub/manualSend/run.ts
+msgid "What had already gone stays on the hub."
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx

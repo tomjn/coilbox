@@ -73,7 +73,7 @@ export type HaveStatus = "have" | "changed" | "missing";
 export type HaveResult = AssetIdentity & { status: HaveStatus };
 
 const hubAssetsHave = defineCommand<
-  { hubUrl: string; keys: AssetKey[] },
+  { hubUrl: string; keys: AssetKey[]; grant?: string },
   { results: HaveResult[] }
 >("coilbox-hub", "hub_assets_have");
 
@@ -88,8 +88,13 @@ const hubAssetsHave = defineCommand<
 export async function assetsTheHubWants(
   hubUrl: string,
   keys: AssetKey[],
+  grant?: string,
 ): Promise<HaveResult[]> {
   if (keys.length === 0) return [];
-  const { results } = await hubAssetsHave({ hubUrl, keys });
+  const { results } = await hubAssetsHave({
+    hubUrl,
+    keys,
+    ...(grant ? { grant } : {}),
+  });
   return results;
 }

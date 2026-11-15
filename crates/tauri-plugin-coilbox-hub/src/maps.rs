@@ -199,8 +199,8 @@ struct MapSubmitBody {
 /// An empty set is answered without asking anybody, which matters because the
 /// callers of this are loops and the hub refuses an empty batch.
 ///
-/// `_consent` is the user's agreement to send what coilbox read off their
-/// machine, and is the reason this takes an argument it never reads. It is asked
+/// `consent` is the user's agreement to send what coilbox read off their
+/// machine, and every key has to fall inside it. It is asked
 /// for here rather than only at the submission because this is the first call the
 /// path makes, the same way [`crate::have::have`] is for pictures.
 ///
@@ -209,12 +209,13 @@ struct MapSubmitBody {
 pub async fn have_maps(
     hub_url: &str,
     keys: &[MapHaveKey],
-    _consent: &AssetUploadConsent,
+    consent: &AssetUploadConsent,
     on_progress: &(dyn Fn(MapBatchProgress) + Send + Sync),
 ) -> Result<Vec<MapHaveResult>, String> {
     if keys.is_empty() {
         return Ok(Vec::new());
     }
+    consent.admits_maps(keys.iter().map(|key| key.map_name.as_str()))?;
     let url = api_url(hub_url, HAVE_PATH, "Asking the hub what it has")?;
     check_keys(keys)?;
 
@@ -341,12 +342,13 @@ async fn ask(
 pub async fn publish_maps(
     hub_url: &str,
     entries: &[MapCatalogEntry],
-    _consent: &AssetUploadConsent,
+    consent: &AssetUploadConsent,
     on_progress: &(dyn Fn(MapBatchProgress) + Send + Sync),
 ) -> Result<Vec<MapSubmitResult>, String> {
     if entries.is_empty() {
         return Ok(Vec::new());
     }
+    consent.admits_maps(entries.iter().map(|entry| entry.map_name.as_str()))?;
     let url = api_url(hub_url, SUBMIT_PATH, "Sending a map's facts")?;
     check_entries(entries)?;
 
@@ -1283,5 +1285,33 @@ mod tests {
             );
             assert_eq!(status, 401);
         }
+    }
+
+    #[tokio::test]
+    async fn a_grant_for_one_map_refuses_another_in_either_call() {
+        use crate::consent::{AssetUploadConsent, SendSubject};
+        let proof = AssetUploadConsent::for_test_subject(SendSubject::Map {
+            map_name: "Tabula".into(),
+        });
+        let other = entry("Comet Catcher", &"a".repeat(64));
+        let said = have_maps(
+            "http://127.0.0.1:9",
+            &[MapHaveKey::of(&other)],
+            &proof,
+            &|_| {},
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            said,
+            "This send was started for Tabula and cannot send Comet Catcher."
+        );
+        let said = publish_maps("http://127.0.0.1:9", &[other], &proof, &|_| {})
+            .await
+            .unwrap_err();
+        assert_eq!(
+            said,
+            "This send was started for Tabula and cannot send Comet Catcher."
+        );
     }
 }

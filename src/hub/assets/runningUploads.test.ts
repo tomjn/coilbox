@@ -31,6 +31,7 @@ import {
   forgetRunningUploads,
   hideUploadRun,
   readRunningUploads,
+  runningSendFor,
   showUploadRun,
   stopUploadRun,
   updateUploadRun,
@@ -50,11 +51,13 @@ describe("what is on screen", () => {
   });
 
   it("shows a run by its game, at nothing done", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     expect(readRunningUploads()).toEqual([
       {
         opId: "op-1",
-        game: "bar",
+        kind: "pictures",
+        subject: "bar",
+        key: "bar",
         phase: "drawing",
         done: 0,
         total: 12,
@@ -65,7 +68,7 @@ describe("what is on screen", () => {
   });
 
   it("takes a run off screen when it ends", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     hideUploadRun("op-1");
     expect(readRunningUploads()).toEqual([]);
   });
@@ -74,29 +77,32 @@ describe("what is on screen", () => {
    *  the other overlap, and the first to finish must not take the second's
    *  stop button with it. */
   it("takes off the run it was asked about and no other", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
-    showUploadRun({ opId: "op-2", game: "sf", total: 3 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
+    showUploadRun({ opId: "op-2", subject: "sf", total: 3 });
     hideUploadRun("op-1");
-    expect(readRunningUploads().map((run) => run.game)).toEqual(["sf"]);
+    expect(readRunningUploads().map((run) => run.subject)).toEqual(["sf"]);
   });
 
   /** Two blueprints opened one after the other, the first still drawing. Each
    *  keeps its own stop button rather than the second hiding the first. */
   it("holds more than one run at a time", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
-    showUploadRun({ opId: "op-2", game: "sf", total: 3 });
-    expect(readRunningUploads().map((run) => run.game)).toEqual(["bar", "sf"]);
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
+    showUploadRun({ opId: "op-2", subject: "sf", total: 3 });
+    expect(readRunningUploads().map((run) => run.subject)).toEqual([
+      "bar",
+      "sf",
+    ]);
   });
 
   it("shows one run once, however many times it announces itself", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     expect(readRunningUploads()).toHaveLength(1);
   });
 
   it("moves a run on without disturbing the others", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
-    showUploadRun({ opId: "op-2", game: "sf", total: 3 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
+    showUploadRun({ opId: "op-2", subject: "sf", total: 3 });
     updateUploadRun("op-1", { done: 5 });
     expect(readRunningUploads().map((run) => run.done)).toEqual([5, 0]);
   });
@@ -123,14 +129,14 @@ describe("what is on screen", () => {
     expect(readRunningUploads()).toBe(first);
     updateUploadRun("never-shown", { done: 4 });
     expect(readRunningUploads()).toBe(first);
-    showUploadRun({ opId: "op-1", game: "bar", total: 2 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 2 });
     expect(readRunningUploads()).not.toBe(first);
   });
 });
 
 describe("stopping a run", () => {
   it("asks the plugin to stop the upload, by the id the run was started with", async () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     await stopUploadRun("op-1");
     expect(cancelled).toEqual([{ opId: "op-1" }]);
   });
@@ -138,7 +144,7 @@ describe("stopping a run", () => {
   /** The drawing half is where most of the minute goes, and the plugin has no
    *  run to cancel yet. The flag is what the render loop reads. */
   it("raises a flag the run itself can read", async () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     expect(uploadRunStopping("op-1")).toBe(false);
     await stopUploadRun("op-1");
     expect(uploadRunStopping("op-1")).toBe(true);
@@ -147,21 +153,21 @@ describe("stopping a run", () => {
   /** Both halves, so the button does not have to know which one it is in. */
   it("still stops the run when the plugin will not take the call", async () => {
     cancelThrows.value = "no such command";
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     await stopUploadRun("op-1");
     expect(uploadRunStopping("op-1")).toBe(true);
   });
 
   it("stops the run it was asked about and no other", async () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
-    showUploadRun({ opId: "op-2", game: "sf", total: 3 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
+    showUploadRun({ opId: "op-2", subject: "sf", total: 3 });
     await stopUploadRun("op-2");
     expect(uploadRunStopping("op-1")).toBe(false);
     expect(uploadRunStopping("op-2")).toBe(true);
   });
 
   it("reads as not stopping once the run has gone", async () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     await stopUploadRun("op-1");
     hideUploadRun("op-1");
     expect(uploadRunStopping("op-1")).toBe(false);
@@ -170,13 +176,56 @@ describe("stopping a run", () => {
 
 describe("what has already gone", () => {
   it("is nothing until the hub has taken one", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     expect(uploadRunSent("op-1")).toBe(0);
   });
 
   it("is what the run has got onto the hub", () => {
-    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-1", subject: "bar", total: 12 });
     updateUploadRun("op-1", { phase: "sending", sent: 3 });
     expect(uploadRunSent("op-1")).toBe(3);
+  });
+});
+
+describe("a manual send's row", () => {
+  it("keeps what it is when its picture fill shows the same id", () => {
+    showUploadRun({
+      opId: "op-1",
+      kind: "game",
+      subject: "Splinter Faction",
+      phase: "reading",
+      total: 0,
+    });
+    showUploadRun({ opId: "op-2", subject: "bar", total: 3 });
+    showUploadRun({ opId: "op-1", subject: "sf", total: 5 });
+
+    expect(readRunningUploads().map((run) => run.opId)).toEqual([
+      "op-1",
+      "op-2",
+    ]);
+    expect(readRunningUploads()[0]).toMatchObject({
+      kind: "game",
+      subject: "Splinter Faction",
+      phase: "drawing",
+      total: 5,
+      done: 0,
+    });
+  });
+
+  it("is found by kind and subject, a game ignoring case", () => {
+    showUploadRun({
+      opId: "op-1",
+      kind: "game",
+      subject: "Splinter Faction",
+      key: "SF",
+      total: 0,
+    });
+    showUploadRun({ opId: "op-2", kind: "map", subject: "Tabula", total: 0 });
+    showUploadRun({ opId: "op-3", subject: "sf", total: 0 });
+
+    expect(runningSendFor("game", "sf")?.opId).toBe("op-1");
+    expect(runningSendFor("map", "Tabula")?.opId).toBe("op-2");
+    expect(runningSendFor("map", "tabula")).toBeUndefined();
+    expect(runningSendFor("map", "SF")).toBeUndefined();
   });
 });

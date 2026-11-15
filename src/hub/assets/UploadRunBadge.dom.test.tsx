@@ -65,20 +65,20 @@ describe("the topbar while a backfill is going", () => {
 
   it("appears when a run puts itself on screen", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     expect(screen.getByText("Making pictures")).toBeTruthy();
   });
 
   it("goes when the run ends", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     act(() => hideUploadRun("op-1"));
     expect(screen.queryByText("Making pictures")).toBeNull();
   });
 
   it("says which half of the run is going", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     act(() => updateUploadRun("op-1", { phase: "sending", total: 24 }));
     expect(screen.getByText("Sending pictures")).toBeTruthy();
   });
@@ -89,17 +89,46 @@ describe("the topbar while a backfill is going", () => {
   it("appears in the sending half for a run that had nothing to draw", () => {
     render(<UploadRunBadge />);
     act(() =>
-      showUploadRun({ opId: "op-1", game: "bar", phase: "sending", total: 12 }),
+      showUploadRun({
+        opId: "op-1",
+        subject: "bar",
+        phase: "sending",
+        total: 12,
+      }),
     );
     expect(screen.getByText("Sending pictures")).toBeTruthy();
     expect(screen.queryByText("Making pictures")).toBeNull();
   });
 });
 
+describe("the topbar while a manual send is going", () => {
+  it("reads as a send to the hub, and names what it is reading", () => {
+    render(<UploadRunBadge />);
+    act(() =>
+      showUploadRun({
+        opId: "op-1",
+        kind: "map",
+        subject: "Tabula",
+        phase: "reading",
+        total: 0,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /hub/i }));
+
+    expect(screen.getByText("Sending to hub")).toBeTruthy();
+    expect(
+      screen.getByText("Coilbox is reading Tabula to send to the hub."),
+    ).toBeTruthy();
+    // Nothing to count yet, so no bar sitting at zero.
+    expect(screen.queryByText("0 of 0 sent")).toBeNull();
+    expect(screen.getByRole("button", { name: "Stop sending" })).toBeTruthy();
+  });
+});
+
 describe("what the pill says when it is opened", () => {
   it("names the game and says nothing has gone yet while it is drawing", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     open();
 
     expect(
@@ -112,7 +141,7 @@ describe("what the pill says when it is opened", () => {
 
   it("counts what has gone once it is sending", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     act(() =>
       updateUploadRun("op-1", {
         phase: "sending",
@@ -135,7 +164,7 @@ describe("what the pill says when it is opened", () => {
    */
   it("warns that what has gone stays on the hub, before the button is pressed", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     act(() => updateUploadRun("op-1", { phase: "sending", sent: 3 }));
     open();
 
@@ -148,7 +177,7 @@ describe("what the pill says when it is opened", () => {
 
   it("says it in the singular for one picture", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     act(() => updateUploadRun("op-1", { phase: "sending", sent: 1 }));
     open();
 
@@ -161,7 +190,7 @@ describe("what the pill says when it is opened", () => {
 
   it("says nothing about the hub keeping anything until something has gone", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     open();
 
     expect(screen.queryByText(/stays on the hub/)).toBeNull();
@@ -170,8 +199,8 @@ describe("what the pill says when it is opened", () => {
   /** Two blueprints opened one after the other. Each keeps its own button. */
   it("gives every run its own button", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
-    act(() => showUploadRun({ opId: "op-2", game: "sf", total: 3 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-2", subject: "sf", total: 3 }));
     open();
 
     expect(
@@ -183,7 +212,7 @@ describe("what the pill says when it is opened", () => {
 describe("the stop button", () => {
   it("says what pressing it will do", () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     open();
 
     expect(
@@ -193,7 +222,7 @@ describe("the stop button", () => {
 
   it("reaches the plugin with the run's own id", async () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     open();
     await act(async () => {
       fireEvent.click(
@@ -208,7 +237,7 @@ describe("the stop button", () => {
    *  been asked and has not stopped. Saying so beats a button that looks unpressed. */
   it("says it is stopping, and will not take a second press", async () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
     open();
     await act(async () => {
       fireEvent.click(
@@ -222,8 +251,8 @@ describe("the stop button", () => {
 
   it("stops the run it belongs to and no other", async () => {
     render(<UploadRunBadge />);
-    act(() => showUploadRun({ opId: "op-1", game: "bar", total: 12 }));
-    act(() => showUploadRun({ opId: "op-2", game: "sf", total: 3 }));
+    act(() => showUploadRun({ opId: "op-1", subject: "bar", total: 12 }));
+    act(() => showUploadRun({ opId: "op-2", subject: "sf", total: 3 }));
     open();
     await act(async () => {
       fireEvent.click(

@@ -395,6 +395,9 @@ export interface HubGame {
   banner?: string | null;
   /** The modinfo shortname of the game this is a mutator of. Absent from a hub that predates it. */
   base_game?: string | null;
+  /** Every release the hub holds facts for, newest first, verbatim as each
+   *  game's modinfo spelled it. Absent from a hub that predates it. */
+  releases?: string[];
   faction_count: number;
   unit_count: number;
   item_count: number;
