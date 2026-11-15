@@ -17,6 +17,8 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
+import { HubSendControl } from "@/hub/manualSend/HubSendControl";
+import { useMapPresence } from "@/hub/manualSend/status";
 import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
@@ -220,6 +222,9 @@ export default function MapDetailPage() {
     () => mapRecordFor(statRecords, decoded, statsPlayer, refights),
     [statRecords, decoded, statsPlayer, refights],
   );
+  const hubPresence = useMapPresence(
+    data?.maps.some((m) => m.name === decoded) ? decoded : null,
+  );
 
   if (error && !data)
     return (
@@ -374,6 +379,13 @@ export default function MapDetailPage() {
           <Clapperboard className="size-4" /> <Trans>Replays on this map</Trans>
         </Button>
         <CopyMapLinkButton mapName={map.name} labelled />
+        <HubSendControl
+          subject={{ kind: "map", map_name: map.name }}
+          label={map.name}
+          presence={hubPresence}
+          enginePath={selected?.enginePath}
+          dataDir={selected?.rootPath}
+        />
         {advanced && archiveName && (
           <Button
             size="sm"

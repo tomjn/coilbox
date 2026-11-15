@@ -17,6 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFactionLogos } from "@/factions/logos";
 import { useAdvancedMode } from "@/general/advanced";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { HubSendControl } from "@/hub/manualSend/HubSendControl";
+import { useGamePresence, useSendableGame } from "@/hub/manualSend/status";
 import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
 import { setGamePin, setGameUpdates } from "../../downloads/gamePrefs";
@@ -199,6 +201,15 @@ export default function GameDetailPage() {
   const parent = parentRecord?.installed[0]
     ? { name: parentRecord.installed[0].name, title: parentRecord.title }
     : undefined;
+  const sendable = useSendableGame(
+    game,
+    data?.games ?? null,
+    selected?.rootPath,
+  );
+  const hubPresence = useGamePresence(
+    sendable?.shortname ?? null,
+    sendable?.release ?? null,
+  );
 
   if (error && !data)
     return (
@@ -299,6 +310,17 @@ export default function GameDetailPage() {
         dataDir={selected?.rootPath}
         onPlay={() => playGame(game.name)}
         parent={parent}
+        hubAction={
+          sendable && (
+            <HubSendControl
+              subject={{ kind: "game", shortname: sendable.shortname }}
+              label={game.info.name?.trim() || game.name}
+              presence={hubPresence}
+              enginePath={selected?.enginePath}
+              dataDir={selected?.rootPath}
+            />
+          )
+        }
       />
 
       <Tabs

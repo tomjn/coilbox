@@ -159,6 +159,15 @@ vi.mock("../mapEligibility", () => ({
 vi.mock("../usePlayMap", () => ({ usePlayMap: () => () => {} }));
 vi.mock("../usePlayGame", () => ({ usePlayGame: () => () => {} }));
 vi.mock("../branding", () => ({ useBrandingEntry: () => null }));
+// The hub send control has tests of its own, and reaches the hub sweeps.
+vi.mock("@/hub/manualSend/HubSendControl", () => ({
+  HubSendControl: () => null,
+}));
+vi.mock("@/hub/manualSend/status", () => ({
+  useSendableGame: () => null,
+  useGamePresence: () => ({ state: "unknown" }),
+  useMapPresence: () => ({ state: "unknown" }),
+}));
 vi.mock("../useGameLibrary", () => ({
   useGameLibrary: () => ({
     record: undefined,

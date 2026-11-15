@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, Play } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useHubGameArtUrl } from "@/hub/gameIcons";
 import { versionLabel } from "@/lib/utils";
@@ -28,6 +29,7 @@ export function GameHeader({
   dataDir,
   onPlay,
   parent,
+  hubAction,
 }: {
   game: GameItem;
   /** Every installed game, so the hub match tells this game from a sibling. */
@@ -37,6 +39,8 @@ export function GameHeader({
   onPlay: () => void;
   /** The game this one is a mutator of, which the back link goes to. */
   parent?: { name: string; title: string };
+  /** The hub's send or link control, beside Play. */
+  hubAction?: ReactNode;
 }) {
   const { t } = useLingui();
   // Same art source as the Games grid: the batch loader keyed on cheap file
@@ -98,9 +102,12 @@ export function GameHeader({
             </span>
           )}
         </div>
-        <Button size="sm" className="shrink-0 gap-1.5" onClick={onPlay}>
-          <Play className="size-4 fill-current" /> <Trans>Play</Trans>
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {hubAction}
+          <Button size="sm" className="gap-1.5" onClick={onPlay}>
+            <Play className="size-4 fill-current" /> <Trans>Play</Trans>
+          </Button>
+        </div>
       </div>
     </header>
   );

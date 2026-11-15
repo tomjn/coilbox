@@ -66,6 +66,15 @@ vi.mock("@/blueprint/pages/components/GameEquivalents", () => ({
 }));
 
 vi.mock("../branding", () => ({ useBrandingEntry: () => null }));
+// The hub send control has tests of its own, and reaches the hub sweeps.
+vi.mock("@/hub/manualSend/HubSendControl", () => ({
+  HubSendControl: () => null,
+}));
+vi.mock("@/hub/manualSend/status", () => ({
+  useSendableGame: () => null,
+  useGamePresence: () => ({ state: "unknown" }),
+  useMapPresence: () => ({ state: "unknown" }),
+}));
 // The library facts and the Versions and Sources tabs (#4580) have tests of
 // their own. Here they only need to stay out of the way.
 vi.mock("../useGameLibrary", () => ({
