@@ -717,7 +717,7 @@ struct UploadBody {
 /// Send a set of pictures to the hub, as the signed-in account.
 ///
 /// `consent` is the user's agreement to send pictures off this machine (issue
-/// #1635), and is the reason this takes an argument it never reads. The type has a
+/// #1635), and every asset has to fall inside it. The type has a
 /// private field and one constructor, so an upload path cannot compile without the
 /// check having run. See [`crate::consent`].
 ///
@@ -738,6 +738,8 @@ pub async fn upload_all(
     // spend a refresh finding out.
     api_url(hub_url, UPLOAD_PATH, "Sending pictures to the hub")?;
     api_url(hub_url, HAVE_PATH, "Sending pictures to the hub")?;
+    // Before the token too, so a send outside its grant spends no refresh.
+    consent.admits_assets(assets.iter().map(|asset| &asset.identity))?;
 
     let token = auth::access_token(hub_url)
         .await
@@ -751,10 +753,11 @@ pub(crate) async fn run(
     hub_url: &str,
     token: &str,
     assets: &[AssetUpload],
-    _consent: &AssetUploadConsent,
+    consent: &AssetUploadConsent,
     report: &(dyn Fn(AssetUploadProgress) + Send + Sync),
     cancel: &Arc<AtomicBool>,
 ) -> Result<Vec<AssetOutcome>, String> {
+    consent.admits_assets(assets.iter().map(|asset| &asset.identity))?;
     let upload_url = api_url(hub_url, UPLOAD_PATH, "Sending pictures to the hub")?;
     let have_url = api_url(hub_url, HAVE_PATH, "Sending pictures to the hub")?;
 
@@ -2482,5 +2485,22 @@ mod tests {
         let status = response.status().as_u16();
         println!("{status}: {}", response.text().await.unwrap_or_default());
         assert_eq!(status, 401);
+    }
+
+    #[tokio::test]
+    async fn a_grant_for_a_map_refuses_a_unit_picture() {
+        use crate::consent::SendSubject;
+        let proof = AssetUploadConsent::for_test_subject(SendSubject::Map {
+            map_name: "Tabula".into(),
+        });
+        let asset = unit(PathBuf::from("unused.webp"), "armcom", &"a".repeat(64));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let said = upload_all("http://127.0.0.1:9", &[asset], &proof, &|_| {}, &cancel)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            said,
+            "This send was started for Tabula and cannot send bar."
+        );
     }
 }

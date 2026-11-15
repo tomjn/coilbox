@@ -234,13 +234,14 @@ struct GameFactsBody {
 /// the answer to any of it is a 400 for the whole game and the reason would name
 /// a field rather than the unit that carries it.
 ///
-/// `_consent` is the user's agreement to send what coilbox read off their
-/// machine, and is the reason this takes an argument it never reads.
+/// `consent` is the user's agreement to send what coilbox read off their
+/// machine, and the game has to fall inside it.
 pub async fn publish_game_facts(
     hub_url: &str,
     game: &GameFacts,
-    _consent: &AssetUploadConsent,
+    consent: &AssetUploadConsent,
 ) -> Result<Vec<GameFactsResult>, String> {
+    consent.admits_game(&game.shortname)?;
     let url = api_url(hub_url, SUBMIT_PATH, "Sending a game's units")?;
     let body = check_and_build(game)?;
 
@@ -1381,5 +1382,17 @@ mod tests {
         assert!(again
             .iter()
             .all(|r| r.outcome == GameFactsOutcome::Unchanged));
+    }
+
+    #[tokio::test]
+    async fn a_grant_for_one_game_refuses_another_games_facts() {
+        use crate::consent::{AssetUploadConsent, SendSubject};
+        let proof = AssetUploadConsent::for_test_subject(SendSubject::Game {
+            shortname: "sf".into(),
+        });
+        let said = publish_game_facts("http://127.0.0.1:9", &game(), &proof)
+            .await
+            .unwrap_err();
+        assert_eq!(said, "This send was started for sf and cannot send BA.");
     }
 }

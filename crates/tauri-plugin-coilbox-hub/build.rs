@@ -14,6 +14,8 @@ const COMMANDS: &[&str] = &[
     "hub_maps_have",
     "hub_publish_maps",
     "hub_publish_game_facts",
+    "hub_manual_send_begin",
+    "hub_manual_send_end",
 ];
 
 fn main() {

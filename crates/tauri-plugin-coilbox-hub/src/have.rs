@@ -173,19 +173,20 @@ struct HaveBody {
 /// An empty set is answered without asking anybody, which matters because the
 /// callers of this are loops and the hub refuses an empty batch.
 ///
-/// `_consent` is the user's agreement to send pictures off this machine, and is the
-/// reason this takes an argument it never reads (issue #1635). It is asked for here
+/// `consent` is the user's agreement to send pictures off this machine (issue
+/// #1635), and every key has to fall inside it. It is asked for here
 /// rather than at the upload because this is the first call the upload path makes,
 /// so a path that starts here cannot begin without the check having run. See
 /// [`crate::consent`].
 pub async fn have(
     hub_url: &str,
     keys: &[AssetKey],
-    _consent: &AssetUploadConsent,
+    consent: &AssetUploadConsent,
 ) -> Result<Vec<HaveResult>, String> {
     if keys.is_empty() {
         return Ok(Vec::new());
     }
+    consent.admits_assets(keys.iter().map(|key| &key.identity))?;
     let url = api_url(hub_url, HAVE_PATH, "Asking the hub what it has")?;
     check_keys(keys)?;
 
@@ -911,5 +912,27 @@ mod tests {
         let status = response.status().as_u16();
         println!("{status}: {}", response.text().await.unwrap_or_default());
         assert_eq!(status, 401);
+    }
+
+    /// A send made under a grant for one game cannot ask about another, and the
+    /// refusal comes before any request, so the unroutable hub is never reached.
+    #[tokio::test]
+    async fn a_grant_for_one_game_refuses_a_key_for_another() {
+        use crate::consent::{AssetUploadConsent, SendSubject};
+        let proof = AssetUploadConsent::for_test_subject(SendSubject::Game {
+            shortname: "sf".into(),
+        });
+        let key = AssetKey {
+            identity: AssetIdentity::Unit {
+                game: "ba".into(),
+                unit_name: "armcom".into(),
+                variant: "buildpic".into(),
+            },
+            source_hash: "a".repeat(64),
+        };
+        let said = have("http://127.0.0.1:9", &[key], &proof)
+            .await
+            .unwrap_err();
+        assert_eq!(said, "This send was started for sf and cannot send ba.");
     }
 }
