@@ -423,3 +423,22 @@ describe("mapPictureSkipSummary", () => {
     );
   });
 });
+
+describe("a sweep of one map's picture", () => {
+  it("surveys and sends that map alone", async () => {
+    const watch = watcher({ library: ["Alpha", "Beta"] });
+
+    const report = await sweepMapPictures(
+      { ...TARGET, only: "Beta" },
+      () => {},
+      watch.tools,
+    );
+
+    expect(watch.walks).toEqual([
+      { maps: ["Beta"], assets: undefined },
+      { maps: ["Beta"], assets: true },
+    ]);
+    expect(watch.sent).toEqual([["Beta"]]);
+    expect(report.sent).toBe(1);
+  });
+});

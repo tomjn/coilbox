@@ -115,7 +115,11 @@ export const liveSweepTools: SweepTools = {
   send: publishMapFacts,
 };
 
-export type SweepTarget = HubSweepTarget;
+export type SweepTarget = HubSweepTarget & {
+  /** A map's full name, to send that map alone. Used by a manual send from the
+   *  map's page. */
+  only?: string;
+};
 
 /** An outcome that means the hub now holds these facts, or already did. */
 function isHeld(outcome: MapSubmitOutcome): boolean {
@@ -147,7 +151,7 @@ export async function sweepMapCatalog(
   onProgress: (progress: SweepProgress) => void = () => {},
   tools: SweepTools = liveSweepTools,
 ): Promise<SweepReport> {
-  const { hubUrl, enginePath, dataDir } = target;
+  const { hubUrl, enginePath, dataDir, only } = target;
 
   // Pass one: every map's archive, hashed. No infomaps, no height grids. The
   // worker reports one sample per map as it hashes, rather than one at the end,
@@ -155,7 +159,7 @@ export async function sweepMapCatalog(
   // #3147).
   onProgress({ phase: "reading", done: 0, total: 0 });
   const keys = await tools.catalog(
-    { enginePath, dataDir, keysOnly: true },
+    { enginePath, dataDir, keysOnly: true, ...(only ? { maps: [only] } : {}) },
     (sample) => onProgress({ phase: "reading", ...sample }),
   );
   const rows = keys.maps;

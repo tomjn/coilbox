@@ -321,3 +321,45 @@ describe("catalogSkipSummary", () => {
     );
   });
 });
+
+describe("a sweep of one map", () => {
+  it("reads and sends that map alone", async () => {
+    const kit = tools(["Isis 1.3", "Tabula 3"]);
+
+    const report = await sweepMapCatalog(
+      { ...target, only: "Tabula 3" },
+      () => {},
+      kit,
+    );
+
+    expect(kit.catalogCalls()).toEqual([
+      {
+        enginePath: target.enginePath,
+        dataDir: target.dataDir,
+        keysOnly: true,
+        maps: ["Tabula 3"],
+      },
+      {
+        enginePath: target.enginePath,
+        dataDir: target.dataDir,
+        keysOnly: false,
+        maps: ["Tabula 3"],
+      },
+    ]);
+    expect(kit.asked()).toEqual([["Tabula 3"]]);
+    expect(report.sent).toBe(1);
+  });
+
+  it("sends nothing when the hub already has it", async () => {
+    const kit = tools(["Tabula 3"], { "Tabula 3": "have" });
+
+    const report = await sweepMapCatalog(
+      { ...target, only: "Tabula 3" },
+      () => {},
+      kit,
+    );
+
+    expect(kit.send).not.toHaveBeenCalled();
+    expect(report.wanted).toBe(0);
+  });
+});
