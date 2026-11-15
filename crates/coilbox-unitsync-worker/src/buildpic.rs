@@ -83,7 +83,10 @@ local function take(def)
     if type(v) == 'table' then
       local key = string.lower(tostring(k))
       if want[key] and not found[key] then
-        local bp = type(v.buildpic) == 'string' and v.buildpic or ''
+        local bp = ''
+        for field, value in pairs(v) do
+          if type(field) == 'string' and string.lower(field) == 'buildpic' and type(value) == 'string' then bp = value end
+        end
         local nm = type(v.name) == 'string' and v.name or ''
         found[key] = bp .. '\t' .. nm
         remaining = remaining - 1
@@ -980,7 +983,7 @@ mod tests {
         assert!(s.contains("VFS.Include")); // flat fast path
         assert!(s.contains("VFS.SubDirs")); // recursive fallback
         assert!(s.contains("lowerkeys")); // gamedata helper shim
-        assert!(s.contains(".buildpic") && s.contains(".name"));
+        assert!(s.contains("== 'buildpic'") && s.contains(".name"));
         // The result goes back in buffer-sized pieces, so the helper that makes
         // them has to be part of the script the parser runs.
         assert!(s.contains("local function __cb_chunk"));

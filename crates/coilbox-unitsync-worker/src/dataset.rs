@@ -493,22 +493,23 @@ for _, k in ipairs(names) do
   local d = ud[k]
   local full = (type(d) == 'table' and type(d.name) == 'string' and d.name ~= '') and d.name or k
   full = tostring(full):gsub('[\t\r\n]', ' ')
+  local ld = lowered(d)
   local opts = {}
-  if type(d) == 'table' and type(d.buildoptions) == 'table' then
+  if type(ld.buildoptions) == 'table' then
     -- Every numbered entry, in key order. Games comment entries out and leave
     -- gaps in the numbering, and the engine keeps what follows a gap.
     local keys = {}
-    for i, o in pairs(d.buildoptions) do
+    for i, o in pairs(ld.buildoptions) do
       if type(i) == 'number' and type(o) == 'string' and o ~= '' then keys[#keys + 1] = i end
     end
     table.sort(keys)
-    for _, i in ipairs(keys) do opts[#opts + 1] = string.lower(d.buildoptions[i]) end
+    for _, i in ipairs(keys) do opts[#opts + 1] = string.lower(ld.buildoptions[i]) end
   end
   local mobile = (speed_of(d) > 0) and '1' or '0'
   -- The model file the engine draws the unit with. Often has no extension and
   -- often a different case from the archive member, so it is passed through as
   -- written and resolved against the archive listing later.
-  local obj = (type(d) == 'table' and type(d.objectname) == 'string') and d.objectname or ''
+  local obj = type(ld.objectname) == 'string' and ld.objectname or ''
   obj = tostring(obj):gsub('[\t\r\n]', ' ')
   lines[#lines + 1] = string.lower(tostring(k)) .. '\t' .. full .. '\t'
     .. table.concat(opts, ',') .. '\t' .. mobile .. '\t' .. obj
@@ -2529,6 +2530,25 @@ mod tests {
             units[0].build_options,
             vec!["armwin", "armsolar", "armgeo_mini", "armmex", "armmstor"]
         );
+    }
+
+    /// Voidborn writes `buildOptions` and `objectName`. The engine reads them
+    /// whatever their case, so a lowercase-only read lost every build list and
+    /// every model, leaving only the start units reachable.
+    #[test]
+    fn a_build_list_and_model_are_read_whatever_case_their_author_typed() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                ch_hierophant = {
+                  objectName = 'ch_hierophant.s3o',
+                  buildOptions = { 'ch_womb', 'CH_Siphon' },
+                },
+              },
+            }"#,
+        );
+        assert_eq!(units[0].build_options, vec!["ch_womb", "ch_siphon"]);
+        assert_eq!(units[0].object_name.as_deref(), Some("ch_hierophant.s3o"));
     }
 
     #[test]
