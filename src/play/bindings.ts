@@ -116,6 +116,19 @@ export interface LaunchEvent {
 export interface LaunchOutcome {
   exitCode: number | null;
   signal: number | null;
+  /** How the engine was started. Only an engine launch that ran sets it. */
+  launch?: LaunchDetails | null;
+}
+
+/** How an engine was started, for a crash report. An engine that dies before
+ * it opens `infolog.txt` leaves nothing else behind. */
+export interface LaunchDetails {
+  /** The command line, quoted for a terminal. */
+  command: string;
+  /** The loader variables the engine was given, `NAME=value` lines. */
+  env: string[];
+  /** The file holding everything the engine printed. */
+  outputLog: string | null;
 }
 
 /** The tail of an engine `infolog.txt`, with enough about the file to tell

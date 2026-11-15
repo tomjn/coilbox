@@ -29,6 +29,9 @@ export interface CrashTriage extends CrashContext {
   /** Set when a log exists but was written before this run started, so it
    * cannot be this crash's. */
   stale: boolean;
+  /** When the run was looked at, milliseconds since the unix epoch. The
+   * engine's output file was last written no later than this. */
+  triagedAt: number;
 }
 
 export function useCrashTriage() {
@@ -61,7 +64,12 @@ export function useCrashTriage() {
         log = null;
       }
       const stale = log != null && log.modifiedMs < startedAtMs;
-      setTriage({ ...rest, log: stale ? null : log, stale });
+      setTriage({
+        ...rest,
+        log: stale ? null : log,
+        stale,
+        triagedAt: Date.now(),
+      });
       setOpen(true);
     },
     [],

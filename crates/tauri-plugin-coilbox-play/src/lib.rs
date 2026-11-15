@@ -97,11 +97,13 @@ pub fn engine_pid<R: Runtime>(app: &AppHandle<R>, run_id: &str) -> Option<u32> {
 /// a signal, so `ExitStatus::code()` answers `None` and flattening it to 0 reports
 /// a segfault as a clean exit (issue #379). Windows has no signals, so `signal` is
 /// always `None` there and a failure shows up in `code`.
-#[derive(Clone, Copy, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExitOutcome {
     code: Option<i32>,
     signal: Option<i32>,
+    /// What was run, for a crash report. Only an engine launch fills it in.
+    launch: Option<LaunchDetails>,
 }
 
 impl ExitOutcome {
@@ -116,7 +118,41 @@ impl ExitOutcome {
         Self {
             code: status.code(),
             signal,
+            launch: None,
         }
+    }
+}
+
+/// How an engine was started, for a crash report: an engine that dies before it
+/// opens `infolog.txt` leaves nothing else behind.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchDetails {
+    /// The command line, quoted for a terminal.
+    command: String,
+    /// The loader variables the engine was given, `NAME=value` lines.
+    env: Vec<String>,
+    /// The file holding everything the engine printed, when one was written.
+    output_log: Option<String>,
+}
+
+/// The file each engine launch's stdout and stderr go to, set at plugin setup
+/// from the app's cache folder. Overwritten by the next launch, as the engine
+/// overwrites `infolog.txt`. Unset in tests, where the output is discarded.
+static OUTPUT_LOG: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+const OUTPUT_LOG_NAME: &str = "engine-output.log";
+
+/// Where to send the engine's stdout and stderr, and the file they go to.
+fn output_streams() -> (Stdio, Stdio, Option<String>) {
+    let opened = OUTPUT_LOG.get().and_then(|path| {
+        let file = std::fs::File::create(path).ok()?;
+        let copy = file.try_clone().ok()?;
+        Some((file, copy, path.display().to_string()))
+    });
+    match opened {
+        Some((out, err, path)) => (Stdio::from(out), Stdio::from(err), Some(path)),
+        None => (Stdio::null(), Stdio::null(), None),
     }
 }
 
@@ -285,13 +321,14 @@ fn launch_blocking_with(
     if let Some(extra) = &extra_datadir {
         datadir = launch_settings::with_extra_datadir(&datadir, extra)?;
     }
-    let mut cmd = coilbox_proc::command(&bin);
+    let (stdout, stderr, output_log) = output_streams();
+    let mut cmd = coilbox_proc::host_command(&bin);
     cmd.args(&args)
         .env("SPRING_DATADIR", datadir)
-        // The engine writes its own infolog file; detach its stdio so we don't
-        // hold pipes open or pop a console.
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        // To a file rather than a pipe, so nothing here has to keep reading it.
+        // It is the only record of an engine that dies before its infolog.
+        .stdout(stdout)
+        .stderr(stderr);
     if let Some(engine_dir) = bin.parent() {
         cmd.envs(coilbox_proc::isolation_env(
             coilbox_portable::is_portable(),
@@ -303,6 +340,11 @@ fn launch_blocking_with(
         Path::new(&data_dir),
     ));
 
+    let launch = LaunchDetails {
+        command: coilbox_proc::shell_line(&bin, &args),
+        env: coilbox_proc::describe_host_env(),
+        output_log,
+    };
     let child = cmd
         .spawn()
         .map_err(|e| format!("failed to launch engine: {e}"))?;
@@ -321,7 +363,10 @@ fn launch_blocking_with(
                 Some(child) => match child.try_wait() {
                     Ok(Some(status)) => {
                         map.remove(&run_id);
-                        Some(ExitOutcome::from_status(&status))
+                        Some(ExitOutcome {
+                            launch: Some(launch.clone()),
+                            ..ExitOutcome::from_status(&status)
+                        })
                     }
                     Ok(None) => None,
                     // This loop is what clears the entry, so it clears it on the
@@ -356,7 +401,11 @@ fn launch_result<E: std::fmt::Display>(
     result: Result<Result<Option<ExitOutcome>, String>, E>,
 ) -> CliResult {
     match result {
-        Ok(Ok(Some(o))) => CliResult::ok(json!({ "exitCode": o.code, "signal": o.signal })),
+        Ok(Ok(Some(o))) => CliResult::ok(json!({
+            "exitCode": o.code,
+            "signal": o.signal,
+            "launch": o.launch,
+        })),
         Ok(Ok(None)) => CliResult::ok(json!({ "exitCode": null, "signal": null })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("launch task failed: {e}")),
@@ -818,6 +867,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             app.manage(RunRegistry::default());
             app.manage(AutohostRegistry::default());
             app.manage(oa_launch::OaRegistry::default());
+            if let Ok(cache) = coilbox_portable::cache_dir(app) {
+                let _ = OUTPUT_LOG.set(cache.join(OUTPUT_LOG_NAME));
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

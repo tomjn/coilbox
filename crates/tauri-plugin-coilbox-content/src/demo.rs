@@ -2178,7 +2178,7 @@ fn demotool_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
 /// on the write until someone reads it, so waiting for the exit first and reading
 /// afterwards would never let the child finish.
 fn run_demotool(bin: &Path, demo: &Path, flag: &str, timeout: Duration) -> Result<String, String> {
-    let mut cmd = coilbox_proc::command(bin);
+    let mut cmd = coilbox_proc::host_command(bin);
     cmd.arg(flag)
         .arg(demo)
         .stdout(Stdio::piped())

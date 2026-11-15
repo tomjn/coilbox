@@ -48310,6 +48310,10 @@ msgstr ""
 msgid "The engine set as preferred could not be read. Pick another in Settings → Engines and try this again, or continue without the check and find out when you play."
 msgstr "De engine die als voorkeur is ingesteld, kon niet gelezen worden. Kies een andere in Instellingen → Engines en probeer het opnieuw, of ga verder zonder de controle en zie het wanneer je speelt."
 
+#: src/play/pages/components/CrashDrawer.tsx
+msgid "The engine stopped before it wrote its log. Everything it printed is in this file."
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "The engine stopped before the match ended."

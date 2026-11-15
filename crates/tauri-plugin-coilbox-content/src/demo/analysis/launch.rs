@@ -285,7 +285,7 @@ pub fn run_headless(launch: &Launch, control: &RunControl) -> Result<EngineExit,
         .try_clone()
         .map_err(|e| format!("could not open {}: {e}", launch.log.display()))?;
 
-    let mut cmd = coilbox_proc::command(launch.engine);
+    let mut cmd = coilbox_proc::host_command(launch.engine);
     cmd.args(engine_args(
         engine_dir,
         launch.write_dir,
