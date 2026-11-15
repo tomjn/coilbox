@@ -35,8 +35,9 @@ const feature = (name: Parameters<typeof useFeature>[0]) =>
   renderHook(() => useFeature(name)).result.current;
 
 describe("feature toggles", () => {
-  it("are off for a new player with no profile", () => {
+  it("are off for a new player with no profile, apart from Unit tools", () => {
     expect(feature("mapping")).toBe(false);
+    expect(feature("units")).toBe(true);
   });
 
   it("are all on for a player who had advanced mode on", () => {
@@ -63,10 +64,16 @@ describe("feature toggles", () => {
     expect(feature("missions")).toBe(true);
   });
 
-  it("keep the old advanced switch over the profile seed", () => {
+  it("treat the old advanced switch stored off as no choice at all", () => {
     profile = { version: 1, features: { mapping: true } };
     store.set("advanced.enabled", false);
-    expect(feature("mapping")).toBe(false);
+    expect(feature("mapping")).toBe(true);
+    expect(feature("units")).toBe(true);
+  });
+
+  it("let a profile turn Unit tools off", () => {
+    profile = { version: 1, advanced: false };
+    expect(feature("units")).toBe(false);
   });
 
   it("store a change under the feature's own key", () => {

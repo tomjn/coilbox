@@ -12591,10 +12591,6 @@ msgstr ""
 msgid "Choose your language"
 msgstr ""
 
-#: src/onboarding/pages/registry.ts
-msgid "Choose your tools"
-msgstr ""
-
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 msgid "circle"
@@ -17312,6 +17308,10 @@ msgstr ""
 msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr ""
 
+#: src/onboarding/pages/registry.ts
+msgid "Enable Content Dev Tools?"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
 msgstr ""
@@ -17572,10 +17572,6 @@ msgstr ""
 #: src/content/index.ts
 #: src/general/index.ts
 msgid "Engine settings"
-msgstr ""
-
-#: src/general/FeatureToggles.tsx
-msgid "Engine stress tests and their history"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -23446,6 +23442,10 @@ msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Load style"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "Load tests for lobby servers, and their results"
 msgstr ""
 
 #: src/play/PresetLoadGate.tsx
@@ -29551,6 +29551,10 @@ msgstr ""
 
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr ""
+
+#: src/onboarding/pages/ToolsPage.tsx
+msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx

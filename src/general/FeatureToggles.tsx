@@ -48,7 +48,7 @@ function useFeatureText(feature: Feature): { label: string; tools: string } {
     case "uberstress":
       return {
         label: t`Uberstress`,
-        tools: t`Engine stress tests and their history`,
+        tools: t`Load tests for lobby servers, and their results`,
       };
   }
 }

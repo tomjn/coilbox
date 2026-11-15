@@ -15422,10 +15422,6 @@ msgstr "Wählen, wohin die .sdd geschrieben wird"
 msgid "Choose your language"
 msgstr "Sprache wählen"
 
-#: src/onboarding/pages/registry.ts
-msgid "Choose your tools"
-msgstr ""
-
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -21149,6 +21145,10 @@ msgstr "Leeres Teil: ein Hierarchieknoten, Mündungsblitz, Zielpunkt oder Emitte
 msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr "Leer, daher trägt es andere Teile und kann ein Emitterpunkt sein."
 
+#: src/onboarding/pages/registry.ts
+msgid "Enable Content Dev Tools?"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
@@ -21464,10 +21464,6 @@ msgstr "Engine erforderlich"
 #, fuzzy
 msgid "Engine settings"
 msgstr "Engine-Einstellungen"
-
-#: src/general/FeatureToggles.tsx
-msgid "Engine stress tests and their history"
-msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -28663,6 +28659,10 @@ msgstr "Repos laden"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Load style"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "Load tests for lobby servers, and their results"
 msgstr ""
 
 #: src/play/PresetLoadGate.tsx
@@ -36124,6 +36124,10 @@ msgstr "Optional. Erscheint auf der Projektkarte und bei allen, denen Sie es sch
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Optional. Zero-K keeps it against your account and does not send a code."
 msgstr "Optional. Zero-K speichert sie zu Ihrem Konto und sendet keinen Code."
+
+#: src/onboarding/pages/ToolsPage.tsx
+msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy

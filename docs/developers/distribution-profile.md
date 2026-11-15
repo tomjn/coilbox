@@ -1199,7 +1199,7 @@ The lock does not hide the [`quit`](#quit-boolean) button. Set `quit` to `true` 
 
 ### `advanced` (boolean)
 
-Starts Coilbox with every tool switch on, which shows all the making and developer tools in the sidebar. Off by default. It is named after the single Advanced mode switch the tool switches replaced.
+Starts Coilbox with every tool switch on, which shows all the making and developer tools in the sidebar. Without it, only Unit tools starts on. `false` turns Unit tools off too. It is named after the single Advanced mode switch the tool switches replaced.
 
 ```json
 { "version": 1, "advanced": true }
@@ -1213,8 +1213,8 @@ Starts Coilbox with chosen tool switches on or off. Each key is one switch and o
 
 | Key          | Switch in Settings > General | What it shows |
 | ------------ | ---------------------------- | ------------- |
-| `mapping`    | Mapping tools      | Mapping tools, and Decompile on map pages |
 | `units`      | Unit tools         | unit builder and workshop |
+| `mapping`    | Mapping tools      | Mapping tools, and Decompile on map pages |
 | `animation`  | Animation tools    | Animation |
 | `archives`   | Archives and Rapid | Library > Archives, Library > Rapid repositories, and the Archives tab on game pages |
 | `missions`   | Mission builders   | Campaign builder, and Campaign on game pages |

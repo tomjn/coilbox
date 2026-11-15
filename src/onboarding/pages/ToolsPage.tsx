@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { FeatureToggles } from "@/general/FeatureToggles";
 
 /**
@@ -7,5 +8,15 @@ import { FeatureToggles } from "@/general/FeatureToggles";
  * the toggles, because the distributor has already chosen.
  */
 export default function ToolsPage() {
-  return <FeatureToggles />;
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        <Trans>
+          Optionally pick tools to turn on, these can be changed in settings if
+          you change your mind.
+        </Trans>
+      </p>
+      <FeatureToggles />
+    </div>
+  );
 }

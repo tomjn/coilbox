@@ -15518,10 +15518,6 @@ msgstr "Velg hvor .sdd-en skal skrives"
 msgid "Choose your language"
 msgstr "Velg språk"
 
-#: src/onboarding/pages/registry.ts
-msgid "Choose your tools"
-msgstr ""
-
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -21282,6 +21278,10 @@ msgstr "Tom del: en hierarkinode, lokkefakkel, et siktepunkt eller et utslippspu
 msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr "Tom, så den bærer andre deler og kan være et utslippspunkt."
 
+#: src/onboarding/pages/registry.ts
+msgid "Enable Content Dev Tools?"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
 msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
@@ -21597,10 +21597,6 @@ msgstr "Motor kreves"
 #, fuzzy
 msgid "Engine settings"
 msgstr "Motorinnstillinger"
-
-#: src/general/FeatureToggles.tsx
-msgid "Engine stress tests and their history"
-msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -28834,6 +28830,10 @@ msgstr "Last repoer"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Load style"
+msgstr ""
+
+#: src/general/FeatureToggles.tsx
+msgid "Load tests for lobby servers, and their results"
 msgstr ""
 
 #: src/play/PresetLoadGate.tsx
@@ -36345,6 +36345,10 @@ msgstr "Valgfritt. Vises på prosjektets kort, og for alle du sender det til."
 #, fuzzy
 msgid "Optional. Zero-K keeps it against your account and does not send a code."
 msgstr "Valgfritt. Zero-K lagrer den på kontoen din og sender ingen kode."
+
+#: src/onboarding/pages/ToolsPage.tsx
+msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy

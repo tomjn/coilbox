@@ -12592,10 +12592,6 @@ msgstr "Choose where to write the .sdd"
 msgid "Choose your language"
 msgstr "Choose your language"
 
-#: src/onboarding/pages/registry.ts
-msgid "Choose your tools"
-msgstr "Choose your tools"
-
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 msgid "circle"
@@ -17313,6 +17309,10 @@ msgstr "Empty piece: a hierarchy node, flare, aim point or emitter"
 msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr "Empty, so it carries other pieces and can be an emit point."
 
+#: src/onboarding/pages/registry.ts
+msgid "Enable Content Dev Tools?"
+msgstr "Enable Content Dev Tools?"
+
 #: src/direct/ReachablePorts.tsx
 msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
 msgstr "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
@@ -17574,10 +17574,6 @@ msgstr "Engine required"
 #: src/general/index.ts
 msgid "Engine settings"
 msgstr "Engine settings"
-
-#: src/general/FeatureToggles.tsx
-msgid "Engine stress tests and their history"
-msgstr "Engine stress tests and their history"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Engine to use"
@@ -23448,6 +23444,10 @@ msgstr "Load repos"
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Load style"
 msgstr "Load style"
+
+#: src/general/FeatureToggles.tsx
+msgid "Load tests for lobby servers, and their results"
+msgstr "Load tests for lobby servers, and their results"
 
 #: src/play/PresetLoadGate.tsx
 msgid "Load this preset"
@@ -29553,6 +29553,10 @@ msgstr "Optional. Shown on the project's card, and to anybody you send it to."
 #: src/lobby-servers/RegisterForm.tsx
 msgid "Optional. Zero-K keeps it against your account and does not send a code."
 msgstr "Optional. Zero-K keeps it against your account and does not send a code."
+
+#: src/onboarding/pages/ToolsPage.tsx
+msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
+msgstr "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "Options"

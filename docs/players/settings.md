@@ -150,10 +150,10 @@ Settings > General has:
 
 ### Tools
 
-The tools for making games, maps and missions are under Tools on the General page. Each switch adds one set of tools to the sidebar and the home page. They are all off unless you turn them on. The setup wizard asks which ones you want the first time you run Coilbox.
+The tools for making games, maps and missions are under Tools on the General page. Each switch adds one set of tools to the sidebar and the home page. Apart from Unit tools, they are all off unless you turn them on. The setup wizard asks which ones you want the first time you run Coilbox.
 
+- Unit tools, which adds unit builder and workshop, to make units and change existing ones. This one starts on.
 - Mapping tools, to build and take apart maps. It also adds a Decompile button to each map's page.
-- Unit tools, which adds unit builder and workshop, to make units and change existing ones.
 - Animation tools, to convert and edit unit animation scripts.
 - Archives and Rapid, which adds Archives and Rapid repositories under Library, to look inside game and map files and to browse a rapid server and download any version it holds. See [Rapid repositories](#rapid-repositories). It also adds an Archives tab to each game's page.
 - Mission builders, which adds Campaign builder, to make campaigns and scenarios.
