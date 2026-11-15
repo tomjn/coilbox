@@ -30,7 +30,7 @@ A map whose archive differs from the hub's copy under the same name still reads 
 
 ### When a game counts as on the hub
 
-`GET /api/v1/games` lists the game's shortname and the new `releases` field includes this install's modinfo version. A hub that predates `releases` reads as unknown, which shows the button, because a send the hub already has is answered `unchanged` and costs nothing. The hub page is `<hub>/games/<shortname>`.
+`GET /api/v1/games` lists the game's shortname and the new `releases` field includes this install's modinfo version. A hub that predates `releases` is taken at its listing: a listed shortname reads as on the hub, so the button does not appear for every game the hub plainly has. The hub page is `<hub>/games/<shortname>`.
 
 The games list is cached per hub address by `src/hub/gameIcons.ts`. A finished send calls `resetHubGames()` so the page re-checks.
 

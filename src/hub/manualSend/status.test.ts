@@ -38,9 +38,10 @@ describe("whether the hub has this release of a game", () => {
     });
   });
 
-  it("counts as missing on a hub that does not say which releases it holds", () => {
+  it("takes a hub that does not say which releases it holds at its listing", () => {
     expect(gamePresence(HUB, [hubGame("sf")], "sf", "1.0")).toEqual({
-      state: "missing",
+      state: "present",
+      url: "https://hub.test/games/sf",
     });
   });
 

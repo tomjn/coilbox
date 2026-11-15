@@ -30,9 +30,9 @@ function base(hubUrl: string): string {
 
 /**
  * A game is on the hub when the hub lists its shortname and holds this
- * release. A hub that does not say which releases it holds reads as missing,
- * because a send of facts it already has is answered `unchanged` and costs
- * nothing, while a release it is missing would otherwise never be offered.
+ * release. A hub that does not say which releases it holds is taken at its
+ * listing: offering every listed game would put a send button on every page
+ * for games the hub plainly has.
  */
 export function gamePresence(
   hubUrl: string,
@@ -43,7 +43,8 @@ export function gamePresence(
   if (!games) return UNKNOWN;
   const wanted = shortname.toLowerCase();
   const game = games.find((one) => one.shortname.toLowerCase() === wanted);
-  if (!game?.releases?.includes(release)) return MISSING;
+  if (!game) return MISSING;
+  if (game.releases && !game.releases.includes(release)) return MISSING;
   return {
     state: "present",
     url: `${base(hubUrl)}/games/${encodeURIComponent(game.shortname)}`,
