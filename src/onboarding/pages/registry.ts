@@ -62,7 +62,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   tools: {
     Component: ToolsPage,
     title: msg`Enable Content Dev Tools?`,
-    art: { drawing: "lego.units" },
+    art: { drawing: "workshop.units" },
   },
   hub: {
     Component: HubPage,
