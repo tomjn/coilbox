@@ -38,8 +38,9 @@ export function HubPageButton({ url, label }: { url: string; label: string }) {
 
 /**
  * The hub send control on a map or game's detail page. It shows only while the
- * hub is missing the item or a send of it is running. When the hub has it, the
- * page shows a {@link HubPageButton} instead.
+ * hub is missing the item, or some of a map's layers, or a send of it is
+ * running. When the hub has it, the page shows a {@link HubPageButton} instead,
+ * and beside this control for a map that is missing layers.
  *
  * Pressing it is the agreement to send this one item, so the uploads switch in
  * the Share panel is not involved. Somebody signed out is offered the sign in
@@ -102,7 +103,9 @@ export function HubSendControl({
       </Button>
     );
   }
-  if (presence.state !== "missing" || !enginePath || !dataDir) return null;
+  const wanted =
+    presence.state === "missing" || presence.state === "incomplete";
+  if (!wanted || !enginePath || !dataDir) return null;
   if (account.signedIn) {
     return (
       <Button size="sm" variant="outline" className="gap-1.5" onClick={send}>

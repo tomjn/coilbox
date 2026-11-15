@@ -96,6 +96,18 @@ describe("the hub control on a detail page", () => {
     expect(opened).toHaveBeenCalledWith("https://hub.test/map/tabula-3");
   });
 
+  it("offers the send for a map the hub has without all its layers", () => {
+    account = { ...signedOut(), signedIn: true };
+    render(
+      <HubSendControl
+        {...PROPS}
+        presence={{ state: "incomplete", url: "https://hub.test/map/tabula-3" }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send to hub" }));
+    expect(started).toHaveBeenCalled();
+  });
+
   it("sends at once for somebody signed in", () => {
     account = { ...signedOut(), signedIn: true };
     render(<HubSendControl {...PROPS} presence={{ state: "missing" }} />);

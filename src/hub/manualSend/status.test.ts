@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HubGame } from "../api";
+import { MAP_VARIANTS, MINIMAP_VARIANT } from "../assets/vocabulary";
 import type { MapFacts } from "../maps/lookup";
 import { gamePresence, mapPresence } from "./status";
 
@@ -61,21 +62,33 @@ describe("whether the hub has this release of a game", () => {
 describe("whether the hub has a map", () => {
   const facts = { slug: "tabula-3" } as MapFacts;
 
+  const every = new Set(MAP_VARIANTS);
+  const minimapOnly = new Set([MINIMAP_VARIANT]);
+
   it("does not know until both answers are in", () => {
-    expect(mapPresence(HUB, undefined, true)).toEqual({ state: "unknown" });
+    expect(mapPresence(HUB, undefined, every)).toEqual({ state: "unknown" });
     expect(mapPresence(HUB, facts, undefined)).toEqual({ state: "unknown" });
   });
 
   it("is missing a map it has no facts for", () => {
-    expect(mapPresence(HUB, null, true)).toEqual({ state: "missing" });
+    expect(mapPresence(HUB, null, every)).toEqual({ state: "missing" });
   });
 
   it("is missing a map it has no minimap of", () => {
-    expect(mapPresence(HUB, facts, false)).toEqual({ state: "missing" });
+    expect(mapPresence(HUB, facts, new Set(["overlay:height"]))).toEqual({
+      state: "missing",
+    });
   });
 
-  it("has a map with both, and links to its page", () => {
-    expect(mapPresence(HUB, facts, true)).toEqual({
+  it("is incomplete without its overlay layers, and still links to its page", () => {
+    expect(mapPresence(HUB, facts, minimapOnly)).toEqual({
+      state: "incomplete",
+      url: "https://hub.test/map/tabula-3",
+    });
+  });
+
+  it("has a map with every layer, and links to its page", () => {
+    expect(mapPresence(HUB, facts, every)).toEqual({
       state: "present",
       url: "https://hub.test/map/tabula-3",
     });
