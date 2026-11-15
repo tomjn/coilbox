@@ -26,6 +26,9 @@ import {
 export interface ManualRun {
   grant: string;
   opId: string;
+  /** Set when the send has failed and must go no further. Every bound call
+   *  after that throws it. */
+  abort?: string;
 }
 
 /** Thrown by a bound tool once somebody has pressed Stop on the run. */
@@ -38,6 +41,7 @@ export class SendStopped extends Error {
 
 function guard(run: ManualRun): void {
   if (uploadRunStopping(run.opId)) throw new SendStopped();
+  if (run.abort) throw new Error(run.abort);
 }
 
 /** Tools for `sweepGamePictures`, which sends a game's facts and pictures. */

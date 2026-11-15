@@ -57,6 +57,7 @@ describe("what is on screen", () => {
         opId: "op-1",
         kind: "pictures",
         subject: "bar",
+        key: "bar",
         phase: "drawing",
         done: 0,
         total: 12,
@@ -212,7 +213,13 @@ describe("a manual send's row", () => {
   });
 
   it("is found by kind and subject, a game ignoring case", () => {
-    showUploadRun({ opId: "op-1", kind: "game", subject: "SF", total: 0 });
+    showUploadRun({
+      opId: "op-1",
+      kind: "game",
+      subject: "Splinter Faction",
+      key: "SF",
+      total: 0,
+    });
     showUploadRun({ opId: "op-2", kind: "map", subject: "Tabula", total: 0 });
     showUploadRun({ opId: "op-3", subject: "sf", total: 0 });
 

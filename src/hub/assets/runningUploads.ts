@@ -60,9 +60,11 @@ export interface RunningUpload {
   /** The id `hub_upload_cancel` stops the upload half by. */
   opId: string;
   kind: UploadRunKind;
-  /** What is being sent, by the name a person knows it by: the game for a
-   *  picture backfill or a game send, the map for a map send. */
+  /** What is being sent, by the name a person knows it by. */
   subject: string;
+  /** What a manual send is filed under for {@link runningSendFor}: a game's
+   *  shortname or a map's full name. The subject for a picture backfill. */
+  key: string;
   phase: UploadRunPhase;
   /** Pictures decided in this phase, however they were decided. */
   done: number;
@@ -118,6 +120,7 @@ export function showUploadRun(run: {
   total: number;
   phase?: UploadRunPhase;
   kind?: UploadRunKind;
+  key?: string;
 }): void {
   // A run already on screen under this id is a manual send whose picture fill
   // has reached its drawing half. It keeps what it is and who it is for, and
@@ -135,6 +138,7 @@ export function showUploadRun(run: {
     opId: run.opId,
     kind: run.kind ?? "pictures",
     subject: run.subject,
+    key: run.key ?? run.subject,
     phase: run.phase ?? "drawing",
     done: 0,
     total: run.total,
@@ -148,7 +152,7 @@ export function showUploadRun(run: {
  *  below the threshold reports progress to nobody. */
 export function updateUploadRun(
   opId: string,
-  patch: Partial<Omit<RunningUpload, "opId" | "kind" | "subject">>,
+  patch: Partial<Omit<RunningUpload, "opId" | "kind" | "subject" | "key">>,
 ): void {
   if (!runs.some((run) => run.opId === opId)) return;
   setRuns(runs.map((run) => (run.opId === opId ? { ...run, ...patch } : run)));
@@ -208,8 +212,8 @@ function findSend(
     (run) =>
       run.kind === kind &&
       (kind === "game"
-        ? run.subject.toLowerCase() === subject.toLowerCase()
-        : run.subject === subject),
+        ? run.key.toLowerCase() === subject.toLowerCase()
+        : run.key === subject),
   );
 }
 

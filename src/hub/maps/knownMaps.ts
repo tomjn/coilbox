@@ -102,6 +102,12 @@ async function flush(): Promise<void> {
   }
 }
 
+/** Forget one map's answer, so the next ask goes to the hub. Called once a
+ *  send of that map has finished, when the old answer is likely wrong. */
+export function forgetKnownMap(base: string, mapName: string): void {
+  answered.delete(`${base}\n${mapName}`);
+}
+
 /** Forget every answer. For tests, which would otherwise see the hub answer once
  *  and every case after it read the first one's cache. */
 export function forgetKnownMaps(): void {
