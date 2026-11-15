@@ -13352,6 +13352,7 @@ msgstr "Coilbox has not read this game's units. Nothing here has been checked ag
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox has stopped sending {sendingNoun}. {already}"
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -44833,7 +44834,7 @@ msgstr "View unit details"
 msgid "Violet"
 msgstr "Violet"
 
-#: src/hub/manualSend/HubSendControl.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Visit hub page"
 msgstr "Visit hub page"
 

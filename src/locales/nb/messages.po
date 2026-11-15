@@ -16449,6 +16449,7 @@ msgstr "Coilbox har ikke lest enhetene i dette spillet. Ingenting her er kontrol
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox har sluttet å sende {sendingNoun}. {already}"
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -55134,7 +55135,7 @@ msgstr "Vis enhetsdetaljer"
 msgid "Violet"
 msgstr "Fiolett"
 
-#: src/hub/manualSend/HubSendControl.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Visit hub page"
 msgstr ""
 

@@ -16340,6 +16340,7 @@ msgstr "Coilbox はこのゲームのユニットを読み込んでいません�
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox は {sendingNoun} の送信を停止しました。{already}"
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -54786,7 +54787,7 @@ msgstr "ユニットの詳細を表示"
 msgid "Violet"
 msgstr "バイオレット"
 
-#: src/hub/manualSend/HubSendControl.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Visit hub page"
 msgstr ""
 

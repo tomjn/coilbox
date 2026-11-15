@@ -38,7 +38,7 @@ vi.mock("../assets/runningUploads", () => ({
   useRunningSendFor: () => running,
 }));
 
-import { HubSendControl } from "./HubSendControl";
+import { HubPageButton, HubSendControl } from "./HubSendControl";
 
 function signedOut(): HubAccount {
   return {
@@ -78,11 +78,21 @@ describe("the hub control on a detail page", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("links to the hub page when the hub has it", () => {
-    render(
+  it("shows nothing when the hub has it, which the page links to instead", () => {
+    const { container } = render(
       <HubSendControl
         {...PROPS}
         presence={{ state: "present", url: "https://hub.test/map/tabula-3" }}
+      />,
+    );
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("opens the hub page from the page's own button", () => {
+    render(
+      <HubPageButton
+        url="https://hub.test/map/tabula-3"
+        label="Visit hub page"
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Visit hub page" }));

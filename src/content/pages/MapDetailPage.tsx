@@ -17,7 +17,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
-import { HubSendControl } from "@/hub/manualSend/HubSendControl";
+import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
 import { useMapPresence } from "@/hub/manualSend/status";
 import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
@@ -386,6 +386,9 @@ export default function MapDetailPage() {
           enginePath={selected?.enginePath}
           dataDir={selected?.rootPath}
         />
+        {hubPresence.state === "present" && (
+          <HubPageButton url={hubPresence.url} label={t`Visit hub page`} />
+        )}
         {advanced && archiveName && (
           <Button
             size="sm"

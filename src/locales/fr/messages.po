@@ -16340,6 +16340,7 @@ msgstr "Coilbox n’a pas lu les unités de ce jeu. Rien ici n’a été vérifi
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox a cessé d’envoyer {sendingNoun}. {already}"
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -54786,7 +54787,7 @@ msgstr "Voir les détails de l’unité"
 msgid "Violet"
 msgstr "Violet"
 
-#: src/hub/manualSend/HubSendControl.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Visit hub page"
 msgstr ""
 

@@ -2,17 +2,27 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Play } from "lucide-react";
+import type { ReactNode } from "react";
 import type { BrandingEntry } from "../../branding";
 
 /**
  * Branding links + video links for a game (the dead-`modinfo`-site backfill).
  * Everything opens in the system browser; videos are never embedded.
+ *
+ * `hubLink` is the game's hub page, first in the row, when the hub has it. A
+ * game with no branding entry still gets the section for that one link.
  */
-export function BrandingLinks({ entry }: { entry: BrandingEntry }) {
+export function BrandingLinks({
+  entry,
+  hubLink,
+}: {
+  entry: BrandingEntry | null;
+  hubLink?: ReactNode;
+}) {
   const { t } = useLingui();
-  const videos = entry.videos ?? [];
-  const links = entry.links ?? [];
-  if (videos.length === 0 && links.length === 0) return null;
+  const videos = entry?.videos ?? [];
+  const links = entry?.links ?? [];
+  if (videos.length === 0 && links.length === 0 && !hubLink) return null;
 
   const videoUrl = (v: NonNullable<BrandingEntry["videos"]>[number]) =>
     v.kind === "youtube" ? `https://youtu.be/${v.id}` : v.url;
@@ -23,6 +33,7 @@ export function BrandingLinks({ entry }: { entry: BrandingEntry }) {
         <Trans>Links</Trans>
       </h2>
       <div className="flex flex-wrap gap-2">
+        {hubLink}
         {links.map((l) => (
           <Button
             key={l.url}

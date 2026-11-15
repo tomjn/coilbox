@@ -18,8 +18,28 @@ import { startManualSend } from "./run";
 import type { HubPresence } from "./status";
 
 /**
- * The hub control on a map or game's detail page: a way to send it when the
- * hub is missing it, and a link to it when the hub has it.
+ * A button that opens an item's page on the hub in the browser. The pages place
+ * it themselves, since a game puts it among its links rather than beside Play.
+ */
+export function HubPageButton({ url, label }: { url: string; label: string }) {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="gap-1.5"
+      onClick={() => openUrl(url).catch(() => {})}
+    >
+      <CoilboxGlyph size={16} />
+      {label}
+      <ExternalLink className="size-4" aria-hidden />
+    </Button>
+  );
+}
+
+/**
+ * The hub send control on a map or game's detail page. It shows only while the
+ * hub is missing the item or a send of it is running. When the hub has it, the
+ * page shows a {@link HubPageButton} instead.
  *
  * Pressing it is the agreement to send this one item, so the uploads switch in
  * the Share panel is not involved. Somebody signed out is offered the sign in
@@ -82,21 +102,7 @@ export function HubSendControl({
       </Button>
     );
   }
-  if (presence.state === "unknown" || !enginePath || !dataDir) return null;
-  if (presence.state === "present") {
-    return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="gap-1.5"
-        onClick={() => openUrl(presence.url).catch(() => {})}
-      >
-        <CoilboxGlyph size={16} />
-        {t`Visit hub page`}
-        <ExternalLink className="size-4" aria-hidden />
-      </Button>
-    );
-  }
+  if (presence.state !== "missing" || !enginePath || !dataDir) return null;
   if (account.signedIn) {
     return (
       <Button size="sm" variant="outline" className="gap-1.5" onClick={send}>

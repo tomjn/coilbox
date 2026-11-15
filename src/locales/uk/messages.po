@@ -16340,6 +16340,7 @@ msgstr "Юніти цієї гри ще не прочитано. Тут нічо
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox припинив надсилати: {sendingNoun}. {already}"
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -54786,7 +54787,7 @@ msgstr "Переглянути подробиці юніта"
 msgid "Violet"
 msgstr "Фіалковий"
 
-#: src/hub/manualSend/HubSendControl.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Visit hub page"
 msgstr ""
 

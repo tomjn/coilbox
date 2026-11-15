@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFactionLogos } from "@/factions/logos";
 import { useAdvancedMode } from "@/general/advanced";
 import { nextDrawerKey } from "@/general/drawerKey";
-import { HubSendControl } from "@/hub/manualSend/HubSendControl";
+import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
 import { useGamePresence, useSendableGame } from "@/hub/manualSend/status";
 import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
@@ -503,7 +503,14 @@ export default function GameDetailPage() {
             )}
           </div>
 
-          {brand && <BrandingLinks entry={brand} />}
+          <BrandingLinks
+            entry={brand}
+            hubLink={
+              hubPresence.state === "present" && (
+                <HubPageButton url={hubPresence.url} label={t`Coilbox hub`} />
+              )
+            }
+          />
           {/* The widgets this game loads, on the Widgets page (issue #1284). */}
           <div>
             <Link
