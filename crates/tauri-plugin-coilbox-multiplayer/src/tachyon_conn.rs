@@ -157,6 +157,7 @@ pub fn spawn_connection(
             // Nor does it have a relay credential to ask for: a Tachyon server
             // arranges the match itself and tells us where to be.
             turn: watch::channel(TurnAnswer::Unasked).1,
+            turn_ask: Default::default(),
             // And nothing here hosts, so nothing here is relayed and no lobby
             // ever answers about a battle of ours opening.
             relay: crate::conn::HostedRelay::default(),
