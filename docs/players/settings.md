@@ -148,18 +148,18 @@ Settings > General has:
 - Ambient effects, which turns the decorative effects on or off.
 - Performance mode, which draws 3D views at a lower quality. Turn it on for a laptop or an older computer.
 
-### Advanced mode
+### Tools
 
-Advanced mode is under Advanced tools on the General page. It is off unless you turn it on.
+The tools for making games, maps and missions are under Tools on the General page. Each switch adds one set of tools to the sidebar and the home page. They are all off unless you turn them on. The setup wizard asks which ones you want the first time you run Coilbox.
 
-It adds the tools for making games, maps and missions to the sidebar and the home page:
+- Mapping tools, to build and take apart maps. It also adds a Decompile button to each map's page.
+- Unit tools, which adds unit builder and workshop, to make units and change existing ones.
+- Animation tools, to convert and edit unit animation scripts.
+- Archives and Rapid, which adds Archives and Rapid repositories under Library, to look inside game and map files and to browse a rapid server and download any version it holds. See [Rapid repositories](#rapid-repositories). It also adds an Archives tab to each game's page.
+- Mission builders, which adds Campaign builder, to make campaigns and scenarios.
+- Uberstress, to load test a lobby server.
 
-- Archives, under Library, to look inside game and map files.
-- Rapid repositories, under Library, to browse a rapid server and download any version it holds. See [Rapid repositories](#rapid-repositories).
-- uberstress, to load test a lobby server.
-- Campaign builder, to make campaigns and scenarios.
-- Mapping tools, to build and take apart maps.
-- unit builder and workshop, to make units and change existing ones.
+If you had Advanced mode turned on before these switches were added, they all start on.
 - animation, to convert unit animation scripts.
 
 These are covered in the [game developer guides](../developers/index.md). You do not need any of them to play.

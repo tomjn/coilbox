@@ -8,10 +8,10 @@ This page covers what is on each screen. The unit and weapon fields themselves b
 
 ## Turn on Unit tweaks
 
-Unit tweaks is hidden until you turn on Advanced mode.
+Unit tweaks is hidden until you turn on Unit tools.
 
 1. Open Settings, then General.
-2. Under Advanced tools, turn on Advanced mode.
+2. Under Tools, turn on Unit tools.
 
 Unit tweaks now appears in the sidebar, under workshop. It opens on a list of your projects, grouped by game.
 

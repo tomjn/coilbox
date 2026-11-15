@@ -2,7 +2,7 @@
 
 A **scenario** is authored content the engine plays: where the units start, what the zones are, what happens when the player reaches one, what they are being asked to do, and who says what along the way. Coilbox's campaigns stop at the engine boundary, so a campaign mission on its own is a skirmish setup with a briefing over it. A scenario is the other half, and it runs inside the game.
 
-The **Scenario builder** is an advanced-mode tool: turn on Advanced mode in Settings > General and it appears in the sidebar as Campaign builder > **Scenarios**. A scenario you can play also shows up under Play > **Scenarios**.
+The **Scenario builder** is hidden until you turn on **Mission builders** in Settings > General. It then appears in the sidebar as Campaign builder > **Scenarios**. A scenario you can play also shows up under Play > **Scenarios**.
 
 Two things to know before you spend an evening on this:
 
@@ -350,7 +350,7 @@ The button is disabled with a reason for the things you have to fix elsewhere: n
 
 Both the editor's drawer and the player's offer a difficulty, for a scenario that varies by one. See [Difficulty](#difficulty).
 
-**Play > Scenarios** is the player-facing half. It lists every scenario that names a game and a map, with its contents, and gives each one a **Play** button that runs the same pipeline. It also has its own **Import**, so a scenario someone sent you can be brought in and played without Advanced mode or the editor. The sidebar item is hidden until at least one scenario is ready to play.
+**Play > Scenarios** is the player-facing half. It lists every scenario that names a game and a map, with its contents, and gives each one a **Play** button that runs the same pipeline. It also has its own **Import**, so a scenario someone sent you can be brought in and played without Mission builders or the editor. The sidebar item is hidden until at least one scenario is ready to play.
 
 A player is told the same facts as an author in different words. "Install it from Content" is something anyone can do, so it is said either way, while "set the scenario up on a game you have", the test mutator and mission runtime versions are the author's and are not shown on the Scenarios page at all. A player is told that coilbox sets up what the game needs and leaves their copy of it alone.
 
@@ -423,7 +423,7 @@ If the two ever do disagree, because the archive was built by hand or the docume
 
 **Silence the Jericho** is the first mission authored end to end in the Scenario builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
 
-Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Advanced mode on you can do the same from **Campaign builder > Scenarios** and get a scenario you can read and edit like any other.
+Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Mission builders on you can do the same from **Campaign builder > Scenarios** and get a scenario you can read and edit like any other.
 
 Playing it needs the game it was written for. That machine also needs, in this order:
 

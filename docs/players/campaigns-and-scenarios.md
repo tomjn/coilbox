@@ -126,7 +126,7 @@ To import from the [community hub](https://hub.coilbox.org), open Coilbox hub in
 
 Campaigns come as a single file. They are not on the community hub and do not have codes.
 
-1. Turn on Advanced mode in Settings > General.
+1. Turn on Mission builders in Settings > General, under Tools.
 2. Open Campaign builder > Campaigns in the sidebar.
 3. Select Import and pick the campaign file.
 

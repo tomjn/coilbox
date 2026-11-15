@@ -6,10 +6,10 @@ Both are under Animation in the sidebar. This page covers what is on each screen
 
 ## Turn on the animation tools
 
-The Animation group is hidden until you turn on Advanced mode.
+The Animation group is hidden until you turn on Animation tools.
 
 1. Open Settings, then General.
-2. Under Advanced tools, turn on Advanced mode.
+2. Under Tools, turn on Animation tools.
 
 Animation now appears in the sidebar, with BOS → Lua and COB tools under it.
 
