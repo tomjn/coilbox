@@ -51,8 +51,15 @@ const triage = (over: Partial<CrashTriage> = {}): CrashTriage => ({
   map: "Comet Catcher Remake",
   log,
   stale: false,
+  triagedAt: 1_755_800_100_000,
   ...over,
 });
+
+const launch = {
+  command: "'/home/al/.spring/engine/2026.09.02/spring' 'script.txt'",
+  env: ["AppImage: yes", "LD_LIBRARY_PATH=(unset)"],
+  outputLog: "/home/al/.cache/com.tomjn.coilbox/engine-output.log",
+};
 
 describe("CrashDrawer", () => {
   it("says how the engine died", () => {
@@ -147,6 +154,43 @@ describe("CrashDrawer", () => {
     );
     expect(screen.queryByText("Open the log file")).toBeNull();
     expect(screen.queryByText("Show in folder")).toBeNull();
+  });
+
+  it("points at the engine's output when it died before writing its log", () => {
+    render(
+      <CrashDrawer
+        open
+        onOpenChange={() => {}}
+        triage={triage({
+          outcome: { exitCode: null, signal: 6, launch },
+          log: null,
+          stale: true,
+        })}
+      />,
+    );
+    expect(screen.getByText(launch.outputLog)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /open the log file/i }));
+    expect(m.contentOpenPath).toHaveBeenCalledWith({ path: launch.outputLog });
+  });
+
+  it("copies the command, the loader variables and the output file", () => {
+    const writeText = vi.fn(async (_t: string) => {});
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    render(
+      <CrashDrawer
+        open
+        onOpenChange={() => {}}
+        triage={triage({ outcome: { exitCode: null, signal: 6, launch } })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /copy details/i }));
+    const text = writeText.mock.calls[0][0];
+    expect(text).toContain(`Command: ${launch.command}`);
+    expect(text).toContain("LD_LIBRARY_PATH=(unset)");
+    expect(text).toContain(`Engine output: ${launch.outputLog}`);
   });
 
   it("reports a nonzero exit with its code", () => {

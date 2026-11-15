@@ -133,5 +133,11 @@ export function buildCrashReport(r: CrashReport): string {
   if (r.file) out.push(`File: ${r.file}`);
   if (r.engine) out.push(`Engine: ${r.engine}`);
   out.push(`Log: ${r.logPath ?? "none found"}`);
+  const launch = r.outcome.launch;
+  if (launch) {
+    if (launch.outputLog) out.push(`Engine output: ${launch.outputLog}`);
+    out.push(`Command: ${launch.command}`);
+    out.push(...launch.env);
+  }
   return out.join("\n");
 }

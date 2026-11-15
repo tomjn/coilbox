@@ -32,7 +32,9 @@ export function CrashDrawer({
   const [copied, setCopied] = useState(false);
 
   if (!triage) return null;
-  const { outcome, runKind, game, map, engine, file, log, stale } = triage;
+  const { outcome, runKind, game, map, engine, file, log, stale, triagedAt } =
+    triage;
+  const outputLog = outcome.launch?.outputLog;
 
   const copyReport = () => {
     const text = buildCrashReport({
@@ -117,6 +119,21 @@ export function CrashDrawer({
 
             {log ? (
               <EngineLogFile log={log} />
+            ) : outputLog ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {t`The engine stopped before it wrote its log. Everything it printed is in this file.`}
+                </p>
+                <EngineLogFile
+                  log={{
+                    path: outputLog,
+                    modifiedMs: triagedAt,
+                    totalLines: 0,
+                    lines: [],
+                    truncated: false,
+                  }}
+                />
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">
                 {stale

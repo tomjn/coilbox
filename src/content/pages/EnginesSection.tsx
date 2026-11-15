@@ -80,7 +80,7 @@ export default function EnginesSection() {
       {actionError && (
         <Alert variant="destructive">
           <AlertCircle />
-          <AlertDescription className="break-words">
+          <AlertDescription className="select-text whitespace-pre-wrap break-words">
             {actionError}
           </AlertDescription>
         </Alert>
