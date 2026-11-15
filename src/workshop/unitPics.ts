@@ -19,7 +19,7 @@
  */
 import type { UnitBuildpicsResult, UnitDisplay } from "@/content/bindings";
 import type { UnitClones } from "./clones";
-import { readPath, type UnitOverrides } from "./overrides";
+import type { UnitOverrides } from "./overrides";
 
 /**
  * Ask for a unit's picture by internal name.
@@ -41,7 +41,10 @@ export function unitPicLookup({
   overrides: UnitOverrides;
 }): (key: string) => UnitDisplay | undefined {
   const picOf = (key: string): string | undefined => {
-    const value = overrides[key]?.buildpic ?? readPath(units[key], "buildpic");
+    const own = Object.entries(units[key] ?? {}).find(
+      ([field]) => field.toLowerCase() === "buildpic",
+    )?.[1];
+    const value = overrides[key]?.buildpic ?? own;
     if (typeof value !== "string") return undefined;
     // Lowercased because a game writes the same file both ways: Balanced
     // Annihilation's defs say `ARMAAP.DDS` where the archive holds `armaap.dds`.
