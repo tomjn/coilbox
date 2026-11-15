@@ -35517,10 +35517,6 @@ msgstr "su un terreno troppo ripido, in ambra"
 msgid "on or off"
 msgstr "attivato o disattivato"
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -55161,6 +55157,10 @@ msgstr "Vedi i dettagli dell’unità"
 #, fuzzy
 msgid "Violet"
 msgstr "Viola chiaro"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import {
@@ -87,12 +87,13 @@ export function HubSendControl({
     return (
       <Button
         size="sm"
-        variant="ghost"
-        className="gap-1.5 text-muted-foreground"
+        variant="outline"
+        className="gap-1.5"
         onClick={() => openUrl(presence.url).catch(() => {})}
       >
         <CoilboxGlyph size={16} />
-        {t`On the hub`}
+        {t`Visit hub page`}
+        <ExternalLink className="size-4" aria-hidden />
       </Button>
     );
   }

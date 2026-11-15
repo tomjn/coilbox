@@ -35297,10 +35297,6 @@ msgstr "傾斜が急すぎる場所（琥珀色）"
 msgid "on or off"
 msgstr "オンまたはオフ"
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -54789,6 +54785,10 @@ msgstr "ユニットの詳細を表示"
 #, fuzzy
 msgid "Violet"
 msgstr "バイオレット"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

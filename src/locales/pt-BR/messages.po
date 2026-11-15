@@ -35500,10 +35500,6 @@ msgstr "em terreno íngreme demais para ela, em âmbar"
 msgid "on or off"
 msgstr "ligado ou desligado"
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -55137,6 +55133,10 @@ msgstr "Ver detalhes da unidade"
 #, fuzzy
 msgid "Violet"
 msgstr "Violeta"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

@@ -35297,10 +35297,6 @@ msgstr "na zbyt stromym dla niej terenie, na bursztynowo"
 msgid "on or off"
 msgstr "wł. lub wył."
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -54789,6 +54785,10 @@ msgstr "Pokaż szczegóły jednostki"
 #, fuzzy
 msgid "Violet"
 msgstr "Fiołkowy"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

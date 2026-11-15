@@ -28862,10 +28862,6 @@ msgstr ""
 msgid "on or off"
 msgstr ""
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "On the menu"
 msgstr ""
@@ -44834,6 +44830,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Violet"
+msgstr ""
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
 msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx

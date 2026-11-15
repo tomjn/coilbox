@@ -35500,10 +35500,6 @@ msgstr "på grunn som er for bratt for den, i gult"
 msgid "on or off"
 msgstr "på eller av"
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -55137,6 +55133,10 @@ msgstr "Vis enhetsdetaljer"
 #, fuzzy
 msgid "Violet"
 msgstr "Fiolett"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

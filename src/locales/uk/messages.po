@@ -35297,10 +35297,6 @@ msgstr "на надто крутому для нього схилі, буршт�
 msgid "on or off"
 msgstr "увімкнено чи вимкнено"
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -54789,6 +54785,10 @@ msgstr "Переглянути подробиці юніта"
 #, fuzzy
 msgid "Violet"
 msgstr "Фіалковий"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

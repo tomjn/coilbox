@@ -35297,10 +35297,6 @@ msgstr "地面太陡（琥珀色）"
 msgid "on or off"
 msgstr "开或关"
 
-#: src/hub/manualSend/HubSendControl.tsx
-msgid "On the hub"
-msgstr ""
-
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -54789,6 +54785,10 @@ msgstr "查看单位详情"
 #, fuzzy
 msgid "Violet"
 msgstr "紫罗兰色"
+
+#: src/hub/manualSend/HubSendControl.tsx
+msgid "Visit hub page"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy

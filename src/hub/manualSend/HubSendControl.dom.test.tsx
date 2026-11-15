@@ -85,7 +85,7 @@ describe("the hub control on a detail page", () => {
         presence={{ state: "present", url: "https://hub.test/map/tabula-3" }}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "On the hub" }));
+    fireEvent.click(screen.getByRole("button", { name: "Visit hub page" }));
     expect(opened).toHaveBeenCalledWith("https://hub.test/map/tabula-3");
   });
 
