@@ -2,6 +2,7 @@ export const PAGE_IDS = [
   "language",
   "appearance",
   "games",
+  "tools",
   "hub",
   "server",
   "done",

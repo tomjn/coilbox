@@ -8,6 +8,7 @@ import GamesPage from "./GamesPage";
 import HubPage from "./HubPage";
 import LanguagePage from "./LanguagePage";
 import ServerPage from "./ServerPage";
+import ToolsPage from "./ToolsPage";
 
 /**
  * What the shell hands a page. Both settle the current page and move on: a page
@@ -57,6 +58,10 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   games: {
     Component: GamesPage,
     ownHeading: true,
+  },
+  tools: {
+    Component: ToolsPage,
+    title: msg`Choose your tools`,
   },
   hub: {
     Component: HubPage,

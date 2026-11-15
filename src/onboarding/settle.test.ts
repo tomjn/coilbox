@@ -11,6 +11,7 @@ const all = (r: Relevance) => ({
   language: r,
   appearance: r,
   games: r,
+  tools: r,
   hub: r,
   server: r,
 });
@@ -51,7 +52,15 @@ describe("planRun", () => {
       planRun({ settled: [], relevance: all(false), rerun: false }),
     ).toEqual({
       status: "none",
-      settleNow: ["language", "appearance", "games", "hub", "server", "done"],
+      settleNow: [
+        "language",
+        "appearance",
+        "games",
+        "tools",
+        "hub",
+        "server",
+        "done",
+      ],
     });
   });
   it("opens a first run with relevant pages and done, settling only irrelevant ones", () => {
@@ -64,12 +73,12 @@ describe("planRun", () => {
     ).toEqual({
       status: "open",
       pages: ["language", "server", "done"],
-      settleNow: ["appearance", "games", "hub"],
+      settleNow: ["appearance", "games", "tools", "hub"],
     });
   });
   it("leaves out done once done is settled", () => {
     const plan = planRun({
-      settled: ["language", "appearance", "games", "hub", "done"],
+      settled: ["language", "appearance", "games", "tools", "hub", "done"],
       relevance: all(true),
       rerun: false,
     });
