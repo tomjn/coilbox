@@ -319,7 +319,7 @@ pub(crate) fn run_blocking(
         if !map.is_empty() {
             return Err("Open Annihilation is already running.".to_string());
         }
-        let mut cmd = coilbox_proc::command(bin);
+        let mut cmd = coilbox_proc::host_command(bin);
         cmd.args(args);
         if !args.iter().any(|a| a == STATUS_FLAG) {
             cmd.arg(STATUS_FLAG);

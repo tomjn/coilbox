@@ -56,6 +56,154 @@ pub fn command<S: AsRef<OsStr>>(program: S) -> Command {
     cmd
 }
 
+/// [`command`], for a program that belongs to the player's system rather than
+/// to coilbox: an engine, demotool, Open Annihilation.
+///
+/// From an AppImage, coilbox runs with the AppImage's own folders at the front
+/// of `LD_LIBRARY_PATH`, `PATH`, `XDG_DATA_DIRS` and a dozen GTK, GIO and
+/// GStreamer variables, and with the host's libwayland in `LD_PRELOAD` on
+/// Wayland (`src-tauri/src/main.rs`). A child started with that environment
+/// loads coilbox's Ubuntu 22.04 libraries in place of the system's. An engine
+/// started that way loads seven of them before `main`, where skylobby or the
+/// BAR launcher gives it none. This hands the child the environment coilbox
+/// was started with instead.
+///
+/// Our own sidecars keep using [`command`]: they ship inside the AppImage and
+/// may need its libraries.
+pub fn host_command<S: AsRef<OsStr>>(program: S) -> Command {
+    let mut cmd = command(program);
+    for (key, value) in host_env_changes() {
+        match value {
+            Some(v) => cmd.env(key, v),
+            None => cmd.env_remove(key),
+        };
+    }
+    cmd
+}
+
+/// The variable `src-tauri/src/main.rs` sets when it re-runs coilbox with the
+/// host's libwayland in `LD_PRELOAD`. Its presence means that preload is ours.
+pub const WAYLAND_REEXEC_VAR: &str = "COILBOX_WAYLAND_REEXEC";
+
+/// What [`host_command`] changes in this process's environment: a new value, or
+/// `None` to remove the variable. Empty outside an AppImage.
+pub fn host_env_changes() -> Vec<(String, Option<String>)> {
+    if !cfg!(target_os = "linux") || std::env::var_os("APPIMAGE").is_none() {
+        return Vec::new();
+    }
+    let Ok(appdir) = std::env::var("APPDIR") else {
+        return Vec::new();
+    };
+    appimage_env_changes(&appdir, std::env::vars())
+}
+
+/// The variables that decide which libraries a [`host_command`] child loads, as
+/// it gets them, one `NAME=value` line each. For error reports, so a player can
+/// show what the engine was started with.
+pub fn describe_host_env() -> Vec<String> {
+    let changes = host_env_changes();
+    let mut lines = vec![format!(
+        "AppImage: {}",
+        if std::env::var_os("APPIMAGE").is_some() {
+            "yes"
+        } else {
+            "no"
+        }
+    )];
+    for key in [
+        "LD_LIBRARY_PATH",
+        "LD_PRELOAD",
+        "SDL_VIDEODRIVER",
+        "XDG_SESSION_TYPE",
+    ] {
+        let value = match changes.iter().find(|(k, _)| k == key) {
+            Some((_, v)) => v.clone(),
+            None => std::env::var(key).ok(),
+        };
+        lines.push(format!("{key}={}", value.as_deref().unwrap_or("(unset)")));
+    }
+    if !changes.is_empty() {
+        let keys: Vec<&str> = changes.iter().map(|(k, _)| k.as_str()).collect();
+        lines.push(format!("AppImage paths removed from: {}", keys.join(", ")));
+    }
+    lines
+}
+
+/// How a process ended, in words: "exited with code 1", or "killed by signal 6
+/// (SIGABRT)".
+pub fn describe_exit(status: &std::process::ExitStatus) -> String {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(signal) = status.signal() {
+            let name = match signal {
+                libc::SIGILL => " (SIGILL)",
+                libc::SIGABRT => " (SIGABRT)",
+                libc::SIGBUS => " (SIGBUS)",
+                libc::SIGFPE => " (SIGFPE)",
+                libc::SIGKILL => " (SIGKILL)",
+                libc::SIGSEGV => " (SIGSEGV)",
+                libc::SIGTERM => " (SIGTERM)",
+                _ => "",
+            };
+            let core = if status.core_dumped() {
+                ", core dumped"
+            } else {
+                ""
+            };
+            return format!("killed by signal {signal}{name}{core}");
+        }
+    }
+    match status.code() {
+        Some(code) => format!("exited with code {code}"),
+        None => "ended with no exit code".to_string(),
+    }
+}
+
+/// `program` and `args` as a line a player can paste into a terminal to run
+/// the same thing, each part quoted.
+pub fn shell_line<P: AsRef<OsStr>, A: AsRef<OsStr>>(program: P, args: &[A]) -> String {
+    std::iter::once(program.as_ref())
+        .chain(args.iter().map(AsRef::as_ref))
+        .map(|part| format!("'{}'", part.to_string_lossy().replace('\'', r"'\''")))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// [`host_env_changes`] for a given `APPDIR` and environment.
+///
+/// Every list entry inside `appdir` goes, and a variable left with nothing is
+/// removed, because the AppImage set it and the system never had it. The
+/// `LD_PRELOAD` goes only when coilbox set it, so a player's own preload stays.
+fn appimage_env_changes(
+    appdir: &str,
+    vars: impl Iterator<Item = (String, String)>,
+) -> Vec<(String, Option<String>)> {
+    let appdir = appdir.trim_end_matches('/');
+    if appdir.is_empty() {
+        return Vec::new();
+    }
+    let inside = |entry: &str| entry == appdir || entry.starts_with(&format!("{appdir}/"));
+    let vars: Vec<(String, String)> = vars.collect();
+    let preload_is_ours = vars.iter().any(|(k, _)| k == WAYLAND_REEXEC_VAR);
+    let mut changes = Vec::new();
+    for (key, value) in vars {
+        if key == WAYLAND_REEXEC_VAR || (key == "LD_PRELOAD" && preload_is_ours) {
+            changes.push((key, None));
+            continue;
+        }
+        if !value.contains(appdir) {
+            continue;
+        }
+        let kept: Vec<&str> = value
+            .split(':')
+            .filter(|e| !e.is_empty() && !inside(e))
+            .collect();
+        changes.push((key, (!kept.is_empty()).then(|| kept.join(":"))));
+    }
+    changes
+}
+
 /// [`command`], for the one child that has to keep running after coilbox has
 /// closed.
 ///
@@ -449,6 +597,90 @@ fn join_extras(primary: &str, roots: &[String]) -> String {
         .map(String::as_str)
         .collect::<Vec<_>>()
         .join(&DATADIR_SEP.to_string())
+}
+
+#[cfg(test)]
+mod appimage_env {
+    use super::*;
+
+    const APPDIR: &str = "/tmp/.mount_CoilbxAb12";
+
+    fn changes(vars: &[(&str, &str)]) -> Vec<(String, Option<String>)> {
+        let mut out = appimage_env_changes(
+            APPDIR,
+            vars.iter().map(|(k, v)| (k.to_string(), v.to_string())),
+        );
+        out.sort();
+        out
+    }
+
+    fn set(k: &str, v: &str) -> (String, Option<String>) {
+        (k.to_string(), Some(v.to_string()))
+    }
+
+    fn unset(k: &str) -> (String, Option<String>) {
+        (k.to_string(), None)
+    }
+
+    #[test]
+    fn the_appimages_folders_come_off_the_front_of_a_list() {
+        // As AppRun.wrapped in the 1.29.2 AppImage writes them.
+        let path = format!("{APPDIR}/usr/bin/:{APPDIR}/usr/sbin/:/usr/local/bin:/usr/bin");
+        let data = format!("{APPDIR}/usr/share:/usr/share:/home/al/.local/share");
+        assert_eq!(
+            changes(&[("PATH", &path), ("XDG_DATA_DIRS", &data)]),
+            vec![
+                set("PATH", "/usr/local/bin:/usr/bin"),
+                set("XDG_DATA_DIRS", "/usr/share:/home/al/.local/share"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_variable_only_the_appimage_set_is_removed() {
+        let ld = format!("{APPDIR}/usr/lib/:{APPDIR}/usr/lib/x86_64-linux-gnu/:");
+        // The gtk hook writes a doubled slash.
+        let gio = format!("{APPDIR}//usr/lib/gio/modules");
+        assert_eq!(
+            changes(&[
+                ("LD_LIBRARY_PATH", &ld),
+                ("GIO_MODULE_DIR", &gio),
+                ("APPDIR", APPDIR)
+            ]),
+            vec![
+                unset("APPDIR"),
+                unset("GIO_MODULE_DIR"),
+                unset("LD_LIBRARY_PATH")
+            ]
+        );
+    }
+
+    #[test]
+    fn coilboxs_own_preload_is_removed_and_a_players_is_kept() {
+        let wayland = "/usr/lib/libwayland-client.so.0";
+        assert_eq!(
+            changes(&[("LD_PRELOAD", wayland), (WAYLAND_REEXEC_VAR, "1")]),
+            vec![unset(WAYLAND_REEXEC_VAR), unset("LD_PRELOAD")]
+        );
+        assert_eq!(changes(&[("LD_PRELOAD", "/opt/mine.so")]), vec![]);
+    }
+
+    #[test]
+    fn a_folder_that_only_shares_the_prefix_is_kept() {
+        let other = format!("{APPDIR}-other/lib:/usr/lib");
+        assert_eq!(
+            changes(&[("LD_LIBRARY_PATH", &other)]),
+            vec![set("LD_LIBRARY_PATH", &other)]
+        );
+    }
+
+    #[test]
+    fn variables_without_the_appimage_are_untouched() {
+        assert_eq!(
+            changes(&[("HOME", "/home/al"), ("PATH", "/usr/bin")]),
+            vec![]
+        );
+    }
 }
 
 #[cfg(test)]

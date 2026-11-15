@@ -81,7 +81,7 @@ pub fn check(path: &Path, wait: Duration) -> Result<String, String> {
         .param("path", &shown)
         .into());
     }
-    let mut child = coilbox_proc::command(path)
+    let mut child = coilbox_proc::host_command(path)
         .arg("--version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -188,7 +188,7 @@ pub struct OaMap {
 /// order OA gives them. Its log goes to standard error, which is dropped.
 pub fn list_maps(path: &Path, wait: Duration) -> Result<Vec<OaMap>, String> {
     let shown = path.display().to_string();
-    let mut child = coilbox_proc::command(path)
+    let mut child = coilbox_proc::host_command(path)
         .args(["--list-content", "--json"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
