@@ -135,8 +135,17 @@
 -- A runtime behind 12 reports the kind as unknown and the group stands still. So
 -- a scenario using it asks for 12.
 
+-- 13 is the neutral team (issue #5252). One format feature:
+--
+--   * a team may be `{ gaia = true, color = { r, g, b } }`, and then what is placed
+--     for it goes on the engine's Gaia team, marked neutral and holding its fire,
+--     and Gaia is drawn in that colour
+--
+-- A runtime behind 13 finds no engine team number on it and drops the team, and
+-- everything placed for it with it. So a scenario with a neutral team asks for 13.
+
 return {
-	version = 12,
+	version = 13,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,

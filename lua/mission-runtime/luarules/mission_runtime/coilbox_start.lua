@@ -40,15 +40,38 @@ end
 -- handed out. A mission's economy is authored, so it has to play the same
 -- wherever it was launched from. `resources` is how a scenario asks for more.
 --
+-- The neutral team is the one entry with no number of its own. It is marked
+-- `gaia`, and it plays on the engine's Gaia team, so it needs `gaiaTeam`. A game
+-- that switched Gaia off has none, and the team is reported and dropped.
+--
 -- @param mission the compiled mission table
+-- @param gaiaTeam the engine's Gaia team, or nil when it has none
 -- @return array of team plans, array of problems to log
-function M.teamPlan(mission)
+function M.teamPlan(mission, gaiaTeam)
 	local teams = mission.teams or {}
 	local plan, problems = {}, {}
 
 	for _, id in ipairs(sortedKeys(teams)) do
 		local team = teams[id]
-		if type(team.team) ~= "number" then
+		if team.gaia == true then
+			if type(gaiaTeam) ~= "number" or gaiaTeam < 0 then
+				problems[#problems + 1] = "team " .. id
+					.. " is the neutral team, but this game has no Gaia team to put it on, ignoring it"
+			else
+				plan[#plan + 1] = {
+					id = id,
+					team = gaiaTeam,
+					neutral = true,
+					color = team.color,
+					startUnits = {},
+					metal = 0,
+					energy = 0,
+					metalIncome = 0,
+					energyIncome = 0,
+					noCommander = false,
+				}
+			end
+		elseif type(team.team) ~= "number" then
 			problems[#problems + 1] = "team " .. id .. " has no engine team number, ignoring it"
 		else
 			local resources = team.resources or {}

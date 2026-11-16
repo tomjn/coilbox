@@ -176,6 +176,10 @@ function M.newEngine(modOptions, files, options)
 		resources = {},
 		income = {},
 		noSelect = {},
+		-- Unit id -> the flag Spring.SetUnitNeutral last set.
+		neutral = {},
+		-- Engine team number -> { r, g, b }, from Spring.SetTeamColor.
+		teamColors = {},
 		-- Game rules params by name. The engine keeps one static table for every
 		-- Lua handle, which is what makes them readable outside synced code.
 		rulesParams = {},
@@ -639,6 +643,12 @@ function M.newEngine(modOptions, files, options)
 			end,
 			SetUnitNoSelect = function(unitID, flag)
 				engine.noSelect[unitID] = flag
+			end,
+			SetUnitNeutral = function(unitID, flag)
+				engine.neutral[unitID] = flag
+			end,
+			SetTeamColor = function(teamID, r, g, b)
+				engine.teamColors[teamID] = { r, g, b }
 			end,
 			GetUnitStates = function(unitID)
 				return { movestate = engine.units[unitID].movestate }
