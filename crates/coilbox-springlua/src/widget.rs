@@ -496,7 +496,10 @@ mod tests {
     #[test]
     fn os_date_refuses_a_specifier_strftime_does_not_know() {
         let error = read(r#"os.date("%Q")"#).unwrap_err();
-        assert!(error.contains("invalid conversion specifier '%Q'"), "{error}");
+        assert!(
+            error.contains("invalid conversion specifier '%Q'"),
+            "{error}"
+        );
     }
 
     #[test]
