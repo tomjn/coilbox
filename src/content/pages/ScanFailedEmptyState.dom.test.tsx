@@ -86,6 +86,7 @@ vi.mock("../../downloads/DownloadQueueProvider", () => ({
 vi.mock("../../hub/gameIcons", () => ({
   useHubGames: () => null,
   useHubGamesFailure: () => null,
+  useRefreshHubGames: () => () => {},
 }));
 vi.mock("../../downloads/config", () => ({
   useContentRootPaths: () => [],
