@@ -45,10 +45,13 @@ vi.mock("@/content/branding", () => ({
 
 import { GameIcon } from "@/components/GameIcon";
 import {
+  HUB_GAMES_REFRESH_MS,
   loadHubGames,
+  refreshHubGames,
   resetHubGames,
   useHubGames,
   useHubGamesFailure,
+  useTimedHubGamesRefresh,
 } from "./gameIcons";
 
 const SF_LOGO = "https://assets.example/coilbox-assets/games/SF/logo.png";
@@ -275,5 +278,140 @@ describe("useHubGamesFailure", () => {
     render(<Probe />);
     await act(async () => {});
     expect(probe()).toBe("none");
+  });
+});
+
+describe("refreshHubGames", () => {
+  const HUB = "https://hub.example";
+  function Probe() {
+    const games = useHubGames();
+    const failure = useHubGamesFailure();
+    return (
+      <span data-testid="probe">
+        {games ? games.map((g) => g.shortname).join(",") : "none"}
+        {failure ? ` (${failure})` : ""}
+      </span>
+    );
+  }
+  const probe = () => screen.getByTestId("probe").textContent;
+
+  it("shows a game published since the list was read on a page already open", async () => {
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("SF", null)]),
+    );
+    render(<Probe />);
+    await act(async () => {});
+    expect(probe()).toBe("SF");
+
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("SF", null), hubGame("TA", null)]),
+    );
+    await act(async () => {
+      await refreshHubGames(HUB);
+    });
+    expect(probe()).toBe("SF,TA");
+    expect(await loadHubGames(HUB)).toHaveLength(2);
+    expect(hoisted.fetchHubGames).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the list it has when the read fails, with no failure shown", async () => {
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("SF", null)]),
+    );
+    render(<Probe />);
+    await act(async () => {});
+    hoisted.fetchHubGames.mockResolvedValue({ ok: false, reason: "down" });
+    await act(async () => {
+      expect(await refreshHubGames(HUB)).toHaveLength(1);
+    });
+    expect(probe()).toBe("SF");
+  });
+
+  it("replaces a remembered failure once the hub answers", async () => {
+    hoisted.fetchHubGames.mockResolvedValueOnce({ ok: false, reason: "down" });
+    render(<Probe />);
+    await act(async () => {});
+    expect(probe()).toBe(" (down)");
+
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("TA", null)]),
+    );
+    await act(async () => {
+      await refreshHubGames(HUB);
+    });
+    expect(probe()).toBe("TA");
+  });
+
+  it("shares one read between refreshes asked for together", async () => {
+    hoisted.fetchHubGames.mockImplementation(() => answer([]));
+    await loadHubGames(HUB);
+    await Promise.all([refreshHubGames(HUB), refreshHubGames(HUB)]);
+    expect(hoisted.fetchHubGames).toHaveBeenCalledTimes(2);
+  });
+
+  it("is a first read, not remembering a failure, when nothing is held", async () => {
+    hoisted.fetchHubGames.mockResolvedValueOnce({ ok: false, reason: "down" });
+    expect(await refreshHubGames(HUB)).toEqual([]);
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("SF", null)]),
+    );
+    expect(await loadHubGames(HUB)).toHaveLength(1);
+  });
+
+  it("makes an open page ask again after a reset", async () => {
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("SF", null)]),
+    );
+    render(<Probe />);
+    await act(async () => {});
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([hubGame("TA", null)]),
+    );
+    await act(async () => {
+      resetHubGames();
+    });
+    await act(async () => {});
+    expect(probe()).toBe("TA");
+  });
+});
+
+describe("useTimedHubGamesRefresh", () => {
+  function Timer({ enabled }: { enabled: boolean }) {
+    useTimedHubGamesRefresh(enabled);
+    return null;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads the list again on each interval", async () => {
+    hoisted.fetchHubGames.mockImplementation(() => answer([]));
+    await loadHubGames("https://hub.example");
+    render(<Timer enabled />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HUB_GAMES_REFRESH_MS * 2);
+    });
+    expect(hoisted.fetchHubGames).toHaveBeenCalledTimes(3);
+  });
+
+  it("does nothing when background fetches are off", async () => {
+    render(<Timer enabled={false} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HUB_GAMES_REFRESH_MS * 2);
+    });
+    expect(hoisted.fetchHubGames).not.toHaveBeenCalled();
+  });
+
+  it("does nothing with no trusted hub", async () => {
+    hoisted.hub = null;
+    render(<Timer enabled />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HUB_GAMES_REFRESH_MS * 2);
+    });
+    expect(hoisted.fetchHubGames).not.toHaveBeenCalled();
   });
 });

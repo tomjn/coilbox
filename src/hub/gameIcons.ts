@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { GameItem } from "@/content/bindings";
 import { gameIconKey } from "@/content/gameIcon";
 import { describeError } from "@/i18n/uiError";
 import { createGameResolver } from "../career/games";
-import { fetchHubGames, type HubGame } from "./api";
+import { fetchHubGames, type HubGame, type HubResult } from "./api";
 import { assetCdnBase } from "./assets/tier";
 import { useTrustedHubUrl } from "./config";
 
@@ -86,6 +86,35 @@ const requests = new Map<string, Promise<HubGame[]>>();
 const answers = new Map<string, HubGame[]>();
 /** Why the last read of each hub's list failed, cleared when one succeeds. */
 const failures = new Map<string, string>();
+/** A refresh still out, per hub, so callers that ask together share one read. */
+const refreshing = new Map<string, Promise<HubGame[]>>();
+
+/** Counts each time a held list is replaced or dropped, so open pages re-read. */
+let version = 0;
+const listeners = new Set<() => void>();
+
+function changed(): void {
+  version++;
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function readVersion(): number {
+  return version;
+}
+
+/** One read of the list, with a throw turned into a reason. */
+async function readHubGames(hubUrl: string): Promise<HubResult<HubGame[]>> {
+  try {
+    return await fetchHubGames(hubUrl);
+  } catch (e) {
+    return { ok: false, reason: describeError(e) };
+  }
+}
 
 /**
  * The hub's game list, read once per hub for the session and shared by every
@@ -102,14 +131,10 @@ export function loadHubGames(
 ): Promise<HubGame[]> {
   let request = requests.get(hubUrl);
   if (!request) {
-    const started: Promise<HubGame[]> = fetchHubGames(hubUrl)
+    const started: Promise<HubGame[]> = readHubGames(hubUrl)
       .then((result) => {
         if (result.ok) return result.value;
         failures.set(hubUrl, result.reason);
-        return null;
-      })
-      .catch((e: unknown) => {
-        failures.set(hubUrl, describeError(e));
         return null;
       })
       .then((games) => {
@@ -131,11 +156,64 @@ export function loadHubGames(
   return request;
 }
 
-/** Forget what was read, for a test that needs a fresh session. */
+/**
+ * Read the hub's list again, so a game published since launch shows up. A page
+ * already showing the list keeps it until the new one lands, and keeps it if the
+ * read fails, since a stale list is more use than none. With nothing held yet,
+ * this is {@link loadHubGames} without remembering a failure.
+ */
+export function refreshHubGames(hubUrl: string): Promise<HubGame[]> {
+  if (!answers.has(hubUrl)) return loadHubGames(hubUrl, false);
+  let pending = refreshing.get(hubUrl);
+  if (!pending) {
+    pending = readHubGames(hubUrl).then((result) => {
+      refreshing.delete(hubUrl);
+      if (!result.ok) return answers.get(hubUrl) ?? [];
+      failures.delete(hubUrl);
+      answers.set(hubUrl, result.value);
+      requests.set(hubUrl, Promise.resolve(result.value));
+      changed();
+      return result.value;
+    });
+    refreshing.set(hubUrl, pending);
+  }
+  return pending;
+}
+
+/**
+ * How often an open coilbox reads the hub's list again. The hub lets the list be
+ * cached for 60 seconds (`Api::SUCCESS_CACHE` in tomjn/coilbox-hub), so a
+ * shorter interval would only get the same answer back.
+ */
+export const HUB_GAMES_REFRESH_MS = 15 * 60 * 1000;
+
+/** Re-read the trusted hub's list every {@link HUB_GAMES_REFRESH_MS}. */
+export function useTimedHubGamesRefresh(enabled: boolean): void {
+  const hubUrl = useTrustedHubUrl();
+  useEffect(() => {
+    if (!enabled || !hubUrl) return;
+    const timer = setInterval(() => {
+      void refreshHubGames(hubUrl);
+    }, HUB_GAMES_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [enabled, hubUrl]);
+}
+
+/** Re-read the trusted hub's list, or nothing when there is no trusted hub. */
+export function useRefreshHubGames(): () => void {
+  const hubUrl = useTrustedHubUrl();
+  return useCallback(() => {
+    if (hubUrl) void refreshHubGames(hubUrl);
+  }, [hubUrl]);
+}
+
+/** Forget what was read, so every open page asks the hub again. */
 export function resetHubGames(): void {
   requests.clear();
   answers.clear();
   failures.clear();
+  refreshing.clear();
+  changed();
 }
 
 /**
@@ -145,9 +223,11 @@ export function resetHubGames(): void {
  */
 export function useHubGames(): HubGame[] | null {
   const hubUrl = useTrustedHubUrl();
+  const seen = useSyncExternalStore(subscribe, readVersion);
   const [games, setGames] = useState<HubGame[] | null>(
     hubUrl ? (answers.get(hubUrl) ?? null) : null,
   );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `seen` is the signal to read again
   useEffect(() => {
     if (!hubUrl) {
       setGames(null);
@@ -165,7 +245,7 @@ export function useHubGames(): HubGame[] | null {
     return () => {
       live = false;
     };
-  }, [hubUrl]);
+  }, [hubUrl, seen]);
   return games;
 }
 

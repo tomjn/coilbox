@@ -1,7 +1,7 @@
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { CloudOff } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { errorText } from "@/lib/helpers";
@@ -10,7 +10,11 @@ import {
   type EnqueueInput,
   useDownloadQueue,
 } from "../../downloads/DownloadQueueProvider";
-import { useHubGames, useHubGamesFailure } from "../../hub/gameIcons";
+import {
+  useHubGames,
+  useHubGamesFailure,
+  useRefreshHubGames,
+} from "../../hub/gameIcons";
 import {
   filterUninstalledGames,
   useBrandingCatalog,
@@ -91,6 +95,7 @@ export default function GamesPage() {
   const { enqueue, cancel: cancelDownload, itemFor } = useDownloadQueue();
   const hubFailure = useHubGamesFailure();
   const hubRead = useHubGames() !== null && !hubFailure;
+  const refreshHubGames = useRefreshHubGames();
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<GameSort>("featured");
@@ -138,6 +143,10 @@ export default function GamesPage() {
   // The player's own games until they pick a chip, or the games they could
   // get when they have none yet.
   const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
+  // Looking for updates, by the chip or the topbar badge, reads the hub again.
+  useEffect(() => {
+    if (chip === "updates") refreshHubGames();
+  }, [chip, refreshHubGames]);
   const shown = useMemo(
     () =>
       sortGames(
@@ -203,7 +212,10 @@ export default function GamesPage() {
         actions={
           targets.length > 0 && (
             <RescanButton
-              onRescan={() => run(true)}
+              onRescan={() => {
+                run(true);
+                refreshHubGames();
+              }}
               scanning={loading}
               onCancel={cancel}
             />

@@ -17,6 +17,7 @@ import { formatBytes, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "../../content/pages/components/FilterBar";
 import { EmptyState } from "../../content/pages/components/states";
+import { useRefreshHubGames } from "../../hub/gameIcons";
 import {
   type ActivityRow,
   type ActivityState,
@@ -394,6 +395,9 @@ export default function ActivityPage() {
   // This page is the queue, so a failure that lands while it is open is seen.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `settled` is the trigger, a download stopping while the page is open, and is not read in the body
   useEffect(() => acknowledgeFailures(), [acknowledgeFailures, settled]);
+  // Opening downloads is a sign the player is looking for something new.
+  const refreshHubGames = useRefreshHubGames();
+  useEffect(() => refreshHubGames(), [refreshHubGames]);
   const history = useDownloadHistory();
   const drawer = useDrawer();
   const rows = useMemo(

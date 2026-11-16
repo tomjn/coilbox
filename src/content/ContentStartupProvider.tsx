@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
 import { backfillWriteRootId } from "../downloads/writeRoot";
 import { useTrustedHubUrl } from "../hub/config";
+import { useTimedHubGamesRefresh } from "../hub/gameIcons";
 import { useSkirmishDraft } from "../play/drafts";
 import { BundledEngineSetup } from "./BundledEngineSetup";
 import { fetchListsInBackground } from "./backgroundFetch";
@@ -42,6 +43,7 @@ export default function ContentStartupProvider({
   const [preferredId] = useSetting<string>("content.preferredEngineId", "");
   const [dlConfig, setDlConfig] = useDownloadsConfig();
   const hubUrl = useTrustedHubUrl();
+  useTimedHubGamesRefresh(prefs.fetchListsInBackground !== false);
   // The game the skirmish setup last held, which is the game the player last used.
   const [skirmish] = useSkirmishDraft();
   const ran = useRef(false);

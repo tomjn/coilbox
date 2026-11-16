@@ -45,6 +45,9 @@ vi.mock("../bindings", () => ({
   dlDownloadFile: vi.fn(),
   dlDownloadMap: vi.fn(),
 }));
+vi.mock("../../hub/gameIcons", () => ({
+  useRefreshHubGames: () => () => {},
+}));
 vi.mock("../warmEngineCache", () => ({ installEngine: vi.fn() }));
 vi.mock("../downloadGame", () => ({ downloadGameAnySource: vi.fn() }));
 vi.mock("../downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
