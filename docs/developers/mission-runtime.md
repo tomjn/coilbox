@@ -6,6 +6,21 @@ This page is for two readers. The first half is the adoption contract, for anyon
 
 For authoring, see [Scenarios](scenarios.md).
 
+## Adding the runtime to your game
+
+Coilbox installs the runtime for you. You do not copy any files by hand. Your game has to be a loose `.sdd` folder in one of coilbox's content folders.
+
+1. Open **Settings > General**, and under **Tools** switch on **Archives and Rapid**. The install button is on a tab this switch adds, and it is off by default.
+2. Open **Library > Games** and select your game.
+3. Open the **Archives** tab.
+4. Scroll to the bottom and expand the **Mission runtime** heading. It starts closed.
+5. Press **Install the mission runtime**.
+6. Add the two guards to your game's own Lua: [one where your game ends](#_2-guard-your-game-over) and [one where it spawns start units](#_3-do-not-start-a-team-the-mission-has-already-started).
+
+Once the runtime is installed, coilbox can play scenarios in your game directly. To bring the runtime up to date after a coilbox update, repeat steps 2 to 5. The button then reads **Update the mission runtime**.
+
+If your game is a packaged `.sd7` or `.sdz`, the **Mission runtime** section explains why it cannot install into it. Coilbox can still test scenarios through its test mutator. To ship the runtime with your game, build it into your game's source and package it from there.
+
 ## What adopting the runtime costs
 
 - **Three folders of Lua**, all of it named `coilbox_*` so you can see at a glance what came from here.
@@ -21,7 +36,7 @@ A game that has not adopted the runtime is not shut out of scenarios. It just ca
 
 ### 1. Bundle the runtime in your game archive
 
-Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do not copy them by hand: open **Content > Games**, pick your game, and use the **Mission runtime** section. That writes:
+Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do not copy them by hand. The install button in [Adding the runtime to your game](#adding-the-runtime-to-your-game) writes:
 
 ```
 <yourgame>.sdd/
@@ -334,7 +349,7 @@ Everything else your game does carries on. The runtime does not touch your econo
 For coilbox contributors. The runtime is one of three pieces that have to stay in step.
 
 1. **The runtime** lives in this repo under `lua/mission-runtime/` and ships as a Tauri resource. `lua/mission-runtime/README.md` is its own reference and documents every module in detail.
-2. **The install path** is Content > Games, above. Coilbox writes the files in, reads the version marker back, and shows what the installed runtime supports.
+2. **The install path** is the **Mission runtime** section on a game's Archives tab, above. Coilbox writes the files in, reads the version marker back, and shows what the installed runtime supports.
 3. **The test mutator** is a generated game, `coilbox-mission-test.sdd`, in the content root's `games/` folder. It carries a generated `modinfo.lua` depending on the base game, the runtime, and the one scenario under test. Everything else comes from the base game. The folder name is a compile-time constant in the Rust that writes it, so that code can only ever write to coilbox's own game, and deleting the folder undoes everything it ever did. It follows the same pattern as the lego builder's scratch game.
 
 ## Compile and validate
