@@ -307,7 +307,7 @@ local NOT_KEPT = "which units are in a group and what a group was ordered to do,
 -- `mission` is the compiled scenario exactly as coilbox emitted it, so a mission
 -- that misbehaves can be diagnosed by reading missions/<id>/mission.lua.
 local function publish()
-	local teams, problems = START.teamPlan(MISSION)
+	local teams, problems = START.teamPlan(MISSION, Spring.GetGaiaTeamID())
 
 	local actors = {}
 	for _, actor in ipairs(MISSION.actors or {}) do
@@ -487,6 +487,16 @@ if gadgetHandler:IsSyncedCode() then
 	-- refusal worth saying most: the mission plays, the engine exits cleanly, and
 	-- the only difference between it and a mission whose author placed nothing
 	-- there is this line (issue #2165).
+	--- Whether an engine team is the scenario's neutral team.
+	local function neutralTeam(team)
+		for _, entry in ipairs(teams) do
+			if entry.neutral and entry.team == team then
+				return true
+			end
+		end
+		return false
+	end
+
 	local function create(placement)
 		local x, y, z = groundAt(placement)
 		spawning = true
@@ -504,6 +514,12 @@ if gadgetHandler:IsSyncedCode() then
 				"the engine refused to spawn %s for team %s at %g,%g, so it is not on the map",
 				tostring(placement.unitDef), tostring(placement.team), x, z))
 			return nil
+		end
+		if neutralTeam(placement.team) then
+			-- Neutral means nobody fires at it unprompted, and it holds its own fire
+			-- too, or a neutral turret would shoot at a player who ignores it.
+			Spring.SetUnitNeutral(unitID, true)
+			Spring.GiveOrderToUnit(unitID, CMD.FIRE_STATE, { 0 }, 0)
 		end
 		return unitID
 	end
@@ -1199,8 +1215,21 @@ if gadgetHandler:IsSyncedCode() then
 else
 	local published
 
+	--- Draw the neutral team in the scenario's colour rather than the white the
+	-- engine gives Gaia. A team's colour is local to each screen, so it is set
+	-- here and not in the synced half.
+	local function paintNeutral()
+		for _, team in ipairs(published.teams) do
+			local color = team.neutral and team.color
+			if type(color) == "table" and #color == 3 then
+				Spring.SetTeamColor(team.team, color[1], color[2], color[3])
+			end
+		end
+	end
+
 	function gadget:Initialize()
 		published = publish()
+		paintNeutral()
 	end
 
 	--- Which unit an actor became. Anything about an actor that is local to this

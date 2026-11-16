@@ -82,6 +82,7 @@ import type { Scenario } from "../../model";
 import type { LoadedScenario } from "../../storage";
 import { defsMissingFrom, type MissionIssue, unitDefsIn } from "../../validate";
 import { MissionHomeActions } from "./MissionHomeActions";
+import { NeutralTeamField } from "./NeutralTeamField";
 import { EditorPanel, RowProblem } from "./panels";
 import {
   applyPresetSetup,
@@ -510,6 +511,10 @@ export function SetupPanel({
             {teamNotes.map((message) => (
               <RowProblem key={message} problem={message} />
             ))}
+            <NeutralTeamField
+              neutral={scenario.neutral}
+              onChange={(neutral) => onChange({ ...latest.current, neutral })}
+            />
             <GameOptionsPanel
               selectedGame={selectedGame}
               options={modOptions}

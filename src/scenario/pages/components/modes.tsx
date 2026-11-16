@@ -72,6 +72,7 @@ import {
   type Point,
   type Scenario,
   type ScenarioZone,
+  teamOwners,
 } from "../../model";
 import { takeBlueprint } from "./blueprintImport";
 import type { ScenarioEdit } from "./edits";
@@ -456,7 +457,7 @@ const actorsMode: EditorMode = {
   use: ({ scenario, onChange, onSelect }) => {
     const [unitDef, setUnitDef] = useState("");
     const [team, setTeam] = useState("");
-    const participants = scenario.setup.participants;
+    const participants = teamOwners(scenario);
     const owner = participants.some((p) => p.id === team)
       ? team
       : (participants[0]?.id ?? "");
@@ -519,7 +520,7 @@ const groupsMode: EditorMode = {
     const [unitDef, setUnitDef] = useState("");
     const [count, setCount] = useState(DEFAULT_GROUP_COUNT);
     const [team, setTeam] = useState("");
-    const participants = scenario.setup.participants;
+    const participants = teamOwners(scenario);
     const owner = participants.some((p) => p.id === team)
       ? team
       : (participants[0]?.id ?? "");
@@ -618,7 +619,7 @@ const basesMode: EditorMode = {
   }) => {
     const [unitDef, setUnitDef] = useState("");
     const [team, setTeam] = useState("");
-    const participants = scenario.setup.participants;
+    const participants = teamOwners(scenario);
     const owner = participants.some((p) => p.id === team)
       ? team
       : (participants[0]?.id ?? "");
@@ -787,7 +788,7 @@ const layoutsMode: EditorMode = {
   },
   use: ({ scenario, onChange, onSelect, layout: choice, onLayout }) => {
     const [team, setTeam] = useState("");
-    const participants = scenario.setup.participants;
+    const participants = teamOwners(scenario);
     const owner = participants.some((p) => p.id === team)
       ? team
       : (participants[0]?.id ?? "");

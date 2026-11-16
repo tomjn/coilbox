@@ -13,7 +13,12 @@ import type {
   ScenarioZone,
   TriggerStep,
 } from "./model";
-import { baseBuildings, holdsAtStart, MISSION_SCHEMA_VERSION } from "./model";
+import {
+  baseBuildings,
+  holdsAtStart,
+  MISSION_SCHEMA_VERSION,
+  NEUTRAL_TEAM_ID,
+} from "./model";
 
 /**
  * Compile a scenario document to the Lua the mission runtime reads.
@@ -319,6 +324,16 @@ function teams(scenario: Scenario): LuaTable {
             : undefined,
         ],
         ["noCommander", team.noCommander],
+      ]),
+    );
+  }
+  // No engine team number: the runtime asks the engine which team Gaia is.
+  if (scenario.neutral) {
+    table.set(
+      NEUTRAL_TEAM_ID,
+      tbl([
+        ["gaia", true],
+        ["color", [...scenario.neutral.color]],
       ]),
     );
   }

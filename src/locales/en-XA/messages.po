@@ -25808,11 +25808,20 @@ msgstr ""
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/replayAnalysisEvents.ts
 #: src/i18n/frameStrings.ts
+#: src/scenario/pages/components/TeamSelect.tsx
 msgid "Neutral"
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "neutral space"
+msgstr ""
+
+#: src/scenario/pages/components/NeutralTeamField.tsx
+msgid "Neutral team"
+msgstr ""
+
+#: src/scenario/pages/components/NeutralTeamField.tsx
+msgid "Neutral team colour"
 msgstr ""
 
 #: src/content/pages/components/RootCard.tsx

@@ -725,9 +725,11 @@ export function validateMission(
   );
 
   // A team with no engine team number cannot be spawned for. The emitter keeps
-  // the entry rather than dropping it precisely so this is sayable.
+  // the entry rather than dropping it precisely so this is sayable. The neutral
+  // team has none on purpose, because the runtime asks the engine for Gaia's.
   for (const [id, raw] of Object.entries(asRecord(mission.teams))) {
-    if (typeof asRecord(raw).team !== "number") {
+    const entry = asRecord(raw);
+    if (entry.gaia !== true && typeof entry.team !== "number") {
       issues.push({
         path: `teams[${JSON.stringify(id)}]`,
         message: t`"${id}" has no engine team, so nothing can spawn for it. It names a spectator, or a participant the setup does not have.`,
