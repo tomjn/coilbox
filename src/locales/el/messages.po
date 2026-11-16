@@ -31737,6 +31737,7 @@ msgstr "Τοποθέτηση κάτω από"
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/replayAnalysisEvents.ts
 #: src/i18n/frameStrings.ts
+#: src/scenario/pages/components/TeamSelect.tsx
 #, fuzzy
 msgid "Neutral"
 msgstr "Ουδέτερο"
@@ -31745,6 +31746,14 @@ msgstr "Ουδέτερο"
 #, fuzzy
 msgid "neutral space"
 msgstr "ουδέτερος χώρος"
+
+#: src/scenario/pages/components/NeutralTeamField.tsx
+msgid "Neutral team"
+msgstr ""
+
+#: src/scenario/pages/components/NeutralTeamField.tsx
+msgid "Neutral team colour"
+msgstr ""
 
 #: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx

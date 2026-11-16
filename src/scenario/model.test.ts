@@ -4,8 +4,11 @@ import {
   DIFFICULTIES,
   type DifficultyRange,
   difficultyApplies,
+  NEUTRAL_DEFAULT_COLOR,
+  NEUTRAL_TEAM_ID,
   parseScenario,
   parseScenarioJson,
+  teamOwners,
   usesDifficulty,
 } from "./model";
 
@@ -1355,5 +1358,54 @@ describe("usesDifficulty", () => {
         }),
       ),
     ).toBe(true);
+  });
+});
+
+describe("the neutral team", () => {
+  it("is absent unless the document has one", () => {
+    expect(parseScenario(doc())?.neutral).toBeUndefined();
+  });
+
+  it("keeps its colour", () => {
+    expect(
+      parseScenario(doc({ neutral: { color: [0.2, 0.4, 0.6] } }))?.neutral,
+    ).toEqual({ color: [0.2, 0.4, 0.6] });
+  });
+
+  it("clamps a colour outside 0..1", () => {
+    expect(
+      parseScenario(doc({ neutral: { color: [-1, 0.5, 3] } }))?.neutral,
+    ).toEqual({ color: [0, 0.5, 1] });
+  });
+
+  it("falls back to Gaia's white for a colour it cannot read", () => {
+    expect(parseScenario(doc({ neutral: { color: "red" } }))?.neutral).toEqual({
+      color: NEUTRAL_DEFAULT_COLOR,
+    });
+  });
+
+  it("is offered as an owner after the participants, in its colour", () => {
+    const scenario = parseScenario(
+      doc({
+        setup: {
+          gameName: "BAR",
+          mapName: "Comet Catcher",
+          participants: [{ id: "p0", kind: "you", name: "You" }],
+        },
+        neutral: { color: [0.2, 0.4, 0.6] },
+      }),
+    );
+    if (!scenario) throw new Error("fixture is not a valid scenario");
+    const owners = teamOwners(scenario);
+
+    expect(owners.map((p) => p.id)).toEqual(["p0", NEUTRAL_TEAM_ID]);
+    expect(owners[1].color).toEqual([0.2, 0.4, 0.6]);
+    expect(teamOwners(scenario)).toBe(owners);
+  });
+
+  it("is not offered when the scenario has none", () => {
+    const scenario = parseScenario(doc());
+    if (!scenario) throw new Error("fixture is not a valid scenario");
+    expect(teamOwners(scenario)).toBe(scenario.setup.participants);
   });
 });

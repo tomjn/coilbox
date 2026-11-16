@@ -44,7 +44,7 @@ import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
 import { useScenarioUnits } from "@/placement/useScenarioUnits";
 import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
-import type { Point, Scenario } from "../../model";
+import { type Point, type Scenario, teamOwners } from "../../model";
 import type { MissionIssue } from "../../validate";
 import {
   type ContentEntry,
@@ -566,7 +566,7 @@ export const ScenarioMapScene = forwardRef<
     <GroupControls
       key={pickedGroup.id}
       group={pickedGroup}
-      participants={scenario.setup.participants}
+      participants={teamOwners(scenario)}
       units={gameUnits.units}
       unitsLoading={gameUnits.loading}
       targets={targetOptions(scenario, pickedGroup.id)}
@@ -999,7 +999,7 @@ export const ScenarioMapScene = forwardRef<
           entries={entries}
           layouts={layouts}
           selected={listed}
-          participants={scenario.setup.participants}
+          participants={teamOwners(scenario)}
           onPick={pickEntry}
           onToggle={toggleEntry}
           onChange={onChange}

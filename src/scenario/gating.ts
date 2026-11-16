@@ -193,6 +193,13 @@ const STARTS_ASLEEP_VERSION = 11;
  */
 const HUNT_VERSION = 12;
 
+/**
+ * The runtime that first knew the neutral team (issue #5252). A runtime behind
+ * this has no engine team for it, so it drops the team and everything placed
+ * for it, and the mission plays with the units it was built around missing.
+ */
+const NEUTRAL_TEAM_VERSION = 13;
+
 /** Whether any group is told to hunt, at the start or by a `give_orders`. */
 function huntsAParticipant(scenario: Scenario): boolean {
   const hunts = (orders: unknown) =>
@@ -296,6 +303,9 @@ export function requiredRuntimeVersion(
   }
   if (huntsAParticipant(scenario)) {
     version = Math.max(version, HUNT_VERSION);
+  }
+  if (scenario.neutral) {
+    version = Math.max(version, NEUTRAL_TEAM_VERSION);
   }
   return version;
 }

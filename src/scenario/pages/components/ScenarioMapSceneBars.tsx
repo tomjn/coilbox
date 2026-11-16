@@ -34,6 +34,7 @@ import {
   type Point,
   type Scenario,
   type ScenarioGroup,
+  teamOwners,
 } from "../../model";
 import type { MissionIssue } from "../../validate";
 import { ActorControls } from "./ActorControls";
@@ -177,7 +178,7 @@ export function PlacementSelectionBar({
         <ActorControls
           key={pickedActor.id}
           actor={pickedActor}
-          participants={scenario.setup.participants}
+          participants={teamOwners(scenario)}
           issues={issues}
           onEdit={(patch) =>
             onChange((doc) => editActor(doc, pickedActor.id, patch))
@@ -221,7 +222,7 @@ export function PlacementSelectionBar({
           absent={absentIn(placements, footprints, pickedBase.id)}
           designedFor={pickedLayout?.designedFor}
           onMap={mapName}
-          participants={scenario.setup.participants}
+          participants={teamOwners(scenario)}
           units={gameUnits.units}
           unitsLoading={gameUnits.loading}
           sides={gameSides}

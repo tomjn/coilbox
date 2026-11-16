@@ -141,6 +141,14 @@ A zone is a named area: a box with two corners or a circle with a centre and a r
 
 The **name** is what triggers refer to, so it is the only thing worth editing after you have drawn one. Membership is the engine's own spatial query, so a zone contains what everything else in the game would say it contains, including units nobody can see.
 
+### The neutral team
+
+Tick **Neutral team** under the participants to add a team that owns placed units but plays no side. It is for things nobody should fight over until the mission says so, like a building the player has to capture. Pick its colour next to the tick box. The game draws it white otherwise.
+
+Actors, groups and bases can then be given to **Neutral**. In the game they belong to the engine's Gaia team. Each one is marked neutral, so units leave it alone unless ordered to attack it, and it is set to hold fire, so it does not shoot back either.
+
+Triggers cannot name the neutral team. It cannot win, lose or be given resources. A scenario with a neutral team needs mission runtime 13, and a game whose own settings turn Gaia off places nothing for it and logs why.
+
 ### Per-team settings
 
 Each participant can be given a starting bank, free income per second, a list of units to spawn on its start position, and **no commander**. Resources are set for every team the scenario declares, so a team you say nothing about starts with nothing rather than with the game's usual opening bank. The commander is only suppressed for a team you actually mark **no commander**, because the format has a flag per team and a flat rule would make it meaningless.

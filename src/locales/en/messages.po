@@ -25809,12 +25809,21 @@ msgstr "Nest under"
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/replayAnalysisEvents.ts
 #: src/i18n/frameStrings.ts
+#: src/scenario/pages/components/TeamSelect.tsx
 msgid "Neutral"
 msgstr "Neutral"
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "neutral space"
 msgstr "neutral space"
+
+#: src/scenario/pages/components/NeutralTeamField.tsx
+msgid "Neutral team"
+msgstr "Neutral team"
+
+#: src/scenario/pages/components/NeutralTeamField.tsx
+msgid "Neutral team colour"
+msgstr "Neutral team colour"
 
 #: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx

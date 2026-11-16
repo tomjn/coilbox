@@ -325,6 +325,24 @@ describe("validateMission", () => {
     ]);
   });
 
+  it("does not flag the neutral team, which the runtime gives Gaia's number", () => {
+    const issues = validateMission(
+      mission({
+        teams: {
+          player: { team: 0 },
+          "Enemy-1": { team: 1 },
+          neutral: { gaia: true, color: [1, 1, 1] },
+        },
+        actors: [
+          { id: "boss", unitDef: "armcom", team: "Enemy-1" },
+          { id: "prize", unitDef: "armmex", team: "neutral" },
+        ],
+      }),
+    );
+
+    expect(issues).toEqual([]);
+  });
+
   it("flags a team the launcher gave no engine team number", () => {
     const issues = validateMission(
       mission({

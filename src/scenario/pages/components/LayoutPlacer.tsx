@@ -34,7 +34,7 @@ import {
   layoutOptions,
   parseLayoutChoice,
 } from "@/lib/scenarioEditing/layoutPlacing";
-import type { Scenario } from "../../model";
+import { type Scenario, teamOwners } from "../../model";
 import { TeamSelect } from "./TeamSelect";
 
 /** What one arriving layout is worth saying about, worst first, and what it
@@ -163,7 +163,7 @@ export function LayoutPlacer({
       ),
     [scenario, records, footprintOf],
   );
-  const participants = scenario.setup.participants;
+  const participants = teamOwners(scenario);
 
   return (
     <>

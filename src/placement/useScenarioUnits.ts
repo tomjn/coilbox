@@ -21,7 +21,7 @@ import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
 import { usePreferredTarget } from "@/play/config";
-import type { Scenario } from "@/scenario/model";
+import { type Scenario, teamOwners } from "@/scenario/model";
 import type { Point } from "./geometry";
 import type { ModelsStage, StageState } from "./mapLoad";
 import { type Placement, teamColor } from "./placements";
@@ -201,7 +201,7 @@ export function useScenarioUnits(
     [placements, undrawn],
   );
 
-  const participants = scenario.setup.participants;
+  const participants = teamOwners(scenario);
   const colorKey = useMemo(
     () => participants.map((p) => `${p.id}:${p.color.join(",")}`).join("|"),
     [participants],

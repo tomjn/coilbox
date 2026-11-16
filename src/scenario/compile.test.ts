@@ -304,6 +304,23 @@ describe("compileScenario", () => {
     expect(emitted).toContain("ghost = { noCommander = true }");
   });
 
+  it("emits the neutral team with its colour and no engine team number", () => {
+    const emitted = compileScenario(
+      build({
+        setup: { participants: [{ id: "p0", kind: "you", name: "You" }] },
+        neutral: { color: [0.2, 0.4, 0.6] },
+      }),
+    );
+
+    expect(emitted).toContain(
+      "neutral = {\n      gaia = true,\n      color = { 0.2, 0.4, 0.6 },\n    },",
+    );
+  });
+
+  it("emits no neutral team for a scenario without one", () => {
+    expect(compileScenario(build())).not.toContain("gaia");
+  });
+
   it("emits the map and game so the runtime can refuse the wrong map", () => {
     const emitted = compileScenario(
       build({ setup: { gameName: "SF 0.1", mapName: "Comet Catcher" } }),

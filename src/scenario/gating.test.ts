@@ -436,6 +436,25 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5252. A runtime behind 13 finds no engine team number on the neutral
+   * team and drops it with everything placed for it.
+   */
+  describe("a neutral team", () => {
+    it("asks for 13", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...withTrigger([], []),
+          neutral: { color: [1, 1, 1] },
+        }),
+      ).toBe(13);
+    });
+
+    it("asks for nothing more without one", () => {
+      expect(requiredRuntimeVersion(withTrigger([], []))).toBe(1);
+    });
+  });
+
+  /**
    * Issue #903. A runtime behind 12 reports a hunt as an order it does not know,
    * and the group stands still.
    */

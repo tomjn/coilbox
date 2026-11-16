@@ -1,5 +1,5 @@
 /**
- * Whose a placed thing is: one of the setup's participants.
+ * Whose a placed thing is: one of the setup's participants, or the neutral team.
  *
  * Picked by the colour its units are drawn in as much as by the name, because a
  * skirmish setup names most of its participants "AI 1" and the colour is what is
@@ -11,6 +11,7 @@ import { useLingui } from "@lingui/react/macro";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { Participant } from "@/play/config";
 import { useParticipantLabel } from "@/play/participantLabel";
+import { NEUTRAL_TEAM_ID } from "../../model";
 
 export function TeamSelect({
   participants,
@@ -47,7 +48,7 @@ export function TeamSelect({
       describedBy={describedBy}
       options={participants.map((p) => ({
         value: p.id,
-        label: labelOf(p),
+        label: p.id === NEUTRAL_TEAM_ID ? t`Neutral` : labelOf(p),
         icon: <Swatch participant={p} />,
       }))}
     />

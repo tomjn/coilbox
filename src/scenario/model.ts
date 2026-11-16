@@ -2,7 +2,11 @@ import type { BaseBlueprint, BlueprintBuilding } from "../blueprint/model";
 import { parseTerrainSteps } from "../blueprint/payload";
 import type { Facing, Point } from "../placement/geometry";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
-import { type Participant, uniqueParticipantIds } from "../play/participants";
+import {
+  type Participant,
+  type Rgb,
+  uniqueParticipantIds,
+} from "../play/participants";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -271,6 +275,52 @@ export type ScenarioTeam = {
   noCommander?: boolean;
 };
 
+/**
+ * A team that owns placed units but plays no side. The runtime puts its units on
+ * the engine's Gaia team and marks each one neutral, so nobody fires at them
+ * unprompted and they fire at nobody. A capture mission's prize is the usual use.
+ */
+export type ScenarioNeutral = {
+  /** Its team colour, as the launcher's 0..1 float RGB. */
+  color: Rgb;
+};
+
+/** The owner id that names the neutral team. A participant id is `you` or `p`
+ *  and hex digits, so it can never be this. */
+export const NEUTRAL_TEAM_ID = "neutral";
+
+/** The engine draws Gaia white unless something says otherwise. */
+export const NEUTRAL_DEFAULT_COLOR: Rgb = [1, 1, 1];
+
+const ownersOf = new WeakMap<Scenario, Participant[]>();
+
+/**
+ * Everyone a placed thing can belong to: the participants, then the neutral team
+ * when the scenario has one, shaped as a participant so the owner pickers and the
+ * map colours take it as they take any other. The list is kept per document, so
+ * a caller that memoises on it does not see a new one each render.
+ */
+export function teamOwners(scenario: Scenario): Participant[] {
+  if (!scenario.neutral) return scenario.setup.participants;
+  let owners = ownersOf.get(scenario);
+  if (!owners) {
+    owners = [
+      ...scenario.setup.participants,
+      {
+        id: NEUTRAL_TEAM_ID,
+        kind: "ai",
+        name: "Neutral",
+        side: "",
+        color: scenario.neutral.color,
+        allyTeam: -1,
+        spectator: false,
+      },
+    ];
+    ownersOf.set(scenario, owners);
+  }
+  return owners;
+}
+
 export type ScenarioObjective = {
   id: string;
   kind: "primary" | "secondary";
@@ -411,6 +461,8 @@ export interface Scenario {
   setup: SkirmishDraft;
   /** Keyed by `setup.participants` id. */
   teams: Record<string, ScenarioTeam>;
+  /** The neutral team, when the scenario has one. */
+  neutral?: ScenarioNeutral;
   zones: ScenarioZone[];
   actors: ScenarioActor[];
   groups: ScenarioGroup[];
@@ -1092,6 +1144,17 @@ function parseTeams(value: unknown): Record<string, ScenarioTeam> | null {
   return out;
 }
 
+function parseNeutral(value: unknown): ScenarioNeutral | undefined {
+  if (!isRecord(value)) return undefined;
+  const color = Array.isArray(value.color) ? value.color.map(num) : [];
+  if (color.length !== 3 || color.some((c) => c === undefined)) {
+    return { color: NEUTRAL_DEFAULT_COLOR };
+  }
+  return {
+    color: (color as number[]).map((c) => Math.min(1, Math.max(0, c))) as Rgb,
+  };
+}
+
 function parseRestrictions(value: unknown): ScenarioRestrictions {
   if (!isRecord(value)) return {};
   const out: ScenarioRestrictions = {};
@@ -1255,6 +1318,7 @@ export function parseScenario(value: unknown): Scenario | null {
     runtimeVersion: num(value.runtimeVersion) ?? SCENARIO_RUNTIME_VERSION,
     setup,
     teams,
+    neutral: parseNeutral(value.neutral),
     zones,
     actors,
     groups,
