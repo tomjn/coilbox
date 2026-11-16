@@ -171,6 +171,29 @@ return function(real_os)
       return date(format, ...)
     end,
   }, meta)
+  -- Placeholders for the engine's Platform constants, which widgets compare
+  -- with numbers at the top of the file. Lua 5.1 cannot compare a number with
+  -- a table, so a stand-in there is an error. The values describe a capable
+  -- GL 4.6 machine, so a widget that checks hardware goes on to GetInfo.
+  env.Platform = setmetatable({
+    gpu = "", gpuVendor = "", gpuMemorySize = 8000000,
+    glVersionShort = "4.6", glVersionNum = 460,
+    glslVersionShort = "4.60", glslVersionNum = 460,
+    glVersion = "4.6", glVendor = "", glRenderer = "", glslVersion = "4.60",
+    gladVersion = "", glewVersion = "",
+    sdlVersionCompiledMajor = 2, sdlVersionCompiledMinor = 0, sdlVersionCompiledPatch = 0,
+    sdlVersionLinkedMajor = 2, sdlVersionLinkedMinor = 0, sdlVersionLinkedPatch = 0,
+    numDisplays = 1,
+    glSupportNonPowerOfTwoTex = true, glSupportTextureQueryLOD = true,
+    glSupportMSAAFrameBuffer = true, glHaveAMD = false, glHaveNVidia = false,
+    glHaveIntel = false, glHaveGLSL = true, glHaveGL4 = true,
+    glSupportDepthBufferBitDepth = 24, glSupportRestartPrimitive = true,
+    glSupportClipSpaceControl = true, glSupportFragDepthLayout = true,
+    glSupportSeamlessCubeMaps = true,
+    osName = "", osVersion = "", osFamily = "", architecture = "", hwConfig = "",
+    cpuLogicalCores = 8, cpuPhysicalCores = 8, cpuBrand = "", totalRAM = 16000,
+    sysInfoHash = "", macAddrHash = "", isHeadless = false, hasSyncChecksums = false,
+  }, meta)
   -- Its own _G too, or `_G.VFS` would reach past the stand-ins.
   env._G = env
   setmetatable(env, {
@@ -453,6 +476,21 @@ mod tests {
         .unwrap();
         assert_eq!(info.name.as_deref(), Some("Ambient"));
         assert!(info.desc.unwrap().ends_with(" %1"));
+    }
+
+    #[test]
+    fn platform_numbers_can_be_compared() {
+        // Splinter Faction's map_grass_gl4.lua and gfx_ssao.lua open this way.
+        let info = read(
+            r#"
+            local gpuMem = (Platform.gpuMemorySize and Platform.gpuMemorySize or 1000) / 1000
+            if gpuMem and gpuMem > 0 and gpuMem < 1800 then end
+            local modes = Platform.availableVideoModes
+            function widget:GetInfo() return { name = "Grass" } end
+            "#,
+        )
+        .unwrap();
+        assert_eq!(info.name.as_deref(), Some("Grass"));
     }
 
     #[test]
