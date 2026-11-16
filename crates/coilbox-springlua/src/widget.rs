@@ -8,13 +8,14 @@
 //! Top level code in a widget often reads engine globals, such as
 //! `local vsx, vsy = Spring.GetViewGeometry()`. Here every engine global is a
 //! stand-in that can be indexed, called and used in arithmetic, and a call
-//! returns nothing. Lua's own libraries are the sandbox's real ones.
+//! returns nothing. Lua's own libraries are the sandbox's real ones, and `os`
+//! has the real functions that read the clock.
 //!
 //! When the file stops with an error after it has defined `GetInfo`, which is
 //! where most widgets define it, the info is still read. The game has the real
 //! engine behind those globals, so a stand-in failing is not the widget failing.
 
-use mlua::{Function, Table, Value};
+use mlua::{Function, StdLib, Table, Value};
 use serde::Serialize;
 
 use crate::{Error, Result, SpringLua};
@@ -147,9 +148,29 @@ standin = setmetatable({}, meta)
 -- an empty Spring table makes every Spring.X() call an error, and the VFS
 -- would read the player's folder for files that live in the game archive.
 local engine = { Spring = true, VFS = true, Game = true }
-return function()
+return function(real_os)
   local env = {}
   env.widget = env
+  -- LuaUI has os, and widgets seed math.random from os.time() at the top of
+  -- the file. Only the functions that read the clock are real. Lua 5.1 hands
+  -- os.date's format to strftime, which aborts on Windows for a specifier C89
+  -- does not define, so those are an error here as they are in Lua 5.2.
+  local date = real_os.date
+  env.os = setmetatable({
+    time = real_os.time,
+    clock = real_os.clock,
+    difftime = real_os.difftime,
+    date = function(format, ...)
+      if type(format) == "string" then
+        for c in format:gsub("%%%%", ""):gmatch("%%(.?)") do
+          if not c:find("^[aAbBcdHIjmMpSUwWxXyYZ]$") then
+            error("bad argument #1 to 'date' (invalid conversion specifier '%" .. c .. "')", 2)
+          end
+        end
+      end
+      return date(format, ...)
+    end,
+  }, meta)
   -- Its own _G too, or `_G.VFS` would reach past the stand-ins.
   env._G = env
   setmetatable(env, {
@@ -205,7 +226,13 @@ impl SpringLua {
             .load(WIDGET_ENV)
             .set_name("springlua:widget")
             .eval()?;
-        let env: Table = make_env.call(())?;
+        // Loaded for the widget's own `os` and taken out of the globals again,
+        // so config files evaluated on this VM never see it.
+        self.lua.load_std_libs(StdLib::OS)?;
+        let globals = self.lua.globals();
+        let real_os: Table = globals.get("os")?;
+        globals.set("os", Value::Nil)?;
+        let env: Table = make_env.call(real_os)?;
         let chunk = self
             .lua
             .load(src)
@@ -409,6 +436,38 @@ mod tests {
         .unwrap();
         assert_eq!(info.name.as_deref(), Some("Uses engine"));
         assert_eq!(info.layer, None);
+    }
+
+    #[test]
+    fn os_reads_the_clock() {
+        // Splinter Faction's snd_ambientSoundPlayer.lua seeds this way before
+        // it defines GetInfo.
+        let info = read(
+            r#"
+            math.randomseed( os.time() - os.clock() * 1000 )
+            local stamp = os.date("%Y-%m-%d %%") .. os.difftime(2, 1)
+            os.remove("anything")
+            function widget:GetInfo() return { name = "Ambient", desc = stamp } end
+            "#,
+        )
+        .unwrap();
+        assert_eq!(info.name.as_deref(), Some("Ambient"));
+        assert!(info.desc.unwrap().ends_with(" %1"));
+    }
+
+    #[test]
+    fn os_date_refuses_a_specifier_strftime_does_not_know() {
+        let error = read(r#"os.date("%Q")"#).unwrap_err();
+        assert!(error.contains("invalid conversion specifier '%Q'"), "{error}");
+    }
+
+    #[test]
+    fn os_stays_out_of_the_vm_globals() {
+        let lua = SpringLua::new(std::env::temp_dir()).unwrap();
+        lua.widget_info("function widget:GetInfo() return {} end", "w.lua")
+            .unwrap();
+        let os: Value = lua.lua.globals().get("os").unwrap();
+        assert!(os.is_nil());
     }
 
     #[test]
