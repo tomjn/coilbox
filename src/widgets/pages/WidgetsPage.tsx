@@ -682,7 +682,7 @@ function SectionHeading({
       <TableHead
         scope="rowgroup"
         colSpan={columnCount(columns)}
-        className="h-12 align-bottom text-sm font-medium"
+        className="h-12 pb-2 align-bottom text-sm font-medium"
       >
         <div className="flex items-center justify-between gap-2">
           {children}
