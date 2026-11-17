@@ -652,11 +652,34 @@ async fn fetch_text(url: String) -> Result<String, String> {
     resp.text().await.map_err(|e| e.to_string())
 }
 
+/// The start of the message for a download whose SHA-256 was not the one asked
+/// for. `src/downloads/failureReason.ts` matches on it to word the failure for
+/// the player, so change the two together.
+const HASH_MISMATCH_MSG: &str = "Checksum mismatch";
+
+fn hash_mismatch(filename: &str, expected: &str, actual: &str) -> String {
+    format!("{HASH_MISMATCH_MSG} for {filename}: expected {expected}, got {actual}")
+}
+
+fn is_sha256_hex(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Lowercase hex, two digits a byte.
+fn hex_lower(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
 /// Stream a URL into `dest_dir/filename` (creating the directory), emitting
 /// progress over `on_progress` as bytes arrive. Used for non-rapid content (e.g.
 /// springfiles game mirrors) the sidecar can't fetch. Removes the partial file
 /// if the transfer fails partway. `cancel` (polled each chunk) and the client's
 /// idle read-timeout turn a stalled or cancelled transfer into an error.
+///
+/// `expected_sha256`, when given, is hashed as the bytes arrive. A file whose
+/// hash differs is deleted and the call fails with `hash_mismatch`, so nothing
+/// that was not what the hub listed stays in the content folder. A value that is
+/// not 64 hex characters is refused before the request is made.
 ///
 /// There is no explicit check that `downloaded` reached `total` once the loop
 /// below sees `Ok(None)`. That was investigated for issue #2878 and found to be
@@ -674,9 +697,20 @@ async fn download_to(
     filename: &str,
     on_progress: &Channel<DownloadProgress>,
     cancel: &Arc<AtomicBool>,
+    expected_sha256: Option<&str>,
 ) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
     use std::io::Write;
     use std::time::Instant;
+
+    if let Some(expected) = expected_sha256 {
+        if !is_sha256_hex(expected) {
+            return Err(format!(
+                "the checksum for {filename} is not 64 hex characters: {expected}"
+            ));
+        }
+    }
+    let mut hasher = expected_sha256.map(|_| Sha256::new());
 
     let mut resp = timed_client()?
         .get(url)
@@ -706,6 +740,9 @@ async fn download_to(
                 if let Err(e) = file.write_all(&chunk) {
                     break Err(format!("could not write {}: {e}", path.display()));
                 }
+                if let Some(h) = hasher.as_mut() {
+                    h.update(&chunk);
+                }
                 downloaded += chunk.len() as u64;
                 // Throttle emits to ~10/sec to avoid flooding the channel.
                 if last_emit.elapsed().as_millis() >= 100 {
@@ -731,6 +768,15 @@ async fn download_to(
     if let Err(e) = stream_result {
         let _ = std::fs::remove_file(&path);
         return Err(e);
+    }
+
+    if let (Some(expected), Some(h)) = (expected_sha256, hasher) {
+        let actual = hex_lower(&h.finalize());
+        if !actual.eq_ignore_ascii_case(expected) {
+            drop(file);
+            let _ = std::fs::remove_file(&path);
+            return Err(hash_mismatch(filename, expected, &actual));
+        }
     }
 
     let _ = on_progress.send(DownloadProgress::done(downloaded, total));
@@ -849,12 +895,15 @@ async fn dl_download_map(
 
 /// `dl_download_file` — directly download a file (e.g. a springfiles game mirror)
 /// into `dest_dir/filename`, for non-rapid content the sidecar can't fetch.
-/// `op_id` (optional) makes it user-cancellable.
+/// `op_id` (optional) makes it user-cancellable. `sha256` (optional, 64 hex
+/// characters) is checked against the bytes received: a file that does not match
+/// is deleted and the call fails with a "Checksum mismatch" error.
 #[tauri::command]
 async fn dl_download_file(
     url: String,
     dest_dir: String,
     filename: String,
+    sha256: Option<String>,
     op_id: Option<String>,
     on_progress: Channel<DownloadProgress>,
 ) -> CliResult {
@@ -865,7 +914,15 @@ async fn dl_download_file(
         return CliResult::err(e);
     }
     let (cancel, _child_slot) = cancel_slots(&op_id);
-    let res = download_to(&url, &dest_dir, &filename, &on_progress, &cancel).await;
+    let res = download_to(
+        &url,
+        &dest_dir,
+        &filename,
+        &on_progress,
+        &cancel,
+        sha256.as_deref(),
+    )
+    .await;
     if let Some(id) = &op_id {
         unregister_cancel(id);
     }
@@ -2552,6 +2609,7 @@ mod download_to_tests {
             "short.bin",
             &on_progress,
             &cancel,
+            None,
         ));
 
         assert_eq!(
@@ -2567,5 +2625,136 @@ mod download_to_tests {
             !dest_dir.join("short.bin").exists(),
             "download_to should not leave a truncated file behind"
         );
+    }
+}
+
+/// The SHA-256 check in `download_to`, against a real local server that serves
+/// one fixed body, so the bytes hashed are the ones that crossed the socket.
+#[cfg(test)]
+mod hash_check_tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::atomic::AtomicUsize;
+
+    const BODY: &[u8] = b"a game archive, more or less";
+
+    /// Answers every `GET /game.sdz` with `BODY`, and lets go of anything else.
+    /// Returns the URL and a count of the files it served.
+    fn serving_server() -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a local port");
+        let port = listener.local_addr().expect("local addr").port();
+        let served = Arc::new(AtomicUsize::new(0));
+        let counted = served.clone();
+        std::thread::spawn(move || {
+            while let Ok((mut sock, _)) = listener.accept() {
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 512];
+                const REQUEST: &[u8] = b"GET /game.sdz ";
+                let ours = loop {
+                    match sock.read(&mut chunk) {
+                        Ok(0) | Err(_) => break false,
+                        Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    }
+                    let seen = buf.len().min(REQUEST.len());
+                    if buf[..seen] != REQUEST[..seen] {
+                        break false;
+                    }
+                    if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                        break true;
+                    }
+                };
+                if !ours {
+                    continue;
+                }
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    BODY.len()
+                );
+                let _ = sock.write_all(header.as_bytes());
+                let _ = sock.write_all(BODY);
+                let _ = sock.flush();
+                counted.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        (format!("http://127.0.0.1:{port}/game.sdz"), served)
+    }
+
+    fn body_hash() -> String {
+        hex_lower(&Sha256::digest(BODY))
+    }
+
+    fn fetch(url: &str, dir: &std::path::Path, sha256: Option<&str>) -> Result<String, String> {
+        let on_progress: Channel<DownloadProgress> = Channel::new(|_| Ok(()));
+        let cancel = Arc::new(AtomicBool::new(false));
+        tauri::async_runtime::block_on(download_to(
+            url,
+            dir.to_str().expect("utf8 path"),
+            "game.sdz",
+            &on_progress,
+            &cancel,
+            sha256,
+        ))
+    }
+
+    #[test]
+    fn a_matching_hash_keeps_the_file() {
+        let (url, served) = serving_server();
+        let tmp = tempfile::tempdir().expect("tempdir");
+
+        let path = fetch(&url, tmp.path(), Some(&body_hash())).expect("download");
+
+        assert_eq!(served.load(Ordering::SeqCst), 1);
+        assert_eq!(std::fs::read(path).expect("read"), BODY);
+    }
+
+    #[test]
+    fn a_hash_in_capitals_still_matches() {
+        let (url, _) = serving_server();
+        let tmp = tempfile::tempdir().expect("tempdir");
+
+        fetch(&url, tmp.path(), Some(&body_hash().to_uppercase())).expect("download");
+
+        assert!(tmp.path().join("game.sdz").exists());
+    }
+
+    #[test]
+    fn a_different_hash_deletes_the_file_and_names_both_hashes() {
+        let (url, served) = serving_server();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let wrong = "0".repeat(64);
+
+        let err = fetch(&url, tmp.path(), Some(&wrong)).expect_err("a mismatch must fail");
+
+        assert_eq!(served.load(Ordering::SeqCst), 1, "the file was fetched");
+        assert!(err.starts_with(HASH_MISMATCH_MSG), "{err}");
+        assert!(err.contains(&wrong) && err.contains(&body_hash()), "{err}");
+        assert!(
+            !tmp.path().join("game.sdz").exists(),
+            "a mismatching file was left in the folder"
+        );
+    }
+
+    #[test]
+    fn no_hash_downloads_as_before() {
+        let (url, _) = serving_server();
+        let tmp = tempfile::tempdir().expect("tempdir");
+
+        let path = fetch(&url, tmp.path(), None).expect("download");
+
+        assert_eq!(std::fs::read(path).expect("read"), BODY);
+    }
+
+    #[test]
+    fn a_malformed_hash_is_refused_before_the_request() {
+        let (url, served) = serving_server();
+        let tmp = tempfile::tempdir().expect("tempdir");
+
+        let err = fetch(&url, tmp.path(), Some("abc123")).expect_err("must refuse");
+
+        assert!(err.contains("64 hex characters"), "{err}");
+        assert_eq!(served.load(Ordering::SeqCst), 0);
+        assert!(!tmp.path().join("game.sdz").exists());
     }
 }
