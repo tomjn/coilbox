@@ -406,14 +406,14 @@ export default function MapDetailPage() {
           <TabsTrigger value="overview">
             <Trans>Overview</Trans>
           </TabsTrigger>
-          <TabsTrigger value="playability">
-            <Trans>Passability</Trans>
-          </TabsTrigger>
           {hasDetails && (
             <TabsTrigger value="details">
               <Trans>Details</Trans>
             </TabsTrigger>
           )}
+          <TabsTrigger value="playability">
+            <Trans>Passability</Trans>
+          </TabsTrigger>
           {compatFindings.length > 0 && (
             <TabsTrigger value="compat">
               <Trans>Compatibility</Trans>
