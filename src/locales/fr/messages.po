@@ -2771,6 +2771,10 @@ msgstr "{figure} pour l’équipe {team} : la rediffusion a enregistré {record
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure} : la rediffusion a enregistré {recorded}, la lecture a donné {observed}."
 
+#: src/downloads/failureReason.ts
+msgid "{file} from {who} did not match its checksum"
+msgstr ""
+
 #: src/content/caches.ts
 #, fuzzy
 msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
@@ -21656,6 +21660,10 @@ msgstr "Chaque bâtiment est décalé par rapport à l’origine de la base. En 
 msgid "Every command allowed"
 msgstr "Toutes les commandes autorisées"
 
+#: src/downloads/downloadHubGame.ts
+msgid "Every download source for {label} failed. {errors}"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Every edit in the project is a patch against this game's own units."
@@ -32400,6 +32408,10 @@ msgstr "Aucun fichier de ce jeu ne cite ce paramètre."
 msgid "No file to save over"
 msgstr "Aucun fichier à écraser"
 
+#: src/downloads/downloadHubGame.ts
+msgid "no filename to save it as"
+msgstr ""
+
 #: src/content/pages/components/ArchiveTree.tsx
 #, fuzzy
 msgid "No files listed for this archive."
@@ -33167,6 +33179,14 @@ msgstr "aucun résultat enregistré sur {gameCount}"
 msgid "No release archive found for {repo}."
 msgstr "Aucune archive de version trouvée pour {repo}."
 
+#: src/downloads/downloadHubGame.ts
+msgid "no release archives"
+msgstr ""
+
+#: src/downloads/downloadHubGame.ts
+msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
+msgstr ""
+
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy
 msgid "No render was stored: {skipReason}"
@@ -33715,11 +33735,6 @@ msgstr "Aucune unité ne correspond."
 #, fuzzy
 msgid "No units."
 msgstr "Aucune unité."
-
-#: src/hub/games/download.ts
-#, fuzzy
-msgid "No usable download source for {label}."
-msgstr "Aucune source de téléchargement utilisable pour {label}."
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
@@ -48732,6 +48747,7 @@ msgstr "Le hub l’indique comme {listed}, mais ce qu’il a envoyé est {sent}.
 msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
 msgstr "Le hub se réveille peut-être après une période calme, ce qui prend quelques secondes. Réessayez dans un instant."
 
+#: src/downloads/downloadHubGame.ts
 #: src/hub/games/download.ts
 #, fuzzy
 msgid "The hub named no download source for {label}."

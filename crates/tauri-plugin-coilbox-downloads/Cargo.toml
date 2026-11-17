@@ -27,6 +27,8 @@ flate2 = "1"
 sevenz-rust2 = { workspace = true }
 # Read the file list of a .sdz the player installs from a file.
 zip = { workspace = true }
+# Check a download against the SHA-256 the hub lists for it.
+sha2 = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -284,6 +284,70 @@ describe("readGamesBody", () => {
     const result = readGamesBody({ ...gamesBody(), games: undefined });
     expect(result).toMatchObject({ ok: false });
   });
+
+  describe("a download's sha256", () => {
+    const HASH = "a".repeat(64);
+    const downloadsOf = (...sha256: unknown[]) => {
+      const result = readGamesBody(
+        gamesBody([
+          {
+            ...A_GAME,
+            downloads: sha256.map((h) => ({
+              kind: "url",
+              value: "https://m.example/g.sdz",
+              filename: "g.sdz",
+              sha256: h,
+            })),
+          },
+        ]),
+      );
+      if (!result.ok) throw new Error("expected a listing");
+      return result.value[0].downloads.map((d) => d.sha256);
+    };
+
+    it("is kept when it is 64 lowercase hex characters", () => {
+      expect(downloadsOf(HASH)).toEqual([HASH]);
+    });
+
+    it("is dropped when it is anything else", () => {
+      expect(
+        downloadsOf(
+          "A".repeat(64),
+          "a".repeat(63),
+          "a".repeat(65),
+          "g".repeat(64),
+          "",
+          null,
+          42,
+        ),
+      ).toEqual([
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+    });
+
+    it("leaves the download itself in the list when its hash is dropped", () => {
+      const result = readGamesBody(
+        gamesBody([
+          {
+            ...A_GAME,
+            downloads: [
+              { kind: "url", value: "u", filename: "f", sha256: "x" },
+            ],
+          },
+        ]),
+      );
+      expect(result).toMatchObject({
+        ok: true,
+        value: [{ downloads: [{ kind: "url", value: "u", filename: "f" }] }],
+      });
+    });
+  });
 });
 
 describe("fetchHubGames", () => {

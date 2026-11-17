@@ -2289,6 +2289,10 @@ msgstr "{figure} for team {team}: the replay recorded {recorded}, the playback g
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 
+#: src/downloads/failureReason.ts
+msgid "{file} from {who} did not match its checksum"
+msgstr "{file} from {who} did not match its checksum"
+
 #: src/content/caches.ts
 msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
 msgstr "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
@@ -17732,6 +17736,10 @@ msgstr "Every building sits at an offset from the base's origin. Dragging one mo
 msgid "Every command allowed"
 msgstr "Every command allowed"
 
+#: src/downloads/downloadHubGame.ts
+msgid "Every download source for {label} failed. {errors}"
+msgstr "Every download source for {label} failed. {errors}"
+
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Every edit in the project is a patch against this game's own units."
 msgstr "Every edit in the project is a patch against this game's own units."
@@ -26512,6 +26520,10 @@ msgstr "No file in this game names this parameter."
 msgid "No file to save over"
 msgstr "No file to save over"
 
+#: src/downloads/downloadHubGame.ts
+msgid "no filename to save it as"
+msgstr "no filename to save it as"
+
 #: src/content/pages/components/ArchiveTree.tsx
 msgid "No files listed for this archive."
 msgstr "No files listed for this archive."
@@ -27139,6 +27151,14 @@ msgstr "no recorded result in {gameCount}"
 msgid "No release archive found for {repo}."
 msgstr "No release archive found for {repo}."
 
+#: src/downloads/downloadHubGame.ts
+msgid "no release archives"
+msgstr "no release archives"
+
+#: src/downloads/downloadHubGame.ts
+msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
+msgstr "no release matching \"{wanted}\" in its latest {count} release(s)"
+
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "No render was stored: {skipReason}"
 msgstr "No render was stored: {skipReason}"
@@ -27586,10 +27606,6 @@ msgstr "No units match."
 #: src/workshop/pages/components/UnitReferenceView.tsx
 msgid "No units."
 msgstr "No units."
-
-#: src/hub/games/download.ts
-msgid "No usable download source for {label}."
-msgstr "No usable download source for {label}."
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "No versions in this repository."
@@ -39896,6 +39912,7 @@ msgstr "The hub lists this as {listed}, but what it sent is {sent}."
 msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
 msgstr "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
 
+#: src/downloads/downloadHubGame.ts
 #: src/hub/games/download.ts
 msgid "The hub named no download source for {label}."
 msgstr "The hub named no download source for {label}."

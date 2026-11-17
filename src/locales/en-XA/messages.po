@@ -2288,6 +2288,10 @@ msgstr ""
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr ""
 
+#: src/downloads/failureReason.ts
+msgid "{file} from {who} did not match its checksum"
+msgstr ""
+
 #: src/content/caches.ts
 msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
 msgstr ""
@@ -17731,6 +17735,10 @@ msgstr ""
 msgid "Every command allowed"
 msgstr ""
 
+#: src/downloads/downloadHubGame.ts
+msgid "Every download source for {label} failed. {errors}"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Every edit in the project is a patch against this game's own units."
 msgstr ""
@@ -26511,6 +26519,10 @@ msgstr ""
 msgid "No file to save over"
 msgstr ""
 
+#: src/downloads/downloadHubGame.ts
+msgid "no filename to save it as"
+msgstr ""
+
 #: src/content/pages/components/ArchiveTree.tsx
 msgid "No files listed for this archive."
 msgstr ""
@@ -27138,6 +27150,14 @@ msgstr ""
 msgid "No release archive found for {repo}."
 msgstr ""
 
+#: src/downloads/downloadHubGame.ts
+msgid "no release archives"
+msgstr ""
+
+#: src/downloads/downloadHubGame.ts
+msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
+msgstr ""
+
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "No render was stored: {skipReason}"
 msgstr ""
@@ -27584,10 +27604,6 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitReferenceView.tsx
 msgid "No units."
-msgstr ""
-
-#: src/hub/games/download.ts
-msgid "No usable download source for {label}."
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -39895,6 +39911,7 @@ msgstr ""
 msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
 msgstr ""
 
+#: src/downloads/downloadHubGame.ts
 #: src/hub/games/download.ts
 msgid "The hub named no download source for {label}."
 msgstr ""

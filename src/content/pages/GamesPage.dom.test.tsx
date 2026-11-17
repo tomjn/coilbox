@@ -201,15 +201,21 @@ describe("Games page", () => {
     ).toBeTruthy();
   });
 
-  it("queues the hub's first source when Install is pressed", async () => {
+  it("queues the hub's sources, in the hub's order, when Install is pressed", async () => {
     renderPage("/library/games?filter=notInstalled");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Install" }));
     });
     expect(hoisted.enqueue).toHaveBeenCalledWith({
-      kind: "rapid",
+      kind: "hubGame",
       label: "Metal Factions",
-      args: { tag: "mf:stable" },
+      args: {
+        downloads: [
+          { kind: "rapid", value: "mf:stable" },
+          { kind: "github", value: "metalfactions/mf" },
+        ],
+        destDir: "/data/games",
+      },
     });
   });
 

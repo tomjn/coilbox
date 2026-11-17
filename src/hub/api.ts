@@ -363,6 +363,8 @@ export function fetchHubItem(
  * rapid tag, a direct address, or an `owner/repo` GitHub path depending on
  * `kind`. `asset` (github only) is a fragment of the release archive's
  * filename to pick. `filename` (url only) is what to save the download as.
+ * `sha256` (url only, on a mirror's copy of an archive) is the hash the file
+ * must have: 64 lowercase hex characters, which `readGamesBody` enforces.
  * See `hubGameDownloadRequest` in `./games/download` for how these turn into
  * an actual download.
  */
@@ -371,6 +373,7 @@ export interface HubGameDownload {
   value: string;
   asset?: string;
   filename?: string;
+  sha256?: string;
 }
 
 /**
@@ -419,7 +422,27 @@ export function readGamesBody(body: unknown): HubResult<HubGame[]> {
       reason: t`The hub sent a games list with no games in it.`,
     };
   }
-  return { ok: true, value: games as HubGame[] };
+  return { ok: true, value: (games as HubGame[]).map(withCheckedHashes) };
+}
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * The game with every download's `sha256` kept only when it is 64 lowercase
+ * hex characters. The hub sends it that way, so anything else is not a hash a
+ * file could be checked against, and the download goes ahead unchecked rather
+ * than failing every time on a value nothing could match.
+ */
+function withCheckedHashes(game: HubGame): HubGame {
+  if (!Array.isArray(game.downloads)) return game;
+  return {
+    ...game,
+    downloads: game.downloads.map((d) => {
+      if (!d || typeof d !== "object" || !("sha256" in d)) return d;
+      const { sha256, ...rest } = d;
+      return typeof sha256 === "string" && SHA256_HEX.test(sha256) ? d : rest;
+    }),
+  };
 }
 
 /**

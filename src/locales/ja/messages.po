@@ -2771,6 +2771,10 @@ msgstr "チーム {team} の {figure}：リプレイの記録は {recorded}、�
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure}：リプレイの記録は {recorded}、再生では {observed} でした。"
 
+#: src/downloads/failureReason.ts
+msgid "{file} from {who} did not match its checksum"
+msgstr ""
+
 #: src/content/caches.ts
 #, fuzzy
 msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
@@ -21656,6 +21660,10 @@ msgstr "各建物はベースの原点からのオフセットに置かれます
 msgid "Every command allowed"
 msgstr "すべてのコマンドを許可"
 
+#: src/downloads/downloadHubGame.ts
+msgid "Every download source for {label} failed. {errors}"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Every edit in the project is a patch against this game's own units."
@@ -32400,6 +32408,10 @@ msgstr "このゲームでこのパラメーターを指定するファイルは
 msgid "No file to save over"
 msgstr "上書きするファイルがありません"
 
+#: src/downloads/downloadHubGame.ts
+msgid "no filename to save it as"
+msgstr ""
+
 #: src/content/pages/components/ArchiveTree.tsx
 #, fuzzy
 msgid "No files listed for this archive."
@@ -33167,6 +33179,14 @@ msgstr "{gameCount} で結果の記録なし"
 msgid "No release archive found for {repo}."
 msgstr "{repo} のリリースアーカイブが見つかりません。"
 
+#: src/downloads/downloadHubGame.ts
+msgid "no release archives"
+msgstr ""
+
+#: src/downloads/downloadHubGame.ts
+msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
+msgstr ""
+
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy
 msgid "No render was stored: {skipReason}"
@@ -33715,11 +33735,6 @@ msgstr "一致するユニットはありません。"
 #, fuzzy
 msgid "No units."
 msgstr "ユニットはありません。"
-
-#: src/hub/games/download.ts
-#, fuzzy
-msgid "No usable download source for {label}."
-msgstr "{label} の使えるダウンロード元はありません。"
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
@@ -48732,6 +48747,7 @@ msgstr "ハブでは {listed} と掲載されていますが、送られてき�
 msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
 msgstr "しばらく使われていなかったハブが起動中の可能性があり、数秒かかります。しばらくしてから再試行してください。"
 
+#: src/downloads/downloadHubGame.ts
 #: src/hub/games/download.ts
 #, fuzzy
 msgid "The hub named no download source for {label}."
