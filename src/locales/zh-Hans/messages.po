@@ -2771,6 +2771,10 @@ msgstr "队伍 {team} 的 {figure}：回放记录为 {recorded}，播放得到 {
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure}：回放记录为 {recorded}，播放得到 {observed}。"
 
+#: src/downloads/failureReason.ts
+msgid "{file} from {who} did not match its checksum"
+msgstr ""
+
 #: src/content/caches.ts
 #, fuzzy
 msgid "{fileCount, plural, one {Can reclaim # file ({size}).} other {Can reclaim # files ({size}).}}"
@@ -21656,6 +21660,10 @@ msgstr "每个建筑都位于相对于基地原点的偏移处。拖动建筑会
 msgid "Every command allowed"
 msgstr "允许所有命令"
 
+#: src/downloads/downloadHubGame.ts
+msgid "Every download source for {label} failed. {errors}"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Every edit in the project is a patch against this game's own units."
@@ -32400,6 +32408,10 @@ msgstr "此游戏中没有文件引用此参数。"
 msgid "No file to save over"
 msgstr "没有可覆盖保存的文件"
 
+#: src/downloads/downloadHubGame.ts
+msgid "no filename to save it as"
+msgstr ""
+
 #: src/content/pages/components/ArchiveTree.tsx
 #, fuzzy
 msgid "No files listed for this archive."
@@ -33167,6 +33179,14 @@ msgstr "{gameCount} 中没有记录结果"
 msgid "No release archive found for {repo}."
 msgstr "未找到 {repo} 的发行版归档。"
 
+#: src/downloads/downloadHubGame.ts
+msgid "no release archives"
+msgstr ""
+
+#: src/downloads/downloadHubGame.ts
+msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
+msgstr ""
+
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy
 msgid "No render was stored: {skipReason}"
@@ -33715,11 +33735,6 @@ msgstr "没有匹配的单位。"
 #, fuzzy
 msgid "No units."
 msgstr "没有单位。"
-
-#: src/hub/games/download.ts
-#, fuzzy
-msgid "No usable download source for {label}."
-msgstr "{label} 没有可用的下载来源。"
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
@@ -48732,6 +48747,7 @@ msgstr "中心将其列为 {listed}，但发送的是 {sent}。"
 msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
 msgstr "中心可能在一段空闲后正在唤醒，这需要几秒钟。请稍后再试。"
 
+#: src/downloads/downloadHubGame.ts
 #: src/hub/games/download.ts
 #, fuzzy
 msgid "The hub named no download source for {label}."
