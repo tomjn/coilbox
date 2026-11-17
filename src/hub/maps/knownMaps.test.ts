@@ -23,6 +23,7 @@ function facts(slug: string): MapFacts {
     tags: [],
     points: { start: [], metal: [], geo: [] },
     appearance: {},
+    downloads: [],
   };
 }
 

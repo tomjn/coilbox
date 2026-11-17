@@ -26520,7 +26520,7 @@ msgstr "No file in this game names this parameter."
 msgid "No file to save over"
 msgstr "No file to save over"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr "no filename to save it as"
 
@@ -27151,11 +27151,11 @@ msgstr "no recorded result in {gameCount}"
 msgid "No release archive found for {repo}."
 msgstr "No release archive found for {repo}."
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr "no release archives"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr "no release matching \"{wanted}\" in its latest {count} release(s)"
 

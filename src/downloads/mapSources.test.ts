@@ -27,3 +27,23 @@ describe("mapSourceOrder (issue #511)", () => {
     expect(mapSourceOrder({ hasWritePath: false })).toEqual(["rapid"]);
   });
 });
+
+describe("mapSourceOrder, the hub's sources (issue #5251)", () => {
+  it("puts the hub first, ahead of every known mirror", () => {
+    expect(mapSourceOrder({ hasWritePath: true, hasHubSources: true })).toEqual(
+      ["hub", "evolutionrts", "springfiles", "hakora", "rapid"],
+    );
+  });
+
+  it("leaves the order as it was for a map the hub lists no sources for", () => {
+    expect(
+      mapSourceOrder({ hasWritePath: true, hasHubSources: false }),
+    ).toEqual(mapSourceOrder({ hasWritePath: true }));
+  });
+
+  it("has no hub step without a write root", () => {
+    expect(
+      mapSourceOrder({ hasWritePath: false, hasHubSources: true }),
+    ).toEqual(["rapid"]);
+  });
+});

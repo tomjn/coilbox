@@ -1,10 +1,9 @@
 import { t } from "@lingui/core/macro";
 import type { HubGameDownload } from "../hub/api";
-import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
+import { dlDownloadRaw } from "./bindings";
 import type { DownloadAttempt } from "./downloadHistory";
-import { hostOf } from "./downloadHistory";
 import { withDownloadNotify } from "./downloadNotify";
-import { loadGithubReleases } from "./githubReleases";
+import { fetchHubFile } from "./hubFileDownload";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import {
   AttemptLog,
@@ -46,20 +45,6 @@ async function downloadHubGameImpl(opts: {
   const { label, downloads, destDir, opId, onProgress } = opts;
   const log = new AttemptLog(opts.onAttempt, opts.onSource);
 
-  const fetchFile = (
-    url: string,
-    filename: string,
-    sha256: string | undefined,
-  ) =>
-    dlDownloadFileRaw({
-      url,
-      destDir,
-      filename,
-      sha256,
-      opId,
-      onProgress: progressChannel(onProgress),
-    });
-
   for (const dl of downloads) {
     try {
       if (dl.kind === "rapid") {
@@ -69,40 +54,16 @@ async function downloadHubGameImpl(opts: {
           opId,
           onProgress: progressChannel(onProgress),
         });
-      } else if (dl.kind === "url") {
-        const host = hostOf(dl.value);
-        log.begin(
-          "url",
-          { reference: dl.value, filename: dl.filename, mirror: host },
-          { label: host ?? dl.value },
-        );
-        if (!dl.filename) throw new Error(t`no filename to save it as`);
-        await fetchFile(dl.value, dl.filename, dl.sha256);
       } else {
-        log.begin("github", { reference: dl.value }, { label: dl.value });
-        const archives = await loadGithubReleases(dl.value);
-        if (archives.length === 0) throw new Error(t`no release archives`);
-        const asset = dl.asset?.toLowerCase();
-        const pick = asset
-          ? archives.find((a) => a.filename.toLowerCase().includes(asset))
-          : archives[0];
-        if (!pick) {
-          const count = archives.length;
-          const wanted = dl.asset ?? "";
-          throw new Error(
-            t`no release matching "${wanted}" in its latest ${count} release(s)`,
-          );
-        }
-        log.begin(
-          "github",
+        await fetchHubFile(
+          { ...dl, kind: dl.kind },
           {
-            reference: pick.tag,
-            filename: pick.filename,
-            mirror: hostOf(pick.url),
+            destDir,
+            opId,
+            onProgress,
+            log,
           },
-          { label: dl.value },
         );
-        await fetchFile(pick.url, pick.filename, undefined);
       }
       log.ok();
       return;

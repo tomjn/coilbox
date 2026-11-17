@@ -25,6 +25,7 @@ function facts(over: Partial<MapFacts> = {}): MapFacts {
     tags: [],
     points: { start: [], metal: [], geo: [] },
     appearance: {},
+    downloads: [],
     ...over,
   };
 }

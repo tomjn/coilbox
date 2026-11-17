@@ -32408,7 +32408,7 @@ msgstr "このゲームでこのパラメーターを指定するファイルは
 msgid "No file to save over"
 msgstr "上書きするファイルがありません"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr ""
 
@@ -33179,11 +33179,11 @@ msgstr "{gameCount} で結果の記録なし"
 msgid "No release archive found for {repo}."
 msgstr "{repo} のリリースアーカイブが見つかりません。"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr ""
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr ""
 

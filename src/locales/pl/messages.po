@@ -32408,7 +32408,7 @@ msgstr "Żaden plik tej gry nie wymienia tego parametru."
 msgid "No file to save over"
 msgstr "Brak pliku do nadpisania"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr ""
 
@@ -33179,11 +33179,11 @@ msgstr "brak zapisanego wyniku w {gameCount}"
 msgid "No release archive found for {repo}."
 msgstr "Nie znaleziono archiwum wydania dla {repo}."
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr ""
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr ""
 

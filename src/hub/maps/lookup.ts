@@ -28,7 +28,7 @@
  */
 
 import { t } from "@lingui/core/macro";
-import { serverError } from "../api";
+import { type HubFileDownload, SHA256_HEX, serverError } from "../api";
 import { MAX_LOOKUP_NAMES } from "./vocabulary";
 
 /** The envelope, from `lib/api/mapLookup.ts` in tomjn/coilbox-hub. */
@@ -91,6 +91,12 @@ export interface MapFacts {
   tags: string[];
   points: MapFactPoints;
   appearance: Record<string, unknown>;
+  /**
+   * Where the hub says to fetch the map, best first (issue #5251). The author's
+   * own sources come before mirrors' copies. Empty for a map with none, and for a
+   * hub that predates the field.
+   */
+  downloads: HubFileDownload[];
 }
 
 /** Either the answers, in the order the names were asked, or a sentence saying
@@ -138,6 +144,42 @@ function points(value: unknown): MapFactPoints {
     });
   };
   return { start: read("start"), metal: read("metal"), geo: read("geo") };
+}
+
+/**
+ * The entries of a map's `downloads` that a download can use, in the hub's order.
+ * An entry of a kind this does not know, one with no address, and a file with no
+ * name to save it as are left out rather than failing every download on them. A
+ * `sha256` is kept only when it is 64 lowercase hex characters, the same rule
+ * game downloads follow.
+ */
+function downloads(value: unknown): HubFileDownload[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): HubFileDownload[] => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const one = entry as Record<string, unknown>;
+    if (typeof one.value !== "string" || !one.value) return [];
+    if (one.kind === "url") {
+      if (typeof one.filename !== "string" || !one.filename) return [];
+      const download: HubFileDownload = {
+        kind: "url",
+        value: one.value,
+        filename: one.filename,
+      };
+      if (typeof one.sha256 === "string" && SHA256_HEX.test(one.sha256)) {
+        download.sha256 = one.sha256;
+      }
+      return [download];
+    }
+    if (one.kind === "github") {
+      const download: HubFileDownload = { kind: "github", value: one.value };
+      if (typeof one.asset === "string" && one.asset) {
+        download.asset = one.asset;
+      }
+      return [download];
+    }
+    return [];
+  });
 }
 
 /**
@@ -189,6 +231,7 @@ export function readMapFacts(value: unknown): MapFacts | null {
       typeof facts.appearance === "object" && facts.appearance !== null
         ? (facts.appearance as Record<string, unknown>)
         : {},
+    downloads: downloads(facts.downloads),
   };
 }
 

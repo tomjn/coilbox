@@ -99,7 +99,7 @@ export class SourceWalkError extends Error {
 }
 
 /** `order` from the step a retry asked to start at, or all of it. */
-export function orderFrom<T extends DownloadSourceKind>(
+export function orderFrom<T extends string>(
   order: readonly T[],
   startAt?: SourceStep,
 ): T[] {
@@ -113,11 +113,14 @@ export const isCancel = (e: unknown) =>
 /**
  * The sources after `current` in `order`, as the next step to offer. Their hosts
  * are not known until the source is reached, so the step names the kind alone.
+ *
+ * `order` may hold a step that is not a source kind, the map walk's "hub". That
+ * step is always first, so it is never the one after `current`.
  */
-export function nextKind<T extends DownloadSourceKind>(
+export function nextKind<T extends string>(
   order: readonly T[],
   current: T,
 ): SourceStep | null {
   const after = order[order.indexOf(current) + 1];
-  return after ? { source: after, mirror: null } : null;
+  return after ? { source: after as DownloadSourceKind, mirror: null } : null;
 }

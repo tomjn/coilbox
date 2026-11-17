@@ -377,6 +377,12 @@ export interface HubGameDownload {
 }
 
 /**
+ * A download source that is a file or a GitHub repository, which is every kind a
+ * map has: the hub has no rapid tag for a map (issue #5251).
+ */
+export type HubFileDownload = HubGameDownload & { kind: "url" | "github" };
+
+/**
  * A game as `GET /api/v1/games` lists it (issue #2951). `downloads` is best
  * source first - the caller is expected to try the next one when a source
  * comes up empty, never to stop at the first entry.
@@ -425,7 +431,7 @@ export function readGamesBody(body: unknown): HubResult<HubGame[]> {
   return { ok: true, value: (games as HubGame[]).map(withCheckedHashes) };
 }
 
-const SHA256_HEX = /^[0-9a-f]{64}$/;
+export const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 /**
  * The game with every download's `sha256` kept only when it is 64 lowercase
