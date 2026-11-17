@@ -46,6 +46,8 @@ import { SourceWalkError } from "./sourceWalk";
 const MAP = "Isis 1.3";
 const HUB = "https://hub.example";
 const FILE = "isis_1.3.sd7";
+const HASH_A = "a".repeat(64);
+const HASH_B = "b".repeat(64);
 
 const mirror = (host: string): HubFileDownload => ({
   kind: "url",
@@ -233,6 +235,55 @@ describe("downloadMapAnySource, the hub's sources (issue #5251)", () => {
       ["url", "failed"],
       ["url", "failed"],
       ["springfiles", "ok"],
+    ]);
+  });
+
+  it("passes a mirror's hash to the file download, and installs when it matches", async () => {
+    hubLists([{ ...mirror("a.example"), sha256: HASH_A }]);
+
+    const { result, onAttempt } = run();
+
+    await expect(result).resolves.toBe("hub: a.example");
+    expect(dlDownloadFileRaw).toHaveBeenCalledTimes(1);
+    expect(dlDownloadFileRaw).toHaveBeenCalledWith(
+      expect.objectContaining({ sha256: HASH_A }),
+    );
+    expect(onAttempt.mock.calls.map((c) => c[0].outcome)).toEqual(["ok"]);
+  });
+
+  it("downloads as before when the source lists no hash", async () => {
+    hubLists([mirror("a.example")]);
+
+    await run().result;
+
+    expect(dlDownloadFileRaw.mock.calls[0][0].sha256).toBeUndefined();
+  });
+
+  it("moves to the next source when a file does not match its hash", async () => {
+    hubLists([
+      { ...mirror("a.example"), sha256: HASH_A },
+      { ...mirror("b.example"), sha256: HASH_A },
+    ]);
+    dlDownloadFileRaw
+      .mockRejectedValueOnce(
+        new Error(
+          `Checksum mismatch for ${FILE}: expected ${HASH_A}, got ${HASH_B} (a.example)`,
+        ),
+      )
+      .mockResolvedValueOnce({ message: "ok", path: "" });
+
+    const { result, onAttempt } = run();
+
+    await expect(result).resolves.toBe("hub: b.example");
+    expect(fetched()).toEqual([
+      `https://a.example/maps/${FILE}`,
+      `https://b.example/maps/${FILE}`,
+    ]);
+    expect(
+      onAttempt.mock.calls.map((c) => [c[0].mirror, c[0].outcome]),
+    ).toEqual([
+      ["a.example", "failed"],
+      ["b.example", "ok"],
     ]);
   });
 
