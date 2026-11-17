@@ -16,6 +16,9 @@ const COMMANDS: &[&str] = &[
     "hub_publish_game_facts",
     "hub_manual_send_begin",
     "hub_manual_send_end",
+    "hub_archive_upload_start",
+    "hub_archive_upload_list",
+    "hub_archive_upload_cancel",
 ];
 
 fn main() {

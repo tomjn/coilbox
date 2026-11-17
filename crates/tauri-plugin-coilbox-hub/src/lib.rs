@@ -18,6 +18,10 @@
 //! the setting off disk here rather than trusting an argument. Anything that uploads
 //! takes the proof it hands back.
 //!
+//! [`uploads`] sends a whole map or game archive to one of the hub's mirrors
+//! (issue #5258). It is the only module here whose work outlives the command that
+//! started it.
+//!
 //! Every command takes the hub address rather than knowing one. It is a user
 //! setting layered over a distribution profile's own (`src/hub/config.ts`), so the
 //! frontend is the only place that can resolve it.
@@ -32,6 +36,7 @@ pub mod publish;
 #[cfg(test)]
 mod testing;
 pub mod upload;
+pub mod uploads;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -418,6 +423,52 @@ fn hub_upload_cancel(op_id: String) -> CliResult {
     CliResult::ok(json!({}))
 }
 
+/// `hub_archive_upload_start`: send a map or game archive to one of the hub's
+/// mirrors, as whoever is signed in (issue #5258).
+///
+/// `facts` is what `unitsync_upload_facts` answered with, and `path` is the
+/// archive it was read from. Answers as soon as the transfer is running, because
+/// the transfer belongs to the app and not to the page that started it. See
+/// [`uploads`] for how a page follows it and for every way it can end.
+///
+/// Behind the same consent gate as the other sends: `grant` is the one a press of
+/// "Send to hub" opened for this map or game. Starting the same archive again
+/// while it is on its way answers the upload that is already running.
+#[tauri::command]
+async fn hub_archive_upload_start<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    path: String,
+    facts: uploads::ArchiveFacts,
+    grant: Option<String>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app, grant.as_deref()) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    match uploads::begin(app, hub_url, path.into(), facts, &consent) {
+        Ok(state) => CliResult::ok(json!({ "upload": state })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
+/// `hub_archive_upload_list`: every archive upload this run of the app has
+/// started, finished ones included, so a page opened after one began can find
+/// it by `sha256` and read how far it got.
+#[tauri::command]
+fn hub_archive_upload_list() -> CliResult {
+    CliResult::ok(json!({ "uploads": uploads::list() }))
+}
+
+/// `hub_archive_upload_cancel`: stop an archive upload by its `opId`. The mirror
+/// keeps what it received, so starting the same archive again carries on from
+/// there. A no-op for an unknown or finished id.
+#[tauri::command]
+fn hub_archive_upload_cancel(op_id: String) -> CliResult {
+    uploads::cancel(&op_id);
+    CliResult::ok(json!({}))
+}
+
 /// Build the plugin. Registered as `"coilbox-hub"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-hub")
@@ -434,7 +485,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_publish_maps,
             hub_publish_game_facts,
             hub_manual_send_begin,
-            hub_manual_send_end
+            hub_manual_send_end,
+            hub_archive_upload_start,
+            hub_archive_upload_list,
+            hub_archive_upload_cancel
         ])
         .build()
 }
