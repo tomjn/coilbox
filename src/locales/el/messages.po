@@ -32611,7 +32611,7 @@ msgstr "Κανένα αρχείο σε αυτό το παιχνίδι δεν α�
 msgid "No file to save over"
 msgstr "Δεν υπάρχει αρχείο για αντικατάσταση"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr ""
 
@@ -33388,11 +33388,11 @@ msgstr "κανένα καταγεγραμμένο αποτέλεσμα σε {gam
 msgid "No release archive found for {repo}."
 msgstr "Δεν βρέθηκε αρχειοθήκη έκδοσης για το {repo}."
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr ""
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr ""
 

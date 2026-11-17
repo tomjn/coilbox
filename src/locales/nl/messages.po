@@ -32611,7 +32611,7 @@ msgstr "Geen enkel bestand in dit spel noemt deze parameter."
 msgid "No file to save over"
 msgstr "Geen bestand om te overschrijven"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr ""
 
@@ -33388,11 +33388,11 @@ msgstr "geen vastgelegde uitslag in {gameCount}"
 msgid "No release archive found for {repo}."
 msgstr "Geen releasearchief gevonden voor {repo}."
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr ""
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr ""
 

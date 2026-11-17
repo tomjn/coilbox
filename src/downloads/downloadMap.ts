@@ -1,9 +1,13 @@
 import { t } from "@lingui/core/macro";
+import type { HubFileDownload } from "../hub/api";
+import { knownMap } from "../hub/maps/knownMaps";
 import { dlDownloadMapRaw } from "./bindings";
-import type { DownloadAttempt } from "./downloadHistory";
+import { type DownloadAttempt, hostOf } from "./downloadHistory";
 import { downloadFromMirrors } from "./downloadMirrors";
 import { withDownloadNotify } from "./downloadNotify";
 import { norm } from "./gameRepos";
+import { fetchHubFile } from "./hubFileDownload";
+import { getHubMapBase } from "./hubMapBase";
 import { type MapSource, mapSourceOrder } from "./mapSources";
 import {
   findInIndex,
@@ -25,11 +29,60 @@ import {
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
+ * What the hub lists for a map, or none when there is no write root to save to,
+ * the hub is off, or it knows nothing of the map (issue #5251). `knownMap` never
+ * rejects, so a hub that cannot be reached is the same as one with no sources.
+ */
+async function hubMapSources(
+  mapName: string,
+  hasWritePath: boolean,
+): Promise<HubFileDownload[]> {
+  const base = getHubMapBase();
+  if (!base || !hasWritePath) return [];
+  return (await knownMap(base, mapName))?.downloads ?? [];
+}
+
+/** The step that names a hub source, as a retry offers it. */
+function hubStep(dl: HubFileDownload): SourceStep {
+  return {
+    source: dl.kind,
+    mirror: dl.kind === "url" ? hostOf(dl.value) : null,
+  };
+}
+
+/**
+ * Where in the hub's sources a retry starts. A step of kind `url` or `github`
+ * can only have come from this step, since no other map source records as
+ * either, so it names a hub source: the first of that kind on the same host.
+ * Anything else starts at the first.
+ */
+function hubStartIndex(
+  sources: readonly HubFileDownload[],
+  startAt?: SourceStep,
+): number {
+  if (startAt?.source !== "url" && startAt?.source !== "github") return 0;
+  const at = sources.findIndex((s) => {
+    const step = hubStep(s);
+    return (
+      step.source === startAt.source &&
+      (startAt.mirror === null || step.mirror === startAt.mirror)
+    );
+  });
+  return Math.max(at, 0);
+}
+
+/**
  * Download a map, trying each source in the order set by mapSourceOrder and
  * resolving with the name of the first that succeeds. Per project policy (issue
  * 511, following #500's game ordering) that order is known mirrors first, then
- * pr-downloader (rapid) as the last resort.
+ * pr-downloader (rapid) as the last resort, with the hub's own sources ahead of
+ * the mirrors (issue #5251).
  *
+ * 0. the hub: every source it lists for the map, in its order and github
+ *    entries included, so an author's repository comes before any known mirror.
+ *    Each is an attempt of its own, and a failure moves on to the next. Present
+ *    only when the hub lists some. A hub that is off, cannot be reached or does
+ *    not know the map lists none.
  * 1. the maps.evolutionrts.info mirror of maps first made for Beyond All
  *    Reason. Match by filename, since it carries no springname.
  * 2. springfiles catalog mirror. Match by springname/name, then fetch each of
@@ -37,7 +90,7 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * 3. the hakora.xyz mirror. Match by filename, like evolutionrts.
  * 4. rapid via pr-downloader, on its own default search, which is springfiles.
  *
- * Steps 1-3 need a write root. Without one only rapid is attempted. Throws with
+ * Steps 0-3 need a write root. Without one only rapid is attempted. Throws with
  * every attempted source's error when all fail.
  *
  * There was another step: retrying rapid against Beyond All Reason's
@@ -74,11 +127,15 @@ async function downloadMapAnySourceImpl(opts: {
   const askedAt = opts.askedAt ?? indexTick();
   const target = norm(mapName);
   const log = new AttemptLog(opts.onAttempt, opts.onSource);
-  const order = mapSourceOrder({ hasWritePath: !!writePath });
+  const hubSources = await hubMapSources(mapName, !!writePath);
+  const order = mapSourceOrder({
+    hasWritePath: !!writePath,
+    hasHubSources: hubSources.length > 0,
+  });
 
   /** Fetch a file from its mirrors, and say which kind of source it was. */
   const fetchFile = async (
-    source: MapSource,
+    source: Exclude<MapSource, "hub">,
     urls: readonly string[],
     filename: string,
     label: string,
@@ -97,8 +154,40 @@ async function downloadMapAnySourceImpl(opts: {
       ? label
       : null;
 
+  /**
+   * Try each hub source in turn. A cancel stops the walk with the hub source
+   * after the one cancelled as the next step, or the step after the hub's when
+   * it was the last.
+   */
+  const fetchFromHub = async (): Promise<string | null> => {
+    const from = hubStartIndex(hubSources, startAt);
+    for (const [i, dl] of hubSources.slice(from).entries()) {
+      try {
+        await fetchHubFile(dl, {
+          destDir: `${writePath}/maps`,
+          opId,
+          onProgress,
+          log,
+        });
+        return `hub: ${dl.kind === "url" ? (hostOf(dl.value) ?? dl.value) : dl.value}`;
+      } catch (e) {
+        if (isCancel(e)) {
+          const rest = hubSources[from + i + 1];
+          throw new SourceWalkError(
+            msg(e),
+            rest ? hubStep(rest) : nextKind(order, "hub"),
+          );
+        }
+        log.fail(e);
+      }
+    }
+    return null;
+  };
+
   const attempt = async (source: MapSource): Promise<string | null> => {
     switch (source) {
+      case "hub":
+        return fetchFromHub();
       case "springfiles": {
         if (!writePath) return null;
         const hit = await findInIndex(
@@ -161,7 +250,8 @@ async function downloadMapAnySourceImpl(opts: {
   };
 
   for (const source of orderFrom(order, startAt)) {
-    log.begin(source);
+    // The hub step begins an attempt for each source it lists.
+    if (source !== "hub") log.begin(source);
     try {
       const result = await attempt(source);
       if (result) {

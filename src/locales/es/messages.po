@@ -32408,7 +32408,7 @@ msgstr "Ningún archivo de este juego nombra este parámetro."
 msgid "No file to save over"
 msgstr "No hay archivo que sobrescribir"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr ""
 
@@ -33179,11 +33179,11 @@ msgstr "sin resultado registrado en {gameCount}"
 msgid "No release archive found for {repo}."
 msgstr "No se encontró ningún archivo comprimido de versión publicada para {repo}."
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr ""
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr ""
 

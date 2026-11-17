@@ -105,5 +105,6 @@ export function mapFacts(starts: number, tags: string[] = []): MapFacts {
       geo: [],
     },
     appearance: {},
+    downloads: [],
   };
 }

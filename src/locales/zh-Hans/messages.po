@@ -32408,7 +32408,7 @@ msgstr "此游戏中没有文件引用此参数。"
 msgid "No file to save over"
 msgstr "没有可覆盖保存的文件"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no filename to save it as"
 msgstr ""
 
@@ -33179,11 +33179,11 @@ msgstr "{gameCount} 中没有记录结果"
 msgid "No release archive found for {repo}."
 msgstr "未找到 {repo} 的发行版归档。"
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release archives"
 msgstr ""
 
-#: src/downloads/downloadHubGame.ts
+#: src/downloads/hubFileDownload.ts
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
 msgstr ""
 

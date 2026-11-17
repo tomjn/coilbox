@@ -38,6 +38,7 @@ const FACTS: MapFacts = {
     geo: [],
   },
   appearance: { waterColor: [0.1, 0.2, 0.3] },
+  downloads: [],
 };
 
 function body(results: unknown[], over: Record<string, unknown> = {}) {
@@ -130,6 +131,73 @@ describe("readMapFacts", () => {
       tags: [],
       points: { start: [], metal: [], geo: [] },
       appearance: {},
+      downloads: [],
+    });
+  });
+
+  describe("downloads (issue #5251)", () => {
+    const HASH = "a".repeat(64);
+    const read = (downloads: unknown) => readMapFacts({ ...FACTS, downloads });
+
+    it("reads a url and a github source, in the hub's order", () => {
+      expect(
+        read([
+          { kind: "github", value: "someone/isis", asset: "isis" },
+          {
+            kind: "url",
+            value: "https://m.example/maps/isis.sd7",
+            filename: "isis.sd7",
+            sha256: HASH,
+          },
+        ])?.downloads,
+      ).toEqual([
+        { kind: "github", value: "someone/isis", asset: "isis" },
+        {
+          kind: "url",
+          value: "https://m.example/maps/isis.sd7",
+          filename: "isis.sd7",
+          sha256: HASH,
+        },
+      ]);
+    });
+
+    it("reads a hub that sends none as no sources", () => {
+      expect(
+        readMapFacts({ ...FACTS, downloads: undefined })?.downloads,
+      ).toEqual([]);
+      expect(read("nothing")?.downloads).toEqual([]);
+    });
+
+    it("leaves out what a download cannot use, and keeps the rest", () => {
+      expect(
+        read([
+          { kind: "rapid", value: "isis:latest" },
+          { kind: "url", value: "https://m.example/a.sd7" },
+          { kind: "url", filename: "b.sd7" },
+          { kind: "github", value: "" },
+          null,
+          { kind: "github", value: "someone/isis" },
+        ])?.downloads,
+      ).toEqual([{ kind: "github", value: "someone/isis" }]);
+    });
+
+    it("drops a hash that is not 64 lowercase hex characters", () => {
+      expect(
+        read([
+          {
+            kind: "url",
+            value: "https://m.example/isis.sd7",
+            filename: "isis.sd7",
+            sha256: "ABC",
+          },
+        ])?.downloads,
+      ).toEqual([
+        {
+          kind: "url",
+          value: "https://m.example/isis.sd7",
+          filename: "isis.sd7",
+        },
+      ]);
     });
   });
 });
