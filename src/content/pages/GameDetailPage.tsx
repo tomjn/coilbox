@@ -18,7 +18,8 @@ import { useFactionLogos } from "@/factions/logos";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useFeature } from "@/general/features";
 import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
-import { useGamePresence, useSendableGame } from "@/hub/manualSend/status";
+import { useGameHubState, useSendableGame } from "@/hub/manualSend/status";
+import { UploadToHubButton } from "@/hub/upload/UploadToHubButton";
 import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
 import { setGamePin, setGameUpdates } from "../../downloads/gamePrefs";
@@ -206,10 +207,14 @@ export default function GameDetailPage() {
     data?.games ?? null,
     selected?.rootPath,
   );
-  const hubPresence = useGamePresence(
-    sendable?.shortname ?? null,
+  // The upload button is offered for a game the send is not, such as one
+  // installed through rapid, so the hub is asked about the modinfo shortname.
+  const modinfoShortname = game?.info.shortname?.trim() || null;
+  const hubState = useGameHubState(
+    sendable?.shortname ?? modinfoShortname,
     sendable?.release ?? null,
   );
+  const hubPresence = hubState.presence;
 
   if (error && !data)
     return (
@@ -311,15 +316,33 @@ export default function GameDetailPage() {
         onPlay={() => playGame(game.name)}
         parent={parent}
         hubAction={
-          sendable && (
-            <HubSendControl
-              subject={{ kind: "game", shortname: sendable.shortname }}
+          <>
+            {sendable && (
+              <HubSendControl
+                subject={{ kind: "game", shortname: sendable.shortname }}
+                label={game.info.name?.trim() || game.name}
+                presence={hubPresence}
+                enginePath={selected?.enginePath}
+                dataDir={selected?.rootPath}
+              />
+            )}
+            <UploadToHubButton
+              target={{ kind: "game", archiveName: game.primaryArchive.name }}
               label={game.info.name?.trim() || game.name}
-              presence={hubPresence}
+              shortname={sendable?.shortname ?? modinfoShortname}
               enginePath={selected?.enginePath}
               dataDir={selected?.rootPath}
+              archivePath={game.primaryArchive.path}
+              fileName={game.primaryArchive.path?.split(/[\\/]/).pop()}
+              hub={hubState}
+              pageUrl={
+                hubPresence.state === "present" ||
+                hubPresence.state === "incomplete"
+                  ? hubPresence.url
+                  : null
+              }
             />
-          )
+          </>
         }
       />
 

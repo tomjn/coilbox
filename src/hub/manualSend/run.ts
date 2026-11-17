@@ -103,6 +103,15 @@ function subjectName(subject: SendSubject): string {
 let finished = 0;
 const listeners = new Set<() => void>();
 
+/**
+ * Say that something a page asked the hub about may have changed, so pages ask
+ * again. A manual send calls it as it ends, and so does an archive upload.
+ */
+export function noteHubChanged(): void {
+  finished += 1;
+  for (const listener of listeners) listener();
+}
+
 /** Counts sends that have ended, so a page can ask the hub again after one. */
 export function useManualSendsFinished(): number {
   return useSyncExternalStore(
@@ -177,8 +186,7 @@ export async function startManualSend(
       });
     }
     forgetAnswers(request);
-    finished += 1;
-    for (const listener of listeners) listener();
+    noteHubChanged();
   }
 }
 

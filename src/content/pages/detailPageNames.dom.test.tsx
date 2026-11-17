@@ -166,8 +166,11 @@ vi.mock("@/hub/manualSend/HubSendControl", () => ({
 }));
 vi.mock("@/hub/manualSend/status", () => ({
   useSendableGame: () => null,
-  useGamePresence: () => ({ state: "unknown" }),
-  useMapPresence: () => ({ state: "unknown" }),
+  useGameHubState: () => ({ presence: { state: "unknown" }, hashes: undefined }),
+  useMapHubState: () => ({ presence: { state: "unknown" }, hashes: undefined }),
+}));
+vi.mock("@/hub/upload/UploadToHubButton", () => ({
+  UploadToHubButton: () => null,
 }));
 vi.mock("../useGameLibrary", () => ({
   useGameLibrary: () => ({

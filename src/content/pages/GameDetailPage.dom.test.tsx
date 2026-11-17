@@ -73,8 +73,12 @@ vi.mock("@/hub/manualSend/HubSendControl", () => ({
 }));
 vi.mock("@/hub/manualSend/status", () => ({
   useSendableGame: () => null,
-  useGamePresence: () => ({ state: "unknown" }),
-  useMapPresence: () => ({ state: "unknown" }),
+  useGameHubState: () => ({ presence: { state: "unknown" }, hashes: undefined }),
+  useMapHubState: () => ({ presence: { state: "unknown" }, hashes: undefined }),
+}));
+// The upload button has tests of its own, and reads the archive's facts.
+vi.mock("@/hub/upload/UploadToHubButton", () => ({
+  UploadToHubButton: () => null,
 }));
 // The library facts and the Versions and Sources tabs (#4580) have tests of
 // their own. Here they only need to stay out of the way.
