@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /**
  * The playability figures read and decode the whole height and metal maps and
- * then measure them, so the map's page does none of it until its Playability
- * tab is opened. What the panel shows is `PlayabilityPanel`'s own business.
+ * then measure them, so the map's page does none of it until its Passability
+ * or Gameplay tab is opened. What the panel shows is `PlayabilityPanel`'s own business.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -52,7 +52,9 @@ vi.mock("../config", () => ({
   useUnitsyncMapSkybox: () => ({}),
 }));
 vi.mock("../../mapconv/pages/components/PlayabilityPanel", () => ({
-  PlayabilityPanel: () => <div data-testid="playability" />,
+  PlayabilityPanel: ({ part }: { part?: string }) => (
+    <div data-testid={`playability-${part}`} />
+  ),
 }));
 vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => null,
@@ -84,24 +86,41 @@ afterEach(() => {
   metalField.mockClear();
 });
 
-describe("the playability tab on a map's page", () => {
-  it("reads nothing until it is opened, then reads this map", () => {
-    render(
-      <MemoryRouter
-        initialEntries={[`/library/maps/${encodeURIComponent(MAP)}`]}
-      >
-        <Routes>
-          <Route path="/library/maps/:name" element={<MapDetailPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.queryByTestId("playability")).toBeNull();
+function renderPage() {
+  render(
+    <MemoryRouter initialEntries={[`/library/maps/${encodeURIComponent(MAP)}`]}>
+      <Routes>
+        <Route path="/library/maps/:name" element={<MapDetailPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+// Radix picks a tab on mouse down rather than on click.
+const openTab = (name: string) =>
+  fireEvent.mouseDown(screen.getByRole("tab", { name }));
+
+describe("the measured figures on a map's page", () => {
+  it("read nothing until a tab that shows them is opened", () => {
+    renderPage();
+    expect(screen.queryByTestId("playability-movement")).toBeNull();
+    expect(screen.queryByTestId("playability-economy")).toBeNull();
     expect(heightField).not.toHaveBeenCalled();
     expect(metalField).not.toHaveBeenCalled();
+  });
 
-    // Radix picks a tab on mouse down rather than on click.
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Passability" }));
-    expect(screen.getByTestId("playability")).toBeTruthy();
+  it("read the heights and no metal on the Passability tab", () => {
+    renderPage();
+    openTab("Passability");
+    expect(screen.getByTestId("playability-movement")).toBeTruthy();
+    expect(heightField).toHaveBeenCalledWith("/engine", "/data", MAP);
+    expect(metalField).not.toHaveBeenCalledWith("/engine", "/data", MAP);
+  });
+
+  it("read the heights and the metal on the Gameplay tab", () => {
+    renderPage();
+    openTab("Gameplay");
+    expect(screen.getByTestId("playability-economy")).toBeTruthy();
     expect(heightField).toHaveBeenCalledWith("/engine", "/data", MAP);
     expect(metalField).toHaveBeenCalledWith("/engine", "/data", MAP);
   });

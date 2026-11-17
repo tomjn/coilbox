@@ -263,6 +263,27 @@ export default function MapDetailPage() {
   const previewUrl =
     minimap.url ?? (minimap.loading ? thumbs.get(decoded)?.url : undefined);
 
+  // The 3D preview, on the overview and again on the gameplay tab, where the
+  // picture of every match drapes over it.
+  const preview3D = (onScene?: (scene: MapScene3D | null) => void) =>
+    heightmap.data &&
+    heightmap.url &&
+    minimap.url && (
+      <MapPreview3D
+        className="w-full min-w-0 lg:flex-1"
+        heightSrc={heightmap.url}
+        heightRange={heightmap.range}
+        textureSrc={minimap.url}
+        appearance={minimap.appearance}
+        skyboxSrc={skybox.dataUrl}
+        minHeight={heightmap.data.minHeight ?? 0}
+        maxHeight={heightmap.data.maxHeight ?? 0}
+        worldWidth={world.worldWidth || 16}
+        worldHeight={world.worldHeight || 16}
+        onScene={onScene}
+      />
+    );
+
   // Resolve the map's backing archive to its on-disk path and hand it to mapconv
   // decompile. The scan reports map archives by a versioned display name (no path),
   // so ask the archive-tree command — it turns that name into the real `.sd7`/
@@ -411,6 +432,9 @@ export default function MapDetailPage() {
               <Trans>Details</Trans>
             </TabsTrigger>
           )}
+          <TabsTrigger value="gameplay">
+            <Trans>Gameplay</Trans>
+          </TabsTrigger>
           <TabsTrigger value="playability">
             <Trans>Passability</Trans>
           </TabsTrigger>
@@ -497,24 +521,21 @@ export default function MapDetailPage() {
                 )}
               </div>
 
-              {heightmap.data && heightmap.url && minimap.url && (
-                <MapPreview3D
-                  className="w-full min-w-0 lg:flex-1"
-                  heightSrc={heightmap.url}
-                  heightRange={heightmap.range}
-                  textureSrc={minimap.url}
-                  appearance={minimap.appearance}
-                  skyboxSrc={skybox.dataUrl}
-                  minHeight={heightmap.data.minHeight ?? 0}
-                  maxHeight={heightmap.data.maxHeight ?? 0}
-                  worldWidth={world.worldWidth || 16}
-                  worldHeight={world.worldHeight || 16}
-                  onScene={insightShown ? setScene : undefined}
-                />
-              )}
+              {preview3D()}
             </div>
           </section>
-
+        </TabsContent>
+        <TabsContent value="playability">
+          <MapPlayabilityTab
+            key={map.name}
+            enginePath={selected?.enginePath}
+            rootPath={selected?.rootPath}
+            mapName={map.name}
+            starts={minimap.startPositions}
+            part="movement"
+          />
+        </TabsContent>
+        <TabsContent value="gameplay" className="flex flex-col gap-5">
           {!statsHidden && (
             <section className="rounded-lg border border-border/60 bg-card p-4">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
@@ -567,31 +588,32 @@ export default function MapDetailPage() {
               )}
             </section>
           )}
-
           {insightShown && (
-            <MapAggregate
-              // Keyed, so the filters and the layer of one map do not carry to
-              // the next when the route changes under the same page.
-              key={map.name}
-              mapName={map.name}
-              world={world}
-              minimapUrl={minimap.url ?? undefined}
-              records={statRecords}
-              ingesting={statsIngesting}
-              scene={scene}
-              declared={minimap.startPositions}
-              refights={refights}
-              mapSizes={mapSizes}
-            />
+            <>
+              {preview3D(setScene)}
+              <MapAggregate
+                // Keyed, so the filters and the layer of one map do not carry to
+                // the next when the route changes under the same page.
+                key={map.name}
+                mapName={map.name}
+                world={world}
+                minimapUrl={minimap.url ?? undefined}
+                records={statRecords}
+                ingesting={statsIngesting}
+                scene={scene}
+                declared={minimap.startPositions}
+                refights={refights}
+                mapSizes={mapSizes}
+              />
+            </>
           )}
-        </TabsContent>
-        <TabsContent value="playability">
           <MapPlayabilityTab
             key={map.name}
             enginePath={selected?.enginePath}
             rootPath={selected?.rootPath}
             mapName={map.name}
             starts={minimap.startPositions}
+            part="economy"
           />
         </TabsContent>
         <TabsContent value="details" className="flex flex-col gap-5">
@@ -669,11 +691,13 @@ function MapPlayabilityTab({
   rootPath,
   mapName,
   starts,
+  part,
 }: {
   enginePath?: string;
   rootPath?: string;
   mapName: string;
   starts: { x: number; z: number }[];
+  part: "movement" | "economy";
 }) {
   // The raw heights, for the playability panel to measure at the depth the
   // engine holds them (issue #2169).
@@ -694,7 +718,12 @@ function MapPlayabilityTab({
   );
   // The raw metal map and the map's extractor radius, for the playability
   // panel's metal figures (issue #5098).
-  const metalField = useUnitsyncMetalField(enginePath, rootPath, mapName);
+  // Only the economy half shows metal, so the movement half reads none.
+  const metalField = useUnitsyncMetalField(
+    enginePath,
+    rootPath,
+    part === "economy" ? mapName : undefined,
+  );
   const metalGrid = useMetalGrid(
     metalField.url ?? undefined,
     metalField.data?.width,
@@ -716,7 +745,8 @@ function MapPlayabilityTab({
       heights={playHeights}
       heightsError={heightField.error ?? heightGridError}
       starts={starts}
-      metal={playMetal}
+      metal={part === "economy" ? playMetal : undefined}
+      part={part}
     />
   );
 }
