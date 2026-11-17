@@ -1711,13 +1711,16 @@ async fn dl_inspect_archive(
 }
 
 /// `dl_install_archive` — copy the archive at `path` into `games/` or `maps/`
-/// under the root for its kind. The original is left where it is and a file
-/// already in the target folder is never replaced.
+/// under the root for its kind. A file already in the target folder is never
+/// replaced. With `move_original` the original is deleted once the copy is on
+/// disk, and a failure to delete it comes back as `moveError` beside the
+/// installed copy, because the install itself worked.
 #[tauri::command]
 async fn dl_install_archive(
     path: String,
     games_root: Option<String>,
     maps_root: Option<String>,
+    move_original: Option<bool>,
 ) -> CliResult {
     for root in [games_root.as_deref(), maps_root.as_deref()]
         .into_iter()
@@ -1729,17 +1732,22 @@ async fn dl_install_archive(
         }
     }
     let installed = tauri::async_runtime::spawn_blocking(move || {
-        install::install(
-            std::path::Path::new(&path),
-            games_root.as_deref(),
-            maps_root.as_deref(),
-        )
+        let source = std::path::Path::new(&path);
+        let (plan, dest) = install::install(source, games_root.as_deref(), maps_root.as_deref())?;
+        let move_error = move_original
+            .unwrap_or(false)
+            .then(|| install::remove_original(source, &plan).err())
+            .flatten();
+        Ok::<_, String>((plan, dest, move_error))
     })
     .await;
     match installed {
-        Ok(Ok((plan, dest))) => {
+        Ok(Ok((plan, dest, move_error))) => {
             let mut body = archive_plan_json(&plan);
             body["path"] = json!(dest.display().to_string());
+            if let Some(e) = move_error {
+                body["moveError"] = json!(e);
+            }
             CliResult::ok(body)
         }
         Ok(Err(e)) => CliResult::err(e),
