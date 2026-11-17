@@ -1406,6 +1406,13 @@ msgstr "{0} på en position utan namn."
 msgid "{0} called a vote: {1}"
 msgstr "{0} startade en omröstning: {1}"
 
+#. placeholder {0}: found.candidates.length
+#. placeholder {1}: found.skipped.length
+#. placeholder {2}: found.listed
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -2746,6 +2753,10 @@ msgstr "{factions} · {units}"
 msgid "{factionWins}W of {factionGames}"
 msgstr "{factionWins}V av {factionGames}"
 
+#: src/hub/upload/bulkMaps.ts
+msgid "{failed, plural, one {# map failed. Settings > Coilbox hub says why.} other {# maps failed. Settings > Coilbox hub says why.}}"
+msgstr ""
+
 #: src/hub/games/factsSweep.ts
 #, fuzzy
 msgid "{failedCount, plural, one {The hub would not take one game.} other {The hub would not take # games.}}"
@@ -2848,6 +2859,11 @@ msgstr ""
 
 #: src/downloads/installArchive.ts
 msgid "{fileName}, a map, goes in {destDir}."
+msgstr ""
+
+#. placeholder {0}: run.items.length
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "{finished} of {0} done"
 msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
@@ -12074,6 +12090,7 @@ msgstr "Ber den sluta…"
 msgid "Asking the hub about {done} of {total}"
 msgstr "Frågar hubben om {done} av {total}"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -14490,6 +14507,7 @@ msgstr "Kan inte skada sin egen enhet"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -16191,6 +16209,10 @@ msgstr "Coilbox kunde inte skapa inställningsfilen för {0}."
 msgid "Coilbox could not create the game's settings file."
 msgstr "Coilbox kunde inte skapa spelets inställningsfil."
 
+#: src/hub/upload/bulkMaps.ts
+msgid "Coilbox could not find the file for this map."
+msgstr ""
+
 #: src/hub/upload/messages.ts
 msgid "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
 msgstr ""
@@ -16617,6 +16639,7 @@ msgstr "Coilbox behöver en installerad motor innan det kan rita dina enheter."
 msgid "Coilbox needs an engine installed before it can read your games."
 msgstr "Coilbox behöver en installerad motor innan det kan läsa dina spel."
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -22577,6 +22600,7 @@ msgstr "misslyckades"
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/components/MapArchivesControl.tsx
 #, fuzzy
 msgid "Failed"
 msgstr "Misslyckades"
@@ -22951,10 +22975,18 @@ msgstr "Ta reda på den på något annat sätt, eller använd <0>{lan}</0> på d
 msgid "Find it in Downloads"
 msgstr "Hitta det under Nedladdningar"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Find maps the hub is missing"
+msgstr ""
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "Find other accounts on this IP"
 msgstr "Hitta andra konton på den här IP-adressen"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Finding maps…"
+msgstr ""
 
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
@@ -35661,6 +35693,10 @@ msgstr "på för brant mark, i gulorange"
 msgid "on or off"
 msgstr "på eller av"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "On the hub"
+msgstr ""
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -39304,6 +39340,12 @@ msgstr "Skanna igen"
 msgid "Re-verify"
 msgstr "Verifiera igen"
 
+#. placeholder {0}: progress.done
+#. placeholder {1}: progress.total
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Read {0} of {1}"
+msgstr ""
+
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -39821,6 +39863,7 @@ msgstr "Läser in dina spel…"
 msgid "Reading your installed games"
 msgstr "Läser dina installerade spel"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -46729,6 +46772,7 @@ msgstr ""
 msgid "Stone"
 msgstr "Sten"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -46797,6 +46841,10 @@ msgstr ""
 #, fuzzy
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Stoppa ditt eget rum först. Coilbox kan vara i ett rum åt gången."
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Stopped"
+msgstr ""
 
 #: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
@@ -51124,6 +51172,10 @@ msgstr "Dessa följer med spelet och spelas som själva spelet. De listas under 
 msgid "These costs come from a different build and may be wrong."
 msgstr "De här kostnaderna kommer från en annan version och kan vara fel."
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "These files will be public. Anyone can download them from the hub's mirrors."
+msgstr ""
+
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #, fuzzy
 msgid "These loadouts are the same."
@@ -54958,6 +55010,10 @@ msgstr "Uppgraderas till"
 msgid "Upload"
 msgstr ""
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Upload {count, plural, one {# map} other {# maps}} ({size})"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Upload {label} to the hub?"
 msgstr ""
@@ -54970,12 +55026,24 @@ msgstr ""
 msgid "Upload to hub"
 msgstr ""
 
+#: src/hub/upload/bulkMaps.ts
+msgid "Uploaded {listed} of {total, plural, one {# map} other {# maps}} to the hub"
+msgstr ""
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Uploading"
+msgstr ""
+
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Uploading to hub"
 msgstr ""
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Uploading to the hub. Open to stop."
+msgstr ""
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Uploading your map files"
 msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
@@ -55506,6 +55574,10 @@ msgstr "vänta på spelaren"
 #, fuzzy
 msgid "Wait for them"
 msgstr "Vänta på dem"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Waiting"
+msgstr ""
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx

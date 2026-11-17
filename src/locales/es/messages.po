@@ -1392,6 +1392,13 @@ msgstr ""
 msgid "{0} called a vote: {1}"
 msgstr ""
 
+#. placeholder {0}: found.candidates.length
+#. placeholder {1}: found.skipped.length
+#. placeholder {2}: found.listed
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 #, fuzzy
@@ -2717,6 +2724,10 @@ msgstr "{factions} · {units}"
 msgid "{factionWins}W of {factionGames}"
 msgstr "{factionWins}V de {factionGames}"
 
+#: src/hub/upload/bulkMaps.ts
+msgid "{failed, plural, one {# map failed. Settings > Coilbox hub says why.} other {# maps failed. Settings > Coilbox hub says why.}}"
+msgstr ""
+
 #: src/hub/games/factsSweep.ts
 #, fuzzy
 msgid "{failedCount, plural, one {The hub would not take one game.} other {The hub would not take # games.}}"
@@ -2818,6 +2829,11 @@ msgstr ""
 
 #: src/downloads/installArchive.ts
 msgid "{fileName}, a map, goes in {destDir}."
+msgstr ""
+
+#. placeholder {0}: run.items.length
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "{finished} of {0} done"
 msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
@@ -11997,6 +12013,7 @@ msgstr "Pidiéndole que se detenga…"
 msgid "Asking the hub about {done} of {total}"
 msgstr "Consultando al hub sobre {done} de {total}"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -14405,6 +14422,7 @@ msgstr "No puede dañar a su propia unidad"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -16087,6 +16105,10 @@ msgstr ""
 msgid "Coilbox could not create the game's settings file."
 msgstr ""
 
+#: src/hub/upload/bulkMaps.ts
+msgid "Coilbox could not find the file for this map."
+msgstr ""
+
 #: src/hub/upload/messages.ts
 msgid "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
 msgstr ""
@@ -16504,6 +16526,7 @@ msgstr "Coilbox necesita un motor instalado para poder dibujar tus unidades."
 msgid "Coilbox needs an engine installed before it can read your games."
 msgstr "Coilbox necesita un motor instalado para poder leer tus juegos."
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -22428,6 +22451,7 @@ msgstr "fallido"
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/components/MapArchivesControl.tsx
 #, fuzzy
 msgid "Failed"
 msgstr "Fallido"
@@ -22800,10 +22824,18 @@ msgstr "Búscala de otra forma, o en esta red usa <0>{lan}</0>."
 msgid "Find it in Downloads"
 msgstr "Búscalo en Descargas"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Find maps the hub is missing"
+msgstr ""
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
 msgid "Find other accounts on this IP"
 msgstr "Buscar otras cuentas en esta IP"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Finding maps…"
+msgstr ""
 
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
@@ -35441,6 +35473,10 @@ msgstr "en un terreno demasiado empinado para ella, en ámbar"
 msgid "on or off"
 msgstr "activado o desactivado"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "On the hub"
+msgstr ""
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "On the menu"
@@ -39039,6 +39075,12 @@ msgstr "Volver a analizar"
 msgid "Re-verify"
 msgstr "Volver a verificar"
 
+#. placeholder {0}: progress.done
+#. placeholder {1}: progress.total
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Read {0} of {1}"
+msgstr ""
+
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -39552,6 +39594,7 @@ msgstr "Leyendo tus juegos…"
 msgid "Reading your installed games"
 msgstr "Leyendo tus juegos instalados"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 #, fuzzy
@@ -46419,6 +46462,7 @@ msgstr ""
 msgid "Stone"
 msgstr "Piedra"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -46487,6 +46531,10 @@ msgstr ""
 #, fuzzy
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Primero detén tu propia sala. Coilbox solo puede estar en una sala a la vez."
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Stopped"
+msgstr ""
 
 #: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
@@ -50774,6 +50822,10 @@ msgstr "Vienen con el juego y se juegan como el propio juego. Aparecen en Jugar,
 msgid "These costs come from a different build and may be wrong."
 msgstr "Estos costes vienen de otra versión y pueden ser incorrectos."
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "These files will be public. Anyone can download them from the hub's mirrors."
+msgstr ""
+
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #, fuzzy
 msgid "These loadouts are the same."
@@ -54588,6 +54640,10 @@ msgstr "Se mejora a"
 msgid "Upload"
 msgstr ""
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Upload {count, plural, one {# map} other {# maps}} ({size})"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Upload {label} to the hub?"
 msgstr ""
@@ -54600,12 +54656,24 @@ msgstr ""
 msgid "Upload to hub"
 msgstr ""
 
+#: src/hub/upload/bulkMaps.ts
+msgid "Uploaded {listed} of {total, plural, one {# map} other {# maps}} to the hub"
+msgstr ""
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Uploading"
+msgstr ""
+
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Uploading to hub"
 msgstr ""
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Uploading to the hub. Open to stop."
+msgstr ""
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Uploading your map files"
 msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
@@ -55134,6 +55202,10 @@ msgstr "esperar al jugador"
 #, fuzzy
 msgid "Wait for them"
 msgstr "Esperarlos"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Waiting"
+msgstr ""
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx
