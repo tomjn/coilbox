@@ -201,6 +201,39 @@ pub(crate) fn map_archive_file(us: &Unitsync, map_index: i32, map_name: &str) ->
     MapArchives::for_one_map(us, map_index).file_for(us, map_index, map_name)
 }
 
+/// The map held by the archive file called `file_name` under `maps/`, as its
+/// position in unitsync's list and its name, or `None` when there is none.
+///
+/// For a caller that has a file and does not know what it holds. Opens that one
+/// archive for its `.smf` and looks for the map carrying it, rather than
+/// indexing the whole library, then checks the map resolves back to this file so
+/// a copy under another name is not mistaken for it.
+pub(crate) fn map_in_archive_file(us: &Unitsync, file_name: &str) -> Option<(i32, String)> {
+    let candidate = us
+        .list_vfs_dir("maps", "*", "r")
+        .into_iter()
+        .filter(|c| is_archive_file(c) && !is_working_folder(c))
+        .find(|c| Path::new(c).file_name().and_then(|n| n.to_str()) == Some(file_name))?;
+    let handle = us.open_archive(&candidate)?;
+    let smfs: Vec<String> = us
+        .list_archive_files(handle)
+        .into_iter()
+        .map(|(path, _)| path.to_lowercase())
+        .filter(|path| path.ends_with(".smf"))
+        .collect();
+    us.close_archive(handle);
+    (0..us.map_count()).find_map(|i| {
+        let smf = us.map_file_name(i)?.to_lowercase();
+        if !smfs.iter().any(|held| same_member(held, &smf)) {
+            return None;
+        }
+        let name = us.map_name(i)?;
+        let file = map_archive_file(us, i, &name)?;
+        (Path::new(&file).file_name().and_then(|n| n.to_str()) == Some(file_name))
+            .then_some((i, name))
+    })
+}
+
 /// Which archive under `maps/` holds each `.smf`, read once.
 ///
 /// A walk over the whole library needs this and a single map does not, which is

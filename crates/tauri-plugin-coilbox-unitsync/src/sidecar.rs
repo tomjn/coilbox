@@ -719,8 +719,9 @@ pub fn build_map_catalog_args(
 }
 
 /// Build args for the facts the hub takes before one map or game is uploaded
-/// as a file (issue #5257): `map` is a unitsync map name and `game` a game's
-/// primary archive file name, and exactly one of them is set.
+/// as a file (issue #5257): `map` is a unitsync map name, `map_archive` the file
+/// name of a map archive and `game` a game's primary archive file name, and
+/// exactly one of them is set.
 ///
 /// The mode's fields and that rule live once in
 /// `coilbox_unitsync_worker::UploadFactsArgs`, so this function only has to add
@@ -729,6 +730,7 @@ pub fn build_upload_facts_args(
     lib: &str,
     datadir: &str,
     map: Option<&str>,
+    map_archive: Option<&str>,
     game: Option<&str>,
     cache_dir: Option<&str>,
 ) -> Vec<String> {
@@ -736,6 +738,7 @@ pub fn build_upload_facts_args(
     args.extend(
         coilbox_unitsync_worker::Mode::UploadFacts(coilbox_unitsync_worker::UploadFactsArgs {
             map: map.map(String::from),
+            map_archive: map_archive.map(String::from),
             game: game.map(String::from),
             cache_dir: cache_dir.map(String::from),
         })
@@ -1430,19 +1433,39 @@ mod tests {
             "/data",
             Some("Acidic Quarry 5.17"),
             None,
+            None,
             Some("/cache/info"),
         );
         assert_eq!(
             UploadFactsArgs::from_args(&map).expect("valid argv"),
             UploadFactsArgs {
                 map: Some("Acidic Quarry 5.17".into()),
+                map_archive: None,
                 game: None,
                 cache_dir: Some("/cache/info".into()),
+            }
+        );
+        let map_archive = build_upload_facts_args(
+            "/eng/libunitsync.so",
+            "/data",
+            None,
+            Some("acidic_quarry_5.17.sd7"),
+            None,
+            None,
+        );
+        assert_eq!(
+            UploadFactsArgs::from_args(&map_archive).expect("valid argv"),
+            UploadFactsArgs {
+                map: None,
+                map_archive: Some("acidic_quarry_5.17.sd7".into()),
+                game: None,
+                cache_dir: None,
             }
         );
         let game = build_upload_facts_args(
             "/eng/libunitsync.so",
             "/data",
+            None,
             None,
             Some("splinterfaction.sdz"),
             None,
@@ -1451,6 +1474,7 @@ mod tests {
             UploadFactsArgs::from_args(&game).expect("valid argv"),
             UploadFactsArgs {
                 map: None,
+                map_archive: None,
                 game: Some("splinterfaction.sdz".into()),
                 cache_dir: None,
             }
