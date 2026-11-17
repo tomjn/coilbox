@@ -2326,12 +2326,12 @@ msgid "{filename} is not what the hub says it is. The hub has been told. The fil
 msgstr "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
 
 #: src/downloads/installArchive.ts
-msgid "{fileName}, a game, is copied to {destDir}."
-msgstr "{fileName}, a game, is copied to {destDir}."
+msgid "{fileName}, a game, goes in {destDir}."
+msgstr "{fileName}, a game, goes in {destDir}."
 
 #: src/downloads/installArchive.ts
-msgid "{fileName}, a map, is copied to {destDir}."
-msgstr "{fileName}, a map, is copied to {destDir}."
+msgid "{fileName}, a map, goes in {destDir}."
+msgstr "{fileName}, a map, goes in {destDir}."
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{finishedCount, plural, one {# building finished.} other {# buildings finished.}}"
@@ -14641,6 +14641,10 @@ msgstr "could not connect to {who} for {file}"
 msgid "Could not count the backups: {0}"
 msgstr "Could not count the backups: {0}"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not delete an original"
+msgstr "Could not delete an original"
+
 #: src/game-updates/GameUpdatesProvider.tsx
 msgid "Could not download {filename}"
 msgstr "Could not download {filename}"
@@ -15939,6 +15943,11 @@ msgstr "Delete the matching replays"
 msgid "Delete the name {name}"
 msgstr "Delete the name {name}"
 
+#: src/deeplink/ArchiveChoices.tsx
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete the original after installing"
+msgstr "Delete the original after installing"
+
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/lego/shortcuts.ts
 msgid "Delete the selection"
@@ -16424,6 +16433,10 @@ msgstr "Divided by the build power poured into it to give the seconds a build ta
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "do ... end"
 msgstr "do ... end"
+
+#: src/deeplink/ArchiveChoices.tsx
+msgid "Do not ask again"
+msgstr "Do not ask again"
 
 #: src/runlite/generate.ts
 msgid "Dock and repair"
@@ -16950,6 +16963,10 @@ msgstr "Drop unit {unit}"
 #: src/multiplayer/debriefing.ts
 msgid "Dropped a rank"
 msgstr "Dropped a rank"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Dropped archives"
+msgstr "Dropped archives"
 
 #: src/multiplayer/debriefing.ts
 msgid "Dropped to {name}"
@@ -21809,6 +21826,10 @@ msgstr "Install this conversion?"
 msgid "Install widget"
 msgstr "Install widget"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install without asking"
+msgstr "Install without asking"
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
 msgstr "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
@@ -22065,6 +22086,10 @@ msgstr "it encoded past the size the hub accepts."
 msgid "it encoded, and the file could not be written."
 msgstr "it encoded, and the file could not be written."
 
+#: src/downloads/installArchive.ts
+msgid "It goes in {destDir}."
+msgstr "It goes in {destDir}."
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "It goes out of the library. Undo puts it back."
 msgstr "It goes out of the library. Undo puts it back."
@@ -22124,10 +22149,6 @@ msgstr "It is carrying a battle this coilbox is hosting right now. Leave that ba
 #: src/lego/pages/components/ScriptTab.tsx
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "It is converted from the game's BOS again. Edits you made since are lost."
-
-#: src/downloads/installArchive.ts
-msgid "It is copied to {destDir}. The file you opened stays where it is."
-msgstr "It is copied to {destDir}. The file you opened stays where it is."
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "It is in the style list under Generate on the Models page."
@@ -25310,6 +25331,10 @@ msgstr "Moved in {callin}"
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "Moved the base's origin, now at {spot}."
 msgstr "Moved the base's origin, now at {spot}."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Moved to {destDir}."
+msgstr "Moved to {destDir}."
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
@@ -37161,6 +37186,10 @@ msgstr "Some content this preset needs isn't installed. Download it below, or ca
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Some files were not installed"
+msgstr "Some files were not installed"
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Some of \"{presetName}\" did not take"
 msgstr "Some of \"{presetName}\" did not take"
@@ -39563,10 +39592,6 @@ msgstr "The file paints with {imagesUsed} textures where a Spring unit has one, 
 #: src/lego/moduleFile.ts
 msgid "The file was made by a newer version of coilbox."
 msgstr "The file was made by a newer version of coilbox."
-
-#: src/downloads/installArchive.ts
-msgid "The files you opened stay where they are."
-msgstr "The files you opened stay where they are."
 
 #: src/content/unitFieldNotes.ts
 msgid "The first character is the shape and the last is the axis, so cylY is a cylinder on y. Read only when there is no collisionVolume table."

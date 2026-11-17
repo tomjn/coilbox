@@ -2843,14 +2843,12 @@ msgid "{filename} is not what the hub says it is. The hub has been told. The fil
 msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a game, is copied to {destDir}."
-msgstr "{fileName}, een spel, wordt gekopieerd naar {destDir}."
+msgid "{fileName}, a game, goes in {destDir}."
+msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a map, is copied to {destDir}."
-msgstr "{fileName}, een kaart, wordt gekopieerd naar {destDir}."
+msgid "{fileName}, a map, goes in {destDir}."
+msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -18013,6 +18011,10 @@ msgstr "kan geen verbinding maken met {who} voor {file}"
 msgid "Could not count the backups: {0}"
 msgstr "Kan de back-ups niet tellen: {0}"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not delete an original"
+msgstr ""
+
 #: src/game-updates/GameUpdatesProvider.tsx
 #, fuzzy
 msgid "Could not download {filename}"
@@ -19595,6 +19597,11 @@ msgstr "De overeenkomende replays verwijderen"
 msgid "Delete the name {name}"
 msgstr "De naam {name} verwijderen"
 
+#: src/deeplink/ArchiveChoices.tsx
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete the original after installing"
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -20187,6 +20194,10 @@ msgstr "Gedeeld door de bouwkracht die erin wordt gestoken, geeft dit het aantal
 #, fuzzy
 msgid "do ... end"
 msgstr "do ... end"
+
+#: src/deeplink/ArchiveChoices.tsx
+msgid "Do not ask again"
+msgstr ""
 
 #: src/runlite/generate.ts
 #, fuzzy
@@ -20831,6 +20842,10 @@ msgstr "Eenheid {unit} neerzetten"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "Een rang gezakt"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Dropped archives"
+msgstr ""
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -26814,6 +26829,10 @@ msgstr "Deze omzetting installeren?"
 msgid "Install widget"
 msgstr "Widget installeren"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
@@ -27126,6 +27145,10 @@ msgstr "het werd gecodeerd tot voorbij de grootte die de hub accepteert."
 msgid "it encoded, and the file could not be written."
 msgstr "het werd gecodeerd, en het bestand kon niet worden geschreven."
 
+#: src/downloads/installArchive.ts
+msgid "It goes in {destDir}."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "It goes out of the library. Undo puts it back."
@@ -27199,11 +27222,6 @@ msgstr "Hij draagt een gevecht dat deze coilbox nu host. Verlaat dat gevecht voo
 #, fuzzy
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "Het wordt opnieuw omgezet uit de BOS van het spel. Wijzigingen die je sindsdien hebt gemaakt, gaan verloren."
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "It is copied to {destDir}. The file you opened stays where it is."
-msgstr "Het wordt gekopieerd naar {destDir}. Het bestand dat je hebt geopend, blijft waar het is."
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "It is in the style list under Generate on the Models page."
@@ -31110,6 +31128,10 @@ msgstr ""
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
 msgstr "De oorsprong van de basis verplaatst, nu op {spot}."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Moved to {destDir}."
+msgstr ""
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
@@ -45668,6 +45690,10 @@ msgstr "Sommige inhoud die deze voorinstelling nodig heeft, is niet geïnstallee
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Sommige engines nemen op in hun eigen map, dus als je die engine verwijdert, verwijder je ook die replays. Dit verplaatst ze naar de demos-map bij de rest."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Some files were not installed"
+msgstr ""
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
 msgid "Some of \"{presetName}\" did not take"
@@ -48616,11 +48642,6 @@ msgstr "Het bestand schildert met {imagesUsed} texturen waar een Spring-eenheid 
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
 msgstr "Het bestand is gemaakt met een nieuwere versie van coilbox."
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "The files you opened stay where they are."
-msgstr "De bestanden die je opende, blijven waar ze zijn."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

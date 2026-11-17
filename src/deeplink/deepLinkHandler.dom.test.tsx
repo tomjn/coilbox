@@ -48,6 +48,12 @@ vi.mock("../hub/config", async () => ({
 // what these tests are about. The folders come from the frame's settings store.
 vi.mock("../downloads/config", () => ({
   useWriteRoot: () => ({ path: undefined, loading: false }),
+  useArchiveInstallSettings: () => ({
+    move: false,
+    noPrompt: false,
+    setMove: () => {},
+    setNoPrompt: () => {},
+  }),
 }));
 
 const notify = vi.fn();

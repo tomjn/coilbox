@@ -82,8 +82,16 @@ let roots = {
   games: { path: "/spring" as string | undefined, loading: false },
   maps: { path: "/spring" as string | undefined, loading: false },
 };
+let archiveSettings = { move: false, noPrompt: false };
+const setMove = vi.fn();
+const setNoPrompt = vi.fn();
 vi.mock("../downloads/config", () => ({
   useWriteRoot: (kind: "games" | "maps") => roots[kind],
+  useArchiveInstallSettings: () => ({
+    ...archiveSettings,
+    setMove,
+    setNoPrompt,
+  }),
 }));
 
 const invalidateScans = vi.fn();
@@ -91,7 +99,12 @@ vi.mock("../content/config", () => ({
   invalidateScans: () => invalidateScans(),
 }));
 
-type Args = { path: string; gamesRoot?: string; mapsRoot?: string };
+type Args = {
+  path: string;
+  gamesRoot?: string;
+  mapsRoot?: string;
+  moveOriginal?: boolean;
+};
 const inspect = vi.fn(async ({ path }: Args) => {
   const fileName = path.split("/").pop() ?? path;
   if (fileName === "notes.sdz") {
@@ -106,7 +119,9 @@ const inspect = vi.fn(async ({ path }: Args) => {
     ? { kind: "map" as const, fileName, destDir: "/spring/maps" }
     : { kind: "game" as const, fileName, destDir: "/spring/games" };
 });
-const install = vi.fn(async (_args: Args) => ({}));
+const install = vi.fn(
+  async (_args: Args): Promise<{ moveError?: string }> => ({}),
+);
 vi.mock("../downloads/bindings", () => ({
   dlInspectArchive: (args: Args) => inspect(args),
   dlInstallArchive: (args: Args) => install(args),
@@ -142,6 +157,7 @@ beforeEach(() => {
   onDrop = null;
   onOpenArchive = null;
   launchArchives = [];
+  archiveSettings = { move: false, noPrompt: false };
   roots = {
     games: { path: "/spring", loading: false },
     maps: { path: "/spring", loading: false },
@@ -160,9 +176,7 @@ describe("a file opened with coilbox", () => {
     act(() => dispatchDeepLink(GAME_URL));
 
     await screen.findByText("Install the game SplinterFaction_0.1.89.sdz?");
-    screen.getByText(
-      "It is copied to /spring/games. The file you opened stays where it is.",
-    );
+    screen.getByText("It goes in /spring/games.");
     expect(install).not.toHaveBeenCalled();
 
     press("Install");
@@ -171,8 +185,10 @@ describe("a file opened with coilbox", () => {
         path: GAME,
         gamesRoot: "/spring",
         mapsRoot: "/spring",
+        moveOriginal: false,
       }),
     );
+    expect(setNoPrompt).not.toHaveBeenCalled();
     await waitFor(() => expect(invalidateScans).toHaveBeenCalledTimes(1));
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -296,6 +312,83 @@ describe("a file opened with coilbox", () => {
   });
 });
 
+describe("the prompt's choices", () => {
+  it("deletes the original when that box is ticked", async () => {
+    await draw();
+    act(() => dispatchDeepLink(GAME_URL));
+    await screen.findByText("Install the game SplinterFaction_0.1.89.sdz?");
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Delete the original after installing",
+      }),
+    );
+    press("Install");
+    await waitFor(() =>
+      expect(install).toHaveBeenCalledWith(
+        expect.objectContaining({ path: GAME, moveOriginal: true }),
+      ),
+    );
+    // Asking again next time means this answer is not kept.
+    expect(setMove).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({ body: "Moved to /spring/games." }),
+      ),
+    );
+  });
+
+  it("keeps both answers when told not to ask again", async () => {
+    await draw();
+    act(() => dispatchDeepLink(GAME_URL));
+    await screen.findByText("Install the game SplinterFaction_0.1.89.sdz?");
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Delete the original after installing",
+      }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Do not ask again" }));
+    press("Install");
+    await waitFor(() => expect(install).toHaveBeenCalledTimes(1));
+    expect(setMove).toHaveBeenCalledWith(true);
+    expect(setNoPrompt).toHaveBeenCalledWith(true);
+  });
+
+  it("installs without asking once that is the setting", async () => {
+    archiveSettings = { move: true, noPrompt: true };
+    await draw();
+    act(() => dispatchDeepLink(GAME_URL));
+
+    await waitFor(() =>
+      expect(install).toHaveBeenCalledWith(
+        expect.objectContaining({ path: GAME, moveOriginal: true }),
+      ),
+    );
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+  });
+
+  it("says so when the original could not be deleted", async () => {
+    archiveSettings = { move: true, noPrompt: true };
+    install.mockResolvedValueOnce({ moveError: "It is read-only." });
+    await draw();
+    act(() => dispatchDeepLink(GAME_URL));
+
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Could not delete an original",
+          body: "It is read-only.",
+          level: "warning",
+        }),
+      ),
+    );
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ body: "Copied to /spring/games." }),
+    );
+  });
+});
+
 describe("a file from a Windows or Linux launch", () => {
   it("is offered when the app was started with it", async () => {
     launchArchives = [GAME];
@@ -316,9 +409,9 @@ describe("a file dropped on the window", () => {
     drop({ type: "drop", paths: [GAME, "/dl/comet.sd7", "/dl/notes.sdz"] });
 
     await screen.findByText(
-      "SplinterFaction_0.1.89.sdz, a game, is copied to /spring/games.",
+      "SplinterFaction_0.1.89.sdz, a game, goes in /spring/games.",
     );
-    screen.getByText("comet.sd7, a map, is copied to /spring/maps.");
+    screen.getByText("comet.sd7, a map, goes in /spring/maps.");
     screen.getByText("notes.sdz is neither a game nor a map.");
 
     press("Install");

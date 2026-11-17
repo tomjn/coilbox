@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, ExternalLink } from "lucide-react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,9 @@ export interface Pending {
    * import is. The hub's Remove passes its own, because a dialog about deleting
    * something should not be marked with the sign for fetching it. */
   icon?: ComponentType<{ className?: string }>;
+  /** Choices shown under the lines, such as the archive install's checkboxes.
+   * `run` reads what was chosen, so whoever builds this holds that state. */
+  extra?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -80,6 +83,7 @@ export function ConfirmDialog({
                 {w}
               </p>
             ))}
+            {pending.extra}
           </div>
 
           <DialogFooter>

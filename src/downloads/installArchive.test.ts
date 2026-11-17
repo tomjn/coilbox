@@ -104,7 +104,7 @@ describe("describeOffers", () => {
       title: "Install a game",
       lines: [
         "Install the game SplinterFaction_0.1.89.sdz?",
-        "It is copied to /spring/games. The file you opened stays where it is.",
+        "It goes in /spring/games.",
       ],
     });
   });
@@ -113,9 +113,8 @@ describe("describeOffers", () => {
     expect(describeOffers([game, map])).toEqual({
       title: "Install 2 archives",
       lines: [
-        "SplinterFaction_0.1.89.sdz, a game, is copied to /spring/games.",
-        "comet.sd7, a map, is copied to /spring/maps.",
-        "The files you opened stay where they are.",
+        "SplinterFaction_0.1.89.sdz, a game, goes in /spring/games.",
+        "comet.sd7, a map, goes in /spring/maps.",
       ],
     });
   });
@@ -125,13 +124,26 @@ describe("installArchives", () => {
   it("carries on past one that fails and reports both", async () => {
     const install = vi.fn(async ({ path }: { path: string }) => {
       if (path === game.path) throw new Error("Could not write it.");
+      return undefined;
     });
     const result = await installArchives(
       [game, map],
       { gamesRoot: "/spring", mapsRoot: "/spring" },
+      false,
       install,
     );
     expect(result.installed).toEqual([map]);
     expect(result.failed).toEqual(["Could not write it."]);
+  });
+
+  it("asks for a move and keeps an install whose original stayed", async () => {
+    const install = vi.fn(async () => ({ moveError: "Could not delete it." }));
+    const result = await installArchives([map], {}, true, install);
+    expect(install).toHaveBeenCalledWith({
+      path: map.path,
+      moveOriginal: true,
+    });
+    expect(result.installed).toEqual([map]);
+    expect(result.notMoved).toEqual(["Could not delete it."]);
   });
 });

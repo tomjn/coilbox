@@ -101,7 +101,7 @@ export function describeOffers(offers: ArchiveOffer[]): {
         only.kind === "game"
           ? t`Install the game ${fileName}?`
           : t`Install the map ${fileName}?`,
-        t`It is copied to ${destDir}. The file you opened stays where it is.`,
+        t`It goes in ${destDir}.`,
       ],
     };
   }
@@ -114,32 +114,46 @@ export function describeOffers(offers: ArchiveOffer[]): {
       ...offers.map((o) => {
         const { fileName, destDir } = o;
         return o.kind === "game"
-          ? t`${fileName}, a game, is copied to ${destDir}.`
-          : t`${fileName}, a map, is copied to ${destDir}.`;
+          ? t`${fileName}, a game, goes in ${destDir}.`
+          : t`${fileName}, a map, goes in ${destDir}.`;
       }),
-      t`The files you opened stay where they are.`,
     ],
   };
 }
 
 /**
- * Copy each offer into place. One that fails does not stop the rest, and each
- * failure comes back with its reason.
+ * Copy each offer into place, deleting each original after its copy when `move`
+ * is set. One that fails does not stop the rest, and each failure comes back
+ * with its reason. An original that could not be deleted is still installed,
+ * and its reason comes back in `notMoved`.
  */
 export async function installArchives(
   offers: ArchiveOffer[],
   roots: ArchiveRoots,
-  install: (args: { path: string } & ArchiveRoots) => Promise<unknown>,
-): Promise<{ installed: ArchiveOffer[]; failed: string[] }> {
+  move: boolean,
+  install: (
+    args: { path: string; moveOriginal: boolean } & ArchiveRoots,
+  ) => Promise<{ moveError?: string } | undefined>,
+): Promise<{
+  installed: ArchiveOffer[];
+  failed: string[];
+  notMoved: string[];
+}> {
   const installed: ArchiveOffer[] = [];
   const failed: string[] = [];
+  const notMoved: string[] = [];
   for (const offer of offers) {
     try {
-      await install({ path: offer.path, ...roots });
+      const result = await install({
+        path: offer.path,
+        moveOriginal: move,
+        ...roots,
+      });
       installed.push(offer);
+      if (result?.moveError) notMoved.push(result.moveError);
     } catch (e) {
       failed.push(errorText(e));
     }
   }
-  return { installed, failed };
+  return { installed, failed, notMoved };
 }
