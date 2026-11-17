@@ -422,6 +422,9 @@ export default function MapDetailPage() {
           <TabsTrigger value="archives">
             <Trans>Archives</Trans>
           </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Trans>Settings</Trans>
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="flex flex-col gap-5">
           <section className="flex flex-col gap-2">
@@ -581,7 +584,6 @@ export default function MapDetailPage() {
               mapSizes={mapSizes}
             />
           )}
-          <MapEligibilitySection mapName={map.name} />
         </TabsContent>
         <TabsContent value="playability">
           <MapPlayabilityTab
@@ -649,6 +651,9 @@ export default function MapDetailPage() {
               </ul>
             )}
           </section>
+        </TabsContent>
+        <TabsContent value="settings">
+          <MapEligibilitySection mapName={map.name} />
         </TabsContent>
       </Tabs>
     </div>
