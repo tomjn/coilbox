@@ -73,17 +73,21 @@ pub(crate) fn problem(said: String) -> UploadFactsOutput {
     }
 }
 
-fn answer(assembled: Result<UploadFacts, String>, errors: Vec<String>) -> UploadFactsOutput {
+fn answer(
+    assembled: Result<(UploadFacts, String), String>,
+    errors: Vec<String>,
+) -> UploadFactsOutput {
     match assembled {
-        Ok(facts) => UploadFactsOutput {
+        Ok((facts, path)) => UploadFactsOutput {
             facts: Some(facts),
-            problem: None,
+            path: Some(path),
             errors,
+            ..Default::default()
         },
         Err(said) => UploadFactsOutput {
-            facts: None,
             problem: Some(said),
             errors,
+            ..Default::default()
         },
     }
 }
@@ -166,6 +170,7 @@ fn read_map_selected(
                 description: mapcatalog::some_text(info.get("description")),
             };
             assemble(&source.archive_file, UploadKind::Map, identity, cache_dir)
+                .map(|facts| (facts, source.archive_file.clone()))
         }
         Err(MapCatalogSkip::NoArchiveFile) => Err(format!(
             "{map_name} is not a single .sd7 or .sdz file under maps/. It may be unpacked into \
@@ -219,7 +224,8 @@ pub fn read_game(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> Upl
             match crate::archive::resolve_open_path(&us, game_archive)
                 .filter(|path| Path::new(path).is_file())
             {
-                Some(path) => assemble(&path, UploadKind::Game, identity, cache_dir),
+                Some(path) => assemble(&path, UploadKind::Game, identity, cache_dir)
+                    .map(|facts| (facts, path)),
                 None => Err(format!(
                     "{game_archive} is not a single .sd7 or .sdz file. It may be unpacked into a \
                      folder or installed through rapid, so there is no archive to upload."
@@ -310,6 +316,19 @@ mod tests {
         assert_eq!(facts.kind, UploadKind::Game);
         assert_eq!(facts.internal_name, "Splinter Faction 1.2");
         assert_eq!(facts.shortname.as_deref(), Some("SF"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn an_answer_with_facts_names_the_file_to_send_and_a_refusal_does_not() {
+        let dir = scratch("answerpath");
+        let path = archive(&dir, "acidic_quarry_5.17.sd7");
+        let facts = assemble(&path, UploadKind::Map, map_identity(), None).unwrap();
+        let json = serde_json::to_value(answer(Ok((facts, path.clone())), vec![])).unwrap();
+        assert_eq!(json["path"], path.as_str());
+        assert_eq!(json["facts"]["filename"], "acidic_quarry_5.17.sd7");
+        let refused = serde_json::to_value(answer(Err("no".into()), vec![])).unwrap();
+        assert!(refused.get("path").is_none(), "{refused}");
         let _ = std::fs::remove_dir_all(dir);
     }
 
