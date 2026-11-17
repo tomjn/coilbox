@@ -1,86 +1,31 @@
 import { t } from "@lingui/core/macro";
-import { describeError } from "@/i18n/uiError";
 import type { EnqueueInput } from "../../downloads/DownloadQueueProvider";
-import { loadGithubReleases } from "../../downloads/githubReleases";
 import type { HubGameDownload } from "../api";
 
-const msg = (e: unknown) => describeError(e);
-
 /**
- * Turn a hub game's ordered download sources into one download-queue request,
- * trying each in the order the hub gave (issue #2951). The order is the
- * point: a repository with no release archives sits below a rapid tag rather
- * than instead of it, so a source that resolves to nothing is skipped rather
- * than failing the whole game.
+ * Turn a hub game's ordered download sources into one download-queue request
+ * (issue #2951). The queue tries the sources in the order the hub gave and
+ * moves on to the next when one fails, so a repository with no release
+ * archives sits below a rapid tag rather than instead of it, and a mirror
+ * whose file does not match its hash is followed by the next mirror (issue
+ * #5260). See `downloadHubGame` for how each kind is fetched.
  *
- * `rapid` and `url` are returned unconditionally - there is nothing to check
- * ahead of enqueuing a tag or an address, the same as `suggestionRequest` in
- * `content/pages/components/SuggestionsList.tsx` does for the curated "Get
- * started" list. `github` is the only kind that can come up empty ahead of
- * time: its release archives are looked up, and a repo with none, or with an
- * `asset` fragment none of its recent releases match, is treated as empty and
- * the next source is tried instead. That mirrors `downloadGameAnySource`'s
- * issue #2859 reasoning: installing a different release than the one asked
- * for is worse than trying the next source.
+ * Nothing is looked up here: a source that cannot deliver is found out when
+ * the queue reaches it, which is also when the player sees why.
  *
- * Throws when every source comes up empty (or there were none), carrying
- * every attempted source's reason.
+ * Throws when the hub named no source.
  */
 export async function hubGameDownloadRequest(
-  downloads: HubGameDownload[],
+  downloads: readonly HubGameDownload[],
   destDir: string,
   label: string,
 ): Promise<EnqueueInput> {
-  const errors: string[] = [];
-
-  for (const dl of downloads) {
-    if (dl.kind === "rapid") {
-      return { kind: "rapid", label, args: { tag: dl.value } };
-    }
-
-    if (dl.kind === "url") {
-      if (!dl.filename) {
-        errors.push(`${dl.value}: no filename to save it as`);
-        continue;
-      }
-      return {
-        kind: "file",
-        label,
-        args: { url: dl.value, destDir, filename: dl.filename },
-      };
-    }
-
-    // github: the only kind that can genuinely come up empty ahead of time.
-    try {
-      const archives = await loadGithubReleases(dl.value);
-      if (archives.length === 0) {
-        errors.push(`${dl.value}: no release archives`);
-        continue;
-      }
-      const pick = dl.asset
-        ? archives.find((a) =>
-            a.filename.toLowerCase().includes(dl.asset?.toLowerCase() ?? ""),
-          )
-        : archives[0];
-      if (!pick) {
-        errors.push(
-          `${dl.value}: no release matching "${dl.asset}" in its latest ${archives.length} release(s)`,
-        );
-        continue;
-      }
-      return {
-        kind: "file",
-        label,
-        args: { url: pick.url, destDir, filename: pick.filename },
-      };
-    } catch (e) {
-      errors.push(`${dl.value}: ${msg(e)}`);
-    }
+  if (downloads.length === 0) {
+    throw new Error(t`The hub named no download source for ${label}.`);
   }
-
-  throw new Error(
-    downloads.length === 0
-      ? t`The hub named no download source for ${label}.`
-      : `${t`No usable download source for ${label}.`} ${errors.join("; ")}`,
-  );
+  return {
+    kind: "hubGame",
+    label,
+    args: { downloads: [...downloads], destDir },
+  };
 }

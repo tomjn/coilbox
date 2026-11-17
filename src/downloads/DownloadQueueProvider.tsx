@@ -15,6 +15,7 @@ import {
 } from "../content/bindings";
 import { forgetScans, rescanMounted } from "../content/config";
 import { warmAllRoots } from "../content/rapidPoolWarm";
+import type { HubGameDownload } from "../hub/api";
 import {
   type DownloadProgress,
   dlCancel,
@@ -26,6 +27,7 @@ import {
 } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
 import { type DownloadAttempt, recordDownload } from "./downloadHistory";
+import { downloadHubGame } from "./downloadHubGame";
 import { downloadMapAnySource } from "./downloadMap";
 import {
   addSample,
@@ -77,7 +79,14 @@ export type EnqueueInput = (
   | {
       kind: "file";
       label: string;
-      args: { url: string; destDir: string; filename: string };
+      args: { url: string; destDir: string; filename: string; sha256?: string };
+    }
+  | {
+      // A hub game's download sources in the hub's order, each tried in turn
+      // until one delivers (issue #5260). See `downloadHubGame`.
+      kind: "hubGame";
+      label: string;
+      args: { downloads: HubGameDownload[]; destDir: string };
     }
   | {
       kind: "engineRecoil";
@@ -193,6 +202,8 @@ export function identityOf(input: EnqueueInput): string {
       return `mapAnySource:${input.args.mapName}`;
     case "file":
       return `file:${input.args.destDir}/${input.args.filename}`;
+    case "hubGame":
+      return `hubGame:${input.args.destDir}:${input.label}`;
     case "engineRecoil":
       return `engine:recoil:${input.args.version}`;
     case "engineSpring":
@@ -470,6 +481,18 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             onProgress: progressChannel(onProgress),
           });
           libraryChanged(item);
+          return;
+        case "hubGame":
+          await downloadHubGame({
+            label: item.label,
+            ...item.args,
+            opId: item.id,
+            onProgress,
+            onAttempt,
+            onSource,
+          });
+          libraryChanged(item);
+          warmAllRoots().catch(() => {});
           return;
         case "mapAnySource":
           await downloadMapAnySource({

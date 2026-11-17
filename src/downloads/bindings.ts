@@ -233,6 +233,12 @@ export const dlDownloadFileRaw = defineCommand<
     url: string;
     destDir: string;
     filename: string;
+    /**
+     * The SHA-256 the file must have, as 64 hex characters. A file that does
+     * not match is deleted and the call fails with a "Checksum mismatch"
+     * error. Without it nothing is checked.
+     */
+    sha256?: string;
     /** Pass a stable id to make the download cancellable via `dlCancel`. */
     opId?: string;
     onProgress: Channel<DownloadProgress>;

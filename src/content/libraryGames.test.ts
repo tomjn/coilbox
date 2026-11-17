@@ -101,11 +101,12 @@ describe("the Games grid", () => {
 });
 
 describe("download requests", () => {
-  it("installs a hub game from the hub's first source", async () => {
-    expect(await installRequest(byId("mf"), "/data")).toEqual({
-      kind: "rapid",
+  it("installs a hub game from the hub's sources, in the hub's order", async () => {
+    const mf = byId("mf");
+    expect(await installRequest(mf, "/data")).toEqual({
+      kind: "hubGame",
       label: "Metal Factions",
-      args: { tag: "mf:stable" },
+      args: { downloads: mf.hub?.downloads, destDir: "/data/games" },
     });
   });
 
@@ -144,18 +145,13 @@ describe("download requests", () => {
         pin: { source: "url" as const, mirror: "files.example" },
       },
     };
-    expect(await installRequest(withUrl, "/data", prefs)).toEqual({
-      kind: "file",
-      label: "Metal Factions",
-      args: {
-        url: "https://files.example/mf.sdz",
-        destDir: "/data/games",
-        filename: "mf.sdz",
-      },
-    });
-    expect(await installRequest(withUrl, "/data", {})).toMatchObject({
-      kind: "rapid",
-    });
+    const first = async (prefs: Parameters<typeof installRequest>[2]) => {
+      const request = await installRequest(withUrl, "/data", prefs);
+      if (request.kind !== "hubGame") throw new Error("expected a hub game");
+      return request.args.downloads[0].kind;
+    };
+    expect(await first(prefs)).toBe("url");
+    expect(await first({})).toBe("rapid");
   });
 
   it("says why when a game has no source at all", async () => {

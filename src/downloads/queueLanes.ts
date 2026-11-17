@@ -46,6 +46,7 @@ export function contentOf(input: EnqueueInput): QueueContent {
     case "rapid":
       return "rapid";
     case "game":
+    case "hubGame":
       return "game";
     case "map":
     case "mapAnySource":

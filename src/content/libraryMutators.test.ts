@@ -183,9 +183,12 @@ describe("a hub mutator that is not installed", () => {
   it("is installed from its hub sources", async () => {
     const games = hubLibrary([installedBase], [hubGame("mode", "bg")]);
     expect(await installRequest(find(games, "Hub mode"), "/data")).toEqual({
-      kind: "rapid",
+      kind: "hubGame",
       label: "Hub mode",
-      args: { tag: "mode:test" },
+      args: {
+        downloads: [{ kind: "rapid", value: "mode:test" }],
+        destDir: "/data/games",
+      },
     });
   });
 

@@ -34,7 +34,9 @@ export function failureContextOf(item: QueueItem): FailureContext {
  * so that stands. The other kinds name the one host they used.
  */
 export function failureText(item: QueueItem, raw: string): string {
-  return item.kind === "game" || item.kind === "mapAnySource"
+  return item.kind === "game" ||
+    item.kind === "hubGame" ||
+    item.kind === "mapAnySource"
     ? raw
     : describeFailure(raw, failureContextOf(item));
 }
@@ -89,6 +91,7 @@ export function attemptsToRecord(
   if (!key) return [];
   switch (item.kind) {
     case "game":
+    case "hubGame":
     case "mapAnySource":
       return reported.map((attempt) => ({ key, attempt }));
     case "rapid":
@@ -125,6 +128,7 @@ export function historyKeyOf(item: EnqueueInput): string | null {
     case "mapAnySource":
       return downloadKey("map", item.args.mapName);
     case "rapid":
+    case "hubGame":
       return downloadKey("game", item.label);
     case "map":
       return downloadKey("map", item.args.springName);

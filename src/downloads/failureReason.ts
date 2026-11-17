@@ -33,6 +33,11 @@ export function describeFailure(raw: string, ctx: FailureContext): string {
 
   if (/cancel/i.test(raw)) return raw;
 
+  // The downloads plugin's `HASH_MISMATCH_MSG`: the file arrived whole but was
+  // not the one the hub listed, so it was deleted.
+  if (/checksum mismatch/i.test(raw))
+    return t`${file} from ${who} did not match its checksum`;
+
   const status = /HTTP status [^(]*\((\d{3})\b/i.exec(raw);
   if (status) {
     const code = status[1];
