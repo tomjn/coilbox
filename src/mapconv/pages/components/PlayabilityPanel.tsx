@@ -53,6 +53,7 @@ export function PlayabilityPanel({
   heightsError,
   starts,
   metal,
+  part,
 }: {
   /** The map's corner heights, or null while they are read. */
   heights: Heights | null;
@@ -71,6 +72,11 @@ export function PlayabilityPanel({
     error?: string | null;
     extractorRadius?: number | null;
   };
+  /**
+   * Which half to measure and show: the movement classes, or the buildings
+   * and metal. Left out, the panel does both.
+   */
+  part?: "movement" | "economy";
 }) {
   const { t } = useLingui();
   const { selected } = useScanTargetSelection();
@@ -104,10 +110,10 @@ export function PlayabilityPanel({
   const specs = useMemo(() => {
     if (!defs.defs || defs.defsFor !== game?.primaryArchive.name) return null;
     return {
-      classes: moveClassSpecs(defs.defs.moveDefs),
-      buildings: buildingSpecs(defs.defs.units),
+      classes: part === "economy" ? [] : moveClassSpecs(defs.defs.moveDefs),
+      buildings: part === "movement" ? [] : buildingSpecs(defs.defs.units),
     };
-  }, [defs.defs, defs.defsFor, game]);
+  }, [defs.defs, defs.defsFor, game, part]);
 
   // By value, because a caller's list can be a fresh array each render and
   // the measuring should not start over for it.
@@ -220,6 +226,12 @@ export function PlayabilityPanel({
     if (same) same.names.push(c.name);
     else rows.push({ names: [c.name], c });
   }
+  const title =
+    part === "movement"
+      ? t`Passability`
+      : part === "economy"
+        ? t`Buildings and metal`
+        : t`Playability`;
   const kindName = {
     tank: t`tank`,
     kbot: t`kbot`,
@@ -228,9 +240,9 @@ export function PlayabilityPanel({
   };
 
   return (
-    <section className="flex flex-col gap-2" aria-label={t`Playability`}>
+    <section className="flex flex-col gap-2" aria-label={title}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-medium">{t`Playability`}</h2>
+        <h2 className="text-sm font-medium">{title}</h2>
         <div className="w-72">
           <GamePickerField
             value={gameName}
@@ -263,7 +275,7 @@ export function PlayabilityPanel({
         <Skeleton className="h-24 rounded bg-muted" />
       ) : (
         <div className="flex flex-col gap-3">
-          {result.classes.length === 0 ? (
+          {part === "economy" ? null : result.classes.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {t`The game declares no movement classes.`}
             </p>

@@ -11780,6 +11780,7 @@ msgstr "Archiv nicht installiert: <0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Archive"
@@ -13933,6 +13934,10 @@ msgstr "Vorschau wird erstellt…"
 #, fuzzy
 msgid "Building the sheet for {folder}"
 msgstr "Blatt für {folder} wird erstellt"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -19770,6 +19775,7 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
@@ -24186,6 +24192,10 @@ msgstr "Spiel: {title}"
 #, fuzzy
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Spiel: <0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -36586,6 +36596,7 @@ msgstr "Überschreibt die Schwerkraft der Karte für ballistische Waffen und Rak
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Overview"
 msgstr "Übersicht"
@@ -36812,6 +36823,11 @@ msgstr "Bauteil-Paket nutzt Schema {schema}, diese Version versteht {supported}"
 #, fuzzy
 msgid "Party"
 msgstr "Gruppe"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -43901,6 +43917,7 @@ msgstr "Wird eingerichtet…"
 msgid "settings"
 msgstr "Einstellungen"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx

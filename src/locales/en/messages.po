@@ -9610,6 +9610,7 @@ msgstr "Archive not installed: <0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Archives"
 msgstr "Archives"
 
@@ -11371,6 +11372,10 @@ msgstr "Building the preview…"
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Building the sheet for {folder}"
 msgstr "Building the sheet for {folder}"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr "Buildings and metal"
 
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Buildings finished"
@@ -16196,6 +16201,7 @@ msgstr "Detail"
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 msgid "Details"
@@ -19808,6 +19814,10 @@ msgstr "Game: {title}"
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Game: <0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr "Gameplay"
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -29962,6 +29972,7 @@ msgstr "Overrides the map's gravity for ballistic weapons and missiles; missiles
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 msgid "Overview"
 msgstr "Overview"
 
@@ -30147,6 +30158,11 @@ msgstr "parts pack uses schema {schema}, this build understands {supported}"
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Party"
 msgstr "Party"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr "Passability"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -35970,6 +35986,7 @@ msgstr "Setting up…"
 msgid "settings"
 msgstr "settings"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx

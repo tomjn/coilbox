@@ -11856,6 +11856,7 @@ msgstr "Archief niet geïnstalleerd: <0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Archieven"
@@ -14017,6 +14018,10 @@ msgstr "Het voorbeeld wordt gebouwd…"
 #, fuzzy
 msgid "Building the sheet for {folder}"
 msgstr "Het blad voor {folder} wordt gebouwd"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -19904,6 +19909,7 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
@@ -24344,6 +24350,10 @@ msgstr "Spel: {title}"
 #, fuzzy
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Spel: <0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -36829,6 +36839,7 @@ msgstr "Vervangt de zwaartekracht van de kaart voor ballistische wapens en raket
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Overview"
 msgstr "Overzicht"
@@ -37056,6 +37067,11 @@ msgstr "onderdelenpakket gebruikt schema {schema}, deze build begrijpt {supporte
 #, fuzzy
 msgid "Party"
 msgstr "Groep"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -44195,6 +44211,7 @@ msgstr "Instellen…"
 msgid "settings"
 msgstr "instellingen"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx

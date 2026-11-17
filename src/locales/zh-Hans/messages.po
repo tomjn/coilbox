@@ -11780,6 +11780,7 @@ msgstr "未安装归档：<0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "归档"
@@ -13933,6 +13934,10 @@ msgstr "正在生成预览…"
 #, fuzzy
 msgid "Building the sheet for {folder}"
 msgstr "正在为 {folder} 生成贴图表"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -19770,6 +19775,7 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
@@ -24186,6 +24192,10 @@ msgstr "游戏：{title}"
 #, fuzzy
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "游戏：<0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -36586,6 +36596,7 @@ msgstr "为弹道武器和导弹覆盖地图重力，导弹只有在 flightTime 
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Overview"
 msgstr "概览"
@@ -36812,6 +36823,11 @@ msgstr "零件包使用架构 {schema}，此版本支持 {supported}"
 #, fuzzy
 msgid "Party"
 msgstr "小队"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -43901,6 +43917,7 @@ msgstr "设置中…"
 msgid "settings"
 msgstr "设置"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx

@@ -113,8 +113,9 @@ afterEach(() => {
   mounts = 0;
 });
 
+/** Renders the page on its Gameplay tab, where the picture is. */
 function renderPage() {
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[`/library/maps/${encodeURIComponent(MAP)}`]}>
       <Link to="/library/maps/Other%20Map">Another map</Link>
       <Routes>
@@ -122,6 +123,9 @@ function renderPage() {
       </Routes>
     </MemoryRouter>,
   );
+  // Radix picks a tab on mouse down rather than on click.
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Gameplay" }));
+  return view;
 }
 
 describe("the picture of every match on a map's page", () => {

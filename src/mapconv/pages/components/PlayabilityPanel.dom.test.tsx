@@ -92,6 +92,23 @@ describe("the playability panel", () => {
     expect(screen.getAllByText("100.0%").length).toBeGreaterThanOrEqual(2);
   });
 
+  it("shows only the movement classes as its movement half", async () => {
+    render(<PlayabilityPanel heights={flat()} starts={[]} part="movement" />);
+    expect(screen.getByRole("heading", { name: "Passability" })).toBeTruthy();
+    expect(await screen.findByText("KBOT2")).toBeTruthy();
+    expect(screen.queryByText("mex")).toBeNull();
+  });
+
+  it("shows only the buildings as its economy half", async () => {
+    render(<PlayabilityPanel heights={flat()} starts={[]} part="economy" />);
+    expect(
+      screen.getByRole("heading", { name: "Buildings and metal" }),
+    ).toBeTruthy();
+    expect(await screen.findByText("mex")).toBeTruthy();
+    expect(screen.queryByText("KBOT2")).toBeNull();
+    expect(screen.queryByText("Movement class")).toBeNull();
+  });
+
   it("shows the metal figures against the map's extractor radius", async () => {
     // The 16 by 16 square map has an 8 by 8 metal map. Two spots 64 elmos
     // apart, one at each end of a row, and a third far from both.
