@@ -28,8 +28,29 @@ export type HubPresence =
 const UNKNOWN: HubPresence = { state: "unknown" };
 const MISSING: HubPresence = { state: "missing" };
 
+/**
+ * What the hub says about one game or map: whether it has it, and the hashes of
+ * the archives it lists for it. `hashes` is undefined while the hub has not
+ * answered, and empty when it lists none. A hub that lists an archive with
+ * the hash of the one on this machine already has what an upload would send.
+ */
+export interface HubState {
+  presence: HubPresence;
+  hashes: ReadonlySet<string> | undefined;
+}
+
 function base(hubUrl: string): string {
   return hubUrl.replace(/\/+$/, "");
+}
+
+/** A game's page on the hub. */
+export function gamePageUrl(hubUrl: string, shortname: string): string {
+  return `${base(hubUrl)}/games/${encodeURIComponent(shortname)}`;
+}
+
+/** A map's page on the hub, by the slug the hub gave it. */
+export function mapPageUrl(hubUrl: string, slug: string): string {
+  return `${base(hubUrl)}/map/${encodeURIComponent(slug)}`;
 }
 
 /**
@@ -49,10 +70,31 @@ export function gamePresence(
   const game = games.find((one) => one.shortname.toLowerCase() === wanted);
   if (!game) return MISSING;
   if (game.releases && !game.releases.includes(release)) return MISSING;
-  return {
-    state: "present",
-    url: `${base(hubUrl)}/games/${encodeURIComponent(game.shortname)}`,
-  };
+  return { state: "present", url: gamePageUrl(hubUrl, game.shortname) };
+}
+
+/** The hashes of the archives the hub lists for a game, from its download
+ *  sources. Undefined until the listing is known. */
+export function gameHashes(
+  games: readonly HubGame[] | null,
+  shortname: string,
+): ReadonlySet<string> | undefined {
+  if (!games) return undefined;
+  const wanted = shortname.toLowerCase();
+  const game = games.find((one) => one.shortname.toLowerCase() === wanted);
+  const downloads = game && Array.isArray(game.downloads) ? game.downloads : [];
+  return new Set(downloads.flatMap((d) => (d.sha256 ? [d.sha256] : [])));
+}
+
+/** The hashes of the archives the hub lists for a map, from its download
+ *  sources. Undefined until the hub has answered. */
+export function mapHashes(
+  facts: MapFacts | null | undefined,
+): ReadonlySet<string> | undefined {
+  if (facts === undefined) return undefined;
+  return new Set(
+    (facts?.downloads ?? []).flatMap((d) => (d.sha256 ? [d.sha256] : [])),
+  );
 }
 
 /**
@@ -67,7 +109,7 @@ export function mapPresence(
 ): HubPresence {
   if (facts === undefined || held === undefined) return UNKNOWN;
   if (!facts || !held.has(MINIMAP_VARIANT)) return MISSING;
-  const url = `${base(hubUrl)}/map/${encodeURIComponent(facts.slug)}`;
+  const url = mapPageUrl(hubUrl, facts.slug);
   return MAP_VARIANTS.every((variant) => held.has(variant))
     ? { state: "present", url }
     : { state: "incomplete", url };
@@ -80,10 +122,10 @@ export function mapPresence(
  * an empty list: that would read as "the hub has none of your games" and put a
  * button on every page while the hub is down.
  */
-export function useGamePresence(
+export function useGameHubState(
   shortname: string | null,
   release: string | null,
-): HubPresence {
+): HubState {
   const hubUrl = useTrustedHubUrl();
   const finished = useManualSendsFinished();
   const [games, setGames] = useState<HubGame[] | null>(null);
@@ -99,13 +141,18 @@ export function useGamePresence(
       .catch(() => {});
     return () => abort.abort();
   }, [hubUrl, shortname, finished]);
-  if (!hubUrl || !shortname || !release) return UNKNOWN;
-  return gamePresence(hubUrl, games, shortname, release);
+  if (!hubUrl || !shortname) return { presence: UNKNOWN, hashes: undefined };
+  return {
+    presence: release
+      ? gamePresence(hubUrl, games, shortname, release)
+      : UNKNOWN,
+    hashes: gameHashes(games, shortname),
+  };
 }
 
 /** Ask the hub about one map's facts and layers, and again whenever a manual
  *  send ends. */
-export function useMapPresence(mapName: string | null): HubPresence {
+export function useMapHubState(mapName: string | null): HubState {
   const hubUrl = useTrustedHubUrl();
   const finished = useManualSendsFinished();
   const [facts, setFacts] = useState<MapFacts | null | undefined>(undefined);
@@ -143,8 +190,11 @@ export function useMapPresence(mapName: string | null): HubPresence {
       .catch(() => {});
     return () => abort.abort();
   }, [hubUrl, mapName, finished]);
-  if (!hubUrl || !mapName) return UNKNOWN;
-  return mapPresence(hubUrl, facts, held);
+  if (!hubUrl || !mapName) return { presence: UNKNOWN, hashes: undefined };
+  return {
+    presence: mapPresence(hubUrl, facts, held),
+    hashes: mapHashes(facts),
+  };
 }
 
 /**

@@ -8,6 +8,7 @@ import { isHubEnabled } from "../profile/profile";
 import UploadRunBadge from "./assets/UploadRunBadge";
 import { isHubItemPageReachable } from "./config";
 import HubSettings from "./pages/SettingsSection";
+import ArchiveUploadBadge from "./upload/ArchiveUploadBadge";
 
 /**
  * The Coilbox hub plugin (issue #1347): one screen listing what other players
@@ -62,7 +63,10 @@ const hubPlugin: FramePlugin = {
   // same kind of thing as the queue: work coilbox is doing now, with a way to
   // stop it. Ungated, unlike the nav item: it only ever renders while a run is
   // going, and a run can only start once somebody has agreed to uploads.
-  slots: [{ slot: "topbar.right", order: 2.5, Component: UploadRunBadge }],
+  slots: [
+    { slot: "topbar.right", order: 2.5, Component: UploadRunBadge },
+    { slot: "topbar.right", order: 2.6, Component: ArchiveUploadBadge },
+  ],
   settings: [
     {
       id: "hub",

@@ -2771,6 +2771,10 @@ msgstr "{figure} del equipo {team}: la repetición registró {recorded}, la repr
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure}: la repetición registró {recorded}, la reproducción dio {observed}."
 
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{file} ({size}) will be public. Anyone can download it from the hub's mirrors."
+msgstr ""
+
 #: src/downloads/failureReason.ts
 msgid "{file} from {who} did not match its checksum"
 msgstr ""
@@ -3655,6 +3659,18 @@ msgstr "{label} de {unitName}"
 msgid "{label} for {unitName}, now {text}. {before}"
 msgstr "{label} de {unitName}, ahora {text}. {before}"
 
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{label} is installed as an unpacked folder. The hub takes one .sd7 or .sdz file, so it cannot be uploaded."
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{label} is installed through rapid. The hub takes one .sd7 or .sdz file, so it cannot be uploaded."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "{label} is on the hub"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 #, fuzzy
 msgid "{label} volume"
@@ -3662,6 +3678,11 @@ msgstr "Volumen de {label}"
 
 #: src/hub/manualSend/run.ts
 msgid "{label} was not sent to the hub"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{label} was not uploaded"
 msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
@@ -5046,6 +5067,10 @@ msgstr "{name} posee {holds}."
 msgid "{name} preview"
 msgstr "Vista previa de {name}"
 
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "{name} progress"
+msgstr ""
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "{name} settings"
 msgstr ""
@@ -6201,6 +6226,10 @@ msgstr "{sent, plural, =0 {No se había enviado nada, así que no se añadió na
 #, fuzzy
 msgid "{sent, plural, one {One picture has already gone, and it stays on the hub.} other {# pictures have already gone, and they stay on the hub.}}"
 msgstr "{sent, plural, one {Ya se ha enviado una imagen, y se queda en el hub.} other {Ya se han enviado # imágenes, y se quedan en el hub.}}"
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "{sent} of {size} sent"
+msgstr ""
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -9109,6 +9138,10 @@ msgstr "Un mensaje que coincide hace parpadear la ventana y reproduce un sonido.
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "Un enfrentamiento son las partidas en las que jugaste en el equipo contrario al de otro jugador, sacadas de las repeticiones de tus carpetas de contenido."
+
+#: src/hub/upload/messages.ts
+msgid "A mirror already has a file with this name that the hub has not listed, so the hub cannot list this one."
+msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -14361,6 +14394,7 @@ msgstr "No puede dañar a su propia unidad"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/AddAccountForm.tsx
@@ -15752,6 +15786,7 @@ msgstr "Coste de ocultación en movimiento"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
+#: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -16041,6 +16076,10 @@ msgstr ""
 msgid "Coilbox could not create the game's settings file."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
+msgstr ""
+
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
 msgid "Coilbox could not leave it: {reason}."
@@ -16079,6 +16118,10 @@ msgstr "coilbox no pudo leer"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox no pudo leer {game}: {said}"
+
+#: src/hub/upload/messages.ts
+msgid "Coilbox could not read the file."
+msgstr ""
 
 #: src/hub/manualSend/run.ts
 msgid "Coilbox could not read the map."
@@ -16363,6 +16406,10 @@ msgstr "Hub de Coilbox"
 msgid "Coilbox Hub"
 msgstr "Hub de Coilbox"
 
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Coilbox is asking the hub where to send {name}."
+msgstr ""
+
 #: src/multiplayer/battle/compatBattle.ts
 #, fuzzy
 msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {version}) that this battle uses. It can start for you once that finishes."
@@ -16400,6 +16447,10 @@ msgstr ""
 
 #: src/widgets/widgetSync.ts
 msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
+msgstr ""
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Coilbox is uploading {name} to the hub's mirror."
 msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
@@ -32829,6 +32880,10 @@ msgstr "Todavía no hay mensajes."
 msgid "No minimap"
 msgstr "Sin minimapa"
 
+#: src/hub/upload/messages.ts
+msgid "No mirror can take an upload right now. Try again later."
+msgstr ""
+
 #: src/campaign/listing.ts
 #, fuzzy
 msgid "No missions yet"
@@ -35605,6 +35660,10 @@ msgstr "Solo se registran los campos que cambias, así que el resto sigue al jue
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 msgstr "Solo se leyeron los primeros {scanned} elementos del hub, así que puede haber más para este juego de los que aparecen aquí. Busca para acotar."
 
+#: src/hub/upload/messages.ts
+msgid "Only the game's owner can upload it. You can ask to own it on the game's page on the hub."
+msgstr ""
+
 #: src/multiplayer/battles/OaPorts.tsx
 msgid "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
 msgstr ""
@@ -35923,6 +35982,10 @@ msgstr "Abrir la página de la partida"
 #, fuzzy
 msgid "Open the game \"{id}\"."
 msgstr "Abrir el juego \"{id}\"."
+
+#: src/hub/upload/messages.ts
+msgid "Open the game on the hub"
+msgstr ""
 
 #: src/onboarding/pages/HubPage.tsx
 msgid "Open the hub"
@@ -36353,6 +36416,10 @@ msgstr "Otros eventos"
 #, fuzzy
 msgid "Other pieces stay where they are."
 msgstr "Las demás partes se quedan donde están."
+
+#: src/hub/upload/messages.ts
+msgid "Other players can now download it from the hub's mirrors."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -39094,6 +39161,10 @@ msgstr "Leyendo {gameName}."
 #, fuzzy
 msgid "Reading {gameName}'s units…"
 msgstr "Leyendo las unidades de {gameName}…"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Reading {label}…"
+msgstr ""
 
 #: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
@@ -43269,6 +43340,7 @@ msgid "Send to every player?"
 msgstr "¿Enviar a todos los jugadores?"
 
 #: src/hub/manualSend/HubSendControl.tsx
+#: src/hub/upload/UploadToHubButton.tsx
 msgid "Send to hub"
 msgstr ""
 
@@ -44412,6 +44484,7 @@ msgstr "Mostrar rayo nano"
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
+#: src/hub/upload/messages.ts
 msgid "Show on hub"
 msgstr ""
 
@@ -44787,6 +44860,10 @@ msgstr "Inicia sesión para publicar desde aquí. O copia el código y termina e
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Iniciar sesión en el hub"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Sign in to the hub to upload {label}."
+msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"
@@ -46347,6 +46424,10 @@ msgstr "Dejar de enviar {unitName} por la vía del mutador"
 msgid "Stop sending pictures"
 msgstr "Dejar de enviar imágenes"
 
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Stop uploading"
+msgstr ""
+
 #: src/direct/lan.ts
 #, fuzzy
 msgid "Stop your own room first. Coilbox can be in one room at a time."
@@ -46365,10 +46446,18 @@ msgstr "Has dejado de seguir a {name}"
 msgid "Stopped sending {label}"
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "Stopped uploading {label}"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Stopping"
 msgstr "Deteniendo"
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Stopping keeps what the mirror has. Uploading it again carries on from there."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -48108,6 +48197,10 @@ msgstr "Los pies o ruedas que tocan el suelo están en línea, así que la zona 
 msgid "the file"
 msgstr "el archivo"
 
+#: src/hub/upload/messages.ts
+msgid "The file changed while it was uploading. Upload it again to send the new version."
+msgstr ""
+
 #: src/conquest/handmade/archive.ts
 #, fuzzy
 msgid "The file could not be read from the game archive."
@@ -48147,6 +48240,10 @@ msgstr "El archivo está vacío. La partida que lo estaba grabando no terminó o
 #, fuzzy
 msgid "The file is in the document but could not be read back, so it will be missing from the mission too."
 msgstr "El archivo está en el documento pero no se pudo volver a leer, así que también faltará en la misión."
+
+#: src/hub/upload/messages.ts
+msgid "The file is larger than the mirror takes."
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -48662,6 +48759,18 @@ msgstr "Su proveedor de internet comparte la dirección del anfitrión ({ip}) co
 msgid "The hub already had every map on this machine."
 msgstr "El hub ya tenía todos los mapas de este equipo."
 
+#: src/hub/upload/messages.ts
+msgid "The hub already has {label}"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has a file with exactly the same contents."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has a file with the same name."
+msgstr ""
+
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
 msgid "The hub already has a picture of every map coilbox could draw one for."
@@ -48676,6 +48785,14 @@ msgstr "El hub ya tiene una imagen de todos los mapas de este equipo."
 #, fuzzy
 msgid "The hub already has a picture of every unit in your games."
 msgstr "El hub ya tiene una imagen de todas las unidades de tus juegos."
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has an archive with the same name and version."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has this archive."
+msgstr ""
 
 #: src/hub/assets/pictures.ts
 #, fuzzy
@@ -48707,6 +48824,14 @@ msgstr "El hub no pudo responder."
 msgid "The hub could not publish it."
 msgstr "El hub no pudo publicarlo."
 
+#: src/hub/upload/messages.ts
+msgid "The hub did not accept your sign-in. Sign in again, then upload it again."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
+msgstr ""
+
 #: src/content/pages/GamesPage.tsx
 #, fuzzy
 msgid "The hub features no games."
@@ -48736,6 +48861,10 @@ msgstr "El hub todavía no tiene nada para este juego. Esta copia de Coilbox sol
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "El hub todavía no tiene nada. Todo lo que compartas aparecerá aquí."
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "The hub keeps the name of your account, privately."
+msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -49176,6 +49305,14 @@ msgstr "No se pudo leer el minimapa: {failure}"
 #, fuzzy
 msgid "the mirror"
 msgstr "el espejo"
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "The mirror has all of {name}. Waiting for the hub to list it."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The mirror keeps what it received, so uploading it again carries on from there."
+msgstr ""
 
 #: src/scenario/wording.ts
 #, fuzzy
@@ -54396,6 +54533,34 @@ msgstr "Mejorar con STLS"
 #, fuzzy
 msgid "Upgrades into"
 msgstr "Se mejora a"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload"
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload {label} to the hub?"
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload again"
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload to hub"
+msgstr ""
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Uploading to hub"
+msgstr ""
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Uploading to the hub. Open to stop."
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Uploading…"
+msgstr ""
 
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #, fuzzy

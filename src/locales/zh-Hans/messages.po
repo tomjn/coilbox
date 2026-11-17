@@ -2771,6 +2771,10 @@ msgstr "队伍 {team} 的 {figure}：回放记录为 {recorded}，播放得到 {
 msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure}：回放记录为 {recorded}，播放得到 {observed}。"
 
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{file} ({size}) will be public. Anyone can download it from the hub's mirrors."
+msgstr ""
+
 #: src/downloads/failureReason.ts
 msgid "{file} from {who} did not match its checksum"
 msgstr ""
@@ -3655,6 +3659,18 @@ msgstr "{unitName} 的 {label}"
 msgid "{label} for {unitName}, now {text}. {before}"
 msgstr "{unitName} 的 {label}，当前为 {text}。{before}"
 
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{label} is installed as an unpacked folder. The hub takes one .sd7 or .sdz file, so it cannot be uploaded."
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{label} is installed through rapid. The hub takes one .sd7 or .sdz file, so it cannot be uploaded."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "{label} is on the hub"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 #, fuzzy
 msgid "{label} volume"
@@ -3662,6 +3678,11 @@ msgstr "{label} 音量"
 
 #: src/hub/manualSend/run.ts
 msgid "{label} was not sent to the hub"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "{label} was not uploaded"
 msgstr ""
 
 #: src/lego/pages/components/StatsSection.tsx
@@ -5046,6 +5067,10 @@ msgstr "{name} 拥有 {holds}。"
 msgid "{name} preview"
 msgstr "{name} 预览"
 
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "{name} progress"
+msgstr ""
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "{name} settings"
 msgstr ""
@@ -6201,6 +6226,10 @@ msgstr "{sent, plural, =0 {尚未发送任何内容，因此中心没有新增�
 #, fuzzy
 msgid "{sent, plural, one {One picture has already gone, and it stays on the hub.} other {# pictures have already gone, and they stay on the hub.}}"
 msgstr "{sent, plural, other {已有 # 张图片发出，它们会保留在中心。}}"
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "{sent} of {size} sent"
+msgstr ""
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -9109,6 +9138,10 @@ msgstr "匹配的消息会让窗口闪烁并播放音效。可在<0>音效</0>�
 #, fuzzy
 msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr "对阵记录是你在内容文件夹的回放中与其处于对立队伍的对局。"
+
+#: src/hub/upload/messages.ts
+msgid "A mirror already has a file with this name that the hub has not listed, so the hub cannot list this one."
+msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -14361,6 +14394,7 @@ msgstr "不会伤害自己的单位"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/AddAccountForm.tsx
@@ -15752,6 +15786,7 @@ msgstr "移动时隐形消耗"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
+#: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -16041,6 +16076,10 @@ msgstr ""
 msgid "Coilbox could not create the game's settings file."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
+msgstr ""
+
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
 msgid "Coilbox could not leave it: {reason}."
@@ -16079,6 +16118,10 @@ msgstr "coilbox 无法读取"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox 无法读取 {game}：{said}"
+
+#: src/hub/upload/messages.ts
+msgid "Coilbox could not read the file."
+msgstr ""
 
 #: src/hub/manualSend/run.ts
 msgid "Coilbox could not read the map."
@@ -16363,6 +16406,10 @@ msgstr "Coilbox 中心"
 msgid "Coilbox Hub"
 msgstr "Coilbox 中心"
 
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Coilbox is asking the hub where to send {name}."
+msgstr ""
+
 #: src/multiplayer/battle/compatBattle.ts
 #, fuzzy
 msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {version}) that this battle uses. It can start for you once that finishes."
@@ -16400,6 +16447,10 @@ msgstr ""
 
 #: src/widgets/widgetSync.ts
 msgid "Coilbox is still scanning your content, so the game starts with the widgets it last had."
+msgstr ""
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Coilbox is uploading {name} to the hub's mirror."
 msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
@@ -32829,6 +32880,10 @@ msgstr "还没有消息。"
 msgid "No minimap"
 msgstr "无小地图"
 
+#: src/hub/upload/messages.ts
+msgid "No mirror can take an upload right now. Try again later."
+msgstr ""
+
 #: src/campaign/listing.ts
 #, fuzzy
 msgid "No missions yet"
@@ -35605,6 +35660,10 @@ msgstr "只记录你更改的字段，所以其余字段在游戏更新时仍会
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
 msgstr "只读取了中心上的前 {scanned} 项，所以此游戏的内容可能比这里列出的更多。可以通过搜索缩小范围。"
 
+#: src/hub/upload/messages.ts
+msgid "Only the game's owner can upload it. You can ask to own it on the game's page on the hub."
+msgstr ""
+
 #: src/multiplayer/battles/OaPorts.tsx
 msgid "Only the host forwards these. A player behind a router who forwarded nothing can still join, because their connections go out. A host behind a router that forwards nothing cannot be joined."
 msgstr ""
@@ -35923,6 +35982,10 @@ msgstr "打开对局页面"
 #, fuzzy
 msgid "Open the game \"{id}\"."
 msgstr "打开游戏 \"{id}\"。"
+
+#: src/hub/upload/messages.ts
+msgid "Open the game on the hub"
+msgstr ""
 
 #: src/onboarding/pages/HubPage.tsx
 msgid "Open the hub"
@@ -36353,6 +36416,10 @@ msgstr "其他事件"
 #, fuzzy
 msgid "Other pieces stay where they are."
 msgstr "其他部件保持原位。"
+
+#: src/hub/upload/messages.ts
+msgid "Other players can now download it from the hub's mirrors."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -39094,6 +39161,10 @@ msgstr "正在读取 {gameName}。"
 #, fuzzy
 msgid "Reading {gameName}'s units…"
 msgstr "正在读取 {gameName} 的单位…"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Reading {label}…"
+msgstr ""
 
 #: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
@@ -43269,6 +43340,7 @@ msgid "Send to every player?"
 msgstr "发送给所有玩家？"
 
 #: src/hub/manualSend/HubSendControl.tsx
+#: src/hub/upload/UploadToHubButton.tsx
 msgid "Send to hub"
 msgstr ""
 
@@ -44412,6 +44484,7 @@ msgstr "显示纳米喷流"
 
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
+#: src/hub/upload/messages.ts
 msgid "Show on hub"
 msgstr ""
 
@@ -44787,6 +44860,10 @@ msgstr "登录后即可从这里发布。或者复制代码，在中心的页面
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "登录中心"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Sign in to the hub to upload {label}."
+msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"
@@ -46347,6 +46424,10 @@ msgstr "停止通过变异器路径发送 {unitName}"
 msgid "Stop sending pictures"
 msgstr "停止发送图片"
 
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Stop uploading"
+msgstr ""
+
 #: src/direct/lan.ts
 #, fuzzy
 msgid "Stop your own room first. Coilbox can be in one room at a time."
@@ -46365,10 +46446,18 @@ msgstr "已取消关注 {name}"
 msgid "Stopped sending {label}"
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "Stopped uploading {label}"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "Stopping"
 msgstr "停止中"
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Stopping keeps what the mirror has. Uploading it again carries on from there."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -48108,6 +48197,10 @@ msgstr "着地的脚或轮子排成一条线，所以支撑面没有宽度。"
 msgid "the file"
 msgstr "文件"
 
+#: src/hub/upload/messages.ts
+msgid "The file changed while it was uploading. Upload it again to send the new version."
+msgstr ""
+
 #: src/conquest/handmade/archive.ts
 #, fuzzy
 msgid "The file could not be read from the game archive."
@@ -48147,6 +48240,10 @@ msgstr "该文件为空。录制它的游戏没有结束，或仍在运行。"
 #, fuzzy
 msgid "The file is in the document but could not be read back, so it will be missing from the mission too."
 msgstr "该文件在文档中，但无法读回，所以任务中也会缺少它。"
+
+#: src/hub/upload/messages.ts
+msgid "The file is larger than the mirror takes."
+msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -48662,6 +48759,18 @@ msgstr "主机的地址（{ip}）由其网络服务商与其他用户共享，�
 msgid "The hub already had every map on this machine."
 msgstr "中心已经有这台机器上的所有地图。"
 
+#: src/hub/upload/messages.ts
+msgid "The hub already has {label}"
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has a file with exactly the same contents."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has a file with the same name."
+msgstr ""
+
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
 msgid "The hub already has a picture of every map coilbox could draw one for."
@@ -48676,6 +48785,14 @@ msgstr "中心已经有这台电脑上所有地图的图片。"
 #, fuzzy
 msgid "The hub already has a picture of every unit in your games."
 msgstr "中心已经有你的游戏中所有单位的图片。"
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has an archive with the same name and version."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub already has this archive."
+msgstr ""
 
 #: src/hub/assets/pictures.ts
 #, fuzzy
@@ -48707,6 +48824,14 @@ msgstr "中心无法回答。"
 msgid "The hub could not publish it."
 msgstr "中心无法发布它。"
 
+#: src/hub/upload/messages.ts
+msgid "The hub did not accept your sign-in. Sign in again, then upload it again."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
+msgstr ""
+
 #: src/content/pages/GamesPage.tsx
 #, fuzzy
 msgid "The hub features no games."
@@ -48736,6 +48861,10 @@ msgstr "中心上还没有此游戏的内容。此版本 Coilbox 只列出该游
 #, fuzzy
 msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "中心上还没有任何内容。你分享的任何内容都会显示在这里。"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "The hub keeps the name of your account, privately."
+msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -49176,6 +49305,14 @@ msgstr "无法读取小地图：{failure}"
 #, fuzzy
 msgid "the mirror"
 msgstr "镜像站"
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "The mirror has all of {name}. Waiting for the hub to list it."
+msgstr ""
+
+#: src/hub/upload/messages.ts
+msgid "The mirror keeps what it received, so uploading it again carries on from there."
+msgstr ""
 
 #: src/scenario/wording.ts
 #, fuzzy
@@ -54396,6 +54533,34 @@ msgstr "使用 STLS 升级"
 #, fuzzy
 msgid "Upgrades into"
 msgstr "升级为"
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload"
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload {label} to the hub?"
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload again"
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Upload to hub"
+msgstr ""
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Uploading to hub"
+msgstr ""
+
+#: src/hub/upload/ArchiveUploadBadge.tsx
+msgid "Uploading to the hub. Open to stop."
+msgstr ""
+
+#: src/hub/upload/UploadToHubButton.tsx
+msgid "Uploading…"
+msgstr ""
 
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #, fuzzy

@@ -18,7 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useFeature } from "@/general/features";
 import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
-import { useMapPresence } from "@/hub/manualSend/status";
+import { useMapHubState } from "@/hub/manualSend/status";
+import { UploadToHubButton } from "@/hub/upload/UploadToHubButton";
 import { formatDate } from "@/lib/format";
 import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
@@ -222,9 +223,10 @@ export default function MapDetailPage() {
     () => mapRecordFor(statRecords, decoded, statsPlayer, refights),
     [statRecords, decoded, statsPlayer, refights],
   );
-  const hubPresence = useMapPresence(
+  const hubState = useMapHubState(
     data?.maps.some((m) => m.name === decoded) ? decoded : null,
   );
+  const hubPresence = hubState.presence;
 
   if (error && !data)
     return (
@@ -385,6 +387,21 @@ export default function MapDetailPage() {
           presence={hubPresence}
           enginePath={selected?.enginePath}
           dataDir={selected?.rootPath}
+        />
+        <UploadToHubButton
+          target={{ kind: "map", mapName: map.name }}
+          label={map.name}
+          enginePath={selected?.enginePath}
+          dataDir={selected?.rootPath}
+          archivePath={archivePath}
+          fileName={map.fileName}
+          hub={hubState}
+          pageUrl={
+            hubPresence.state === "present" ||
+            hubPresence.state === "incomplete"
+              ? hubPresence.url
+              : null
+          }
         />
         {(hubPresence.state === "present" ||
           hubPresence.state === "incomplete") && (

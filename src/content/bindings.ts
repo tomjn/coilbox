@@ -1,6 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
 import type { DownloadProgress } from "../downloads/bindings";
+import type { ArchiveFacts } from "../hub/archiveUploads";
 import type { LaunchEvent, LaunchOutcome } from "../play/bindings";
 import { gameArchivePath, gameRefs, mapHint, mapRefs } from "./scanHints";
 
@@ -4437,6 +4438,36 @@ const archiveTreeCommand = defineCommand<ArchiveTreeArgs, ArchiveTreeResult>(
   "coilbox-unitsync",
   "unitsync_archive_tree",
 );
+
+/**
+ * What `unitsync_upload_facts` answers with. Exactly one of `facts` and
+ * `problem` is set. `problem` is a sentence for the player, and `errors` is
+ * unitsync's own diagnostics for a log.
+ */
+export interface UploadFactsResult {
+  facts?: ArchiveFacts;
+  problem?: string;
+  errors: string[];
+}
+
+/** Give a map's unitsync name or a game's primary archive name, never both. */
+type UploadFactsArgs = {
+  enginePath: string;
+  dataDir: string;
+  map?: string;
+  game?: string;
+};
+
+/**
+ * Read what the hub asks for before it takes one map or game archive as an
+ * upload: the file's hash, size and name, and the names, version and credits in
+ * it (issue #5257). The hash is cached on the file, so asking again about an
+ * unchanged archive reads no bytes.
+ */
+export const unitsyncUploadFacts = defineCommand<
+  UploadFactsArgs,
+  UploadFactsResult
+>("coilbox-unitsync", "unitsync_upload_facts");
 
 export interface ArchiveFileResult {
   /** `"text"`, `"image"`, `"audio"`, or `"binary"`. */
