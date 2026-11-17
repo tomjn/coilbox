@@ -9,7 +9,10 @@ import {
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { formatBytes } from "@/lib/format";
-import { type ArchiveUploadState, cancelArchiveUpload } from "../archiveUploads";
+import {
+  type ArchiveUploadState,
+  cancelArchiveUpload,
+} from "../archiveUploads";
 import { followArchiveUploads, labelOf, useArchiveUploads } from "./store";
 
 /**

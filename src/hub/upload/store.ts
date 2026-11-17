@@ -7,9 +7,9 @@ import {
   listArchiveUploads,
   onArchiveUploadChanged,
 } from "../archiveUploads";
-import { fetchMapFacts } from "../maps/lookup";
 import { noteHubChanged } from "../manualSend/run";
 import { gamePageUrl, mapPageUrl } from "../manualSend/status";
+import { fetchMapFacts } from "../maps/lookup";
 import { describeUploadEnd, type UploadEnding } from "./messages";
 
 /**
@@ -93,7 +93,9 @@ export function followArchiveUploads(): Promise<void> {
   return following;
 }
 
-function read(): readonly ArchiveUploadState[] {
+/** Every archive upload held right now. A stable reference between changes,
+ *  which is what `useSyncExternalStore` needs. */
+export function readArchiveUploads(): readonly ArchiveUploadState[] {
   return uploads;
 }
 
@@ -104,8 +106,8 @@ export function useArchiveUploads(): readonly ArchiveUploadState[] {
       listeners.add(cb);
       return () => listeners.delete(cb);
     },
-    read,
-    read,
+    readArchiveUploads,
+    readArchiveUploads,
   );
 }
 
@@ -166,7 +168,10 @@ export function endingToNotification(ending: UploadEnding): NotifyInput {
     // A refusal is worth reading at leisure, and a toast that times out is not.
     sticky: ending.level === "error" || ending.level === "warning",
     action: link
-      ? { label: link.label, onClick: () => void openUrl(link.url).catch(() => {}) }
+      ? {
+          label: link.label,
+          onClick: () => void openUrl(link.url).catch(() => {}),
+        }
       : undefined,
   };
 }

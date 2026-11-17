@@ -16,7 +16,12 @@ import { notify } from "@/notify/notify";
 import { useHubAccount } from "../account";
 import { type ArchiveFacts, startArchiveUpload } from "../archiveUploads";
 import { useHubUrl } from "../config";
-import { beginManualSend, endManualSend } from "../manualSend/grant";
+import {
+  beginManualSend,
+  endManualSend,
+  type SendSubject,
+} from "../manualSend/grant";
+import { startManualSend } from "../manualSend/run";
 import { gamePageUrl, type HubState } from "../manualSend/status";
 import { SignInButton } from "../pages/components/AccountControl";
 import { describeUploadEnd } from "./messages";
@@ -70,6 +75,7 @@ export function UploadToHubButton({
   fileName,
   hub,
   pageUrl,
+  sendSubject,
 }: {
   target: UploadTarget;
   /** What a person calls it. */
@@ -85,6 +91,9 @@ export function UploadToHubButton({
   hub: HubState;
   /** The item's page on the hub, when it has one. */
   pageUrl: string | null;
+  /** What the page's send control sends, when it has one. A game the hub does
+   *  not know is offered that send before the file goes up. */
+  sendSubject?: SendSubject;
 }) {
   const { t } = useLingui();
   const hubUrl = useHubUrl();
@@ -227,6 +236,24 @@ export function UploadToHubButton({
               onClick={() => openUrl(link.url).catch(() => {})}
             >
               {link.label}
+            </Button>
+          )}
+          {said.sendFirst && sendSubject && enginePath && dataDir && (
+            <Button
+              size="sm"
+              onClick={() => {
+                if (upload) setDismissed(upload.opId);
+                setOpen(false);
+                void startManualSend({
+                  hubUrl,
+                  enginePath,
+                  dataDir,
+                  subject: sendSubject,
+                  label,
+                });
+              }}
+            >
+              {t`Send to hub`}
             </Button>
           )}
           {said.retry ? (

@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { HubGame } from "../api";
 import { MAP_VARIANTS, MINIMAP_VARIANT } from "../assets/vocabulary";
 import type { MapFacts } from "../maps/lookup";
-import { gamePresence, mapPresence } from "./status";
+import {
+  gameHashes,
+  gamePageUrl,
+  gamePresence,
+  mapHashes,
+  mapPageUrl,
+  mapPresence,
+} from "./status";
 
 const HUB = "https://hub.test/";
 
@@ -92,5 +99,53 @@ describe("whether the hub has a map", () => {
       state: "present",
       url: "https://hub.test/map/tabula-3",
     });
+  });
+});
+
+describe("the archives the hub lists, by hash", () => {
+  const A = "a".repeat(64);
+  const B = "b".repeat(64);
+
+  it("does not know a game's hashes until the listing is in", () => {
+    expect(gameHashes(null, "sf")).toBeUndefined();
+  });
+
+  it("lists the hashes on a game's download sources, ignoring case in the shortname", () => {
+    const sf: HubGame = {
+      ...hubGame("SF"),
+      downloads: [
+        { kind: "url", value: "https://m.test/sf.sdz", sha256: A },
+        { kind: "rapid", value: "sf:test" },
+        { kind: "url", value: "https://m2.test/sf.sdz", sha256: B },
+      ],
+    };
+    expect(gameHashes([sf], "sf")).toEqual(new Set([A, B]));
+  });
+
+  it("knows a game the hub does not list has no hashes", () => {
+    expect(gameHashes([hubGame("other")], "sf")).toEqual(new Set());
+  });
+
+  it("does not know a map's hashes until the hub has answered", () => {
+    expect(mapHashes(undefined)).toBeUndefined();
+  });
+
+  it("knows a map the hub has no facts for has none", () => {
+    expect(mapHashes(null)).toEqual(new Set());
+  });
+
+  it("lists the hashes on a map's download sources", () => {
+    const facts = {
+      downloads: [
+        { kind: "url", value: "https://m.test/t.sd7", sha256: A },
+        { kind: "github", value: "owner/repo" },
+      ],
+    } as MapFacts;
+    expect(mapHashes(facts)).toEqual(new Set([A]));
+  });
+
+  it("builds the pages a message links to", () => {
+    expect(gamePageUrl(HUB, "S F")).toBe("https://hub.test/games/S%20F");
+    expect(mapPageUrl(HUB, "tabula-3")).toBe("https://hub.test/map/tabula-3");
   });
 });

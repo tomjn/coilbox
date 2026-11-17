@@ -341,6 +341,11 @@ export default function GameDetailPage() {
                   ? hubPresence.url
                   : null
               }
+              sendSubject={
+                sendable
+                  ? { kind: "game", shortname: sendable.shortname }
+                  : undefined
+              }
             />
           </>
         }

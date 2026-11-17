@@ -73,7 +73,10 @@ vi.mock("@/hub/manualSend/HubSendControl", () => ({
 }));
 vi.mock("@/hub/manualSend/status", () => ({
   useSendableGame: () => null,
-  useGameHubState: () => ({ presence: { state: "unknown" }, hashes: undefined }),
+  useGameHubState: () => ({
+    presence: { state: "unknown" },
+    hashes: undefined,
+  }),
   useMapHubState: () => ({ presence: { state: "unknown" }, hashes: undefined }),
 }));
 // The upload button has tests of its own, and reads the archive's facts.

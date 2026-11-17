@@ -10,6 +10,9 @@ export interface UploadEnding {
   link?: { url: string; label: string };
   /** Whether pressing upload again is a sensible next step. */
   retry: boolean;
+  /** Whether the game has to be sent to the hub, as the send control does,
+   *  before the file can be uploaded. */
+  sendFirst?: boolean;
 }
 
 /** Where the message can point a player, by what it is about. */
@@ -90,8 +93,9 @@ export function describeUploadEnd(
       return {
         level: "error",
         title: notUploaded,
-        body: t`The hub does not know this game yet. Use Send to hub on this page first, then upload the file.`,
+        body: t`The hub does not know this game yet. Send it to the hub first, then upload the file.`,
         retry: false,
+        sendFirst: true,
       };
     case "no_mirror":
     case "unavailable":
