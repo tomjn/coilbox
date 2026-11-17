@@ -1820,6 +1820,48 @@ async fn unitsync_map_catalog<R: Runtime>(
     }
 }
 
+/// `unitsync_upload_facts` reads the facts the hub asks for before it accepts one
+/// map or one game as an upload (issue #5257): the archive's sha256, size and
+/// file name, and the names, version and credits inside it.
+///
+/// Give it a unitsync map name in `map` or a game's primary archive file name in
+/// `game`, and exactly one of them. It answers `{ facts, problem, errors }`.
+/// `facts` is the body of `POST /api/v1/uploads`, already checked against the
+/// hub's rules. `problem` is a sentence for the player when the archive cannot
+/// be uploaded, such as a game with no shortname or one that is not a single
+/// `.sd7` or `.sdz` file.
+///
+/// The hash is the one the map catalog caches, keyed on the file's path, size and
+/// modified time, so asking twice about an unchanged archive reads no bytes. A
+/// first read of a large archive does read all of it, so this runs on the
+/// library worker and not the page worker.
+#[tauri::command]
+async fn unitsync_upload_facts<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    map: Option<String>,
+    game: Option<String>,
+) -> CliResult {
+    if map.is_some() == game.is_some() {
+        return CliResult::err("Give either a map or a game to read upload facts for.".to_string());
+    }
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = sidecar::build_upload_facts_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        map.as_deref(),
+        game.as_deref(),
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    run_library_worker(bin, args, envs, SCAN_TIMEOUT, "upload facts", None).await
+}
+
 /// `unitsync_map_minimaps` names what every installed map's minimap would be
 /// called, and with `assets` encodes the pictures themselves (issue #2379).
 ///
@@ -2928,6 +2970,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_remember_render,
             unitsync_local_renders,
             unitsync_map_catalog,
+            unitsync_upload_facts,
             unitsync_map_minimaps,
             unitsync_map_info,
             unitsync_map_skybox,
