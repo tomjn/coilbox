@@ -302,8 +302,14 @@ export const dlInspectArchive = defineCommand<
  * {@link dlInspectArchive} does again and never replaces a file.
  */
 export const dlInstallArchive = defineCommand<
-  { path: string; gamesRoot?: string; mapsRoot?: string },
-  ArchivePlan & { path: string }
+  {
+    path: string;
+    gamesRoot?: string;
+    mapsRoot?: string;
+    /** Delete the original once the copy is on disk. */
+    moveOriginal?: boolean;
+  },
+  ArchivePlan & { path: string; moveError?: string }
 >("coilbox-downloads", "dl_install_archive");
 
 /**

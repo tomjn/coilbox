@@ -1,18 +1,20 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
-import { Globe, Plus, Server, Swords, Trash2 } from "lucide-react";
-import { Field } from "@/components/Field";
+import { Globe, PackagePlus, Plus, Server, Swords, Trash2 } from "lucide-react";
+import { CheckField, Field } from "@/components/Field";
 import { Switch } from "@/components/ui/switch";
 import { HubAddressField } from "../../hub/pages/components/HubAddressField";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
 import { isHubEnabled } from "../../profile/profile";
-import { useDownloadsConfig } from "../config";
+import { useArchiveInstallSettings, useDownloadsConfig } from "../config";
 
 /**
  * Settings > Library > Sources (frame settings page at `/settings/sources`,
  * issue #4584). Three concerns, all persisted immediately (no Save button):
  *  - the list of rapid masters offered on the Rapid repositories page
  *  - whether joining a battle fetches missing content on its own (issue #439)
+ *  - what a game or map archive dropped on the window does: ask first or not,
+ *    and keep or delete the original
  *  - which Coilbox hub to read, while the hub is on
  *
  * Where downloads are written is not here. It is chosen beside the folders
@@ -33,6 +35,7 @@ export default function DownloadsSettings() {
     AUTO_DOWNLOAD_ON_JOIN_KEY,
     true,
   );
+  const archive = useArchiveInstallSettings();
 
   const addRepo = () =>
     setCfg({
@@ -135,6 +138,23 @@ export default function DownloadsSettings() {
             onCheckedChange={setAutoOnJoin}
           />
         </label>
+      </section>
+
+      {/* A .sdz or .sd7 dropped on the window or opened with coilbox */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <PackagePlus size={15} /> <Trans>Dropped archives</Trans>
+        </h2>
+        <CheckField
+          label={t`Delete the original after installing`}
+          checked={archive.move}
+          onChange={archive.setMove}
+        />
+        <CheckField
+          label={t`Install without asking`}
+          checked={archive.noPrompt}
+          onChange={archive.setNoPrompt}
+        />
       </section>
 
       {/* The hub, unless the profile has switched it off */}

@@ -2843,14 +2843,12 @@ msgid "{filename} is not what the hub says it is. The hub has been told. The fil
 msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a game, is copied to {destDir}."
-msgstr "Το {fileName}, ένα παιχνίδι, αντιγράφεται στο {destDir}."
+msgid "{fileName}, a game, goes in {destDir}."
+msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a map, is copied to {destDir}."
-msgstr "Το {fileName}, ένας χάρτης, αντιγράφεται στο {destDir}."
+msgid "{fileName}, a map, goes in {destDir}."
+msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -18013,6 +18011,10 @@ msgstr "δεν ήταν δυνατή η σύνδεση με {who} για το {f
 msgid "Could not count the backups: {0}"
 msgstr "Δεν ήταν δυνατή η καταμέτρηση των αντιγράφων ασφαλείας: {0}"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not delete an original"
+msgstr ""
+
 #: src/game-updates/GameUpdatesProvider.tsx
 #, fuzzy
 msgid "Could not download {filename}"
@@ -19595,6 +19597,11 @@ msgstr "Διαγραφή των επαναλήψεων που ταιριάζου
 msgid "Delete the name {name}"
 msgstr "Διαγραφή του ονόματος {name}"
 
+#: src/deeplink/ArchiveChoices.tsx
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete the original after installing"
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -20187,6 +20194,10 @@ msgstr "Διαιρείται με την ισχύ κατασκευής που δ
 #, fuzzy
 msgid "do ... end"
 msgstr "do ... end"
+
+#: src/deeplink/ArchiveChoices.tsx
+msgid "Do not ask again"
+msgstr ""
 
 #: src/runlite/generate.ts
 #, fuzzy
@@ -20831,6 +20842,10 @@ msgstr "Απόθεση μονάδας {unit}"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "Πτώση βαθμίδας"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Dropped archives"
+msgstr ""
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -26814,6 +26829,10 @@ msgstr "Εγκατάσταση αυτής της μετατροπής;"
 msgid "Install widget"
 msgstr "Εγκατάσταση widget"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
@@ -27126,6 +27145,10 @@ msgstr "κωδικοποιήθηκε πάνω από το μέγεθος που 
 msgid "it encoded, and the file could not be written."
 msgstr "κωδικοποιήθηκε, και το αρχείο δεν ήταν δυνατό να γραφτεί."
 
+#: src/downloads/installArchive.ts
+msgid "It goes in {destDir}."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "It goes out of the library. Undo puts it back."
@@ -27199,11 +27222,6 @@ msgstr "Μεταφέρει μια μάχη που φιλοξενεί αυτή τ
 #, fuzzy
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "Μετατρέπεται ξανά από το BOS του παιχνιδιού. Οι αλλαγές που κάνατε από τότε χάνονται."
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "It is copied to {destDir}. The file you opened stays where it is."
-msgstr "Αντιγράφεται στο {destDir}. Το αρχείο που ανοίξατε μένει εκεί που είναι."
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "It is in the style list under Generate on the Models page."
@@ -31110,6 +31128,10 @@ msgstr ""
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
 msgstr "Η αρχή αξόνων της βάσης μετακινήθηκε, τώρα στο {spot}."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Moved to {destDir}."
+msgstr ""
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
@@ -45668,6 +45690,10 @@ msgstr "Κάποιο περιεχόμενο που χρειάζεται αυτή
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Ορισμένες μηχανές καταγράφουν στον δικό τους φάκελο, οπότε η διαγραφή της μηχανής διαγράφει και αυτές τις επαναλήψεις. Αυτό τις μεταφέρει στον φάκελο demos μαζί με τις υπόλοιπες."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Some files were not installed"
+msgstr ""
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
 msgid "Some of \"{presetName}\" did not take"
@@ -48616,11 +48642,6 @@ msgstr "Το αρχείο βάφει με {imagesUsed} υφές ενώ μια μ
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
 msgstr "Το αρχείο δημιουργήθηκε από νεότερη έκδοση του coilbox."
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "The files you opened stay where they are."
-msgstr "Τα αρχεία που ανοίξατε μένουν εκεί που είναι."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

@@ -47,6 +47,23 @@ export function useDownloadsConfig() {
 }
 
 /**
+ * What happens to a game or map archive dropped on the window or opened with
+ * coilbox. `move` deletes the original once it is installed, and `noPrompt`
+ * installs it without asking first.
+ */
+export const ARCHIVE_MOVE_KEY = "downloads.archiveInstall.move";
+export const ARCHIVE_NO_PROMPT_KEY = "downloads.archiveInstall.noPrompt";
+
+export function useArchiveInstallSettings() {
+  const [move, setMove] = useSetting<boolean>(ARCHIVE_MOVE_KEY, false);
+  const [noPrompt, setNoPrompt] = useSetting<boolean>(
+    ARCHIVE_NO_PROMPT_KEY,
+    false,
+  );
+  return { move, setMove, noPrompt, setNoPrompt };
+}
+
+/**
  * All detected content-root paths. Used to detect already-installed content
  * across every folder (not just the write root) — e.g. a map present in a
  * skylobby data dir still counts as installed.

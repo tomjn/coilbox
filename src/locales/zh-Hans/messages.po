@@ -2813,14 +2813,12 @@ msgid "{filename} is not what the hub says it is. The hub has been told. The fil
 msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a game, is copied to {destDir}."
-msgstr "游戏 {fileName} 已复制到 {destDir}。"
+msgid "{fileName}, a game, goes in {destDir}."
+msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a map, is copied to {destDir}."
-msgstr "地图 {fileName} 已复制到 {destDir}。"
+msgid "{fileName}, a map, goes in {destDir}."
+msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -17890,6 +17888,10 @@ msgstr "下载 {file} 时无法连接到 {who}"
 msgid "Could not count the backups: {0}"
 msgstr "无法统计备份数量：{0}"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not delete an original"
+msgstr ""
+
 #: src/game-updates/GameUpdatesProvider.tsx
 #, fuzzy
 msgid "Could not download {filename}"
@@ -19461,6 +19463,11 @@ msgstr "删除匹配的回放"
 msgid "Delete the name {name}"
 msgstr "删除名称 {name}"
 
+#: src/deeplink/ArchiveChoices.tsx
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete the original after installing"
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -20052,6 +20059,10 @@ msgstr "用投入的建造力去除，即得到建造所需的秒数。"
 #, fuzzy
 msgid "do ... end"
 msgstr "do ... end"
+
+#: src/deeplink/ArchiveChoices.tsx
+msgid "Do not ask again"
+msgstr ""
 
 #: src/runlite/generate.ts
 #, fuzzy
@@ -20694,6 +20705,10 @@ msgstr "放下单位 {unit}"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "等级下降"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Dropped archives"
+msgstr ""
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -26644,6 +26659,10 @@ msgstr "安装此转换结果？"
 msgid "Install widget"
 msgstr "安装小部件"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
@@ -26955,6 +26974,10 @@ msgstr "编码后的大小超出了中心接受的上限。"
 msgid "it encoded, and the file could not be written."
 msgstr "编码已完成，但无法写入文件。"
 
+#: src/downloads/installArchive.ts
+msgid "It goes in {destDir}."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "It goes out of the library. Undo puts it back."
@@ -27028,11 +27051,6 @@ msgstr "它正承载着此 coilbox 正在主持的一个房间。请先离开那
 #, fuzzy
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "它会重新从游戏的 BOS 转换而来。之后所做的编辑将会丢失。"
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "It is copied to {destDir}. The file you opened stays where it is."
-msgstr "它会被复制到 {destDir}。你打开的文件保持原位。"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "It is in the style list under Generate on the Models page."
@@ -30914,6 +30932,10 @@ msgstr ""
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
 msgstr "已移动基地原点，现在位于 {spot}。"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Moved to {destDir}."
+msgstr ""
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
@@ -45365,6 +45387,10 @@ msgstr ""
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "有些引擎会录制到自己的文件夹中，所以删除该引擎也会删除这些回放。这会把它们移到 demos 文件夹，与其他回放放在一起。"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Some files were not installed"
+msgstr ""
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Some of \"{presetName}\" did not take"
 msgstr ""
@@ -48287,11 +48313,6 @@ msgstr "该文件使用 {imagesUsed} 张纹理着色，而 Spring 单位只有�
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
 msgstr "该文件由更新版本的 coilbox 创建。"
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "The files you opened stay where they are."
-msgstr "你打开的文件保持原位。"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy

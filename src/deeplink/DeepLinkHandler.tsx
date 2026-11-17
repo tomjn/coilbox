@@ -18,7 +18,7 @@ import { fileDropClaimed } from "@/lib/fileDropClaim";
 import { containerKindPhrase } from "../container/names";
 import { invalidateScans } from "../content/config";
 import { dlInspectArchive, dlInstallArchive } from "../downloads/bindings";
-import { useWriteRoot } from "../downloads/config";
+import { useArchiveInstallSettings, useWriteRoot } from "../downloads/config";
 import {
   type ArchiveOffer,
   type ArchiveRoots,
@@ -41,6 +41,7 @@ import {
   offerInvite,
 } from "../multiplayer/invite/inviteStore";
 import { notify } from "../notify/notify";
+import { type ArchiveChoice, ArchiveChoices } from "./ArchiveChoices";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
 import { ConfirmDialog, type Pending } from "./ConfirmDialog";
@@ -95,7 +96,9 @@ import { openScreenRoute, parseDeepLink } from "./parse";
  * coilbox on Windows or Linux, which is a launch argument (`open_file.rs`). All
  * three end at `offerArchives`, which reads the file, asks with the same dialog
  * and under the same one prompt at a time rule, and only then copies it into the
- * content folder chosen for its kind.
+ * content folder chosen for its kind. The prompt can be turned off and the
+ * original deleted after the copy, both from the prompt itself or from
+ * Settings > Sources.
  */
 
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
@@ -128,6 +131,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
 
   const gamesRoot = useWriteRoot("games");
   const mapsRoot = useWriteRoot("maps");
+  const archiveSettings = useArchiveInstallSettings();
   // Files handed over and not yet read. They wait here until the content
   // folders are known, which on a cold start is after the file arrives.
   const [queued, setQueued] = useState<string[] | null>(null);
@@ -160,7 +164,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   }, []);
 
   const runInstall = useCallback(
-    async (offers: ArchiveOffer[], roots: ArchiveRoots) => {
+    async (offers: ArchiveOffer[], roots: ArchiveRoots, move: boolean) => {
       // A copy holds the one prompt, like a fetch does, so nothing else is
       // asked over the top of it.
       open.current.archives = true;
@@ -169,9 +173,10 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           ? offers[0].fileName
           : plural(offers.length, { other: "# archives" }),
       );
-      const { installed, failed } = await installArchives(
+      const { installed, failed, notMoved } = await installArchives(
         offers,
         roots,
+        move,
         dlInstallArchive,
       );
       open.current.archives = false;
@@ -187,7 +192,10 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           installedCount === 1
             ? {
                 title: t`Installed ${fileName}`,
-                body: t`Copied to ${destDir}.`,
+                body:
+                  move && notMoved.length === 0
+                    ? t`Moved to ${destDir}.`
+                    : t`Copied to ${destDir}.`,
                 level: "success",
               }
             : {
@@ -204,6 +212,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           title: t`Could not install an archive`,
           body: failed.join(" "),
           level: "error",
+        });
+      }
+      if (notMoved.length > 0) {
+        notify({
+          title: t`Could not delete an original`,
+          body: notMoved.join(" "),
+          level: "warning",
         });
       }
     },
@@ -225,16 +240,45 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           });
           return;
         }
+        const { move, noPrompt, setMove, setNoPrompt } = archiveSettings;
+        if (noPrompt) {
+          if (refused.length > 0) {
+            notify({
+              title: t`Some files were not installed`,
+              body: refused.join(" "),
+              level: "error",
+            });
+          }
+          void runInstall(offers, roots, move);
+          return;
+        }
+        let choice: ArchiveChoice = { move, noPrompt: false };
         setPending({
           ...describeOffers(offers),
           warnings: refused,
           confirmLabel: t`Install`,
           icon: PackagePlus,
-          run: () => void runInstall(offers, roots),
+          extra: (
+            <ArchiveChoices
+              initial={choice}
+              onChange={(next) => {
+                choice = next;
+              }}
+            />
+          ),
+          run: () => {
+            // Not asking again keeps this answer for next time, including
+            // whether to delete the original.
+            if (choice.noPrompt) {
+              setMove(choice.move);
+              setNoPrompt(true);
+            }
+            void runInstall(offers, roots, choice.move);
+          },
         });
       },
     );
-  }, [queued, gamesRoot, mapsRoot, runInstall, setPending]);
+  }, [queued, gamesRoot, mapsRoot, archiveSettings, runInstall, setPending]);
 
   // Build the second (apply) confirmation for a resolved import plan. `host` is
   // set for a fetch-URL import so the dialog says where the content came from.

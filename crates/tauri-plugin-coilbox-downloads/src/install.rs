@@ -181,12 +181,26 @@ pub fn install(
             ),
             _ => format!("Could not write {}: {e}", dest.display()),
         })?;
-    if let Err(e) = std::io::copy(&mut from, &mut to) {
+    // Synced before returning, so a caller that then deletes the original never
+    // leaves the only copy in a write cache.
+    if let Err(e) = std::io::copy(&mut from, &mut to).and_then(|_| to.sync_all()) {
         drop(to);
         let _ = std::fs::remove_file(&dest);
         return Err(format!("Could not copy {}: {e}", plan.file_name));
     }
     Ok((plan, dest))
+}
+
+/// Delete the file a finished [`install`] copied from, which turns the copy
+/// into a move. The error says the copy is in place, because it is.
+pub fn remove_original(path: &Path, plan: &Plan) -> Result<(), String> {
+    std::fs::remove_file(path).map_err(|e| {
+        format!(
+            "{} was copied to {}, but the original could not be deleted: {e}",
+            plan.file_name,
+            plan.dest_dir.display()
+        )
+    })
 }
 
 #[cfg(test)]
@@ -265,6 +279,29 @@ mod tests {
         assert_eq!(plan.kind, ArchiveKind::Game);
         assert_eq!(dest, root.join("games").join("Some Game 1.0.sdz"));
         assert_eq!(std::fs::read(&dest).unwrap(), std::fs::read(&src).unwrap());
+    }
+
+    #[test]
+    fn a_move_leaves_only_the_installed_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = sdz(dir.path(), "Some Game 1.0.sdz", &["modinfo.lua"]);
+        let bytes = std::fs::read(&src).unwrap();
+        let root = dir.path().join("root");
+        let (plan, dest) = install(&src, root.to_str(), None).unwrap();
+        remove_original(&src, &plan).unwrap();
+        assert!(!src.exists());
+        assert_eq!(std::fs::read(&dest).unwrap(), bytes);
+    }
+
+    #[test]
+    fn an_original_that_cannot_be_deleted_says_the_copy_is_in_place() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = sdz(dir.path(), "Some Game 1.0.sdz", &["modinfo.lua"]);
+        let root = dir.path().join("root");
+        let (plan, _) = install(&src, root.to_str(), None).unwrap();
+        std::fs::remove_file(&src).unwrap();
+        let err = remove_original(&src, &plan).unwrap_err();
+        assert!(err.contains("was copied to"), "{err}");
     }
 
     #[test]

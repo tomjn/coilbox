@@ -2843,14 +2843,12 @@ msgid "{filename} is not what the hub says it is. The hub has been told. The fil
 msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a game, is copied to {destDir}."
-msgstr "{fileName}, un gioco, viene copiato in {destDir}."
+msgid "{fileName}, a game, goes in {destDir}."
+msgstr ""
 
 #: src/downloads/installArchive.ts
-#, fuzzy
-msgid "{fileName}, a map, is copied to {destDir}."
-msgstr "{fileName}, una mappa, viene copiata in {destDir}."
+msgid "{fileName}, a map, goes in {destDir}."
+msgstr ""
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -18013,6 +18011,10 @@ msgstr "impossibile connettersi a {who} per {file}"
 msgid "Could not count the backups: {0}"
 msgstr "Impossibile contare i backup: {0}"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not delete an original"
+msgstr ""
+
 #: src/game-updates/GameUpdatesProvider.tsx
 #, fuzzy
 msgid "Could not download {filename}"
@@ -19595,6 +19597,11 @@ msgstr "Elimina i replay corrispondenti"
 msgid "Delete the name {name}"
 msgstr "Elimina il nome {name}"
 
+#: src/deeplink/ArchiveChoices.tsx
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Delete the original after installing"
+msgstr ""
+
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -20187,6 +20194,10 @@ msgstr "Diviso per la potenza di costruzione impiegata, dà i secondi che richie
 #, fuzzy
 msgid "do ... end"
 msgstr "do ... end"
+
+#: src/deeplink/ArchiveChoices.tsx
+msgid "Do not ask again"
+msgstr ""
 
 #: src/runlite/generate.ts
 #, fuzzy
@@ -20831,6 +20842,10 @@ msgstr "Rilascia l’unità {unit}"
 #, fuzzy
 msgid "Dropped a rank"
 msgstr "Retrocessione di grado"
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Dropped archives"
+msgstr ""
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -26814,6 +26829,10 @@ msgstr "Installare questa conversione?"
 msgid "Install widget"
 msgstr "Installa widget"
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Install without asking"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
@@ -27126,6 +27145,10 @@ msgstr "la codifica ha superato la dimensione che l’hub accetta."
 msgid "it encoded, and the file could not be written."
 msgstr "la codifica è riuscita, ma non è stato possibile scrivere il file."
 
+#: src/downloads/installArchive.ts
+msgid "It goes in {destDir}."
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "It goes out of the library. Undo puts it back."
@@ -27199,11 +27222,6 @@ msgstr "Sta trasportando una battaglia che questo coilbox sta ospitando ora. Las
 #, fuzzy
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "Viene convertito di nuovo dal BOS del gioco. Le modifiche fatte da allora vanno perse."
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "It is copied to {destDir}. The file you opened stays where it is."
-msgstr "Viene copiato in {destDir}. Il file che hai aperto resta dov’è."
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "It is in the style list under Generate on the Models page."
@@ -31110,6 +31128,10 @@ msgstr ""
 #, fuzzy
 msgid "Moved the base's origin, now at {spot}."
 msgstr "Origine della base spostata, ora a {spot}."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Moved to {destDir}."
+msgstr ""
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
@@ -45668,6 +45690,10 @@ msgstr "Alcuni contenuti necessari a questa preimpostazione non sono installati.
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Alcuni motori registrano nella propria cartella, quindi eliminare quel motore elimina quei replay. Questo li sposta nella cartella demos insieme agli altri."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Some files were not installed"
+msgstr ""
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
 msgid "Some of \"{presetName}\" did not take"
@@ -48616,11 +48642,6 @@ msgstr "Il file dipinge con {imagesUsed} texture dove un’unità Spring ne ha u
 #, fuzzy
 msgid "The file was made by a newer version of coilbox."
 msgstr "Il file è stato creato da una versione più recente di coilbox."
-
-#: src/downloads/installArchive.ts
-#, fuzzy
-msgid "The files you opened stay where they are."
-msgstr "I file che hai aperto restano dove sono."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
