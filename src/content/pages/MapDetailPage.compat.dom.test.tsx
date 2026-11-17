@@ -4,7 +4,7 @@
  * (#4565). What each finding means is `mapCompatReport.test.ts`. This file
  * checks the page reads the archive and its mapinfo.lua and shows the rows.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -130,7 +130,8 @@ describe("the compatibility report on a map's page", () => {
       errors: [],
     });
     renderPage();
-    expect(screen.getByText("Compatibility")).toBeTruthy();
+    // Radix picks a tab on mouse down rather than on click.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Compatibility" }));
     expect(screen.getByText(".3do feature models")).toBeTruthy();
     expect(
       await screen.findByText(".pcx textures in mapinfo.lua"),
@@ -156,6 +157,7 @@ describe("the compatibility report on a map's page", () => {
     ROOT = "/data-smd";
     TREE = tree(["maps/some.smf", "maps/some.smd"]);
     renderPage();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Compatibility" }));
     expect(
       screen.getByText("No mapinfo.lua, settings from the .smd file"),
     ).toBeTruthy();

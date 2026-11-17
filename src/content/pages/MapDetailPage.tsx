@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFeature } from "@/general/features";
 import { HubPageButton, HubSendControl } from "@/hub/manualSend/HubSendControl";
 import { useMapHubState } from "@/hub/manualSend/status";
@@ -88,6 +89,7 @@ export default function MapDetailPage() {
   const playMap = usePlayMap();
   const mapping = useFeature("mapping");
   const [decompiling, setDecompiling] = useState(false);
+  const [tab, setTab] = useState("overview");
   // The 3D preview's scene, which the picture of every match drapes over.
   const [scene, setScene] = useState<MapScene3D | null>(null);
   const { selected } = useScanTargetSelection();
@@ -110,50 +112,6 @@ export default function MapDetailPage() {
     selected?.rootPath,
     decoded,
   );
-  // The raw heights, for the playability panel to measure at the depth the
-  // engine holds them (issue #2169).
-  const heightField = useUnitsyncHeightField(
-    selected?.enginePath,
-    selected?.rootPath,
-    decoded,
-  );
-  const { grid: heightGrid, error: heightGridError } = useHeightGrid(
-    heightField.url ?? undefined,
-    heightField.data?.width,
-    heightField.data?.height,
-  );
-  const fieldMin = heightField.data?.minHeight;
-  const fieldMax = heightField.data?.maxHeight;
-  const playHeights = useMemo(
-    () =>
-      heightGrid && fieldMin != null && fieldMax != null
-        ? heightsOf(heightGrid, fieldMin, fieldMax)
-        : null,
-    [heightGrid, fieldMin, fieldMax],
-  );
-  // The raw metal map and the map's extractor radius, for the playability
-  // panel's metal figures (issue #5098).
-  const metalField = useUnitsyncMetalField(
-    selected?.enginePath,
-    selected?.rootPath,
-    decoded,
-  );
-  const metalGrid = useMetalGrid(
-    metalField.url ?? undefined,
-    metalField.data?.width,
-    metalField.data?.height,
-  );
-  const playMetal = {
-    grid: metalGrid.grid,
-    error:
-      metalField.error ??
-      metalGrid.error ??
-      // An answer with no file and no error is a map with no metal map.
-      (metalField.data && !metalField.url
-        ? "the map has no metal map to read"
-        : null),
-    extractorRadius: metalField.data?.extractorRadius,
-  };
   const mapInfo = useUnitsyncMapInfo(
     selected?.enginePath,
     selected?.rootPath,
@@ -260,6 +218,8 @@ export default function MapDetailPage() {
   const otherInfo = Object.entries(map.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),
   );
+  const hasDetails =
+    otherInfo.length > 0 || (mapInfo.info?.options.length ?? 0) > 0;
   const size = mapSizeLabel(map.width, map.height);
   const checksum = mapInfo.info?.checksum;
   const mapTitle = map.name;
@@ -432,226 +392,327 @@ export default function MapDetailPage() {
         <WarningBanner warnings={mapInfo.info.warnings} noun={t`map`} />
       ) : null}
 
-      {compatFindings.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">
-            <Trans>Compatibility</Trans>
-          </h2>
-          <FindingList findings={compatFindings} />
-        </section>
-      )}
-
-      {!statsHidden && (
-        <section className="rounded-lg border border-border/60 bg-card p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
-            <Trophy className="size-4 text-muted-foreground" />
-            <Trans>Your record on this map</Trans>
-          </h2>
-          {statsIngesting && statRecords.length === 0 ? (
-            <Skeleton className="h-16 rounded bg-muted" />
-          ) : mapRecord.games === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              <Trans>No replays recorded on this map yet.</Trans>
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard
-                icon={<Swords className="size-3.5" />}
-                label={t`Games`}
-                value={String(mapRecord.games)}
-              />
-              <StatCard
-                icon={<Trophy className="size-3.5" />}
-                label={t`Win rate`}
-                value={
-                  mapRecord.winRate == null
-                    ? "—"
-                    : `${Math.round(mapRecord.winRate * 100)}%`
-                }
-                sub={
-                  mapRecord.decided > 0
-                    ? t`${wins}W · ${losses}L`
-                    : t`outcome unknown`
-                }
-              />
-              <StatCard
-                icon={<Calendar className="size-3.5" />}
-                label={t`Last played`}
-                value={playedAt(mapRecord.lastPlayedMs)}
-              />
-              <StatCard
-                icon={<Flag className="size-3.5" />}
-                label={t`Top faction`}
-                value={mapRecord.favouriteFaction?.key ?? "—"}
-                sub={
-                  mapRecord.favouriteFaction
-                    ? t`${factionWins}W of ${factionGames}`
-                    : undefined
-                }
-              />
-            </div>
+      <Tabs
+        className="gap-4"
+        value={
+          (tab === "compat" && compatFindings.length === 0) ||
+          (tab === "details" && !hasDetails)
+            ? "overview"
+            : tab
+        }
+        onValueChange={setTab}
+      >
+        <TabsList>
+          <TabsTrigger value="overview">
+            <Trans>Overview</Trans>
+          </TabsTrigger>
+          <TabsTrigger value="playability">
+            <Trans>Playability</Trans>
+          </TabsTrigger>
+          {hasDetails && (
+            <TabsTrigger value="details">
+              <Trans>Details</Trans>
+            </TabsTrigger>
           )}
-        </section>
-      )}
-
-      <section className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">
-            {startCount > 0
-              ? plural(startCount, {
-                  one: "Preview · # start position",
-                  other: "Preview · # start positions",
-                })
-              : t`Preview`}
-          </h2>
-          {minimap.url && (
-            <MapLayerToggle layer={overlay.layer} onChange={overlay.setLayer} />
+          {compatFindings.length > 0 && (
+            <TabsTrigger value="compat">
+              <Trans>Compatibility</Trans>
+            </TabsTrigger>
           )}
-        </div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
-            {minimap.loading && !previewUrl ? (
-              <div className="flex size-64 max-w-full items-center justify-center">
-                <Skeleton className="size-32 rounded bg-muted" />
-              </div>
-            ) : previewUrl ? (
-              // Give the box a definite width derived from the 32rem height cap
-              // (`width = ratio * 32rem` ⇒ `height = 32rem`), capped by `max-w-sm`
-              // for wide maps (then `max-w` binds and the height shrinks instead —
-              // aspect stays correct). The `shrink-0` card collapses to this width,
-              // so a tall map yields a narrow card and the `flex-1` 3D preview grows
-              // to fill the freed space. `object-fill` stretches the square source
-              // back to the true shape.
-              <div
-                className="relative max-h-[32rem] max-w-sm"
-                style={{
-                  aspectRatio: `${ratio}`,
-                  width: `calc(${ratio} * 32rem)`,
-                }}
-              >
-                <img
-                  src={previewUrl}
-                  alt={t`Minimap of ${mapTitle}`}
-                  className={`absolute inset-0 size-full object-fill${
-                    overlay.overlayUrl ? " brightness-[0.55]" : ""
-                  }`}
+          <TabsTrigger value="archives">
+            <Trans>Archives</Trans>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="flex flex-col gap-5">
+          <section className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-medium">
+                {startCount > 0
+                  ? plural(startCount, {
+                      one: "Preview · # start position",
+                      other: "Preview · # start positions",
+                    })
+                  : t`Preview`}
+              </h2>
+              {minimap.url && (
+                <MapLayerToggle
+                  layer={overlay.layer}
+                  onChange={overlay.setLayer}
                 />
-                {overlay.overlayUrl && (
-                  <MapOverlayImage src={overlay.overlayUrl} />
+              )}
+            </div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
+                {minimap.loading && !previewUrl ? (
+                  <div className="flex size-64 max-w-full items-center justify-center">
+                    <Skeleton className="size-32 rounded bg-muted" />
+                  </div>
+                ) : previewUrl ? (
+                  // Give the box a definite width derived from the 32rem height cap
+                  // (`width = ratio * 32rem` ⇒ `height = 32rem`), capped by `max-w-sm`
+                  // for wide maps (then `max-w` binds and the height shrinks instead —
+                  // aspect stays correct). The `shrink-0` card collapses to this width,
+                  // so a tall map yields a narrow card and the `flex-1` 3D preview grows
+                  // to fill the freed space. `object-fill` stretches the square source
+                  // back to the true shape.
+                  <div
+                    className="relative max-h-[32rem] max-w-sm"
+                    style={{
+                      aspectRatio: `${ratio}`,
+                      width: `calc(${ratio} * 32rem)`,
+                    }}
+                  >
+                    <img
+                      src={previewUrl}
+                      alt={t`Minimap of ${mapTitle}`}
+                      className={`absolute inset-0 size-full object-fill${
+                        overlay.overlayUrl ? " brightness-[0.55]" : ""
+                      }`}
+                    />
+                    {overlay.overlayUrl && (
+                      <MapOverlayImage src={overlay.overlayUrl} />
+                    )}
+                    {markers.map((m, i) => (
+                      <span
+                        key={m.key}
+                        className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
+                        style={{ left: `${m.left}%`, top: `${m.top}%` }}
+                        title={
+                          startNames.find((e) => e.key === `d${i + 1}`)?.name ??
+                          t`Start position ${i + 1}`
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex size-64 max-w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                    <ImageOff className="size-6" />
+                    <span className="text-xs">
+                      <Trans>No minimap</Trans>
+                    </span>
+                  </div>
                 )}
-                {markers.map((m, i) => (
-                  <span
-                    key={m.key}
-                    className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
-                    style={{ left: `${m.left}%`, top: `${m.top}%` }}
-                    title={
-                      startNames.find((e) => e.key === `d${i + 1}`)?.name ??
-                      t`Start position ${i + 1}`
+              </div>
+
+              {heightmap.data && heightmap.url && minimap.url && (
+                <MapPreview3D
+                  className="w-full min-w-0 lg:flex-1"
+                  heightSrc={heightmap.url}
+                  heightRange={heightmap.range}
+                  textureSrc={minimap.url}
+                  appearance={minimap.appearance}
+                  skyboxSrc={skybox.dataUrl}
+                  minHeight={heightmap.data.minHeight ?? 0}
+                  maxHeight={heightmap.data.maxHeight ?? 0}
+                  worldWidth={world.worldWidth || 16}
+                  worldHeight={world.worldHeight || 16}
+                  onScene={insightShown ? setScene : undefined}
+                />
+              )}
+            </div>
+          </section>
+
+          {!statsHidden && (
+            <section className="rounded-lg border border-border/60 bg-card p-4">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+                <Trophy className="size-4 text-muted-foreground" />
+                <Trans>Your record on this map</Trans>
+              </h2>
+              {statsIngesting && statRecords.length === 0 ? (
+                <Skeleton className="h-16 rounded bg-muted" />
+              ) : mapRecord.games === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  <Trans>No replays recorded on this map yet.</Trans>
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <StatCard
+                    icon={<Swords className="size-3.5" />}
+                    label={t`Games`}
+                    value={String(mapRecord.games)}
+                  />
+                  <StatCard
+                    icon={<Trophy className="size-3.5" />}
+                    label={t`Win rate`}
+                    value={
+                      mapRecord.winRate == null
+                        ? "—"
+                        : `${Math.round(mapRecord.winRate * 100)}%`
+                    }
+                    sub={
+                      mapRecord.decided > 0
+                        ? t`${wins}W · ${losses}L`
+                        : t`outcome unknown`
+                    }
+                  />
+                  <StatCard
+                    icon={<Calendar className="size-3.5" />}
+                    label={t`Last played`}
+                    value={playedAt(mapRecord.lastPlayedMs)}
+                  />
+                  <StatCard
+                    icon={<Flag className="size-3.5" />}
+                    label={t`Top faction`}
+                    value={mapRecord.favouriteFaction?.key ?? "—"}
+                    sub={
+                      mapRecord.favouriteFaction
+                        ? t`${factionWins}W of ${factionGames}`
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </section>
+          )}
+
+          {insightShown && (
+            <MapAggregate
+              // Keyed, so the filters and the layer of one map do not carry to
+              // the next when the route changes under the same page.
+              key={map.name}
+              mapName={map.name}
+              world={world}
+              minimapUrl={minimap.url ?? undefined}
+              records={statRecords}
+              ingesting={statsIngesting}
+              scene={scene}
+              declared={minimap.startPositions}
+              refights={refights}
+              mapSizes={mapSizes}
+            />
+          )}
+          <MapEligibilitySection mapName={map.name} />
+        </TabsContent>
+        <TabsContent value="playability">
+          <MapPlayabilityTab
+            key={map.name}
+            enginePath={selected?.enginePath}
+            rootPath={selected?.rootPath}
+            mapName={map.name}
+            starts={minimap.startPositions}
+          />
+        </TabsContent>
+        <TabsContent value="details" className="flex flex-col gap-5">
+          {otherInfo.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-sm font-medium">
+                <Trans>Metadata</Trans>
+              </h2>
+              <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
+                {otherInfo.map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="font-mono text-xs text-muted-foreground">
+                      {k}
+                    </dt>
+                    <dd className="break-words">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          <OptionsList
+            options={mapInfo.info?.options ?? []}
+            title={t`Map options`}
+          />
+        </TabsContent>
+        <TabsContent value="compat">
+          <section className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium">
+              <Trans>Compatibility</Trans>
+            </h2>
+            <FindingList findings={compatFindings} />
+          </section>
+        </TabsContent>
+        <TabsContent value="archives">
+          <section className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium">
+              <Trans>Archives ({archiveCount})</Trans>
+            </h2>
+            {map.archives.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                <Trans>No archives reported for this map.</Trans>
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {map.archives.map((a, i) => (
+                  <ArchiveRow
+                    key={a.name}
+                    archive={a}
+                    // Skip the self-classification on the map's own archive (i === 0)
+                    // so it doesn't render a redundant "View map" back to this page.
+                    classification={
+                      i === 0 ? undefined : classifyArchive(data, a.name)
                     }
                   />
                 ))}
-              </div>
-            ) : (
-              <div className="flex size-64 max-w-full flex-col items-center justify-center gap-1 text-muted-foreground">
-                <ImageOff className="size-6" />
-                <span className="text-xs">
-                  <Trans>No minimap</Trans>
-                </span>
-              </div>
+              </ul>
             )}
-          </div>
-
-          {heightmap.data && heightmap.url && minimap.url && (
-            <MapPreview3D
-              className="w-full min-w-0 lg:flex-1"
-              heightSrc={heightmap.url}
-              heightRange={heightmap.range}
-              textureSrc={minimap.url}
-              appearance={minimap.appearance}
-              skyboxSrc={skybox.dataUrl}
-              minHeight={heightmap.data.minHeight ?? 0}
-              maxHeight={heightmap.data.maxHeight ?? 0}
-              worldWidth={world.worldWidth || 16}
-              worldHeight={world.worldHeight || 16}
-              onScene={insightShown ? setScene : undefined}
-            />
-          )}
-        </div>
-      </section>
-
-      <PlayabilityPanel
-        key={`playability-${map.name}`}
-        heights={playHeights}
-        heightsError={heightField.error ?? heightGridError}
-        starts={minimap.startPositions}
-        metal={playMetal}
-      />
-
-      {insightShown && (
-        <MapAggregate
-          // Keyed, so the filters and the layer of one map do not carry to
-          // the next when the route changes under the same page.
-          key={map.name}
-          mapName={map.name}
-          world={world}
-          minimapUrl={minimap.url ?? undefined}
-          records={statRecords}
-          ingesting={statsIngesting}
-          scene={scene}
-          declared={minimap.startPositions}
-          refights={refights}
-          mapSizes={mapSizes}
-        />
-      )}
-
-      <MapEligibilitySection mapName={map.name} />
-
-      {otherInfo.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">
-            <Trans>Metadata</Trans>
-          </h2>
-          <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
-            {otherInfo.map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
-                <dd className="break-words">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      )}
-
-      <OptionsList
-        options={mapInfo.info?.options ?? []}
-        title={t`Map options`}
-      />
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">
-          <Trans>Archives ({archiveCount})</Trans>
-        </h2>
-        {map.archives.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            <Trans>No archives reported for this map.</Trans>
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {map.archives.map((a, i) => (
-              <ArchiveRow
-                key={a.name}
-                archive={a}
-                // Skip the self-classification on the map's own archive (i === 0)
-                // so it doesn't render a redundant "View map" back to this page.
-                classification={
-                  i === 0 ? undefined : classifyArchive(data, a.name)
-                }
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+          </section>
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+/**
+ * The playability tab. The height and metal reads live here rather than on the
+ * page, so nothing is decoded or measured until the tab is opened.
+ */
+function MapPlayabilityTab({
+  enginePath,
+  rootPath,
+  mapName,
+  starts,
+}: {
+  enginePath?: string;
+  rootPath?: string;
+  mapName: string;
+  starts: { x: number; z: number }[];
+}) {
+  // The raw heights, for the playability panel to measure at the depth the
+  // engine holds them (issue #2169).
+  const heightField = useUnitsyncHeightField(enginePath, rootPath, mapName);
+  const { grid: heightGrid, error: heightGridError } = useHeightGrid(
+    heightField.url ?? undefined,
+    heightField.data?.width,
+    heightField.data?.height,
+  );
+  const fieldMin = heightField.data?.minHeight;
+  const fieldMax = heightField.data?.maxHeight;
+  const playHeights = useMemo(
+    () =>
+      heightGrid && fieldMin != null && fieldMax != null
+        ? heightsOf(heightGrid, fieldMin, fieldMax)
+        : null,
+    [heightGrid, fieldMin, fieldMax],
+  );
+  // The raw metal map and the map's extractor radius, for the playability
+  // panel's metal figures (issue #5098).
+  const metalField = useUnitsyncMetalField(enginePath, rootPath, mapName);
+  const metalGrid = useMetalGrid(
+    metalField.url ?? undefined,
+    metalField.data?.width,
+    metalField.data?.height,
+  );
+  const playMetal = {
+    grid: metalGrid.grid,
+    error:
+      metalField.error ??
+      metalGrid.error ??
+      // An answer with no file and no error is a map with no metal map.
+      (metalField.data && !metalField.url
+        ? "the map has no metal map to read"
+        : null),
+    extractorRadius: metalField.data?.extractorRadius,
+  };
+  return (
+    <PlayabilityPanel
+      heights={playHeights}
+      heightsError={heightField.error ?? heightGridError}
+      starts={starts}
+      metal={playMetal}
+    />
   );
 }
 
