@@ -407,7 +407,7 @@ export default function MapDetailPage() {
             <Trans>Overview</Trans>
           </TabsTrigger>
           <TabsTrigger value="playability">
-            <Trans>Playability</Trans>
+            <Trans>Passability</Trans>
           </TabsTrigger>
           {hasDetails && (
             <TabsTrigger value="details">

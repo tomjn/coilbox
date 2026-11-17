@@ -100,7 +100,7 @@ describe("the playability tab on a map's page", () => {
     expect(metalField).not.toHaveBeenCalled();
 
     // Radix picks a tab on mouse down rather than on click.
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Playability" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Passability" }));
     expect(screen.getByTestId("playability")).toBeTruthy();
     expect(heightField).toHaveBeenCalledWith("/engine", "/data", MAP);
     expect(metalField).toHaveBeenCalledWith("/engine", "/data", MAP);
