@@ -149,7 +149,7 @@ pub(crate) fn source_in_session(
 /// in this worker is keyed on. Without it a sweep re-reads every byte of a map
 /// library on every run, which is tens of gigabytes to learn that nothing has
 /// changed. With it a second sweep reads no archives at all.
-fn cached_hash(path: &str, cache_dir: Option<&std::path::Path>) -> Option<String> {
+pub(crate) fn cached_hash(path: &str, cache_dir: Option<&std::path::Path>) -> Option<String> {
     let key = cache_dir.and_then(|_| infocache::archive_hash_key(std::path::Path::new(path)));
     if let (Some(dir), Some(key)) = (cache_dir, key.as_deref()) {
         if let Some(hit) = infocache::read::<String>(dir, key) {
@@ -348,7 +348,7 @@ fn geo_vents(us: &Unitsync, archive_file: &str, map_index: i32) -> Vec<MapPoint>
 /// `GetMapInfoEx` answers with an empty string for a map that declares no
 /// author, and the hub reads a blank as absent anyway, so the two are settled
 /// here rather than differently at each end.
-fn some_text(value: Option<&String>) -> Option<String> {
+pub(crate) fn some_text(value: Option<&String>) -> Option<String> {
     let trimmed = value?.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
 }

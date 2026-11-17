@@ -718,6 +718,32 @@ pub fn build_map_catalog_args(
     args
 }
 
+/// Build args for the facts the hub takes before one map or game is uploaded
+/// as a file (issue #5257): `map` is a unitsync map name and `game` a game's
+/// primary archive file name, and exactly one of them is set.
+///
+/// The mode's fields and that rule live once in
+/// `coilbox_unitsync_worker::UploadFactsArgs`, so this function only has to add
+/// `--lib`/`--datadir`.
+pub fn build_upload_facts_args(
+    lib: &str,
+    datadir: &str,
+    map: Option<&str>,
+    game: Option<&str>,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::UploadFacts(coilbox_unitsync_worker::UploadFactsArgs {
+            map: map.map(String::from),
+            game: game.map(String::from),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
+    args
+}
+
 /// Build args for the minimap walk: what every installed map's minimap would be
 /// called, in one Init (issue #2379).
 ///
@@ -1392,6 +1418,43 @@ mod tests {
         let a = build_map_catalog_args("/eng/libunitsync.so", "/data", None, false, None);
         let recovered = MapCatalogArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, MapCatalogArgs::default());
+    }
+
+    /// Same check for `build_upload_facts_args`, for a map and for a game.
+    #[test]
+    fn build_upload_facts_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UploadFactsArgs;
+
+        let map = build_upload_facts_args(
+            "/eng/libunitsync.so",
+            "/data",
+            Some("Acidic Quarry 5.17"),
+            None,
+            Some("/cache/info"),
+        );
+        assert_eq!(
+            UploadFactsArgs::from_args(&map).expect("valid argv"),
+            UploadFactsArgs {
+                map: Some("Acidic Quarry 5.17".into()),
+                game: None,
+                cache_dir: Some("/cache/info".into()),
+            }
+        );
+        let game = build_upload_facts_args(
+            "/eng/libunitsync.so",
+            "/data",
+            None,
+            Some("splinterfaction.sdz"),
+            None,
+        );
+        assert_eq!(
+            UploadFactsArgs::from_args(&game).expect("valid argv"),
+            UploadFactsArgs {
+                map: None,
+                game: Some("splinterfaction.sdz".into()),
+                cache_dir: None,
+            }
+        );
     }
 
     /// What `build_map_minimaps_args` writes, the worker's own `from_args`

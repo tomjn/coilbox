@@ -67,6 +67,7 @@ mod unitmodel;
 mod unitmodels;
 mod unitrender;
 mod unitscriptfile;
+mod uploadfacts_read;
 
 use coilbox_unitsync_worker::Mode;
 use coilbox_unitsync_worker::{beforepost, model};
@@ -132,6 +133,11 @@ struct Args {
     /// `coilbox_unitsync_worker::MapCatalogArgs`, shared with the sidecar
     /// plugin that builds this flag's argv (issue #2448).
     map_catalog: Option<Mode>,
+    /// `--upload-facts`: the facts the hub takes before one map (`--map`) or one
+    /// game (`--game`) is uploaded as a file. Its fields live once in
+    /// `coilbox_unitsync_worker::UploadFactsArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv (issue #5257).
+    upload_facts: Option<Mode>,
     /// `--map-minimaps`: name every installed map's minimap, and with
     /// `--asset-dir` encode it as the hub's `minimap` asset too (issue #2379).
     /// `--maps-file` narrows it to the maps the hub said it wanted. Its
@@ -778,6 +784,26 @@ fn dispatch(args: &Args) -> i32 {
         );
     }
 
+    // Upload facts: what the hub asks for before it takes one map or game as
+    // an upload (issue #5257). Before game detail and the minimap, because it
+    // takes `--game` and `--map` too and they would otherwise claim it.
+    if let Some(Mode::UploadFacts(mode)) = &args.upload_facts {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return run_mode(
+            || match (&mode.map, &mode.game) {
+                (Some(map), _) => uploadfacts_read::read_map(&args.lib, map, cache_dir),
+                (None, Some(game)) => uploadfacts_read::read_game(&args.lib, game, cache_dir),
+                (None, None) => uploadfacts_read::problem("nothing was asked for".into()),
+            },
+            print_ok,
+            || {
+                uploadfacts_read::emit_error(
+                    "worker panicked while reading the upload facts".into(),
+                )
+            },
+        );
+    }
+
     // Game detail: load one game's archives to read its sides + unit count.
     if let Some(Mode::Game(mode)) = &args.game {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
@@ -1051,6 +1077,9 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     // #2448). `--keys-only` and `--maps-file` are not shared with any
     // unmigrated mode, so their match arms below only consume the tokens.
     let mut map_catalog_flag = false;
+    // `--upload-facts`' own fields are read by `Mode::UploadFacts`'s
+    // `from_args` below, which re-scans `raw` for them.
+    let mut upload_facts_flag = false;
     // `--map-minimaps`' own fields (maps file, cache directory, asset
     // directory) are not collected into locals here for its own use, the
     // same treatment `--map-catalog` got above: `Mode::MapMinimaps`'s
@@ -1178,6 +1207,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--metalmap" => metalmap_flag = true,
             "--typemap" => typemap = true,
             "--map-catalog" => map_catalog_flag = true,
+            "--upload-facts" => upload_facts_flag = true,
             // Consumed by `Mode::MapCatalog`'s `from_args` below, not stored
             // here.
             "--keys-only" => {}
@@ -1343,6 +1373,13 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         map_catalog: if map_catalog_flag {
             Some(Mode::MapCatalog(
                 coilbox_unitsync_worker::MapCatalogArgs::from_args(raw)?,
+            ))
+        } else {
+            None
+        },
+        upload_facts: if upload_facts_flag {
+            Some(Mode::UploadFacts(
+                coilbox_unitsync_worker::UploadFactsArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -1618,6 +1655,16 @@ fn absolutize(args: &mut Args) {
         {
             if let Some(abs) = absolute_path(path) {
                 *path = abs;
+            }
+        }
+    }
+    // `Mode::UploadFacts` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--map` is a
+    // unitsync name and `--game` an archive file name, so both are left alone.
+    if let Some(Mode::UploadFacts(mode)) = args.upload_facts.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
             }
         }
     }
@@ -2422,6 +2469,7 @@ mod tests {
             metalmap: None,
             typemap: false,
             map_catalog: None,
+            upload_facts: None,
             map_minimaps: None,
             map_info: None,
             map_meta: None,
