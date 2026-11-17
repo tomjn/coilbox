@@ -11853,6 +11853,7 @@ msgstr "Arkiv ikke installert: <0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Arkiver"
@@ -14014,6 +14015,10 @@ msgstr "Bygger forhåndsvisningen…"
 #, fuzzy
 msgid "Building the sheet for {folder}"
 msgstr "Bygger arket for {folder}"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -19900,6 +19905,7 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
@@ -24334,6 +24340,10 @@ msgstr "Spill: {title}"
 #, fuzzy
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Spill: <0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -36812,6 +36822,7 @@ msgstr "Overstyrer kartets tyngdekraft for ballistiske våpen og missiler. Missi
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Overview"
 msgstr "Oversikt"
@@ -37039,6 +37050,11 @@ msgstr "komponentpakken bruker skjema {schema}, denne versjonen forstår {suppor
 #, fuzzy
 msgid "Party"
 msgstr "Gruppe"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -44178,6 +44194,7 @@ msgstr "Setter opp…"
 msgid "settings"
 msgstr "innstillinger"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx

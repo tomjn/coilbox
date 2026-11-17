@@ -11856,6 +11856,7 @@ msgstr "Archivio non installato: <0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Archivi"
@@ -14017,6 +14018,10 @@ msgstr "Creazione dell’anteprima…"
 #, fuzzy
 msgid "Building the sheet for {folder}"
 msgstr "Creazione del foglio per {folder}"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -19904,6 +19909,7 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
@@ -24344,6 +24350,10 @@ msgstr "Gioco: {title}"
 #, fuzzy
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Gioco: <0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -36829,6 +36839,7 @@ msgstr "Sostituisce la gravità della mappa per armi balistiche e missili. I mis
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Overview"
 msgstr "Panoramica"
@@ -37056,6 +37067,11 @@ msgstr "il pacchetto di componenti usa lo schema {schema}, questa build comprend
 #, fuzzy
 msgid "Party"
 msgstr "Gruppo"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -44195,6 +44211,7 @@ msgstr "Configurazione…"
 msgid "settings"
 msgstr "impostazioni"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx

@@ -11853,6 +11853,7 @@ msgstr "Arquivo compactado não instalado: <0>{missingName}</0>"
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchivesPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Archives"
 msgstr "Arquivos"
@@ -14014,6 +14015,10 @@ msgstr "Gerando a prévia…"
 #, fuzzy
 msgid "Building the sheet for {folder}"
 msgstr "Gerando a folha para {folder}"
+
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Buildings and metal"
+msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -19900,6 +19905,7 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
 #, fuzzy
@@ -24334,6 +24340,10 @@ msgstr "Jogo: {title}"
 #, fuzzy
 msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Jogo: <0>{onlyGameName}</0>"
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Gameplay"
+msgstr ""
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -36812,6 +36822,7 @@ msgstr "Substitui a gravidade do mapa para armas balísticas e mísseis. Os mís
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Overview"
 msgstr "Visão geral"
@@ -37039,6 +37050,11 @@ msgstr "o pacote de peças usa o esquema {schema}, esta versão entende {support
 #, fuzzy
 msgid "Party"
 msgstr "Grupo"
+
+#: src/content/pages/MapDetailPage.tsx
+#: src/mapconv/pages/components/PlayabilityPanel.tsx
+msgid "Passability"
+msgstr ""
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Passable"
@@ -44178,6 +44194,7 @@ msgstr "Configurando…"
 msgid "settings"
 msgstr "configurações"
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
 #: src/widgets/pages/WidgetsPage.tsx
