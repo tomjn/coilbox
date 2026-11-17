@@ -4450,11 +4450,16 @@ export interface UploadFactsResult {
   errors: string[];
 }
 
-/** Give a map's unitsync name or a game's primary archive name, never both. */
+/**
+ * Give a map's unitsync name, a map archive's file name or a game's primary
+ * archive name, and only one of them. The file name is for an archive whose map
+ * name is not known, such as one just downloaded.
+ */
 type UploadFactsArgs = {
   enginePath: string;
   dataDir: string;
   map?: string;
+  mapArchive?: string;
   game?: string;
 };
 

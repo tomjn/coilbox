@@ -934,11 +934,14 @@ impl MapCatalogArgs {
 }
 
 /// `--upload-facts`: the facts the hub takes before it accepts one map or one
-/// game as an upload (issue #5257). Exactly one of `map` (a unitsync map name)
-/// and `game` (a game's primary archive file name, as `--game` takes it).
+/// game as an upload (issue #5257). Exactly one of `map` (a unitsync map name),
+/// `map_archive` (the file name of a map archive, for a file whose map name is
+/// not known) and `game` (a game's primary archive file name, as `--game` takes
+/// it).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct UploadFactsArgs {
     pub map: Option<String>,
+    pub map_archive: Option<String>,
     pub game: Option<String>,
     pub cache_dir: Option<String>,
 }
@@ -953,6 +956,10 @@ impl UploadFactsArgs {
             args.push("--map".to_string());
             args.push(map.clone());
         }
+        if let Some(file) = &self.map_archive {
+            args.push("--map-archive".to_string());
+            args.push(file.clone());
+        }
         if let Some(game) = &self.game {
             args.push("--game".to_string());
             args.push(game.clone());
@@ -966,28 +973,38 @@ impl UploadFactsArgs {
 
     /// Recover a `--upload-facts` invocation from a worker argv. As with the
     /// other modes, `args` may be exactly what [`UploadFactsArgs::to_args`]
-    /// returns or a full process argv. Naming both a map and a game, or neither,
-    /// is refused: the mode would have to guess which one was meant.
+    /// returns or a full process argv. Naming more than one of a map, a map
+    /// archive and a game, or none, is refused: the mode would have to guess
+    /// which one was meant.
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut map = None;
+        let mut map_archive = None;
         let mut game = None;
         let mut cache_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
                 "--map" => map = it.next().cloned(),
+                "--map-archive" => map_archive = it.next().cloned(),
                 "--game" => game = it.next().cloned(),
                 "--cache-dir" => cache_dir = it.next().cloned(),
                 _ => {}
             }
         }
-        if map.is_some() == game.is_some() {
+        if [&map, &map_archive, &game]
+            .iter()
+            .filter(|chosen| chosen.is_some())
+            .count()
+            != 1
+        {
             return Err(
-                "--upload-facts needs exactly one of --map <name> and --game <archive>".into(),
+                "--upload-facts needs exactly one of --map <name>, --map-archive <file> and --game <archive>"
+                    .into(),
             );
         }
         Ok(UploadFactsArgs {
             map,
+            map_archive,
             game,
             cache_dir,
         })
@@ -2622,11 +2639,19 @@ mod tests {
         for original in [
             UploadFactsArgs {
                 map: Some("Acidic Quarry 5.17".into()),
+                map_archive: None,
                 game: None,
                 cache_dir: Some("/cache/info".into()),
             },
             UploadFactsArgs {
                 map: None,
+                map_archive: Some("acidic_quarry_5.17.sd7".into()),
+                game: None,
+                cache_dir: None,
+            },
+            UploadFactsArgs {
+                map: None,
+                map_archive: None,
                 game: Some("splinterfaction.sdz".into()),
                 cache_dir: None,
             },
@@ -2637,15 +2662,21 @@ mod tests {
     }
 
     #[test]
-    fn upload_facts_needs_exactly_one_of_a_map_and_a_game() {
+    fn upload_facts_needs_exactly_one_of_a_map_a_map_archive_and_a_game() {
         let neither = UploadFactsArgs::default();
         assert!(UploadFactsArgs::from_args(&neither.to_args()).is_err());
         let both = UploadFactsArgs {
             map: Some("m".into()),
             game: Some("g.sdz".into()),
-            cache_dir: None,
+            ..Default::default()
         };
         assert!(UploadFactsArgs::from_args(&both.to_args()).is_err());
+        let map_and_file = UploadFactsArgs {
+            map: Some("m".into()),
+            map_archive: Some("m.sd7".into()),
+            ..Default::default()
+        };
+        assert!(UploadFactsArgs::from_args(&map_and_file.to_args()).is_err());
     }
 
     fn map_minimaps_args() -> MapMinimapsArgs {

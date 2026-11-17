@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  checkHubDownload,
   dlDownloadFileRaw,
   dlDownloadMapRaw,
   dlEvolutionRtsMaps,
@@ -10,6 +11,7 @@ const {
   knownMap,
   notify,
 } = vi.hoisted(() => ({
+  checkHubDownload: vi.fn(),
   dlDownloadFileRaw: vi.fn(),
   dlDownloadMapRaw: vi.fn(),
   dlEvolutionRtsMaps: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock("./bindings", () => ({
 }));
 vi.mock("../hub/maps/knownMaps", () => ({ knownMap }));
 vi.mock("../notify/notify", () => ({ notify }));
+vi.mock("./hubMismatch", () => ({ checkHubDownload }));
 vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {
     onmessage: (sample: unknown) => void = () => {};
@@ -249,14 +252,20 @@ describe("downloadMapAnySource, the hub's sources (issue #5251)", () => {
       expect.objectContaining({ sha256: HASH_A }),
     );
     expect(onAttempt.mock.calls.map((c) => c[0].outcome)).toEqual(["ok"]);
+    expect(checkHubDownload).toHaveBeenCalledWith({
+      sha256: HASH_A,
+      destDir: "/data/maps",
+      filename: FILE,
+    });
   });
 
-  it("downloads as before when the source lists no hash", async () => {
+  it("downloads as before when the source lists no hash, and checks nothing", async () => {
     hubLists([mirror("a.example")]);
 
     await run().result;
 
     expect(dlDownloadFileRaw.mock.calls[0][0].sha256).toBeUndefined();
+    expect(checkHubDownload).not.toHaveBeenCalled();
   });
 
   it("moves to the next source when a file does not match its hash", async () => {
@@ -285,6 +294,22 @@ describe("downloadMapAnySource, the hub's sources (issue #5251)", () => {
       ["a.example", "failed"],
       ["b.example", "ok"],
     ]);
+    // Only the file that matched is checked. The mismatched one is the
+    // mirror's fault and is never reported to the hub (issue #5267).
+    expect(checkHubDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks nothing for a github source, which carries no hash", async () => {
+    hubLists([author]);
+    dlGithubReleaseArchives.mockResolvedValue({
+      archives: [
+        { tag: "v1", filename: "isis.sd7", url: "https://gh.example/isis.sd7" },
+      ],
+    });
+
+    await run().result;
+
+    expect(checkHubDownload).not.toHaveBeenCalled();
   });
 
   it("falls to the mirrors when a github source has nothing to fetch", async () => {

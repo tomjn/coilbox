@@ -2834,6 +2834,14 @@ msgstr "{fileName} inkluderar {includes}, som inte hittades bredvid den eller i 
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} är inte ett .sdz- eller .sd7-arkiv."
 
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
+msgstr ""
+
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName}, a game, is copied to {destDir}."
@@ -34691,6 +34699,10 @@ msgstr "Inte spårat än."
 #, fuzzy
 msgid "not tried"
 msgstr "inte provad"
+
+#: src/downloads/hubMismatch.ts
+msgid "Not what the hub says it is"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy

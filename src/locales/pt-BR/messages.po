@@ -2832,6 +2832,14 @@ msgstr "{fileName} inclui {includes}, que não foi encontrado ao lado dele nem e
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} não é um arquivo compactado .sdz ou .sd7."
 
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
+msgstr ""
+
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName}, a game, is copied to {destDir}."
@@ -34674,6 +34682,10 @@ msgstr "Ainda não rastreado."
 #, fuzzy
 msgid "not tried"
 msgstr "não tentado"
+
+#: src/downloads/hubMismatch.ts
+msgid "Not what the hub says it is"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy

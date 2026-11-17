@@ -2804,6 +2804,14 @@ msgstr "{fileName} 包含了 {includes}，但在它旁边或其上级的 scripts
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} 不是 .sdz 或 .sd7 归档。"
 
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
+msgstr ""
+
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName}, a game, is copied to {destDir}."
@@ -34478,6 +34486,10 @@ msgstr "尚未追踪。"
 #, fuzzy
 msgid "not tried"
 msgstr "未尝试"
+
+#: src/downloads/hubMismatch.ts
+msgid "Not what the hub says it is"
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy

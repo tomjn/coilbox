@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dlDownloadRaw, dlDownloadFileRaw, dlGithubReleaseArchives, notify } =
-  vi.hoisted(() => ({
-    dlDownloadRaw: vi.fn(),
-    dlDownloadFileRaw: vi.fn(),
-    dlGithubReleaseArchives: vi.fn(),
-    notify: vi.fn(),
-  }));
+const {
+  checkHubDownload,
+  dlDownloadRaw,
+  dlDownloadFileRaw,
+  dlGithubReleaseArchives,
+  notify,
+} = vi.hoisted(() => ({
+  checkHubDownload: vi.fn(),
+  dlDownloadRaw: vi.fn(),
+  dlDownloadFileRaw: vi.fn(),
+  dlGithubReleaseArchives: vi.fn(),
+  notify: vi.fn(),
+}));
 
 vi.mock("./bindings", () => ({
   dlDownloadRaw,
@@ -14,6 +20,7 @@ vi.mock("./bindings", () => ({
   dlGithubReleaseArchives,
 }));
 vi.mock("../notify/notify", () => ({ notify }));
+vi.mock("./hubMismatch", () => ({ checkHubDownload }));
 // There is no webview here to register a real `Channel` against.
 vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {
@@ -78,14 +85,20 @@ describe("downloadHubGame", () => {
       }),
     );
     expect(attempts.map((a) => a.outcome)).toEqual(["ok"]);
+    expect(checkHubDownload).toHaveBeenCalledWith({
+      sha256: HASH_A,
+      destDir: DEST,
+      filename: "game.sdz",
+    });
   });
 
-  it("downloads as before when the source lists no hash", async () => {
+  it("downloads as before when the source lists no hash, and checks nothing", async () => {
     dlDownloadFileRaw.mockResolvedValueOnce({ path: "/data/games/game.sdz" });
 
     await run([mirror("a.example")]);
 
     expect(dlDownloadFileRaw.mock.calls[0][0].sha256).toBeUndefined();
+    expect(checkHubDownload).not.toHaveBeenCalled();
   });
 
   it("moves to the next source when a file does not match its hash", async () => {
@@ -108,6 +121,9 @@ describe("downloadHubGame", () => {
       ["b.example", "ok"],
     ]);
     expect(attempts[0].failure).toMatch(/did not match its checksum/);
+    // Only the file that matched is checked. The mismatched one is the
+    // mirror's fault and is never reported to the hub (issue #5267).
+    expect(checkHubDownload).toHaveBeenCalledTimes(1);
   });
 
   it("moves on from a failed transfer to a rapid source below it", async () => {
@@ -201,6 +217,7 @@ describe("downloadHubGame", () => {
     expect(text).toMatch(/a\.example: .*did not match its checksum/);
     expect(text).toMatch(/b\.example answered 404/);
     expect(text.indexOf("a.example")).toBeLessThan(text.indexOf("b.example"));
+    expect(checkHubDownload).not.toHaveBeenCalled();
   });
 
   it("stops the walk when the player cancels", async () => {

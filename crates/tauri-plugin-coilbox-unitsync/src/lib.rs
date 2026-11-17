@@ -1824,8 +1824,10 @@ async fn unitsync_map_catalog<R: Runtime>(
 /// map or one game as an upload (issue #5257): the archive's sha256, size and
 /// file name, and the names, version and credits inside it.
 ///
-/// Give it a unitsync map name in `map` or a game's primary archive file name in
-/// `game`, and exactly one of them. It answers `{ facts, problem, errors }`.
+/// Give it a unitsync map name in `map`, the file name of a map archive in
+/// `map_archive`, or a game's primary archive file name in `game`, and exactly
+/// one of them. `map_archive` is for a file whose map name is not known, such as
+/// one just downloaded that may not be the map it was said to be. It answers `{ facts, problem, errors }`.
 /// `facts` is the body of `POST /api/v1/uploads`, already checked against the
 /// hub's rules. `problem` is a sentence for the player when the archive cannot
 /// be uploaded, such as a game with no shortname or one that is not a single
@@ -1841,10 +1843,18 @@ async fn unitsync_upload_facts<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map: Option<String>,
+    map_archive: Option<String>,
     game: Option<String>,
 ) -> CliResult {
-    if map.is_some() == game.is_some() {
-        return CliResult::err("Give either a map or a game to read upload facts for.".to_string());
+    if [&map, &map_archive, &game]
+        .iter()
+        .filter(|chosen| chosen.is_some())
+        .count()
+        != 1
+    {
+        return CliResult::err(
+            "Give one of a map, a map archive or a game to read upload facts for.".to_string(),
+        );
     }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
@@ -1855,6 +1865,7 @@ async fn unitsync_upload_facts<R: Runtime>(
         &libpath.to_string_lossy(),
         &data_dir,
         map.as_deref(),
+        map_archive.as_deref(),
         game.as_deref(),
         cache_dir.as_deref(),
     );

@@ -88,8 +88,29 @@ fn answer(assembled: Result<UploadFacts, String>, errors: Vec<String>) -> Upload
     }
 }
 
+/// Which map to read: the one unitsync names, or the one an archive file holds.
+enum MapSelector<'a> {
+    Name(&'a str),
+    ArchiveFile(&'a str),
+}
+
 /// One map's facts, in a session of its own.
 pub fn read_map(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> UploadFactsOutput {
+    read_map_selected(lib, MapSelector::Name(map_name), cache_dir)
+}
+
+/// The facts of the map in the archive file called `file_name` under `maps/`,
+/// whatever it is named inside. For a file that was just downloaded and may not
+/// be the map it was said to be.
+pub fn read_map_archive(lib: &str, file_name: &str, cache_dir: Option<&Path>) -> UploadFactsOutput {
+    read_map_selected(lib, MapSelector::ArchiveFile(file_name), cache_dir)
+}
+
+fn read_map_selected(
+    lib: &str,
+    selector: MapSelector<'_>,
+    cache_dir: Option<&Path>,
+) -> UploadFactsOutput {
     let us = match unsafe { crate::ffi::Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -102,17 +123,28 @@ pub fn read_map(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> UploadFa
     us.init(false, 0);
     let _ = us.drain_errors();
 
-    let Some(map_index) =
-        (0..us.map_count()).find(|&i| us.map_name(i).as_deref() == Some(map_name))
-    else {
+    let (found, missing) = match selector {
+        MapSelector::Name(name) => (
+            (0..us.map_count())
+                .find(|&i| us.map_name(i).as_deref() == Some(name))
+                .map(|i| (i, name.to_string())),
+            format!("No map named {name} is installed."),
+        ),
+        MapSelector::ArchiveFile(file) => (
+            crate::archive::map_in_archive_file(&us, file),
+            format!("No map archive named {file} is installed."),
+        ),
+    };
+    let Some((map_index, map_name)) = found else {
         let errors = us.drain_errors();
         us.uninit();
         return UploadFactsOutput {
-            problem: Some(format!("No map named {map_name} is installed.")),
+            problem: Some(missing),
             errors,
             ..Default::default()
         };
     };
+    let map_name = map_name.as_str();
 
     let assembled = match mapcatalog::source_in_session(&us, map_index, map_name, None, cache_dir) {
         Ok(source) => {

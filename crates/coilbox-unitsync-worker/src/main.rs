@@ -790,10 +790,13 @@ fn dispatch(args: &Args) -> i32 {
     if let Some(Mode::UploadFacts(mode)) = &args.upload_facts {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return run_mode(
-            || match (&mode.map, &mode.game) {
-                (Some(map), _) => uploadfacts_read::read_map(&args.lib, map, cache_dir),
-                (None, Some(game)) => uploadfacts_read::read_game(&args.lib, game, cache_dir),
-                (None, None) => uploadfacts_read::problem("nothing was asked for".into()),
+            || match (&mode.map, &mode.map_archive, &mode.game) {
+                (Some(map), _, _) => uploadfacts_read::read_map(&args.lib, map, cache_dir),
+                (None, Some(file), _) => {
+                    uploadfacts_read::read_map_archive(&args.lib, file, cache_dir)
+                }
+                (None, None, Some(game)) => uploadfacts_read::read_game(&args.lib, game, cache_dir),
+                (None, None, None) => uploadfacts_read::problem("nothing was asked for".into()),
             },
             print_ok,
             || {
@@ -1208,6 +1211,11 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--typemap" => typemap = true,
             "--map-catalog" => map_catalog_flag = true,
             "--upload-facts" => upload_facts_flag = true,
+            // Consumed by `Mode::UploadFacts`'s `from_args` below, not stored
+            // here.
+            "--map-archive" => {
+                it.next();
+            }
             // Consumed by `Mode::MapCatalog`'s `from_args` below, not stored
             // here.
             "--keys-only" => {}
