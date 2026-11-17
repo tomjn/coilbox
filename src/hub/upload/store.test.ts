@@ -93,6 +93,19 @@ describe("following archive uploads", () => {
     expect(changed).toHaveBeenCalledOnce();
   });
 
+  it("says nothing when a quiet upload ends, but still asks pages to look again", async () => {
+    await followArchiveUploads();
+    rememberUpload(
+      state(),
+      { kind: "map", label: "Tabula 3" },
+      { quiet: true },
+    );
+    heard?.(state({ phase: "done", outcome: { kind: "listed" } }));
+    await flush();
+    expect(notified).not.toHaveBeenCalled();
+    expect(changed).toHaveBeenCalledOnce();
+  });
+
   it("says an ending once however many times it is heard", async () => {
     await followArchiveUploads();
     rememberUpload(state(), { kind: "map", label: "Tabula 3" });
