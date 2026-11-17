@@ -2317,6 +2317,14 @@ msgstr "{fileName} includes {includes}, which could not be found beside it or in
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} is not a .sdz or .sd7 archive."
 
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
+msgstr "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
+
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+msgstr "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+
 #: src/downloads/installArchive.ts
 msgid "{fileName}, a game, is copied to {destDir}."
 msgstr "{fileName}, a game, is copied to {destDir}."
@@ -28223,6 +28231,10 @@ msgstr "Not traced yet."
 #: src/content/pages/components/GameSourcesTab.tsx
 msgid "not tried"
 msgstr "not tried"
+
+#: src/downloads/hubMismatch.ts
+msgid "Not what the hub says it is"
+msgstr "Not what the hub says it is"
 
 #: src/profile/health.ts
 msgid "not writable"

@@ -2316,6 +2316,14 @@ msgstr ""
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr ""
 
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
+msgstr ""
+
+#: src/downloads/hubMismatch.ts
+msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 msgid "{fileName}, a game, is copied to {destDir}."
 msgstr ""
@@ -28221,6 +28229,10 @@ msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
 msgid "not tried"
+msgstr ""
+
+#: src/downloads/hubMismatch.ts
+msgid "Not what the hub says it is"
 msgstr ""
 
 #: src/profile/health.ts

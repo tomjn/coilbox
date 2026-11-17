@@ -3,6 +3,7 @@ import type { HubFileDownload } from "../hub/api";
 import { dlDownloadFileRaw } from "./bindings";
 import { hostOf } from "./downloadHistory";
 import { loadGithubReleases } from "./githubReleases";
+import { checkHubDownload } from "./hubMismatch";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import type { AttemptLog } from "./sourceWalk";
 
@@ -49,6 +50,15 @@ export async function fetchHubFile(
     );
     if (!dl.filename) throw new Error(t`no filename to save it as`);
     await fetchFile(dl.value, dl.filename, dl.sha256);
+    // The file has the hash the hub listed. Whether it is the archive the hub
+    // says it is gets checked in the background and never holds up the download.
+    if (dl.sha256) {
+      void checkHubDownload({
+        sha256: dl.sha256,
+        destDir: o.destDir,
+        filename: dl.filename,
+      });
+    }
     return;
   }
 
