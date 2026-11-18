@@ -56,6 +56,10 @@ pub struct UploadFactsOutput {
     pub facts: Option<UploadFacts>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub problem: Option<String>,
+    /// The archive's full path on disk, set with `facts`. It is what an upload
+    /// sends, and it stays out of `facts` because that is the hub's body.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     pub errors: Vec<String>,
 }
 

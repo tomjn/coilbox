@@ -4447,6 +4447,9 @@ const archiveTreeCommand = defineCommand<ArchiveTreeArgs, ArchiveTreeResult>(
 export interface UploadFactsResult {
   facts?: ArchiveFacts;
   problem?: string;
+  /** The archive's full path on disk, set with `facts`. Absent from a worker
+   *  that predates it. */
+  path?: string;
   errors: string[];
 }
 

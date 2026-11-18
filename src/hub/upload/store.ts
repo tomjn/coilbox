@@ -45,6 +45,8 @@ const listeners = new Set<() => void>();
 /** By archive hash, which is what an upload and the page that started it share. */
 const subjects = new Map<string, UploadSubject>();
 const announced = new Set<string>();
+/** Hashes of uploads a bulk run started, which it reports on itself. */
+const quiet = new Set<string>();
 let following: Promise<void> | null = null;
 
 function emit(): void {
@@ -69,13 +71,26 @@ function apply(state: ArchiveUploadState, announce: boolean): void {
   }
 }
 
-/** Record an upload this page has just started, and what to call it. */
+/** Record an upload this page has just started, and what to call it. A
+ *  `quiet` upload ends with no notification of its own, because whoever
+ *  started it reports on a whole run at once. */
 export function rememberUpload(
   state: ArchiveUploadState,
   subject: UploadSubject,
+  options: { quiet?: boolean } = {},
 ): void {
   subjects.set(state.sha256, subject);
+  if (options.quiet) quiet.add(state.sha256);
   apply(state, true);
+}
+
+/** Hear about every change to the uploads held. Call the returned function to
+ *  stop. */
+export function subscribeArchiveUploads(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /**
@@ -102,10 +117,7 @@ export function readArchiveUploads(): readonly ArchiveUploadState[] {
 /** Every archive upload the app has started, newest last. */
 export function useArchiveUploads(): readonly ArchiveUploadState[] {
   return useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
-    },
+    subscribeArchiveUploads,
     readArchiveUploads,
     readArchiveUploads,
   );
@@ -179,6 +191,10 @@ export function endingToNotification(ending: UploadEnding): NotifyInput {
 async function announceEnd(state: ArchiveUploadState): Promise<void> {
   const { outcome } = state;
   if (!outcome) return;
+  if (quiet.has(state.sha256)) {
+    noteHubChanged();
+    return;
+  }
   const links = await linksFor(state, subjects.get(state.sha256));
   void notify(
     endingToNotification(describeUploadEnd(outcome, labelOf(state), links)),
@@ -192,6 +208,7 @@ export function forgetArchiveUploads(): void {
   uploads = [];
   subjects.clear();
   announced.clear();
+  quiet.clear();
   following = null;
   emit();
 }

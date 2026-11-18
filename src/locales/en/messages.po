@@ -1166,6 +1166,13 @@ msgstr "{0} at a position with no name."
 msgid "{0} called a vote: {1}"
 msgstr "{0} called a vote: {1}"
 
+#. placeholder {0}: found.candidates.length
+#. placeholder {1}: found.skipped.length
+#. placeholder {2}: found.listed
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
+msgstr "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
@@ -2245,6 +2252,10 @@ msgstr "{factions} · {units}"
 msgid "{factionWins}W of {factionGames}"
 msgstr "{factionWins}W of {factionGames}"
 
+#: src/hub/upload/bulkMaps.ts
+msgid "{failed, plural, one {# map failed. Settings > Coilbox hub says why.} other {# maps failed. Settings > Coilbox hub says why.}}"
+msgstr "{failed, plural, one {# map failed. Settings > Coilbox hub says why.} other {# maps failed. Settings > Coilbox hub says why.}}"
+
 #: src/hub/games/factsSweep.ts
 msgid "{failedCount, plural, one {The hub would not take one game.} other {The hub would not take # games.}}"
 msgstr "{failedCount, plural, one {The hub would not take one game.} other {The hub would not take # games.}}"
@@ -2332,6 +2343,11 @@ msgstr "{fileName}, a game, goes in {destDir}."
 #: src/downloads/installArchive.ts
 msgid "{fileName}, a map, goes in {destDir}."
 msgstr "{fileName}, a map, goes in {destDir}."
+
+#. placeholder {0}: run.items.length
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "{finished} of {0} done"
+msgstr "{finished} of {0} done"
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{finishedCount, plural, one {# building finished.} other {# buildings finished.}}"
@@ -9790,6 +9806,7 @@ msgstr "Asking it to stop…"
 msgid "Asking the hub about {done} of {total}"
 msgstr "Asking the hub about {done} of {total}"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "Asking the hub about your maps"
@@ -11760,6 +11777,7 @@ msgstr "Can't damage its own unit"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -13158,6 +13176,10 @@ msgstr "Coilbox could not create {0}'s settings file."
 msgid "Coilbox could not create the game's settings file."
 msgstr "Coilbox could not create the game's settings file."
 
+#: src/hub/upload/bulkMaps.ts
+msgid "Coilbox could not find the file for this map."
+msgstr "Coilbox could not find the file for this map."
+
 #: src/hub/upload/messages.ts
 msgid "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
 msgstr "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
@@ -13508,6 +13530,7 @@ msgstr "Coilbox needs an engine installed before it can draw your units."
 msgid "Coilbox needs an engine installed before it can read your games."
 msgstr "Coilbox needs an engine installed before it can read your games."
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "Coilbox needs an engine installed before it can read your maps."
@@ -18380,6 +18403,7 @@ msgstr "failed"
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/components/MapArchivesControl.tsx
 msgid "Failed"
 msgstr "Failed"
 
@@ -18681,9 +18705,17 @@ msgstr "Find it another way, or on this network use <0>{lan}</0>."
 msgid "Find it in Downloads"
 msgstr "Find it in Downloads"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Find maps the hub is missing"
+msgstr "Find maps the hub is missing"
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Find other accounts on this IP"
 msgstr "Find other accounts on this IP"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Finding maps…"
+msgstr "Finding maps…"
 
 #: src/content/pages/StorageSection.tsx
 msgid "Finish or cancel downloads before reclaiming space"
@@ -29016,6 +29048,10 @@ msgstr "on ground too steep for it, in amber"
 msgid "on or off"
 msgstr "on or off"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "On the hub"
+msgstr "On the hub"
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "On the menu"
 msgstr "On the menu"
@@ -31981,6 +32017,12 @@ msgstr "Re-scan"
 msgid "Re-verify"
 msgstr "Re-verify"
 
+#. placeholder {0}: progress.done
+#. placeholder {1}: progress.total
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Read {0} of {1}"
+msgstr "Read {0} of {1}"
+
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "Read {done} of {total}"
@@ -32402,6 +32444,7 @@ msgstr "Reading your games…"
 msgid "Reading your installed games"
 msgstr "Reading your installed games"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "Reading your maps"
@@ -38037,6 +38080,7 @@ msgstr "Stocky"
 msgid "Stone"
 msgstr "Stone"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
 #: src/lego/pages/components/ScanSkeletons.tsx
 #: src/lego/pages/components/TestDrawer.tsx
 msgid "Stop"
@@ -38093,6 +38137,10 @@ msgstr "Stop uploading"
 #: src/direct/lan.ts
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Stop your own room first. Coilbox can be in one room at a time."
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Stopped"
+msgstr "Stopped"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
 msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
@@ -41615,6 +41663,10 @@ msgstr "These come with the game and play as the game itself. They are listed un
 msgid "These costs come from a different build and may be wrong."
 msgstr "These costs come from a different build and may be wrong."
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "These files will be public. Anyone can download them from the hub's mirrors."
+msgstr "These files will be public. Anyone can download them from the hub's mirrors."
+
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 msgid "These loadouts are the same."
 msgstr "These loadouts are the same."
@@ -44732,6 +44784,10 @@ msgstr "Upgrades into"
 msgid "Upload"
 msgstr "Upload"
 
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Upload {count, plural, one {# map} other {# maps}} ({size})"
+msgstr "Upload {count, plural, one {# map} other {# maps}} ({size})"
+
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Upload {label} to the hub?"
 msgstr "Upload {label} to the hub?"
@@ -44744,6 +44800,14 @@ msgstr "Upload again"
 msgid "Upload to hub"
 msgstr "Upload to hub"
 
+#: src/hub/upload/bulkMaps.ts
+msgid "Uploaded {listed} of {total, plural, one {# map} other {# maps}} to the hub"
+msgstr "Uploaded {listed} of {total, plural, one {# map} other {# maps}} to the hub"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Uploading"
+msgstr "Uploading"
+
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Uploading to hub"
 msgstr "Uploading to hub"
@@ -44751,6 +44815,10 @@ msgstr "Uploading to hub"
 #: src/hub/upload/ArchiveUploadBadge.tsx
 msgid "Uploading to the hub. Open to stop."
 msgstr "Uploading to the hub. Open to stop."
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Uploading your map files"
+msgstr "Uploading your map files"
 
 #: src/hub/upload/UploadToHubButton.tsx
 msgid "Uploading…"
@@ -45182,6 +45250,10 @@ msgstr "wait for the player"
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 msgid "Wait for them"
 msgstr "Wait for them"
+
+#: src/hub/pages/components/MapArchivesControl.tsx
+msgid "Waiting"
+msgstr "Waiting"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx

@@ -1,4 +1,5 @@
 import { useHubUrl } from "../config";
+import { MapArchivesControl } from "./components/MapArchivesControl";
 import { ShareAssetsPanel } from "./components/ShareAssetsPanel";
 
 /**
@@ -21,7 +22,16 @@ import { ShareAssetsPanel } from "./components/ShareAssetsPanel";
  * Signing in and the four sharing controls themselves are `ShareAssetsPanel`
  * (`./components/ShareAssetsPanel.tsx`), shared with the hub page's Share menu
  * (issue #2562) so the same panel does the work wherever it is opened from.
+ *
+ * Uploading map files in bulk (`./components/MapArchivesControl.tsx`) sits below
+ * the panel and only here, not in the Share menu.
  */
 export default function HubSettings() {
-  return <ShareAssetsPanel hubUrl={useHubUrl()} />;
+  const hubUrl = useHubUrl();
+  return (
+    <div className="space-y-6">
+      <ShareAssetsPanel hubUrl={hubUrl} />
+      <MapArchivesControl hubUrl={hubUrl} />
+    </div>
+  );
 }
