@@ -16,6 +16,7 @@ import {
 import { forgetScans, rescanMounted } from "../content/config";
 import { warmAllRoots } from "../content/rapidPoolWarm";
 import type { HubGameDownload } from "../hub/api";
+import { reportDownload } from "../hub/downloadCount";
 import {
   type DownloadProgress,
   dlCancel,
@@ -609,6 +610,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           },
         );
         remember(null);
+        // Never throws, so a hub that is down cannot fail a finished download.
+        reportDownload(item);
         patch(item.id, { status: "done", progress: null, rate: IDLE_RATE });
         setCompletions((c) => ({ ...c, [item.identity]: true }));
         for (const fn of completeListeners.current) fn(settled);

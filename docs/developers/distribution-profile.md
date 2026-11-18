@@ -1063,15 +1063,17 @@ A trailing slash is optional. An empty string counts as not set. There is no pla
 
 ### `hubImportCounts` (boolean)
 
-Stops Coilbox telling the hub when an import from a hub link finished. On by default.
+Stops Coilbox telling the hub when an import from a hub link finished, and when a map or game finished downloading. On by default.
 
 ```json
 { "version": 1, "hubImportCounts": false }
 ```
 
-This is the only thing Coilbox sends to the hub without being asked to, and it exists because the hub can't work it out for itself: it sees the container being fetched, but Coilbox asks the player to confirm before applying anything, so a fetch that ends at the confirm dialog isn't an import. The request is a `POST` to the item's address carrying the item's id and nothing else, with no body, no account and no identifier of any kind, and Coilbox never reads what comes back.
+These are the only counts Coilbox sends to the hub without being asked to, and they exist because the hub can't work them out for itself. For imports, the hub sees the container being fetched, but Coilbox asks the player to confirm before applying anything, so a fetch that ends at the confirm dialog isn't an import. The request is a `POST` to the item's address carrying the item's id and nothing else, with no body, no account and no identifier of any kind.
 
-This is the only switch for it. There's no per-player one: what it would withhold is an item id the hub had just served, with no account and nothing that points back at the player, so there's nothing to ask anybody about. Setting this to `false` means nothing is sent. Turning the hub off with [`hub`](#hub-boolean) also stops it, since there's then no hub to import from.
+Download counts work the same way. When a map or game finishes downloading, Coilbox sends a `POST` saying which one: the map's name in a small JSON body, or the game's hub shortname in the address. A game Coilbox can't match to a hub game sends nothing, and engine downloads send nothing. Coilbox never reads what comes back from either request.
+
+This is the only switch for it. There's no per-player one: what it would withhold is an item id the hub had just served or the name of a map or game, with no account and nothing that points back at the player, so there's nothing to ask anybody about. Setting this to `false` means nothing is sent. Turning the hub off with [`hub`](#hub-boolean) also stops it, since there's then no hub to import from.
 
 ### `hubAssetUploads` (boolean)
 

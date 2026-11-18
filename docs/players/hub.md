@@ -139,6 +139,10 @@ Anyone browsing the hub can see and import it.
 
 When you import something from the hub, coilbox tells the hub that the item was imported, so the hub can count imports. That message says only which item it was. It has no account and nothing that points back to you.
 
+When coilbox finishes downloading a map or a game, it tells the hub which one, so the hub can count downloads. This happens for every finished download, including ones coilbox starts for you, such as a map a lobby needs. It has no account and nothing that points back to you. Engine downloads send nothing.
+
+Coilbox also asks the hub about a map by its name, to show facts about maps you have not installed. If a map file you download is not what the hub lists for it, coilbox sends the hub a report of the difference.
+
 Coilbox sends nothing about your own games, maps, presets or other files unless you publish them or turn on the sharing in [Share your maps and games](#share-your-maps-and-games).
 
 Signing out only affects this computer. It does not remove anything you have already shared.

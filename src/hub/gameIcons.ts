@@ -157,6 +157,14 @@ export function loadHubGames(
 }
 
 /**
+ * The list already read from a hub, or null when none has landed. Reads nothing
+ * from the network, for code that runs outside a component and must not wait.
+ */
+export function heldHubGames(hubUrl: string): HubGame[] | null {
+  return answers.get(hubUrl) ?? null;
+}
+
+/**
  * Read the hub's list again, so a game published since launch shows up. A page
  * already showing the list keeps it until the new one lands, and keeps it if the
  * read fails, since a stale list is more use than none. With nothing held yet,
