@@ -45,6 +45,11 @@ vi.mock("../maps/lookup", () => ({
   fetchMapFacts: async () => ({ ok: false }),
 }));
 
+const factsFirst = vi.fn();
+vi.mock("./bulkMaps", () => ({
+  sendMapFactsFirst: (...args: unknown[]) => factsFirst(...args),
+}));
+
 const notified = vi.fn();
 vi.mock("@/notify/notify", () => ({
   notify: (input: unknown) => notified(input),
@@ -121,6 +126,8 @@ beforeEach(() => {
   readFacts.mockResolvedValue({ facts: FACTS, errors: [] });
   started.mockReset();
   started.mockResolvedValue(state({ phase: "reserving" }));
+  factsFirst.mockReset();
+  factsFirst.mockResolvedValue(null);
   begun.mockClear();
   ended.mockClear();
   notified.mockClear();
@@ -222,6 +229,39 @@ describe("the upload to hub button", () => {
         "disabled",
       ),
     ).toBe(true);
+  });
+
+  it("sends the map's facts under the grant before the file", async () => {
+    factsFirst.mockImplementation(async () => {
+      expect(started).not.toHaveBeenCalled();
+      return null;
+    });
+    render(<UploadToHubButton {...MAP} />);
+    fireEvent.click(screen.getByRole("button", { name: /Upload to hub/ }));
+    await screen.findByText(/will be public/);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(started).toHaveBeenCalled());
+    expect(factsFirst).toHaveBeenCalledWith(
+      { hubUrl: "https://hub.test", enginePath: "/e", dataDir: "/d" },
+      "Tabula 3",
+      "grant-1",
+    );
+  });
+
+  it("does not upload the file when the hub will not take the map's facts", async () => {
+    factsFirst.mockResolvedValue("The hub would not take this map's facts.");
+    render(<UploadToHubButton {...MAP} />);
+    fireEvent.click(screen.getByRole("button", { name: /Upload to hub/ }));
+    await screen.findByText(/will be public/);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(notified).toHaveBeenCalled());
+    expect(notified.mock.calls[0][0]).toMatchObject({
+      title: "Tabula 3 was not uploaded",
+      body: "The hub would not take this map's facts.",
+      level: "error",
+    });
+    expect(started).not.toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledWith("grant-1");
   });
 
   it("says so when the upload could not start", async () => {

@@ -24,6 +24,7 @@ import {
 import { startManualSend } from "../manualSend/run";
 import { gamePageUrl, type HubState } from "../manualSend/status";
 import { SignInButton } from "../pages/components/AccountControl";
+import { sendMapFactsFirst } from "./bulkMaps";
 import { describeUploadEnd } from "./messages";
 import {
   rememberUpload,
@@ -91,8 +92,8 @@ export function UploadToHubButton({
   hub: HubState;
   /** The item's page on the hub, when it has one. */
   pageUrl: string | null;
-  /** What the page's send control sends, when it has one. A game the hub does
-   *  not know is offered that send before the file goes up. */
+  /** What the page's send control sends, when it has one. A game or map the
+   *  hub does not know is offered that send before the file goes up. */
   sendSubject?: SendSubject;
 }) {
   const { t } = useLingui();
@@ -175,6 +176,15 @@ export function UploadToHubButton({
           ? { kind: "map", map_name: checked.internal_name }
           : { kind: "game", shortname: checked.shortname ?? "" },
       );
+      // The hub refuses the file of a map it has no facts for.
+      if (target.kind === "map" && enginePath && dataDir) {
+        const problem = await sendMapFactsFirst(
+          { hubUrl, enginePath, dataDir },
+          target.mapName,
+          grant,
+        );
+        if (problem) throw new Error(problem);
+      }
       const state = await startArchiveUpload(
         hubUrl,
         archivePath,

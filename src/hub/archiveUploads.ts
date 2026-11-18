@@ -56,7 +56,7 @@ export interface ArchiveDuplicate {
  * hub or mirror sent, and `said` has its words.
  *
  * - hub: `bad_request`, `unauthorised`, `not_owner`, `duplicate`,
- *   `unknown_game`, `no_mirror`, `not_configured`, `unavailable`, `failed`,
+ *   `unknown_game`, `unknown_map`, `no_mirror`, `not_configured`, `unavailable`, `failed`,
  *   `removed`, `not_found`
  * - mirror: `exists`, `hash_mismatch`, `removed`, `expired`, `bad_token`,
  *   `wrong_mirror`, `too_large`, `bad_request`, `write_failed`,

@@ -183,7 +183,7 @@ pub struct Duplicate {
 /// The codes a page can meet, by source:
 ///
 /// - hub: `bad_request`, `unauthorised`, `not_owner`, `duplicate`,
-///   `unknown_game`, `no_mirror`, `not_configured`, `unavailable`, `failed`
+///   `unknown_game`, `unknown_map`, `no_mirror`, `not_configured`, `unavailable`, `failed`
 ///   (the hub gave up on the upload), `removed`, `not_found`
 /// - mirror: `exists` (a file with that name is already there, which is not the
 ///   same as the hub's `duplicate`), `hash_mismatch`, `removed`, `expired`,

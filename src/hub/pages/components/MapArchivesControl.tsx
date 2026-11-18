@@ -23,8 +23,9 @@ import {
  *
  * Finding reads and hashes each missing map, which is slow on a large library,
  * so it waits for a press. Nothing is sent until the Upload press, which is
- * the agreement for every map ticked, as one press is for a single map. The
- * uploading itself is `runBulkUpload`, which carries on if this page closes.
+ * the agreement for every map ticked, as one press is for a single map. It
+ * covers each map's facts as well as its file. The uploading itself is
+ * `runBulkUpload`, which carries on if this page closes.
  */
 export function MapArchivesControl({ hubUrl }: { hubUrl: string }) {
   const { t } = useLingui();
@@ -61,8 +62,12 @@ export function MapArchivesControl({ hubUrl }: { hubUrl: string }) {
   const chosen =
     found?.candidates.filter((one) => !unticked.has(one.mapName)) ?? [];
   const upload = () => {
+    if (!target?.enginePath) return;
     setFound(null);
-    void runBulkUpload(hubUrl, chosen);
+    void runBulkUpload(
+      { hubUrl, enginePath: target.enginePath, dataDir: target.dataDir },
+      chosen,
+    );
   };
   const tick = (mapName: string, on: boolean) =>
     setUnticked((held) => {
