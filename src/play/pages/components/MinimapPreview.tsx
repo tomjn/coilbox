@@ -7,9 +7,11 @@ import type { StartPos } from "@/content/bindings";
  * Responsive height cap for the minimap (`--mmh`), stepping up with screen size so
  * the preview stays modest on small screens and grows on large ones. Used to cap
  * the rendered size while preserving aspect ratio (see the width calc below).
+ * Above 3xl the sidebar widens with the window, so the cap follows its width and
+ * a square map fills the column instead of stopping at 23rem.
  */
 const MAX_HEIGHT_CLASSES =
-  "[--mmh:13rem] sm:[--mmh:15rem] lg:[--mmh:19rem] xl:[--mmh:23rem]";
+  "[--mmh:13rem] sm:[--mmh:15rem] lg:[--mmh:19rem] xl:[--mmh:23rem] 3xl:[--mmh:var(--battle-sidebar-width)]";
 
 /**
  * A map's minimap with team-coloured start-position markers overlaid. Start
