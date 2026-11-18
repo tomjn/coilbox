@@ -1085,7 +1085,7 @@ export default function SkirmishPage() {
   const rematchMapName = selectedMap?.name;
 
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-5 p-4">
       <TooltipProvider>
         <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-lg font-semibold">

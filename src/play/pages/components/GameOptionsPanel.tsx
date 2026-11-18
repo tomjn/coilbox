@@ -210,10 +210,14 @@ export function ModOptionGroups({
   );
 }
 
-/** A group's options in the two-column grid, with no header of their own. */
+/**
+ * A group's options in a grid, with no header of their own. It fits as many
+ * 18rem columns as there is room for, so a wide window gets three or four
+ * instead of two very wide ones.
+ */
 function OptionGrid({ group, readValue, disabled, onChange }: GroupProps) {
   return (
-    <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-x-4 gap-y-3">
       {group.options.map((o) => (
         <ModOptionField
           key={o.key}
