@@ -337,32 +337,67 @@ fn the_one_that_says_it_is_this_map(
     candidates: &[String],
     map_name: &str,
 ) -> Option<String> {
-    let mut matched: Vec<&String> = Vec::new();
-    for candidate in candidates {
-        let Some(handle) = us.open_archive(candidate) else {
-            continue;
-        };
-        let mapinfo = us
-            .list_archive_files(handle)
-            .into_iter()
-            .find(|(p, _)| same_member(p, "mapinfo.lua"))
-            .and_then(|(p, _)| us.read_archive_member(handle, &p, MAPINFO_CAP))
-            .map(|(_, bytes)| String::from_utf8_lossy(&bytes).into_owned());
-        us.close_archive(handle);
+    let declared: Vec<(&String, Option<String>)> = candidates
+        .iter()
+        .filter_map(|candidate| {
+            let handle = us.open_archive(candidate)?;
+            let mapinfo = us
+                .list_archive_files(handle)
+                .into_iter()
+                .find(|(p, _)| same_member(p, "mapinfo.lua"))
+                .and_then(|(p, _)| us.read_archive_member(handle, &p, MAPINFO_CAP))
+                .map(|(_, bytes)| String::from_utf8_lossy(&bytes).into_owned());
+            us.close_archive(handle);
+            Some((candidate, mapinfo))
+        })
+        .collect();
+    the_one_whose_mapinfo_names(&declared, map_name).cloned()
+}
 
-        if let Some(declared) = mapinfo.as_deref().and_then(declared_map_name) {
-            if map_name
-                .to_lowercase()
-                .starts_with(&declared.to_lowercase())
-            {
-                matched.push(candidate);
-            }
+/// The tie-break in [`the_one_that_says_it_is_this_map`], given each archive's
+/// `mapinfo.lua`.
+///
+/// Two releases of one map share a `name` and a `.smf`, and differ only in
+/// `version`: Persepolis v1.3 and v1.5 are both `name = "Persepolis"` holding
+/// `maps/persepolis.smf`. So the versioned name is tried first, built the way
+/// the engine's `GetNameVersioned` builds it. A map whose version is not a
+/// literal cannot be rebuilt that way, so the declared name opening the map's
+/// name is the fallback.
+fn the_one_whose_mapinfo_names<'a>(
+    declared: &[(&'a String, Option<String>)],
+    map_name: &str,
+) -> Option<&'a String> {
+    let wanted = map_name.to_lowercase();
+    let only = |test: &dyn Fn(&str) -> bool| -> Option<&'a String> {
+        let matched: Vec<&'a String> = declared
+            .iter()
+            .filter(|(_, mapinfo)| mapinfo.as_deref().is_some_and(test))
+            .map(|(candidate, _)| *candidate)
+            .collect();
+        match matched.as_slice() {
+            [one] => Some(*one),
+            _ => None,
         }
-    }
-    match matched.as_slice() {
-        [only] => Some((*only).clone()),
-        _ => None,
-    }
+    };
+    only(&|mapinfo| {
+        declared_versioned_name(mapinfo).is_some_and(|name| name.to_lowercase() == wanted)
+    })
+    .or_else(|| {
+        only(&|mapinfo| {
+            declared_map_name(mapinfo).is_some_and(|name| wanted.starts_with(&name.to_lowercase()))
+        })
+    })
+}
+
+/// The name unitsync lists a map under, rebuilt from its `mapinfo.lua`: `name`
+/// and `version` joined by a space, or `name` alone when there is no version or
+/// the name already holds it, as `ArchiveScanner.cpp` does.
+fn declared_versioned_name(mapinfo: &str) -> Option<String> {
+    let name = declared_map_name(mapinfo)?;
+    Some(match declared_string(mapinfo, "version") {
+        Some(version) if !name.contains(&version) => format!("{name} {version}"),
+        _ => name,
+    })
 }
 
 /// Which of `maps` are held by a loose working folder under `maps/`
@@ -435,15 +470,22 @@ pub(crate) fn maps_in_working_folders(
 /// read at all, and a map with one is left for the caller to give up on rather
 /// than guessed at.
 fn declared_map_name(mapinfo: &str) -> Option<String> {
+    declared_string(mapinfo, "name")
+}
+
+/// The first whole-word `key =` in a `mapinfo.lua` whose value is a non-empty
+/// string literal.
+fn declared_string(mapinfo: &str, key: &str) -> Option<String> {
     let bytes = mapinfo.as_bytes();
-    for at in 0..bytes.len().saturating_sub(4) {
-        if !bytes[at..at + 4].eq_ignore_ascii_case(b"name") {
+    let len = key.len();
+    for at in 0..bytes.len().saturating_sub(len) {
+        if !bytes[at..at + len].eq_ignore_ascii_case(key.as_bytes()) {
             continue;
         }
         if at > 0 && is_lua_ident(bytes[at - 1]) {
             continue;
         }
-        let mut i = at + 4;
+        let mut i = at + len;
         while i < bytes.len() && bytes[i].is_ascii_whitespace() {
             i += 1;
         }
@@ -1701,6 +1743,77 @@ mod tests {
         assert_eq!(declared_map_name("name = mapName .. version"), None);
         assert_eq!(declared_map_name("-- no name here"), None);
         assert_eq!(declared_map_name("name = \"\"").as_deref(), None);
+    }
+
+    /// The name is rebuilt as the engine builds it, which leaves a version the
+    /// name already carries alone.
+    #[test]
+    fn a_versioned_name_is_rebuilt_as_the_engine_lists_it() {
+        assert_eq!(
+            declared_versioned_name("name = \"Persepolis\",\nversion = \"v1.5\",").as_deref(),
+            Some("Persepolis v1.5")
+        );
+        assert_eq!(
+            declared_versioned_name("name = \"Isis 1.3\", version = \"1.3\"").as_deref(),
+            Some("Isis 1.3")
+        );
+        assert_eq!(
+            declared_versioned_name("name = \"Isis\"").as_deref(),
+            Some("Isis")
+        );
+    }
+
+    /// Two releases of one map hold the same `.smf` under the same `name`, and
+    /// only their `version` tells them apart.
+    #[test]
+    fn two_releases_of_one_map_are_told_apart_by_version() {
+        let old = "persepolis_v1.3.sd7".to_string();
+        let new = "persepolis_v1.5.sd7".to_string();
+        let declared = [
+            (
+                &old,
+                Some("name = \"Persepolis\", version = \"v1.3\"".to_string()),
+            ),
+            (
+                &new,
+                Some("name = \"Persepolis\", version = \"v1.5\"".to_string()),
+            ),
+        ];
+        assert_eq!(
+            the_one_whose_mapinfo_names(&declared, "Persepolis v1.5"),
+            Some(&new)
+        );
+        assert_eq!(
+            the_one_whose_mapinfo_names(&declared, "Persepolis v1.3"),
+            Some(&old)
+        );
+    }
+
+    /// A map built from another keeps its parent's `.smf` under a different
+    /// name, and a computed version still falls back to the name alone.
+    #[test]
+    fn a_tie_falls_back_to_the_declared_name() {
+        let plate = "full_metal_plate.sdz".to_string();
+        let tripolis = "houses_of_tripolis.sd7".to_string();
+        let declared = [
+            (
+                &plate,
+                Some("name = \"Full Metal Plate\", version = v".to_string()),
+            ),
+            (
+                &tripolis,
+                Some("name = \"Houses of Tripolis\", version = v".to_string()),
+            ),
+        ];
+        assert_eq!(
+            the_one_whose_mapinfo_names(&declared, "Houses of Tripolis 1.3"),
+            Some(&tripolis)
+        );
+        let same = [
+            (&plate, Some("name = \"Persepolis\"".to_string())),
+            (&tripolis, Some("name = \"Persepolis\"".to_string())),
+        ];
+        assert_eq!(the_one_whose_mapinfo_names(&same, "Persepolis v1.5"), None);
     }
 
     /// The four formats are four things, and only one of them is a folder
