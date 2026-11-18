@@ -78,8 +78,14 @@ export const OPEN_TOWN_TALL: readonly BuildingModel[] = [
       (i % 2 === 0 ? t.wall : t.ribs)(
         column(round(s * w, s * d), y0 * h, y1 * h),
       );
+      // The collar's top stands a little above the drum's, as a lip. Level
+      // with it, the two tops share a plane and flicker.
       t.dark(
-        column(round((s + 0.06) * w, (s + 0.06) * d), (y1 - 0.012) * h, y1 * h),
+        column(
+          round((s + 0.06) * w, (s + 0.06) * d),
+          (y1 - 0.012) * h,
+          (y1 + 0.004) * h,
+        ),
       );
     });
     t.dark(mast(0.1 * w, 0.88 * h, h));
