@@ -99,6 +99,12 @@ describe("what a player is told when an upload ends", () => {
     expect(said.sendFirst).toBe(true);
   });
 
+  it("sends an unknown map to the send step first", () => {
+    const said = describeUploadEnd(stopped("unknown_map"), "Tabula 3", LINKS);
+    expect(said.body).toContain("Send it to the hub first");
+    expect(said.sendFirst).toBe(true);
+  });
+
   it.each([
     ["no_mirror", "hub"],
     ["unavailable", "hub"],

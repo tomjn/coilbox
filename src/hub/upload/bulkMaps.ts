@@ -19,6 +19,12 @@ import {
   endManualSend,
   type SendSubject,
 } from "../manualSend/grant";
+import {
+  catalogSkipSummary,
+  liveSweepTools,
+  type SweepReport,
+  sweepMapCatalog,
+} from "../maps/catalogSweep";
 import { fetchMapFacts, type LookupResult } from "../maps/lookup";
 import { describeUploadEnd } from "./messages";
 import {
@@ -37,6 +43,8 @@ import {
  * file for. Reading hashes the archive, so maps the hub already has a file for
  * are never read. Uploading sends the maps found one at a time, each under a
  * grant of its own as a single upload is, and carries on past one that fails.
+ * Each map's facts go first, under the same grant, because the hub lists a map
+ * only once it has its facts and refuses the file of a map it has none for.
  *
  * The run belongs to the app, not to the settings page, so leaving the page
  * does not stop it. Its uploads are quiet: the run says how it went once, at the
@@ -83,6 +91,13 @@ export interface BulkItem {
   said?: string;
 }
 
+/** Which hub, and where the library the maps come from is. */
+export interface BulkTarget {
+  hubUrl: string;
+  enginePath: string;
+  dataDir: string;
+}
+
 export interface BulkRun {
   hubUrl: string;
   items: BulkItem[];
@@ -100,6 +115,12 @@ export interface BulkTools {
   }): Promise<UploadFactsResult>;
   begin(subject: SendSubject): Promise<string>;
   end(grant: string): Promise<void>;
+  /** Send one map's facts under this grant, if the hub does not have them. */
+  sendFacts(
+    target: BulkTarget,
+    mapName: string,
+    grant: string,
+  ): Promise<SweepReport>;
   start(
     hubUrl: string,
     path: string,
@@ -119,6 +140,14 @@ export const liveBulkTools: BulkTools = {
   readFacts: (args) => unitsyncUploadFacts(args),
   begin: beginManualSend,
   end: endManualSend,
+  sendFacts: (target, mapName, grant) =>
+    sweepMapCatalog({ ...target, only: mapName }, () => {}, {
+      ...liveSweepTools,
+      ask: (hubUrl, keys, onProgress) =>
+        liveSweepTools.ask(hubUrl, keys, onProgress, grant),
+      send: (hubUrl, entries, onProgress) =>
+        liveSweepTools.send(hubUrl, entries, onProgress, grant),
+    }),
   start: async (hubUrl, path, facts, grant) => {
     await followArchiveUploads();
     const state = await startArchiveUpload(hubUrl, path, facts, grant);
@@ -155,7 +184,7 @@ function uploadEnded(opId: string): Promise<ArchiveUploadOutcome> {
  * either would make every map look missing.
  */
 export async function findMissingMaps(
-  target: { hubUrl: string; enginePath: string; dataDir: string },
+  target: BulkTarget,
   onProgress: (progress: BulkFindProgress) => void,
   tools: BulkTools = liveBulkTools,
 ): Promise<BulkFindResult> {
@@ -205,6 +234,39 @@ export async function findMissingMaps(
   };
 }
 
+/**
+ * Why a map's file cannot go up after sending its facts, or null when the hub
+ * now holds them or already did.
+ */
+export function factsProblem(report: SweepReport): string | null {
+  if (report.read === 0) {
+    return (
+      report.errors[0] ??
+      catalogSkipSummary(report.skipped) ??
+      t`Coilbox could not read the map.`
+    );
+  }
+  const refused = report.problems[0];
+  if (!refused) return null;
+  if (refused.said) return refused.said;
+  return refused.outcome === "conflict"
+    ? t`The hub has a different map under this name, so your copy may not match other players'.`
+    : t`The hub would not take this map's facts.`;
+}
+
+/**
+ * Send one map's facts under the grant its upload holds, ahead of its file.
+ * Answers why the file cannot go up, or null when it can.
+ */
+export async function sendMapFactsFirst(
+  target: BulkTarget,
+  mapName: string,
+  grant: string,
+  tools: Pick<BulkTools, "sendFacts"> = liveBulkTools,
+): Promise<string | null> {
+  return factsProblem(await tools.sendFacts(target, mapName, grant));
+}
+
 let run: BulkRun | null = null;
 let current: string | null = null;
 let stopping = false;
@@ -249,10 +311,11 @@ export function useBulkRun(): BulkRun | null {
  * run while one is going does nothing.
  */
 export async function runBulkUpload(
-  hubUrl: string,
+  target: BulkTarget,
   candidates: readonly BulkMapCandidate[],
   tools: BulkTools = liveBulkTools,
 ): Promise<void> {
+  const { hubUrl } = target;
   if (run?.running) return;
   stopping = false;
   set({
@@ -279,7 +342,15 @@ export async function runBulkUpload(
         kind: "map",
         map_name: one.facts.internal_name,
       });
-      opId = (await tools.start(hubUrl, one.path, one.facts, grant)).opId;
+      const problem = await sendMapFactsFirst(
+        target,
+        one.mapName,
+        grant,
+        tools,
+      );
+      if (problem) setItem(at, { status: "failed", said: problem });
+      else if (stopping) setItem(at, { status: "stopped" });
+      else opId = (await tools.start(hubUrl, one.path, one.facts, grant)).opId;
     } catch (e) {
       setItem(at, { status: "failed", said: describeError(e) });
     } finally {

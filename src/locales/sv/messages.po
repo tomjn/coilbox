@@ -16262,6 +16262,7 @@ msgid "Coilbox could not read the file."
 msgstr ""
 
 #: src/hub/manualSend/run.ts
+#: src/hub/upload/bulkMaps.ts
 msgid "Coilbox could not read the map."
 msgstr ""
 
@@ -49260,6 +49261,10 @@ msgstr ""
 msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
 msgstr ""
 
+#: src/hub/upload/messages.ts
+msgid "The hub does not know this map yet. Send it to the hub first, then upload the file."
+msgstr ""
+
 #: src/content/pages/GamesPage.tsx
 #, fuzzy
 msgid "The hub features no games."
@@ -49269,6 +49274,10 @@ msgstr "Hubben lyfter inte fram några spel."
 #, fuzzy
 msgid "The hub gave no address for that item's contents."
 msgstr "Hubben angav ingen adress för innehållet i det objektet."
+
+#: src/hub/upload/bulkMaps.ts
+msgid "The hub has a different map under this name, so your copy may not match other players'."
+msgstr ""
 
 #: src/hub/api.ts
 #, fuzzy
@@ -49395,6 +49404,10 @@ msgstr "Hubben tog inte emot fler {anyNoun} just nu."
 
 #: src/hub/manualSend/run.ts
 msgid "The hub would not take it."
+msgstr ""
+
+#: src/hub/upload/bulkMaps.ts
+msgid "The hub would not take this map's facts."
 msgstr ""
 
 #: src/hub/assets/pictures.ts

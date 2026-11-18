@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { UploadFactsResult } from "@/content/bindings";
 import type { NotifyInput } from "@/notify/notify";
 import type { ArchiveFacts, ArchiveUploadOutcome } from "../archiveUploads";
+import type { SweepReport } from "../maps/catalogSweep";
 import type { MapFacts } from "../maps/lookup";
 import {
   type BulkMapCandidate,
   type BulkTools,
+  factsProblem,
   findMissingMaps,
   forgetBulkRun,
   readBulkRun,
@@ -33,6 +35,23 @@ function hubMap(hashes: string[]): MapFacts {
   } as unknown as MapFacts;
 }
 
+const TARGET = { hubUrl: "https://hub.test", enginePath: "/e", dataDir: "/d" };
+
+/** A facts sweep of one map, which the hub took unless `patch` says otherwise. */
+function report(patch: Partial<SweepReport> = {}): SweepReport {
+  return {
+    read: 1,
+    asked: 1,
+    wanted: 1,
+    sent: 1,
+    refused: 0,
+    problems: [],
+    skipped: [],
+    errors: [],
+    ...patch,
+  };
+}
+
 function candidate(name: string): BulkMapCandidate {
   return { mapName: name, facts: facts(name), path: `/maps/${name}.sd7` };
 }
@@ -50,6 +69,7 @@ function tools(
       subject.kind === "map" ? `grant-${subject.map_name}` : "grant",
     ),
     end: vi.fn(async () => {}),
+    sendFacts: vi.fn(async () => report()),
     start: vi.fn(
       async (_hub, _path, f: ArchiveFacts) =>
         ({ opId: `op-${f.internal_name}` }) as never,
@@ -167,11 +187,7 @@ describe("finding the maps the hub has no file for", () => {
 describe("uploading the maps found", () => {
   it("uploads them in order, each under its own grant", async () => {
     const t = tools();
-    await runBulkUpload(
-      "https://hub.test",
-      [candidate("A"), candidate("B")],
-      t,
-    );
+    await runBulkUpload(TARGET, [candidate("A"), candidate("B")], t);
     expect(t.start).toHaveBeenNthCalledWith(
       1,
       "https://hub.test",
@@ -196,6 +212,61 @@ describe("uploading the maps found", () => {
     expect(t.notify.mock.calls[0][0]).toMatchObject({ level: "success" });
   });
 
+  it("sends each map's facts under its grant before its file", async () => {
+    const order: string[] = [];
+    const t = tools(
+      {},
+      {
+        sendFacts: vi.fn(async (_target, mapName: string, grant: string) => {
+          order.push(`facts ${mapName} ${grant}`);
+          return report();
+        }),
+        start: vi.fn(async (_hub, _path, f: ArchiveFacts, grant: string) => {
+          order.push(`file ${f.internal_name} ${grant}`);
+          return { opId: `op-${f.internal_name}` } as never;
+        }),
+      },
+    );
+    await runBulkUpload(TARGET, [candidate("A"), candidate("B")], t);
+    expect(t.sendFacts).toHaveBeenCalledWith(TARGET, "A", "grant-A");
+    expect(order).toEqual([
+      "facts A grant-A",
+      "file A grant-A",
+      "facts B grant-B",
+      "file B grant-B",
+    ]);
+  });
+
+  it("does not upload a file whose facts the hub would not take", async () => {
+    const start = vi.fn(
+      async (_hub: string, _path: string, f: ArchiveFacts) =>
+        ({ opId: `op-${f.internal_name}` }) as never,
+    );
+    const t = tools(
+      {},
+      {
+        start,
+        sendFacts: vi.fn(async (_target, mapName: string) =>
+          mapName === "A"
+            ? report({
+                sent: 0,
+                refused: 1,
+                problems: [{ map_name: "A", outcome: "refused", said: "No." }],
+              })
+            : report(),
+        ),
+      },
+    );
+    await runBulkUpload(TARGET, [candidate("A"), candidate("B")], t);
+    expect(start).toHaveBeenCalledOnce();
+    expect(start.mock.calls[0][2]).toEqual(facts("B"));
+    expect(readBulkRun()?.items).toMatchObject([
+      { status: "failed", said: "No." },
+      { status: "listed" },
+    ]);
+    expect(t.end).toHaveBeenCalledWith("grant-A");
+  });
+
   it("carries on past a map that fails, and says why it failed", async () => {
     const t = tools(
       {
@@ -215,7 +286,7 @@ describe("uploading the maps found", () => {
       },
     );
     await runBulkUpload(
-      "https://hub.test",
+      TARGET,
       [candidate("A"), candidate("B"), candidate("C")],
       t,
     );
@@ -246,11 +317,7 @@ describe("uploading the maps found", () => {
           }),
       },
     );
-    const done = runBulkUpload(
-      "https://hub.test",
-      [candidate("A"), candidate("B")],
-      t,
-    );
+    const done = runBulkUpload(TARGET, [candidate("A"), candidate("B")], t);
     await vi.waitFor(() => expect(t.start).toHaveBeenCalledOnce());
     await Promise.resolve();
     stopBulkUpload(t);
@@ -262,5 +329,38 @@ describe("uploading the maps found", () => {
       "stopped",
       "stopped",
     ]);
+  });
+});
+
+describe("whether a map's facts let its file go up", () => {
+  it("lets it go when the hub took the facts or already had them", () => {
+    expect(factsProblem(report())).toBeNull();
+    expect(factsProblem(report({ wanted: 0, sent: 0 }))).toBeNull();
+  });
+
+  it("stops it when the map could not be read", () => {
+    expect(factsProblem(report({ read: 0, errors: ["bad archive"] }))).toBe(
+      "bad archive",
+    );
+    expect(factsProblem(report({ read: 0 }))).toBeTruthy();
+  });
+
+  it("stops it when the hub refused the facts, with the hub's words", () => {
+    expect(
+      factsProblem(
+        report({
+          refused: 1,
+          problems: [{ map_name: "A", outcome: "refused", said: "No." }],
+        }),
+      ),
+    ).toBe("No.");
+    expect(
+      factsProblem(
+        report({
+          refused: 1,
+          problems: [{ map_name: "A", outcome: "conflict" }],
+        }),
+      ),
+    ).toBeTruthy();
   });
 });

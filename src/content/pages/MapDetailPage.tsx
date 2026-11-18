@@ -383,6 +383,7 @@ export default function MapDetailPage() {
               ? hubPresence.url
               : null
           }
+          sendSubject={{ kind: "map", map_name: map.name }}
         />
         {(hubPresence.state === "present" ||
           hubPresence.state === "incomplete") && (

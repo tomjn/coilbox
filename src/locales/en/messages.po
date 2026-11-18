@@ -13221,6 +13221,7 @@ msgid "Coilbox could not read the file."
 msgstr "Coilbox could not read the file."
 
 #: src/hub/manualSend/run.ts
+#: src/hub/upload/bulkMaps.ts
 msgid "Coilbox could not read the map."
 msgstr "Coilbox could not read the map."
 
@@ -40107,6 +40108,10 @@ msgstr "The hub did not accept your sign-in. Sign in again, then upload it again
 msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
 msgstr "The hub does not know this game yet. Send it to the hub first, then upload the file."
 
+#: src/hub/upload/messages.ts
+msgid "The hub does not know this map yet. Send it to the hub first, then upload the file."
+msgstr "The hub does not know this map yet. Send it to the hub first, then upload the file."
+
 #: src/content/pages/GamesPage.tsx
 msgid "The hub features no games."
 msgstr "The hub features no games."
@@ -40114,6 +40119,10 @@ msgstr "The hub features no games."
 #: src/hub/api.ts
 msgid "The hub gave no address for that item's contents."
 msgstr "The hub gave no address for that item's contents."
+
+#: src/hub/upload/bulkMaps.ts
+msgid "The hub has a different map under this name, so your copy may not match other players'."
+msgstr "The hub has a different map under this name, so your copy may not match other players'."
 
 #: src/hub/api.ts
 msgid "The hub has no such item. It may have been taken down."
@@ -40218,6 +40227,10 @@ msgstr "The hub would not take any more {anyNoun} just now."
 #: src/hub/manualSend/run.ts
 msgid "The hub would not take it."
 msgstr "The hub would not take it."
+
+#: src/hub/upload/bulkMaps.ts
+msgid "The hub would not take this map's facts."
+msgstr "The hub would not take this map's facts."
 
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts

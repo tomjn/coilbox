@@ -88,7 +88,11 @@ it("lists the maps found and uploads only the ones still ticked", async () => {
   fireEvent.click(screen.getByRole("checkbox", { name: /Comet/ }));
   fireEvent.click(screen.getByRole("button", { name: /Upload 1 map/ }));
   expect(upload).toHaveBeenCalledOnce();
-  expect(upload.mock.calls[0][0]).toBe("https://hub.test");
+  expect(upload.mock.calls[0][0]).toEqual({
+    hubUrl: "https://hub.test",
+    enginePath: "/engines/105",
+    dataDir: "/data",
+  });
   expect(
     upload.mock.calls[0][1].map((one: { mapName: string }) => one.mapName),
   ).toEqual(["Tabula"]);
