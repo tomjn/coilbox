@@ -19,7 +19,9 @@
 //! frontend JavaScript is a token any script injected into the webview can read.
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 use coilbox_oauth::{
     post_token, AuthError, AuthRequest, TokenBody, TokenRequest, TokenResponse, HTTP_TIMEOUT,
@@ -81,8 +83,16 @@ pub struct HubAuth {
 enum AccountService {
     /// The hub's own sign-in routes (tomjn/coilbox-hub#611). The hub passes each
     /// request on to its Supabase project and adds the key itself, so coilbox
-    /// sends none. Both addresses are on the hub.
-    Hub { authorize: Url, token: Url },
+    /// sends none. Every address is on the hub.
+    Hub {
+        authorize: Url,
+        token: Url,
+        /// Ends the session on the hub (issue #5278). `None` from a hub that lists
+        /// no such route, which still signs in and out as it always did.
+        ///
+        /// Boxed so this variant is not much larger than the Supabase one.
+        logout: Option<Box<Url>>,
+    },
     /// Supabase Auth itself, for a hub from before tomjn/coilbox-hub#611 that
     /// lists no endpoints of its own.
     Supabase {
@@ -216,6 +226,12 @@ fn read_auth_document(hub_url: &str, status: u16, body: &str) -> Result<HubAuth,
         (Some(authorize), Some(token)) => AccountService::Hub {
             authorize: hub_endpoint(hub_url, authorize)?,
             token: hub_endpoint(hub_url, token)?,
+            // A logout route that is not on the hub is ignored rather than
+            // refused. Nothing about signing in depends on it, and the access
+            // token is only ever sent to a route on the hub.
+            logout: endpoint("logout")
+                .and_then(|path| hub_endpoint(hub_url, path).ok())
+                .map(Box::new),
         },
         _ => read_supabase(hub_url, field("supabase_url"), field("publishable_key"))?,
     };
@@ -601,19 +617,84 @@ where
     Ok(SignedIn { identity, problem })
 }
 
-/// Forget this machine's sign-in to a hub.
+/// Forget this machine's sign-in to a hub, after asking the hub to end the session.
 ///
-/// Supabase has no revocation endpoint coilbox can reach with a publishable key, so
-/// this is as far as it goes: the token is gone from here, not from the project.
+/// The hub's logout route needs an access token, so one is fetched first, which
+/// refreshes if the one in memory is spent. Whatever happens there, the token is
+/// then forgotten here. A hub that is down, slow, answers with an error, lists no
+/// logout route or refuses the refresh must not leave anybody stuck signed in
+/// (issue #5278). A hub that predates the route, or lists only Supabase, can only
+/// be forgotten locally, as before.
 ///
 /// The keychain delete has a deadline, so this always answers (issue #1469). A
 /// delete that ran out of time is an error rather than a sign-out, because what
 /// is left on disk is exactly what nobody knows.
 pub async fn sign_out(hub_url: &str) -> Result<(), AuthError> {
+    revoke(hub_url).await;
     let account = account_key(hub_url);
     identities().lock().unwrap().remove(&account);
     display_names().lock().unwrap().remove(&account);
     coilbox_oauth::forget(SERVICE, &account).await
+}
+
+/// Ask the hub to end this account's session. Every failure is dropped, and the
+/// whole attempt is cut off after [`HTTP_TIMEOUT`], the deadline of every other
+/// request to the hub, so a hub that accepts the connection and then says nothing
+/// delays the sign-out by that long and no longer.
+async fn revoke(hub_url: &str) {
+    let attempt = async {
+        let config = discover(hub_url).await?;
+        revoke_session(&config, access_token(hub_url)).await
+    };
+    let _ = tokio::time::timeout(HTTP_TIMEOUT, attempt).await;
+}
+
+/// End the session on the hub with an access token from `access`.
+///
+/// `Ok` when the hub lists no logout route, without asking for a token: there is
+/// nothing to revoke, and a refresh would spend the stored token for no reason.
+/// An error from `access`, such as a refresh token the hub no longer accepts,
+/// skips the call, because the hub would refuse the request without a token.
+async fn revoke_session<F>(config: &HubAuth, access: F) -> Result<(), AuthError>
+where
+    F: Future<Output = Result<String, AuthError>>,
+{
+    let AccountService::Hub {
+        logout: Some(logout),
+        ..
+    } = &config.service
+    else {
+        return Ok(());
+    };
+    post_logout(logout, &access.await?, HTTP_TIMEOUT).await
+}
+
+/// `POST` the hub's logout route. The hub answers 204 when the session ended or
+/// was already gone, and 401 for a token it does not accept.
+async fn post_logout(
+    logout: &Url,
+    access_token: &str,
+    deadline: Duration,
+) -> Result<(), AuthError> {
+    let client = reqwest::Client::builder()
+        .timeout(deadline)
+        .build()
+        .map_err(|e| AuthError::Http(e.to_string()))?;
+    let resp = client
+        .post(logout.clone())
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {access_token}"),
+        )
+        .send()
+        .await
+        .map_err(|e| AuthError::Http(e.to_string()))?;
+    let status = resp.status();
+    if status.is_success() {
+        Ok(())
+    } else {
+        Err(AuthError::Http(format!("HTTP {status}")))
+    }
 }
 
 /// Whether there is a stored sign-in for this hub that has not been refused.
@@ -770,6 +851,9 @@ mod tests {
             AccountService::Hub {
                 authorize: Url::parse("https://hub.example/api/v1/auth/authorize").unwrap(),
                 token: Url::parse("https://hub.example/api/v1/auth/token").unwrap(),
+                logout: Some(Box::new(
+                    Url::parse("https://hub.example/api/v1/auth/logout").unwrap()
+                )),
             }
         );
         assert_eq!(
@@ -1553,6 +1637,205 @@ mod tests {
         assert!(seen.lock().unwrap().is_empty());
     }
 
+    // ---------------------------------------------------------------- sign out
+
+    /// Where a stand-in hub's logout route answers. `None` is a hub that takes the
+    /// request and never answers.
+    async fn logout_hub(status: Option<u16>) -> (Url, std::sync::Arc<Mutex<Vec<String>>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = Url::parse(&format!(
+            "http://127.0.0.1:{}/api/v1/auth/logout",
+            listener.local_addr().unwrap().port()
+        ))
+        .unwrap();
+        let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let recorded = recorded.clone();
+                tokio::spawn(async move {
+                    let mut buf = Vec::new();
+                    let mut chunk = [0u8; 1024];
+                    while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match sock.read(&mut chunk).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    recorded
+                        .lock()
+                        .unwrap()
+                        .push(String::from_utf8_lossy(&buf).to_ascii_lowercase());
+                    let Some(status) = status else {
+                        // Hold the connection open until the client gives up.
+                        let _ = sock.read(&mut chunk).await;
+                        return;
+                    };
+                    let response = format!(
+                        "HTTP/1.1 {status} Whatever\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    );
+                    let _ = sock.write_all(response.as_bytes()).await;
+                    let _ = sock.flush().await;
+                });
+            }
+        });
+        (url, seen)
+    }
+
+    fn hub_with_logout(logout: Option<Url>) -> HubAuth {
+        HubAuth {
+            service: AccountService::Hub {
+                authorize: Url::parse("https://hub.example/api/v1/auth/authorize").unwrap(),
+                token: Url::parse("https://hub.example/api/v1/auth/token").unwrap(),
+                logout: logout.map(Box::new),
+            },
+            asset_vocabulary: None,
+            providers: vec![],
+        }
+    }
+
+    async fn a_token() -> Result<String, AuthError> {
+        Ok("an-access-token".into())
+    }
+
+    #[test]
+    fn the_logout_route_is_read_off_the_document() {
+        let config = document(&hub_document()).unwrap();
+        let AccountService::Hub { logout, .. } = config.service else {
+            panic!("not the hub's own endpoints");
+        };
+        assert_eq!(
+            logout.unwrap().as_str(),
+            "https://hub.example/api/v1/auth/logout"
+        );
+    }
+
+    /// A hub listing only authorize and token still signs in, and has nothing to
+    /// revoke with. A logout route that is off the hub is dropped the same way,
+    /// without taking the sign-in with it.
+    #[test]
+    fn a_hub_without_a_usable_logout_route_still_signs_in() {
+        for logout in [None, Some("https://elsewhere.example/logout")] {
+            let mut doc: Value = serde_json::from_str(&hub_document()).unwrap();
+            match logout {
+                Some(path) => doc["endpoints"]["logout"] = json!(path),
+                None => {
+                    doc["endpoints"].as_object_mut().unwrap().remove("logout");
+                }
+            }
+            let config = document(&doc.to_string()).unwrap();
+            assert!(
+                matches!(config.service, AccountService::Hub { logout: None, .. }),
+                "{logout:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_sign_out_asks_the_hub_to_end_the_session_with_the_access_token() {
+        let (logout, seen) = logout_hub(Some(204)).await;
+        revoke_session(&hub_with_logout(Some(logout)), a_token())
+            .await
+            .unwrap();
+        let requests = seen.lock().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert!(
+            requests[0].starts_with("post /api/v1/auth/logout "),
+            "{}",
+            requests[0]
+        );
+        assert!(
+            requests[0].contains("authorization: bearer an-access-token"),
+            "{}",
+            requests[0]
+        );
+    }
+
+    /// Whatever the hub says, `post_logout` reports it, and `sign_out` goes on to
+    /// forget the token locally because it drops the result.
+    #[tokio::test]
+    async fn a_hub_error_is_reported_and_the_sign_out_goes_on() {
+        for status in [401, 500] {
+            let (logout, seen) = logout_hub(Some(status)).await;
+            let err = revoke_session(&hub_with_logout(Some(logout)), a_token())
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(&err, AuthError::Http(m) if m.contains(&status.to_string())),
+                "{err:?}"
+            );
+            assert_eq!(seen.lock().unwrap().len(), 1);
+        }
+    }
+
+    /// Nothing is listening on port 1, so the connection is refused at once.
+    #[tokio::test]
+    async fn no_network_is_reported_and_the_sign_out_goes_on() {
+        let logout = Url::parse("http://127.0.0.1:1/api/v1/auth/logout").unwrap();
+        let err = revoke_session(&hub_with_logout(Some(logout)), a_token())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AuthError::Http(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn a_hub_that_never_answers_is_given_up_on() {
+        let (logout, seen) = logout_hub(None).await;
+        let started = std::time::Instant::now();
+        let err = post_logout(&logout, "an-access-token", Duration::from_millis(200))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AuthError::Http(_)), "{err:?}");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "waited {:?}",
+            started.elapsed()
+        );
+        assert_eq!(seen.lock().unwrap().len(), 1);
+    }
+
+    /// A refresh token the hub no longer accepts leaves no access token to send,
+    /// so the call is skipped.
+    #[tokio::test]
+    async fn a_failed_refresh_skips_the_revoke() {
+        let (logout, seen) = logout_hub(Some(204)).await;
+        let err = revoke_session(&hub_with_logout(Some(logout)), async {
+            Err(AuthError::SignInRefused(
+                "refresh_token_already_used".into(),
+            ))
+        })
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AuthError::SignInRefused(_)), "{err:?}");
+        assert!(seen.lock().unwrap().is_empty());
+    }
+
+    /// Nothing to revoke with: no token is fetched, which would refresh and spend
+    /// the stored refresh token for nothing, and no request is made.
+    #[tokio::test]
+    async fn a_hub_with_no_logout_route_is_signed_out_locally_without_a_refresh() {
+        let asked = std::sync::atomic::AtomicBool::new(false);
+        for config in [
+            hub_with_logout(None),
+            HubAuth {
+                service: AccountService::Supabase {
+                    url: "https://project.supabase.co".into(),
+                    publishable_key: "sb_publishable_abc".into(),
+                },
+                asset_vocabulary: None,
+                providers: vec![],
+            },
+        ] {
+            revoke_session(&config, async {
+                asked.store(true, std::sync::atomic::Ordering::SeqCst);
+                a_token().await
+            })
+            .await
+            .unwrap();
+        }
+        assert!(!asked.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
     // ------------------------------------------------------------------- live
 
     /// Read the real hub's discovery route. It needs no account and opens nothing,
@@ -1568,7 +1851,10 @@ mod tests {
             .await
             .expect("discovery failed");
         println!("account service: {:?}", config.service);
-        let AccountService::Hub { authorize, token } = &config.service else {
+        let AccountService::Hub {
+            authorize, token, ..
+        } = &config.service
+        else {
             panic!("the live hub lists no endpoints of its own");
         };
         assert_eq!(authorize.host_str(), Some("hub.coilbox.org"));
@@ -1628,6 +1914,44 @@ mod tests {
         println!("a made-up code: {err:?}");
         println!("explained: {}", explain(&err, "https://hub.coilbox.org"));
         assert!(matches!(err, AuthError::Token { .. }), "{err:?}");
+    }
+
+    /// Check the live hub's logout route without an account: with no token and
+    /// with a made-up one it answers 401, and `post_logout` reports that as an
+    /// error, which `sign_out` drops before forgetting the token locally.
+    ///
+    /// ```text
+    /// cargo test -p tauri-plugin-coilbox-hub live_hub_logout -- --ignored --nocapture
+    /// ```
+    #[tokio::test]
+    #[ignore = "reaches the live hub, so it cannot run in CI"]
+    async fn live_hub_logout() {
+        let config = discover("https://hub.coilbox.org")
+            .await
+            .expect("discovery failed");
+        let AccountService::Hub {
+            logout: Some(logout),
+            ..
+        } = &config.service
+        else {
+            panic!("the live hub lists no logout route");
+        };
+        println!("logout: {logout}");
+        let bare = reqwest::Client::new()
+            .post(Url::clone(logout))
+            .send()
+            .await
+            .unwrap();
+        println!("no token answered {}", bare.status());
+        assert_eq!(bare.status().as_u16(), 401);
+        let err = post_logout(logout, "not-a-real-token", HTTP_TIMEOUT)
+            .await
+            .unwrap_err();
+        println!("a made-up token: {err:?}");
+        assert!(
+            matches!(&err, AuthError::Http(m) if m.contains("401")),
+            "{err:?}"
+        );
     }
 
     /// The one test that needs a real Discord account. It opens your browser, waits
