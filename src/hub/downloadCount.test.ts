@@ -19,6 +19,10 @@ const { counting, held } = vi.hoisted(() => ({
 vi.mock("@/profile/profile", () => ({
   isHubImportCountEnabled: () => counting.on,
 }));
+const { archiveShortname } = vi.hoisted(() => ({ archiveShortname: vi.fn() }));
+vi.mock("../downloads/hubMismatch", () => ({
+  gameShortnameFor: archiveShortname,
+}));
 vi.mock("./gameIcons", () => ({
   heldHubGames: () => held.games,
 }));
@@ -30,6 +34,7 @@ import {
 } from "./downloadCount";
 
 const HUB = "https://hub.test";
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function hubGame(
   shortname: string,
@@ -78,6 +83,7 @@ describe("reportDownload", () => {
 
   beforeEach(() => {
     fetchMock.mockReset();
+    archiveShortname.mockReset();
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
     setHubMapBase(HUB);
@@ -90,12 +96,13 @@ describe("reportDownload", () => {
     setHubMapBase(null);
   });
 
-  it("posts the map name for a map from any source", () => {
+  it("posts the map name for a map from any source", async () => {
     reportDownload({
       kind: "mapAnySource",
       label: "Isis",
       args: { mapName: "Isis 1.2" },
     });
+    await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -105,12 +112,13 @@ describe("reportDownload", () => {
     expect(JSON.parse(init.body)).toEqual({ name: "Isis 1.2" });
   });
 
-  it("posts the map name for a catalog map", () => {
+  it("posts the map name for a catalog map", async () => {
     reportDownload({
       kind: "map",
       label: "Isis",
       args: { springName: "Isis 1.2" },
     });
+    await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
@@ -118,7 +126,7 @@ describe("reportDownload", () => {
     });
   });
 
-  it("posts a hub game to the shortname the request carries, with no list lookup", () => {
+  it("posts a hub game to the shortname the request carries, with no list lookup", async () => {
     held.games = null;
 
     reportDownload({
@@ -126,6 +134,7 @@ describe("reportDownload", () => {
       label: "Balanced Annihilation",
       args: { downloads: BA.downloads, destDir: "/d/games", shortname: "BA" },
     });
+    await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -133,22 +142,24 @@ describe("reportDownload", () => {
     expect(init).toEqual({ method: "POST" });
   });
 
-  it("sends nothing for a hub game request that carries no shortname", () => {
+  it("sends nothing for a hub game request that carries no shortname", async () => {
     reportDownload({
       kind: "hubGame",
       label: "Balanced Annihilation",
       args: { downloads: BA.downloads, destDir: "/d/games" },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("posts a rapid download whose tag a hub game lists", () => {
+  it("posts a rapid download whose tag a hub game lists", async () => {
     reportDownload({
       kind: "rapid",
       label: "Zero-K",
       args: { tag: "zk:stable" },
     });
+    await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
@@ -156,27 +167,69 @@ describe("reportDownload", () => {
     );
   });
 
-  it("sends nothing for a game archive name, which could be a fork's", () => {
-    reportDownload({
+  describe("a game named by its archive", () => {
+    const request = {
       kind: "game",
-      label: "Zero-K",
-      args: { gameName: "Zero-K v1.0" },
+      label: "Splinter Faction",
+      args: { gameName: "Splinter Faction 1.2" },
+    } as const;
+
+    it("posts to the shortname the catalogue lists for that exact archive", async () => {
+      archiveShortname.mockResolvedValue("sf");
+
+      reportDownload(request);
+      await settle();
+
+      expect(archiveShortname).toHaveBeenCalledWith(
+        "https://hub.test",
+        "Splinter Faction 1.2",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        "https://hub.test/api/v1/games/sf/downloaded",
+      );
     });
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    it("sends nothing when the catalogue lists no such archive", async () => {
+      archiveShortname.mockResolvedValue(undefined);
+
+      reportDownload(request);
+      await settle();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing, and raises nothing, when the catalogue cannot be loaded", async () => {
+      archiveShortname.mockRejectedValue(new Error("offline"));
+
+      reportDownload(request);
+      await settle();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("looks nothing up when counting is off", async () => {
+      counting.on = false;
+
+      reportDownload(request);
+      await settle();
+
+      expect(archiveShortname).not.toHaveBeenCalled();
+    });
   });
 
-  it("sends nothing for a game no hub game matches", () => {
+  it("sends nothing for a game no hub game matches", async () => {
     reportDownload({
       kind: "rapid",
       label: "Other",
       args: { tag: "other:test" },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends nothing for a game while the hub's list has not landed", () => {
+  it("sends nothing for a game while the hub's list has not landed", async () => {
     held.games = null;
 
     reportDownload({
@@ -184,11 +237,12 @@ describe("reportDownload", () => {
       label: "Zero-K",
       args: { tag: "zk:stable" },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends nothing when two hub games would match", () => {
+  it("sends nothing when two hub games would match", async () => {
     held.games = [ZK, hubGame("ZK2", "Zero-K Fork", ZK.downloads)];
 
     reportDownload({
@@ -196,11 +250,12 @@ describe("reportDownload", () => {
       label: "Zero-K",
       args: { tag: "zk:stable" },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("posts the map name carried by a file request", () => {
+  it("posts the map name carried by a file request", async () => {
     reportDownload({
       kind: "file",
       label: "Isis",
@@ -211,6 +266,7 @@ describe("reportDownload", () => {
         mapName: "Isis 1.2",
       },
     });
+    await settle();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
@@ -221,7 +277,7 @@ describe("reportDownload", () => {
     });
   });
 
-  it("sends nothing for a file request with no map name", () => {
+  it("sends nothing for a file request with no map name", async () => {
     reportDownload({
       kind: "file",
       label: "Isis",
@@ -231,11 +287,12 @@ describe("reportDownload", () => {
         filename: "isis.sd7",
       },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends nothing for an engine", () => {
+  it("sends nothing for an engine", async () => {
     const engines: EnqueueInput[] = [
       {
         kind: "engineRecoil",
@@ -254,11 +311,12 @@ describe("reportDownload", () => {
       },
     ];
     for (const engine of engines) reportDownload(engine);
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends nothing when the distribution switched counting off", () => {
+  it("sends nothing when the distribution switched counting off", async () => {
     counting.on = false;
 
     reportDownload({
@@ -266,11 +324,12 @@ describe("reportDownload", () => {
       label: "Isis",
       args: { mapName: "Isis" },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends nothing when there is no trusted hub", () => {
+  it("sends nothing when there is no trusted hub", async () => {
     setHubMapBase(null);
 
     reportDownload({
@@ -278,6 +337,7 @@ describe("reportDownload", () => {
       label: "Isis",
       args: { mapName: "Isis" },
     });
+    await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -295,7 +355,7 @@ describe("reportDownload", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
-  it("raises nothing when fetch itself throws", () => {
+  it("raises nothing when fetch itself throws", async () => {
     fetchMock.mockImplementation(() => {
       throw new Error("no fetch");
     });

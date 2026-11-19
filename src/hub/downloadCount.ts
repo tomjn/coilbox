@@ -16,14 +16,16 @@
  * Maps are named by the request: a map name, or a `mapName` a file request
  * carries when its caller knows one. A hub game carries its shortname. A rapid
  * request is matched to the one hub game listing its tag in the games list the
- * client already holds (`heldHubGames`), with no extra fetch. Anything that
- * matches nothing, or more than one game, sends nothing, since a wrong count is
- * worse than a missing one.
+ * client already holds (`heldHubGames`). A game archive name is matched exactly
+ * against the hub catalogue the mismatch check holds (`gameShortnameFor`).
+ * Anything that matches nothing, or more than one game, sends nothing, since a
+ * wrong count is worse than a missing one.
  */
 
 import { isHubImportCountEnabled } from "@/profile/profile";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { getHubMapBase } from "../downloads/hubMapBase";
+import { gameShortnameFor } from "../downloads/hubMismatch";
 import type { HubGame } from "./api";
 import { heldHubGames } from "./gameIcons";
 
@@ -43,8 +45,7 @@ export function gameDownloadedUrl(base: string, shortname: string): string {
 
 /**
  * The hub game a rapid request stands for: the one game that lists that tag.
- * Two games listing it, or none, is no answer. A `game` request names an
- * archive, which could as well be a fork's, so it names no game.
+ * Two games listing it, or none, is no answer.
  */
 function hubGameForTag(
   tag: string,
@@ -56,9 +57,17 @@ function hubGameForTag(
   return found.length === 1 ? found[0] : undefined;
 }
 
-/** The hub shortname a game request carries or can be matched to, or undefined. */
-function shortnameFor(base: string, req: EnqueueInput): string | undefined {
+/**
+ * The hub shortname a game request carries or can be matched to, or undefined.
+ * A `game` request names an archive, which is looked up exactly in the hub's
+ * catalogue, so it can fetch that catalogue once. It rejects when that fails.
+ */
+async function shortnameFor(
+  base: string,
+  req: EnqueueInput,
+): Promise<string | undefined> {
   if (req.kind === "hubGame") return req.args.shortname || undefined;
+  if (req.kind === "game") return gameShortnameFor(base, req.args.gameName);
   if (req.kind !== "rapid") return undefined;
   const games = heldHubGames(base);
   return games ? hubGameForTag(req.args.tag, games)?.shortname : undefined;
@@ -97,11 +106,12 @@ export function reportDownload(req: EnqueueInput): void {
       return;
     }
 
-    const shortname = shortnameFor(base, req);
-    if (!shortname) return;
-    void fetch(gameDownloadedUrl(base, shortname), {
-      method: "POST",
-    }).catch(() => undefined);
+    void shortnameFor(base, req)
+      .then((shortname) => {
+        if (!shortname) return;
+        return fetch(gameDownloadedUrl(base, shortname), { method: "POST" });
+      })
+      .catch(() => undefined);
   } catch {
     // A ping must never affect the download that triggered it.
   }
