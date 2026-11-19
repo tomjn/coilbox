@@ -141,6 +141,7 @@ describe("mapInstallRequest", () => {
         url: "https://github.example/tap_map.sd7",
         destDir: "/data/maps",
         filename: "tap_map.sd7",
+        mapName: "Supreme Isthmus v2",
       },
     });
   });

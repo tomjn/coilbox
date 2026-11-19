@@ -221,6 +221,7 @@ export function mapInstallRequest(
       url: release.url,
       destDir: `${writePath}/maps`,
       filename: release.filename,
+      mapName: m.id,
     },
   };
 }

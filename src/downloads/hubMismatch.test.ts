@@ -24,6 +24,7 @@ import {
   checkHubDownload,
   differingFacts,
   forgetCatalogues,
+  gameShortnameFor,
   type ListedArchive,
   listedArchive,
   RETRY_AFTER_MS,
@@ -247,6 +248,45 @@ describe("listedArchive", () => {
     await listedArchive(HUB, HASH, 0);
 
     await listedArchive(HUB, OTHER_HASH, 0);
+
+    expect(hub.catalogueFetches()).toBe(1);
+  });
+});
+
+describe("gameShortnameFor", () => {
+  it("is the shortname of the game archive with exactly that name", async () => {
+    fakeHub([listedMap, listedGame]);
+
+    expect(await gameShortnameFor(HUB, "Splinter Faction 1.2")).toBe("sf");
+  });
+
+  it("is undefined for a name the catalogue does not list, or only lists as a map", async () => {
+    fakeHub([listedMap, listedGame]);
+
+    expect(await gameShortnameFor(HUB, "Splinter Faction")).toBeUndefined();
+    expect(await gameShortnameFor(HUB, "Isis 1.3")).toBeUndefined();
+  });
+
+  it("is undefined when the archive lists no shortname", async () => {
+    fakeHub([{ ...listedGame, shortname: null }]);
+
+    expect(await gameShortnameFor(HUB, "Splinter Faction 1.2")).toBeUndefined();
+  });
+
+  it("is undefined when two shortnames claim the name", async () => {
+    fakeHub([
+      listedGame,
+      { ...listedGame, sha256: OTHER_HASH, shortname: "other" },
+    ]);
+
+    expect(await gameShortnameFor(HUB, "Splinter Faction 1.2")).toBeUndefined();
+  });
+
+  it("uses the held catalogue rather than fetching again", async () => {
+    const hub = fakeHub([listedGame]);
+
+    await gameShortnameFor(HUB, "Splinter Faction 1.2");
+    await gameShortnameFor(HUB, "Splinter Faction 1.2");
 
     expect(hub.catalogueFetches()).toBe(1);
   });

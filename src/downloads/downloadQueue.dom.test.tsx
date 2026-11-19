@@ -25,6 +25,7 @@ import {
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { reportDownload } from "../hub/downloadCount";
 import { type DownloadProgress, dlDownloadEngineRecoil } from "./bindings";
 import DownloadQueueBadge from "./DownloadQueueBadge";
 import {
@@ -78,6 +79,7 @@ vi.mock("./warmEngineCache", () => ({ installEngine }));
 
 vi.mock("./downloadGame", () => ({ downloadGameAnySource: vi.fn() }));
 vi.mock("./downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
+vi.mock("../hub/downloadCount", () => ({ reportDownload: vi.fn() }));
 vi.mock("../content/bindings", () => ({
   contentRescan: vi.fn(async () => {}),
 }));
@@ -715,6 +717,82 @@ describe("a download reported from outside the queue", () => {
     });
     await waitFor(() => expect(result.current.items[0]?.progress).toBeNull());
     expect(result.current.items[0]?.rate).toEqual(IDLE_RATE);
+  });
+
+  it("tells the hub once when a download finishes, and not when it fails", async () => {
+    vi.mocked(downloadMapAnySource)
+      .mockResolvedValueOnce("springfiles mirror")
+      .mockRejectedValueOnce(new Error("no mirror had it"));
+
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    const finished = {
+      kind: "mapAnySource",
+      label: "Map: Isis",
+      args: { mapName: "Isis" },
+    } as const;
+    act(() => {
+      result.current.enqueue(finished);
+    });
+    await waitFor(() => expect(result.current.items[0]?.status).toBe("done"));
+    expect(reportDownload).toHaveBeenCalledTimes(1);
+    expect(reportDownload).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "mapAnySource", label: "Map: Isis" }),
+    );
+
+    act(() => {
+      result.current.enqueue({
+        kind: "mapAnySource",
+        label: "Map: Comet Catcher",
+        args: { mapName: "Comet Catcher" },
+      });
+    });
+    await waitFor(() =>
+      expect(
+        result.current.items.find((i) => i.label === "Map: Comet Catcher")
+          ?.status,
+      ).toBe("error"),
+    );
+    expect(reportDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the hub nothing when a running download is cancelled", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    let id = "";
+    act(() => {
+      id = result.current.enqueue(mapRequest("Isis"));
+    });
+    const run = await nextPending(0);
+
+    act(() => {
+      result.current.cancel(id);
+    });
+    await act(async () => {
+      run.fail("download canceled");
+    });
+
+    await waitFor(() =>
+      expect(result.current.items[0]?.status).toBe("canceled"),
+    );
+    expect(reportDownload).not.toHaveBeenCalled();
+  });
+
+  it("tells the hub once when the same download is enqueued twice", async () => {
+    vi.mocked(downloadMapAnySource).mockResolvedValue("springfiles mirror");
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    const request = {
+      kind: "mapAnySource",
+      label: "Map: Isis",
+      args: { mapName: "Isis" },
+    } as const;
+
+    act(() => {
+      result.current.enqueue(request);
+      result.current.enqueue(request);
+    });
+
+    await waitFor(() => expect(result.current.items[0]?.status).toBe("done"));
+    expect(downloadMapAnySource).toHaveBeenCalledTimes(1);
+    expect(reportDownload).toHaveBeenCalledTimes(1);
   });
 
   it("runs an engine download through the archive-cache warm", async () => {

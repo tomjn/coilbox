@@ -39,9 +39,12 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: async () => {},
 }));
 
+let itemPageReachable = true;
+let trustedHub = "https://hub.example";
 vi.mock("../hub/config", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../hub/config")),
-  useTrustedHubUrl: () => "https://hub.example",
+  useTrustedHubUrl: () => trustedHub,
+  isHubItemPageReachable: () => itemPageReachable,
 }));
 
 // The handler reads the content folders for a file it is handed, which is not
@@ -151,6 +154,8 @@ const refusals = () =>
   notify.mock.calls.filter(([n]) => (n as { body: string }).body === BUSY);
 
 beforeEach(() => {
+  itemPageReachable = true;
+  trustedHub = "https://hub.example";
   where = "";
   state = null;
   invitePrompt = null;
@@ -341,5 +346,97 @@ describe("a link that is not valid while a prompt is open", () => {
       }),
     );
     expect(screen.getByText(LINKS.room.says)).toBeTruthy();
+  });
+});
+
+describe("a hub item link when the hub item page is not reachable", () => {
+  const link = (url: string) =>
+    `coilbox://import?url=${encodeURIComponent(url)}`;
+  const answer = () =>
+    fetchImportPlan.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        host: "hub.example",
+        text: "",
+        plan: {
+          kind: "preset",
+          phrase: "preset",
+          route: "/play/skirmish?import=abc",
+          warnings: [],
+        },
+      } as never),
+    );
+
+  beforeEach(() => {
+    itemPageReachable = false;
+  });
+
+  it("fetches the container for an /i/ link and carries the item id to the importer", async () => {
+    answer();
+    draw();
+    arrive(link("https://hub.example/i/some-item"));
+    expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.example/i/some-item",
+    );
+    expect(where).toBe("/home");
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("fetches the container, not the web page, for an /item/ link", async () => {
+    answer();
+    draw();
+    arrive(link("https://hub.example/item/some-item?from=discord"));
+    expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.example/i/some-item",
+    );
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("fetches from the configured hub for a link on the old vercel address", async () => {
+    trustedHub = "https://hub.coilbox.org";
+    answer();
+    draw();
+    arrive(link("https://coilbox-hub.vercel.app/i/some-item"));
+    expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.coilbox.org/i/some-item",
+    );
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("keeps a path prefix on the configured hub", () => {
+    trustedHub = "https://hub.example/base/";
+    answer();
+    draw();
+    arrive(link("https://hub.example/base/item/some-item"));
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.example/base/i/some-item",
+    );
+  });
+
+  it("leaves a link to another site without an item id", async () => {
+    answer();
+    draw();
+    arrive(link("https://evil.example/i/some-item"));
+    press("Fetch and check");
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc");
+  });
+
+  it("still opens the item page when it is reachable", () => {
+    itemPageReachable = true;
+    draw();
+    arrive(link("https://hub.example/i/some-item"));
+    expect(fetchImportPlan).not.toHaveBeenCalled();
+    expect(where).toBe("/hub/some-item");
   });
 });

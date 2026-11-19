@@ -150,6 +150,27 @@ export async function listedArchive(
   return (await fetchCatalogue(base)).byHash.get(sha256);
 }
 
+/**
+ * The hub shortname of the game archive called exactly `archiveName`, or
+ * undefined when the catalogue lists none, lists it with no shortname, or lists
+ * it under two. Uses the held catalogue, loading it through the same loader as
+ * {@link listedArchive} when this session has not yet. Rejects when it cannot
+ * be loaded.
+ */
+export async function gameShortnameFor(
+  base: string,
+  archiveName: string,
+): Promise<string | undefined> {
+  const held = catalogues.get(base) ?? (await fetchCatalogue(base));
+  const names = new Set<string>();
+  for (const a of held.byHash.values()) {
+    if (a.kind === "game" && a.internal_name === archiveName && a.shortname) {
+      names.add(a.shortname);
+    }
+  }
+  return names.size === 1 ? [...names][0] : undefined;
+}
+
 /* ---- The report ------------------------------------------------------------ */
 
 /** The most a report body may be, as the hub states it. */

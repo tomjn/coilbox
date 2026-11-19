@@ -19,11 +19,10 @@
  * is claimed that is not there.
  *
  * The hub item id reaches the importer without touching the `coilbox://`
- * grammar. The browse screen calls {@link noteHubContainer} with the address it
- * just read out of the hub's own API, the deep-link handler looks that address
- * up when it has finished fetching, and only then does the id ride the importer
- * route as `&hub=` ({@link withHubItem}). A link from anywhere else names an
- * address nothing has claimed, so it records nothing.
+ * grammar. The item page, and the deep-link handler for a pasted link to an
+ * item on the configured hub, know the id when they fetch the container. They
+ * pass it to {@link withHubItem}, and it rides the importer route as `&hub=`.
+ * A link from anywhere else names no item, so it records nothing.
  */
 
 /** What one import from the hub produced. */

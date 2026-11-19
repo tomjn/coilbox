@@ -19,6 +19,7 @@ export async function hubGameDownloadRequest(
   downloads: readonly HubGameDownload[],
   destDir: string,
   label: string,
+  shortname?: string,
 ): Promise<EnqueueInput> {
   if (downloads.length === 0) {
     throw new Error(t`The hub named no download source for ${label}.`);
@@ -26,6 +27,6 @@ export async function hubGameDownloadRequest(
   return {
     kind: "hubGame",
     label,
-    args: { downloads: [...downloads], destDir },
+    args: { downloads: [...downloads], destDir, shortname },
   };
 }

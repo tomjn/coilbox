@@ -31,10 +31,11 @@ import {
 import {
   hubItemIdFromUrl,
   hubItemRoute,
+  isHubItemPageReachable,
   isHubOrigin,
   useTrustedHubUrl,
 } from "../hub/config";
-import { hubItemIdForContainer, withHubItem } from "../hub/importRecord";
+import { withHubItem } from "../hub/importRecord";
 import { inviteLinkFrom } from "../multiplayer/invite/inviteOffer";
 import {
   invitePromptOpen,
@@ -305,7 +306,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // Contact the host, cap and validate the response, then offer to apply it.
   // Only ever called after the user agreed to the fetch. Applies nothing here.
   const runFetch = useCallback(
-    async (url: string, host: string) => {
+    async (url: string, host: string, hubItemId?: string) => {
       setFetching(host);
       const result = await fetchImportPlan(url, fetchImportText);
       setFetching(null);
@@ -317,16 +318,9 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         });
         return;
       }
-      // Only the browse screen knows which hub item an address belongs to, and
-      // only for one it read off the hub itself this session (issue #1368). An
-      // address from anywhere else is not claimed, so it records nothing.
-      setPending(
-        buildImportPending(
-          result.plan,
-          result.host,
-          hubItemIdForContainer(url),
-        ),
-      );
+      // The id is only known for an item address on the configured hub, which
+      // the caller works out. Any other address records nothing.
+      setPending(buildImportPending(result.plan, result.host, hubItemId));
     },
     [buildImportPending, setFetching, setPending],
   );
@@ -437,10 +431,20 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       if (result.source.type === "url") {
         const { url } = result.source;
         // An item's share page on the configured hub: open the page coilbox has
-        // for it, which says what it is and offers to import it there.
+        // for it, which says what it is and offers to import it there. When that
+        // page is switched off the route would send the player home, so the
+        // item's container is fetched from the configured hub instead. That is
+        // not the pasted address, which can be the item's web page or the hub's
+        // old address.
         const hubItemId = hubItemIdFromUrl(url, trustedHubUrl);
-        if (hubItemId) {
-          navigate(hubItemRoute(hubItemId));
+        if (hubItemId && trustedHubUrl) {
+          if (isHubItemPageReachable()) {
+            navigate(hubItemRoute(hubItemId));
+            return;
+          }
+          const base = trustedHubUrl.replace(/\/+$/, "");
+          const container = `${base}/i/${encodeURIComponent(hubItemId)}`;
+          void runFetch(container, new URL(container).host, hubItemId);
           return;
         }
         let host: string;

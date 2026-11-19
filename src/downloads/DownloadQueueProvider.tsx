@@ -16,6 +16,7 @@ import {
 import { forgetScans, rescanMounted } from "../content/config";
 import { warmAllRoots } from "../content/rapidPoolWarm";
 import type { HubGameDownload } from "../hub/api";
+import { reportDownload } from "../hub/downloadCount";
 import {
   type DownloadProgress,
   dlCancel,
@@ -79,14 +80,26 @@ export type EnqueueInput = (
   | {
       kind: "file";
       label: string;
-      args: { url: string; destDir: string; filename: string; sha256?: string };
+      args: {
+        url: string;
+        destDir: string;
+        filename: string;
+        sha256?: string;
+        /** The map's name, when the file is a map the caller knows by name. */
+        mapName?: string;
+      };
     }
   | {
       // A hub game's download sources in the hub's order, each tried in turn
       // until one delivers (issue #5260). See `downloadHubGame`.
       kind: "hubGame";
       label: string;
-      args: { downloads: HubGameDownload[]; destDir: string };
+      args: {
+        downloads: HubGameDownload[];
+        destDir: string;
+        /** The hub's shortname for the game, for the download count. */
+        shortname?: string;
+      };
     }
   | {
       kind: "engineRecoil";
@@ -609,6 +622,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           },
         );
         remember(null);
+        // Never throws, so a hub that is down cannot fail a finished download.
+        reportDownload(item);
         patch(item.id, { status: "done", progress: null, rate: IDLE_RATE });
         setCompletions((c) => ({ ...c, [item.identity]: true }));
         for (const fn of completeListeners.current) fn(settled);
