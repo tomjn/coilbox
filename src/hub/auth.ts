@@ -59,9 +59,8 @@ export const hubProviders = defineCommand<
 >("coilbox-hub", "hub_providers");
 
 /**
- * Forget this machine's sign-in. Coilbox holds a publishable key, which can revoke
- * nothing, so the token stops working here and stays alive in the hub's account
- * service.
+ * Sign out. Coilbox asks the hub to end the session, when the hub offers that, and
+ * then forgets this machine's sign-in whether or not the hub answered.
  */
 export const hubSignOut = defineCommand<
   { hubUrl: string },

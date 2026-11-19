@@ -88,11 +88,11 @@ async fn hub_sign_in(hub_url: String, provider: String) -> CliResult {
     }
 }
 
-/// `hub_sign_out`: forget this machine's sign-in to a hub.
+/// `hub_sign_out`: end the session on the hub, then forget this machine's sign-in.
 ///
-/// This machine is as far as it goes. Coilbox holds a publishable key, which cannot
-/// revoke anything, so the token stops being usable here and stays alive in the
-/// hub's project. Say that rather than promise more.
+/// Asking the hub is best effort. A hub that cannot be reached, answers with an
+/// error or lists no logout route still ends in a local sign-out, so nobody is left
+/// signed in because they are offline (issue #5278).
 ///
 /// It always answers. The keychain delete has a deadline (issue #1469), so a
 /// permission prompt nobody clicks ends the sign-out with words rather than
