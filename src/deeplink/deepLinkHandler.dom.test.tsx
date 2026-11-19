@@ -23,6 +23,7 @@ import {
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeContainerCode } from "../container/container";
+import { clearNotedHubContainers } from "../hub/importRecord";
 import {
   resetInviteStore,
   useInviteState,
@@ -39,9 +40,11 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: async () => {},
 }));
 
+let itemPageReachable = true;
 vi.mock("../hub/config", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../hub/config")),
   useTrustedHubUrl: () => "https://hub.example",
+  isHubItemPageReachable: () => itemPageReachable,
 }));
 
 // The handler reads the content folders for a file it is handed, which is not
@@ -151,6 +154,7 @@ const refusals = () =>
   notify.mock.calls.filter(([n]) => (n as { body: string }).body === BUSY);
 
 beforeEach(() => {
+  itemPageReachable = true;
   where = "";
   state = null;
   invitePrompt = null;
@@ -341,5 +345,67 @@ describe("a link that is not valid while a prompt is open", () => {
       }),
     );
     expect(screen.getByText(LINKS.room.says)).toBeTruthy();
+  });
+});
+
+describe("a hub item link when the hub item page is not reachable", () => {
+  const link = (url: string) =>
+    `coilbox://import?url=${encodeURIComponent(url)}`;
+  const answer = () =>
+    fetchImportPlan.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        host: "hub.example",
+        text: "",
+        plan: {
+          kind: "preset",
+          phrase: "preset",
+          route: "/play/skirmish?import=abc",
+          warnings: [],
+        },
+      } as never),
+    );
+
+  beforeEach(() => {
+    clearNotedHubContainers();
+    itemPageReachable = false;
+  });
+
+  it("fetches the container and carries the item id to the importer", async () => {
+    answer();
+    draw();
+    arrive(link("https://hub.example/i/some-item"));
+    expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(where).toBe("/home");
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("does the same for the item page address", async () => {
+    answer();
+    draw();
+    arrive(link("https://hub.example/item/some-item"));
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("leaves a link to another site without an item id", async () => {
+    answer();
+    draw();
+    arrive(link("https://evil.example/i/some-item"));
+    press("Fetch and check");
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc");
+  });
+
+  it("still opens the item page when it is reachable", () => {
+    itemPageReachable = true;
+    draw();
+    arrive(link("https://hub.example/i/some-item"));
+    expect(fetchImportPlan).not.toHaveBeenCalled();
+    expect(where).toBe("/hub/some-item");
   });
 });
