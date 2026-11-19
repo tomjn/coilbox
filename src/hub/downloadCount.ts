@@ -13,19 +13,18 @@
  * already reads, `getHubMapBase`, is null when the profile switched the hub off)
  * and `isHubImportCountEnabled()`.
  *
- * Maps are named by the request. Games are not: a `hubGame` request holds the
- * hub's download sources, a `rapid` one a tag and a `game` one an archive name,
- * and none of them holds the hub's shortname. They are matched against the games
- * list the client already holds (`heldHubGames`), with no extra fetch. A game
- * that matches nothing, or more than one hub game, sends nothing, since a wrong
- * count is worse than a missing one.
+ * Maps are named by the request: a map name, or a `mapName` a file request
+ * carries when its caller knows one. A hub game carries its shortname. A rapid
+ * request is matched to the one hub game listing its tag in the games list the
+ * client already holds (`heldHubGames`), with no extra fetch. Anything that
+ * matches nothing, or more than one game, sends nothing, since a wrong count is
+ * worse than a missing one.
  */
 
 import { isHubImportCountEnabled } from "@/profile/profile";
-import { stripVersion } from "../career/games";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { getHubMapBase } from "../downloads/hubMapBase";
-import type { HubGame, HubGameDownload } from "./api";
+import type { HubGame } from "./api";
 import { heldHubGames } from "./gameIcons";
 
 function trimBase(base: string): string {
@@ -42,70 +41,39 @@ export function gameDownloadedUrl(base: string, shortname: string): string {
   return `${trimBase(base)}/api/v1/games/${encodeURIComponent(shortname)}/downloaded`;
 }
 
-const sourceKey = (d: HubGameDownload) => `${d.kind}:${d.value}`;
-
-/** The one game `matches` picks out, or undefined for none or several. */
-function only(
+/**
+ * The hub game a rapid request stands for: the one game that lists that tag.
+ * Two games listing it, or none, is no answer. A `game` request names an
+ * archive, which could as well be a fork's, so it names no game.
+ */
+function hubGameForTag(
+  tag: string,
   games: readonly HubGame[],
-  matches: (g: HubGame) => boolean,
 ): HubGame | undefined {
-  const found = games.filter(matches);
+  const found = games.filter((g) =>
+    (g.downloads ?? []).some((d) => d.kind === "rapid" && d.value === tag),
+  );
   return found.length === 1 ? found[0] : undefined;
 }
 
-/**
- * The hub game a game request stands for. A `hubGame` request carries the hub's
- * own sources, so it matches the game whose sources are the same set whatever
- * order a pin put them in. A `rapid` request matches the game that lists its tag.
- * A `game` request names an archive, which matches a game whose title or
- * shortname it is once the version is cut off. Anything else names no game.
- */
-function hubGameFor(
-  req: EnqueueInput,
-  games: readonly HubGame[],
-): HubGame | undefined {
-  switch (req.kind) {
-    case "hubGame": {
-      const wanted = new Set(req.args.downloads.map(sourceKey));
-      if (wanted.size === 0) return undefined;
-      return only(games, (g) => {
-        const have = new Set((g.downloads ?? []).map(sourceKey));
-        return (
-          have.size === wanted.size && [...wanted].every((k) => have.has(k))
-        );
-      });
-    }
-    case "rapid":
-      return only(games, (g) =>
-        (g.downloads ?? []).some(
-          (d) => d.kind === "rapid" && d.value === req.args.tag,
-        ),
-      );
-    case "game": {
-      const name = stripVersion(req.args.gameName).toLowerCase();
-      if (!name) return undefined;
-      return only(
-        games,
-        (g) =>
-          g.title.toLowerCase() === name || g.shortname.toLowerCase() === name,
-      );
-    }
-    default:
-      return undefined;
-  }
+/** The hub shortname a game request carries or can be matched to, or undefined. */
+function shortnameFor(base: string, req: EnqueueInput): string | undefined {
+  if (req.kind === "hubGame") return req.args.shortname || undefined;
+  if (req.kind !== "rapid") return undefined;
+  const games = heldHubGames(base);
+  return games ? hubGameForTag(req.args.tag, games)?.shortname : undefined;
 }
 
-/**
- * The map a request names, or undefined. A `file` request names a url and a
- * filename, not a map, so it counts for nothing.
- */
+/** The map a request names, or undefined. */
 function mapNameFor(req: EnqueueInput): string | undefined {
   const name =
     req.kind === "mapAnySource"
       ? req.args.mapName
       : req.kind === "map"
         ? req.args.springName
-        : undefined;
+        : req.kind === "file"
+          ? req.args.mapName
+          : undefined;
   return name?.trim() ? name : undefined;
 }
 
@@ -129,10 +97,9 @@ export function reportDownload(req: EnqueueInput): void {
       return;
     }
 
-    const games = heldHubGames(base);
-    const game = games && hubGameFor(req, games);
-    if (!game) return;
-    void fetch(gameDownloadedUrl(base, game.shortname), {
+    const shortname = shortnameFor(base, req);
+    if (!shortname) return;
+    void fetch(gameDownloadedUrl(base, shortname), {
       method: "POST",
     }).catch(() => undefined);
   } catch {

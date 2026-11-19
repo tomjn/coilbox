@@ -80,14 +80,26 @@ export type EnqueueInput = (
   | {
       kind: "file";
       label: string;
-      args: { url: string; destDir: string; filename: string; sha256?: string };
+      args: {
+        url: string;
+        destDir: string;
+        filename: string;
+        sha256?: string;
+        /** The map's name, when the file is a map the caller knows by name. */
+        mapName?: string;
+      };
     }
   | {
       // A hub game's download sources in the hub's order, each tried in turn
       // until one delivers (issue #5260). See `downloadHubGame`.
       kind: "hubGame";
       label: string;
-      args: { downloads: HubGameDownload[]; destDir: string };
+      args: {
+        downloads: HubGameDownload[];
+        destDir: string;
+        /** The hub's shortname for the game, for the download count. */
+        shortname?: string;
+      };
     }
   | {
       kind: "engineRecoil";

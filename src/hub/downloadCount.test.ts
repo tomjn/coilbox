@@ -118,18 +118,29 @@ describe("reportDownload", () => {
     });
   });
 
-  it("posts a hub game to its shortname, found by its download sources", () => {
+  it("posts a hub game to the shortname the request carries, with no list lookup", () => {
+    held.games = null;
+
     reportDownload({
       kind: "hubGame",
       label: "Balanced Annihilation",
-      // The pinned source first: order must not matter.
-      args: { downloads: [...BA.downloads].reverse(), destDir: "/d/games" },
+      args: { downloads: BA.downloads, destDir: "/d/games", shortname: "BA" },
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://hub.test/api/v1/games/BA/downloaded");
     expect(init).toEqual({ method: "POST" });
+  });
+
+  it("sends nothing for a hub game request that carries no shortname", () => {
+    reportDownload({
+      kind: "hubGame",
+      label: "Balanced Annihilation",
+      args: { downloads: BA.downloads, destDir: "/d/games" },
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("posts a rapid download whose tag a hub game lists", () => {
@@ -145,25 +156,17 @@ describe("reportDownload", () => {
     );
   });
 
-  it("posts a game archive whose name, less its version, is a hub game's title", () => {
+  it("sends nothing for a game archive name, which could be a fork's", () => {
     reportDownload({
       kind: "game",
-      label: "Balanced Annihilation",
-      args: { gameName: "Balanced Annihilation V15.9.8" },
+      label: "Zero-K",
+      args: { gameName: "Zero-K v1.0" },
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      "https://hub.test/api/v1/games/BA/downloaded",
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends nothing for a game no hub game matches", () => {
-    reportDownload({
-      kind: "game",
-      label: "Remix",
-      args: { gameName: "Balanced Annihilation Remix V1.0" },
-    });
     reportDownload({
       kind: "rapid",
       label: "Other",
@@ -197,7 +200,28 @@ describe("reportDownload", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends nothing for a file, which names no map", () => {
+  it("posts the map name carried by a file request", () => {
+    reportDownload({
+      kind: "file",
+      label: "Isis",
+      args: {
+        url: "https://example.test/isis.sd7",
+        destDir: "/d/maps",
+        filename: "isis.sd7",
+        mapName: "Isis 1.2",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://hub.test/api/v1/maps/downloaded",
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      name: "Isis 1.2",
+    });
+  });
+
+  it("sends nothing for a file request with no map name", () => {
     reportDownload({
       kind: "file",
       label: "Isis",
@@ -268,7 +292,7 @@ describe("reportDownload", () => {
         args: { mapName: "Isis" },
       }),
     ).not.toThrow();
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it("raises nothing when fetch itself throws", () => {

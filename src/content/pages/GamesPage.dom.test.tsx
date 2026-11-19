@@ -215,6 +215,7 @@ describe("Games page", () => {
           { kind: "github", value: "metalfactions/mf" },
         ],
         destDir: "/data/games",
+        shortname: "MF",
       },
     });
   });

@@ -188,6 +188,7 @@ describe("a hub mutator that is not installed", () => {
       args: {
         downloads: [{ kind: "rapid", value: "mode:test" }],
         destDir: "/data/games",
+        shortname: "mode",
       },
     });
   });

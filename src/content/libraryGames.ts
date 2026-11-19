@@ -249,6 +249,7 @@ export async function installRequest(
       pinnedHubDownloads(g.hub.downloads, pinnedSource(prefs, ...gameKeys(g))),
       `${writePath}/games`,
       g.title,
+      g.hub.shortname,
     );
   }
   const source = bestSource(g);

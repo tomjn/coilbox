@@ -16,11 +16,16 @@ describe("hubGameDownloadRequest", () => {
         sha256: "a".repeat(64),
       },
     ];
-    const request = await hubGameDownloadRequest(downloads, DEST, "Some Game");
+    const request = await hubGameDownloadRequest(
+      downloads,
+      DEST,
+      "Some Game",
+      "SG",
+    );
     expect(request).toEqual({
       kind: "hubGame",
       label: "Some Game",
-      args: { downloads, destDir: DEST },
+      args: { downloads, destDir: DEST, shortname: "SG" },
     });
   });
 

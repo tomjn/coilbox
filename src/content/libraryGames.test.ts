@@ -106,7 +106,11 @@ describe("download requests", () => {
     expect(await installRequest(mf, "/data")).toEqual({
       kind: "hubGame",
       label: "Metal Factions",
-      args: { downloads: mf.hub?.downloads, destDir: "/data/games" },
+      args: {
+        downloads: mf.hub?.downloads,
+        destDir: "/data/games",
+        shortname: "MF",
+      },
     });
   });
 
