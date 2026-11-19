@@ -5,9 +5,11 @@
 //! the part that is the hub's own.
 //!
 //! The hub does not run its own accounts. It hands them to a Supabase project,
-//! which hands them to a provider such as Discord, so coilbox has to be told which project before it
-//! can start. `GET <hub>/api/v1/auth` is that answer, and it is the only thing
-//! about the account service this build knows. There is deliberately no built-in
+//! which hands them to a provider such as Discord. `GET <hub>/api/v1/auth` says
+//! where to sign in, and it is the only thing about the account service this
+//! build knows. A current hub lists sign-in endpoints of its own, which pass each
+//! request on to the project. An older one names the project and its key, and
+//! coilbox signs in to Supabase directly. There is deliberately no built-in
 //! fallback: a hub whose `/api/v1/auth` does not answer cannot be signed in to, and
 //! says so, rather than quietly signing the user in to somebody else's project.
 //!
@@ -62,13 +64,10 @@ const PROFILE_LIMIT: usize = 16 * 1024;
 /// would touch all three to store one more entry.
 const SERVICE: &str = "coilbox-hub";
 
-/// Which Supabase project a hub signs its users in through.
+/// How a hub signs its users in.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HubAuth {
-    supabase_url: String,
-    /// The project's publishable key. Public by design: it identifies the project
-    /// on every request and grants nothing on its own.
-    publishable_key: String,
+    service: AccountService,
     /// The hub's digest of the asset vocabulary, when it serves one (issue #1708).
     /// `None` from a hub that has not shipped tomjn/coilbox-hub#165, which says
     /// nothing about whether this build agrees with it.
@@ -77,20 +76,62 @@ pub struct HubAuth {
     providers: Vec<String>,
 }
 
+/// Where the browser is sent and the token requests go.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum AccountService {
+    /// The hub's own sign-in routes (tomjn/coilbox-hub#611). The hub passes each
+    /// request on to its Supabase project and adds the key itself, so coilbox
+    /// sends none. Both addresses are on the hub.
+    Hub { authorize: Url, token: Url },
+    /// Supabase Auth itself, for a hub from before tomjn/coilbox-hub#611 that
+    /// lists no endpoints of its own.
+    Supabase {
+        url: String,
+        /// The project's publishable key. Public by design: it identifies the
+        /// project on every request and grants nothing on its own.
+        publishable_key: String,
+    },
+}
+
 impl HubAuth {
-    /// The headers Supabase wants on a token request, the pair supabase-js sends.
+    /// The address the browser is sent to, before the query is added.
+    fn authorize_endpoint(&self) -> Result<Url, AuthError> {
+        match &self.service {
+            AccountService::Hub { authorize, .. } => Ok(authorize.clone()),
+            AccountService::Supabase { url, .. } => Url::parse(&format!("{url}/auth/v1/authorize"))
+                .map_err(|e| {
+                    AuthError::Discovery(format!(
+                        "the hub named an account service that is not a URL: {e}"
+                    ))
+                }),
+        }
+    }
+
+    /// The headers a token request needs: none for the hub, and for Supabase the
+    /// pair supabase-js sends.
     fn headers(&self) -> Vec<(&'static str, String)> {
-        vec![
-            ("apikey", self.publishable_key.clone()),
-            ("authorization", format!("Bearer {}", self.publishable_key)),
-        ]
+        match &self.service {
+            AccountService::Hub { .. } => Vec::new(),
+            AccountService::Supabase {
+                publishable_key, ..
+            } => vec![
+                ("apikey", publishable_key.clone()),
+                ("authorization", format!("Bearer {publishable_key}")),
+            ],
+        }
     }
 
     fn token_endpoint(&self, grant_type: &str) -> String {
-        format!(
-            "{}/auth/v1/token?grant_type={grant_type}",
-            self.supabase_url
-        )
+        match &self.service {
+            AccountService::Hub { token, .. } => {
+                let mut url = token.clone();
+                url.query_pairs_mut().append_pair("grant_type", grant_type);
+                url.into()
+            }
+            AccountService::Supabase { url, .. } => {
+                format!("{url}/auth/v1/token?grant_type={grant_type}")
+            }
+        }
     }
 }
 
@@ -164,7 +205,60 @@ fn read_auth_document(hub_url: &str, status: u16, body: &str) -> Result<HubAuth,
             .filter(|s| !s.is_empty())
             .map(str::to_owned)
     };
-    let supabase_url = field("supabase_url").ok_or_else(|| {
+    let endpoint = |name: &str| {
+        doc.get("endpoints")
+            .and_then(|e| e.get(name))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    };
+    let service = match (endpoint("authorize"), endpoint("token")) {
+        (Some(authorize), Some(token)) => AccountService::Hub {
+            authorize: hub_endpoint(hub_url, authorize)?,
+            token: hub_endpoint(hub_url, token)?,
+        },
+        _ => read_supabase(hub_url, field("supabase_url"), field("publishable_key"))?,
+    };
+    Ok(HubAuth {
+        service,
+        asset_vocabulary: field("asset_vocabulary"),
+        providers: read_providers(doc.get("providers")),
+    })
+}
+
+/// Resolve an endpoint path the document names against the hub.
+///
+/// The browser and the PKCE verifier go to these addresses, so one that is not a
+/// path on the hub itself is refused. A document that could name any address
+/// would let whoever wrote it put a sign-in page of their choosing in front of
+/// the user.
+fn hub_endpoint(hub_url: &str, path: &str) -> Result<Url, AuthError> {
+    let refused = || {
+        AuthError::Discovery(format!(
+            "The hub at {} named a sign-in address that is not on the hub.",
+            host_of(hub_url)
+        ))
+    };
+    if !path.starts_with('/') {
+        return Err(refused());
+    }
+    let resolved = api_url(hub_url, path, "Signing in").map_err(AuthError::Discovery)?;
+    let resolved = Url::parse(&resolved).map_err(|_| refused())?;
+    let hub = Url::parse(&account_key(hub_url)).map_err(|_| refused())?;
+    if resolved.origin() != hub.origin() {
+        return Err(refused());
+    }
+    Ok(resolved)
+}
+
+/// The Supabase project a hub from before tomjn/coilbox-hub#611 names.
+fn read_supabase(
+    hub_url: &str,
+    supabase_url: Option<String>,
+    publishable_key: Option<String>,
+) -> Result<AccountService, AuthError> {
+    let host = host_of(hub_url);
+    let supabase_url = supabase_url.ok_or_else(|| {
         AuthError::Discovery(format!(
             "The hub at {host} did not say which account service to sign in through."
         ))
@@ -180,16 +274,14 @@ fn read_auth_document(hub_url: &str, status: u16, body: &str) -> Result<HubAuth,
             "The hub at {host} named an account service coilbox cannot open."
         )));
     }
-    let publishable_key = field("publishable_key").ok_or_else(|| {
+    let publishable_key = publishable_key.ok_or_else(|| {
         AuthError::Discovery(format!(
             "The hub at {host} named an account service but no key to reach it with."
         ))
     })?;
-    Ok(HubAuth {
-        supabase_url: supabase_url.trim_end_matches('/').to_owned(),
+    Ok(AccountService::Supabase {
+        url: supabase_url.trim_end_matches('/').to_owned(),
         publishable_key,
-        asset_vocabulary: field("asset_vocabulary"),
-        providers: read_providers(doc.get("providers")),
     })
 }
 
@@ -400,7 +492,8 @@ pub async fn fetch_display_name(hub_url: &str, access_token: &str) {
 
 // ----------------------------------------------------------------- the flow
 
-/// Build the Supabase authorization URL the browser is sent to.
+/// Build the authorization URL the browser is sent to, on the hub or on Supabase.
+/// The query is the same for both, because the hub passes it through to Supabase.
 ///
 /// `redirect_to` carries the `state` rather than a parameter of its own, because
 /// Supabase runs its own handshake with the provider and its own `state` with it, and
@@ -417,12 +510,7 @@ fn authorize_url(
         .query_pairs_mut()
         .append_pair("state", &request.state);
 
-    let mut url =
-        Url::parse(&format!("{}/auth/v1/authorize", config.supabase_url)).map_err(|e| {
-            AuthError::Discovery(format!(
-                "the hub named an account service that is not a URL: {e}"
-            ))
-        })?;
+    let mut url = config.authorize_endpoint()?;
     url.query_pairs_mut()
         .append_pair("provider", provider)
         .append_pair("code_challenge_method", "s256")
@@ -434,7 +522,7 @@ fn authorize_url(
 /// The browser handoff and the PKCE grant that follows it.
 ///
 /// Split from [`sign_in`] so the whole round trip can be tested against a stand-in
-/// Supabase without a test writing to the real OS keychain.
+/// hub without a test writing to the real OS keychain.
 async fn authorize_and_exchange<F>(
     config: &HubAuth,
     provider: &str,
@@ -443,8 +531,9 @@ async fn authorize_and_exchange<F>(
 where
     F: FnOnce(&str) -> Result<(), String>,
 {
+    let origin = config.authorize_endpoint()?;
     let authorization = coilbox_oauth::authorize(
-        &config.supabase_url,
+        origin.as_str(),
         |request| authorize_url(config, provider, request),
         open_browser,
     )
@@ -548,16 +637,22 @@ pub async fn access_token(hub_url: &str) -> Result<String, AuthError> {
     let cache_under = account.clone();
     coilbox_oauth::access_token(SERVICE, &account, move |stored| async move {
         let config = discover(&hub).await?;
-        let endpoint = config.token_endpoint("refresh_token");
-        let answer = post_token(TokenRequest {
-            endpoint: &endpoint,
-            body: TokenBody::Json(json!({ "refresh_token": stored })),
-            headers: config.headers(),
-            previous_refresh: Some(&stored),
-        })
-        .await?;
+        let answer = refresh(&config, &stored).await?;
         remember_identity(&cache_under, &answer);
         Ok(answer.tokens)
+    })
+    .await
+}
+
+/// Trade a stored refresh token for new tokens. Split from [`access_token`] so it
+/// can be tested without the real OS keychain.
+async fn refresh(config: &HubAuth, stored: &str) -> Result<TokenResponse, AuthError> {
+    let endpoint = config.token_endpoint("refresh_token");
+    post_token(TokenRequest {
+        endpoint: &endpoint,
+        body: TokenBody::Json(json!({ "refresh_token": stored })),
+        headers: config.headers(),
+        previous_refresh: Some(stored),
     })
     .await
 }
@@ -646,8 +741,97 @@ mod tests {
     #[test]
     fn discovery_reads_the_project_and_its_key() {
         let config = document(&good_document()).unwrap();
-        assert_eq!(config.supabase_url, "https://project.supabase.co");
-        assert_eq!(config.publishable_key, "sb_publishable_abc");
+        assert_eq!(
+            config.service,
+            AccountService::Supabase {
+                url: "https://project.supabase.co".into(),
+                publishable_key: "sb_publishable_abc".into(),
+            }
+        );
+    }
+
+    /// What the live hub serves since tomjn/coilbox-hub#611: the project as
+    /// before, and the hub's own endpoints beside it.
+    fn hub_document() -> String {
+        let mut doc: Value = serde_json::from_str(&good_document()).unwrap();
+        doc["endpoints"] = json!({
+            "authorize": "/api/v1/auth/authorize",
+            "token": "/api/v1/auth/token",
+            "logout": "/api/v1/auth/logout",
+        });
+        doc.to_string()
+    }
+
+    #[test]
+    fn a_hub_that_lists_its_endpoints_is_signed_in_through_them() {
+        let config = document(&hub_document()).unwrap();
+        assert_eq!(
+            config.service,
+            AccountService::Hub {
+                authorize: Url::parse("https://hub.example/api/v1/auth/authorize").unwrap(),
+                token: Url::parse("https://hub.example/api/v1/auth/token").unwrap(),
+            }
+        );
+        assert_eq!(
+            config.token_endpoint("pkce"),
+            "https://hub.example/api/v1/auth/token?grant_type=pkce"
+        );
+        assert!(config.headers().is_empty(), "a key was sent to the hub");
+    }
+
+    /// The hub path needs nothing of Supabase's, so a hub that stops naming its
+    /// project still signs in.
+    #[test]
+    fn a_hub_listing_its_endpoints_needs_no_project() {
+        let mut doc: Value = serde_json::from_str(&hub_document()).unwrap();
+        let object = doc.as_object_mut().unwrap();
+        object.remove("supabase_url");
+        object.remove("publishable_key");
+        let config = document(&doc.to_string()).unwrap();
+        assert!(matches!(config.service, AccountService::Hub { .. }));
+    }
+
+    /// Both are needed. A document listing only one is an older or partial hub,
+    /// and the Supabase path still works for it.
+    #[test]
+    fn a_hub_listing_one_endpoint_is_signed_in_through_supabase() {
+        let mut doc: Value = serde_json::from_str(&good_document()).unwrap();
+        doc["endpoints"] = json!({ "logout": "/api/v1/auth/logout" });
+        let config = document(&doc.to_string()).unwrap();
+        assert!(matches!(config.service, AccountService::Supabase { .. }));
+    }
+
+    /// The browser and the PKCE verifier go to these addresses, so the document
+    /// may only name paths on the hub it came from.
+    #[test]
+    fn an_endpoint_that_is_not_on_the_hub_is_refused() {
+        for (authorize, token) in [
+            ("https://elsewhere.example/authorize", "/api/v1/auth/token"),
+            ("/api/v1/auth/authorize", "https://elsewhere.example/token"),
+            ("@elsewhere.example/authorize", "/api/v1/auth/token"),
+            ("/api/v1/auth/authorize", "javascript:alert(1)"),
+        ] {
+            let mut doc: Value = serde_json::from_str(&good_document()).unwrap();
+            doc["endpoints"] = json!({ "authorize": authorize, "token": token });
+            let err = document(&doc.to_string()).unwrap_err();
+            assert!(
+                matches!(&err, AuthError::Discovery(m) if m.contains("not on the hub")),
+                "{authorize} {token}: {err:?}"
+            );
+        }
+    }
+
+    /// The hub's endpoints carry the PKCE verifier and the refresh token, so a hub
+    /// served in the clear is refused, other than one on this machine.
+    #[test]
+    fn hub_endpoints_over_plain_http_are_refused() {
+        let err = read_auth_document("http://hub.example", 200, &hub_document()).unwrap_err();
+        assert!(
+            matches!(&err, AuthError::Discovery(m) if m.contains("https")),
+            "{err:?}"
+        );
+        let local = read_auth_document("http://127.0.0.1:8000", 200, &hub_document()).unwrap();
+        assert!(matches!(local.service, AccountService::Hub { .. }));
     }
 
     // -------------------------------------------------------------- providers
@@ -691,7 +875,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_provider_the_hub_does_not_list_is_refused_before_a_browser_opens() {
-        let (base, _) = stand_in_hub().await;
+        let (base, _) = stand_in_hub(false).await;
         let opened = std::sync::atomic::AtomicBool::new(false);
         let refused = sign_in(&base, "google", |_| {
             opened.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -730,7 +914,7 @@ mod tests {
     /// through the refresh that rewrites the provider's name afterwards.
     #[tokio::test]
     async fn the_hub_s_display_name_replaces_the_provider_s() {
-        let (base, _) = stand_in_hub().await;
+        let (base, _) = stand_in_hub(false).await;
         let account = account_key(&base);
         let from_provider = Identity {
             id: "a-user-id".into(),
@@ -912,6 +1096,29 @@ mod tests {
         );
     }
 
+    /// The hub passes the query through to Supabase, so it is the same one, sent
+    /// to the hub.
+    #[test]
+    fn the_authorization_url_is_on_the_hub_when_it_lists_its_endpoints() {
+        let config = document(&hub_document()).unwrap();
+        let request = AuthRequest {
+            challenge: "a-challenge".into(),
+            state: "a-state".into(),
+            redirect_uri: "http://127.0.0.1:41234/oauth2callback".into(),
+        };
+        let url = authorize_url(&config, "discord", &request).unwrap();
+        assert_eq!(url.origin().ascii_serialization(), "https://hub.example");
+        assert_eq!(url.path(), "/api/v1/auth/authorize");
+        let query: HashMap<String, String> = url.query_pairs().into_owned().collect();
+        assert_eq!(query["provider"], "discord");
+        assert_eq!(query["code_challenge_method"], "s256");
+        assert_eq!(query["code_challenge"], "a-challenge");
+        assert_eq!(
+            query["redirect_to"],
+            "http://127.0.0.1:41234/oauth2callback?state=a-state"
+        );
+    }
+
     // --------------------------------------------------------------- identity
 
     #[test]
@@ -1032,18 +1239,31 @@ mod tests {
 
     // ------------------------------------------------------- the whole round trip
 
-    /// A stand-in that is both the hub and its Supabase project: it serves
-    /// `/api/v1/auth` naming itself, and the PKCE grant at
-    /// `/auth/v1/token`. Returns its base URL and what the token endpoint saw.
-    async fn stand_in_hub() -> (String, std::sync::Arc<Mutex<Vec<(String, String)>>>) {
+    /// The token routes the stand-in serves: the hub's own, and Supabase's.
+    const HUB_TOKEN_PATH: &str = "/api/v1/auth/token";
+    const SUPABASE_TOKEN_PATH: &str = "/auth/v1/token";
+
+    /// A stand-in that is both the hub and its Supabase project. It serves
+    /// `/api/v1/auth` naming itself, listing its own endpoints when `endpoints` is
+    /// set, and answers the PKCE and refresh grants on whichever token route was
+    /// asked. Returns its base URL and each token request's head and body.
+    ///
+    /// It rotates refresh tokens as Supabase does: each refresh answers with a new
+    /// one, and a token already spent is refused in Supabase's error shape, the
+    /// one the live hub passes through unchanged.
+    async fn stand_in_hub(
+        endpoints: bool,
+    ) -> (String, std::sync::Arc<Mutex<Vec<(String, String)>>>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
         let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let spent = std::sync::Arc::new(Mutex::new(std::collections::HashSet::new()));
         let recorded = seen.clone();
         let served = base.clone();
         tokio::spawn(async move {
             while let Ok((mut sock, _)) = listener.accept().await {
                 let recorded = recorded.clone();
+                let spent = spent.clone();
                 let base = served.clone();
                 tokio::spawn(async move {
                     let mut buf = Vec::new();
@@ -1075,44 +1295,80 @@ mod tests {
                         }
                     }
                     let body = String::from_utf8_lossy(&buf[head_end..]).into_owned();
+                    let token_path = if endpoints {
+                        HUB_TOKEN_PATH
+                    } else {
+                        SUPABASE_TOKEN_PATH
+                    };
 
-                    let answer = if target.starts_with(DISCOVERY_PATH) {
-                        json!({
+                    let (status, answer) = if target.starts_with(DISCOVERY_PATH)
+                        && !target.starts_with(HUB_TOKEN_PATH)
+                    {
+                        let mut doc = json!({
                             "format": AUTH_FORMAT,
                             "version": 1,
                             "supabase_url": base,
                             "publishable_key": "sb_publishable_abc",
-                        })
+                        });
+                        if endpoints {
+                            doc["endpoints"] = json!({
+                                "authorize": "/api/v1/auth/authorize",
+                                "token": HUB_TOKEN_PATH,
+                                "logout": "/api/v1/auth/logout",
+                            });
+                        }
+                        ("200 OK", doc)
                     } else if target.starts_with(PROFILE_PATH) {
                         let lower = head.to_ascii_lowercase();
-                        json!({
-                            "display_name": lower
-                                .contains("authorization: bearer an-access-token")
-                                .then_some("Tom on the hub"),
-                        })
-                    } else if head.starts_with("POST /auth/v1/token") {
+                        (
+                            "200 OK",
+                            json!({
+                                "display_name": lower
+                                    .contains("authorization: bearer an-access-token")
+                                    .then_some("Tom on the hub"),
+                            }),
+                        )
+                    } else if head.starts_with(&format!("POST {token_path}?")) {
                         recorded
                             .lock()
                             .unwrap()
-                            .push((head.to_ascii_lowercase(), body));
-                        json!({
-                            "access_token": "an-access-token",
-                            "refresh_token": "a-refresh-token",
-                            "expires_in": 3600,
-                            "user": {
-                                "id": "a-user-id",
-                                "user_metadata": { "full_name": "Tom" },
-                            },
-                        })
+                            .push((head.to_ascii_lowercase(), body.clone()));
+                        let sent: Value = serde_json::from_str(&body).unwrap_or_default();
+                        let refreshing = sent["refresh_token"].as_str().map(str::to_owned);
+                        let mut spent = spent.lock().unwrap();
+                        match refreshing {
+                            Some(token) if !spent.insert(token.clone()) => (
+                                "400 Bad Request",
+                                json!({
+                                    "code": 400,
+                                    "error_code": "refresh_token_already_used",
+                                    "msg": "Invalid Refresh Token: Already Used",
+                                }),
+                            ),
+                            _ => (
+                                "200 OK",
+                                json!({
+                                    "access_token": "an-access-token",
+                                    "refresh_token": format!("a-refresh-token-{}", spent.len()),
+                                    "expires_in": 3600,
+                                    "user": {
+                                        "id": "a-user-id",
+                                        "user_metadata": { "full_name": "Tom" },
+                                    },
+                                }),
+                            ),
+                        }
                     } else {
-                        // Not one of the three requests. Other programs on a
+                        // Not one of the requests above. Other programs on a
                         // developer machine probe new local ports with a `GET /`,
-                        // and that must not be taken for the token request.
+                        // and that must not be taken for the token request. A
+                        // token request on the route this hub does not serve is
+                        // let go the same way, so the tests see it never answered.
                         return;
                     };
                     let answer = answer.to_string();
                     let response = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",
+                        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",
                         answer.len()
                     );
                     let _ = sock.write_all(response.as_bytes()).await;
@@ -1187,20 +1443,25 @@ mod tests {
         assert!(!is_behind_hub_vocabulary("http://127.0.0.1:1").await);
     }
 
-    /// The one test that walks the whole thing: ask the hub which project to use,
-    /// send the browser there, take the callback, and trade the code for tokens.
-    /// It stops short of the keychain, which is the shared crate's and would write
-    /// to the real one.
-    #[tokio::test]
-    async fn a_sign_in_goes_from_the_hub_s_answer_to_a_named_user() {
-        let (base, seen) = stand_in_hub().await;
-        let config = discover(&base).await.unwrap();
-        let answer = authorize_and_exchange(&config, "discord", |url| {
+    /// The one round trip that walks the whole thing: ask the hub where to sign
+    /// in, send the browser there, take the callback, and trade the code for
+    /// tokens. It stops short of the keychain, which is the shared crate's and
+    /// would write to the real one. Returns the authorization URL the browser was
+    /// sent to and the token request's head and body.
+    async fn sign_in_against(
+        base: &str,
+        seen: &Mutex<Vec<(String, String)>>,
+    ) -> (Url, String, Value) {
+        let config = discover(base).await.unwrap();
+        let opened = std::sync::Arc::new(Mutex::new(None));
+        let record = opened.clone();
+        let answer = authorize_and_exchange(&config, "discord", move |url| {
             // The browser's part: follow the redirect back to the loopback with a
             // code, the way Supabase does once Discord is done.
             let parsed = Url::parse(url).unwrap();
             let query: HashMap<String, String> = parsed.query_pairs().into_owned().collect();
             let target = format!("{}&code=an-authorization-code", query["redirect_to"]);
+            *record.lock().unwrap() = Some(parsed);
             tokio::spawn(async move {
                 let _ = reqwest::get(&target).await;
             });
@@ -1213,11 +1474,65 @@ mod tests {
         let requests = seen.lock().unwrap();
         let (head, body) = requests.first().expect("the token endpoint was not called");
         assert!(head.contains("grant_type=pkce"), "{head}");
-        assert!(head.contains("apikey: sb_publishable_abc"), "{head}");
         assert!(head.contains("content-type: application/json"), "{head}");
         let sent: Value = serde_json::from_str(body).unwrap();
         assert_eq!(sent["auth_code"], "an-authorization-code");
         assert_eq!(sent["code_verifier"].as_str().unwrap().len(), 43);
+        let opened = opened.lock().unwrap().clone().unwrap();
+        (opened, head.clone(), sent)
+    }
+
+    #[tokio::test]
+    async fn a_sign_in_goes_from_the_hub_s_answer_to_a_named_user() {
+        let (base, seen) = stand_in_hub(false).await;
+        let (opened, head, _) = sign_in_against(&base, &seen).await;
+        assert_eq!(opened.path(), "/auth/v1/authorize");
+        assert!(head.starts_with("post /auth/v1/token?"), "{head}");
+        assert!(head.contains("apikey: sb_publishable_abc"), "{head}");
+    }
+
+    /// Issue #5277. A hub that lists its endpoints is signed in through them,
+    /// and no Supabase key leaves coilbox.
+    #[tokio::test]
+    async fn a_sign_in_goes_through_the_hub_s_own_endpoints() {
+        let (base, seen) = stand_in_hub(true).await;
+        let (opened, head, _) = sign_in_against(&base, &seen).await;
+        assert_eq!(opened.path(), "/api/v1/auth/authorize");
+        assert!(head.starts_with("post /api/v1/auth/token?"), "{head}");
+        assert!(!head.contains("apikey"), "{head}");
+        assert!(!head.contains("authorization:"), "{head}");
+    }
+
+    /// Supabase rotates refresh tokens, and the hub passes its answers through.
+    /// A refresh hands back a new token, and the old one spent again is refused
+    /// as a sign-in that has to be done again, the same on both paths.
+    #[tokio::test]
+    async fn a_refresh_token_reused_after_rotation_is_refused() {
+        for endpoints in [true, false] {
+            let (base, seen) = stand_in_hub(endpoints).await;
+            let config = discover(&base).await.unwrap();
+
+            let rotated = refresh(&config, "the-stored-one").await.unwrap();
+            assert_ne!(rotated.tokens.refresh, "the-stored-one");
+            assert_eq!(identity_from(&rotated.extra).unwrap().name, "Tom");
+
+            let err = refresh(&config, "the-stored-one").await.unwrap_err();
+            assert!(
+                matches!(&err, AuthError::Token { error, .. } if error == "http_400"),
+                "{err:?}"
+            );
+            assert!(err.needs_sign_in(), "{err:?}");
+
+            refresh(&config, &rotated.tokens.refresh).await.unwrap();
+
+            let requests = seen.lock().unwrap();
+            assert_eq!(requests.len(), 3);
+            for (head, body) in requests.iter() {
+                assert!(head.contains("grant_type=refresh_token"), "{head}");
+                assert_eq!(head.contains("apikey"), !endpoints, "{head}");
+                assert!(serde_json::from_str::<Value>(body).unwrap()["refresh_token"].is_string());
+            }
+        }
     }
 
     /// Other programs on a developer machine probe new local ports with a
@@ -1225,7 +1540,7 @@ mod tests {
     /// request, or the sign-in test reads the wrong request as its first.
     #[tokio::test]
     async fn the_stand_in_hub_lets_a_stray_request_go_without_recording_it() {
-        let (base, seen) = stand_in_hub().await;
+        let (base, seen) = stand_in_hub(false).await;
         let mut sock = tokio::net::TcpStream::connect(base.trim_start_matches("http://"))
             .await
             .unwrap();
@@ -1252,9 +1567,67 @@ mod tests {
         let config = discover("https://hub.coilbox.org")
             .await
             .expect("discovery failed");
-        println!("account service: {}", config.supabase_url);
-        println!("key length: {}", config.publishable_key.len());
-        assert!(config.supabase_url.starts_with("https://"));
+        println!("account service: {:?}", config.service);
+        let AccountService::Hub { authorize, token } = &config.service else {
+            panic!("the live hub lists no endpoints of its own");
+        };
+        assert_eq!(authorize.host_str(), Some("hub.coilbox.org"));
+        assert_eq!(token.host_str(), Some("hub.coilbox.org"));
+    }
+
+    /// Check the live hub's sign-in endpoints without signing in: the
+    /// authorization URL coilbox builds is answered with a redirect to Supabase,
+    /// and a made-up code is refused in a shape coilbox reads. It posts to a rate
+    /// limited route once, so run it by hand and not in a loop.
+    ///
+    /// ```text
+    /// cargo test -p tauri-plugin-coilbox-hub live_hub_endpoints -- --ignored --nocapture
+    /// ```
+    #[tokio::test]
+    #[ignore = "reaches the live hub, so it cannot run in CI"]
+    async fn live_hub_endpoints() {
+        let config = discover("https://hub.coilbox.org")
+            .await
+            .expect("discovery failed");
+        let request = AuthRequest {
+            challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM".into(),
+            state: "a-state".into(),
+            redirect_uri: "http://127.0.0.1:41234/oauth2callback".into(),
+        };
+        let url = authorize_url(&config, "discord", &request).unwrap();
+        println!("authorize: {url}");
+        assert_eq!(url.host_str(), Some("hub.coilbox.org"));
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap();
+        let resp = client.get(url).send().await.unwrap();
+        let location = resp
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+        println!("authorize answered {} to {location}", resp.status());
+        assert_eq!(resp.status().as_u16(), 302);
+        assert!(location.contains(".supabase.co/auth/v1/authorize?"));
+
+        let endpoint = config.token_endpoint("pkce");
+        println!("token: {endpoint}");
+        let err = post_token(TokenRequest {
+            endpoint: &endpoint,
+            body: TokenBody::Json(json!({
+                "auth_code": "not-a-real-code",
+                "code_verifier": "x".repeat(43),
+            })),
+            headers: config.headers(),
+            previous_refresh: None,
+        })
+        .await
+        .unwrap_err();
+        println!("a made-up code: {err:?}");
+        println!("explained: {}", explain(&err, "https://hub.coilbox.org"));
+        assert!(matches!(err, AuthError::Token { .. }), "{err:?}");
     }
 
     /// The one test that needs a real Discord account. It opens your browser, waits
