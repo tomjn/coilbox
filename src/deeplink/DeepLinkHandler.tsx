@@ -35,11 +35,7 @@ import {
   isHubOrigin,
   useTrustedHubUrl,
 } from "../hub/config";
-import {
-  hubItemIdForContainer,
-  noteHubContainer,
-  withHubItem,
-} from "../hub/importRecord";
+import { withHubItem } from "../hub/importRecord";
 import { inviteLinkFrom } from "../multiplayer/invite/inviteOffer";
 import {
   invitePromptOpen,
@@ -310,13 +306,8 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // Contact the host, cap and validate the response, then offer to apply it.
   // Only ever called after the user agreed to the fetch. Applies nothing here.
   const runFetch = useCallback(
-    async (url: string, host: string) => {
+    async (url: string, host: string, hubItemId?: string) => {
       setFetching(host);
-      // An item address on the configured hub says which item it is, so note it
-      // for the importer to record and count once the import is saved. Any other
-      // address names no item and is not noted.
-      const itemId = hubItemIdFromUrl(url, trustedHubUrl);
-      if (itemId) noteHubContainer(url, itemId);
       const result = await fetchImportPlan(url, fetchImportText);
       setFetching(null);
       if (!result.ok) {
@@ -327,18 +318,11 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         });
         return;
       }
-      // The id is only known for an item address on the configured hub, noted
-      // above, or one the hub's own pages noted (issue #1368). An address from
-      // anywhere else is not claimed, so it records nothing.
-      setPending(
-        buildImportPending(
-          result.plan,
-          result.host,
-          hubItemIdForContainer(url),
-        ),
-      );
+      // The id is only known for an item address on the configured hub, which
+      // the caller works out. Any other address records nothing.
+      setPending(buildImportPending(result.plan, result.host, hubItemId));
     },
-    [buildImportPending, setFetching, setPending, trustedHubUrl],
+    [buildImportPending, setFetching, setPending],
   );
 
   // Build a pending confirmation from a raw link, or surface a rejection as a
@@ -448,11 +432,19 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         const { url } = result.source;
         // An item's share page on the configured hub: open the page coilbox has
         // for it, which says what it is and offers to import it there. When that
-        // page is switched off the route would send the player home, so the link
-        // is fetched like any other hub address instead.
+        // page is switched off the route would send the player home, so the
+        // item's container is fetched from the configured hub instead. That is
+        // not the pasted address, which can be the item's web page or the hub's
+        // old address.
         const hubItemId = hubItemIdFromUrl(url, trustedHubUrl);
-        if (hubItemId && isHubItemPageReachable()) {
-          navigate(hubItemRoute(hubItemId));
+        if (hubItemId && trustedHubUrl) {
+          if (isHubItemPageReachable()) {
+            navigate(hubItemRoute(hubItemId));
+            return;
+          }
+          const base = trustedHubUrl.replace(/\/+$/, "");
+          const container = `${base}/i/${encodeURIComponent(hubItemId)}`;
+          void runFetch(container, new URL(container).host, hubItemId);
           return;
         }
         let host: string;

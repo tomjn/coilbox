@@ -23,7 +23,6 @@ import {
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeContainerCode } from "../container/container";
-import { clearNotedHubContainers } from "../hub/importRecord";
 import {
   resetInviteStore,
   useInviteState,
@@ -41,9 +40,10 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 }));
 
 let itemPageReachable = true;
+let trustedHub = "https://hub.example";
 vi.mock("../hub/config", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../hub/config")),
-  useTrustedHubUrl: () => "https://hub.example",
+  useTrustedHubUrl: () => trustedHub,
   isHubItemPageReachable: () => itemPageReachable,
 }));
 
@@ -155,6 +155,7 @@ const refusals = () =>
 
 beforeEach(() => {
   itemPageReachable = true;
+  trustedHub = "https://hub.example";
   where = "";
   state = null;
   invitePrompt = null;
@@ -367,28 +368,58 @@ describe("a hub item link when the hub item page is not reachable", () => {
     );
 
   beforeEach(() => {
-    clearNotedHubContainers();
     itemPageReachable = false;
   });
 
-  it("fetches the container and carries the item id to the importer", async () => {
+  it("fetches the container for an /i/ link and carries the item id to the importer", async () => {
     answer();
     draw();
     arrive(link("https://hub.example/i/some-item"));
     expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.example/i/some-item",
+    );
     expect(where).toBe("/home");
     await act(async () => {});
     press("Continue");
     expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
   });
 
-  it("does the same for the item page address", async () => {
+  it("fetches the container, not the web page, for an /item/ link", async () => {
     answer();
     draw();
-    arrive(link("https://hub.example/item/some-item"));
+    arrive(link("https://hub.example/item/some-item?from=discord"));
+    expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.example/i/some-item",
+    );
     await act(async () => {});
     press("Continue");
     expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("fetches from the configured hub for a link on the old vercel address", async () => {
+    trustedHub = "https://hub.coilbox.org";
+    answer();
+    draw();
+    arrive(link("https://coilbox-hub.vercel.app/i/some-item"));
+    expect(fetchImportPlan).toHaveBeenCalledTimes(1);
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.coilbox.org/i/some-item",
+    );
+    await act(async () => {});
+    press("Continue");
+    expect(where).toBe("/play/skirmish?import=abc&hub=some-item");
+  });
+
+  it("keeps a path prefix on the configured hub", () => {
+    trustedHub = "https://hub.example/base/";
+    answer();
+    draw();
+    arrive(link("https://hub.example/base/item/some-item"));
+    expect(fetchImportPlan.mock.calls[0][0]).toBe(
+      "https://hub.example/base/i/some-item",
+    );
   });
 
   it("leaves a link to another site without an item id", async () => {
