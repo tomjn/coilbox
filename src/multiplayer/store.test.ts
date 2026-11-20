@@ -24,6 +24,8 @@ vi.mock("./ingameCue", () => ({
 vi.mock("./chat/mentionCue", () => ({
   triggerMentionCue: () => {},
 }));
+const notifySpy = vi.hoisted(() => vi.fn());
+vi.mock("../notify/notify", () => ({ notify: notifySpy }));
 
 import {
   type Connections,
@@ -31,6 +33,7 @@ import {
   connectionLabelIfSeveral,
   initialMirror,
   mirrorReducer,
+  notifyMention,
   RECONNECT_DELAYS_MS,
   reconnectDelay,
   serverAddressFromKey,
@@ -41,6 +44,38 @@ import {
 } from "./store";
 
 const emptyState = {} as LobbyState;
+
+describe("notifyMention", () => {
+  const base = { from: "Alice", text: "hi bob", at: 0, id: null };
+
+  it("links a channel mention to that channel on the same server", () => {
+    notifySpy.mockClear();
+    notifyMention({ ...base, channel: "main", kind: "said" }, "srv");
+    expect(notifySpy).toHaveBeenCalledWith({
+      title: "Alice mentioned you in #main",
+      body: "hi bob",
+      to: "/chat?channel=main&server=srv",
+    });
+  });
+
+  it("links a battle chat mention to the battle room", () => {
+    notifySpy.mockClear();
+    notifyMention(
+      { ...base, channel: "__battle__7", kind: "saidBattle" },
+      "srv",
+    );
+    expect(notifySpy.mock.calls[0][0].title).toBe(
+      "Alice mentioned you in battle chat",
+    );
+    expect(notifySpy.mock.calls[0][0].to).not.toContain("/chat");
+  });
+
+  it("links a private mention to the conversation with the sender", () => {
+    notifySpy.mockClear();
+    notifyMention({ ...base, channel: null, kind: "private" }, "srv");
+    expect(notifySpy.mock.calls[0][0].to).toBe("/chat?dm=Alice&server=srv");
+  });
+});
 
 describe("reconnectDelay backoff", () => {
   it("returns the scheduled delay per attempt", () => {

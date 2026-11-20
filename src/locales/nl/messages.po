@@ -2940,6 +2940,18 @@ msgstr ""
 msgid "{from} It was called \"{wasCalled}\" in there."
 msgstr "{from} Het heette daar “{wasCalled}”."
 
+#: src/multiplayer/store.tsx
+msgid "{from} mentioned you in #{where}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{from} mentioned you in a private message"
+msgstr ""
+
+#: src/multiplayer/store.tsx
+msgid "{from} mentioned you in battle chat"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #: src/workshop/weaponSlots.ts
 #, fuzzy

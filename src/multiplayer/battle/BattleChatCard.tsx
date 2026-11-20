@@ -1,10 +1,16 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect } from "react";
 import type { MapItem } from "@/content/bindings";
 import { autohostHearsChat } from "../../direct/room";
 import type { Battle, ChatMsg } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
+import {
+  HIGHLIGHT_OWN_KEY,
+  HIGHLIGHT_WORDS_KEY,
+  matchesHighlight,
+} from "../chat/highlight";
 import { useConversation } from "../chat/useConversation";
 import type { NameMark } from "../nameMark";
 import { initialMirror, useConnection, useMultiplayer } from "../store";
@@ -114,6 +120,15 @@ export function BattleChatCard({
   useEffect(() => {
     if (seenId && serverKey) markSeen(seenId, seen, serverKey);
   }, [seenId, seen, markSeen, serverKey]);
+
+  // The same outline the chat page draws round a message that mentions you.
+  const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
+  const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
+  const isHighlighted = useCallback(
+    (m: ChatMsg): boolean =>
+      m.from !== me && matchesHighlight(m.text, hlWords, me, hlOwn),
+    [me, hlWords, hlOwn],
+  );
 
   const senderColor = useCallback(
     (from: string): string | undefined => {
@@ -229,6 +244,7 @@ export function BattleChatCard({
         onSend={conv.send}
         messageAction={messageAction}
         battleMemberNames={rows.map((r) => r.name)}
+        isHighlighted={isHighlighted}
       />
     </div>
   );
