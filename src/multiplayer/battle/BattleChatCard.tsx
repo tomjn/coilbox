@@ -5,6 +5,7 @@ import { autohostHearsChat } from "../../direct/room";
 import type { Battle, ChatMsg } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
 import { type ConversationDescriptor, convId } from "../chat/conversation";
+import { useOpenConversation } from "../chat/openConversations";
 import { useConversation } from "../chat/useConversation";
 import { useIsHighlighted } from "../chat/useIsHighlighted";
 import type { NameMark } from "../nameMark";
@@ -111,6 +112,7 @@ export function BattleChatCard({
   // it. Only the chat hub ever marked anything read, and it cannot mark a room
   // it was never opened for.
   const seenId = desc ? convId(desc) : null;
+  useOpenConversation(serverKey, seenId);
   const seen = conv.total;
   useEffect(() => {
     if (seenId && serverKey) markSeen(seenId, seen, serverKey);

@@ -33,6 +33,7 @@ import {
 } from "../chat/conversation";
 import { MemberActionsMenu } from "../chat/MemberActionsMenu";
 import { MemberList } from "../chat/MemberList";
+import { useOpenConversation } from "../chat/openConversations";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
 import { useConversationParam } from "../chat/useConversationParam";
@@ -96,6 +97,7 @@ function ChatPage() {
   const desc = active?.desc ?? null;
   const activeServerKey = active?.serverKey ?? null;
   const conv = useConversation(desc, activeServerKey);
+  useOpenConversation(activeServerKey, desc ? convId(desc) : null);
   const connection = useConnection(activeServerKey);
   const state = connection?.mirror.state ?? null;
   const me = state?.myUsername ?? null;
