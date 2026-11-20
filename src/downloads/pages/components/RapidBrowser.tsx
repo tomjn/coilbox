@@ -531,14 +531,12 @@ function VersionRow({
         variant="outline"
         size="sm"
         onClick={() => enqueue(input)}
-        disabled={
-          status === "queued" || status === "active" || status === "done"
-        }
+        disabled={installed || status === "queued" || status === "active"}
         aria-label={t`Download ${tag}`}
       >
         {status === "active" ? (
           <Loader2 className="animate-spin" />
-        ) : status === "done" ? (
+        ) : installed ? (
           <CheckCircle2 className="text-emerald-500" />
         ) : (
           <Download />
@@ -549,9 +547,11 @@ function VersionRow({
             ? t`Queued`
             : status === "done"
               ? t`Done`
-              : active
-                ? t`Add to queue`
-                : t`Download`}
+              : installed
+                ? t`Installed`
+                : active
+                  ? t`Add to queue`
+                  : t`Download`}
       </Button>
     </li>
   );
