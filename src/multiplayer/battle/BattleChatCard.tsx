@@ -234,6 +234,11 @@ export function BattleChatCard({
         onSend={conv.send}
         messageAction={messageAction}
         battleMemberNames={rows.map((r) => r.name)}
+        // Players to offer on `@` and Tab. An AI in a slot is not a lobby user
+        // and cannot be told anything.
+        completions={rows
+          .filter((r) => r.kind === "human" && !r.self)
+          .map((r) => r.name)}
         isHighlighted={isHighlighted}
       />
     </div>
