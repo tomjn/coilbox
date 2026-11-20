@@ -116,7 +116,7 @@ function renderNode(
       );
     case "command":
       return (
-        <span key={key} className="rounded bg-primary/20 px-1 font-medium">
+        <span key={key} className="rounded bg-current/20 px-1 font-medium">
           {n.value}
         </span>
       );
@@ -177,10 +177,10 @@ function renderNode(
         </blockquote>
       );
     case "mention":
-      // Mirror the command chip: subtle tint + weight, no forced text colour,
-      // so it stays legible on both the primary and muted bubbles.
+      // Mirror the command chip. The tint is the bubble's own text colour, so
+      // it shows on the primary bubble, where a primary tint did not.
       return (
-        <span key={key} className="rounded bg-primary/20 px-0.5 font-semibold">
+        <span key={key} className="rounded bg-current/20 px-0.5 font-semibold">
           @{n.value}
         </span>
       );
