@@ -37,6 +37,7 @@ import {
   type ManualRun,
 } from "./bind";
 import { beginManualSend, endManualSend, type SendSubject } from "./grant";
+import { rememberSentHere } from "./sentHere";
 
 /**
  * One game or map sent to the hub because somebody pressed "Send to hub" on its
@@ -51,6 +52,8 @@ export interface ManualSendRequest extends HubSweepTarget {
   subject: SendSubject;
   /** What a person calls it, for the badge and the closing message. */
   label: string;
+  /** A game's release, so the page can tell it was sent from here. */
+  release?: string;
 }
 
 /** Everything this reaches outside itself, so a test can stand in for it. */
@@ -231,10 +234,21 @@ async function sendGame(
       level: "error",
     };
   }
+  if (request.release) {
+    rememberSentHere(request.hubUrl, shortname, request.release);
+  }
+  const notes = one.logoNotes ?? [];
   if (one.stopped) {
     return {
       title: t`Sent part of ${label} to the hub`,
-      body: one.stopped,
+      body: [one.stopped, ...notes].join(" "),
+      level: "warning",
+    };
+  }
+  if (notes.length > 0) {
+    return {
+      title: t`Sent ${label} to the hub`,
+      body: notes.join(" "),
       level: "warning",
     };
   }

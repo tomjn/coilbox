@@ -8,6 +8,7 @@ import {
 import type { SweepReport } from "../maps/catalogSweep";
 import type { MapPictureSweepReport } from "../maps/pictureSweep";
 import { type ManualSendTools, startManualSend } from "./run";
+import { sentHere } from "./sentHere";
 
 const HUB = { hubUrl: "https://hub.test", enginePath: "/e", dataDir: "/d" };
 const GAME = {
@@ -72,7 +73,10 @@ function kit(overrides: Partial<ManualSendTools> = {}) {
   return tools;
 }
 
-afterEach(() => forgetRunningUploads());
+afterEach(() => {
+  forgetRunningUploads();
+  vi.unstubAllGlobals();
+});
 
 describe("sending one game", () => {
   it("sends that game alone under its grant, then ends the grant", async () => {
@@ -174,6 +178,50 @@ describe("sending one game", () => {
       body: "Out of pictures for sf.",
       level: "warning",
     });
+  });
+
+  it("says which factions got no logo", async () => {
+    const tools = kit({
+      sweepGame: vi.fn(async () => ({
+        ...gameSent,
+        games: [
+          {
+            ...gameSent.games[0],
+            logoNotes: ["The game has no logo for these factions: Maw."],
+          },
+        ],
+      })),
+    });
+    await startManualSend(GAME, tools);
+
+    expect(tools.notify).toHaveBeenCalledWith({
+      title: "Sent Splinter Faction to the hub",
+      body: "The game has no logo for these factions: Maw.",
+      level: "warning",
+    });
+  });
+
+  it("remembers the release was sent from here, and not one that failed", async () => {
+    const entries = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => entries.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        entries.set(key, value);
+      },
+    });
+    await startManualSend({ ...GAME, release: "1.0" }, kit());
+    expect(sentHere(HUB.hubUrl, "sf", "1.0")).toBe(true);
+    expect(sentHere(HUB.hubUrl, "sf", "1.1")).toBe(false);
+
+    await startManualSend(
+      { ...GAME, release: "1.1" },
+      kit({
+        sweepGame: vi.fn(async () => {
+          throw new Error("down");
+        }),
+      }),
+    );
+    expect(sentHere(HUB.hubUrl, "sf", "1.1")).toBe(false);
   });
 
   it("says it stopped when somebody pressed Stop", async () => {

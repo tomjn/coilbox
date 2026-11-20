@@ -46,6 +46,8 @@ export interface FactionLogoPass {
   found: number;
   /** Logos the hub took. */
   written: number;
+  /** The names of the factions the game ships no logo for, in the facts' order. */
+  unshipped: string[];
   /** Anything the worker or the upload said that is worth showing. */
   errors: string[];
 }
@@ -118,7 +120,12 @@ export async function sendFactionLogos(
   factions: readonly GameFaction[],
   tools: FactionLogoTools = liveFactionLogoTools,
 ): Promise<FactionLogoPass> {
-  const none: FactionLogoPass = { found: 0, written: 0, errors: [] };
+  const none: FactionLogoPass = {
+    found: 0,
+    written: 0,
+    unshipped: [],
+    errors: [],
+  };
   if (factions.length === 0) return none;
 
   const read = await tools.logos({
@@ -130,7 +137,11 @@ export async function sendFactionLogos(
   });
   const errors = [...read.errors];
   const extracted = factionLogoUploads(shortname, factions, read);
-  if (extracted.length === 0) return { ...none, errors };
+  const shipped = new Set(extracted.map((one) => one.faction_key));
+  const unshipped = factions
+    .filter((one) => !shipped.has(one.key))
+    .map((one) => one.name);
+  if (extracted.length === 0) return { ...none, unshipped, errors };
 
   const keys = extracted.map(keyOf);
   const answers = await tools.ask(target.hubUrl, keys);
@@ -138,11 +149,11 @@ export async function sendFactionLogos(
     (_, at) => (answers[at]?.status ?? "missing") !== "have",
   );
   if (sending.length === 0)
-    return { found: extracted.length, written: 0, errors };
+    return { found: extracted.length, written: 0, unshipped, errors };
 
   const run = await tools.upload(target.hubUrl, sending, {
     startedBy: "user",
     opId: crypto.randomUUID(),
   });
-  return { found: extracted.length, written: run.written, errors };
+  return { found: extracted.length, written: run.written, unshipped, errors };
 }

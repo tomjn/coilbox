@@ -8,6 +8,7 @@ import {
   type PictureSweepTools,
   pictureSweepSummary,
   rosterUnits,
+  startUnitsFirst,
   sweepGamePictures,
   unitsWithGaps,
 } from "./pictureSweep";
@@ -257,6 +258,26 @@ describe("which units a roster sweep works on", () => {
     ).toEqual(["unit1"]);
     expect(unitsWithGaps(units, [])).toEqual([]);
   });
+
+  it("puts each faction's start unit first, in the order of the sides", () => {
+    const units = rosterUnits(roster(5));
+    const ordered = startUnitsFirst(units, [
+      { name: "Maw", startUnit: "UNIT3" },
+      { name: "Choir", startUnit: "unit1" },
+      // A start unit the roster does not have, and a side with none.
+      { name: "Ghost", startUnit: "unit99" },
+      { name: "Haptic" },
+      // Two sides sharing a start unit list it once.
+      { name: "Tympan", startUnit: "unit1" },
+    ]);
+    expect(ordered.map((unit) => unit.name)).toEqual([
+      "unit3",
+      "unit1",
+      "unit0",
+      "unit2",
+      "unit4",
+    ]);
+  });
 });
 
 describe("a sweep over the installed games", () => {
@@ -292,6 +313,24 @@ describe("a sweep over the installed games", () => {
       wanted: 5,
       covered: 3,
     });
+  });
+
+  /** Voidborn: a send that runs out of the hour's allowance must still have
+   *  reached every faction's start unit. */
+  it("spends the allowance on the start units before the rest", async () => {
+    const watch = watcher({ dataset: () => roster(10), writesLeft: 2 });
+    watch.tools.info = async () =>
+      ({
+        sides: [
+          { name: "Choir", startUnit: "unit8" },
+          { name: "Maw", startUnit: "unit5" },
+        ],
+        errors: [],
+      }) as never;
+    await run(watch);
+
+    expect(watch.picsSent).toEqual([["unit8", "unit5"]]);
+    expect(watch.fills[0].units.slice(0, 2)).toEqual(["unit8", "unit5"]);
   });
 
   /**
@@ -377,6 +416,20 @@ describe("a sweep over the installed games", () => {
       expect(report.games[0].logos).toBe(2);
     });
 
+    it("names the factions the game ships no logo for", async () => {
+      const watch = watcher();
+      withLogos(watch);
+      watch.tools.factionLogos = async () => ({
+        logos: [logoEntry("Armada")],
+        errors: [],
+      });
+      const report = await run(watch);
+      expect(report.games[0].logos).toBe(1);
+      expect(report.games[0].logoNotes).toEqual([
+        "The game has no logo for these factions: Cortex.",
+      ]);
+    });
+
     it("leaves out a faction the hub refused in the facts", async () => {
       const watch = watcher();
       const seen = withLogos(watch);
@@ -396,7 +449,7 @@ describe("a sweep over the installed games", () => {
       const report = await run(watch);
 
       expect(seen.uploaded).toEqual([]);
-      expect(report.errors.join("\n")).toContain(
+      expect(report.games[0].logoNotes?.join("\n")).toContain(
         "The hub would not take this game.",
       );
       expect(watch.picsSent.length).toBeGreaterThan(0);

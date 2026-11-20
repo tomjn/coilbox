@@ -1,5 +1,5 @@
 import { plural, t } from "@lingui/core/macro";
-import type { GameItem, UnitDatasetEntry } from "@/content/bindings";
+import type { GameItem, Side, UnitDatasetEntry } from "@/content/bindings";
 import {
   unitsyncFactionLogos,
   unitsyncGameInfo,
@@ -181,6 +181,10 @@ export interface GamePictures {
    *  from {@link written} because the hub counts them against their own hourly
    *  allowance. */
   logos?: number;
+  /** Why some factions got no logo, one sentence each: the game ships none for
+   *  them, or reading or sending them failed. Left off when every faction got
+   *  one or there was nothing to say. */
+  logoNotes?: string[];
   /** Why the run did less than the whole game, when it did. */
   stopped?: string;
 }
@@ -284,6 +288,31 @@ export function rosterUnits(
     });
   }
   return units;
+}
+
+/**
+ * The roster with each faction's start unit moved to the front, in the order of
+ * the sides, and everything else after it in roster order.
+ *
+ * The hour's allowance is spent in roster order, so this is what makes sure the
+ * units a player meets first get their pictures before the allowance runs out.
+ *
+ * Exported for its own test.
+ */
+export function startUnitsFirst(
+  units: readonly BackfillUnit[],
+  sides: readonly Side[],
+): BackfillUnit[] {
+  const starts = sides.flatMap((side) => {
+    const name = side.startUnit?.trim().toLowerCase();
+    return name ? [name] : [];
+  });
+  const first: BackfillUnit[] = [];
+  for (const name of starts) {
+    const unit = units.find((one) => one.name.toLowerCase() === name);
+    if (unit && !first.includes(unit)) first.push(unit);
+  }
+  return [...first, ...units.filter((unit) => !first.includes(unit))];
 }
 
 /**
@@ -415,15 +444,36 @@ async function sweepOneGame(
   const dataset = await tools.dataset(mount);
   errors.push(...dataset.errors);
 
+  // The sides, read once: the facts and the logos need them, and so does the
+  // order the units are sent in.
+  let sides: Side[] | null = null;
+  let sidesFailed: string | null = null;
+  if (dataset.units.length > 0) {
+    try {
+      const info = await tools.info(mount);
+      errors.push(...info.errors);
+      sides = info.sides;
+    } catch (e) {
+      sidesFailed = describeError(e);
+    }
+  }
+
   // The game's facts, then its faction logos (issue #4387).
-  const logos = await sendLogos(
-    target,
-    entry,
-    dataset.units,
-    brandingEntries,
-    tools,
-    errors,
-  );
+  const logos = sidesFailed
+    ? {
+        written: 0,
+        notes: [
+          t`Coilbox could not read the factions, so no faction logos were sent. ${sidesFailed}`,
+        ],
+      }
+    : await sendLogos(
+        target,
+        entry,
+        dataset.units,
+        sides ?? [],
+        brandingEntries,
+        tools,
+      );
   const blank: GamePictures = {
     game: game.name,
     shortname,
@@ -431,10 +481,12 @@ async function sweepOneGame(
     wanted: 0,
     covered: 0,
     written: 0,
-    ...(logos > 0 ? { logos } : {}),
+    ...(logos.written > 0 ? { logos: logos.written } : {}),
+    ...(logos.notes.length > 0 ? { logoNotes: logos.notes } : {}),
   };
 
-  const units = rosterUnits(dataset.units);
+  // Each faction's start unit first, so the hour's allowance reaches them.
+  const units = startUnitsFirst(rosterUnits(dataset.units), sides ?? []);
   if (units.length === 0) return blank;
 
   // The build pics first, and the whole roster's worth (issue #1953). They are
@@ -489,6 +541,7 @@ async function sweepOneGame(
       enginePath,
       dataDir,
       startedBy: "user",
+      scope: "game",
       // Already done, a moment ago, over the whole roster rather than over this
       // narrowed list. Doing them again would be a mount and a few hundred
       // encodes to produce bytes the hub would answer `have` to.
@@ -528,26 +581,25 @@ async function sweepOneGame(
  * left out of the logos for the same reason.
  *
  * Nothing here stops the unit pictures. If the facts or the logos fail, the
- * reason goes into `errors` and the game carries on to its units, since the hub
- * does not need the logos for those.
+ * reason comes back in `notes` and the game carries on to its units, since the
+ * hub does not need the logos for those. A faction the game ships no logo for
+ * is a note too, because otherwise a send looks like it skipped it.
  */
 async function sendLogos(
   target: PictureSweepTarget,
   entry: Sendable,
   dataset: readonly UnitDatasetEntry[],
+  sides: readonly Side[],
   brandingEntries: Awaited<ReturnType<typeof loadBrandingCatalog>>,
   tools: PictureSweepTools,
-  errors: string[],
-): Promise<number> {
+): Promise<{ written: number; notes: string[] }> {
   // A game with no units is not a game the hub could hold facts for, and the
   // facts sweep skips it for the same reason.
-  if (dataset.length === 0) return 0;
+  if (dataset.length === 0) return { written: 0, notes: [] };
   const { hubUrl, enginePath, dataDir } = target;
   const gameArchive = entry.game.primaryArchive.name;
   try {
-    const info = await tools.info({ enginePath, dataDir, gameArchive });
-    errors.push(...info.errors);
-    const facts = factsFor(entry, dataset, info.sides, brandingEntries);
+    const facts = factsFor(entry, dataset, sides, brandingEntries);
     const results = await tools.publishFacts(hubUrl, facts);
     const refused = new Set(
       results
@@ -563,13 +615,23 @@ async function sendLogos(
       factions,
       { logos: tools.factionLogos, ask: tools.ask, upload: tools.upload },
     );
-    errors.push(...pass.errors);
-    return pass.written;
+    const notes = [...pass.errors];
+    if (refused.size > 0) {
+      const names = [...refused].join(", ");
+      notes.push(
+        t`The hub refused these factions, so they have no logo: ${names}.`,
+      );
+    }
+    if (pass.unshipped.length > 0) {
+      const names = pass.unshipped.join(", ");
+      notes.push(t`The game has no logo for these factions: ${names}.`);
+    }
+    return { written: pass.written, notes };
   } catch (e) {
-    errors.push(
-      `${entry.game.name}: faction logos were not sent. ${describeError(e)}`,
-    );
-    return 0;
+    return {
+      written: 0,
+      notes: [t`Faction logos were not sent. ${describeError(e)}`],
+    };
   }
 }
 
