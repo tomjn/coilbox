@@ -38,8 +38,8 @@ export function HubPageButton({ url, label }: { url: string; label: string }) {
 
 /**
  * The hub send control on a map or game's detail page. It shows only while the
- * hub is missing the item, or some of a map's layers, or a send of it is
- * running. When the hub has it, the page shows a {@link HubPageButton} instead,
+ * hub is missing the item, some of a map's layers or a picture of one of a
+ * game's start units, or while a send of it is running. When the hub has it, the page shows a {@link HubPageButton} instead,
  * and beside this control for a map that is missing layers.
  *
  * Pressing it is the agreement to send this one item, so the uploads switch in
@@ -48,12 +48,15 @@ export function HubPageButton({ url, label }: { url: string; label: string }) {
  */
 export function HubSendControl({
   subject,
+  release,
   label,
   presence,
   enginePath,
   dataDir,
 }: {
   subject: SendSubject;
+  /** A game's release, so the page can tell it was sent from here. */
+  release?: string;
   label: string;
   presence: HubPresence;
   /** The install the page is showing, which is the one that gets read. */
@@ -75,6 +78,7 @@ export function HubSendControl({
       dataDir,
       subject,
       label,
+      release,
     });
   };
 
