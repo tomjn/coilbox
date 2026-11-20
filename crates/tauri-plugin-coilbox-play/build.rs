@@ -18,6 +18,7 @@ const COMMANDS: &[&str] = &[
     "play_ask_lua_rules",
     "play_focus",
     "play_infolog",
+    "play_engine_output",
     "play_system_info",
     "play_oa_find",
     "play_oa_check",

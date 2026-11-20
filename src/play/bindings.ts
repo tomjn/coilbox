@@ -299,7 +299,8 @@ export const playFocus = defineCommand<{ runId: string }, { focused: boolean }>(
 );
 
 /**
- * Read the tail of the engine's most recent `infolog.txt`.
+ * Read the tail of the engine's most recent `infolog.txt`, or all of it when
+ * `maxLines` is left out.
  *
  * It is not in `dataDir`, whatever the content root says. The engine writes the
  * log to its own write dir, which on unix is `~/.config/spring` rather than
@@ -311,9 +312,19 @@ export const playFocus = defineCommand<{ runId: string }, { focused: boolean }>(
  * no engine log exists anywhere.
  */
 export const playInfolog = defineCommand<
-  { dataDir: string; maxLines: number },
+  { dataDir: string; maxLines?: number },
   { log: InfologTail }
 >("coilbox-play", "play_infolog");
+
+/**
+ * The whole of the file the last launch's stdout and stderr went to. An engine
+ * that dies before it opens `infolog.txt` prints its reason only here. `null`
+ * when no launch has written one this session.
+ */
+export const playEngineOutput = defineCommand<
+  Record<string, never>,
+  { log: InfologTail | null }
+>("coilbox-play", "play_engine_output");
 
 /** The machine coilbox runs on, as far as the OS will say. */
 export interface SystemInfo {

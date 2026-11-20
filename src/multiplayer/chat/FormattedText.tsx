@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { dispatchDeepLink } from "../../deeplink/bus";
 import { jumbojiCount } from "./jumboji";
 import { splitOnNames } from "./nameHighlight";
-import { type Inline, parseMessage } from "./parseMessage";
+import { type Inline, keepMentionsOf, parseMessage } from "./parseMessage";
 
 /** Highlighting for player names inside a message's plain text (issue
  * #3189), e.g. an autohost line naming the players it's talking about.
@@ -23,11 +23,15 @@ export interface NameHighlight {
 export function FormattedText({
   text,
   highlight,
+  mentionable,
 }: {
   text: string;
   /** Player names to pick out of plain text, e.g. an autohost's own
    * messages. Omit where there is nothing to highlight. */
   highlight?: NameHighlight;
+  /** Who is in the conversation. An `@name` for anybody else stays plain
+   * text. Omit where there is no member list, and every `@word` is a chip. */
+  mentionable?: string[];
 }) {
   // Jumboji: a message that is only a handful of emoji renders enlarged, the
   // way Slack/Discord do. Above the small cap it falls back to normal rendering.
@@ -35,7 +39,15 @@ export function FormattedText({
   if (jumbo >= 1 && jumbo <= 3) {
     return <span className="text-5xl leading-none">{text.trim()}</span>;
   }
-  return <>{render(parseMessage(text), highlight)}</>;
+  const nodes = parseMessage(text);
+  return (
+    <>
+      {render(
+        mentionable ? keepMentionsOf(nodes, mentionable) : nodes,
+        highlight,
+      )}
+    </>
+  );
 }
 
 /** A list item. Split out so the key is built where the rest of them are, rather

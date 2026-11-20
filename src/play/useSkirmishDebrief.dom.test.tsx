@@ -110,6 +110,26 @@ describe("useSkirmishDebrief ingest at game end", () => {
     expect(emit).not.toHaveBeenCalled();
   });
 
+  it("records a crashed run's result but leaves the drawer to the crash drawer", async () => {
+    const o = {
+      ...opts(),
+      preset: { key: "k", name: "P" },
+      recordResult: vi.fn(() => ({ kind: "duplicate" as const })),
+    };
+    const { result } = renderHook(() => useSkirmishDebrief());
+    await act(() => result.current.resolve({ ...o, quiet: true }));
+    expect(result.current.open).toBe(false);
+    expect(o.recordResult).toHaveBeenCalledTimes(1);
+    expect(ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a crashed run with no replay shut too", async () => {
+    tagFresh.mockResolvedValue(null);
+    const { result } = renderHook(() => useSkirmishDebrief());
+    await act(() => result.current.resolve({ ...opts(), quiet: true }));
+    expect(result.current.open).toBe(false);
+  });
+
   it("does not ingest when no replay was found", async () => {
     tagFresh.mockResolvedValue(null);
     const { result } = renderHook(() => useSkirmishDebrief());

@@ -18,6 +18,7 @@ permissions = [
   "allow-play-ask-lua-rules",
   "allow-play-focus",
   "allow-play-infolog",
+  "allow-play-engine-output",
   "allow-play-system-info",
   "allow-play-oa-find",
   "allow-play-oa-check",

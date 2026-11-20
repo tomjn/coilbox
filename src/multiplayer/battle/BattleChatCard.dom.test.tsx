@@ -65,9 +65,10 @@ vi.mock("@picoframe/frame", () => ({
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
-  // A list setting keeps its default, so the highlight words can be iterated.
-  useSetting: (_key: string, fallback: unknown) => [
-    Array.isArray(fallback) ? fallback : false,
+  // The highlight settings keep their defaults, so a mention of you is
+  // outlined as it is in the app.
+  useSetting: (key: string, fallback: unknown) => [
+    key.startsWith("multiplayer.highlight.") ? fallback : false,
     vi.fn(),
   ],
   useTheme: () => ({ resolved: "dark" }),
@@ -230,6 +231,26 @@ describe("BattleChatCard: @ mentions", () => {
       (o) => o.textContent,
     );
     expect(offered).toEqual(["Alice", "Bob"]);
+  });
+});
+
+describe("BattleChatCard: mentions", () => {
+  // The bubble is the closest element carrying the outline's ring class.
+  const outlined = (text: string) =>
+    screen.getByText(text).closest(".ring-2") !== null;
+
+  it("outlines a message that says your name", () => {
+    messages = [chatLine("ready Host?")];
+    renderCard(false);
+
+    expect(outlined("ready Host?")).toBe(true);
+  });
+
+  it("leaves a message that does not mention you plain", () => {
+    messages = [chatLine("ready everyone?")];
+    renderCard(false);
+
+    expect(outlined("ready everyone?")).toBe(false);
   });
 });
 

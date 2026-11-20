@@ -271,6 +271,13 @@ export function ChatPane({
   // Runs of join and leave notices fold into one row each, so prev and next
   // below are rows, not messages.
   const rows = useMemo(() => foldNotices(messages), [messages]);
+  // Who an `@name` chip may name: the people in this conversation and you
+  // (issue #5284). Undefined where the pane has no member list.
+  const roomNames = completions ?? battleMemberNames;
+  const mentionable = useMemo(
+    () => (roomNames && currentUser ? [...roomNames, currentUser] : roomNames),
+    [roomNames, currentUser],
+  );
   /** One part of a folded run: "alice, bob and 3 others joined". */
   const noticePart = (names: string[], id: string, verb: string): ReactNode => {
     if (names.length === 0) return null;
@@ -688,6 +695,7 @@ export function ChatPane({
                             <FormattedText
                               text={m.text}
                               highlight={nameHighlightFor(bot)}
+                              mentionable={mentionable}
                             />
                           </span>
                         </div>
@@ -757,6 +765,7 @@ export function ChatPane({
                               <FormattedText
                                 text={m.text}
                                 highlight={nameHighlightFor(bot)}
+                                mentionable={mentionable}
                               />
                             </span>
                             {/* The time sits inside the bubble at the end of

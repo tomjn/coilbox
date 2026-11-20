@@ -65,9 +65,10 @@ vi.mock("@picoframe/frame", () => ({
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
-  // A list setting keeps its default, so the highlight words can be iterated.
-  useSetting: (_key: string, fallback: unknown) => [
-    Array.isArray(fallback) ? fallback : false,
+  // The highlight settings keep their defaults, so a mention of you is
+  // outlined as it is in the app.
+  useSetting: (key: string, fallback: unknown) => [
+    key.startsWith("multiplayer.highlight.") ? fallback : false,
     vi.fn(),
   ],
   useTheme: () => ({ resolved: "dark" }),
