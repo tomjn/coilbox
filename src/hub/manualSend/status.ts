@@ -3,11 +3,17 @@ import type { GameItem } from "@/content/bindings";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
 import { fetchHubGames, type HubGame } from "../api";
 import { fetchHubPictures } from "../assets/pictures";
-import { MAP_VARIANTS, MINIMAP_VARIANT } from "../assets/vocabulary";
+import {
+  MAP_VARIANTS,
+  MINIMAP_VARIANT,
+  PICTURE_ANGLES,
+  renderVariant,
+} from "../assets/vocabulary";
 import { useTrustedHubUrl } from "../config";
 import { gamesToSend, type Sendable } from "../games/factsSweep";
 import { fetchMapFacts, type MapFacts } from "../maps/lookup";
 import { useManualSendsFinished } from "./run";
+import { sentHere } from "./sentHere";
 
 /**
  * Whether the hub has a game or map, as a detail page needs to know it.
@@ -58,19 +64,28 @@ export function mapPageUrl(hubUrl: string, slug: string): string {
  * release. A hub that does not say which releases it holds is taken at its
  * listing: offering every listed game would put a send button on every page
  * for games the hub plainly has.
+ *
+ * A game the hub holds is `incomplete` when `missingStartPics` says the hub
+ * shows no picture of one of its start units. Left undefined, while the hub
+ * has not answered or when this machine has already sent this release, it
+ * counts as present.
  */
 export function gamePresence(
   hubUrl: string,
   games: readonly HubGame[] | null,
   shortname: string,
   release: string,
+  missingStartPics?: boolean,
 ): HubPresence {
   if (!games) return UNKNOWN;
   const wanted = shortname.toLowerCase();
   const game = games.find((one) => one.shortname.toLowerCase() === wanted);
   if (!game) return MISSING;
   if (game.releases && !game.releases.includes(release)) return MISSING;
-  return { state: "present", url: gamePageUrl(hubUrl, game.shortname) };
+  const url = gamePageUrl(hubUrl, game.shortname);
+  return missingStartPics
+    ? { state: "incomplete", url }
+    : { state: "present", url };
 }
 
 /** The hashes of the archives the hub lists for a game, from its download
@@ -125,10 +140,13 @@ export function mapPresence(
 export function useGameHubState(
   shortname: string | null,
   release: string | null,
+  startUnits: readonly string[] = [],
 ): HubState {
   const hubUrl = useTrustedHubUrl();
   const finished = useManualSendsFinished();
   const [games, setGames] = useState<HubGame[] | null>(null);
+  const [missingStartPics, setMissingStartPics] = useState<boolean>();
+  const startKey = startUnits.join("\n");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `finished` is the signal to ask again
   useEffect(() => {
     setGames(null);
@@ -141,10 +159,38 @@ export function useGameHubState(
       .catch(() => {});
     return () => abort.abort();
   }, [hubUrl, shortname, finished]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `startKey` stands for `startUnits`, and `finished` is the signal to ask again
+  useEffect(() => {
+    setMissingStartPics(undefined);
+    if (!hubUrl || !shortname || !release || !startKey) return;
+    // The hub shows a picture only once it is approved, so a release sent from
+    // here would read as missing until then. See `./sentHere`.
+    if (sentHere(hubUrl, shortname, release)) return;
+    const abort = new AbortController();
+    fetchHubPictures(
+      hubUrl,
+      startKey.split("\n").map((unit) => ({
+        keyed_on: "unit" as const,
+        game: shortname,
+        unit_name: unit.toLowerCase(),
+        // The hub answers a render angle it lacks with the unit's build pic,
+        // so this is null only when it shows neither.
+        variant: renderVariant(PICTURE_ANGLES[0] ?? "top"),
+      })),
+      abort.signal,
+    )
+      .then((result) => {
+        if (!abort.signal.aborted && result.ok) {
+          setMissingStartPics(result.pictures.some((one) => one == null));
+        }
+      })
+      .catch(() => {});
+    return () => abort.abort();
+  }, [hubUrl, shortname, release, startKey, finished]);
   if (!hubUrl || !shortname) return { presence: UNKNOWN, hashes: undefined };
   return {
     presence: release
-      ? gamePresence(hubUrl, games, shortname, release)
+      ? gamePresence(hubUrl, games, shortname, release, missingStartPics)
       : UNKNOWN,
     hashes: gameHashes(games, shortname),
   };

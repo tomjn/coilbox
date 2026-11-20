@@ -1120,6 +1120,11 @@ msgstr ""
 msgid "{0, plural, one {This game ships # mission} other {This game ships # missions}}"
 msgstr ""
 
+#. placeholder {0}: total - affordableUnits
+#: src/hub/assets/blueprintBackfill.ts
+msgid "{0, plural, one {This hour's allowance for {game} ran out with # unit still missing pictures. Send it again in an hour to carry on.} other {This hour's allowance for {game} ran out with # units still missing pictures. Send it again in an hour to carry on.}}"
+msgstr ""
+
 #. placeholder {0}: fit.needed
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "{0, plural, one {This pack needs # tweakdefs slot, but this game only declares {available}.} other {This pack needs # tweakdefs slots, but this game only declares {available}.}}"
@@ -13227,6 +13232,10 @@ msgstr ""
 msgid "Coilbox could not read {game}: {said}"
 msgstr ""
 
+#: src/hub/assets/pictureSweep.ts
+msgid "Coilbox could not read the factions, so no faction logos were sent. {sidesFailed}"
+msgstr ""
+
 #: src/hub/upload/messages.ts
 msgid "Coilbox could not read the file."
 msgstr ""
@@ -18379,6 +18388,11 @@ msgstr ""
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 msgid "Faction for the new AI"
+msgstr ""
+
+#. placeholder {0}: describeError(e)
+#: src/hub/assets/pictureSweep.ts
+msgid "Faction logos were not sent. {0}"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
@@ -39806,6 +39820,10 @@ msgstr ""
 msgid "The game has no builders."
 msgstr ""
 
+#: src/hub/assets/pictureSweep.ts
+msgid "The game has no logo for these factions: {names}."
+msgstr ""
+
 #: src/lego/gameFit.ts
 msgid "The game has no movement class {name}, so the engine drops this unit at load."
 msgstr ""
@@ -40195,6 +40213,10 @@ msgstr ""
 
 #: src/hub/assets/pictures.ts
 msgid "The hub refused the picture lookup (HTTP {status})."
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "The hub refused these factions, so they have no logo: {names}."
 msgstr ""
 
 #: src/hub/api.ts

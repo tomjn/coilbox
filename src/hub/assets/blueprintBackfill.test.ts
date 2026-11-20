@@ -1062,6 +1062,18 @@ describe("the rate limit's say", () => {
     expect(watch.models).toHaveLength(4);
     expect(report.stopped).toContain("4 of this layout's 30");
   });
+
+  it("says how many of a game's units are left when a game send runs out", async () => {
+    const watch = spy();
+    const report = await backfillBlueprintUnits(
+      { ...TARGET, scope: "game" },
+      unitsOf(30),
+      4,
+      watch.tools,
+    );
+    expect(report.stopped).toContain("ran out with 26 units still missing");
+    expect(report.stopped).not.toContain("layout");
+  });
 });
 
 describe("lining the answers up", () => {

@@ -77,6 +77,7 @@ export function UploadToHubButton({
   hub,
   pageUrl,
   sendSubject,
+  sendRelease,
 }: {
   target: UploadTarget;
   /** What a person calls it. */
@@ -95,6 +96,8 @@ export function UploadToHubButton({
   /** What the page's send control sends, when it has one. A game or map the
    *  hub does not know is offered that send before the file goes up. */
   sendSubject?: SendSubject;
+  /** A game's release, passed to that send. */
+  sendRelease?: string;
 }) {
   const { t } = useLingui();
   const hubUrl = useHubUrl();
@@ -260,6 +263,7 @@ export function UploadToHubButton({
                   dataDir,
                   subject: sendSubject,
                   label,
+                  release: sendRelease,
                 });
               }}
             >

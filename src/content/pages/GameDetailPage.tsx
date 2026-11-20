@@ -213,6 +213,7 @@ export default function GameDetailPage() {
   const hubState = useGameHubState(
     sendable?.shortname ?? modinfoShortname,
     sendable?.release ?? null,
+    startUnits,
   );
   const hubPresence = hubState.presence;
 
@@ -320,6 +321,7 @@ export default function GameDetailPage() {
             {sendable && (
               <HubSendControl
                 subject={{ kind: "game", shortname: sendable.shortname }}
+                release={sendable.release}
                 label={game.info.name?.trim() || game.name}
                 presence={hubPresence}
                 enginePath={selected?.enginePath}
@@ -346,6 +348,7 @@ export default function GameDetailPage() {
                   ? { kind: "game", shortname: sendable.shortname }
                   : undefined
               }
+              sendRelease={sendable?.release}
             />
           </>
         }
@@ -534,7 +537,8 @@ export default function GameDetailPage() {
           <BrandingLinks
             entry={brand}
             hubLink={
-              hubPresence.state === "present" && (
+              (hubPresence.state === "present" ||
+                hubPresence.state === "incomplete") && (
                 <HubPageButton url={hubPresence.url} label={t`Show on hub`} />
               )
             }

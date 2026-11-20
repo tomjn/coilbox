@@ -235,6 +235,9 @@ export interface BackfillTarget {
    * moment ago and would answer `have` to.
    */
   buildpics?: boolean;
+  /** What the units are, for the message when the allowance cuts the run
+   *  short: a layout's, which is the default, or a whole game's. */
+  scope?: "layout" | "game";
   /**
    * A run the caller already has on screen, which this reports into rather than
    * opening a second row for. The caller owns that row, so it is left on screen
@@ -335,12 +338,17 @@ export async function backfillBlueprintUnits(
   }
 
   const stopped =
-    units.length > affordableUnits
-      ? plural(total, {
-          one: `Only ${affordableUnits} of this layout's # unit fits in this hour's allowance for ${game}.`,
-          other: `Only ${affordableUnits} of this layout's # units fit in this hour's allowance for ${game}.`,
-        })
-      : undefined;
+    units.length <= affordableUnits
+      ? undefined
+      : target.scope === "game"
+        ? plural(total - affordableUnits, {
+            one: `This hour's allowance for ${game} ran out with # unit still missing pictures. Send it again in an hour to carry on.`,
+            other: `This hour's allowance for ${game} ran out with # units still missing pictures. Send it again in an hour to carry on.`,
+          })
+        : plural(total, {
+            one: `Only ${affordableUnits} of this layout's # unit fits in this hour's allowance for ${game}.`,
+            other: `Only ${affordableUnits} of this layout's # units fit in this hour's allowance for ${game}.`,
+          });
   const working = units.slice(0, affordableUnits);
 
   const archive = {

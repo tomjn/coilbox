@@ -177,7 +177,7 @@ describe("sendFactionLogos", () => {
         one.keyed_on === "faction" ? one.faction_key : "",
       ),
     ).toEqual(["cortex"]);
-    expect(pass).toEqual({ found: 2, written: 1, errors: [] });
+    expect(pass).toEqual({ found: 2, written: 1, unshipped: [], errors: [] });
   });
 
   it("sends nothing when the hub holds every logo", async () => {
@@ -187,20 +187,26 @@ describe("sendFactionLogos", () => {
     });
     const pass = await sendFactionLogos(TARGET, "bar", FACTIONS, fake);
     expect(calls.sent).toEqual([]);
-    expect(pass).toEqual({ found: 1, written: 0, errors: [] });
+    expect(pass).toEqual({
+      found: 1,
+      written: 0,
+      unshipped: ["Cortex"],
+      errors: [],
+    });
   });
 
   it("reads and asks nothing for a game with no factions", async () => {
     const { fake, calls } = tools({ logos: [logo("Armada")] });
     const pass = await sendFactionLogos(TARGET, "bar", [], fake);
     expect(calls).toEqual({ read: [], asked: [], sent: [] });
-    expect(pass).toEqual({ found: 0, written: 0, errors: [] });
+    expect(pass).toEqual({ found: 0, written: 0, unshipped: [], errors: [] });
   });
 
-  it("asks nothing when the game ships no emblems", async () => {
+  it("asks nothing when the game ships no emblems, and names the factions", async () => {
     const { fake, calls } = tools({ logos: [] });
-    await sendFactionLogos(TARGET, "bar", FACTIONS, fake);
+    const pass = await sendFactionLogos(TARGET, "bar", FACTIONS, fake);
     expect(calls.asked).toEqual([]);
     expect(calls.sent).toEqual([]);
+    expect(pass.unshipped).toEqual(["Armada", "Cortex"]);
   });
 });

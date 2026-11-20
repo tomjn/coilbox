@@ -1339,6 +1339,11 @@ msgstr "{0, plural, one {Ce jeu ne propose aucune IA pour {skipped}, il est donc
 msgid "{0, plural, one {This game ships # mission} other {This game ships # missions}}"
 msgstr "{0, plural, one {Ce jeu fournit # mission} other {Ce jeu fournit # missions}}"
 
+#. placeholder {0}: total - affordableUnits
+#: src/hub/assets/blueprintBackfill.ts
+msgid "{0, plural, one {This hour's allowance for {game} ran out with # unit still missing pictures. Send it again in an hour to carry on.} other {This hour's allowance for {game} ran out with # units still missing pictures. Send it again in an hour to carry on.}}"
+msgstr ""
+
 #. placeholder {0}: fit.needed
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
@@ -16164,6 +16169,10 @@ msgstr "illisible par coilbox"
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox n’a pas pu lire {game} : {said}"
 
+#: src/hub/assets/pictureSweep.ts
+msgid "Coilbox could not read the factions, so no faction logos were sent. {sidesFailed}"
+msgstr ""
+
 #: src/hub/upload/messages.ts
 msgid "Coilbox could not read the file."
 msgstr ""
@@ -22422,6 +22431,11 @@ msgstr "Emblème de faction"
 #, fuzzy
 msgid "Faction for the new AI"
 msgstr "Faction de la nouvelle IA"
+
+#. placeholder {0}: describeError(e)
+#: src/hub/assets/pictureSweep.ts
+msgid "Faction logos were not sent. {0}"
+msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -48558,6 +48572,10 @@ msgstr "Le jeu n’a pas de {list}, ils sont donc dessinés comme un simple spri
 msgid "The game has no builders."
 msgstr "Le jeu n’a pas de constructeurs."
 
+#: src/hub/assets/pictureSweep.ts
+msgid "The game has no logo for these factions: {names}."
+msgstr ""
+
 #: src/lego/gameFit.ts
 #, fuzzy
 msgid "The game has no movement class {name}, so the engine drops this unit at load."
@@ -49035,6 +49053,10 @@ msgstr "Le hub a refusé la recherche de cartes (HTTP {status})."
 #, fuzzy
 msgid "The hub refused the picture lookup (HTTP {status})."
 msgstr "Le hub a refusé la recherche d’images (HTTP {status})."
+
+#: src/hub/assets/pictureSweep.ts
+msgid "The hub refused these factions, so they have no logo: {names}."
+msgstr ""
 
 #: src/hub/api.ts
 #, fuzzy

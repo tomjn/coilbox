@@ -53,6 +53,21 @@ describe("whether the hub has this release of a game", () => {
     });
   });
 
+  it("is incomplete when the hub shows no picture of a start unit", () => {
+    expect(
+      gamePresence(HUB, [hubGame("sf", ["1.0"])], "sf", "1.0", true),
+    ).toEqual({ state: "incomplete", url: "https://hub.test/games/sf" });
+    expect(
+      gamePresence(HUB, [hubGame("sf", ["1.0"])], "sf", "1.0", false),
+    ).toEqual({ state: "present", url: "https://hub.test/games/sf" });
+  });
+
+  it("is still missing a release it does not hold, pictures or not", () => {
+    expect(
+      gamePresence(HUB, [hubGame("sf", ["0.9"])], "sf", "1.0", true),
+    ).toEqual({ state: "missing" });
+  });
+
   it("has a release it holds, matching the shortname ignoring case", () => {
     expect(
       gamePresence(HUB, [hubGame("SF", ["1.0", "0.9"])], "sf", "1.0"),
