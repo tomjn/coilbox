@@ -27,6 +27,7 @@
 
 use crate::assetencode::{encode_height_picture, HeightWindow};
 use crate::ffi::Unitsync;
+use crate::mapfile::MapFile;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, WEBP_MIME};
 use crate::model::{HeightmapOutput, MapOverlayAsset, MapOverlaySkip};
 use coilbox_unitsync_worker::cached::{self, read_meta, CachedMeta, CachedWindow, META_VERSION};
@@ -292,6 +293,9 @@ fn render_with(
     let cache = cache_file(cache_dir, key.as_deref());
     let window_cache = window_file(cache_dir, key.as_deref());
     let meta_cache = meta_file(cache_dir, key.as_deref());
+    // Read once, and only if something below needs it. See `crate::mapfile`.
+    let fast = std::cell::OnceCell::new();
+    let map_file = || fast.get_or_init(|| MapFile::read(us, map_name)).as_ref();
 
     // The sizes and world heights come off the map's archive, so a map whose
     // picture is cached has them stored beside it rather than read again.
@@ -301,13 +305,20 @@ fn render_with(
             Some((meta.min_height, meta.max_height)),
             Some((meta.width, meta.height)),
         ),
-        None => (us.height_bounds(map_name), us.heightmap_size(map_name)),
+        None => (
+            map_file()
+                .and_then(MapFile::bounds)
+                .or_else(|| us.height_bounds(map_name)),
+            map_file()
+                .map(MapFile::height_size)
+                .or_else(|| us.heightmap_size(map_name)),
+        ),
     };
     // The sample read, done once and shared. Only an asset run needs it up front:
     // the display path reads it inside the cache miss below, so a map whose
     // picture is already cached still costs nothing when nobody wants an asset.
     let raw = match (asset_dir, dims) {
-        (Some(_), Some((w, h))) => us.heightmap_data(map_name, w, h),
+        (Some(_), Some((w, h))) => read_heights(us, map_file(), map_name, w, h),
         _ => None,
     };
 
@@ -330,8 +341,7 @@ fn render_with(
             let samples = match raw.as_deref() {
                 Some(raw) => raw,
                 None => {
-                    read = us
-                        .heightmap_data(map_name, w, h)
+                    read = read_heights(us, map_file(), map_name, w, h)
                         .ok_or_else(|| "failed to read heightmap".to_string())?;
                     &read
                 }
@@ -387,6 +397,21 @@ fn render_with(
             ..Default::default()
         },
     }
+}
+
+/// The height samples, from the map file when it was read and holds a grid of
+/// the size asked for, and from unitsync otherwise.
+pub(crate) fn read_heights(
+    us: &Unitsync,
+    map_file: Option<&MapFile>,
+    map_name: &str,
+    w: u32,
+    h: u32,
+) -> Option<Vec<u16>> {
+    map_file
+        .filter(|file| file.height_size() == (w, h))
+        .and_then(MapFile::heights)
+        .or_else(|| us.heightmap_data(map_name, w, h))
 }
 
 /// Print a heightmap error envelope to stdout (used on panic).
@@ -576,7 +601,7 @@ mod tests {
     /// bytes on their own are a shape rather than terrain.
     #[test]
     fn serves_the_window_back_with_the_picture_it_belongs_to() {
-        let dir = cache_dir("hit");
+        let dir = cache_dir("window-hit");
         let picture = cache_file(Some(&dir), Some("abc"));
         let window = window_file(Some(&dir), Some("abc"));
         let made = HeightWindow {
