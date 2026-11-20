@@ -39,7 +39,11 @@ import {
   type Version,
 } from "../../bindings";
 import { useDownloadsConfig } from "../../config";
-import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
+import {
+  identityOf,
+  useDownloadComplete,
+  useDownloadQueue,
+} from "../../DownloadQueueProvider";
 import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
 
@@ -201,13 +205,29 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     );
   }, [versions, deferredVersionFilter]);
 
-  // A new list starts at its top, or a filter that narrows 12,000 rows to 3
-  // would leave the view scrolled far past all of them.
+  // Another repository or filter starts at the top, or a filter that narrows
+  // 12,000 rows to 3 would leave the view scrolled far past all of them. A
+  // finished download marking its row installed keeps the place.
+  const listKey = `${selected?.url ?? ""}\n${deferredVersionFilter}`;
+  const shownListKey = useRef(listKey);
   useLayoutEffect(() => {
-    if (!filteredVersions || !scroller) return;
+    if (!scroller || shownListKey.current === listKey) return;
+    shownListKey.current = listKey;
     scroller.scrollTop = 0;
     setScrollTop(0);
-  }, [filteredVersions, scroller]);
+  }, [listKey, scroller]);
+
+  // The queue forgets a finished download shortly after, so the row has to
+  // remember it was installed rather than read it from the queue.
+  useDownloadComplete((item) => {
+    if (item.kind !== "rapid") return;
+    const { tag } = item.args;
+    setVersions((list) =>
+      list?.some((v) => v.tag === tag && !v.installed)
+        ? list.map((v) => (v.tag === tag ? { ...v, installed: true } : v))
+        : list,
+    );
+  });
 
   const { start, end } = visibleRowWindow(
     scrollTop,
