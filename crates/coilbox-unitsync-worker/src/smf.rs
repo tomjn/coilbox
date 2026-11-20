@@ -143,6 +143,95 @@ pub fn features(smf: &[u8]) -> Result<Vec<MapFeature>, SmfError> {
 /// rotation and the relative size are not read.
 const FEATURE_RECORD: usize = 4 + 5 * 4;
 
+/// Where the fields the infomap reads need sit in `SMFHeader`.
+const OFF_MAPX: usize = 24;
+const OFF_MAPY: usize = 28;
+const OFF_MIN_HEIGHT: usize = 44;
+const OFF_MAX_HEIGHT: usize = 48;
+const OFF_HEIGHTMAP_PTR: usize = 52;
+const OFF_METALMAP_PTR: usize = 68;
+
+/// The parts of an `.smf` header that say where the height and metal grids are
+/// and how big they are.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SmfHeader {
+    /// The map's size in squares, which is eight elmos each.
+    pub mapx: u32,
+    pub mapy: u32,
+    /// The world heights a height word of 0 and of 65535 stand for, before any
+    /// `mapinfo.lua` override.
+    pub min_height: f32,
+    pub max_height: f32,
+    heightmap_ptr: usize,
+    metalmap_ptr: usize,
+}
+
+impl SmfHeader {
+    /// The height grid's size, one sample more than the squares each way, as
+    /// `CSMFMapFile::GetInfoMapSize` gives it for `height`.
+    pub fn height_size(&self) -> (u32, u32) {
+        (self.mapx + 1, self.mapy + 1)
+    }
+
+    /// The metal grid's size, one sample per two squares, as
+    /// `CSMFMapFile::GetInfoMapSize` gives it for `metal`.
+    pub fn metal_size(&self) -> (u32, u32) {
+        (self.mapx / 2, self.mapy / 2)
+    }
+}
+
+/// Read an `.smf` header.
+pub fn header(smf: &[u8]) -> Result<SmfHeader, SmfError> {
+    if smf.len() < OFF_FEATURE_PTR + 4 || !smf.starts_with(MAGIC) {
+        return Err(SmfError::NotAnSmf);
+    }
+    let size = |at| {
+        read_i32(smf, at)
+            .and_then(|v| u32::try_from(v).ok())
+            .filter(|&v| v > 0)
+            .ok_or(SmfError::Truncated)
+    };
+    let ptr = |at| {
+        read_i32(smf, at)
+            .and_then(|v| usize::try_from(v).ok())
+            .ok_or(SmfError::Truncated)
+    };
+    Ok(SmfHeader {
+        mapx: size(OFF_MAPX)?,
+        mapy: size(OFF_MAPY)?,
+        min_height: read_f32(smf, OFF_MIN_HEIGHT).ok_or(SmfError::Truncated)?,
+        max_height: read_f32(smf, OFF_MAX_HEIGHT).ok_or(SmfError::Truncated)?,
+        heightmap_ptr: ptr(OFF_HEIGHTMAP_PTR)?,
+        metalmap_ptr: ptr(OFF_METALMAP_PTR)?,
+    })
+}
+
+/// The height grid as little endian `u16` words, row major, the same samples
+/// unitsync's `GetInfoMap "height"` gives.
+pub fn heights(smf: &[u8], header: &SmfHeader) -> Result<Vec<u16>, SmfError> {
+    let (w, h) = header.height_size();
+    let len = w as usize * h as usize * 2;
+    let bytes = smf
+        .get(header.heightmap_ptr..header.heightmap_ptr.saturating_add(len))
+        .ok_or(SmfError::Truncated)?;
+    Ok(bytes
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .collect())
+}
+
+/// The metal grid as one byte a sample, row major, the same samples unitsync's
+/// `GetInfoMap "metal"` gives.
+pub fn metal(smf: &[u8], header: &SmfHeader) -> Result<Vec<u8>, SmfError> {
+    let (w, h) = header.metal_size();
+    let len = w as usize * h as usize;
+    smf.get(header.metalmap_ptr..header.metalmap_ptr.saturating_add(len))
+        .map(<[u8]>::to_vec)
+        .ok_or(SmfError::Truncated)
+}
+
 fn read_i32(bytes: &[u8], at: usize) -> Option<i32> {
     let four: [u8; 4] = bytes.get(at..at + 4)?.try_into().ok()?;
     Some(i32::from_le_bytes(four))
@@ -179,6 +268,56 @@ mod tests {
             bytes.extend_from_slice(&1f32.to_le_bytes()); // relativeSize
         }
         bytes
+    }
+
+    /// An `.smf` of `mapx` by `mapy` squares with its height and metal grids
+    /// after the header, each sample its own index so a misplaced read shows.
+    fn smf_grids(mapx: i32, mapy: i32) -> Vec<u8> {
+        let mut bytes = vec![0u8; OFF_FEATURE_PTR + 8];
+        bytes[..MAGIC.len()].copy_from_slice(MAGIC);
+        bytes[OFF_MAPX..OFF_MAPX + 4].copy_from_slice(&mapx.to_le_bytes());
+        bytes[OFF_MAPY..OFF_MAPY + 4].copy_from_slice(&mapy.to_le_bytes());
+        bytes[OFF_MIN_HEIGHT..OFF_MIN_HEIGHT + 4].copy_from_slice(&(-40f32).to_le_bytes());
+        bytes[OFF_MAX_HEIGHT..OFF_MAX_HEIGHT + 4].copy_from_slice(&300f32.to_le_bytes());
+        let heights_at = bytes.len() as i32;
+        bytes[OFF_HEIGHTMAP_PTR..OFF_HEIGHTMAP_PTR + 4].copy_from_slice(&heights_at.to_le_bytes());
+        for word in 0..((mapx + 1) * (mapy + 1)) as u16 {
+            bytes.extend_from_slice(&word.to_le_bytes());
+        }
+        let metal_at = bytes.len() as i32;
+        bytes[OFF_METALMAP_PTR..OFF_METALMAP_PTR + 4].copy_from_slice(&metal_at.to_le_bytes());
+        bytes.extend((0..(mapx / 2 * mapy / 2)).map(|i| i as u8));
+        bytes
+    }
+
+    #[test]
+    fn reads_the_grids_the_header_points_at() {
+        let smf = smf_grids(4, 2);
+        let header = header(&smf).unwrap();
+        assert_eq!((header.min_height, header.max_height), (-40.0, 300.0));
+        assert_eq!(header.height_size(), (5, 3));
+        assert_eq!(header.metal_size(), (2, 1));
+        assert_eq!(
+            heights(&smf, &header).unwrap(),
+            (0..15).collect::<Vec<u16>>()
+        );
+        assert_eq!(metal(&smf, &header).unwrap(), vec![0, 1]);
+    }
+
+    #[test]
+    fn a_grid_that_runs_off_the_file_is_truncated() {
+        let mut smf = smf_grids(4, 2);
+        smf.truncate(smf.len() - 1);
+        let header = header(&smf).unwrap();
+        assert_eq!(metal(&smf, &header), Err(SmfError::Truncated));
+        assert!(heights(&smf, &header).is_ok());
+    }
+
+    #[test]
+    fn a_header_with_no_squares_is_refused() {
+        let smf = smf_grids(0, 2);
+        assert_eq!(header(&smf), Err(SmfError::Truncated));
+        assert_eq!(header(b"not a map"), Err(SmfError::NotAnSmf));
     }
 
     #[test]

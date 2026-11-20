@@ -188,6 +188,14 @@ fn read_logged(mut get: impl FnMut(String) -> String) -> Vec<String> {
     }
 }
 
+/// What a map's own `mapinfo.lua` sets, from [`Unitsync::mapinfo_values`].
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct MapinfoValues {
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
+    pub extractor_radius: Option<f32>,
+}
+
 /// A loaded unitsync library plus its resolved entry points. The `Library` is
 /// kept alive in `_lib` so the copied function pointers stay valid.
 pub struct Unitsync {
@@ -1414,6 +1422,83 @@ impl Unitsync {
             close();
         }
         positions
+    }
+
+    /// Run a map's `mapinfo.lua` source through unitsync's own `LuaParser` and
+    /// read the values that the map's own file decides: `smf.minheight` and
+    /// `smf.maxheight`, which override the `.smf` header's height bounds the way
+    /// `GetMapMinHeight` applies them, and the root `extractorradius`, which
+    /// unitsync reads as an int.
+    ///
+    /// The source is run on its own, with no archive mounted, so a script that
+    /// includes another file from the map fails here. That is `None`, and the
+    /// caller asks unitsync instead. A value the script does not set is `None`
+    /// inside the answer.
+    ///
+    /// The parser lowercases table keys, so `minHeight` and `minheight` are the
+    /// same key here as they are to the engine.
+    pub fn mapinfo_values(&self, source: &str) -> Option<MapinfoValues> {
+        let (
+            Some(open),
+            Some(execute),
+            Some(close),
+            Some(root),
+            Some(sub_str),
+            Some(pop),
+            Some(float_val),
+        ) = (
+            self.lp_open_source_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_sub_table_str_fn,
+            self.lp_pop_table_fn,
+            self.lp_str_key_float_val_fn,
+        )
+        else {
+            return None;
+        };
+        let (Ok(csrc), Ok(modes), Ok(smf_key), Ok(min_key), Ok(max_key), Ok(radius_key)) = (
+            CString::new(source),
+            CString::new("rmMbe"),
+            CString::new("smf"),
+            CString::new("minheight"),
+            CString::new("maxheight"),
+            CString::new("extractorradius"),
+        ) else {
+            return None;
+        };
+        // NaN is no number a map can declare, so getting it back means the key
+        // is not there, which is `KeyExists` in the engine's terms.
+        let read = |key: &CString| {
+            let value = unsafe { float_val(key.as_ptr(), f32::NAN) };
+            (!value.is_nan()).then_some(value)
+        };
+        unsafe {
+            if open(csrc.as_ptr(), modes.as_ptr()) == 0 {
+                return None;
+            }
+            execute();
+            if root() == 0 {
+                close();
+                return None;
+            }
+            // `GetInt` truncates, as `lua_tointeger` does.
+            let extractor_radius = read(&radius_key).map(f32::trunc);
+            let (min_height, max_height) = if sub_str(smf_key.as_ptr()) != 0 {
+                let found = (read(&min_key), read(&max_key));
+                pop();
+                found
+            } else {
+                (None, None)
+            };
+            close();
+            Some(MapinfoValues {
+                min_height,
+                max_height,
+                extractor_radius,
+            })
+        }
     }
 
     /// Parse `mapinfo.lua` (the map's archives must be added) for the map's

@@ -16,6 +16,7 @@
 //! from [`crate::seed`] and from the map picture walk in [`crate::minimap`].
 
 use crate::ffi::Unitsync;
+use crate::mapfile::MapFile;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, PNG_MIME};
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MetalmapOutput};
 use image::{DynamicImage, GrayImage, ImageBuffer, ImageFormat, Rgba};
@@ -215,12 +216,17 @@ pub fn render(
         max_side,
     );
 
-    let dims = us.map_dimensions(map_name);
+    // Read once, and only if something below needs it. See `crate::mapfile`.
+    let fast = std::cell::OnceCell::new();
+    let map_file = || fast.get_or_init(|| MapFile::read(&us, map_name)).as_ref();
+    let dims = map_file()
+        .map(MapFile::metal_size)
+        .or_else(|| us.map_dimensions(map_name));
     // The density read, done once and shared. Only an asset run needs it up
     // front: the display path reads it inside the cache miss below, so a map
     // whose PNG is already cached still costs nothing when nobody wants an asset.
     let raw = match (asset_dir, dims) {
-        (Some(_), Some((w, h))) => us.metalmap_data(map_name, w, h),
+        (Some(_), Some((w, h))) => read_metal(&us, map_file(), map_name, w, h),
         _ => None,
     };
 
@@ -241,8 +247,7 @@ pub fn render(
             coilbox_thumb_cache::cached_at(cache.clone(), || match raw.as_deref() {
                 Some(raw) => metalmap_png(raw, w, h, max_side),
                 None => {
-                    let raw = us
-                        .metalmap_data(map_name, w, h)
+                    let raw = read_metal(&us, map_file(), map_name, w, h)
                         .ok_or_else(|| "failed to read metal infomap".to_string())?;
                     metalmap_png(&raw, w, h, max_side)
                 }
@@ -271,6 +276,21 @@ pub fn render(
             ..Default::default()
         },
     }
+}
+
+/// The metal samples, from the map file when it was read and holds a grid of
+/// the size asked for, and from unitsync otherwise.
+pub(crate) fn read_metal(
+    us: &Unitsync,
+    map_file: Option<&MapFile>,
+    map_name: &str,
+    w: u32,
+    h: u32,
+) -> Option<Vec<u8>> {
+    map_file
+        .filter(|file| file.metal_size() == (w, h))
+        .and_then(MapFile::metal)
+        .or_else(|| us.metalmap_data(map_name, w, h))
 }
 
 /// Print a metalmap error envelope to stdout (used on panic).

@@ -47,6 +47,7 @@ mod initlock;
 mod lua;
 mod luacompat;
 mod mapcatalog;
+mod mapfile;
 mod mapmeta;
 mod metalfield;
 mod metalmap;

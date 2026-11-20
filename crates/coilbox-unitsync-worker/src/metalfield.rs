@@ -23,6 +23,7 @@
 //! (500) then. It is deliberately not applied here.
 
 use crate::ffi::Unitsync;
+use crate::mapfile::MapFile;
 use crate::minimap::{map_cache_key, map_index};
 use crate::model::MetalFieldOutput;
 use std::path::{Path, PathBuf};
@@ -69,14 +70,19 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> MetalField
     us.init(false, 0);
     let _ = us.drain_errors();
 
-    let extractor_radius = declared_radius(
-        map_index(&us, map_name).and_then(|index| us.map_number(index, "extractorRadius")),
-    );
+    // Read once, and only if something below needs it. See `crate::mapfile`.
+    let fast = std::cell::OnceCell::new();
+    let map_file = || fast.get_or_init(|| MapFile::read(&us, map_name)).as_ref();
+    let extractor_radius =
+        declared_radius(map_file().and_then(MapFile::extractor_radius).or_else(|| {
+            map_index(&us, map_name).and_then(|index| us.map_number(index, "extractorRadius"))
+        }));
     let cache = cache_file(cache_dir, map_cache_key(&us, None, map_name).as_deref());
 
     let result = (|| -> Result<(String, u32, u32), String> {
-        let (w, h) = us
-            .map_dimensions(map_name)
+        let (w, h) = map_file()
+            .map(MapFile::metal_size)
+            .or_else(|| us.map_dimensions(map_name))
             .ok_or_else(|| "no metal infomap available".to_string())?;
         let file = cache
             .ok_or_else(|| "no cache directory to write the map's metal grid to".to_string())?;
@@ -90,8 +96,7 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> MetalField
         if std::fs::metadata(&file).is_ok_and(|m| m.len() == u64::from(w) * u64::from(h)) {
             coilbox_thumb_cache::touch(&file);
         } else {
-            let raw = us
-                .metalmap_data(map_name, w, h)
+            let raw = crate::metalmap::read_metal(&us, map_file(), map_name, w, h)
                 .ok_or_else(|| "failed to read metal infomap".to_string())?;
             if let Some(dir) = file.parent() {
                 let _ = std::fs::create_dir_all(dir);

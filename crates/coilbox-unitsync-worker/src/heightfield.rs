@@ -24,6 +24,7 @@
 //! again the next time somebody opens it.
 
 use crate::ffi::Unitsync;
+use crate::mapfile::MapFile;
 use crate::minimap::map_cache_key;
 use crate::model::HeightFieldOutput;
 use std::path::{Path, PathBuf};
@@ -79,12 +80,18 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> HeightFiel
     us.init(false, 0);
     let _ = us.drain_errors();
 
-    let bounds = us.height_bounds(map_name);
+    // Read once, and only if something below needs it. See `crate::mapfile`.
+    let fast = std::cell::OnceCell::new();
+    let map_file = || fast.get_or_init(|| MapFile::read(&us, map_name)).as_ref();
+    let bounds = map_file()
+        .and_then(MapFile::bounds)
+        .or_else(|| us.height_bounds(map_name));
     let cache = cache_file(cache_dir, map_cache_key(&us, None, map_name).as_deref());
 
     let result = (|| -> Result<(String, u32, u32), String> {
-        let (w, h) = us
-            .heightmap_size(map_name)
+        let (w, h) = map_file()
+            .map(MapFile::height_size)
+            .or_else(|| us.heightmap_size(map_name))
             .ok_or_else(|| "no heightmap available".to_string())?;
         let file =
             cache.ok_or_else(|| "no cache directory to write the map's heights to".to_string())?;
@@ -99,8 +106,7 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> HeightFiel
         if file.is_file() {
             coilbox_thumb_cache::touch(&file);
         } else {
-            let raw = us
-                .heightmap_data(map_name, w, h)
+            let raw = crate::heightmap::read_heights(&us, map_file(), map_name, w, h)
                 .ok_or_else(|| "failed to read heightmap".to_string())?;
             if let Some(dir) = file.parent() {
                 let _ = std::fs::create_dir_all(dir);
