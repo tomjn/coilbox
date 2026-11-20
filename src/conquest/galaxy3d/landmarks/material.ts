@@ -57,6 +57,14 @@ const RIB_DARK = 0.42;
 const PANE = [0.035, 0.05];
 const BRICK = [0.018, 0.007];
 
+/**
+ * How deep a town building's seams and mortar joints are cut, its ribs'
+ * grooves and its recessed panels, in its own units.
+ */
+export const SEAM_DEPTH = 0.004;
+export const GROOVE_DEPTH = 0.008;
+export const RECESS_DEPTH = 0.006;
+
 /** A hazard stripe's period along the surface, and how dark its dark band is. */
 const STRIPE = 0.06;
 const STRIPE_DARK = 0.12;
@@ -108,6 +116,73 @@ float lmNoise3(vec3 p) {
         mix(lmHash3(i + vec3(0, 1, 1)), lmHash3(i + vec3(1, 1, 1)), f.x), f.y),
     f.z);
 }
+
+#ifdef RELIEF
+// How deep a seam or a mortar joint is cut, a rib's groove and a recessed
+// panel. The Persepolis bake (docs/reports/town-models/townkit.ts) cuts the
+// same, so a building lights alike in the app and in the game.
+#define SEAM_DEPTH ${SEAM_DEPTH.toFixed(4)}
+#define GROOVE_DEPTH ${GROOVE_DEPTH.toFixed(4)}
+#define RECESS_DEPTH ${RECESS_DEPTH.toFixed(4)}
+
+// A pattern's cell at a point: how far its nearest joint is, its hash, and
+// how much of it shows at the size it is drawn.
+vec3 reliefCell(vec2 q, vec2 size, bool offsetRows, float foot) {
+  vec2 b = q / size;
+  if (offsetRows) b.x += 0.5 * mod(floor(b.y), 2.0);
+  vec2 f = fract(b);
+  float edge = min(min(f.x, 1.0 - f.x) * size.x, min(f.y, 1.0 - f.y) * size.y);
+  float fade = clamp(1.0 - max(foot / size.x, foot / size.y) * 1.6, 0.0, 1.0);
+  return vec3(edge, lmHash(floor(b)), fade);
+}
+float joint(float edge, float width, float foot) { return 1.0 - smoothstep(0.0, max(width, foot), edge); }
+
+// How far a surface stands proud at a point: the joints, grooves and frames
+// the patterns below draw, as relief the light can catch.
+float relief(float kind, vec3 p, vec3 n, float foot) {
+  bool side = abs(n.y) < 0.75;
+  vec2 wall = vec2(abs(n.x) > abs(n.z) ? p.z : p.x, p.y);
+  if (kind < 0.5) {
+    if (abs(n.y) >= 0.6) return 0.0;
+    vec3 c = reliefCell(wall, vec2(0.13, 0.065), true, foot);
+    return -SEAM_DEPTH * joint(c.x, 0.008, foot) * clamp(1.0 - foot / 0.065 * 0.9, 0.0, 1.0);
+  }
+  if (kind < 1.5) {
+    if (!side) return 0.0;
+    vec3 c = reliefCell(wall, vec2(${BRICK[0].toFixed(3)}, ${BRICK[1].toFixed(3)}), true, foot);
+    return -SEAM_DEPTH * 0.5 * joint(c.x, 0.001, foot) * c.z;
+  }
+  if (kind > 2.5 && kind < 3.5) {
+    // A pane sits back from the frame round it.
+    if (!side) return 0.0;
+    vec3 c = reliefCell(wall, vec2(${PANE[0].toFixed(3)}, ${PANE[1].toFixed(3)}), false, foot);
+    return SEAM_DEPTH * joint(c.x, 0.003, foot) * c.z;
+  }
+  if ((kind > 7.5 && kind < 8.5) || (kind > 4.5 && kind < 5.5)) {
+    vec3 c = side
+      ? reliefCell(wall, vec2(0.17, 0.36), false, foot)
+      : reliefCell(p.xz, vec2(0.31, 0.31), false, foot);
+    // The panels drawn darker are the recessed ones.
+    float recess = c.y > 0.9 ? -RECESS_DEPTH * smoothstep(0.0, 0.012, c.x) : 0.0;
+    return (recess - SEAM_DEPTH * joint(c.x, 0.004, foot)) * c.z;
+  }
+  if (kind > 5.5 && kind < 6.5) {
+    if (!side) return 0.0;
+    float duty = ${RIB_GROOVE.toFixed(3)};
+    float w = max(foot, 0.006) / ${RIB_PERIOD.toFixed(3)};
+    float f = fract(p.y / ${RIB_PERIOD.toFixed(3)});
+    float groove = smoothstep(0.0, w, f) * (1.0 - smoothstep(duty, duty + w, f));
+    return -GROOVE_DEPTH * groove * clamp(1.6 - foot / ${RIB_PERIOD.toFixed(3)} * 2.2, 0.0, 1.0);
+  }
+  if (kind > 10.5 && kind < 11.5) {
+    vec3 c = side
+      ? reliefCell(wall, vec2(0.09, 0.075), false, foot)
+      : reliefCell(p.xz, vec2(0.09, 0.075), false, foot);
+    return -SEAM_DEPTH * 0.6 * joint(c.x, 0.003, foot) * c.z;
+  }
+  return 0.0;
+}
+#endif
 
 /**
  * How far a worn skin stands proud at a point, 0 to 1: broad swells, cracks
@@ -256,6 +331,25 @@ void main() {
   vec3 w = normalize(vWorldNormal);
   vec3 hemi = mix(uGroundBounce, uSky, w.y * 0.5 + 0.5);
   float facing = max(dot(w, uSun), 0.0);
+#ifdef RELIEF
+  if (vKind < 1.5 || (vKind > 2.5 && vKind < 3.5) || (vKind > 4.5 && vKind < 6.5)
+      || (vKind > 7.5 && vKind < 8.5) || (vKind > 10.5 && vKind < 11.5)) {
+    // The joints and grooves, lit: the slope of the relief along the
+    // pattern's two axes, half a pixel either side.
+    float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
+    bool side = abs(n.y) < 0.75;
+    vec3 U = side ? (abs(n.x) > abs(n.z) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)) : vec3(1.0, 0.0, 0.0);
+    vec3 V = side ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0);
+    U = normalize(U - n * dot(U, n));
+    V = normalize(V - n * dot(V, n));
+    float e = 0.5 * foot;
+    vec3 grad = U * (relief(vKind, vLocal + U * e, n, foot) - relief(vKind, vLocal - U * e, n, foot))
+      + V * (relief(vKind, vLocal + V * e, n, foot) - relief(vKind, vLocal - V * e, n, foot));
+    vec3 nl = normalize(n - grad / (2.0 * e));
+    hemi = mix(uGroundBounce, uSky, nl.y * 0.5 + 0.5);
+    facing = max(dot(nl, normalize(vSunLocal)), 0.0);
+  }
+#endif
   if (vKind > 8.5 && vKind < RELIEF_BELOW) {
     // A worn skin: relief the light catches, dark in its cracks and hollows.
     float foot = max(fwidth(vLocal.x), max(fwidth(vLocal.y), fwidth(vLocal.z)));
@@ -313,15 +407,20 @@ void main() {
  * The lit surface of a landmark. `transparent` for its see-through edges.
  * `outpost` draws as a sealed outpost keeps itself: painted metal as it left
  * the factory, with no scuffs worn through it and no relief, and tinted glass.
+ * `relief` lights the joints and grooves of a town's buildings as cut into
+ * the surface.
  */
 export function landmarkMaterial(
-  opts: { transparent?: boolean; outpost?: boolean } = {},
+  opts: { transparent?: boolean; outpost?: boolean; relief?: boolean } = {},
 ): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexColors: true,
     transparent: opts.transparent ?? false,
     depthWrite: !opts.transparent,
-    defines: opts.outpost ? { OUTPOST: 1 } : {},
+    defines: {
+      ...(opts.outpost ? { OUTPOST: 1 } : {}),
+      ...(opts.relief ? { RELIEF: 1 } : {}),
+    },
     uniforms: {
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uSunLight: { value: SUN_LIGHT.clone() },

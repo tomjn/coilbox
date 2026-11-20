@@ -386,7 +386,10 @@ export function buildTownModelLayer(
     const group = new THREE.Group();
     group.name = TOWN_NAME;
     group.position.set(town.x, y0, town.z);
-    const material = landmarkMaterial({ outpost: sealed !== null });
+    const material = landmarkMaterial({
+      outpost: sealed !== null,
+      relief: true,
+    });
     const mesh = new THREE.Mesh(merged, material);
     mesh.raycast = () => {};
     group.add(mesh);
