@@ -27,9 +27,9 @@ const { finishDownload } = vi.hoisted(() => ({
   finishDownload: { current: null as null | (() => void) },
 }));
 
-const version = (tag: string, installed = false): Version => ({
+const version = (tag: string, md5: string, installed = false): Version => ({
   tag,
-  md5: "",
+  md5,
   name: tag,
   depends: [],
   kind: "release",
@@ -54,7 +54,12 @@ vi.mock("./bindings", () => ({
     ageSecs: 0,
   })),
   dlVersions: vi.fn(async () => ({
-    versions: [version("byar:stable"), version("byar:test")],
+    // `byar:test` and the snapshot it points at are one package.
+    versions: [
+      version("byar:stable", "aaa"),
+      version("byar:test", "bbb"),
+      version("byar:git:1", "bbb"),
+    ],
     ageSecs: 0,
   })),
 }));
@@ -66,6 +71,30 @@ vi.mock("./config", async (importOriginal) => ({
     },
     vi.fn(),
   ],
+}));
+/** Stands in for the real confirm-then-delete, recording the path it was
+ *  given, so the test covers what the browser does once a package is gone. */
+const { deletedPaths } = vi.hoisted(() => ({ deletedPaths: [] as string[] }));
+vi.mock("../content/pages/components/DeleteArchiveButton", () => ({
+  DeleteArchiveButton: ({
+    path,
+    name,
+    onDeleted,
+  }: {
+    path: string;
+    name: string;
+    onDeleted: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        deletedPaths.push(path);
+        onDeleted();
+      }}
+    >
+      Delete {name}
+    </button>
+  ),
 }));
 vi.mock("./warmEngineCache", () => ({ installEngine: vi.fn() }));
 vi.mock("./downloadGame", () => ({ downloadGameAnySource: vi.fn() }));
@@ -101,30 +130,64 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it("keeps a downloaded version installed after the queue forgets it", async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+async function openByar(writePath?: string) {
   render(
     <I18nProvider i18n={i18n}>
       <MemoryRouter>
         <DownloadQueueProvider>
-          <RapidBrowser />
+          <RapidBrowser writePath={writePath} />
         </DownloadQueueProvider>
       </MemoryRouter>
     </I18nProvider>,
   );
-
   fireEvent.click(await screen.findByRole("button", { name: "byar" }));
-  const button = await screen.findByRole("button", {
+}
+
+/** Download `byar:test` and let the queue prune the finished item. */
+async function downloadTest(): Promise<HTMLButtonElement> {
+  const button = await screen.findByRole<HTMLButtonElement>("button", {
     name: "Download byar:test",
   });
   fireEvent.click(button);
   await waitFor(() => expect(finishDownload.current).not.toBeNull());
   await act(async () => finishDownload.current?.());
-  await waitFor(() => expect(button.textContent).toBe("Done"));
-
-  // Long enough for the queue to prune the finished item.
+  // `PRUNE_MS` in the queue is 4000.
   await act(async () => vi.advanceTimersByTime(10_000));
+  return button;
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  finishDownload.current = null;
+  deletedPaths.length = 0;
+});
+
+it("keeps a downloaded version installed after the queue forgets it", async () => {
+  await openByar();
+  const button = await downloadTest();
 
   expect(button.textContent).toBe("Installed");
-  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect(button.disabled).toBe(true);
+});
+
+it("offers to delete every tag of a downloaded package, then to download it again", async () => {
+  await openByar("/data/spring/");
+  await downloadTest();
+
+  // The snapshot is the same package, so it is installed too.
+  expect(
+    screen.getByRole("button", { name: "Delete byar:git:1" }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Delete byar:test" }));
+
+  expect(deletedPaths).toEqual(["/data/spring/packages/bbb.sdp"]);
+  expect(
+    screen.getByRole("button", { name: "Download byar:test" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Download byar:git:1" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Download byar:stable" }),
+  ).toBeTruthy();
 });

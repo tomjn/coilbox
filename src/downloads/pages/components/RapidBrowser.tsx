@@ -24,6 +24,8 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { isDeletableArchive } from "../../../content/format";
+import { DeleteArchiveButton } from "../../../content/pages/components/DeleteArchiveButton";
 import {
   EmptyState,
   ErrorBanner,
@@ -217,16 +219,24 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     setScrollTop(0);
   }, [listKey, scroller]);
 
+  // Several tags can name one package, so installing or deleting it changes
+  // every row with its md5.
+  const setInstalled = useCallback((md5: string, installed: boolean) => {
+    if (!md5) return;
+    setVersions((list) =>
+      list?.some((v) => v.md5 === md5 && v.installed !== installed)
+        ? list.map((v) => (v.md5 === md5 ? { ...v, installed } : v))
+        : list,
+    );
+  }, []);
+
   // The queue forgets a finished download shortly after, so the row has to
   // remember it was installed rather than read it from the queue.
   useDownloadComplete((item) => {
     if (item.kind !== "rapid") return;
     const { tag } = item.args;
-    setVersions((list) =>
-      list?.some((v) => v.tag === tag && !v.installed)
-        ? list.map((v) => (v.tag === tag ? { ...v, installed: true } : v))
-        : list,
-    );
+    const md5 = versions?.find((v) => v.tag === tag)?.md5;
+    if (md5) setInstalled(md5, true);
   });
 
   const { start, end } = visibleRowWindow(
@@ -468,6 +478,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                         top={(start + i) * VERSION_ROW_HEIGHT}
                         masterUrl={masterUrl}
                         writePath={writePath}
+                        onDeleted={() => setInstalled(v.md5, false)}
                       />
                     ))}
                   </ul>
@@ -489,11 +500,13 @@ function VersionRow({
   top,
   masterUrl,
   writePath,
+  onDeleted,
 }: {
   version: Version;
   top: number;
   masterUrl: string;
   writePath?: string;
+  onDeleted: () => void;
 }) {
   const { t } = useLingui();
   const { enqueue, itemFor, active } = useDownloadQueue();
@@ -504,7 +517,8 @@ function VersionRow({
   };
   const item = itemFor(identityOf(input));
   const status = item?.status ?? null;
-  const installed = v.installed || status === "done";
+  const installed = v.installed;
+  const packagePath = packagePathOf(writePath, v.md5);
   const tag = v.tag;
   const dependencies = v.depends.join(", ");
   const details = [
@@ -547,32 +561,49 @@ function VersionRow({
           )
         )}
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => enqueue(input)}
-        disabled={installed || status === "queued" || status === "active"}
-        aria-label={t`Download ${tag}`}
-      >
-        {status === "active" ? (
-          <Loader2 className="animate-spin" />
-        ) : installed ? (
-          <CheckCircle2 className="text-emerald-500" />
-        ) : (
-          <Download />
-        )}
-        {status === "active"
-          ? t`Downloading…`
-          : status === "queued"
-            ? t`Queued`
-            : status === "done"
-              ? t`Done`
-              : installed
-                ? t`Installed`
-                : active
-                  ? t`Add to queue`
-                  : t`Download`}
-      </Button>
+      {installed && packagePath && isDeletableArchive(packagePath) ? (
+        <DeleteArchiveButton
+          path={packagePath}
+          name={v.name || v.tag}
+          onDeleted={onDeleted}
+        />
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => enqueue(input)}
+          disabled={installed || status === "queued" || status === "active"}
+          aria-label={t`Download ${tag}`}
+        >
+          {status === "active" ? (
+            <Loader2 className="animate-spin" />
+          ) : installed ? (
+            <CheckCircle2 className="text-emerald-500" />
+          ) : (
+            <Download />
+          )}
+          {status === "active"
+            ? t`Downloading…`
+            : status === "queued"
+              ? t`Queued`
+              : status === "done"
+                ? t`Done`
+                : installed
+                  ? t`Installed`
+                  : active
+                    ? t`Add to queue`
+                    : t`Download`}
+        </Button>
+      )}
     </li>
   );
+}
+
+/** Where a rapid package's `.sdp` sits in the write root, which is what makes
+ *  a version installed, or null when there is no write root to look in. */
+function packagePathOf(writePath: string | undefined, md5: string) {
+  if (!writePath || !md5) return null;
+  const sep = writePath.includes("\\") ? "\\" : "/";
+  const root = writePath.replace(/[\\/]+$/, "");
+  return `${root}${sep}packages${sep}${md5.toLowerCase()}.sdp`;
 }
