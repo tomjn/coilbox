@@ -17736,8 +17736,11 @@ msgstr "Code kopieren und Hub öffnen"
 msgid "Copy code adds a line under the code: \"{bestText}\". It is your claim, and coilbox does not check it."
 msgstr "„Code kopieren“ fügt unter dem Code eine Zeile hinzu: „{bestText}“. Das ist Ihre Angabe, und coilbox prüft sie nicht."
 
-#: src/general/ErrorBoundary.tsx
 #: src/play/pages/components/CrashDrawer.tsx
+msgid "Copy crash report"
+msgstr ""
+
+#: src/general/ErrorBoundary.tsx
 #, fuzzy
 msgid "Copy details"
 msgstr "Details kopieren"
@@ -46896,6 +46899,7 @@ msgstr "Synchron"
 #: src/content/pages/components/ReplayTimeline.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
+#: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "System"

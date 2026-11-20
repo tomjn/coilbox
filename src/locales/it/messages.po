@@ -17858,8 +17858,11 @@ msgstr "Copia codice e apri hub"
 msgid "Copy code adds a line under the code: \"{bestText}\". It is your claim, and coilbox does not check it."
 msgstr "Copia codice aggiunge una riga sotto il codice: «{bestText}». È una tua dichiarazione, e coilbox non la verifica."
 
-#: src/general/ErrorBoundary.tsx
 #: src/play/pages/components/CrashDrawer.tsx
+msgid "Copy crash report"
+msgstr ""
+
+#: src/general/ErrorBoundary.tsx
 #, fuzzy
 msgid "Copy details"
 msgstr "Copia dettagli"
@@ -47208,6 +47211,7 @@ msgstr "Sincronizzato"
 #: src/content/pages/components/ReplayTimeline.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
+#: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "System"

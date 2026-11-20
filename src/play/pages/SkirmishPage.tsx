@@ -114,6 +114,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../config";
+import { isAbnormal } from "../crash";
 import { bumpAiHandicap } from "../debrief";
 import {
   type BattleRestrictions,
@@ -741,8 +742,12 @@ export default function SkirmishPage() {
       }
       // Cancelled before the game started: nothing to debrief.
       if (res.exitCode === null) return;
+      // The crash drawer reports this run, so the debrief stays shut rather
+      // than opening on top of it. A game can finish and then crash on the way
+      // out, so its replay is still read and its result still recorded.
+      const crashed = isAbnormal(res);
       if (!beforePaths) {
-        markUndetectable();
+        if (!crashed) markUndetectable();
         return;
       }
       await resolveDebrief({
@@ -752,6 +757,7 @@ export default function SkirmishPage() {
         setProvenance,
         preset,
         recordResult: recordPresetResult,
+        quiet: crashed,
       });
     } catch (e) {
       setError(describeError(e));

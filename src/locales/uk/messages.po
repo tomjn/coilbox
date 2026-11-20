@@ -17736,8 +17736,11 @@ msgstr "Копіювати код і відкрити хаб"
 msgid "Copy code adds a line under the code: \"{bestText}\". It is your claim, and coilbox does not check it."
 msgstr "«Копіювати код» додає під кодом рядок: \"{bestText}\". Це ваше твердження, і coilbox його не перевіряє."
 
-#: src/general/ErrorBoundary.tsx
 #: src/play/pages/components/CrashDrawer.tsx
+msgid "Copy crash report"
+msgstr ""
+
+#: src/general/ErrorBoundary.tsx
 #, fuzzy
 msgid "Copy details"
 msgstr "Копіювати подробиці"
@@ -46896,6 +46899,7 @@ msgstr "Синхронізовано"
 #: src/content/pages/components/ReplayTimeline.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
+#: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "System"

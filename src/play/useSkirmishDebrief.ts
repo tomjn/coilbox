@@ -40,9 +40,9 @@ export function useSkirmishDebrief() {
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const show = useCallback((d: SkirmishDebrief) => {
+  const show = useCallback((d: SkirmishDebrief, open = true) => {
     setDebrief(d);
-    setOpen(true);
+    if (open) setOpen(true);
   }, []);
 
   /** Hide the drawer without discarding the last debrief's data, so a rematch
@@ -75,6 +75,9 @@ export function useSkirmishDebrief() {
       preset: { key: string; name: string } | null;
       /** Merge the game into that preset's record. Called once per replay. */
       recordResult: (key: string, result: GameResult) => ResultChange;
+      /** Tag the replay and record the result, but leave the drawer shut. For
+       * a run the crash drawer already reports, so the two do not stack. */
+      quiet?: boolean;
     }) => {
       const {
         target,
@@ -84,6 +87,7 @@ export function useSkirmishDebrief() {
         preset,
         recordResult,
       } = opts;
+      const open = !opts.quiet;
       // The record is written here, when the replay is first read. The write is
       // keyed on the replay's filename, so reading it again cannot count it twice.
       const countAgainstPreset = (result: GameResult): string | null =>
@@ -100,13 +104,16 @@ export function useSkirmishDebrief() {
         );
         if (!replay) {
           const { outcome, headline } = describeOutcome("no-replay");
-          show({
-            outcome,
-            headline,
-            durationSec: null,
-            replayFilename: null,
-            presetLine: null,
-          });
+          show(
+            {
+              outcome,
+              headline,
+              durationSec: null,
+              replayFilename: null,
+              presetLine: null,
+            },
+            open,
+          );
           return;
         }
         let info: DemoInfo | null = null;
@@ -125,17 +132,20 @@ export function useSkirmishDebrief() {
           : "decode-failed";
         const { outcome, headline } = describeOutcome(reason);
         const durationSec = info?.durationSec ?? null;
-        show({
-          outcome,
-          headline,
-          durationSec,
-          replayFilename: replay.filename,
-          presetLine: countAgainstPreset({
-            replayFilename: replay.filename,
+        show(
+          {
             outcome,
+            headline,
             durationSec,
-          }),
-        });
+            replayFilename: replay.filename,
+            presetLine: countAgainstPreset({
+              replayFilename: replay.filename,
+              outcome,
+              durationSec,
+            }),
+          },
+          open,
+        );
         // After the drawer has its data, and not awaited, so a slow or failed
         // ingest cannot hold the debrief.
         void ingestFinishedReplay(target, replay);

@@ -757,7 +757,8 @@ async fn play_focus(reg: State<'_, RunRegistry>, run_id: String) -> Result<CliRe
 }
 
 /// `play_infolog` — read the tail of the engine's most recent `infolog.txt`, for
-/// crash triage and for the engine log page in settings (issue #379).
+/// crash triage and for the engine log page in settings (issue #379). With no
+/// `max_lines` it reads the whole file, which is what a crash report copies.
 ///
 /// The log is not in `data_dir`, whatever the content root says: the engine writes
 /// it to its own write dir, which on unix is `~/.config/spring` long before it is
@@ -771,7 +772,7 @@ async fn play_focus(reg: State<'_, RunRegistry>, run_id: String) -> Result<CliRe
 async fn play_infolog<R: Runtime>(
     app: AppHandle<R>,
     data_dir: String,
-    max_lines: usize,
+    max_lines: Option<usize>,
 ) -> CliResult {
     let documents = app.path().document_dir().ok();
     let base = infolog::LogBaseDirs::from_env(documents);
@@ -797,8 +798,23 @@ async fn play_infolog<R: Runtime>(
     let Some(path) = infolog::newest_log(&dirs) else {
         return CliResult::err("no engine log was found");
     };
-    match infolog::read_tail(&path, max_lines) {
+    match infolog::read_tail(&path, max_lines.unwrap_or(usize::MAX)) {
         Ok(tail) => CliResult::ok(json!({ "log": tail })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `play_engine_output` reads the whole of the file the last launch's stdout and
+/// stderr went to, for a crash report. An engine that dies before it opens
+/// `infolog.txt` prints its reason only here. Answers `{ log: null }` when no
+/// launch has written one this session.
+#[tauri::command]
+async fn play_engine_output() -> CliResult {
+    let Some(path) = OUTPUT_LOG.get().filter(|p| p.is_file()) else {
+        return CliResult::ok(json!({ "log": null }));
+    };
+    match infolog::read_tail(path, usize::MAX) {
+        Ok(log) => CliResult::ok(json!({ "log": log })),
         Err(e) => CliResult::err(e),
     }
 }
@@ -888,6 +904,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_ask_lua_rules,
             play_focus,
             play_infolog,
+            play_engine_output,
             play_system_info,
             play_oa_find,
             play_oa_check,
