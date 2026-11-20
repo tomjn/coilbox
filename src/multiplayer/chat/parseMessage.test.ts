@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMessage } from "./parseMessage";
+import { keepMentionsOf, parseMessage } from "./parseMessage";
 
 describe("parseMessage", () => {
   it("returns a single text token for plain text", () => {
@@ -368,5 +368,35 @@ describe("parseMessage lists", () => {
       { type: "quote", children: [{ type: "text", value: "said" }] },
       { type: "list", items: [item("one"), item("two")] },
     ]);
+  });
+});
+
+describe("keepMentionsOf", () => {
+  it("keeps a mention of somebody in the room, whatever its case", () => {
+    expect(keepMentionsOf(parseMessage("hi @BOB"), ["bob"])).toEqual([
+      { type: "text", value: "hi " },
+      { type: "mention", value: "BOB" },
+    ]);
+  });
+
+  it("turns a mention of nobody here back into plain text", () => {
+    expect(keepMentionsOf(parseMessage("hi @someone"), ["bob"])).toEqual([
+      { type: "text", value: "hi " },
+      { type: "text", value: "@someone" },
+    ]);
+  });
+
+  it("looks inside emphasis and lists", () => {
+    expect(keepMentionsOf(parseMessage("**@someone**"), [])).toEqual([
+      { type: "bold", children: [{ type: "text", value: "@someone" }] },
+    ]);
+    const [list] = keepMentionsOf(parseMessage("- @someone\n- @bob"), ["bob"]);
+    expect(list).toEqual({
+      type: "list",
+      items: [
+        [{ type: "text", value: "@someone" }],
+        [{ type: "mention", value: "bob" }],
+      ],
+    });
   });
 });
