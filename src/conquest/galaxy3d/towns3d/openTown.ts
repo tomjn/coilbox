@@ -14,6 +14,7 @@
 import type * as THREE from "three";
 import { at, type Builder, type Paint } from "../landmarks/kit";
 import type { TownPalette } from "../landmarks/palettes";
+import { addDetail, type Placed } from "./buildingDetail";
 import type { BuildingModel } from "./buildings";
 import { chamfered, column, plate, rect, shouldered } from "./parts";
 
@@ -74,8 +75,21 @@ export const model = (
   height,
   landmark,
   settlements: OPEN,
-  build(b, w, d, palette) {
-    parts(tools(b, palette), w, d, height);
+  build(b, w, d, palette, detail = "town") {
+    const t = tools(b, palette);
+    // Each part is kept as it is added, for the detail added after them.
+    const placed: Placed[] = [];
+    const kept = Object.fromEntries(
+      (Object.keys(t) as (keyof Tools)[]).map((finish) => [
+        finish,
+        (g: THREE.BufferGeometry) => {
+          placed.push({ g, finish });
+          t[finish](g);
+        },
+      ]),
+    ) as unknown as Tools;
+    parts(kept, w, d, height);
+    addDetail(t, placed, id, height, detail);
   },
 });
 
