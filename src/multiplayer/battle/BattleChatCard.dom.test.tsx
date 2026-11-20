@@ -209,6 +209,30 @@ describe("BattleChatCard: !map suggestions", () => {
   });
 });
 
+describe("BattleChatCard: @ mentions", () => {
+  it("offers the other players in the battle, not you or an AI", () => {
+    messages = [];
+    renderCard(false, vi.fn(), {
+      rows: [
+        row("Host", { self: true }),
+        row("Alice"),
+        row("Bob"),
+        row("BARbarian", { kind: "bot" }),
+      ],
+    });
+
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "@", selectionStart: 1 },
+    });
+
+    const menu = screen.getByRole("listbox", { name: "Mention a user" });
+    const offered = [...menu.querySelectorAll('[role="option"]')].map(
+      (o) => o.textContent,
+    );
+    expect(offered).toEqual(["Alice", "Bob"]);
+  });
+});
+
 describe("BattleChatCard: !balance/!lock host suggestions", () => {
   // The command line is the baseline that works everywhere, including a
   // real SPADS room and any other lobby client reading the same room. The
