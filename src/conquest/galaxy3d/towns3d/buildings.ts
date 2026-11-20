@@ -8,6 +8,7 @@ import type * as THREE from "three";
 import type { SettlementStyle } from "../../planets";
 import { Builder } from "../landmarks/kit";
 import type { TownPalette } from "../landmarks/palettes";
+import type { Detail } from "./buildingDetail";
 import { FILLERS } from "./fillers";
 import { OPEN_TOWN } from "./openTown";
 import { OPEN_TOWN_DETAIL } from "./openTownDetail";
@@ -24,8 +25,17 @@ export interface BuildingModel {
   filler?: boolean;
   /** Set on a town's one or two tallest towers, which only a city or a capital has. */
   landmark?: boolean;
-  /** Add the model's parts round its own origin, standing on y = 0, inside `w` by `d`. */
-  build(b: Builder, w: number, d: number, palette: TownPalette): void;
+  /**
+   * Add the model's parts round its own origin, standing on y = 0, inside `w`
+   * by `d`, with the detail `detail` asks for, "town" when left out.
+   */
+  build(
+    b: Builder,
+    w: number,
+    d: number,
+    palette: TownPalette,
+    detail?: Detail,
+  ): void;
 }
 
 export const BUILDINGS: readonly BuildingModel[] = [
@@ -45,8 +55,9 @@ export function buildModel(
   w: number,
   d: number,
   palette: TownPalette,
+  detail: Detail = "town",
 ): THREE.BufferGeometry {
   const builder = new Builder();
-  model.build(builder, w, d, palette);
+  model.build(builder, w, d, palette, detail);
   return builder.build().solid;
 }
