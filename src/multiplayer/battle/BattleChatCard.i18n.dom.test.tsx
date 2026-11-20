@@ -65,7 +65,11 @@ vi.mock("@picoframe/frame", () => ({
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
-  useSetting: () => [false, vi.fn()],
+  // A list setting keeps its default, so the highlight words can be iterated.
+  useSetting: (_key: string, fallback: unknown) => [
+    Array.isArray(fallback) ? fallback : false,
+    vi.fn(),
+  ],
   useTheme: () => ({ resolved: "dark" }),
 }));
 
