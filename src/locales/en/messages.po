@@ -36762,6 +36762,10 @@ msgstr "Shows the repulse effect"
 msgid "Shows the repulse effect (old name)"
 msgstr "Shows the repulse effect (old name)"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Shows units behind buildings and other tall features as team coloured silhouettes."
+msgstr "Shows units behind buildings and other tall features as team coloured silhouettes."
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "Shrank {step}, now {size}."
 msgstr "Shrank {step}, now {size}."
@@ -46812,6 +46816,10 @@ msgstr "X axis"
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "X in elmos"
 msgstr "X in elmos"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "X-Ray Unit Silhouettes"
+msgstr "X-Ray Unit Silhouettes"
 
 #: src/content/aiRecord.ts
 msgid "x{income} income"

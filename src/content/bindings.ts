@@ -2597,7 +2597,7 @@ export const contentBlueprintDelete = defineCommand<
 
 /** The in game widgets coilbox ships, by the name the commands take
  *  (issues #1419 and #5180). */
-export type CoilboxWidget = "blueprints" | "skeleton";
+export type CoilboxWidget = "blueprints" | "skeleton" | "xray";
 
 /** What of one of coilbox's in game widgets is installed under a content root,
  *  against what this coilbox ships (issue #1419). */

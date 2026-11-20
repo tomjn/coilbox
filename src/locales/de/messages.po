@@ -44856,6 +44856,10 @@ msgstr "Zeigt den Abstoßungseffekt"
 msgid "Shows the repulse effect (old name)"
 msgstr "Zeigt den Abstoßungseffekt (alter Name)"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Shows units behind buildings and other tall features as team coloured silhouettes."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Shrank {step}, now {size}."
@@ -57103,6 +57107,10 @@ msgstr "X-Achse"
 #, fuzzy
 msgid "X in elmos"
 msgstr "X in Elmos"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "X-Ray Unit Silhouettes"
+msgstr ""
 
 #: src/content/aiRecord.ts
 #, fuzzy
