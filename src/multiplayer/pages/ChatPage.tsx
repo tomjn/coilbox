@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
+import { Button, cn, NavGate } from "@picoframe/frame";
 import { Gamepad2, LogOut, Star, UserCheck, Users, UserX } from "lucide-react";
 import {
   type ReactNode,
@@ -19,7 +19,7 @@ import {
 import { notify } from "@/notify/notify";
 import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
-import { type ChatMsg, mpLeaveChannel, mpSend, type User } from "../bindings";
+import { mpLeaveChannel, mpSend, type User } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChannelTopicMenu } from "../chat/ChannelTopicMenu";
 import { ChatPane } from "../chat/ChatPane";
@@ -31,17 +31,13 @@ import {
   isBattleChannel,
   resolveConversationRequest,
 } from "../chat/conversation";
-import {
-  HIGHLIGHT_OWN_KEY,
-  HIGHLIGHT_WORDS_KEY,
-  matchesHighlight,
-} from "../chat/highlight";
 import { MemberActionsMenu } from "../chat/MemberActionsMenu";
 import { MemberList } from "../chat/MemberList";
 import { useOpenConversation } from "../chat/openConversations";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
 import { useConversationParam } from "../chat/useConversationParam";
+import { useIsHighlighted } from "../chat/useIsHighlighted";
 import { usePlayerActions } from "../chat/usePlayerActions";
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
@@ -242,15 +238,7 @@ function ChatPage() {
     ],
   );
 
-  // Flag messages that mention a highlight word or our own username (issue #193).
-  // Our own messages never flag us, even if we type our own name.
-  const [hlWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
-  const [hlOwn] = useSetting<boolean>(HIGHLIGHT_OWN_KEY, true);
-  const isHighlighted = useCallback(
-    (m: ChatMsg): boolean =>
-      m.from !== me && matchesHighlight(m.text, hlWords, me, hlOwn),
-    [me, hlWords, hlOwn],
-  );
+  const isHighlighted = useIsHighlighted(me);
 
   // Coarse presence for a username: offline when absent from the roster, else
   // in-game/in-battle/away/online (see `userPresence`). Used by the DM header

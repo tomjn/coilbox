@@ -6,7 +6,7 @@
  * The drawer points at the real `infolog.txt` and shows none of it, as the
  * Engine log page does. A slice of the file reads as the whole of it, and the
  * start, where the engine records the system and the GPU, is the part a slice
- * leaves out (issue #4167).
+ * leaves out (issue #4167). The copied report carries all of it.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -39,9 +39,9 @@ const LINES = [
 const log: InfologTail = {
   path: "/Users/tomjn/.config/spring/infolog.txt",
   modifiedMs: 1_755_800_000_000,
-  totalLines: 1091,
+  totalLines: LINES.length,
   lines: LINES,
-  truncated: true,
+  truncated: false,
 };
 
 const triage = (over: Partial<CrashTriage> = {}): CrashTriage => ({
@@ -49,7 +49,12 @@ const triage = (over: Partial<CrashTriage> = {}): CrashTriage => ({
   runKind: "Skirmish",
   game: "Beyond All Reason test-1234",
   map: "Comet Catcher Remake",
+  engine: "/e/2025.06.19/spring",
+  engineVersion: "2025.06.19",
   log,
+  output: null,
+  system: { os: "linux", osVersion: "24.04", arch: "x86_64" },
+  appVersion: "1.42.0",
   stale: false,
   triagedAt: 1_755_800_100_000,
   ...over,
@@ -98,18 +103,28 @@ describe("CrashDrawer", () => {
     expect(m.revealItemInDir).toHaveBeenCalledWith(log.path);
   });
 
-  it("copies the crash details and the log path, and no log line", () => {
+  it("shows the versions and system the report carries", () => {
+    render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
+    expect(screen.getByText("1.42.0")).toBeTruthy();
+    expect(screen.getByText("linux 24.04 (x86_64)")).toBeTruthy();
+    expect(screen.getByText("2025.06.19 · /e/2025.06.19/spring")).toBeTruthy();
+  });
+
+  it("copies the crash details, the versions and the whole log in one go", () => {
     const writeText = vi.fn(async (_t: string) => {});
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
     render(<CrashDrawer open onOpenChange={() => {}} triage={triage()} />);
-    fireEvent.click(screen.getByRole("button", { name: /copy details/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy crash report/i }));
     const text = writeText.mock.calls[0][0];
     expect(text).toContain("Comet Catcher Remake");
-    expect(text).toContain(log.path);
-    expect(text).not.toContain("UsePBO");
+    expect(text).toContain("Coilbox: 1.42.0");
+    expect(text).toContain("System: linux 24.04 (x86_64)");
+    expect(text).toContain("Engine version: 2025.06.19");
+    expect(text).toContain(`(whole file, ${LINES.length} lines)`);
+    for (const line of LINES) expect(text).toContain(line);
   });
 
   it("shows no log at all when the newest one predates the run", () => {
@@ -186,7 +201,7 @@ describe("CrashDrawer", () => {
         triage={triage({ outcome: { exitCode: null, signal: 6, launch } })}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /copy details/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy crash report/i }));
     const text = writeText.mock.calls[0][0];
     expect(text).toContain(`Command: ${launch.command}`);
     expect(text).toContain("LD_LIBRARY_PATH=(unset)");

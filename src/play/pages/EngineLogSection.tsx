@@ -11,12 +11,8 @@ import {
   type SystemInfo,
 } from "@/play/bindings";
 import { usePreferredTarget } from "@/play/config";
+import { describeSystem } from "@/play/crash";
 import { EngineLogFile } from "./components/EngineLogFile";
-
-/** "macos 14.5 (aarch64)", or without the version when the OS would not say. */
-function describeSystem(s: SystemInfo): string {
-  return `${[s.os, s.osVersion].filter(Boolean).join(" ")} (${s.arch})`;
-}
 
 /**
  * Where the engine's last log is, and what a helper asks for alongside it

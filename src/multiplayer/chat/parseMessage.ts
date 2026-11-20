@@ -239,3 +239,32 @@ function parseMentions(text: string): Inline[] {
   if (last < text.length) out.push({ type: "text", value: text.slice(last) });
   return out;
 }
+
+/**
+ * Turn `@name` back into plain text unless `name` is one of `names`, compared
+ * case-insensitively as lobby names are (issue #5284). The parser marks every
+ * `@word` as a mention, but a chip should only appear for somebody who is in
+ * the conversation to hear it.
+ */
+export function keepMentionsOf(nodes: Inline[], names: string[]): Inline[] {
+  const known = new Set(names.map((n) => n.toLowerCase()));
+  const walk = (list: Inline[]): Inline[] =>
+    list.map((n): Inline => {
+      switch (n.type) {
+        case "mention":
+          return known.has(n.value.toLowerCase())
+            ? n
+            : { type: "text", value: `@${n.value}` };
+        case "bold":
+        case "italic":
+        case "strike":
+        case "quote":
+          return { ...n, children: walk(n.children) };
+        case "list":
+          return { ...n, items: n.items.map(walk) };
+        default:
+          return n;
+      }
+    });
+  return walk(nodes);
+}

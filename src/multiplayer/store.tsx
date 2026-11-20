@@ -111,7 +111,7 @@ import {
 } from "./connections";
 import { DebriefingDrawer } from "./DebriefingDrawer";
 import { useFavourites } from "./friends";
-import { useIgnored } from "./ignore";
+import { isIgnored, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
 import {
   isLoginRefusedCode,
@@ -283,6 +283,30 @@ function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
     return arr?.[arr.length - 1] ?? null;
   }
   return null;
+}
+
+/**
+ * Whether an incoming message should fire the mention cue: live chat or a
+ * private message from somebody else, not on your ignore list, that names you
+ * or a highlight word. Replayed history (`id != null`) never counts, or joining
+ * a channel would ping once per past mention in its backlog.
+ */
+export function mentionsMe(
+  msg: ChatMsg,
+  me: string | null,
+  hl: { words: string[]; own: boolean },
+  fromIgnored: boolean,
+): boolean {
+  return (
+    msg.id == null &&
+    msg.from !== me &&
+    !fromIgnored &&
+    (msg.kind === "said" ||
+      msg.kind === "saidEx" ||
+      msg.kind === "saidBattle" ||
+      msg.kind === "private") &&
+    matchesHighlight(msg.text, hl.words, me, hl.own)
+  );
 }
 
 /**
@@ -936,6 +960,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   );
 
   const [ignored, setIgnored] = useIgnored();
+  // Read by the frozen event handler, as the highlight settings are above, so
+  // a mention from somebody you have ignored makes no sound (issue #5283).
+  const ignoredRef = useRef(ignored);
+  useEffect(() => {
+    ignoredRef.current = ignored;
+  }, [ignored]);
   const [favourites] = useFavourites();
   const { searches: savedSearches } = useSavedBattleSearches();
 
@@ -1208,13 +1238,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               const msg = incomingChatMsg(d, r.state);
               if (
                 msg &&
-                msg.id == null &&
-                msg.from !== r.state.myUsername &&
-                (msg.kind === "said" ||
-                  msg.kind === "saidEx" ||
-                  msg.kind === "saidBattle" ||
-                  msg.kind === "private") &&
-                matchesHighlight(msg.text, hl.words, r.state.myUsername, hl.own)
+                mentionsMe(
+                  msg,
+                  r.state.myUsername,
+                  hl,
+                  isIgnored(ignoredRef.current, serverKey, msg.from),
+                )
               ) {
                 triggerMentionCue(msg.from);
                 notifyMention(msg, serverKey);

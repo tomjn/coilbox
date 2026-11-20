@@ -1,5 +1,14 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { useCallback, useState } from "react";
-import { type InfologTail, type LaunchOutcome, playInfolog } from "./bindings";
+import { loadContentState } from "@/content/contentState";
+import {
+  type InfologTail,
+  type LaunchOutcome,
+  playEngineOutput,
+  playInfolog,
+  playSystemInfo,
+  type SystemInfo,
+} from "./bindings";
 import { isAbnormal } from "./crash";
 
 /**
@@ -24,14 +33,40 @@ export interface CrashContext {
 }
 
 export interface CrashTriage extends CrashContext {
-  /** The log, or null when none was found or the newest predates the run. */
+  /** The whole log, or null when none was found or the newest predates the
+   * run. The drawer shows only its path. The lines go into the copied report. */
   log: InfologTail | null;
+  /** The whole of what the engine printed this run, or null when nothing was
+   * written. It holds what never reaches the log, such as a C++ abort message. */
+  output: InfologTail | null;
+  system: SystemInfo | null;
+  appVersion: string | null;
+  /** The version the engine that ran reported, or its folder name when it has
+   * not reported one. Null when the engine is no longer among the installed. */
+  engineVersion: string | null;
   /** Set when a log exists but was written before this run started, so it
    * cannot be this crash's. */
   stale: boolean;
   /** When the run was looked at, milliseconds since the unix epoch. The
    * engine's output file was last written no later than this. */
   triagedAt: number;
+}
+
+/** The version of the installed engine whose binary is `executable`. */
+async function installedEngineVersion(
+  executable: string | undefined,
+): Promise<string | null> {
+  if (!executable) return null;
+  try {
+    const state = await loadContentState();
+    for (const root of state.roots) {
+      const e = root.engines.find((e) => e.executable === executable);
+      if (e) return e.syncVersion ?? e.version;
+    }
+  } catch {
+    // The report says the version is unknown.
+  }
+  return null;
 }
 
 export function useCrashTriage() {
@@ -55,18 +90,31 @@ export function useCrashTriage() {
       const { dataDir, startedAtMs, ...rest } = ctx;
       if (!isAbnormal(rest.outcome)) return;
 
-      let log: InfologTail | null = null;
-      try {
-        // No lines: the drawer shows the log's path and time, none of its text.
-        const res = await playInfolog({ dataDir, maxLines: 0 });
-        log = res.log;
-      } catch {
-        log = null;
-      }
+      // Read now rather than when the player copies, because the next launch
+      // overwrites both files. The whole of each: the drawer shows neither, and
+      // the copied report carries all of it.
+      const [log, output, system, appVersion, engineVersion] =
+        await Promise.all([
+          playInfolog({ dataDir }).then(
+            (r) => r.log,
+            () => null,
+          ),
+          playEngineOutput({}).then(
+            (r) => r.log,
+            () => null,
+          ),
+          playSystemInfo({}).catch(() => null),
+          getVersion().catch(() => null),
+          installedEngineVersion(rest.engine),
+        ]);
       const stale = log != null && log.modifiedMs < startedAtMs;
       setTriage({
         ...rest,
         log: stale ? null : log,
+        output: output && output.modifiedMs >= startedAtMs ? output : null,
+        system,
+        appVersion,
+        engineVersion,
         stale,
         triagedAt: Date.now(),
       });

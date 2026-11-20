@@ -135,15 +135,36 @@ describe("buildCrashReport", () => {
       runKind: "skirmish",
       game: "Beyond All Reason test-1234",
       map: "Comet Catcher Remake",
-      logPath: "/Users/tomjn/.config/spring/infolog.txt",
+      engineVersion: "2025.06.19",
+      system: { os: "windows", osVersion: "10.0.19045", arch: "x86_64" },
+      appVersion: "1.42.0",
+      at: Date.UTC(2026, 10, 20, 12, 0, 0),
+      log: {
+        path: "/Users/tomjn/.config/spring/infolog.txt",
+        modifiedMs: 0,
+        totalLines: 3,
+        lines: ["Spring 2025.06.19", "Loading", "Error: boom"],
+        truncated: false,
+      },
+      output: {
+        path: "/cache/engine-output.log",
+        modifiedMs: 0,
+        totalLines: 1,
+        lines: ["terminate called after throwing"],
+        truncated: false,
+      },
     });
 
   it("leads with how the engine died", () => {
     expect(report()).toContain("SIGSEGV");
   });
 
-  it("names the log it came from", () => {
-    expect(report()).toContain("/Users/tomjn/.config/spring/infolog.txt");
+  it("carries the versions and system a helper asks for", () => {
+    const r = report();
+    expect(r).toContain("Coilbox: 1.42.0");
+    expect(r).toContain("System: windows 10.0.19045 (x86_64)");
+    expect(r).toContain("Engine version: 2025.06.19");
+    expect(r).toContain("Time: 2026-11-20T12:00:00.000Z");
   });
 
   it("names what was being played", () => {
@@ -152,17 +173,39 @@ describe("buildCrashReport", () => {
     expect(r).toContain("Comet Catcher Remake");
   });
 
-  it("carries no lines from the log, which would pass for the whole file", () => {
+  it("carries every line of both logs, marked as whole files", () => {
     const r = report();
-    expect(r).not.toContain("Error lines");
-    expect(r).not.toContain("Last ");
+    expect(r).toContain(
+      "===== infolog.txt: /Users/tomjn/.config/spring/infolog.txt (whole file, 3 lines) =====\nSpring 2025.06.19\nLoading\nError: boom\n===== end of infolog.txt =====",
+    );
+    expect(r).toContain("terminate called after throwing");
   });
 
-  it("says so when no log was found", () => {
+  it("never passes a slice of a log off as the whole file", () => {
+    const r = buildCrashReport({
+      outcome: { exitCode: 1, signal: null },
+      runKind: "skirmish",
+      log: {
+        path: "/x/infolog.txt",
+        modifiedMs: 0,
+        totalLines: 900,
+        lines: ["tail"],
+        truncated: true,
+      },
+    });
+    expect(r).toContain("last 1 of 900 lines, NOT the whole file");
+    expect(r).not.toContain("whole file, ");
+  });
+
+  it("says so when anything is missing", () => {
     const r = buildCrashReport({
       outcome: { exitCode: 1, signal: null },
       runKind: "skirmish",
     });
-    expect(r).toContain("Log: none found");
+    expect(r).toContain("Log: none found for this run");
+    expect(r).toContain("Coilbox: unknown");
+    expect(r).toContain("System: unknown");
+    expect(r).toContain("Engine version: unknown");
+    expect(r).not.toContain("=====");
   });
 });

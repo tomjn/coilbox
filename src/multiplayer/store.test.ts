@@ -38,6 +38,7 @@ import {
   connectBlockedReason,
   connectionLabelIfSeveral,
   initialMirror,
+  mentionsMe,
   mirrorReducer,
   notifyMention,
   RECONNECT_DELAYS_MS,
@@ -735,5 +736,33 @@ describe("connectionLabelIfSeveral", () => {
     expect(
       connectionLabelIfSeveral(null, live("a@x:1", "b@y:2"), servers),
     ).toBeNull();
+  });
+});
+
+describe("mentionsMe", () => {
+  const hl = { words: [], own: true };
+  const said = {
+    from: "Alice",
+    text: "hi Bob",
+    at: 0,
+    id: null,
+    channel: "main",
+    kind: "said" as const,
+  };
+
+  it("fires for live chat that names you", () => {
+    expect(mentionsMe(said, "Bob", hl, false)).toBe(true);
+  });
+
+  it("stays quiet when the sender is on your ignore list", () => {
+    expect(mentionsMe(said, "Bob", hl, true)).toBe(false);
+    expect(
+      mentionsMe({ ...said, kind: "private", channel: null }, "Bob", hl, true),
+    ).toBe(false);
+  });
+
+  it("stays quiet for replayed history and your own lines", () => {
+    expect(mentionsMe({ ...said, id: 4 }, "Bob", hl, false)).toBe(false);
+    expect(mentionsMe({ ...said, from: "Bob" }, "Bob", hl, false)).toBe(false);
   });
 });

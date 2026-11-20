@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import type { LaunchOutcome } from "./bindings";
+import type { InfologTail, LaunchOutcome, SystemInfo } from "./bindings";
 
 /**
  * Pure engine-crash logic (issue #379), kept apart from the Tauri-calling
@@ -100,7 +100,12 @@ export function classifyLine(line: string): LineKind {
   return "normal";
 }
 
-/** What a crash report says. It carries no lines from the log: a few lines of
+/** "macos 14.5 (aarch64)", or without the version when the OS would not say. */
+export function describeSystem(s: SystemInfo): string {
+  return `${[s.os, s.osVersion].filter(Boolean).join(" ")} (${s.arch})`;
+}
+
+/** What a crash report says. A log goes in whole or not at all: a few lines of
  * `infolog.txt` pasted as the log hide the start of the file, which is where the
  * engine records the system, the GPU and what it loaded (issue #4064). */
 export interface CrashReport {
@@ -109,17 +114,39 @@ export interface CrashReport {
   runKind: string;
   game?: string;
   map?: string;
+  /** The engine binary that ran. */
   engine?: string;
+  engineVersion?: string | null;
   /** The replay or savegame being played back, when that is what died. */
   file?: string;
-  /** Absolute path of the log, when one was found. */
-  logPath?: string;
+  system?: SystemInfo | null;
+  appVersion?: string | null;
+  /** When the run was looked at, milliseconds since the unix epoch. */
+  at?: number;
+  /** This run's `infolog.txt`, when one was found. */
+  log?: InfologTail | null;
+  /** Everything the engine printed this run, when anything was written. */
+  output?: InfologTail | null;
+}
+
+/** A file's lines between markers, saying whether they are all of it. */
+function fileSection(title: string, f: InfologTail): string[] {
+  const extent = f.truncated
+    ? `last ${f.lines.length} of ${f.totalLines} lines, NOT the whole file`
+    : `whole file, ${f.totalLines} lines`;
+  return [
+    "",
+    `===== ${title}: ${f.path} (${extent}) =====`,
+    ...f.lines,
+    `===== end of ${title} =====`,
+  ];
 }
 
 /**
- * A plain-text note about a crash to paste into Discord or a bug report. It
- * names the log file so the reader can attach the whole of it. The labels stay
- * English, because the report usually ends up with the maintainers.
+ * A plain-text report about a crash to paste into Discord or a bug report:
+ * the versions and system a helper asks for first, how the engine was started,
+ * and the whole of every log the run left. The labels stay English, because
+ * the report usually ends up with the maintainers.
  */
 export function buildCrashReport(r: CrashReport): string {
   const out: string[] = [
@@ -127,17 +154,23 @@ export function buildCrashReport(r: CrashReport): string {
     "",
     describeExit(r.outcome),
   ];
+  if (r.at != null) out.push(`Time: ${new Date(r.at).toISOString()}`);
+  out.push(`Coilbox: ${r.appVersion ?? "unknown"}`);
+  out.push(`System: ${r.system ? describeSystem(r.system) : "unknown"}`);
+  out.push(`Engine version: ${r.engineVersion ?? "unknown"}`);
   out.push(`Run: ${r.runKind}`);
   if (r.game) out.push(`Game: ${r.game}`);
   if (r.map) out.push(`Map: ${r.map}`);
   if (r.file) out.push(`File: ${r.file}`);
   if (r.engine) out.push(`Engine: ${r.engine}`);
-  out.push(`Log: ${r.logPath ?? "none found"}`);
+  out.push(`Log: ${r.log?.path ?? "none found for this run"}`);
   const launch = r.outcome.launch;
   if (launch) {
     if (launch.outputLog) out.push(`Engine output: ${launch.outputLog}`);
     out.push(`Command: ${launch.command}`);
     out.push(...launch.env);
   }
+  if (r.log) out.push(...fileSection("infolog.txt", r.log));
+  if (r.output) out.push(...fileSection("engine output", r.output));
   return out.join("\n");
 }
