@@ -45152,6 +45152,10 @@ msgstr "Visar bortstötningseffekten"
 msgid "Shows the repulse effect (old name)"
 msgstr "Visar bortstötningseffekten (gammalt namn)"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Shows units behind buildings and other tall features as team coloured silhouettes."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Shrank {step}, now {size}."
@@ -57486,6 +57490,10 @@ msgstr "X-axel"
 #, fuzzy
 msgid "X in elmos"
 msgstr "X i elmo"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "X-Ray Unit Silhouettes"
+msgstr ""
 
 #: src/content/aiRecord.ts
 #, fuzzy

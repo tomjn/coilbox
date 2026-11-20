@@ -36761,6 +36761,10 @@ msgstr ""
 msgid "Shows the repulse effect (old name)"
 msgstr ""
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Shows units behind buildings and other tall features as team coloured silhouettes."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "Shrank {step}, now {size}."
 msgstr ""
@@ -46810,6 +46814,10 @@ msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "X in elmos"
+msgstr ""
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "X-Ray Unit Silhouettes"
 msgstr ""
 
 #: src/content/aiRecord.ts

@@ -44856,6 +44856,10 @@ msgstr "显示斥力效果"
 msgid "Shows the repulse effect (old name)"
 msgstr "显示斥力效果（旧名称）"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "Shows units behind buildings and other tall features as team coloured silhouettes."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "Shrank {step}, now {size}."
@@ -57103,6 +57107,10 @@ msgstr "X 轴"
 #, fuzzy
 msgid "X in elmos"
 msgstr "X（elmo）"
+
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "X-Ray Unit Silhouettes"
+msgstr ""
 
 #: src/content/aiRecord.ts
 #, fuzzy

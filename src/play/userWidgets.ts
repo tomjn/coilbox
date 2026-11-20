@@ -17,7 +17,7 @@ export async function coilboxWidgetInstalled(
   rootPath: string,
 ): Promise<boolean> {
   const installed = await Promise.all(
-    (["blueprints", "skeleton"] as const).map((widget) =>
+    (["blueprints", "skeleton", "xray"] as const).map((widget) =>
       contentWidgetStatus({ rootPath, widget }).then(
         (s) => s.installed,
         () => false,

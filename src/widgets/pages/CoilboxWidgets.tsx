@@ -47,6 +47,11 @@ function useEntries(): CoilboxWidgetEntry[] {
       name: t`Skeleton`,
       description: t`Draws the bones of the selected units in game.`,
     },
+    {
+      widget: "xray",
+      name: t`X-Ray Unit Silhouettes`,
+      description: t`Shows units behind buildings and other tall features as team coloured silhouettes.`,
+    },
   ];
 }
 

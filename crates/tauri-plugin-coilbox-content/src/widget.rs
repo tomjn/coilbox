@@ -49,10 +49,12 @@ pub enum Widget {
     Blueprints,
     /// Draws the skeleton of the selected units (issue #5179).
     Skeleton,
+    /// Draws units hidden behind tall features as team coloured silhouettes.
+    Xray,
 }
 
 /// Every widget coilbox ships.
-const WIDGETS: [Widget; 2] = [Widget::Blueprints, Widget::Skeleton];
+const WIDGETS: [Widget; 3] = [Widget::Blueprints, Widget::Skeleton, Widget::Xray];
 
 impl Widget {
     /// The name the commands take.
@@ -60,6 +62,7 @@ impl Widget {
         match name {
             "blueprints" => Ok(Self::Blueprints),
             "skeleton" => Ok(Self::Skeleton),
+            "xray" => Ok(Self::Xray),
             other => Err(format!("coilbox has no widget called \"{other}\"")),
         }
     }
@@ -69,6 +72,7 @@ impl Widget {
         match self {
             Self::Blueprints => "blueprint-widget",
             Self::Skeleton => "skeleton-widget",
+            Self::Xray => "xray-widget",
         }
     }
 
@@ -78,6 +82,7 @@ impl Widget {
         match self {
             Self::Blueprints => "coilbox_blueprints",
             Self::Skeleton => "coilbox_skeleton",
+            Self::Xray => "coilbox_xray",
         }
     }
 
@@ -101,6 +106,7 @@ impl Widget {
         match self {
             Self::Blueprints => "blueprint widget",
             Self::Skeleton => "skeleton widget",
+            Self::Xray => "x-ray widget",
         }
     }
 }
@@ -374,7 +380,7 @@ fn widget_dir<R: Runtime>(app: &AppHandle<R>, widget: Widget) -> Result<PathBuf,
 
 /// `content_widget_status`, what is installed under a content root against
 /// what coilbox ships. `rootPath` is a `ContentRoot.path`, and `widget` is
-/// `blueprints` or `skeleton`.
+/// `blueprints`, `skeleton` or `xray`.
 #[tauri::command]
 pub(crate) async fn content_widget_status<R: Runtime>(
     app: AppHandle<R>,
@@ -779,6 +785,8 @@ mod tests {
         assert!(widget_owned("Widgets/coilbox_skeleton.lua"));
         assert!(widget_owned("coilbox_blueprints/store.lua"));
         assert!(widget_owned("Widgets/coilbox_blueprints.lua"));
+        assert!(widget_owned("Widgets/coilbox_xray.lua"));
+        assert!(!widget_owned("Widgets/map_persepolis_xray.lua"));
         assert!(!widget_owned("Widgets/gui_skeleton.lua"));
         assert!(!widget_owned("Config/coilbox_skeleton.json"));
     }
@@ -787,6 +795,7 @@ mod tests {
     fn a_widget_name_the_commands_do_not_know_is_refused() {
         assert_eq!(Widget::parse("blueprints"), Ok(Widget::Blueprints));
         assert_eq!(Widget::parse("skeleton"), Ok(Widget::Skeleton));
+        assert_eq!(Widget::parse("xray"), Ok(Widget::Xray));
         assert!(Widget::parse("mission").is_err());
     }
 
