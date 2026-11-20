@@ -11,6 +11,7 @@ import {
   HIGHLIGHT_WORDS_KEY,
   matchesHighlight,
 } from "../chat/highlight";
+import { useOpenConversation } from "../chat/openConversations";
 import { useConversation } from "../chat/useConversation";
 import type { NameMark } from "../nameMark";
 import { initialMirror, useConnection, useMultiplayer } from "../store";
@@ -116,6 +117,7 @@ export function BattleChatCard({
   // it. Only the chat hub ever marked anything read, and it cannot mark a room
   // it was never opened for.
   const seenId = desc ? convId(desc) : null;
+  useOpenConversation(serverKey, seenId);
   const seen = conv.total;
   useEffect(() => {
     if (seenId && serverKey) markSeen(seenId, seen, serverKey);

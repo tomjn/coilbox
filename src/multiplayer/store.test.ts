@@ -25,7 +25,13 @@ vi.mock("./chat/mentionCue", () => ({
   triggerMentionCue: () => {},
 }));
 const notifySpy = vi.hoisted(() => vi.fn());
-vi.mock("../notify/notify", () => ({ notify: notifySpy }));
+const recordQuietlySpy = vi.hoisted(() => vi.fn());
+vi.mock("../notify/notify", () => ({
+  notify: notifySpy,
+  recordQuietly: recordQuietlySpy,
+}));
+const openSpy = vi.hoisted(() => vi.fn(() => false));
+vi.mock("./chat/openConversations", () => ({ isConversationOpen: openSpy }));
 
 import {
   type Connections,
@@ -74,6 +80,41 @@ describe("notifyMention", () => {
     notifySpy.mockClear();
     notifyMention({ ...base, channel: null, kind: "private" }, "srv");
     expect(notifySpy.mock.calls[0][0].to).toBe("/chat?dm=Alice&server=srv");
+  });
+
+  describe("in the conversation you are reading", () => {
+    const said = { ...base, channel: "main", kind: "said" as const };
+
+    it("only goes in the bell while coilbox has focus", () => {
+      notifySpy.mockClear();
+      recordQuietlySpy.mockClear();
+      openSpy.mockReturnValueOnce(true);
+      notifyMention(said, "srv", () => true);
+      expect(openSpy).toHaveBeenLastCalledWith("srv", "channel:main");
+      expect(notifySpy).not.toHaveBeenCalled();
+      expect(recordQuietlySpy.mock.calls[0][0].title).toBe(
+        "Alice mentioned you in #main",
+      );
+    });
+
+    it("still notifies when coilbox is in the background", () => {
+      notifySpy.mockClear();
+      recordQuietlySpy.mockClear();
+      openSpy.mockReturnValueOnce(true);
+      notifyMention(said, "srv", () => false);
+      expect(notifySpy).toHaveBeenCalledOnce();
+      expect(recordQuietlySpy).not.toHaveBeenCalled();
+    });
+
+    it("keys a private mention by the sender", () => {
+      openSpy.mockClear();
+      notifyMention(
+        { ...base, channel: null, kind: "private" },
+        "srv",
+        () => true,
+      );
+      expect(openSpy).toHaveBeenLastCalledWith("srv", "dm:Alice");
+    });
   });
 });
 

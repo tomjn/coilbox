@@ -40,7 +40,7 @@ import {
   dialHost,
 } from "../lobby-servers/hostForms";
 import { hostOfKey, serverForKey } from "../lobby-servers/sameServer";
-import { notify } from "../notify/notify";
+import { type NotifyInput, notify, recordQuietly } from "../notify/notify";
 import type { ClientFlags } from "./awayStatus";
 import {
   forgetBattleMovedUnless,
@@ -83,13 +83,14 @@ import {
   rememberJoinedChannel,
   useJoinedChannels,
 } from "./channels";
-import { conversationHref, isBattleChannel } from "./chat/conversation";
+import { conversationHref, convId, isBattleChannel } from "./chat/conversation";
 import {
   HIGHLIGHT_OWN_KEY,
   HIGHLIGHT_WORDS_KEY,
   matchesHighlight,
 } from "./chat/highlight";
 import { triggerMentionCue } from "./chat/mentionCue";
+import { isConversationOpen } from "./chat/openConversations";
 import {
   CLIENT_ID_KEY,
   newClientId,
@@ -288,29 +289,47 @@ function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
  * A mention shows as a toast, or an OS banner when coilbox is in the
  * background, and stays in the bell. The sound and flash alone left nothing on
  * screen to say who mentioned you or where.
+ *
+ * A mention in the conversation you are reading only goes in the bell, since
+ * it is already on screen with its outline (issue #5285).
  */
-export function notifyMention(msg: ChatMsg, serverKey: string): void {
+export function notifyMention(
+  msg: ChatMsg,
+  serverKey: string,
+  hasFocus: () => boolean = () => document.hasFocus(),
+): void {
+  const input = mentionNotice(msg, serverKey);
+  const id = convId(
+    msg.kind === "private" || !msg.channel
+      ? { kind: "dm", peer: msg.from }
+      : { kind: "channel", name: msg.channel },
+  );
+  if (isConversationOpen(serverKey, id) && hasFocus()) recordQuietly(input);
+  else void notify(input);
+}
+
+function mentionNotice(msg: ChatMsg, serverKey: string): NotifyInput {
   const from = msg.from;
   const where = msg.channel;
   if (msg.kind === "private" || !where) {
-    void notify({
+    return {
       title: t`${from} mentioned you in a private message`,
       body: msg.text,
       to: conversationHref({ kind: "dm", peer: from }, serverKey),
-    });
-  } else if (isBattleChannel(where)) {
-    void notify({
+    };
+  }
+  if (isBattleChannel(where)) {
+    return {
       title: t`${from} mentioned you in battle chat`,
       body: msg.text,
       to: battleRoomHref(serverKey),
-    });
-  } else {
-    void notify({
-      title: t`${from} mentioned you in #${where}`,
-      body: msg.text,
-      to: conversationHref({ kind: "channel", name: where }, serverKey),
-    });
+    };
   }
+  return {
+    title: t`${from} mentioned you in #${where}`,
+    body: msg.text,
+    to: conversationHref({ kind: "channel", name: where }, serverKey),
+  };
 }
 
 /**
