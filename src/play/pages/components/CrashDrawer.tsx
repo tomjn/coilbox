@@ -3,7 +3,7 @@ import { Button } from "@picoframe/frame";
 import { AlertTriangle, ClipboardCopy, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
-import { buildCrashReport, describeExit } from "@/play/crash";
+import { buildCrashReport, describeExit, describeSystem } from "@/play/crash";
 import type { CrashTriage } from "@/play/useCrashTriage";
 import { EngineLogFile } from "./EngineLogFile";
 
@@ -12,9 +12,10 @@ import { EngineLogFile } from "./EngineLogFile";
  *
  * A crash used to be silent: the window closed, the badge cleared, and nothing
  * said the engine had gone. This says what happened, points at the log file the
- * way the Engine log page does, and puts a note on the clipboard for pasting
- * into Discord or a bug report. Neither the drawer nor the note carries a line
- * of the log: part of a log passes for the whole of it (issues #4064 and #4167).
+ * way the Engine log page does, and puts a report on the clipboard for pasting
+ * into Discord or a bug report. The drawer shows no line of the log, and the
+ * report carries every line or none: part of a log passes for the whole of it
+ * (issues #4064 and #4167).
  *
  * A right-hand sheet like `DebriefDrawer`, per the repo's preference for drawers
  * over modal dialogs.
@@ -32,8 +33,21 @@ export function CrashDrawer({
   const [copied, setCopied] = useState(false);
 
   if (!triage) return null;
-  const { outcome, runKind, game, map, engine, file, log, stale, triagedAt } =
-    triage;
+  const {
+    outcome,
+    runKind,
+    game,
+    map,
+    engine,
+    engineVersion,
+    file,
+    log,
+    output,
+    system,
+    appVersion,
+    stale,
+    triagedAt,
+  } = triage;
   const outputLog = outcome.launch?.outputLog;
 
   const copyReport = () => {
@@ -43,8 +57,13 @@ export function CrashDrawer({
       game,
       map,
       engine,
+      engineVersion,
       file,
-      logPath: log?.path,
+      system,
+      appVersion,
+      at: triagedAt,
+      log,
+      output,
     });
     navigator.clipboard
       .writeText(text)
@@ -110,7 +129,25 @@ export function CrashDrawer({
                       <dt>
                         <Trans>Engine</Trans>
                       </dt>
-                      <dd className="break-all">{engine}</dd>
+                      <dd className="break-all">
+                        {engineVersion
+                          ? `${engineVersion} · ${engine}`
+                          : engine}
+                      </dd>
+                    </>
+                  ) : null}
+                  {appVersion ? (
+                    <>
+                      <dt>Coilbox</dt>
+                      <dd>{appVersion}</dd>
+                    </>
+                  ) : null}
+                  {system ? (
+                    <>
+                      <dt>
+                        <Trans>System</Trans>
+                      </dt>
+                      <dd>{describeSystem(system)}</dd>
                     </>
                   ) : null}
                 </dl>
@@ -145,7 +182,7 @@ export function CrashDrawer({
             <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
               <Button onClick={copyReport} className="gap-1.5">
                 <ClipboardCopy className="size-4" />
-                {copied ? t`Copied` : t`Copy details`}
+                {copied ? t`Copied` : t`Copy crash report`}
               </Button>
             </div>
           </div>
