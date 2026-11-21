@@ -141,6 +141,8 @@ vi.mock("../../../play/config", () => ({
 }));
 
 const { ReplayMapViewSection } = await import("./ReplayMapView");
+const { MatchClockProvider, useMatchClock, useMatchFrame, useSettledFrame } =
+  await import("../../useMatchClock");
 const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
   "../../replayAnalysis"
 );
@@ -1267,5 +1269,117 @@ describe("opening the engine at the moment shown", () => {
   it("is not there when the track is not shown", async () => {
     await show("stale");
     expect(screen.queryByRole("button", { name: "Open in engine" })).toBeNull();
+  });
+});
+
+describe("the page's match clock", () => {
+  /** A section elsewhere on the page that reads the clock. */
+  const renders = { table: 0 };
+  function Elsewhere() {
+    const frame = useMatchFrame();
+    const { range } = useMatchClock();
+    return (
+      <span data-testid="elsewhere">
+        {`${Math.round(frame)} ${range.source} ${range.firstFrame}-${range.lastFrame}`}
+      </span>
+    );
+  }
+  function Table() {
+    renders.table++;
+    return <span data-testid="table">{Math.round(useSettledFrame())}</span>;
+  }
+
+  async function showInPage(url = "/replay") {
+    seedReplayTracksForTests([track("current")]);
+    navigations.length = 0;
+    renders.table = 0;
+    const router = createMemoryRouter(
+      [
+        {
+          path: "*",
+          element: (
+            <MatchClockProvider durationSec={600}>
+              <ReplayMapViewSection
+                info={info}
+                enginePath="/engine"
+                dataDir="/data"
+                replayPath="/replays/a.sdfz"
+                watch={WATCH}
+                dependencyBlock={BLOCK}
+                game={GAME}
+              />
+              <Elsewhere />
+              <Table />
+            </MatchClockProvider>
+          ),
+        },
+      ],
+      { initialEntries: [url] },
+    );
+    router.subscribe((state) => {
+      navigations.push({
+        action: state.historyAction,
+        search: state.location.search,
+      });
+    });
+    render(<RouterProvider router={router} />);
+    await settle();
+  }
+
+  const elsewhere = () => screen.getByTestId("elsewhere").textContent;
+  const table = () => screen.getByTestId("table").textContent;
+  const knobRoot = () =>
+    document.querySelector("[data-slot='slider']") as HTMLElement;
+
+  beforeEach(() => {
+    const held = new Set<number>();
+    vi.spyOn(Element.prototype, "setPointerCapture").mockImplementation(
+      (id) => void held.add(id),
+    );
+    vi.spyOn(Element.prototype, "hasPointerCapture").mockImplementation((id) =>
+      held.has(id),
+    );
+    vi.spyOn(Element.prototype, "releasePointerCapture").mockImplementation(
+      (id) => void held.delete(id),
+    );
+  });
+
+  it("takes the track's range from the replay's duration once the track is read, and opens at the address's time", async () => {
+    await showInPage("/replay?frame=60");
+    expect(elsewhere()).toBe("60 track 0-150");
+    expect(clockFrame()).toBe(60);
+    expect(table()).toBe("60");
+    expect(navigations).toEqual([]);
+  });
+
+  it("shows a seek through the playback bar to another section", async () => {
+    await showInPage();
+    fireEvent.pointerDown(knobRoot(), { clientX: 0, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(knobRoot(), { clientX: 512, pointerId: 1 });
+    await settle();
+    const dragged = Math.round((512 / 1024) * 150);
+    expect(elsewhere()).toBe(`${dragged} track 0-150`);
+    // A drag has not settled until it ends.
+    expect(table()).toBe("0");
+
+    fireEvent.pointerUp(knobRoot(), { clientX: 512, pointerId: 1 });
+    await settle();
+    expect(table()).toBe(String(dragged));
+    expect(navigations).toEqual([
+      { action: "REPLACE", search: `?frame=${dragged}` },
+    ]);
+  });
+
+  it("does not render a table on the frames of playback, and gives it the time when it stops", async () => {
+    await showInPage("/replay?frame=20");
+    await click("Play");
+    const before = renders.table;
+    for (const stamp of [0, 100, 200, 300, 400, 500]) await frameAt(stamp);
+    expect(elsewhere()).toBe("35 track 0-150");
+    expect(renders.table).toBe(before);
+    expect(table()).toBe("20");
+
+    await click("Pause");
+    expect(table()).toBe("35");
   });
 });
