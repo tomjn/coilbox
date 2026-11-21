@@ -9,9 +9,11 @@ import {
   cropImageBox,
   cropSide,
   cropWindow,
+  spawnedStarts,
 } from "./replayBaseCrops";
 import type { BuildOrderSeat } from "./replayBuildOrders";
 import { mapFraction, type StartDot } from "./replayMapLayers";
+import { startUnitTracks } from "./replayStartUnits";
 
 /** 4096 by 4096 elmos. */
 const SQUARE = { worldWidth: 4096, worldHeight: 4096 };
@@ -274,6 +276,76 @@ describe("whose orders a crop shows", () => {
     const [crop] = baseCrops([dot(0, 2048, 2048)], [], SQUARE, null, info());
     expect(crop.marks).toEqual([]);
     expect(crop.ordered).toBe(0);
+  });
+});
+
+/**
+ * Tumult's numbers (#5339), from the replay 2026-10-20_23-13-32 and its
+ * analysis. The map is 896 map squares a side, 7168 elmos. Splinter Faction
+ * records the same start in every replay, and the commanders appear where the
+ * players pick after the game begins.
+ */
+describe("a start the game moved", () => {
+  const TUMULT = { worldWidth: 7168, worldHeight: 7168 };
+  const recorded = [dot(0, 2537, 918, TUMULT), dot(1, 4631, 6250, TUMULT)];
+  const spawned = (team: number, x: number, z: number) => ({
+    kind: "unit_created",
+    frame: 327,
+    unit: 1000 + team,
+    def: 20,
+    team,
+    x,
+    y: 0,
+    z,
+    startUnit: true,
+  });
+  const events = [spawned(0, 560, 5952), spawned(1, 6464, 3696)];
+  // The first six of team 0's 23 orders.
+  const orders = [
+    [464, 5872],
+    [904, 5880],
+    [904, 5960],
+    [816, 5856],
+    [808, 5944],
+    [888, 6104],
+  ].map(([x, z]) => order({ team: 0, position: at(x, z) }));
+
+  it("has every order outside a crop round the recorded start", () => {
+    const crop = baseCrops(recorded, orders, TUMULT, null, info()).find(
+      (c) => c.team === 0,
+    ) as BaseCrop;
+    expect(crop.marks).toHaveLength(0);
+    expect(crop.outside).toBe(orders.length);
+  });
+
+  it("centres on where the starting unit appeared, so the orders are inside", () => {
+    const spawns = spawnedStarts(startUnitTracks(events));
+    expect(spawns.get(0)).toEqual({ x: 560, z: 5952 });
+    const crops = baseCrops(recorded, orders, TUMULT, null, info(), spawns);
+    const crop = crops.find((c) => c.team === 0) as BaseCrop;
+    expect(crop.window).toEqual({ x0: 0, z0: 5056, side: 1792 });
+    expect(crop.marks).toHaveLength(orders.length);
+    expect(crop.outside).toBe(0);
+    expect(crop.start.left).toBeCloseTo(560 / 1792);
+    expect(crop.start.top).toBeCloseTo((5952 - 5056) / 1792);
+  });
+
+  it("keeps the recorded start for a team whose unit appeared off the map", () => {
+    const spawns = new Map([[0, { x: -10, z: 5952 }]]);
+    const crop = baseCrops(recorded, orders, TUMULT, null, info(), spawns).find(
+      (c) => c.team === 0,
+    ) as BaseCrop;
+    expect(crop.window.x0).toBe(2537 - 1792 / 2);
+  });
+
+  it("takes a team's first starting unit when it has more than one", () => {
+    const spawns = spawnedStarts(
+      startUnitTracks([
+        spawned(0, 560, 5952),
+        { ...spawned(0, 3000, 3000), unit: 2000 },
+      ]),
+    );
+    expect(spawns.get(0)).toEqual({ x: 560, z: 5952 });
   });
 });
 
