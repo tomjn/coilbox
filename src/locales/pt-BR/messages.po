@@ -9332,6 +9332,10 @@ msgstr "um caminho que não existe mais"
 msgid "A picture of this map is not available, so the match is drawn on plain ground."
 msgstr "Não há imagem deste mapa, então a partida é desenhada em um terreno liso."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A player unticked in the players table has faint units. Point at a player in the table and their units get a white edge while everyone else's go faint."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A player who is not an ally sees no health bar and no health in the tooltip."
@@ -9383,9 +9387,8 @@ msgid "A ratio is one figure over another for the same army, and is not per minu
 msgstr "Uma proporção é um dado dividido por outro do mesmo exército, e não é por minuto. Um jogo em que o dado menor é zero não tem proporção. Ele fica de fora da média e é contado ao lado."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
-msgstr "Um retângulo é uma unidade, na cor da equipe e do tamanho da área ocupada, com uma linha na direção em que está virada. Uma unidade ainda em construção aparece clara. Em um mapa grande, uma marca nunca é menor que 3 pixels, então unidades pequenas parecem maiores do que são."
+msgid "A rectangle is a unit, in the colour of its player's line in the chart and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
+msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

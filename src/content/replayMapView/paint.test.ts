@@ -1,7 +1,13 @@
 /** What the map view puts on its canvas (#3807), counted on a context that
  *  records the calls made to it. */
 import { describe, expect, it } from "vitest";
-import { paintScene, teamStyles } from "./paint";
+import {
+  emphasisedStyles,
+  FAINT_UNITS,
+  paintScene,
+  styleOfColour,
+  teamStyles,
+} from "./paint";
 import { collectScene, createMapScene, type MapScene } from "./scene";
 import {
   fixtureAlive,
@@ -193,5 +199,110 @@ describe("paintScene", () => {
     const { ctx, counts } = await painted(100, 99);
     expect(ctx.count("arc")).toBe(0);
     expect(counts.highlighted).toBe(false);
+  });
+});
+
+/** A scene of one unit for each of teams 0 and 1. */
+function two(): MapScene {
+  const scene = one({});
+  scene.units = 2;
+  scene.unitX[1] = 5000;
+  scene.unitZ[1] = 3000;
+  scene.unitFx[1] = 0;
+  scene.unitFz[1] = 1;
+  scene.unitAcross[1] = 64;
+  scene.unitAlong[1] = 64;
+  scene.unitBuild[1] = 1;
+  scene.unitTeam[1] = 1;
+  return scene;
+}
+
+/** The fill of each team's finished units, with how much of it shows. */
+function fillsOf(scene: MapScene, teams: ReturnType<typeof teamStyles>) {
+  const ctx = recordingContext();
+  paintScene(ctx, scene, view, teams, null);
+  return ctx.calls
+    .filter((c) => c.op === "fill")
+    .map((c) => [c.fillStyle, c.globalAlpha] as const);
+}
+
+describe("the colour a team is drawn in", () => {
+  it("is the one the page names for it, and the track's own when it names none", () => {
+    const named = teamStyles(fixtureHeader.teams, new Map([[0, "#112233"]]));
+    expect(named.get(0)?.fill).toBe("#112233");
+    expect(named.get(1)).toEqual(teamStyles(fixtureHeader.teams).get(1));
+  });
+
+  it("gets a pale edge when it is dark and a dark one when it is light, in either notation", () => {
+    expect(styleOfColour("#101010").edge).toBe(
+      styleOfColour("rgb(16, 16, 16)").edge,
+    );
+    expect(styleOfColour("#101010").edge).not.toBe(
+      styleOfColour("#f0f0f0").edge,
+    );
+    expect(styleOfColour("#f0f0f0").edge).toBe(
+      styleOfColour("rgb(240, 240, 240)").edge,
+    );
+  });
+
+  it("paints a unit in the colour named for its team", () => {
+    const named = teamStyles(fixtureHeader.teams, new Map([[0, "#112233"]]));
+    expect(fillsOf(one({}), named)).toEqual([["#112233", 1]]);
+  });
+});
+
+describe("a team the players table leaves out or points past", () => {
+  const base = teamStyles(fixtureHeader.teams);
+
+  it("changes nothing when the table says nothing", () => {
+    expect(emphasisedStyles(base, { hidden: [], active: null })).toBe(base);
+  });
+
+  it("draws an unticked team's units faint and every other team's whole", () => {
+    const faint = emphasisedStyles(base, { hidden: [0], active: null });
+    expect(fillsOf(two(), faint)).toEqual([
+      [base.get(0)?.fill, FAINT_UNITS],
+      [base.get(1)?.fill, 1],
+    ]);
+    // Faint units are still on the canvas, and in their own colour.
+    expect(FAINT_UNITS).toBeGreaterThan(0);
+  });
+
+  it("keeps a faint unit under construction on the map, and fainter than a built one", () => {
+    const faint = emphasisedStyles(base, { hidden: [0], active: null });
+    const alphaOf = (build: number) => fillsOf(one({ build }), faint)[0][1];
+    expect(alphaOf(0)).toBeGreaterThan(0);
+    expect(alphaOf(0.5)).toBeLessThan(alphaOf(1));
+  });
+
+  it("fades every team but the one pointed at, and lights that one", () => {
+    const pointed = emphasisedStyles(base, { hidden: [], active: [1] });
+    expect(pointed.get(1)?.lit).toBe(true);
+    expect(pointed.get(0)?.lit).toBe(false);
+    expect(fillsOf(two(), pointed)).toEqual([
+      [base.get(0)?.fill, FAINT_UNITS],
+      [base.get(1)?.fill, 1],
+    ]);
+  });
+
+  it("draws the team pointed at last, with a halo, even when it is the lower numbered", () => {
+    const pointed = emphasisedStyles(base, { hidden: [], active: [0] });
+    const ctx = recordingContext();
+    paintScene(ctx, two(), view, pointed, null);
+    const fills = ctx.calls.filter((c) => c.op === "fill");
+    expect(fills.map((c) => c.fillStyle)).toEqual([
+      base.get(1)?.fill,
+      base.get(0)?.fill,
+    ]);
+    const strokes = ctx.calls.filter((c) => c.op === "stroke");
+    // Team 0's edge is the halo, which team 1's is not.
+    expect(strokes[0].strokeStyle).toBe(base.get(1)?.edge);
+    expect(strokes[2].strokeStyle).not.toBe(base.get(0)?.edge);
+  });
+
+  it("does not light a team that is unticked", () => {
+    const style = emphasisedStyles(base, { hidden: [0], active: [0, 1] });
+    expect(style.get(0)).toMatchObject({ alpha: FAINT_UNITS, lit: false });
+    expect(style.get(1)).toMatchObject({ alpha: 1, lit: true });
   });
 });

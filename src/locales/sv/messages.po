@@ -9335,6 +9335,10 @@ msgstr "en bana som är borta"
 msgid "A picture of this map is not available, so the match is drawn on plain ground."
 msgstr "Det finns ingen bild av den här kartan, så matchen ritas på enfärgad mark."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A player unticked in the players table has faint units. Point at a player in the table and their units get a white edge while everyone else's go faint."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A player who is not an ally sees no health bar and no health in the tooltip."
@@ -9386,9 +9390,8 @@ msgid "A ratio is one figure over another for the same army, and is not per minu
 msgstr "En kvot är ett värde delat med ett annat för samma armé, och är inte per minut. En match där det mindre värdet är noll har ingen kvot. Den utelämnas från genomsnittet och räknas bredvid."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
-msgstr "En rektangel är en enhet, i lagets färg och med fotavtryckets storlek, med en linje åt det håll den är vänd. En enhet som fortfarande byggs är svag. På en stor karta är ett märke aldrig mindre än 3 pixlar, så små enheter ser större ut än de är."
+msgid "A rectangle is a unit, in the colour of its player's line in the chart and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
+msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

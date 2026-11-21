@@ -4,7 +4,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ReplayTrackHeader } from "../../bindings";
+import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import {
   ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
@@ -15,11 +15,12 @@ import {
   type MapView,
   type MapViewStatus,
 } from "../../replayMapView/loop";
-import { teamStyles } from "../../replayMapView/paint";
+import type { TeamStyle } from "../../replayMapView/paint";
 import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useMatchClock } from "../../useMatchClock";
+import { useUnitMapStyles } from "../../useUnitMapStyles";
 import { MapHelp, ReplayMapLayout } from "./ReplayMapRail";
 import { useTimelineKeys } from "./ReplayTimelineDock";
 
@@ -102,10 +103,17 @@ function Legend() {
       </p>
       <p>
         <Trans>
-          A rectangle is a unit, in its team's colour and the size of its
-          footprint, with a line the way it faces. A unit still being built is
-          faint. On a large map a mark is never smaller than 3 pixels, so small
-          units look bigger than they are.
+          A rectangle is a unit, in the colour of its player's line in the chart
+          and the size of its footprint, with a line the way it faces. A unit
+          still being built is faint. On a large map a mark is never smaller
+          than 3 pixels, so small units look bigger than they are.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
+          A player unticked in the players table has faint units. Point at a
+          player in the table and their units get a white edge while everyone
+          else's go faint.
         </Trans>
       </p>
       <p>
@@ -150,7 +158,13 @@ function Legend() {
 }
 
 /** Whose colour is whose, in the rail under the map. */
-function TeamKey({ header }: { header: ReplayTrackHeader }) {
+function TeamKey({
+  header,
+  styles,
+}: {
+  header: ReplayTrackHeader;
+  styles: ReadonlyMap<number, TeamStyle>;
+}) {
   return (
     <ul className="flex flex-col gap-1 text-xs">
       {header.teams.map((team) => (
@@ -158,7 +172,10 @@ function TeamKey({ header }: { header: ReplayTrackHeader }) {
           <span
             aria-hidden="true"
             className="size-2.5 shrink-0 rounded-[2px] border border-foreground/40"
-            style={{ backgroundColor: `rgb(${team.colour.join(", ")})` }}
+            style={{
+              backgroundColor:
+                styles.get(team.id)?.fill ?? `rgb(${team.colour.join(", ")})`,
+            }}
           />
           {ownerWords(header, team.id)}
         </li>
@@ -219,11 +236,16 @@ export function useAdoptedTrack(header: ReplayTrackHeader | null): boolean {
  */
 export function ReplayMapUnits({
   handle,
+  info,
+  replayPath,
   adopted,
   mapName,
   minimapUrl,
 }: {
   handle: ReplayTrackHandle;
+  /** Whose colours the teams wear: the chart's, from the replay's own match. */
+  info: DemoInfo;
+  replayPath: string | undefined;
   /** From {@link useAdoptedTrack}. Nothing is drawn before it is true. */
   adopted: boolean;
   mapName: string;
@@ -234,6 +256,8 @@ export function ReplayMapUnits({
   return (
     <UnitsView
       handle={handle}
+      info={info}
+      replayPath={replayPath}
       clock={clock}
       mapName={mapName}
       minimapUrl={minimapUrl}
@@ -251,11 +275,15 @@ export function ReplayMapUnits({
  */
 function UnitsView({
   handle,
+  info,
+  replayPath,
   clock,
   mapName,
   minimapUrl,
 }: {
   handle: ReplayTrackHandle;
+  info: DemoInfo;
+  replayPath: string | undefined;
   clock: ReplayClock;
   mapName: string;
   minimapUrl: string | null;
@@ -271,6 +299,10 @@ function UnitsView({
   const [status, setStatus] = useState<MapViewStatus>({ kind: "ready" });
   const [pointed, setPointed] = useState<Named | null>(null);
   const [chosen, setChosen] = useState<Named | null>(null);
+  // Read by the loop when it is made, and handed to it again as they change.
+  const styles = useUnitMapStyles(info, replayPath, header.teams);
+  const stylesRef = useRef(styles);
+  stylesRef.current = styles;
 
   useEffect(() => {
     const ground = groundRef.current;
@@ -282,7 +314,7 @@ function UnitsView({
     const view = createMapView({
       handle,
       clock,
-      teams: teamStyles(header.teams),
+      teams: stylesRef.current,
       surface: () =>
         ctx && canvas.width > 0
           ? {
@@ -366,7 +398,11 @@ function UnitsView({
       view.dispose();
       viewRef.current = null;
     };
-  }, [handle, clock, header.teams, mapX, mapZ]);
+  }, [handle, clock, mapX, mapZ]);
+
+  useEffect(() => {
+    viewRef.current?.setTeams(styles);
+  }, [styles]);
 
   // The ring goes round the unit the pointer is on, or the chosen one.
   const named = pointed ?? chosen;
@@ -481,7 +517,7 @@ function UnitsView({
           >
             {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
           </p>
-          <TeamKey header={header} />
+          <TeamKey header={header} styles={styles} />
         </>
       }
     />
