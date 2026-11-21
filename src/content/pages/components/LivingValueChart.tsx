@@ -90,12 +90,14 @@ interface ChartProps {
  * each. `auto-fit` drops the tracks nothing is in and lets the rest stretch, and
  * the least a track may be is a quarter of the width less the gaps, so no row
  * holds more than {@link MOST_COLUMNS} charts and the rest wrap. In a plot area
- * too narrow for that, the 10rem floor wins and fewer fit across: a chart under
- * 10rem is a stack of unit kinds nobody can read. The gap is `gap-3`, 0.75rem.
+ * too narrow for that, {@link LEAST_WIDTH} wins and fewer fit across. The
+ * replay page's two column layout leaves the plot area about 300px, which is
+ * two charts wide at that floor. The gap is `gap-3`, 0.75rem.
  */
 const MOST_COLUMNS = 4;
+const LEAST_WIDTH = "8rem";
 const PANEL_GRID: React.CSSProperties = {
-  gridTemplateColumns: `repeat(auto-fit, minmax(max(10rem, calc((100% - ${(MOST_COLUMNS - 1) * 0.75}rem) / ${MOST_COLUMNS})), 1fr))`,
+  gridTemplateColumns: `repeat(auto-fit, minmax(max(${LEAST_WIDTH}, calc((100% - ${(MOST_COLUMNS - 1) * 0.75}rem) / ${MOST_COLUMNS})), 1fr))`,
 };
 
 const frame = (children: React.ReactNode, help?: React.ReactNode) => (
