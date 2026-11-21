@@ -679,6 +679,11 @@ msgstr "{0, plural, one {# def-åsidosättning} other {# def-åsidosättningar}}
 msgid "{0, plural, one {# duplicate} other {# duplicates}}"
 msgstr ""
 
+#. placeholder {0}: rows.length
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "{0, plural, one {# entry.} other {# entries.}}"
+msgstr ""
+
 #. placeholder {0}: model.paletteFaces
 #: src/content/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -3007,7 +3012,7 @@ msgstr "{game} anger inte {names}."
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
 msgstr "{game} är inte installerat, så inget anger vad en enhet kostar eller vad den är till för."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "{game} is not installed, so the units cannot be named. Each event shows its unit definition id."
 msgstr "{game} är inte installerat, så enheterna kan inte namnges. Varje händelse visar sin enhetsdefinitions id."
@@ -4490,10 +4495,9 @@ msgstr "{matched} gjorda av komponenter, och {empty} utan geometri, vilket är h
 msgid "{matches}, {note}"
 msgstr "{matches}, {note}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "{matchingCount} of {totalCount} events match."
-msgstr "{matchingCount} av {totalCount} händelser matchar."
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "{matching} of {total} entries match."
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -7066,11 +7070,6 @@ msgstr "{total, plural, one {{failed} av # bot kunde inte läggas till. {names}}
 msgid "{total, plural, one {# building, and it has room here.} other {# buildings, and they all have room here.}}"
 msgstr "{total, plural, one {# byggnad, och den har plats här.} other {# byggnader, och alla har plats här.}}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "{total, plural, one {# event} other {# events}}"
-msgstr "{total, plural, one {# händelse} other {# händelser}}"
-
 #: src/workshop/pages/components/AssetPicker.tsx
 #, fuzzy
 msgid "{total, plural, one {# file.} other {# files.}}"
@@ -7141,11 +7140,6 @@ msgstr "{total} s"
 #, fuzzy
 msgid "{totalBuildings, plural, one {{swapping} of # building} other {{swapping} of # buildings}}"
 msgstr "{totalBuildings, plural, one {{swapping} av # byggnad} other {{swapping} av # byggnader}}"
-
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "{totalCount} events."
-msgstr "{totalCount} händelser."
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
@@ -7739,6 +7733,22 @@ msgstr "{variableCount, plural, one {# variabel} other {# variabler}}"
 #, fuzzy
 msgid "{vertices, plural, one {{triangles} from # vertex} other {{triangles} from # vertices}}"
 msgstr "{vertices, plural, one {{triangles} från # hörnpunkt} other {{triangles} från # hörnpunkter}}"
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed"
+msgstr ""
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed by {killer}"
+msgstr ""
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed by {killer} ({owner})"
+msgstr ""
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed by {owner}"
+msgstr ""
 
 #: src/scenario/wording.ts
 #, fuzzy
@@ -9632,6 +9642,10 @@ msgstr "En utlösare kör sina åtgärder när dess villkor är uppfyllda. Allt 
 msgid "A trot: diagonal pairs move together, so the body does not rock. Needs both pairs of legs."
 msgstr "Trav: diagonala par rör sig tillsammans, så att kroppen inte gungar. Kräver båda benparen."
 
+#: src/content/replayEventList.ts
+msgid "A unit"
+msgstr ""
+
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
 msgid "A unit at its real size, for scale"
@@ -10782,6 +10796,7 @@ msgstr "Justera {axisName} mitten. En del utan form justeras efter sin origo."
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/Inventory.tsx
@@ -10845,7 +10860,7 @@ msgstr "alla spelalternativ"
 msgid "All games"
 msgstr "Alla spel"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "All kinds"
@@ -10886,7 +10901,7 @@ msgstr "Alla paket"
 msgid "All packs downloaded"
 msgstr "Alla paket nedladdade"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "All players"
 msgstr "Alla spelare"
@@ -15093,7 +15108,9 @@ msgstr "Mått i diagrammet, med varje måtts form"
 msgid "Charted values"
 msgstr "Värden i diagrammet"
 
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#: src/content/replayEventList.ts
 #: src/multiplayer/index.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/pages/ChatPage.tsx
@@ -15105,11 +15122,6 @@ msgstr "Chatt"
 #, fuzzy
 msgid "Chat highlights"
 msgstr "Markeringar i chatten"
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Chat log"
-msgstr "Chatthistorik"
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #: src/multiplayer/index.tsx
@@ -19933,7 +19945,6 @@ msgid "Detail"
 msgstr ""
 
 #: src/components/ResultCard.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
@@ -20447,7 +20458,7 @@ msgstr "Nedladdningen misslyckades"
 msgid "Download failed: {downloadError}"
 msgstr "Nedladdningen misslyckades: {downloadError}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Download failed: {reason}"
 msgstr "Nedladdningen misslyckades: {reason}"
@@ -20463,7 +20474,7 @@ msgstr "Ladda ned spel"
 msgid "Download game and map"
 msgstr "Ladda ned spel och karta"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Download log"
 msgstr "Ladda ned logg"
@@ -20501,7 +20512,7 @@ msgstr "Nedladdningsförlopp"
 msgid "Download the engine this replay needs"
 msgstr "Ladda ned motorn som den här reprisen behöver"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Download the event log"
 msgstr "Ladda ned händelseloggen"
@@ -21848,7 +21859,7 @@ msgstr "Uppskattat från upptrappning + längd. Live-mätvärden visas när kör
 msgid "Event"
 msgstr "Händelse"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Event log downloaded."
 msgstr "Händelseloggen nedladdad."
@@ -21858,6 +21869,7 @@ msgstr "Händelseloggen nedladdad."
 msgid "Events"
 msgstr "Händelser"
 
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayPanel.tsx
 msgid "Events and chat"
 msgstr ""
@@ -25453,6 +25465,10 @@ msgstr "Markera ord"
 msgid "Highlight words"
 msgstr "Markera ord"
 
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "Highlights"
+msgstr ""
+
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/uberstress/index.ts
 #, fuzzy
@@ -27692,7 +27708,7 @@ msgstr "Går med i striden, där du kan titta på det pågående spelet"
 msgid "Joins waiting for you"
 msgstr "Anslutningar som väntar på dig"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "JSON lines"
 msgstr "JSON-rader"
@@ -28020,6 +28036,11 @@ msgstr "Sparkar ut {username} från servern."
 msgid "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch."
 msgstr "Slår tillbaka eldröret längs sin egen lopp när vapnet skjuter, och för det mjukt tillbaka. En engångshändelse, inte en slinga: förhandsvisningen upprepar den på en timer så att det finns något att titta på."
 
+#: src/content/replayEventList.ts
+msgid "Kill"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Kills"
@@ -28027,7 +28048,6 @@ msgstr "Dödade"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
@@ -28037,7 +28057,7 @@ msgstr "Dödade"
 msgid "Kind"
 msgstr "Typ"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Kind of event"
 msgstr "Typ av händelse"
@@ -32413,11 +32433,6 @@ msgstr "Inga kanaler. Bläddra för att gå med i en."
 msgid "No chat logs yet. Conversations you have while connected are saved here."
 msgstr "Ingen chatthistorik än. Samtal som du har medan du är ansluten sparas här."
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "No chat was recorded in this replay."
-msgstr "Ingen chatt registrerades i den här reprisen."
-
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "No collection has been defined against this game yet."
@@ -32702,10 +32717,9 @@ msgstr "Inga motorer hittades i dina innehållsmappar."
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
 msgstr "Inga motorer hittades i dina innehållsmappar. Lägg till en mapp under <0>Innehållsmappar</0> eller installera en från <1>Motorer</1>."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "No event matches these filters."
-msgstr "Ingen händelse matchar de här filtren."
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "No entry matches these filters."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -35307,6 +35321,10 @@ msgstr "Inget installerades"
 #, fuzzy
 msgid "Nothing was named to open."
 msgstr "Inget angavs att öppna."
+
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "Nothing was recorded for this replay."
+msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 #, fuzzy
@@ -38052,12 +38070,13 @@ msgstr "Spelad till"
 msgid "played until {playedUntil}"
 msgstr "spelad till {playedUntil}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/replayEventList.ts
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/multiplayer/index.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -38067,12 +38086,12 @@ msgid "Player"
 msgstr "Spelare"
 
 #. placeholder {0}: dest.player
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "Player {0}"
 msgstr "Spelare {0}"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "Player {player}"
 msgstr "Spelare {player}"
@@ -38121,6 +38140,7 @@ msgstr "Spelarens egna"
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/admin/tools.tsx
@@ -38389,7 +38409,7 @@ msgstr "pr-downloader är inte tillgängligt"
 msgid "Pre-fill the file pickers with the folders you used last time."
 msgstr "Fyll i filväljarna i förväg med mapparna du använde senast."
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "Pre-game"
 msgstr "Före spelet"
@@ -39561,11 +39581,6 @@ msgstr "Läser och skickar dina kartor"
 msgid "Reading build orders…"
 msgstr "Läser byggorder…"
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Reading chat…"
-msgstr "Läser chatt…"
-
 #: src/direct/room.ts
 #, fuzzy
 msgid "Reading content…"
@@ -39581,8 +39596,8 @@ msgstr "Läser motorversioner…"
 msgid "Reading events and unit definitions…"
 msgstr "Läser händelser och enhetsdefinitioner…"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Reading events…"
 msgstr "Läser händelser…"
@@ -39802,9 +39817,9 @@ msgstr "Läser reprisens statistik…"
 msgid "Reading unit definitions…"
 msgstr "Läser enhetsdefinitioner…"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Reading unit names…"
@@ -40053,11 +40068,6 @@ msgstr "Spela in den här reprisen i avsnittet för analys och inspelning, som k
 #, fuzzy
 msgid "Record this replay, then watch it with rewind?"
 msgstr "Spela in den här reprisen och sedan titta på den med tillbakaspolning?"
-
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "Recorded events"
-msgstr "Registrerade händelser"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -43879,7 +43889,7 @@ msgstr "Avstånd till andra"
 msgid "server"
 msgstr "server"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -44692,6 +44702,7 @@ msgstr "Skott testas mot varje modelldel i stället för en volym runt hela enhe
 msgid "Shots per burst"
 msgstr "Skott per salva"
 
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/MapsPage.tsx
@@ -44716,11 +44727,6 @@ msgstr "Visa {label} i diagrammet"
 #, fuzzy
 msgid "Show {moreCount} more of {entryCount} entries"
 msgstr "Visa {moreCount} till av {entryCount} poster"
-
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "Show {moreCount} more of {matchingCount}"
-msgstr "Visa {moreCount} till av {matchingCount}"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
@@ -44771,11 +44777,6 @@ msgstr "Visa bannlysningar"
 #, fuzzy
 msgid "Show build orders"
 msgstr "Visa byggorder"
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Show chat log"
-msgstr "Visa chatthistorik"
 
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
@@ -48148,15 +48149,10 @@ msgstr "Diagrammet kunde inte ritas som en bild."
 msgid "The chassis was renamed, so the list of locked units under its old name was emptied:"
 msgstr "Chassit bytte namn, så listan över låsta enheter under dess gamla namn tömdes:"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "The chat could not be read from this replay."
 msgstr "Chatten kunde inte läsas från den här reprisen."
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "the chat log"
-msgstr "chatthistoriken"
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -48589,13 +48585,17 @@ msgstr "Motorns logg kunde inte läsas för den här körningen, så det finns i
 msgid "The engine's unit list could not be read."
 msgstr "Motorns enhetslista kunde inte läsas."
 
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "the events and chat"
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The events could not be read from this replay's analysis."
 msgstr "Händelserna kunde inte läsas från reprisens analys."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "The events could not be read."
 msgstr "Händelserna kunde inte läsas."
@@ -50916,7 +50916,7 @@ msgstr ""
 msgid "The unit's root piece"
 msgstr ""
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "The units of {gameName} could not be read, so each event shows its unit definition id."
 msgstr "Enheterna i {gameName} kunde inte läsas, så varje händelse visar sin enhetsdefinitions id."
@@ -51286,7 +51286,6 @@ msgstr "Den här analysen registrerades innan coilbox loggade skada, så det fin
 msgid "This analysis was recorded before coilbox logged starting units, so there is nothing to draw. Analyse the replay again to record them."
 msgstr "Den här analysen registrerades innan coilbox loggade startenheter, så det finns inget att rita. Analysera reprisen igen för att registrera dem."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/replayEventLayers.ts
 #, fuzzy
 msgid "This analysis was recorded by an older logger and may lack newer kinds of event."
@@ -52352,10 +52351,9 @@ msgstr "Reprisen kunde inte läsas till slutet, så senare byggorder kan saknas.
 msgid "This replay could not be read to the end, so later orders may be missing."
 msgstr "Reprisen kunde inte läsas till slutet, så senare order kan saknas."
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "This replay could not be read to the end, so the chat log may be incomplete."
-msgstr "Reprisen kunde inte läsas till slutet, så chatthistoriken kan vara ofullständig."
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "This replay could not be read to the end, so the list may be incomplete."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -52456,8 +52454,8 @@ msgstr "Den här reprisen spelades på {0}, som inte är installerat. Kostnadern
 msgid "This replay was played on {0}, which is not installed. Shapes and the choice of buildings come from {sourceGame}, a different build, and may be wrong."
 msgstr "Den här reprisen spelades på {0}, som inte är installerat. Former och val av byggnader kommer från {sourceGame}, en annan version, och kan vara fel."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "This replay was played on {recorded}, which is not installed. Unit names come from {gameName}, a different build, and may be wrong."
 msgstr "Den här reprisen spelades på {recorded}, som inte är installerat. Enhetsnamnen kommer från {gameName}, en annan version, och kan vara fel."
@@ -52488,9 +52486,9 @@ msgid "This replay was recorded on the replay playback game. It has no match of 
 msgstr "Den här reprisen spelades in med uppspelningsspelet för repriser. Den har ingen egen match att spela in."
 
 #: src/content/pages/components/LivingValueChart.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "This replay's game"
 msgstr "Reprisens spel"
@@ -53112,7 +53110,6 @@ msgid "Tilt smoothing"
 msgstr "Utjämning av lutning"
 
 #: src/content/pages/components/MatchStatsTable.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Time"
@@ -53189,7 +53186,7 @@ msgstr "Titel, karta, värd eller spel"
 msgid "TLS mode"
 msgstr "TLS-läge"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "to {target}"
 msgstr "till {target}"
@@ -53199,7 +53196,7 @@ msgstr "till {target}"
 msgid "To action"
 msgstr "Till åtgärd"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "to allies"
 msgstr "till allierade"
@@ -53214,7 +53211,7 @@ msgstr "Till minut"
 msgid "To play, Coilbox needs a content folder and a game engine."
 msgstr "För att spela behöver Coilbox en innehållsmapp och en spelmotor."
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "to spectators"
 msgstr "till åskådare"
@@ -54260,7 +54257,6 @@ msgstr "enhet"
 #: src/content/index.ts
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/lego/pages/components/ReferencePicker.tsx
 #: src/scenario/validate.ts
 #, fuzzy
@@ -54274,7 +54270,7 @@ msgstr "Enhet"
 msgid "Unit {0}"
 msgstr "Enhet {0}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Unit {def}"
 msgstr "Enhet {def}"
@@ -57297,7 +57293,7 @@ msgstr "Skriver en kopia som läser in ett lokalt installerat spel i stället f�
 msgid "Writes each start position with how many times it was taken and how many of those won."
 msgstr "Skriver varje startposition med hur många gånger den togs och hur många av dem som vann."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Writes every event, whatever the filters show."
 msgstr "Skriver varje händelse, oavsett vad filtren visar."

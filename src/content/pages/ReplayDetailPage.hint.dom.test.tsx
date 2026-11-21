@@ -92,6 +92,9 @@ vi.mock("../../downloads/pages/components/ProgressBar", () => ({
 vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => null,
 }));
+vi.mock("./components/ReplayEventList", () => ({
+  ReplayEventList: () => null,
+}));
 vi.mock("./components/MatchStatsSection", () => ({
   MatchStatsSection: () => null,
 }));

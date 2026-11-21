@@ -673,6 +673,11 @@ msgstr "{0, plural, one {# перевизначення def} few {# переви
 msgid "{0, plural, one {# duplicate} other {# duplicates}}"
 msgstr ""
 
+#. placeholder {0}: rows.length
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "{0, plural, one {# entry.} other {# entries.}}"
+msgstr ""
+
 #. placeholder {0}: model.paletteFaces
 #: src/content/pages/components/ModelViewport.tsx
 #, fuzzy
@@ -2976,7 +2981,7 @@ msgstr ""
 msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
 msgstr "Гру {game} не встановлено, тому невідомо, скільки коштує юніт і для чого він."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "{game} is not installed, so the units cannot be named. Each event shows its unit definition id."
 msgstr "Гру {game} не встановлено, тому юніти неможливо назвати. Кожна подія показує id визначення свого юніта."
@@ -4454,10 +4459,9 @@ msgstr "{matched} складено з деталей, а {empty} – без ге
 msgid "{matches}, {note}"
 msgstr "{matches}, {note}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "{matchingCount} of {totalCount} events match."
-msgstr "Збігається подій: {matchingCount} з {totalCount}."
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "{matching} of {total} entries match."
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -7012,11 +7016,6 @@ msgstr "{total, plural, one {Не вдалося додати {failed} з # бо
 msgid "{total, plural, one {# building, and it has room here.} other {# buildings, and they all have room here.}}"
 msgstr "{total, plural, one {# будівля, і для неї тут є місце.} few {# будівлі, і для всіх тут є місце.} many {# будівель, і для всіх тут є місце.} other {# будівлі, і для всіх тут є місце.}}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "{total, plural, one {# event} other {# events}}"
-msgstr "{total, plural, one {# подія} few {# події} many {# подій} other {# події}}"
-
 #: src/workshop/pages/components/AssetPicker.tsx
 #, fuzzy
 msgid "{total, plural, one {# file.} other {# files.}}"
@@ -7087,11 +7086,6 @@ msgstr "{total} с"
 #, fuzzy
 msgid "{totalBuildings, plural, one {{swapping} of # building} other {{swapping} of # buildings}}"
 msgstr "{totalBuildings, plural, one {{swapping} з # будівлі} few {{swapping} з # будівель} many {{swapping} з # будівель} other {{swapping} з # будівлі}}"
-
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "{totalCount} events."
-msgstr "Подій: {totalCount}."
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
@@ -7683,6 +7677,22 @@ msgstr "{variableCount, plural, one {# змінна} few {# змінні} many {
 #, fuzzy
 msgid "{vertices, plural, one {{triangles} from # vertex} other {{triangles} from # vertices}}"
 msgstr "{vertices, plural, one {{triangles} з # вершини} few {{triangles} з # вершин} many {{triangles} з # вершин} other {{triangles} з # вершини}}"
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed"
+msgstr ""
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed by {killer}"
+msgstr ""
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed by {killer} ({owner})"
+msgstr ""
+
+#: src/content/replayEventList.ts
+msgid "{victim} destroyed by {owner}"
+msgstr ""
 
 #: src/scenario/wording.ts
 #, fuzzy
@@ -9565,6 +9575,10 @@ msgstr "Тригер виконує свої дії, коли виконують
 msgid "A trot: diagonal pairs move together, so the body does not rock. Needs both pairs of legs."
 msgstr "Рись: діагональні пари рухаються разом, тож корпус не гойдається. Потрібні обидві пари ніг."
 
+#: src/content/replayEventList.ts
+msgid "A unit"
+msgstr ""
+
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
 msgid "A unit at its real size, for scale"
@@ -10711,6 +10725,7 @@ msgstr "Вирівняти {axisName} за серединою. Елемент б
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/Inventory.tsx
@@ -10774,7 +10789,7 @@ msgstr "усі параметри гри"
 msgid "All games"
 msgstr "Усі ігри"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "All kinds"
@@ -10815,7 +10830,7 @@ msgstr "Усі пакети"
 msgid "All packs downloaded"
 msgstr "Усі пакети завантажено"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "All players"
 msgstr "Усі гравці"
@@ -15002,7 +15017,9 @@ msgstr "Показник на графіку, що показує форму к�
 msgid "Charted values"
 msgstr "Значення на графіку"
 
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#: src/content/replayEventList.ts
 #: src/multiplayer/index.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/pages/ChatPage.tsx
@@ -15014,11 +15031,6 @@ msgstr "Чат"
 #, fuzzy
 msgid "Chat highlights"
 msgstr "Виділення в чаті"
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Chat log"
-msgstr "Журнал чату"
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #: src/multiplayer/index.tsx
@@ -19799,7 +19811,6 @@ msgid "Detail"
 msgstr ""
 
 #: src/components/ResultCard.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/scenario/pages/components/ActorControls.tsx
@@ -20311,7 +20322,7 @@ msgstr "Завантаження не вдалося"
 msgid "Download failed: {downloadError}"
 msgstr "Завантаження не вдалося: {downloadError}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Download failed: {reason}"
 msgstr "Завантаження не вдалося: {reason}"
@@ -20327,7 +20338,7 @@ msgstr "Завантажити гру"
 msgid "Download game and map"
 msgstr "Завантажити гру й мапу"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Download log"
 msgstr "Завантажити журнал"
@@ -20365,7 +20376,7 @@ msgstr "Прогрес завантаження"
 msgid "Download the engine this replay needs"
 msgstr "Завантажити рушій, потрібний цьому повтору"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Download the event log"
 msgstr "Завантажити журнал подій"
@@ -21704,7 +21715,7 @@ msgstr "Оцінено з наростання й тривалості. Живі
 msgid "Event"
 msgstr "Подія"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Event log downloaded."
 msgstr "Журнал подій завантажено."
@@ -21714,6 +21725,7 @@ msgstr "Журнал подій завантажено."
 msgid "Events"
 msgstr "Події"
 
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayPanel.tsx
 msgid "Events and chat"
 msgstr ""
@@ -25291,6 +25303,10 @@ msgstr "Слово для виділення"
 msgid "Highlight words"
 msgstr "Слова для виділення"
 
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "Highlights"
+msgstr ""
+
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/uberstress/index.ts
 #, fuzzy
@@ -27520,7 +27536,7 @@ msgstr "Приєднує до матчу, де можна дивитися по�
 msgid "Joins waiting for you"
 msgstr "Запити на приєднання, що чекають на вас"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "JSON lines"
 msgstr "Рядки JSON"
@@ -27846,6 +27862,11 @@ msgstr "Виганяє {username} із сервера."
 msgid "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch."
 msgstr "Відкидає ствол назад уздовж його каналу під час пострілу й плавно повертає на місце. Одноразова дія, а не цикл: перегляд повторює її за таймером, щоб було на що дивитися."
 
+#: src/content/replayEventList.ts
+msgid "Kill"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Kills"
@@ -27853,7 +27874,6 @@ msgstr "Знищення"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/Inventory.tsx
@@ -27863,7 +27883,7 @@ msgstr "Знищення"
 msgid "Kind"
 msgstr "Тип"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Kind of event"
 msgstr "Тип події"
@@ -32210,11 +32230,6 @@ msgstr "Ви не приєдналися до жодного каналу. Пе�
 msgid "No chat logs yet. Conversations you have while connected are saved here."
 msgstr "Історія чатів поки порожня. Тут зберігаються розмови, які ви ведете під час підключення."
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "No chat was recorded in this replay."
-msgstr "У цьому повторі не записано чату."
-
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "No collection has been defined against this game yet."
@@ -32499,10 +32514,9 @@ msgstr "У ваших папках вмісту не знайдено рушії
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
 msgstr "У ваших папках вмісту не знайдено рушіїв. Додайте папку в <0>Папки вмісту</0> або встановіть рушій у <1>Рушії</1>."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "No event matches these filters."
-msgstr "Жодна подія не відповідає цим фільтрам."
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "No entry matches these filters."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -35090,6 +35104,10 @@ msgstr "Нічого не встановлено"
 #, fuzzy
 msgid "Nothing was named to open."
 msgstr "Не вказано, що відкрити."
+
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "Nothing was recorded for this replay."
+msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 #, fuzzy
@@ -37805,12 +37823,13 @@ msgstr "Зіграно до"
 msgid "played until {playedUntil}"
 msgstr "зіграно до {playedUntil}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/MatchupPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
+#: src/content/replayEventList.ts
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/multiplayer/index.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -37820,12 +37839,12 @@ msgid "Player"
 msgstr "Гравець"
 
 #. placeholder {0}: dest.player
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "Player {0}"
 msgstr "Гравець {0}"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "Player {player}"
 msgstr "Гравець {player}"
@@ -37873,6 +37892,7 @@ msgstr "Власні гравця"
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/admin/tools.tsx
@@ -38135,7 +38155,7 @@ msgstr ""
 msgid "Pre-fill the file pickers with the folders you used last time."
 msgstr "Заповнювати вікна вибору файлів папками, які ви використовували минулого разу."
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "Pre-game"
 msgstr "До гри"
@@ -39296,11 +39316,6 @@ msgstr "Читання й надсилання ваших мап"
 msgid "Reading build orders…"
 msgstr "Читання черговості будівництва…"
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Reading chat…"
-msgstr "Читання чату…"
-
 #: src/direct/room.ts
 #, fuzzy
 msgid "Reading content…"
@@ -39316,8 +39331,8 @@ msgstr "Читання версій рушія…"
 msgid "Reading events and unit definitions…"
 msgstr "Читання подій і визначень юнітів…"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Reading events…"
 msgstr "Читання подій…"
@@ -39533,9 +39548,9 @@ msgstr "Читання статистики цього повтору…"
 msgid "Reading unit definitions…"
 msgstr "Читання визначень юнітів…"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Reading unit names…"
@@ -39784,11 +39799,6 @@ msgstr "Записати цей повтор у розділі аналізу й
 #, fuzzy
 msgid "Record this replay, then watch it with rewind?"
 msgstr "Записати цей повтор, а потім переглянути з перемотуванням назад?"
-
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "Recorded events"
-msgstr "Записані події"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -43589,7 +43599,7 @@ msgstr "Відстань розділення"
 msgid "server"
 msgstr "сервер"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -44397,6 +44407,7 @@ msgstr "Постріли перевіряються для кожного еле
 msgid "Shots per burst"
 msgstr "Пострілів у черзі"
 
+#: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/MapsPage.tsx
@@ -44421,11 +44432,6 @@ msgstr "Показати {label} на графіку"
 #, fuzzy
 msgid "Show {moreCount} more of {entryCount} entries"
 msgstr "Показати ще {moreCount} (усього записів: {entryCount})"
-
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
-#, fuzzy
-msgid "Show {moreCount} more of {matchingCount}"
-msgstr "Показати ще {moreCount} з {matchingCount}"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
@@ -44476,11 +44482,6 @@ msgstr "Показати бани"
 #, fuzzy
 msgid "Show build orders"
 msgstr "Показати черговість будівництва"
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Show chat log"
-msgstr "Показати журнал чату"
 
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
@@ -47821,15 +47822,10 @@ msgstr ""
 msgid "The chassis was renamed, so the list of locked units under its old name was emptied:"
 msgstr "Шасі перейменовано, тож список заблокованих юнітів під його старою назвою очищено:"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "The chat could not be read from this replay."
 msgstr "Не вдалося прочитати чат із цього повтору."
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "the chat log"
-msgstr "журнал чату"
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -48260,13 +48256,17 @@ msgstr "Не вдалося прочитати журнал рушія для ц
 msgid "The engine's unit list could not be read."
 msgstr ""
 
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "the events and chat"
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The events could not be read from this replay's analysis."
 msgstr "Не вдалося прочитати події з аналізу цього повтору."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "The events could not be read."
 msgstr "Не вдалося прочитати події."
@@ -50567,7 +50567,7 @@ msgstr ""
 msgid "The unit's root piece"
 msgstr ""
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "The units of {gameName} could not be read, so each event shows its unit definition id."
 msgstr "Не вдалося прочитати юніти {gameName}, тож кожна подія показує id визначення юніта."
@@ -50936,7 +50936,6 @@ msgstr "Цей аналіз записано до того, як coilbox поч�
 msgid "This analysis was recorded before coilbox logged starting units, so there is nothing to draw. Analyse the replay again to record them."
 msgstr "Цей аналіз записано до того, як coilbox почав записувати стартові юніти, тож немає що малювати. Проаналізуйте повтор знову, щоб записати їх."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/replayEventLayers.ts
 #, fuzzy
 msgid "This analysis was recorded by an older logger and may lack newer kinds of event."
@@ -52000,10 +51999,9 @@ msgstr "Не вдалося дочитати цей повтор до кінця
 msgid "This replay could not be read to the end, so later orders may be missing."
 msgstr "Не вдалося дочитати цей повтор до кінця, тож пізніших наказів може бракувати."
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "This replay could not be read to the end, so the chat log may be incomplete."
-msgstr "Не вдалося дочитати цей повтор до кінця, тож журнал чату може бути неповним."
+#: src/content/pages/components/ReplayEventList.tsx
+msgid "This replay could not be read to the end, so the list may be incomplete."
+msgstr ""
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -52104,8 +52102,8 @@ msgstr "Цей повтор зіграно на {0}, яку не встанов�
 msgid "This replay was played on {0}, which is not installed. Shapes and the choice of buildings come from {sourceGame}, a different build, and may be wrong."
 msgstr "Цей повтор зіграно на {0}, яку не встановлено. Форми й вибір будівель беруться з {sourceGame}, іншої версії, і можуть бути неправильними."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "This replay was played on {recorded}, which is not installed. Unit names come from {gameName}, a different build, and may be wrong."
 msgstr "Цей повтор зіграно на {recorded}, яку не встановлено. Назви юнітів беруться з {gameName}, іншої версії, і можуть бути неправильними."
@@ -52136,9 +52134,9 @@ msgid "This replay was recorded on the replay playback game. It has no match of 
 msgstr "Цей повтор записано на грі для відтворення повторів. Він не має власного матчу для запису."
 
 #: src/content/pages/components/LivingValueChart.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "This replay's game"
 msgstr "Гра цього повтору"
@@ -52753,7 +52751,6 @@ msgid "Tilt smoothing"
 msgstr "Згладжування нахилу"
 
 #: src/content/pages/components/MatchStatsTable.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Time"
@@ -52830,7 +52827,7 @@ msgstr "Назва, мапа, хост чи гра"
 msgid "TLS mode"
 msgstr "Режим TLS"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "to {target}"
 msgstr "для {target}"
@@ -52840,7 +52837,7 @@ msgstr "для {target}"
 msgid "To action"
 msgstr "До дії"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "to allies"
 msgstr "союзникам"
@@ -52855,7 +52852,7 @@ msgstr "До хвилини"
 msgid "To play, Coilbox needs a content folder and a game engine."
 msgstr "Щоб грати, Coilbox потрібні папка вмісту й ігровий рушій."
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/replayEventList.ts
 #, fuzzy
 msgid "to spectators"
 msgstr "глядачам"
@@ -53898,7 +53895,6 @@ msgstr "юніт"
 #: src/content/index.ts
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/lego/pages/components/ReferencePicker.tsx
 #: src/scenario/validate.ts
 #, fuzzy
@@ -53912,7 +53908,7 @@ msgstr "Юніт"
 msgid "Unit {0}"
 msgstr "Юніт {0}"
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Unit {def}"
 msgstr "Юніт {def}"
@@ -56915,7 +56911,7 @@ msgstr "Записує копію, що завантажує локально в
 msgid "Writes each start position with how many times it was taken and how many of those won."
 msgstr "Записує кожну стартову позицію з тим, скільки разів її займали і скільки з цих разів виграли."
 
-#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
 msgid "Writes every event, whatever the filters show."
 msgstr "Записує кожну подію, хоч би що показували фільтри."
