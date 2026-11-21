@@ -65,9 +65,9 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 // The roster table moved out of the page into its own component (#1143).
 const ROSTER =
   readFileSync(`${HERE}pages/ReplayDetailPage.tsx`, "utf8") +
-  // The start boxes are drawn by the component both map modes share (#1152,
-  // #5312).
-  readFileSync(`${HERE}pages/components/ReplayStartAreas.tsx`, "utf8") +
+  // The start areas are named where both map modes get them from (#1152,
+  // #5312, #5313).
+  readFileSync(`${HERE}replayStartAreas.ts`, "utf8") +
   readFileSync(`${HERE}pages/components/ReplayRoster.tsx`, "utf8");
 const STATS_SECTION = readFileSync(
   `${HERE}pages/components/MatchStatsSection.tsx`,
@@ -85,7 +85,7 @@ describe("every side-naming site on replay detail agrees with the chart", () => 
   });
 
   it("the start-box number badge counts from one, like the roster next to it", () => {
-    expect(ROSTER).toMatch(/\{id \+ 1\}/);
+    expect(ROSTER).toMatch(/String\(side \+ 1\)/);
   });
 
   it("the roster heading and start-box title call teamLabel", () => {

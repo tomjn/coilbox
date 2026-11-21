@@ -1535,7 +1535,7 @@ msgstr "{bots} of them bots"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# box} other {# boxes}}"
 
-#: src/content/pages/components/ReplayStartAreas.tsx
+#: src/content/replayStartAreas.ts
 msgid "{boxTeam} start box"
 msgstr "{boxTeam} start box"
 

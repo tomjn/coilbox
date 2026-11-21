@@ -1,86 +1,33 @@
-import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
-import type { DemoInfo, StartBox } from "../../bindings";
-import { NEUTRAL_TEAM_COLOUR, type StartDot } from "../../replayMapLayers";
-import { teamLabel } from "../../replaySideLabel";
+import { StartPolygonOverlay } from "@/startbox/StartPolygonOverlay";
+import type { StartDot } from "../../replayMapLayers";
+import type { StartAreaSet } from "../../replayStartAreas";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { swatch } from "./ReplayRoster";
-
-/**
- * Where a side was allowed to start. Today an area is a rectangle, and the map
- * draws it as one. The area is the thing the two map modes share, so a polygon
- * from a Zero-K or Beyond All Reason start script can take the rectangle's
- * place in both by changing {@link StartAreas} alone.
- */
-export interface StartArea {
-  /** The ally team's number, from zero. */
-  id: number;
-  colour: string;
-  /** As fractions of the map's width and height. */
-  box: StartBox;
-}
-
-/** The start areas a replay's setup carries, in the colour of their side. */
-export function startAreas(info: DemoInfo): StartArea[] {
-  const out: StartArea[] = [];
-  for (const a of info.allyTeams) {
-    if (a.startBox)
-      out.push({
-        id: a.id,
-        colour: swatch(a.color) ?? NEUTRAL_TEAM_COLOUR,
-        box: a.startBox,
-      });
-  }
-  return out;
-}
-
-const withAlpha = (colour: string, alpha: number) =>
-  colour.replace("rgb", "rgba").replace(")", `, ${alpha})`);
 
 /**
  * The start areas, each an outline in its side's colour with a light tint and
  * the side's number. Put it in the map's box, under whatever must stay in
- * front. With `named` a box has a tooltip and takes the pointer. Without, the
- * pointer goes through to what is beneath, which is how the unit map keeps a
- * unit inside a box pointable.
+ * front. The areas are polygons, which a replay's rectangles are too, so a
+ * Zero-K or Beyond All Reason shape draws here as the rectangle does and both
+ * map modes share it. With `named` an area's number has a tooltip and takes the
+ * pointer. Without, the pointer goes through to what is beneath, which is how
+ * the unit map keeps a unit inside an area pointable.
  */
 export function StartAreas({
-  areas,
+  set,
   named,
 }: {
-  areas: readonly StartArea[];
+  set: StartAreaSet;
   named: boolean;
 }) {
-  const { t } = useLingui();
-  return areas.map(({ id, colour, box }) => {
-    const boxTeam = teamLabel(id);
-    return (
-      <span
-        key={id}
-        data-layer="startBox"
-        className={cn(
-          "absolute flex items-start justify-start",
-          !named && "pointer-events-none",
-        )}
-        style={{
-          left: `${box.left * 100}%`,
-          top: `${box.top * 100}%`,
-          width: `${(box.right - box.left) * 100}%`,
-          height: `${(box.bottom - box.top) * 100}%`,
-          border: `1.5px solid ${colour}`,
-          backgroundColor: withAlpha(colour, 0.22),
-        }}
-        title={named ? t`${boxTeam} start box` : undefined}
-      >
-        <span
-          className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
-          style={{ backgroundColor: withAlpha(colour, 0.85) }}
-        >
-          {id + 1}
-        </span>
-      </span>
-    );
-  });
+  return (
+    <StartPolygonOverlay
+      areas={set.areas}
+      extent={set.extent}
+      named={named}
+      labelAt="corner"
+    />
+  );
 }
 
 /** The round mark of one start position. Emphasis is a ring and a fade, never a

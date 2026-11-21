@@ -25,6 +25,7 @@ import type {
   DemoInfo,
   DemoOrderPoints,
   GameItem,
+  StartBoxConfig,
   UnitDatasetEntry,
 } from "../../bindings";
 
@@ -34,8 +35,10 @@ let GAMES: GameItem[] = [];
 let DATASET: { units: UnitDatasetEntry[] } | null = null;
 let PRIMARY = "";
 let POINTS: DemoOrderPoints | Error;
+let STARTBOXES: StartBoxConfig | null = null;
 const ordersRead = vi.fn();
 const pointsRead = vi.fn();
+const startBoxesAsked = vi.fn();
 
 vi.mock("../../../profile/profile", async (orig) => ({
   ...(await orig<typeof import("../../../profile/profile")>()),
@@ -47,6 +50,10 @@ vi.mock("../../bindings", async (original) => ({
     ordersRead(args);
     if (ORDERS instanceof Error) throw ORDERS;
     return ORDERS;
+  },
+  contentStartBoxes: async (args: unknown) => {
+    startBoxesAsked(args);
+    return { config: STARTBOXES };
   },
   contentDemoOrderPoints: async (args: unknown) => {
     pointsRead(args);
@@ -220,6 +227,8 @@ afterEach(() => {
   localStorage.clear();
   ordersRead.mockClear();
   pointsRead.mockClear();
+  startBoxesAsked.mockClear();
+  STARTBOXES = null;
   HIDE = [];
   GAMES = [];
   DATASET = null;
@@ -862,5 +871,154 @@ describe("what stays in the page and what moves to the help", () => {
     const dialog = help();
     for (const said of moved)
       expect(dialog.getAllByText(said).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Zero-K's polygon start boxes (#5313)", () => {
+  const ZK = { ...game("Zero-K v1.12.0"), info: { shortname: "ZK" } };
+  const square = (x: number, z: number): [number, number][] => [
+    [x, z],
+    [x + 1000, z],
+    [x + 1000, z + 1000],
+    [x, z + 1000],
+  ];
+  const zerok = (mapName: string, over: Partial<DemoInfo> = {}): DemoInfo =>
+    ({
+      ...INFO,
+      gameType: "Zero-K v1.12.0",
+      mapName,
+      // A Zero-K replay carries no rectangles.
+      allyTeams: [
+        { id: 0, color: [1, 0, 0] },
+        { id: 1, color: [0, 0, 1] },
+      ],
+      ...over,
+    }) as DemoInfo;
+  const areas = () =>
+    [...document.querySelectorAll("[data-layer='startBox']")].map((g) => ({
+      points: g.querySelector("polygon")?.getAttribute("points"),
+      stroke: g.querySelectorAll("polygon")[1]?.getAttribute("stroke"),
+    }));
+  const numbers = () =>
+    [...document.querySelectorAll("[data-layer='startBoxLabel']")].map(
+      (l) => l.textContent,
+    );
+
+  it("draws the polygons for the map, in the colour of the side that started in each", async () => {
+    GAMES = [ZK];
+    STARTBOXES = {
+      source: "game",
+      file: "Zk Shuffled.lua",
+      teams: [
+        { id: 0, startPoints: [], boxes: [square(2000, 0)] },
+        { id: 1, startPoints: [], boxes: [square(1000, 0)] },
+        { id: 2, startPoints: [], boxes: [square(0, 3000)] },
+      ],
+    };
+    // Alice (side 1) starts at 1024, 512, which is in the second box.
+    show(zerok("Zk Shuffled"));
+    await waitFor(() => expect(areas()).toHaveLength(3));
+    expect(areas()).toEqual([
+      {
+        points: "48.828,0 73.242,0 73.242,24.414 48.828,24.414",
+        stroke: "#94a3b8",
+      },
+      {
+        points: "24.414,0 48.828,0 48.828,24.414 24.414,24.414",
+        stroke: "#ff0000",
+      },
+      {
+        points: "0,73.242 24.414,73.242 24.414,97.656 0,97.656",
+        stroke: "#94a3b8",
+      },
+    ]);
+    // Bob (side 2) starts at 3072, 3584, in no box, so no area is his.
+    expect(numbers()).toEqual(["1"]);
+    // The number sits at the area's top left, clear of the start dot that
+    // Zero-K's start points put in the middle.
+    const badge = document.querySelector<HTMLElement>(
+      "[data-layer='startBoxLabel']",
+    ) as HTMLElement;
+    expect(Number.parseFloat(badge.style.left)).toBeCloseTo(24.414, 2);
+    expect(Number.parseFloat(badge.style.top)).toBe(0);
+    expect(startBoxesAsked).toHaveBeenCalledTimes(1);
+    expect(startBoxesAsked).toHaveBeenCalledWith({
+      enginePath: "/engine",
+      dataDir: "/data",
+      gameArchive: "Zero-K v1.12.0.sdz",
+      mapName: "Zk Shuffled",
+      mapSizeX: 4096,
+      mapSizeZ: 4096,
+      allyTeams: [
+        { allyTeam: 0, bots: [false] },
+        { allyTeam: 1, bots: [false] },
+      ],
+    });
+  });
+
+  it("does not ask for a replay of another game, and draws its rectangles", async () => {
+    GAMES = [game("Some Game 1.0")];
+    STARTBOXES = {
+      source: "game",
+      file: "x.lua",
+      teams: [{ id: 0, startPoints: [], boxes: [square(0, 0)] }],
+    };
+    show({ ...INFO, mapName: "Not Zk Map" });
+    await act(async () => {});
+    expect(startBoxesAsked).not.toHaveBeenCalled();
+    expect(boxes()).toHaveLength(2);
+  });
+
+  it("does not ask when the replay's game is not installed", async () => {
+    GAMES = [];
+    show(zerok("Zk No Game"));
+    await act(async () => {});
+    expect(startBoxesAsked).not.toHaveBeenCalled();
+    expect(boxes()).toHaveLength(0);
+    screen.getByText("This match set no start boxes.");
+  });
+
+  it("shows none, with the same line, for a map Zero-K defines no areas for", async () => {
+    GAMES = [ZK];
+    STARTBOXES = null;
+    show(zerok("Zk No Areas"));
+    await waitFor(() => screen.getByText("This match set no start boxes."));
+    expect(startBoxesAsked).toHaveBeenCalledTimes(1);
+    expect(boxes()).toHaveLength(0);
+  });
+
+  it("says nothing while the file is being read", async () => {
+    GAMES = [ZK];
+    STARTBOXES = null;
+    show(zerok("Zk Still Reading"));
+    expect(screen.queryByText("This match set no start boxes.")).toBeNull();
+    await waitFor(() => screen.getByText("This match set no start boxes."));
+  });
+
+  it("asks once for the session when the map is shown again", async () => {
+    GAMES = [ZK];
+    STARTBOXES = {
+      source: "map",
+      file: "mapconfig/map_startboxes.lua",
+      teams: [{ id: 0, startPoints: [], boxes: [square(0, 0)] }],
+    };
+    const first = show(zerok("Zk Twice"));
+    await waitFor(() => expect(areas()).toHaveLength(1));
+    first.unmount();
+    show(zerok("Zk Twice"));
+    await waitFor(() => expect(areas()).toHaveLength(1));
+    expect(startBoxesAsked).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not run the file while the start boxes switch is off", async () => {
+    GAMES = [ZK];
+    STARTBOXES = null;
+    localStorage.setItem(
+      "coilbox.replayMap.layers",
+      JSON.stringify({ startBoxes: false }),
+    );
+    show(zerok("Zk Switched Off"));
+    await act(async () => {});
+    expect(startBoxesAsked).not.toHaveBeenCalled();
   });
 });

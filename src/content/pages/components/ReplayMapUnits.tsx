@@ -25,9 +25,10 @@ import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useMatchClock } from "../../useMatchClock";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useMapLayerToggles } from "../../useReplayMapLayers";
+import { useReplayStartAreas } from "../../useReplayStartAreas";
 import { useUnitMapStyles } from "../../useUnitMapStyles";
 import { LayerSwitches, MapHelp, ReplayMapLayout } from "./ReplayMapRail";
-import { StartAreas, StartDotMarks, startAreas } from "./ReplayStartAreas";
+import { StartAreas, StartDotMarks } from "./ReplayStartAreas";
 import { useTimelineKeys } from "./ReplayTimelineDock";
 
 /** Said under the analysis and recording section, which has already said the
@@ -337,8 +338,13 @@ function UnitsView({
   stylesRef.current = styles;
   const layers = useMapLayerToggles(UNIT_MAP_LAYERS);
   const { on } = layers;
-  const areas = on.startBoxes ? startAreas(info) : [];
-  const hasBoxes = info.allyTeams.some((a) => a.startBox);
+  // The map's size in world units, which a Zero-K file's areas are placed in.
+  const extent = useMemo(() => ({ x: mapX, z: mapZ }), [mapX, mapZ]);
+  const startAreas = useReplayStartAreas({
+    info,
+    extent: on.startBoxes ? extent : null,
+  });
+  const hasBoxes = startAreas.loading || startAreas.areas.length > 0;
   const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const primary = usePrimaryPlayer();
   const meTeam = primary ? playerTeam(info, primary) : undefined;
@@ -506,7 +512,7 @@ function UnitsView({
             )}
             {/* Under the canvas, so a box or a dot never hides a unit or takes
                 the pointer from it. */}
-            <StartAreas areas={areas} named={false} />
+            {on.startBoxes && <StartAreas set={startAreas} named={false} />}
             <StartDotMarks dots={dots} />
             <canvas
               ref={canvasRef}
@@ -561,7 +567,10 @@ function UnitsView({
       rail={
         <>
           <MapHelp section={tr`the recorded match`}>
-            <Legend boxes={areas.length > 0} dots={dots.length > 0} />
+            <Legend
+              boxes={on.startBoxes && startAreas.areas.length > 0}
+              dots={dots.length > 0}
+            />
           </MapHelp>
           <p
             ref={countsRef}
@@ -590,7 +599,8 @@ function UnitsView({
               </div>
             </div>
           ) : (
-            areas.length > 0 && (
+            on.startBoxes &&
+            startAreas.areas.length > 0 && (
               <p className="text-xs text-muted-foreground">
                 <Trans>Start boxes per team.</Trans>
               </p>

@@ -1837,10 +1837,9 @@ msgstr "其中 {bots} 个是机器人"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, other {# 个区域}}"
 
-#: src/content/pages/components/ReplayStartAreas.tsx
-#, fuzzy
+#: src/content/replayStartAreas.ts
 msgid "{boxTeam} start box"
-msgstr "{boxTeam} 的出生区域"
+msgstr ""
 
 #: src/lego/buildList.ts
 #, fuzzy

@@ -1,5 +1,7 @@
+import { cn } from "@picoframe/frame";
 import { readableText } from "@/lib/allyDisplay";
 import {
+  cornerAnchor,
   labelAnchor,
   polygonPoints,
   type StartArea,
@@ -12,14 +14,21 @@ import {
  * Render-only start areas drawn as polygons over the minimap, in world units,
  * with each area's suggested start points and its name. The polygon twin of
  * `StartBoxOverlay`, which draws the lobby's rectangles. Draws nothing until
- * the map's size is known, since that is what places a point.
+ * the map's size is known, since that is what places a point. With `named`
+ * false the labels have no tooltip and let the pointer through to what is under
+ * them, as the unit map needs. With `labelAt` "corner" a label sits at the top
+ * left of its area and not in the middle, which is where a start position is.
  */
 export function StartPolygonOverlay({
   areas,
   extent,
+  named = true,
+  labelAt = "centre",
 }: {
   areas: StartArea[];
   extent: WorldExtent | null | undefined;
+  named?: boolean;
+  labelAt?: "centre" | "corner";
 }) {
   if (!extent || !usableExtent(extent)) return null;
   return (
@@ -35,7 +44,7 @@ export function StartPolygonOverlay({
             const points = polygonPoints(polygon, extent);
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: an area's polygons never reorder
-              <g key={`${area.key}:${i}`}>
+              <g key={`${area.key}:${i}`} data-layer="startBox">
                 {/* A dark hairline under the coloured edge, so the area reads
                     on light and dark maps alike. */}
                 <polygon
@@ -77,19 +86,27 @@ export function StartPolygonOverlay({
         }),
       )}
       {areas.map((area) => {
-        const at = area.label ? labelAnchor(area, extent) : null;
+        const anchor = labelAt === "corner" ? cornerAnchor : labelAnchor;
+        const at = area.label ? anchor(area, extent) : null;
         if (!at) return null;
         return (
           <span
             key={`${area.key}:label`}
-            className="absolute -translate-x-1/2 -translate-y-1/2 rounded px-1 text-[10px] font-bold leading-tight shadow"
+            data-layer="startBoxLabel"
+            className={cn(
+              "absolute rounded px-1 text-[10px] font-bold leading-tight shadow",
+              labelAt === "corner"
+                ? "m-0.5"
+                : "-translate-x-1/2 -translate-y-1/2",
+              !named && "pointer-events-none",
+            )}
             style={{
               left: `${at.left}%`,
               top: `${at.top}%`,
               background: area.color,
               color: readableText(area.color),
             }}
-            title={area.title}
+            title={named ? area.title : undefined}
           >
             {area.label}
           </span>
