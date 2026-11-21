@@ -37,6 +37,7 @@ import { SPLIT_BUCKETS, type SplitBucket } from "../../replayOpening";
 import { SPLIT_COLOURS } from "../../splitColours";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { ChartPlayhead } from "./ChartPlayhead";
 import { SectionHelp } from "./SectionHelp";
 import { StoredListNote } from "./UnitListNotes";
 
@@ -395,6 +396,7 @@ function OpenValueChart({
                           isAnimationActive={false}
                         />
                       ))}
+                      <ChartPlayhead />
                     </AreaChart>
                   </ResponsiveContainer>
                 </figure>

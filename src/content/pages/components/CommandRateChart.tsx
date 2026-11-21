@@ -22,6 +22,7 @@ import {
 import { type ChartSeries, formatRate, seriesTeams } from "../../matchStats";
 import { useReplayCommandRates } from "../../useReplayCommandRates";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { ChartPlayhead } from "./ChartPlayhead";
 import { CommandRateExportButton } from "./CommandRateExportButton";
 import { SectionHelp } from "./SectionHelp";
 
@@ -205,6 +206,7 @@ export function CommandRateChart({
                   />
                 );
               })}
+              <ChartPlayhead />
             </LineChart>
           </ResponsiveContainer>
         )}
