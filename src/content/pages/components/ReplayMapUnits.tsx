@@ -103,10 +103,10 @@ function Legend() {
       </p>
       <p>
         <Trans>
-          A rectangle is a unit, in the colour of its player's line in the
-          chart and the size of its footprint, with a line the way it faces. A
-          unit still being built is faint. On a large map a mark is never
-          smaller than 3 pixels, so small units look bigger than they are.
+          A rectangle is a unit, in the colour of its player's line in the chart
+          and the size of its footprint, with a line the way it faces. A unit
+          still being built is faint. On a large map a mark is never smaller
+          than 3 pixels, so small units look bigger than they are.
         </Trans>
       </p>
       <p>
