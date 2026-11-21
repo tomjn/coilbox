@@ -42,8 +42,9 @@ import { useReplayTimeWindow } from "./useReplayTimeWindow";
 import { useReplayUnits } from "./useReplayUnits";
 
 /** What the replay page's flat map and 3D view both read (#1152): the layer
- *  switches, the build orders and order points behind them, the time window,
- *  and the fields and marks worked out from those. Nothing here draws. */
+ *  switches, the build orders and order points behind them, the time window the
+ *  timeline dock sets (#5309), and the fields and marks worked out from those.
+ *  Nothing here draws. */
 export function useReplayMapLayers({
   info,
   replayPath,
@@ -157,10 +158,7 @@ export function useReplayMapLayers({
       (result?.incomplete ?? false) || (allOrders?.incomplete ?? false),
     ),
   );
-  const [timeWindow, setTimeWindow] = useReplayTimeWindow(
-    replayPath ?? "",
-    domainSec,
-  );
+  const timeWindow = useReplayTimeWindow(domainSec);
   const inWindow = useMemo(
     () =>
       result
@@ -267,7 +265,6 @@ export function useReplayMapLayers({
     windowed,
     domainSec,
     timeWindow,
-    setTimeWindow,
     inWindow,
     placedCount,
     ev,

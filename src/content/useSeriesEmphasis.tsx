@@ -17,6 +17,7 @@ import {
   isShown,
   type TeamSet,
 } from "./seriesEmphasis";
+import { createTimeWindowStore, type TimeWindowStore } from "./timeWindowStore";
 
 /**
  * The one {@link EmphasisStore} for a replay page. The roster and the match
@@ -26,15 +27,36 @@ import {
  */
 const EmphasisContext = createContext<EmphasisStore | null>(null);
 const ChoiceContext = createContext<ChartChoiceStore | null>(null);
+const WindowContext = createContext<TimeWindowStore | null>(null);
 
 export function SeriesEmphasisProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createEmphasisStore);
   const [choice] = useState(createChartChoiceStore);
+  const [window] = useState(createTimeWindowStore);
   return (
     <EmphasisContext.Provider value={store}>
-      <ChoiceContext.Provider value={choice}>{children}</ChoiceContext.Provider>
+      <ChoiceContext.Provider value={choice}>
+        <WindowContext.Provider value={window}>
+          {children}
+        </WindowContext.Provider>
+      </ChoiceContext.Provider>
     </EmphasisContext.Provider>
   );
+}
+
+/**
+ * The stretch of the match the map's layers add up (#5309), which the timeline
+ * dock's Heat window lane sets and the layers read. Kept here with the other
+ * stores the page's surfaces share, so a new replay starts on the whole match
+ * with the rest.
+ */
+export function useTimeWindowStore(): TimeWindowStore {
+  const store = useContext(WindowContext);
+  if (!store)
+    throw new Error(
+      "useTimeWindowStore needs a SeriesEmphasisProvider above it",
+    );
+  return store;
 }
 
 /**

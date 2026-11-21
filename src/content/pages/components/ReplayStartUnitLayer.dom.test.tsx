@@ -79,6 +79,9 @@ const { resetReplayEventReadsForTests } = await import("../../replayEventRead");
 const { resetReplayAnalysisForTests, seedReplayAnalysisForTests } =
   await import("../../replayAnalysis");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+const { WindowLane, pressWindowPreset } = await import(
+  "../../heatWindowFixture"
+);
 
 const SEC = 30;
 
@@ -272,6 +275,7 @@ function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
       <div id="replay-analysis">Analysis</div>
+      <WindowLane info={info} />
       <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
@@ -421,7 +425,7 @@ describe("starting unit paths", () => {
     expect(said).toMatch(/on exactly the same spot/);
     // Alice's unit was upgraded at 2:00 and is still alive in the last five
     // minutes, so her line is still there.
-    fireEvent.click(screen.getByRole("button", { name: "Last 5 minutes" }));
+    pressWindowPreset("Last 5 minutes");
     await waitFor(() =>
       expect(labels().map((l) => l[1])).toEqual(["Alice", "Bob"]),
     );
@@ -485,7 +489,7 @@ describe("starting unit paths", () => {
     await screen.findByTestId("start-units");
     expect(labels().length).toBe(2);
     // Alice's was replaced at 2:00, before the last five minutes of ten.
-    fireEvent.click(screen.getByRole("button", { name: "Last 5 minutes" }));
+    pressWindowPreset("Last 5 minutes");
     await waitFor(() => expect(labels().map((l) => l[1])).toEqual(["Bob"]));
     expect(help()).toMatch(/where one starting unit went in this window/);
   });

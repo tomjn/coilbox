@@ -3474,7 +3474,7 @@ msgstr "{infoCount, plural, other {# 条备注}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} 个进行中"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} / {total} {countNoun}。"
@@ -6737,7 +6737,7 @@ msgstr "{subject} 来自 {date} 分析此回放时引擎写入的单位列表，
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel}，从 {rangeStart} 到 {rangeEnd}。"
@@ -13062,10 +13062,9 @@ msgstr "开始征途"
 msgid "Beginner guide"
 msgstr "新手指南"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "范围后方是所有队伍的 {activityLabel}。"
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21720,7 +21719,7 @@ msgstr "事件"
 msgid "Event log downloaded."
 msgstr "已下载事件日志。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "事件"
@@ -23449,7 +23448,7 @@ msgstr "用于 Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "对大多数武器而言，基础冲量等于造成的伤害。对近战武器而言，则为攻击者的质量。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "对于命令，时间段指的是下达命令的时间，而不是建成的时间。对于事件，则是它们在播放中发生的时间。"
@@ -24973,6 +24972,18 @@ msgstr "热云"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "热云位图"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -29990,11 +30001,6 @@ msgstr "已导出对局统计。"
 msgid "Match statistics image exported."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "对局时间段"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32000,7 +32006,7 @@ msgstr "噩梦"
 msgid "No"
 msgstr "否"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "没有 {countNoun}。"
@@ -32943,10 +32949,9 @@ msgstr "你的库中还没有此地图上的对局。"
 msgid "No match on this map passes these filters."
 msgstr "此地图上没有符合这些筛选条件的对局。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "范围后方没有绘制对局统计。"
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36430,7 +36435,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "下令消耗：{metal} 金属和 {energy} 能量。"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "命令"
@@ -36450,12 +36455,12 @@ msgstr "玩家机器上的 widget 向指定单位发送的命令。引擎的每�
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "指向单位的命令不会显示在该单位上，因为回放记录的是单位而不是其位置。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "下达的命令"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "下达的命令和事件"
@@ -44029,7 +44034,7 @@ msgstr "设置包"
 msgid "Several"
 msgstr "多个"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "阴影：{activityLabel}"
@@ -50661,7 +50666,7 @@ msgstr "整个文件夹都会被删除，释放 {freedBytes}。要重播在此�
 msgid "the whole match"
 msgstr "整场对局"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "整场对局，{matchStart} 到 {matchEnd}。"
@@ -50680,12 +50685,12 @@ msgstr ""
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "时间段是按每场对局自身的时钟计算的 {when}，以整分钟为单位。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "时间段指的是下达命令的时间，而不是建造完成的时间。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "时间段指的是每个事件在回放中发生的时间。"
@@ -52782,11 +52787,6 @@ msgstr "对局内时间"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "在地面上的时间"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "时间段"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56342,8 +56342,8 @@ msgstr "完整"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "整场对局"

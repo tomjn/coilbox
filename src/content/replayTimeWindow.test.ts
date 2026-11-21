@@ -12,8 +12,11 @@ import {
   activityPath,
   activitySeries,
   countInRange,
+  dragWindow,
   filterByFrame,
   frameIndexes,
+  heldWindow,
+  keyedWindow,
   PRESET_MINUTES,
   toWindow,
   WHOLE_MATCH,
@@ -24,6 +27,91 @@ import {
 
 const FPS = 30;
 const MINUTE = 60;
+
+describe("heldWindow", () => {
+  it("is null for the whole match", () => {
+    expect(heldWindow(0, 600, 600)).toBeNull();
+  });
+
+  it("holds an end at the match's end open", () => {
+    expect(heldWindow(300, 600, 600)).toEqual({
+      startSec: 300,
+      endSec: Number.POSITIVE_INFINITY,
+    });
+  });
+
+  it("keeps an end inside the match as it is", () => {
+    expect(heldWindow(60, 120, 600)).toEqual({ startSec: 60, endSec: 120 });
+  });
+});
+
+describe("dragWindow", () => {
+  const axis = { domainSec: 600, totalSec: 600 };
+
+  it("moves the start and stops a second short of the end", () => {
+    expect(dragWindow("start", [100, 200], 30, axis)).toEqual([130, 200]);
+    expect(dragWindow("start", [100, 200], 500, axis)).toEqual([199, 200]);
+    expect(dragWindow("start", [100, 200], -500, axis)).toEqual([0, 200]);
+  });
+
+  it("moves the end and stops a second past the start, or at the match's end", () => {
+    expect(dragWindow("end", [100, 200], 30, axis)).toEqual([100, 230]);
+    expect(dragWindow("end", [100, 200], -500, axis)).toEqual([100, 101]);
+    expect(dragWindow("end", [100, 200], 500, axis)).toEqual([100, 600]);
+  });
+
+  it("slides the box with its width kept, and stops at either edge", () => {
+    expect(dragWindow("move", [100, 200], 50, axis)).toEqual([150, 250]);
+    expect(dragWindow("move", [100, 200], -500, axis)).toEqual([0, 100]);
+    expect(dragWindow("move", [100, 200], 900, axis)).toEqual([500, 600]);
+  });
+
+  it("rounds to whole seconds", () => {
+    expect(dragWindow("start", [100, 200], 10.4, axis)).toEqual([110, 200]);
+    expect(dragWindow("start", [100, 200], 10.6, axis)).toEqual([111, 200]);
+  });
+
+  it("ends at the whole second past a fractional match's end when it reaches the last half second", () => {
+    const fractional = { domainSec: 601, totalSec: 600.4 };
+    expect(dragWindow("end", [100, 200], 400, fractional)).toEqual([100, 601]);
+    expect(dragWindow("move", [100, 200], 400, fractional)).toEqual([501, 601]);
+  });
+});
+
+describe("keyedWindow", () => {
+  const key = (
+    part: "start" | "end",
+    pressed: string,
+    shift = false,
+    from: [number, number] = [100, 200],
+  ) => keyedWindow(part, from, pressed, shift, 600);
+
+  it("moves an end a second with an arrow and ten with Shift or a page key", () => {
+    expect(key("start", "ArrowRight")).toEqual([101, 200]);
+    expect(key("start", "ArrowLeft")).toEqual([99, 200]);
+    expect(key("end", "ArrowRight", true)).toEqual([100, 210]);
+    expect(key("end", "PageDown")).toEqual([100, 190]);
+    expect(key("start", "PageUp")).toEqual([110, 200]);
+  });
+
+  it("sends an end to the least and the most it can be", () => {
+    expect(key("start", "Home")).toEqual([0, 200]);
+    expect(key("start", "End")).toEqual([199, 200]);
+    expect(key("end", "Home")).toEqual([100, 101]);
+    expect(key("end", "End")).toEqual([100, 600]);
+  });
+
+  it("does not let the ends cross or leave the match", () => {
+    expect(key("start", "ArrowRight", false, [100, 101])).toEqual([100, 101]);
+    expect(key("start", "ArrowLeft", false, [0, 101])).toEqual([0, 101]);
+    expect(key("end", "ArrowRight", false, [100, 600])).toEqual([100, 600]);
+  });
+
+  it("leaves any other key alone", () => {
+    expect(key("start", "r")).toBeNull();
+    expect(key("end", " ")).toBeNull();
+  });
+});
 
 describe("windowRange", () => {
   it("keeps everything for the whole match", () => {

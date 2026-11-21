@@ -24,10 +24,7 @@ import type { ReplayMapLayers } from "../../useReplayMapLayers";
 import { BaseCropsHelp } from "./ReplayBaseCrops";
 import { EventLayerHelp } from "./ReplayEventLayers";
 import { StartUnitHelp } from "./ReplayStartUnitLayer";
-import {
-  ReplayTimeWindowControl,
-  TimeWindowHelp,
-} from "./ReplayTimeWindowControl";
+import { ReplayTimeWindowNote, TimeWindowHelp } from "./ReplayTimeWindowNote";
 import { SectionHelp } from "./SectionHelp";
 
 /**
@@ -275,8 +272,9 @@ export function HeatLegends({ layers }: { layers: ReplayMapLayers }) {
   );
 }
 
-/** The window's own control, straight under the map it filters and wide enough
- *  to drag. It is shown while a layer that has a time is on. */
+/** What the window covers, and how much of each layer falls inside it, straight
+ *  under the map it filters. The window is set on the timeline dock's Heat
+ *  window lane (#5309). It is shown while a layer that has a time is on. */
 export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
   const { t } = useLingui();
   const {
@@ -286,8 +284,6 @@ export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
     ev,
     domainSec,
     timeWindow,
-    setTimeWindow,
-    activity,
     orderCount,
     result,
     placedCount,
@@ -295,11 +291,9 @@ export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
   if (!layers.layersShown || !(windowed || ev.active)) return null;
   return (
     <div data-map-window className="w-full max-w-3xl">
-      <ReplayTimeWindowControl
+      <ReplayTimeWindowNote
         domainSec={domainSec}
         window={timeWindow}
-        onChange={setTimeWindow}
-        activity={activity}
         // With the order layer on as well there are two kinds of point to
         // count, and each is counted under its own name.
         count={

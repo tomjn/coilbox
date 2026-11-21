@@ -86,6 +86,10 @@ const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { resetReplayOrderPoints } = await import("../../replayOrderPoints");
 const { packOrders } = await import("../../orderPointsFixture");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+// The dock's Heat window lane is where the window is set (#5309).
+const { WindowLane: Lane, pressWindowPreset: press } = await import(
+  "../../heatWindowFixture"
+);
 
 const order = (over: Partial<BuildOrder>): BuildOrder => ({
   frame: 0,
@@ -171,6 +175,7 @@ function show(info: DemoInfo = INFO, extra?: React.ReactNode) {
   return render(
     <SeriesEmphasisProvider>
       {extra}
+      <Lane info={info} />
       <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
@@ -499,8 +504,6 @@ describe("the time window", () => {
   };
   const LONG = { ...INFO, durationSec: 1800 } as DemoInfo;
   const window = () => screen.queryByTestId("time-window");
-  const press = (name: string) =>
-    fireEvent.click(screen.getByRole("button", { name }));
 
   it("is not there while only the layers set before the game are on", () => {
     ORDERS = EARLY;
@@ -513,13 +516,26 @@ describe("the time window", () => {
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
     expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Heat window" }));
     expect(
       screen
         .getByRole("button", { name: "Whole match" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(screen.getAllByRole("slider")).toHaveLength(2);
     expect(screen.getByText(/The whole match, 0:00 to 30:00/)).toBeTruthy();
+  });
+
+  it("does not have the old control under the map", async () => {
+    ORDERS = EARLY;
+    show(LONG);
+    fireEvent.click(toggle("Buildings ordered"));
+    await screen.findByText(/3 of 3 orders/);
+    expect(screen.queryByText("Time window")).toBeNull();
+    // The lane's two ends are the only sliders there are.
+    expect(screen.getAllByRole("slider")).toHaveLength(2);
+    expect(
+      document.querySelector("[data-map-window] [role=slider]"),
+    ).toBeNull();
   });
 
   it("narrows the orders every layer draws when a preset is pressed", async () => {
@@ -592,26 +608,20 @@ describe("the time window", () => {
       heightmap: HEIGHTMAP,
       preview: null,
     };
-    const view = render(
-      <SeriesEmphasisProvider>
-        <ReplayMapHeat {...props} replayPath="/replays/a.sdfz" />
-      </SeriesEmphasisProvider>,
+    // The page keys its stores by replay, so the next one starts again.
+    const page = (path: string) => (
+      <SeriesEmphasisProvider key={path}>
+        <Lane info={LONG} />
+        <ReplayMapHeat {...props} replayPath={path} />
+      </SeriesEmphasisProvider>
     );
+    const view = render(page("/replays/a.sdfz"));
     fireEvent.click(toggle("Building density"));
     await screen.findByText(/3 of 3 orders/);
     press("First 5 minutes");
     await screen.findByText(/2 of 3 orders/);
-    view.rerender(
-      <SeriesEmphasisProvider>
-        <ReplayMapHeat {...props} replayPath="/replays/b.sdfz" />
-      </SeriesEmphasisProvider>,
-    );
+    view.rerender(page("/replays/b.sdfz"));
     // Read straight after the path changed, before anything is read for it.
-    expect(
-      screen
-        .getByRole("button", { name: "Whole match" })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
     expect(screen.getByText(/The whole match, 0:00 to 30:00/)).toBeTruthy();
   });
 
@@ -625,11 +635,9 @@ describe("the time window", () => {
     cleanup();
     resetReplayBuildOrders();
     show(LONG);
-    expect(
-      screen
-        .getByRole("button", { name: "Whole match" })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    // The layer is still on from the last visit, and the window is not.
+    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
+    expect(screen.getByText(/The whole match, 0:00 to 30:00/)).toBeTruthy();
     expect(localStorage.getItem("coilbox.replayMap.layers")).not.toContain(
       "window",
     );
@@ -639,7 +647,6 @@ describe("the time window", () => {
     HIDE = ["analytics.spatialLayers"];
     show(LONG);
     expect(window()).toBeNull();
-    expect(screen.queryByRole("slider")).toBeNull();
   });
 });
 
@@ -655,8 +662,6 @@ describe("order density in the time window", () => {
     ],
     { lastFrame: 30 * MIN },
   );
-  const press = (name: string) =>
-    fireEvent.click(screen.getByRole("button", { name }));
 
   it("shows the window while only this layer is on, counting its own points", async () => {
     POINTS = POINTS_OVER_TIME;

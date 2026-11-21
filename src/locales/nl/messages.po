@@ -3507,7 +3507,7 @@ msgstr "{infoCount, plural, one {# opmerking} other {# opmerkingen}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} bezig"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} van {total} {countNoun}."
@@ -6787,7 +6787,7 @@ msgstr "{subject} komen uit de eenhedenlijst die de engine schreef toen deze rep
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel} van {rangeStart} tot {rangeEnd}."
@@ -13143,10 +13143,9 @@ msgstr "Oorlogspad beginnen"
 msgid "Beginner guide"
 msgstr "Gids voor beginners"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "Achter het bereik, {activityLabel} over alle teams."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21864,7 +21863,7 @@ msgstr "Gebeurtenis"
 msgid "Event log downloaded."
 msgstr "Gebeurtenissenlog gedownload."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "Gebeurtenissen"
@@ -23604,7 +23603,7 @@ msgstr "Voor Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "Bij de meeste wapens is de basisimpuls gelijk aan de toegebrachte schade. Bij melee-wapens is het de massa van de aanvaller."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "Voor orders is het tijdvak het moment waarop ze werden gegeven, niet wanneer er iets werd gebouwd. Voor gebeurtenissen is het het moment waarop ze in het afspelen gebeurden."
@@ -25134,6 +25133,18 @@ msgstr "Hittewolk"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "bitmap van hittewolk"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -30178,11 +30189,6 @@ msgstr "Wedstrijdstatistieken geëxporteerd."
 msgid "Match statistics image exported."
 msgstr "Afbeelding van de wedstrijdstatistieken geëxporteerd."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "Tijdvak van de wedstrijd"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32201,7 +32207,7 @@ msgstr "Nachtmerrie"
 msgid "No"
 msgstr "Nee"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "Geen {countNoun}."
@@ -33151,10 +33157,9 @@ msgstr "Er staat nog geen wedstrijd op deze kaart in je bibliotheek."
 msgid "No match on this map passes these filters."
 msgstr "Geen enkele wedstrijd op deze kaart voldoet aan deze filters."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "Er worden geen wedstrijdstatistieken achter het bereik getekend."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36671,7 +36676,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Bestelde kosten: {metal} metaal en {energy} energie."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "orders"
@@ -36691,12 +36696,12 @@ msgstr "Orders die een widget op de computer van de speler naar benoemde eenhede
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Orders gericht op een eenheid staan er niet op, omdat de replay de eenheid vastlegt en niet haar positie."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "Gegeven orders"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "Gegeven orders en gebeurtenissen"
@@ -44324,7 +44329,7 @@ msgstr "Opzetpakketten"
 msgid "Several"
 msgstr "Meerdere"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "Gearceerd: {activityLabel}"
@@ -51010,7 +51015,7 @@ msgstr "De hele map gaat weg en maakt {freedBytes} vrij. Je zou deze versie opni
 msgid "the whole match"
 msgstr "de hele wedstrijd"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "De hele wedstrijd, {matchStart} tot {matchEnd}."
@@ -51030,12 +51035,12 @@ msgstr "De widgets die je aan je spellen hebt toegevoegd."
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "Het tijdvak is {when} van elke wedstrijd volgens de eigen klok, in hele minuten."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "Het tijdvak is wanneer een order gegeven werd, niet wanneer er iets gebouwd werd."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "Het tijdvak is wanneer elke gebeurtenis in het afspelen plaatsvond."
@@ -53141,11 +53146,6 @@ msgstr "Tijd in de wedstrijd"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "Tijd op de grond"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "Tijdvak"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56722,8 +56722,8 @@ msgstr "Heel"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "Hele wedstrijd"

@@ -81,6 +81,9 @@ const { resetReplayEventReadsForTests } = await import("../../replayEventRead");
 const { resetReplayAnalysisForTests, seedReplayAnalysisForTests } =
   await import("../../replayAnalysis");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+const { WindowLane, pressWindowPreset } = await import(
+  "../../heatWindowFixture"
+);
 
 const MIN = 60 * 30;
 
@@ -205,6 +208,7 @@ function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
       <div id="replay-analysis">Analysis</div>
+      <WindowLane info={info} />
       <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
@@ -572,8 +576,7 @@ describe("buildings finished", () => {
 });
 
 describe("the time window with events", () => {
-  const press = (name: string) =>
-    fireEvent.click(screen.getByRole("button", { name }));
+  const press = pressWindowPreset;
 
   it("counts deaths in deaths, and says the window is when each happened", async () => {
     analysed();
@@ -797,7 +800,7 @@ describe("damage dealt", () => {
     show();
     fireEvent.click(toggle("Damage dealt"));
     await screen.findByText("Where damage landed");
-    fireEvent.click(screen.getByRole("button", { name: "First 5 minutes" }));
+    pressWindowPreset("First 5 minutes");
     expect(
       await screen.findByText(
         /Most is 400 damage landed within 128 elmos of one spot in this window/,
