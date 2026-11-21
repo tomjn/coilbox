@@ -14,6 +14,7 @@ import {
   durationRange,
   MatchClockProvider,
   useMatchClock,
+  useMatchFrameValue,
   useSettledFrame,
 } from "./useMatchClock";
 
@@ -118,5 +119,50 @@ describe("a recording that loads after the page opens", () => {
     act(() => stop());
     expect(result.current.range.source).toBe("duration");
     expect(result.current.clock.frame).toBe(500);
+  });
+});
+
+describe("useMatchFrameValue", () => {
+  function selectBy(bucket: number) {
+    const renders = { count: 0 };
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter>
+        <MatchClockProvider durationSec={125}>{children}</MatchClockProvider>
+      </MemoryRouter>
+    );
+    const hook = renderHook(
+      () => {
+        renders.count++;
+        return {
+          ...useMatchClock(),
+          value: useMatchFrameValue((frame) => Math.floor(frame / bucket)),
+        };
+      },
+      { wrapper },
+    );
+    return { ...hook, renders };
+  }
+
+  it("stands still while a drag moves the clock, and takes the settled frame when it ends", () => {
+    const { result } = selectBy(100);
+    act(() => result.current.playback.seek(250, { settle: false }));
+    expect(result.current.value).toBe(0);
+    act(() => result.current.playback.settle());
+    expect(result.current.value).toBe(2);
+  });
+
+  it("follows the clock while playing, rendering only when the value changes", () => {
+    const { result, renders } = selectBy(100);
+    act(() => result.current.playback.play());
+    const before = renders.count;
+    // Fifty frames inside one bucket, then the next bucket.
+    for (let frame = 1; frame <= 50; frame++)
+      act(() => result.current.clock.set(frame));
+    expect(renders.count).toBe(before);
+    expect(result.current.value).toBe(0);
+    act(() => result.current.clock.set(100));
+    expect(result.current.value).toBe(1);
+    expect(renders.count).toBe(before + 1);
+    act(() => result.current.playback.pause());
   });
 });

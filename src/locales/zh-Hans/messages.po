@@ -12070,6 +12070,10 @@ msgstr "位置"
 msgid "at {fromPercent}"
 msgstr "加成 {fromPercent}"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "At {time}"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "at least"
@@ -56232,6 +56236,10 @@ msgstr "哪些部件是作为模块放入的。模块在使用时会复制到单
 msgid "Which team won"
 msgstr "获胜的队伍"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Which time the figures are for"
+msgstr ""
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Which units this mod touches."
@@ -56326,6 +56334,7 @@ msgstr "完整"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"

@@ -12070,6 +12070,10 @@ msgstr "o"
 msgid "at {fromPercent}"
 msgstr "przy {fromPercent}"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "At {time}"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "at least"
@@ -56232,6 +56236,10 @@ msgstr "Które elementy wstawiono jako moduł. Moduł jest kopiowany do jednostk
 msgid "Which team won"
 msgstr "Która drużyna wygrała"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Which time the figures are for"
+msgstr ""
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Which units this mod touches."
@@ -56326,6 +56334,7 @@ msgstr "Całość"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"

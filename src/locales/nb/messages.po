@@ -12144,6 +12144,10 @@ msgstr "ved"
 msgid "at {fromPercent}"
 msgstr "ved {fromPercent}"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "At {time}"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "at least"
@@ -56585,6 +56589,10 @@ msgstr "Hvilke deler som ble sluppet inn som en modul. En modul kopieres inn i e
 msgid "Which team won"
 msgstr "Hvilket lag som vant"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Which time the figures are for"
+msgstr ""
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Which units this mod touches."
@@ -56682,6 +56690,7 @@ msgstr "Hel"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"

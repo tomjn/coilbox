@@ -9862,6 +9862,10 @@ msgstr "at"
 msgid "at {fromPercent}"
 msgstr "at {fromPercent}"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "At {time}"
+msgstr "At {time}"
+
 #: src/scenario/triggerTypes.ts
 msgid "at least"
 msgstr "at least"
@@ -46118,6 +46122,10 @@ msgstr "Which pieces were dropped in as a module. A module is copied into the un
 msgid "Which team won"
 msgstr "Which team won"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Which time the figures are for"
+msgstr "Which time the figures are for"
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Which units this mod touches."
 msgstr "Which units this mod touches."
@@ -46196,6 +46204,7 @@ msgstr "Whole"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Whole match"
 msgstr "Whole match"

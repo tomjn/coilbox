@@ -21,10 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Toggle } from "@/components/ui/toggle";
-import { formatNumber } from "@/lib/format";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { formatDuration, formatNumber } from "@/lib/format";
 import { RatingBadge } from "@/multiplayer/UserBadges";
 import { isProfileHidden } from "../../../profile/hidden";
 import type { DemoInfo, ReplayAi, ReplayPlayer } from "../../bindings";
+import { frameToChartSec } from "../../chartPlayhead";
 import { hasStatistics } from "../../matchStats";
 import { labelOfMetric } from "../../metricLabels";
 import { formatFigure } from "../../replayMatchFigures";
@@ -32,6 +34,7 @@ import {
   ariaSort,
   buildRoster,
   cellValue,
+  lastAtOrBefore,
   nextSort,
   parseRating,
   type RosterColumn,
@@ -40,11 +43,15 @@ import {
   rosterMetrics,
   rowApm,
   type Seat,
+  sameColumn,
+  sampleTimes,
   sortRows,
+  teamFiguresAt,
   teamFinals,
 } from "../../replayRoster";
 import { teamLabel } from "../../replaySideLabel";
 import { isEmphasised } from "../../seriesEmphasis";
+import { useMatchClock, useMatchFrameValue } from "../../useMatchClock";
 import { useMatchStats } from "../../useMatchStats";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { SectionHelp } from "./SectionHelp";
@@ -58,6 +65,14 @@ import { SectionHelp } from "./SectionHelp";
  * order with its side named on the row, because "who did the damage" is a
  * question about the whole match. With no column sorted the grouped order is
  * back, side header rows and all.
+ *
+ * A switch beside the title chooses what the figures are for (#5319): "Whole
+ * match", which is how it opens, or "At" the match clock's time. At a time each
+ * statistic is the last sample at or before it, and the columns with no history
+ * (APM, the result) are not shown. A sort follows the figures shown. The table
+ * follows the clock once per sample while the match plays, and at a pause or
+ * the end of a drag otherwise. The choice is not kept in the address, which
+ * already holds the time.
  *
  * The figures and the checkboxes each wait for what they need. With no trailer,
  * or one that measured nothing, the roster is names, ratings and results. With
@@ -255,6 +270,24 @@ function SortIcon({ dir }: { dir: "ascending" | "descending" | "none" }) {
   );
 }
 
+/** Whether the figures are the whole match's, or as they stood at the clock's time. */
+type RosterView = "at" | "whole";
+
+/**
+ * "At" and the match clock's time in whole seconds, such as "At 3:00". It
+ * follows the time the way the figures do, so it renders once a second of
+ * playback and the table around it does not.
+ */
+function AtTime() {
+  const { t } = useLingui();
+  const { range } = useMatchClock();
+  const seconds = useMatchFrameValue((frame) =>
+    Math.max(0, Math.floor(frameToChartSec(range, frame))),
+  );
+  const time = formatDuration(seconds);
+  return <>{t`At ${time}`}</>;
+}
+
 interface FigureColumn {
   column: RosterColumn;
   label: string;
@@ -272,7 +305,10 @@ export function ReplayRoster({
   const statsOn = !isProfileHidden("analytics.matchStats");
   const { data } = useMatchStats(statsOn && replayPath ? replayPath : null);
   const e = useSeriesEmphasis();
-  const [sort, setSort] = useState<RosterSort | null>(null);
+  const [chosenSort, setSort] = useState<RosterSort | null>(null);
+
+  const [view, setView] = useState<RosterView>("whole");
+  const { range } = useMatchClock();
 
   const roster = useMemo(() => buildRoster(info), [info]);
   // Nothing measured is no totals, which is not a column of zeros.
@@ -285,8 +321,32 @@ export function ReplayRoster({
     [measured],
   );
 
+  // The sample the match clock's time falls in. It changes when a sample is
+  // passed, so playback renders the table once per sample and not per frame.
+  const times = useMemo(
+    () => (measured ? sampleTimes(measured.trailer) : []),
+    [measured],
+  );
+  const sampleAt = useMatchFrameValue((frame) =>
+    lastAtOrBefore(times, frameToChartSec(range, frame)),
+  );
+  const at = view === "at" && measured !== null;
+  const atFigures = useMemo(
+    () =>
+      at && measured && sampleAt >= 0
+        ? teamFiguresAt(
+            measured.trailer,
+            rosterMetrics(measured.metrics),
+            times[sampleAt],
+          )
+        : new Map<number, Record<string, number>>(),
+    [at, measured, times, sampleAt],
+  );
+  const figuresShown = at ? atFigures : finals;
+
   const figures: FigureColumn[] = [];
-  if (statsOn && roster.rows.some((r) => rowApm(r) !== undefined))
+  // Actions per minute is a figure for the whole match, with no history.
+  if (statsOn && !at && roster.rows.some((r) => rowApm(r) !== undefined))
     figures.push({
       column: { kind: "apm" },
       label: t`APM`,
@@ -304,11 +364,18 @@ export function ReplayRoster({
       (s) => s.kind === "player" && parseRating(s.player.skill) !== undefined,
     ),
   );
-  const hasResult = roster.sides.some((id) => outcomeOf(info, id));
+  // The result is the match's, so it is not on a column of "at this time".
+  const hasResult = !at && roster.sides.some((id) => outcomeOf(info, id));
   const hasChecks = roster.rows.some((r) => e.isCharted(r.team));
+  // A column that is not shown does not sort. Choosing it again, which the
+  // switch back to the whole match allows, sorts by it again.
+  const sort =
+    chosenSort && figures.some((f) => sameColumn(f.column, chosenSort.column))
+      ? chosenSort
+      : null;
   const sorted = sort !== null;
   const spectatorNames = roster.spectators.map((s) => s.name).join(", ");
-  const rows = sortRows(roster.rows, sort, finals);
+  const rows = sortRows(roster.rows, sort, figuresShown);
 
   /** The charted teams on a side, which a side's checkbox stands for. */
   const sideTeams = (id: number) =>
@@ -405,7 +472,7 @@ export function ReplayRoster({
             </TableCell>
           ) : (
             <TableCell key={column.key} className="text-right tabular-nums">
-              {formatFigure(cellValue(row, column, finals))}
+              {formatFigure(cellValue(row, column, figuresShown))}
             </TableCell>
           ),
         )}
@@ -439,14 +506,37 @@ export function ReplayRoster({
 
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">
-          <Trans>Players</Trans>
-        </h2>
-        <SectionHelp
-          section={t`the players`}
-          source={statsOn ? "players" : "setup"}
-        />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="flex items-center gap-1">
+          <h2 className="text-sm font-medium">
+            <Trans>Players</Trans>
+          </h2>
+          <SectionHelp
+            section={t`the players`}
+            source={statsOn ? "players" : "setup"}
+          />
+        </div>
+        {measured && (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            aria-label={t`Which time the figures are for`}
+            value={view}
+            // Radix clears the value when the lit button is pressed again, and
+            // there is no third choice, so an empty change is ignored.
+            onValueChange={(v) => {
+              if (v === "at" || v === "whole") setView(v);
+            }}
+          >
+            <ToggleGroupItem value="at" className="px-3 text-xs">
+              <AtTime />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="whole" className="px-3 text-xs">
+              <Trans>Whole match</Trans>
+            </ToggleGroupItem>
+          </ToggleGroup>
+        )}
       </div>
       {sorted && hasChecks && checkableSides.length > 0 && (
         // Sorting drops the side header rows, which is where side boxes live.
@@ -528,7 +618,8 @@ export function ReplayRoster({
           ) : (
             roster.sides.map((id) => {
               const result = outcomeOf(info, id);
-              const won = result === "won";
+              // Who won is the match's result, so it is not shown "at" a time.
+              const won = !at && result === "won";
               const teams = sideTeams(id);
               const sideName = id === -1 ? t`Unassigned` : teamLabel(id);
               return (

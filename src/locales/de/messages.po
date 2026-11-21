@@ -12070,6 +12070,10 @@ msgstr "bei"
 msgid "at {fromPercent}"
 msgstr "ab {fromPercent}"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "At {time}"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "at least"
@@ -56232,6 +56236,10 @@ msgstr "Welche Teile als Modul eingefügt wurden. Ein Modul wird beim Verwenden 
 msgid "Which team won"
 msgstr "Welches Team gewann"
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Which time the figures are for"
+msgstr ""
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Which units this mod touches."
@@ -56326,6 +56334,7 @@ msgstr "Ganz"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"

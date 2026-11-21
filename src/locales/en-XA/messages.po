@@ -9861,6 +9861,10 @@ msgstr ""
 msgid "at {fromPercent}"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "At {time}"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 msgid "at least"
 msgstr ""
@@ -46117,6 +46121,10 @@ msgstr ""
 msgid "Which team won"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Which time the figures are for"
+msgstr ""
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Which units this mod touches."
 msgstr ""
@@ -46195,6 +46203,7 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Whole match"
 msgstr ""
