@@ -692,7 +692,7 @@ msgid "{0, plural, one {# factory order names a unit that does not} other {# fac
 msgstr "{0, plural, one {# наказ заводу називає нерухомий юніт} few {# накази заводу називають нерухомий юніт} many {# наказів заводу називають нерухомий юніт} other {# наказу заводу називають нерухомий юніт}}"
 
 #. placeholder {0}: built.unplaced
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, one {# наказ у черзі заводу не має позиції й не відображається.} few {# накази в черзі заводу не мають позиції й не відображаються.} many {# наказів у черзі заводу не мають позиції й не відображаються.} other {# наказу в черзі заводу не мають позиції й не відображаються.}}"
@@ -828,31 +828,31 @@ msgid "{0, plural, one {# order that took units off a factory queue is not liste
 msgstr "{0, plural, one {# наказ, що прибрав юніти з черги заводу, не показано.} few {# накази, що прибрали юніти з черги заводу, не показано.} many {# наказів, що прибрали юніти з черги заводу, не показано.} other {# наказу, що прибрали юніти з черги заводу, не показано.}}"
 
 #. placeholder {0}: allOrders.custom
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{0, plural, one {# order was a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and is left out.} other {# orders were a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and are left out.}}"
 msgstr "{0, plural, one {# наказ був командою, якої рушій не визначає: її вигадала гра чи віджет, і вона нічого не каже про те, куди спрямована. Його не враховано.} few {# накази були командами, яких рушій не визначає: їх вигадала гра чи віджет, і вони нічого не кажуть про те, куди спрямовані. Їх не враховано.} many {# наказів були командами, яких рушій не визначає: їх вигадала гра чи віджет, і вони нічого не кажуть про те, куди спрямовані. Їх не враховано.} other {# наказу були командами, яких рушій не визначає: їх вигадала гра чи віджет, і вони нічого не кажуть про те, куди спрямовані. Їх не враховано.}}"
 
 #. placeholder {0}: allOrders.unitAimed
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{0, plural, one {# order was aimed at a unit in the whole match, which the window cannot narrow.} other {# orders were aimed at a unit in the whole match, which the window cannot narrow.}}"
 msgstr "{0, plural, one {# наказ був спрямований на юніт протягом усього матчу, і проміжок не може його звузити.} few {# накази були спрямовані на юніт протягом усього матчу, і проміжок не може їх звузити.} many {# наказів були спрямовані на юніт протягом усього матчу, і проміжок не може їх звузити.} other {# наказу були спрямовані на юніт протягом усього матчу, і проміжок не може їх звузити.}}"
 
 #. placeholder {0}: allOrders.unitAimed
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{0, plural, one {# order was aimed at a unit.} other {# orders were aimed at a unit.}}"
 msgstr "{0, plural, one {# наказ був спрямований на юніт.} few {# накази були спрямовані на юніт.} many {# наказів були спрямовані на юніт.} other {# наказу були спрямовані на юніт.}}"
 
 #. placeholder {0}: orderField?.dropped ?? 0
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{0, plural, one {# order was aimed off the map and is not drawn.} other {# orders were aimed off the map and are not drawn.}}"
 msgstr "{0, plural, one {# наказ спрямовано за межі мапи, тож він не відображається.} few {# накази спрямовано за межі мапи, тож вони не відображаються.} many {# наказів спрямовано за межі мапи, тож вони не відображаються.} other {# наказу спрямовано за межі мапи, тож вони не відображаються.}}"
 
 #. placeholder {0}: built.offMap
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{0, plural, one {# order was placed off the map and is not drawn.} other {# orders were placed off the map and are not drawn.}}"
 msgstr "{0, plural, one {# наказ розміщено за межами мапи, тож він не відображається.} few {# накази розміщено за межами мапи, тож вони не відображаються.} many {# наказів розміщено за межами мапи, тож вони не відображаються.} other {# наказу розміщено за межами мапи, тож вони не відображаються.}}"
@@ -913,7 +913,7 @@ msgid "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
 msgstr "{0, plural, one {# проблема в `home`} few {# проблеми в `home`} many {# проблем у `home`} other {# проблеми в `home`}}"
 
 #. placeholder {0}: counts.projectiles
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "{0, plural, one {# projectile} other {# projectiles}}"
 msgstr "{0, plural, one {# снаряд} few {# снаряди} many {# снарядів} other {# снаряда}}"
@@ -1067,7 +1067,7 @@ msgstr "{0, plural, one {# юніт по порядку} few {# юніти по 
 #. placeholder {0}: c.units
 #. placeholder {0}: counts.units
 #: src/content/pages/components/GameLibrarySummary.tsx
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
 #: src/workshop/pages/components/ArmorClassPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -1123,7 +1123,7 @@ msgid "{0, plural, one {# win} other {# wins}}"
 msgstr "{0, plural, one {# перемога} few {# перемоги} many {# перемог} other {# перемоги}}"
 
 #. placeholder {0}: counts.wrecks
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "{0, plural, one {# wreck} other {# wrecks}}"
 msgstr "{0, plural, one {# уламок} few {# уламки} many {# уламків} other {# уламка}}"
@@ -1832,7 +1832,7 @@ msgstr "з них ботів: {bots}"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# стартова зона} few {# стартові зони} many {# стартових зон} other {# стартової зони}}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Стартова зона {boxTeam}"
@@ -2202,12 +2202,12 @@ msgstr "{count, plural, one {# місія} few {# місії} many {# місій
 msgid "{count, plural, one {# objective} other {# objectives}}"
 msgstr "{count, plural, one {# ціль} few {# цілі} many {# цілей} other {# цілі}}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
 msgstr "{count, plural, one {# наказ у межах {radius} ельмо від однієї точки в цьому проміжку} few {# накази в межах {radius} ельмо від однієї точки в цьому проміжку} many {# наказів у межах {radius} ельмо від однієї точки в цьому проміжку} other {# наказу в межах {radius} ельмо від однієї точки в цьому проміжку}}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
 msgstr "{count, plural, one {# наказ у межах {radius} ельмо від однієї точки} few {# накази в межах {radius} ельмо від однієї точки} many {# наказів у межах {radius} ельмо від однієї точки} other {# наказу в межах {radius} ельмо від однієї точки}}"
@@ -4958,7 +4958,7 @@ msgstr "{name} (з {fromName}) (заблоковано)"
 msgid "{name} (locked)"
 msgstr "{name} (заблоковано)"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "{name} (you)"
 msgstr "{name} (ви)"
@@ -5348,12 +5348,12 @@ msgstr "Замовлено: {ordered}"
 msgid "{ordered} ordered in {replays}"
 msgstr "Замовлено: {ordered} ({replays})"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
 msgstr "Наказів тут: {orders} – від власного вибору гравця, віджетів, що діють від імені гравця, та ШІ. З них віджети надіслали: {widgets}."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike."
 msgstr "Наказів тут: {orders} – від власного вибору гравця, віджетів, що діють від імені гравця, та ШІ."
@@ -5363,12 +5363,12 @@ msgstr "Наказів тут: {orders} – від власного вибору
 msgid "{orders} orders given"
 msgstr "Віддано наказів: {orders}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
 msgstr "Наказів тут у цьому проміжку: {orders} – від власного вибору гравця, віджетів, що діють від імені гравця, та ШІ. З них віджети надіслали: {widgets}."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike."
 msgstr "Наказів тут у цьому проміжку: {orders} – від власного вибору гравця, віджетів, що діють від імені гравця, та ШІ."
@@ -5453,12 +5453,12 @@ msgstr "{overlappingCount, plural, one {Будівля {overlapping} стоят�
 msgid "{own} of it a player did to their own units."
 msgstr "З цього {own} – шкода, завдана гравцями власним юнітам."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "{owner} (AI), {side}"
 msgstr "{owner} (ШІ), {side}"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "{owner}, {side}"
 msgstr "{owner}, {side}"
@@ -5977,7 +5977,7 @@ msgstr "{rate} за хвилину"
 msgid "{reached} reached a unit"
 msgstr "Досягли юніта: {reached}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "{recordedGame} is not installed, so nothing says what each building is for and every mark is the same shape."
 msgstr "{recordedGame} не встановлено, тому невідомо, для чого кожна будівля, і всі позначки однакової форми."
@@ -8254,7 +8254,7 @@ msgstr "<0>{gameName}</0> залежить від нього."
 msgid "<0>{gameName}</0> isn't installed — download it to join, or rescan if it's already on disk."
 msgstr "<0>{gameName}</0> не встановлено – завантажте гру, щоб приєднатися, або виконайте пересканування, якщо вона вже на диску."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "<0>{mapName}</0> isn't installed, so its preview can't be rendered."
 msgstr "Мапу <0>{mapName}</0> не встановлено, тому неможливо відрендерити її перегляд."
@@ -8472,6 +8472,10 @@ msgstr "3 – Божевільно (уся мапа, дуже повільно)"
 #, fuzzy
 msgid "30 minutes to 1 hour"
 msgstr "Від 30 хвилин до 1 години"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "3D"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -8820,7 +8824,7 @@ msgstr "інший розмір, ніж мапа цієї сторінки, то
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "Активний профіль дистрибуції (завантажено з <0>{source}</0>). Він змінює вигляд і звужує цю збірку:"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
 msgstr "Точка – це місце, де стартову позицію гравця задано перед грою. Рушій може зсунути старт у стартову зону, тому командир міг з’явитися трохи осторонь. Наведіть на точку, щоб побачити, чия вона."
@@ -9118,7 +9122,7 @@ msgstr "Мапі потрібні і старт, і фініш, або жодн�
 msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
 msgstr ""
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A mark is one order, in its player's colour."
 msgstr "Позначка – це один наказ у кольорі свого гравця."
@@ -9217,7 +9221,7 @@ msgstr "Доступна для завантаження новіша версі
 msgid "a number"
 msgstr "число"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A pale line is a projectile, drawn along the way it is moving. A grey square is a wreck, or anything else left on the map during the match."
 msgstr "Бліда лінія – це снаряд, намальований уздовж його руху. Сірий квадрат – уламки або щось інше, що лишилося на мапі під час матчу."
@@ -9252,7 +9256,7 @@ msgstr "Зміна пароля вже триває."
 msgid "a path that is gone"
 msgstr "шлях, якого вже немає"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A picture of this map is not available, so the match is drawn on plain ground."
 msgstr "Зображення цієї мапи недоступне, тому матч намальовано на простому тлі."
@@ -9306,7 +9310,7 @@ msgstr "Черга належить базі, а не макету, тому в�
 msgid "A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio. It is left out of the average and counted beside it."
 msgstr "Співвідношення – це одне число, поділене на інше для тієї самої армії, і воно не за хвилину. Гра, де менше число дорівнює нулю, не має співвідношення. Її не враховано в середньому й пораховано окремо поруч."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
 msgstr "Прямокутник – це юніт у кольорі його команди й розміром із його контур, з лінією в напрямку, куди він дивиться. Юніт, який ще будується, блідий. На великій мапі позначка ніколи не менша за 3 пікселі, тож малі юніти виглядають більшими, ніж є."
@@ -9491,7 +9495,7 @@ msgstr "Загін рухомих юнітів, які з’являються, 
 msgid "a start"
 msgstr "старт"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Стартова зона – це місце, де команді дозволено було почати."
@@ -11290,6 +11294,10 @@ msgstr "Проаналізувати й записати цей повтор?"
 msgid "Analyse and record with {chosenLabel}"
 msgstr "Проаналізувати й записати з {chosenLabel}"
 
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Analyse replay"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
 msgid "Analyse this replay"
@@ -12743,7 +12751,7 @@ msgid "basename for the .smf/.smt (no extension)"
 msgstr "базова назва для .smf/.smt (без розширення)"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -13896,7 +13904,7 @@ msgid "Building 3D preview…"
 msgstr "Створення 3D-перегляду…"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Building density"
 msgstr "Щільність будівель"
@@ -13906,7 +13914,7 @@ msgstr "Щільність будівель"
 msgid "Building mask"
 msgstr "Маска будівництва"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "building orders"
 msgstr "накази будівництва"
@@ -13937,17 +13945,17 @@ msgstr "Створення аркуша для {folder}"
 msgid "Buildings and metal"
 msgstr ""
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Buildings finished"
 msgstr "Завершені будівлі"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Buildings ordered"
 msgstr "Замовлені будівлі"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Buildings ordered shows the orders each player gave, not what was built. An order that was cancelled or never carried out is drawn like any other."
 msgstr "«Замовлені будівлі» показують накази кожного гравця, а не те, що збудовано. Скасований чи невиконаний наказ малюється, як і будь-який інший."
@@ -16780,7 +16788,7 @@ msgid "Colour texture"
 msgstr "Кольорова текстура"
 
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Colours compare places on this map with each other, not with another picture."
 msgstr "Кольори порівнюють місця на цій мапі між собою, а не з іншим зображенням."
@@ -18815,7 +18823,7 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 #: src/content/metricLabels.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Damage dealt"
 msgstr "Завдана шкода"
@@ -18965,7 +18973,7 @@ msgid "deaths"
 msgstr "втрати"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Deaths"
 msgstr "Втрати"
@@ -23759,7 +23767,7 @@ msgstr "Ззовні"
 msgid "From playing the match back with coilbox's own recorder, which is kept only when the playback reproduced the recorded match exactly. These are events, not orders."
 msgstr "З відтворення матчу власним записувачем coilbox, яке зберігається, лише коли відтворення точно повторило записаний матч. Це події, а не накази."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "From playing the match back with coilbox's own recorder. Nothing here runs the game."
 msgstr "З відтворення матчу власним записувачем coilbox. Тут гра не запускається."
@@ -24527,7 +24535,7 @@ msgstr "Тривалість у форматі Go, напр. 30s"
 msgid "Go to battle"
 msgstr "Перейти до матчу"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Go to recording"
 msgstr "Перейти до запису"
@@ -24930,6 +24938,10 @@ msgstr "частка здоров’я"
 #, fuzzy
 msgid "Heard from in the last 15 seconds"
 msgstr "На зв’язку протягом останніх 15 секунд"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Heat"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -26445,7 +26457,7 @@ msgstr "Триває"
 msgid "In the source"
 msgstr "У джерелі"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
 msgstr ""
 
@@ -26617,7 +26629,7 @@ msgstr "Спочатку встановіть рушій (<0>Налаштува�
 msgid "Install an engine first."
 msgstr "Спочатку встановіть рушій."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "Install an engine to preview this map."
 msgstr "Встановіть рушій, щоб переглянути цю мапу."
@@ -28889,7 +28901,7 @@ msgstr "Завантаження матчу"
 msgid "Loading this game's skirmish AIs."
 msgstr "Завантаження ШІ цієї гри для сутичок."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Loading this part of the match"
 msgstr "Завантаження цієї частини матчу"
@@ -29525,6 +29537,7 @@ msgstr "мапа"
 #: src/content/index.ts
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
@@ -29546,7 +29559,7 @@ msgstr "мапа"
 msgid "Map"
 msgstr "Мапа"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "Map · {infoMapName}"
 msgstr "Мапа · {infoMapName}"
@@ -29604,7 +29617,7 @@ msgstr ""
 msgid "Map keys. Full stop and comma step through what is on the map, including a path's points, which follow the group they belong to. Arrow keys move what is selected one build square north, south, east or west. Hold Shift for ten squares, Alt for one elmo. With nothing selected the arrows move the view's cursor instead. R turns, Shift R turns the other way. Delete removes. T turns everything selected as one shape instead, so a base swings round its own middle rather than each building spinning where it stands, and Shift T swings it the other way. S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. North and east make it bigger, south and west make it smaller. Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. Escape lets go of the selection. More than one thing can be selected at once, and then every one of those keys acts on all of it. Full stop and comma replace the selection rather than growing it. A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. Contents' Shift with Enter on a row adds that row the same way. P reads how many of the buildings on the map cannot be built where they stand. Question mark reads this out again."
 msgstr "Клавіші мапи. Крапка й кома перебирають те, що є на мапі, включно з точками шляху, які йдуть за групою, до якої належать. Клавіші зі стрілками переміщують виділене на одну клітинку будівництва на північ, південь, схід чи захід. Утримуйте Shift для десяти клітинок, Alt для одного ельмо. Коли нічого не виділено, стрілки переміщують курсор вигляду. R повертає, Shift R повертає в інший бік. Delete видаляє. T натомість повертає все виділене як одну фігуру, тож база обертається навколо власного центру, а не кожна будівля на своєму місці, а Shift T повертає її в інший бік. S перемикає режим зміни розміру для виділеної зони: тоді стрілки змінюють її розмір замість положення тими самими кроками. Північ і схід збільшують її, південь і захід зменшують. Enter діє в позиції курсора: відповідає на те, чого чекає мапа, або розміщує те, що розміщує поточний режим. Escape знімає виділення. Можна виділити кілька об’єктів одночасно, і тоді кожна з цих клавіш діє на всі. Крапка й кома замінюють виділення, а не розширюють його. A переходить до наступного об’єкта й додає його до виділення, Shift A переходить до попереднього й додає його так само; перехід на вже виділений об’єкт знімає з нього виділення. Shift з Enter на рядку вмісту додає цей рядок так само. P зачитує, скільки будівель на мапі не можна збудувати там, де вони стоять. Знак питання зачитує цей текст знову."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Map layers"
 msgstr "Шари мапи"
@@ -29713,6 +29726,10 @@ msgstr "Розміри мапи"
 #, fuzzy
 msgid "Map style"
 msgstr "Стиль мапи"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Map view"
+msgstr ""
 
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 #, fuzzy
@@ -30371,8 +30388,8 @@ msgstr "Мінімапа {battleMap}"
 
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/direct/LanRooms.tsx
 #: src/hub/assets/picture.ts
 #: src/play/pages/components/MapCard.tsx
@@ -31548,6 +31565,10 @@ msgstr "Потрібна назва"
 msgid "Needs a piece set as {missingRoles}."
 msgstr "Потрібен елемент із роллю: {missingRoles}."
 
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Needs a recording of the match."
+msgstr ""
+
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Needs a team"
@@ -31607,6 +31628,10 @@ msgstr "Потрібне середовище місій {version}"
 #, fuzzy
 msgid "Needs the game's units"
 msgstr "Потрібні юніти гри"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Needs the map's picture and height data."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -32121,7 +32146,7 @@ msgstr "Жоден будівельник не відповідає цьому."
 msgid "No buildings"
 msgstr ""
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No buildings were ordered in this replay."
 msgstr "У цьому повторі не замовлено жодної будівлі."
@@ -32806,7 +32831,7 @@ msgstr "Мапу не встановлено"
 msgid "No map is installed. Download one from Content first."
 msgstr "Мапу не встановлено. Спочатку завантажте її в розділі «Вміст»."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "No map recorded for this replay."
 msgstr "Для цього повтору мапу не записано."
@@ -33035,7 +33060,7 @@ msgstr "Без наказів"
 msgid "No orders were given in this stretch."
 msgstr "На цьому відрізку не було наказів."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
 msgstr "У цьому повторі не було наказів із місцем на мапі."
@@ -33679,7 +33704,7 @@ msgstr "Немає такого спорядження."
 msgid "no target given"
 msgstr "ціль не вказано"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "no team"
 msgstr "без команди"
@@ -36120,13 +36145,13 @@ msgstr "Відкрито з файлу"
 msgid "Opened the remixed replay — use Watch to run it."
 msgstr "Відкрито реміксований повтор – натисніть «Дивитися», щоб запустити його."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "opened with {opening}"
 msgstr "дебют: {opening}"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
 msgstr "Дебют: {opening}"
@@ -36332,12 +36357,12 @@ msgid "Order acknowledged sound"
 msgstr "Звук прийняття наказу"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Order density"
 msgstr "Щільність наказів"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Order density shows where orders were aimed, which is roughly where attention went."
 msgstr "Щільність наказів показує, куди спрямовувалися накази, тобто приблизно куди йшла увага."
@@ -36388,7 +36413,7 @@ msgstr "Накази, які віддав ШІ для сутичок. Це те�
 msgid "Orders a widget on the player's machine sent to named units. The engine's actions per minute does not count these, and a widget can send thousands a minute."
 msgstr "Накази, які віджет на комп’ютері гравця надсилав іменованим юнітам. Рушійний показник дій за хвилину їх не враховує, а віджет може надсилати тисячі за хвилину."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Накази, спрямовані на юніт, не показано на ньому, бо повтор зберігає юніт, а не його позицію."
@@ -36409,7 +36434,7 @@ msgstr "Віддані накази й події"
 msgid "Orders given in each {0} second stretch, shown as a rate per minute."
 msgstr "Накази, віддані за кожні {0} с, показано як темп за хвилину."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "orders on the map"
 msgstr "накази на мапі"
@@ -37800,7 +37825,7 @@ msgstr "Гравець {player}"
 msgid "Player {playerNumber}"
 msgstr "Гравець {playerNumber}"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "player {slot}"
 msgstr "гравець {slot}"
@@ -37955,7 +37980,7 @@ msgstr "Час гри"
 msgid "PNG image"
 msgstr "Зображення PNG"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
 msgstr "Наведіть на юніт, щоб назвати його. Клацніть, щоб закріпити назву, і клацніть на землі, щоб відпустити."
@@ -39256,7 +39281,7 @@ msgid "Reading and sending your maps"
 msgstr "Читання й надсилання ваших мап"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Reading build orders…"
 msgstr "Читання черговості будівництва…"
@@ -39326,7 +39351,7 @@ msgid "Reading maps…"
 msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Reading orders…"
 msgstr "Читання наказів…"
@@ -39425,7 +39450,7 @@ msgstr ""
 msgid "Reading the rapid index…"
 msgstr "Читання індексу rapid…"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "Reading the recorded track."
 msgstr "Читання записаної доріжки."
@@ -39501,7 +39526,7 @@ msgstr "Читання визначень юнітів…"
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Reading unit names…"
 msgstr "Читання назв юнітів…"
@@ -39760,7 +39785,7 @@ msgstr "Записані події"
 msgid "Recorded for rewind. The track takes {size}."
 msgstr "Записано для перемотування назад. Доріжка займає {size}."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Recorded match"
 msgstr "Записаний матч"
@@ -45945,18 +45970,18 @@ msgstr "Почати знову"
 msgid "Start anyway"
 msgstr "Усе одно почати"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #: src/startbox/StartBoxControls.tsx
 #, fuzzy
 msgid "Start boxes"
 msgstr "Стартові зони"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "Стартові зони беруться з налаштувань матчу."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Стартові зони для кожної команди."
@@ -46062,13 +46087,13 @@ msgstr "Стартова позиція {position} (вільна)"
 msgid "start position {startPosition}"
 msgstr ""
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start position of {says}"
 msgstr "Стартова позиція: {says}"
 
 #: src/content/pages/components/MapRecords.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/play/presetParts.ts
 #: src/startbox/StartPosCard.tsx
@@ -46194,12 +46219,12 @@ msgstr "Початкова територія"
 msgid "Starting the engine"
 msgstr "Запуск рушія"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Starting unit deaths"
 msgstr "Втрати стартових юнітів"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Starting unit paths"
 msgstr "Шляхи стартових юнітів"
@@ -47621,6 +47646,10 @@ msgstr "Sidecar <0>mapcompile</0> не знайдено. Додайте до з�
 msgid "The <0>mapdecompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPDECOMPILE_SIDECAR</1>."
 msgstr "Sidecar <0>mapdecompile</0> не знайдено. Додайте до збірки SpringMapConvNG або задайте <1>MAPCONV_MAPDECOMPILE_SIDECAR</1>."
 
+#: src/content/pages/components/ReplayMap3D.tsx
+msgid "the 3D map"
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "The addresses the server gives players for the battles they host."
@@ -47721,7 +47750,7 @@ msgid "The briefing backdrop: a horizontally-tiling image, a looping muted video
 msgstr "Тло брифінгу: зображення, що повторюється по горизонталі, зациклене відео без звуку, мапа місії як повноекранний обертовий 3D-перегляд або один із юнітів гри, що обертається на місці."
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "The build orders could not be read from this replay."
 msgstr "Не вдалося прочитати черговість будівництва з цього повтору."
@@ -49098,7 +49127,7 @@ msgstr "Інструкції, які містять ці байти."
 msgid "The join form opens filled in. Nothing connects until you press Join in it."
 msgstr "Форма приєднання відкривається заповненою. Ніщо не підключається, доки ви не натиснете в ній «Приєднатися»."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The keys work while focus is in the map or the timeline."
 msgstr "Клавіші працюють, коли фокус на мапі чи шкалі часу."
@@ -49222,7 +49251,7 @@ msgstr "Оглядове зображення низької роздільно�
 msgid "The lowest foot or wheel is {height} elmos above the ground."
 msgstr "Найнижча стопа чи колесо на {height} ельмо над землею."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #: src/multiplayer/battle/contentBlock.ts
 #, fuzzy
 msgid "the map"
@@ -49566,7 +49595,7 @@ msgid "The options for {subject} are not available, so this cannot be compared w
 msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "The orders could not be read from this replay."
 msgstr "Не вдалося прочитати накази з цього повтору."
@@ -49721,32 +49750,32 @@ msgstr "Зображення провінцій має колір {color} у п�
 msgid "The recorded events are deleted. The replay is not touched, and it can be analysed again."
 msgstr "Записані події видаляються. Повтор не змінюється, і його можна проаналізувати знову."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "the recorded match"
 msgstr "записаний матч"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The recorded track could not be read. {reason}."
 msgstr "Не вдалося прочитати записану доріжку. {reason}."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The recorded track could not be read. It has no window {windowIndex}."
 msgstr "Не вдалося прочитати записану доріжку. У ній немає проміжку {windowIndex}."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #, fuzzy
 msgid "The recorded track does not say how large the map is, so it is not shown."
 msgstr "Записана доріжка не вказує розміру мапи, тож її не показано."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The recorded track is no longer on this computer."
 msgstr "Записаної доріжки більше немає на цьому комп’ютері."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The recorded track is not shown: its {field} is {found} and this version of coilbox reads {expected}."
 msgstr "Записану доріжку не показано: її {field} – {found}, а ця версія coilbox читає {expected}."
@@ -50270,6 +50299,10 @@ msgstr ""
 msgid "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. It must be {wantWidth} by {wantHeight} to reach as far as the surround heightmap."
 msgstr ""
 
+#: src/content/pages/components/ReplayMap3D.tsx
+msgid "The terrain comes from the map's own height data."
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
@@ -50328,7 +50361,7 @@ msgstr "не вдалося прочитати доріжку: {message}"
 msgid "the track file failed: {message}"
 msgstr "помилка файлу доріжки: {message}"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The track has to be recorded again before the match can be shown here."
 msgstr "Доріжку треба записати знову, перш ніж тут можна буде показати матч."
@@ -50338,7 +50371,7 @@ msgstr "Доріжку треба записати знову, перш ніж �
 msgid "the track in this replay's place is for another game"
 msgstr "доріжка на місці цього повтору належить іншій грі"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "The track stored for this replay belongs to another match, so it is not shown."
 msgstr "Доріжка, збережена для цього повтору, належить іншому матчу, тож її не показано."
@@ -50527,7 +50560,7 @@ msgstr "Не вдалося прочитати юніти {gameName}, тож к�
 msgid "The units of {gameName} could not be read, so each order shows the unit definition id the replay recorded."
 msgstr "Не вдалося прочитати юніти {gameName}, тож кожен наказ показує id визначення юніта, записаний у повторі."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "The units of this replay's game could not be read, so every mark is the same shape."
 msgstr "Не вдалося прочитати юніти гри цього повтору, тож усі позначки однакової форми."
@@ -51629,7 +51662,7 @@ msgstr ""
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr "У цьому матчі не записано кінця гри – зазвичай тому, що з нього вийшли до завершення. Немає з чим звірити відтворення, тож його неможливо проаналізувати."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Цей матч не задавав стартових зон."
@@ -51796,7 +51829,7 @@ msgstr "Ця сторінка відкриває одну модель з арх
 msgid "this page's map"
 msgstr "мапа цієї сторінки"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This part of the match cannot be read from the track."
 msgstr "Цю частину матчу неможливо прочитати з доріжки."
@@ -51939,13 +51972,13 @@ msgid "This replay already has the engine's unit list."
 msgstr ""
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "This replay could not be read to the end, so later build orders may be missing."
 msgstr "Не вдалося дочитати цей повтор до кінця, тож пізнішої черговості будівництва може бракувати."
 
 #: src/content/pages/components/CommandRateChart.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "This replay could not be read to the end, so later orders may be missing."
 msgstr "Не вдалося дочитати цей повтор до кінця, тож пізніших наказів може бракувати."
@@ -52037,7 +52070,7 @@ msgstr "Цей повтор коротший за один період у {peri
 msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 msgstr "Цей повтор потребує рушія {version}, який не встановлено й не можна тут завантажити."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Цей повтор не записав стартових позицій."
@@ -52065,7 +52098,7 @@ msgstr "Цей повтор зіграно на {recorded}, яку не вста
 msgid "This replay was played on {recordedGame}, which is not installed. Costs and kinds come from {installedGame}, a different build, and may be wrong."
 msgstr "Цей повтор зіграно на {recordedGame}, яку не встановлено. Вартість і типи беруться з {installedGame}, іншої версії, і можуть бути неправильними."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "This replay was played on {recordedGame}, which is not installed. Shapes come from {differentBuildName}, a different build, and may be wrong."
 msgstr "Цей повтор зіграно на {recordedGame}, яку не встановлено. Форми беруться з {differentBuildName}, іншої версії, і можуть бути неправильними."
@@ -52103,7 +52136,7 @@ msgstr "Гру й мапу цього повтору не встановлено
 msgid "This replay's game is not installed, so every mark is the same shape."
 msgstr "Гру цього повтору не встановлено, тож усі позначки однакової форми."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "This replay's game is not installed, so nothing says what each building is for and every mark is the same shape."
 msgstr "Гру цього повтору не встановлено, тож невідомо, для чого кожна будівля, і всі позначки однакової форми."
@@ -54044,6 +54077,7 @@ msgstr "Об’єм юніта"
 #: src/content/index.ts
 #: src/content/matchStats.ts
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/scenario/triggerTypes.ts
@@ -54135,7 +54169,7 @@ msgstr "Створені юніти"
 msgid "units matching \"{query}\""
 msgstr "юніти, що відповідають «{query}»"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Units on {mapName} at the chosen time"
 msgstr "Юніти на {mapName} у вибраний момент"
@@ -54255,7 +54289,7 @@ msgstr "Невідомий розмір"
 msgid "unknown type"
 msgstr "невідомий тип"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "unknown unit"
 msgstr "невідомий юніт"
@@ -55949,7 +55983,7 @@ msgid "When you join a battle whose game or map you don't have, start the downlo
 msgstr "Коли ви приєднуєтеся до матчу, гри чи мапи якого у вас немає, одразу починати завантаження, а не чекати на клацання. Кнопка «Завантажити» залишається доступною для паузи чи повтору."
 
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Where buildings were ordered"
 msgstr "Де замовлялися будівлі"
@@ -56014,7 +56048,7 @@ msgid "Where metal was lost"
 msgstr "Де втрачено метал"
 
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "Where orders were aimed"
 msgstr "Куди спрямовувалися накази"
@@ -57059,7 +57093,7 @@ msgid "Yesterday"
 msgstr "Учора"
 
 #: src/blueprint/pages/components/EquivalentsPanel.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "you"

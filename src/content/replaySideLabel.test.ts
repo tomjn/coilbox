@@ -66,7 +66,7 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const ROSTER =
   readFileSync(`${HERE}pages/ReplayDetailPage.tsx`, "utf8") +
   // The start boxes are drawn by the map component the page mounts (#1152).
-  readFileSync(`${HERE}pages/components/ReplayMap.tsx`, "utf8") +
+  readFileSync(`${HERE}pages/components/ReplayMapHeat.tsx`, "utf8") +
   readFileSync(`${HERE}pages/components/ReplayRoster.tsx`, "utf8");
 const STATS_SECTION = readFileSync(
   `${HERE}pages/components/MatchStatsSection.tsx`,

@@ -90,8 +90,37 @@ vi.mock("../../replayTrack/commands", () => ({
 }));
 
 let MINIMAP: string | null = "asset://minimap.png";
+/** What the unitsync heightmap hook answers: null for a map with none. */
+let HEIGHTMAP: { width: number; height: number } | null = {
+  width: 513,
+  height: 385,
+};
 vi.mock("../../config", () => ({
   useUnitsyncMinimap: () => ({ url: MINIMAP, loading: false }),
+  useUnitsyncHeightmap: () => ({
+    data: HEIGHTMAP,
+    url: HEIGHTMAP ? "asset://height.png" : null,
+    range: undefined,
+    loading: false,
+  }),
+  useUnitsyncMapSkybox: () => ({ dataUrl: null, loading: false }),
+  useScanTargetSelection: () => ({
+    selected: { enginePath: "/engine", rootPath: "/data" },
+  }),
+  useUnitsyncScan: () => ({ data: { games: [] }, loading: false }),
+  useUnitsyncUnitDataset: () => ({ dataset: null, status: "idle" }),
+  useUnitsyncUnitBuildpics: () => ({ units: {}, errors: [] }),
+}));
+vi.mock("@picoframe/frame", async (orig) => ({
+  ...(await orig<typeof import("@picoframe/frame")>()),
+  useTheme: () => ({ resolved: "dark" }),
+}));
+vi.mock("../../usePrimaryPlayer", () => ({ usePrimaryPlayer: () => "" }));
+vi.mock("../../useMatchStats", () => ({
+  useMatchStats: () => ({ data: null, loading: false, error: null }),
+}));
+vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
+  MapPreview3D: () => <div data-testid="preview-3d" />,
 }));
 
 /** What the replay file holds, and what the analysis logged. */
@@ -118,6 +147,13 @@ vi.mock("../../bindings", async () => {
 });
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
+
+/** The profile's hidden keys. */
+let HIDE: string[] = [];
+vi.mock("../../../profile/profile", async (orig) => ({
+  ...(await orig<typeof import("../../../profile/profile")>()),
+  getProfile: () => ({ version: 1, hide: HIDE }),
+}));
 
 /** What the open-in-engine button reaches for: the running state, the launch
  *  and the engine the replay page resolves for Watch. */
@@ -147,12 +183,13 @@ vi.mock("../../../play/config", () => ({
   }),
 }));
 
-const { ReplayMapViewSection } = await import("./ReplayMapView");
+const { ReplayMapCard } = await import("./ReplayMapCard");
 const { ReplayTimelineDock, TimelineKeysProvider } = await import(
   "./ReplayTimelineDock"
 );
 const { MatchClockProvider, useMatchClock, useMatchFrame, useSettledFrame } =
   await import("../../useMatchClock");
+const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
   "../../replayAnalysis"
 );
@@ -164,6 +201,14 @@ const info = {
   engineVersion: "105.1.1-2511-g4d1de6d",
   // The fixture track is 150 frames, which is 5 seconds.
   durationSec: 5,
+  // What the flat map reads of a match.
+  gameType: "Some Game 1.0",
+  winningAllyTeams: [],
+  winnersKnown: false,
+  players: [],
+  ais: [],
+  allyTeams: [],
+  startPositions: [],
 } as unknown as DemoInfo;
 
 const track = (state: StoredReplayTrack["state"]): StoredReplayTrack => ({
@@ -217,6 +262,8 @@ beforeEach(() => {
   HELD_HEADER = false;
   headerReleases.length = 0;
   MINIMAP = "asset://minimap.png";
+  HEIGHTMAP = { width: 513, height: 385 };
+  HIDE = [];
   hidden = false;
   onScreen = undefined;
   CHAT = { messages: [], incomplete: false, events: [] };
@@ -306,23 +353,26 @@ function Page({
 }) {
   const shown = { ...info, remixed } as DemoInfo;
   return (
-    <MatchClockProvider durationSec={durationSec}>
-      <TimelineKeysProvider>
-        <ReplayMapViewSection
-          info={shown}
-          enginePath="/engine"
-          dataDir="/data"
-        />
-        <ReplayTimelineDock
-          info={shown}
-          replayPath="/replays/a.sdfz"
-          watch={WATCH}
-          dependencyBlock={BLOCK}
-          game={GAME}
-        />
-        {children}
-      </TimelineKeysProvider>
-    </MatchClockProvider>
+    <SeriesEmphasisProvider>
+      <MatchClockProvider durationSec={durationSec}>
+        <TimelineKeysProvider>
+          <ReplayMapCard
+            info={shown}
+            replayPath="/replays/a.sdfz"
+            enginePath="/engine"
+            dataDir="/data"
+          />
+          <ReplayTimelineDock
+            info={shown}
+            replayPath="/replays/a.sdfz"
+            watch={WATCH}
+            dependencyBlock={BLOCK}
+            game={GAME}
+          />
+          {children}
+        </TimelineKeysProvider>
+      </MatchClockProvider>
+    </SeriesEmphasisProvider>
   );
 }
 
@@ -1706,5 +1756,178 @@ describe("the page's match clock", () => {
 
     await click("Pause");
     expect(table()).toBe("35");
+  });
+});
+
+describe("the map card's modes", () => {
+  const radio = (name: string) =>
+    screen.getByRole("radio", { name }) as HTMLButtonElement;
+  const chosen = () =>
+    ["Units", "Heat", "3D"].filter(
+      (name) => radio(name).getAttribute("aria-checked") === "true",
+    );
+  const rail = () => document.querySelector("[data-map-rail]") as HTMLElement;
+  const pick = async (name: string) => {
+    await act(async () => {
+      fireEvent.click(radio(name));
+    });
+    await settle();
+  };
+
+  it("opens on Units when the replay has a current recording", async () => {
+    await show();
+    expect(chosen()).toEqual(["Units"]);
+    expect(canvas()).not.toBeNull();
+    expect(radio("Heat").disabled).toBe(false);
+    expect(radio("3D").disabled).toBe(false);
+    expect(screen.queryByRole("button", { name: "Analyse replay" })).toBeNull();
+  });
+
+  it("opens on Heat when it has no recording, with Units disabled and Analyse replay offered", async () => {
+    await show(null);
+    expect(chosen()).toEqual(["Heat"]);
+    expect(radio("Units").disabled).toBe(true);
+    expect(radio("Units").parentElement?.title).toBe(
+      "Needs a recording of the match.",
+    );
+    screen.getByRole("button", { name: "Analyse replay" });
+    expect(canvas()).toBeNull();
+    screen.getByAltText("Minimap of Test Map");
+  });
+
+  it("opens on Heat for a recording an older version made, says so, and leads to recording again", async () => {
+    await show("stale");
+    expect(chosen()).toEqual(["Heat"]);
+    expect(radio("Units").disabled).toBe(true);
+    screen.getByText(/has to be recorded again/);
+    screen.getByRole("button", { name: "Go to recording" });
+    expect(screen.queryByRole("button", { name: "Analyse replay" })).toBeNull();
+  });
+
+  it("opens on Heat for a remix, which has no recording of its own", async () => {
+    seedReplayTracksForTests([track("current")]);
+    mount("/replay", true);
+    await settle();
+    expect(chosen()).toEqual(["Heat"]);
+    expect(radio("Units").disabled).toBe(true);
+  });
+
+  it("has the Analyse replay button press the analysis section's own button", async () => {
+    const section = document.createElement("section");
+    section.id = ANALYSIS_SECTION_ID;
+    const record = document.createElement("button");
+    record.setAttribute(ANALYSIS_ACTION_ATTRIBUTE, "");
+    const pressed = vi.fn();
+    record.addEventListener("click", pressed);
+    section.append(record);
+    section.scrollIntoView = vi.fn();
+    record.scrollIntoView = vi.fn();
+    document.body.append(section);
+
+    await show(null);
+    fireEvent.click(screen.getByRole("button", { name: "Analyse replay" }));
+    expect(pressed).toHaveBeenCalledTimes(1);
+
+    // A button that cannot be pressed yet is brought into view, so the reasons
+    // beside it can be read.
+    record.disabled = true;
+    fireEvent.click(screen.getByRole("button", { name: "Analyse replay" }));
+    expect(pressed).toHaveBeenCalledTimes(1);
+    expect(record.scrollIntoView).toHaveBeenCalledTimes(2);
+    section.remove();
+  });
+
+  it("has no Analyse replay button when the profile hides the run", async () => {
+    HIDE = ["analytics.run"];
+    await show(null);
+    expect(chosen()).toEqual(["Heat"]);
+    expect(radio("Units").disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Analyse replay" })).toBeNull();
+  });
+
+  it("puts the count of marks and the unit's name in the rail in Units, and the flat map's layers in Heat", async () => {
+    await show();
+    expect(within(rail()).getByText(/1 unit, 0 projectiles/)).toBeTruthy();
+    expect(within(rail()).getByTestId("recorded-unit-name")).toBeTruthy();
+    expect(within(rail()).getByText(/Bot \(AI\), Team 2/)).toBeTruthy();
+
+    await pick("Heat");
+    expect(chosen()).toEqual(["Heat"]);
+    expect(canvas()).toBeNull();
+    const layers = within(rail()).getByRole("toolbar", { name: "Map layers" });
+    for (const name of ["Start boxes", "Buildings ordered", "Bases"]) {
+      within(layers).getByRole("button", { name });
+    }
+  });
+
+  it("shows the 3D view with only the layers that paint on terrain in its rail", async () => {
+    await show();
+    await pick("3D");
+    expect(chosen()).toEqual(["3D"]);
+    screen.getByTestId("preview-3d");
+    const layers = within(rail()).getByRole("toolbar", { name: "Map layers" });
+    expect(
+      within(layers)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Building density", "Order density", "Deaths", "Damage dealt"]);
+  });
+
+  it("disables 3D for a map with no height data", async () => {
+    HEIGHTMAP = null;
+    await show();
+    expect(radio("3D").disabled).toBe(true);
+    expect(radio("3D").parentElement?.title).toBe(
+      "Needs the map's picture and height data.",
+    );
+  });
+
+  it("keeps the mode the reader chose when a recording appears", async () => {
+    await show(null);
+    expect(chosen()).toEqual(["Heat"]);
+    await act(async () => {
+      seedReplayTracksForTests([track("current")]);
+    });
+    await settle();
+    expect(chosen()).toEqual(["Heat"]);
+    expect(radio("Units").disabled).toBe(false);
+  });
+
+  it("gives the dock the track's range whichever mode is open", async () => {
+    seedReplayTracksForTests([track("current")]);
+    mount("/replay", false, 600);
+    await settle();
+    await pick("Heat");
+    expect(chosen()).toEqual(["Heat"]);
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:00 / 0:05");
+    await pick("3D");
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:00 / 0:05");
+  });
+
+  it("holds the time when the mode changes", async () => {
+    await show("current", "/replay?frame=60");
+    await pick("Heat");
+    await pick("Units");
+    expect(clockFrame()).toBe(60);
+    expect(navigations).toEqual([]);
+  });
+
+  it("gives the map all the card's width, in its own shape, limited by the window's height", async () => {
+    await show();
+    const ground = document.querySelector("[data-map-ground]") as HTMLElement;
+    expect(ground.style.aspectRatio).toBe("8192 / 6144");
+    // No wider than lets the map keep its shape inside the window's height
+    // less what is around the map, and no fixed cap.
+    const column = ground.closest("[data-map-column]") as HTMLElement;
+    expect(column.style.maxWidth).toBe(
+      "calc(max(16rem, 100vh - 18rem) * 8192 / 6144)",
+    );
+
+    await pick("Heat");
+    const flat = document.querySelector("[data-map-ground]") as HTMLElement;
+    expect(flat.style.aspectRatio).toBe("513 / 385");
+    expect(
+      (flat.closest("[data-map-column]") as HTMLElement).style.maxWidth,
+    ).toBe(`calc(max(16rem, 100vh - 18rem) * ${513 / 385} / 1)`);
   });
 });

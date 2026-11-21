@@ -4,8 +4,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
-import { useUnitsyncMinimap } from "../../config";
+import type { ReplayTrackHeader } from "../../bindings";
 import {
   ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
@@ -20,15 +19,13 @@ import { teamStyles } from "../../replayMapView/paint";
 import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
-import { useReplayTrack } from "../../replayTrack";
-import { useStoredTracks } from "../../replayTracks";
-import { EnsureMatchClock, useMatchClock } from "../../useMatchClock";
+import { useMatchClock } from "../../useMatchClock";
+import { MapHelp, ReplayMapLayout } from "./ReplayMapRail";
 import { useTimelineKeys } from "./ReplayTimelineDock";
-import { SectionHelp } from "./SectionHelp";
 
 /** Said under the analysis and recording section, which has already said the
  *  track is out of date. This says what that means here. */
-const staleWords = () =>
+export const staleWords = () =>
   t`The track has to be recorded again before the match can be shown here.`;
 
 const capital = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
@@ -40,90 +37,7 @@ interface Named {
   team: number;
 }
 
-/**
- * The replay page's map view of a recorded track (#3807): every unit,
- * projectile and wreck where it was at one moment of the match, drawn from the
- * track with no engine and none of the game's Lua.
- *
- * It is shown when the replay has a track. A current track is drawn. A stale
- * one, or one that cannot be read, says so and leads to the analysis and
- * recording section above it, which has the button that records the replay
- * again.
- *
- * The time comes from the page's match clock (#5305), and this section gives
- * it the track's range. The timeline dock (#5306) moves it, and the view draws
- * whatever the clock says.
- */
-export function ReplayMapViewSection({
-  info,
-  enginePath,
-  dataDir,
-}: {
-  info: DemoInfo;
-  /** For the map's picture. Without them the units are on plain ground. */
-  enginePath: string | undefined;
-  dataDir: string | undefined;
-}) {
-  const tracks = useStoredTracks();
-  // A remix carries its original's game id and has no track of its own.
-  const gameId = info.remixed ? undefined : info.gameId;
-  const stored = gameId ? tracks.get(gameId) : undefined;
-  // A stale track is never opened: it has no footprints to size a mark from.
-  const track = useReplayTrack(
-    stored?.state === "current" && gameId ? gameId : null,
-  );
-  const minimap = useUnitsyncMinimap(enginePath, dataDir, info.mapName);
-  const { t: tr } = useLingui();
-
-  if (!stored) return null;
-
-  return (
-    <section className="flex flex-col gap-2" aria-label={tr`Recorded match`}>
-      <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">
-          <Trans>Recorded match</Trans>
-        </h2>
-        {track.status === "ready" && (
-          <SectionHelp section={tr`the recorded match`}>
-            <Legend header={track.handle.header} />
-          </SectionHelp>
-        )}
-      </div>
-      <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3 text-sm">
-        {stored.state === "stale" ? (
-          <NotShown words={staleWords()} />
-        ) : track.status === "error" ? (
-          <NotShown words={faultWords(track.error)} />
-        ) : track.status === "ready" ? (
-          track.handle.header.mapSize[0] > 0 &&
-          track.handle.header.mapSize[1] > 0 ? (
-            <EnsureMatchClock durationSec={info.durationSec}>
-              <RecordedMatch
-                handle={track.handle}
-                mapName={info.mapName}
-                minimapUrl={minimap.url}
-              />
-            </EnsureMatchClock>
-          ) : (
-            <NotShown
-              words={tr`The recorded track does not say how large the map is, so it is not shown.`}
-            />
-          )
-        ) : (
-          <p
-            role="status"
-            className="flex items-center gap-1.5 text-muted-foreground"
-          >
-            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
-            <Trans>Reading the recorded track.</Trans>
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function faultWords(error: ReplayTrackError): string {
+export function faultWords(error: ReplayTrackError): string {
   const { fault } = error;
   switch (fault.kind) {
     case "stale":
@@ -153,7 +67,7 @@ function faultWords(error: ReplayTrackError): string {
  * Why there is no picture, and the way to the section that can make one. The
  * button that records is in that section and is not repeated here.
  */
-function NotShown({ words }: { words: string }) {
+export function NotShown({ words }: { words: string }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p>{words}</p>
@@ -175,8 +89,8 @@ function NotShown({ words }: { words: string }) {
   );
 }
 
-/** What the marks are, and whose colour is whose. Behind the help button. */
-function Legend({ header }: { header: ReplayTrackHeader }) {
+/** What the marks are and how the timeline moves them. Behind the help button. */
+function Legend() {
   useLocale();
   return (
     <>
@@ -231,19 +145,25 @@ function Legend({ header }: { header: ReplayTrackHeader }) {
       <p className="text-muted-foreground">
         <Trans>The keys work while focus is in the map or the timeline.</Trans>
       </p>
-      <ul className="flex flex-col gap-1">
-        {header.teams.map((team) => (
-          <li key={team.id} className="flex items-center gap-1.5">
-            <span
-              aria-hidden="true"
-              className="size-2.5 shrink-0 rounded-[2px] border border-foreground/40"
-              style={{ backgroundColor: `rgb(${team.colour.join(", ")})` }}
-            />
-            {ownerWords(header, team.id)}
-          </li>
-        ))}
-      </ul>
     </>
+  );
+}
+
+/** Whose colour is whose, in the rail under the map. */
+function TeamKey({ header }: { header: ReplayTrackHeader }) {
+  return (
+    <ul className="flex flex-col gap-1 text-xs">
+      {header.teams.map((team) => (
+        <li key={team.id} className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="size-2.5 shrink-0 rounded-[2px] border border-foreground/40"
+            style={{ backgroundColor: `rgb(${team.colour.join(", ")})` }}
+          />
+          {ownerWords(header, team.id)}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -258,68 +178,66 @@ function ownerWords(header: ReplayTrackHeader, teamId: number): string {
 }
 
 /**
- * The map and the canvas over it. The timeline dock at the bottom of the page
- * sets the time.
+ * Whether the page's match clock has the track's range, which is when the map
+ * can draw from it. The card adopts the range in every mode, so the dock has the
+ * track's range whichever mode is open.
+ */
+export function useAdoptedTrack(header: ReplayTrackHeader | null): boolean {
+  const { range, adoptTrack } = useMatchClock();
+  const firstFrame = header?.firstFrame;
+  const lastFrame = header?.lastFrame;
+  const framesPerSecond = header?.framesPerSecond;
+  useLayoutEffect(
+    () =>
+      firstFrame === undefined ||
+      lastFrame === undefined ||
+      framesPerSecond === undefined
+        ? undefined
+        : adoptTrack({ firstFrame, lastFrame, framesPerSecond }),
+    [adoptTrack, firstFrame, lastFrame, framesPerSecond],
+  );
+  return (
+    range.source === "track" &&
+    range.firstFrame === firstFrame &&
+    range.lastFrame === lastFrame &&
+    range.framesPerSecond === framesPerSecond
+  );
+}
+
+/**
+ * The Units mode of the replay's map card (#3807): every unit, projectile and
+ * wreck where it was at one moment of the match, drawn from the recorded track
+ * with no engine and none of the game's Lua.
  *
  * The time is the page's match clock, which keeps it in the address as
  * `?frame=`. A link opens at that frame, held inside the match. The address is
- * replaced, never added to, and only when playing stops or a seek ends.
+ * replaced, never added to, and only when playing stops or a seek ends. The
+ * timeline dock moves the clock and this draws whatever the clock says.
  *
- * Keys act while focus is anywhere in here, and in the dock, and nowhere else.
- * A text field, and a control that keeps a key for itself, keep it.
+ * Keys act while focus is anywhere in the map, and in the dock, and nowhere
+ * else. A text field, and a control that keeps a key for itself, keep it.
  */
-function RecordedMatch({
+export function ReplayMapUnits({
   handle,
+  adopted,
   mapName,
   minimapUrl,
 }: {
   handle: ReplayTrackHandle;
+  /** From {@link useAdoptedTrack}. Nothing is drawn before it is true. */
+  adopted: boolean;
   mapName: string;
   minimapUrl: string | null;
 }) {
-  const { t: tr } = useLingui();
-  const { header } = handle;
-  const { clock, range, adoptTrack } = useMatchClock();
-  const keys = useTimelineKeys();
-  // The track's header is the page's range while the match is shown here.
-  const { firstFrame, lastFrame, framesPerSecond } = header;
-  useLayoutEffect(
-    () => adoptTrack({ firstFrame, lastFrame, framesPerSecond }),
-    [adoptTrack, firstFrame, lastFrame, framesPerSecond],
-  );
-  const adopted =
-    range.source === "track" &&
-    range.firstFrame === firstFrame &&
-    range.lastFrame === lastFrame &&
-    range.framesPerSecond === framesPerSecond;
-
+  const { clock } = useMatchClock();
+  if (!adopted) return null;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a box that holds the map, which a fieldset would restyle.
-    <div
-      role="group"
-      aria-label={tr`Recorded match`}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: where keyboard focus lands to use the timeline's keys on the map.
-      tabIndex={0}
-      onKeyDown={adopted ? keys?.onKeyDown : undefined}
-      className="flex flex-col gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {adopted && (
-        <RecordedMatchCanvas
-          handle={handle}
-          clock={clock}
-          mapName={mapName}
-          minimapUrl={minimapUrl}
-        />
-      )}
-      {!minimapUrl && (
-        <p className="text-xs text-muted-foreground">
-          <Trans>
-            A picture of this map is not available, so the match is drawn on
-            plain ground.
-          </Trans>
-        </p>
-      )}
-    </div>
+    <UnitsView
+      handle={handle}
+      clock={clock}
+      mapName={mapName}
+      minimapUrl={minimapUrl}
+    />
   );
 }
 
@@ -331,7 +249,7 @@ function RecordedMatch({
  * changes between ready, loading and unreadable, and when the unit that is
  * named changes, and at no other time.
  */
-function RecordedMatchCanvas({
+function UnitsView({
   handle,
   clock,
   mapName,
@@ -343,6 +261,7 @@ function RecordedMatchCanvas({
   minimapUrl: string | null;
 }) {
   const { t: tr } = useLingui();
+  const keys = useTimelineKeys();
   const { header } = handle;
   const [mapX, mapZ] = header.mapSize;
   const groundRef = useRef<HTMLDivElement | null>(null);
@@ -471,73 +390,100 @@ function RecordedMatchCanvas({
   };
 
   return (
-    <div
-      // As wide as the card lets it be, and never taller than most of the
-      // window, so a tall map still fits with its controls. What is said about
-      // the picture is held to the picture's width.
-      style={{ width: `min(100%, 44rem, 70vh * ${mapX} / ${mapZ})` }}
-      className="flex flex-col gap-1.5"
-    >
-      <div
-        ref={groundRef}
-        data-map-ground
-        style={{ aspectRatio: `${mapX} / ${mapZ}` }}
-        className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
-      >
-        {minimapUrl && (
-          // Dimmed, so a team colour stands out from ground of the same hue.
-          <img
-            src={minimapUrl}
-            alt={tr`Minimap of ${mapName}`}
-            className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
-          />
-        )}
-        <canvas
-          ref={canvasRef}
-          data-layer="recorded-units"
-          role="img"
-          aria-label={tr`Units on ${mapName} at the chosen time`}
-          className="absolute inset-0 size-full"
-          onPointerMove={(event) => {
-            const found = unitAt(event);
-            setPointed((was) =>
-              was?.serial === found?.serial ? was : (found ?? null),
-            );
-          }}
-          onPointerLeave={() => setPointed(null)}
-          onClick={(event) => setChosen(unitAt(event))}
-        />
-        {status.kind === "loading" && (
-          <span
-            role="status"
-            aria-label={tr`Loading this part of the match`}
-            className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/70 p-1 text-white"
-          >
-            <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
-          </span>
-        )}
-        {status.kind === "fault" && (
+    <ReplayMapLayout
+      shape={{ width: mapX, height: mapZ }}
+      map={
+        // biome-ignore lint/a11y/useSemanticElements: a box that holds the map, which a fieldset would restyle.
+        <div
+          role="group"
+          aria-label={tr`Recorded match`}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: where keyboard focus lands to use the timeline's keys on the map.
+          tabIndex={0}
+          onKeyDown={keys?.onKeyDown}
+          className="flex flex-col gap-1.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <div
-            role="alert"
-            className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/80 px-2 py-1.5 text-xs text-white"
+            ref={groundRef}
+            data-map-ground
+            style={{ aspectRatio: `${mapX} / ${mapZ}` }}
+            className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
           >
-            <span>
-              <Trans>
-                This part of the match cannot be read from the track.
-              </Trans>
-            </span>
-            <span className="text-white/70">
-              {capital(status.error.message)}.
-            </span>
+            {minimapUrl && (
+              // Dimmed, so a team colour stands out from ground of the same hue.
+              <img
+                src={minimapUrl}
+                alt={tr`Minimap of ${mapName}`}
+                className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
+              />
+            )}
+            <canvas
+              ref={canvasRef}
+              data-layer="recorded-units"
+              role="img"
+              aria-label={tr`Units on ${mapName} at the chosen time`}
+              className="absolute inset-0 size-full"
+              onPointerMove={(event) => {
+                const found = unitAt(event);
+                setPointed((was) =>
+                  was?.serial === found?.serial ? was : (found ?? null),
+                );
+              }}
+              onPointerLeave={() => setPointed(null)}
+              onClick={(event) => setChosen(unitAt(event))}
+            />
+            {status.kind === "loading" && (
+              <span
+                role="status"
+                aria-label={tr`Loading this part of the match`}
+                className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/70 p-1 text-white"
+              >
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
+              </span>
+            )}
+            {status.kind === "fault" && (
+              <div
+                role="alert"
+                className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/80 px-2 py-1.5 text-xs text-white"
+              >
+                <span>
+                  <Trans>
+                    This part of the match cannot be read from the track.
+                  </Trans>
+                </span>
+                <span className="text-white/70">
+                  {capital(status.error.message)}.
+                </span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      <div className="flex min-h-4 flex-wrap items-baseline justify-between gap-x-4 text-xs">
-        <p ref={countsRef} className="text-muted-foreground tabular-nums" />
-        <p data-testid="recorded-unit-name" className="font-medium">
-          {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
-        </p>
-      </div>
-    </div>
+          {!minimapUrl && (
+            <p className="text-xs text-muted-foreground">
+              <Trans>
+                A picture of this map is not available, so the match is drawn on
+                plain ground.
+              </Trans>
+            </p>
+          )}
+        </div>
+      }
+      rail={
+        <>
+          <MapHelp section={tr`the recorded match`}>
+            <Legend />
+          </MapHelp>
+          <p
+            ref={countsRef}
+            className="min-h-4 text-xs text-muted-foreground tabular-nums"
+          />
+          <p
+            data-testid="recorded-unit-name"
+            className="min-h-4 text-xs font-medium"
+          >
+            {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
+          </p>
+          <TeamKey header={header} />
+        </>
+      }
+    />
   );
 }

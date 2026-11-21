@@ -75,7 +75,7 @@ vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 
-const { ReplayMap } = await import("./ReplayMap");
+const { ReplayMapHeat } = await import("./ReplayMapHeat");
 const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { resetReplayEventReadsForTests } = await import("../../replayEventRead");
 const { resetReplayAnalysisForTests, seedReplayAnalysisForTests } =
@@ -205,13 +205,12 @@ function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
       <div id="replay-analysis">Analysis</div>
-      <ReplayMap
+      <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
         mapName="Some Map"
         minimapUrl="data:image/png;base64,"
         heightmap={HEIGHTMAP}
-        preview={null}
       />
     </SeriesEmphasisProvider>,
   );

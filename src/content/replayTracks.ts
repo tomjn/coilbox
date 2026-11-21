@@ -38,6 +38,7 @@ let tracks: Tracks = new Map();
 let usage: TrackUsage = noUsage;
 let costs: readonly RecordingCost[] = [];
 let started = false;
+let read = false;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -56,9 +57,15 @@ export async function refreshStoredTracks(): Promise<void> {
     tracks = new Map(list.map((t) => [t.gameId, t]));
     usage = { totalBytes, defaultBudgetBytes };
     costs = recordingCosts ?? [];
+    read = true;
     emit();
   } catch {
     // No bridge, or the folder could not be read. What is on screen stays.
+  } finally {
+    if (!read) {
+      read = true;
+      emit();
+    }
   }
 }
 
@@ -74,6 +81,7 @@ function subscribe(cb: () => void): () => void {
 }
 
 const readTracks = () => tracks;
+const readRead = () => read;
 const readUsage = () => usage;
 const readCosts = () => costs;
 
@@ -85,6 +93,16 @@ const readCosts = () => costs;
 export function useStoredTracks(): Tracks {
   useEffect(start, []);
   return useSyncExternalStore(subscribe, readTracks, readTracks);
+}
+
+/**
+ * Whether the tracks have been read from disk, or the read has failed. Until
+ * then {@link useStoredTracks} is empty because nothing has been read, not
+ * because no replay has a track.
+ */
+export function useStoredTracksRead(): boolean {
+  useEffect(start, []);
+  return useSyncExternalStore(subscribe, readRead, readRead);
 }
 
 /** What the tracks take on disk, kept current alongside {@link useStoredTracks}. */
@@ -135,6 +153,7 @@ export function resetReplayTracksForTests(): void {
   usage = noUsage;
   costs = [];
   started = false;
+  read = false;
   emit();
 }
 
@@ -145,6 +164,7 @@ export function seedReplayTracksForTests(
   recordingCosts: RecordingCost[] = [],
 ): void {
   started = true;
+  read = true;
   costs = recordingCosts;
   tracks = new Map(seed.map((t) => [t.gameId, t]));
   usage = {
