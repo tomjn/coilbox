@@ -19110,6 +19110,10 @@ msgstr "Fog colour"
 msgid "Fog of war"
 msgstr "Fog of war"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr "Fold the extra lanes"
+
 #: src/mapconv/pages/ProjectsPage.tsx
 msgid "Folder"
 msgstr "Folder"
@@ -36561,6 +36565,10 @@ msgstr "Show build orders"
 #: src/lego/pages/components/ViewportBar.tsx
 msgid "Show each weapon's stated range and firing arc"
 msgstr "Show each weapon's stated range and firing arc"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr "Show every lane"
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "Show every replay again"

@@ -23289,6 +23289,10 @@ msgstr ""
 msgid "Fog of war"
 msgstr "戦場の霧"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Folder"
@@ -44554,6 +44558,10 @@ msgstr "ビルドオーダーを表示"
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
 msgstr "各武器の設定上の射程と射角を表示"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy

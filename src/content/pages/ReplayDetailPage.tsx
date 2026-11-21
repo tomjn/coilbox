@@ -1,6 +1,12 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ArrowLeft, Code2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { formatBytes, formatDateTime, formatDuration } from "@/lib/format";
@@ -20,6 +26,7 @@ import {
   useStoredAnalyses,
 } from "../replayAnalysis";
 import { otherGameVersion } from "../replayAnalysisOffer";
+import { DOCK_MAX_HEIGHT } from "../replayDockRows";
 import { replayDependencyBlock } from "../replayEngine";
 import { provenanceLink } from "../replayProvenanceLink";
 import { teamResultLabel } from "../replaySideLabel";
@@ -241,7 +248,7 @@ export default function ReplayDetailPage() {
     : [];
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto [container-type:size]">
       {/* The title and the actions share a row until the title has 20rem, and
        * below that the actions drop to their own line rather than taking the
        * last of it (#1215). `min-w-0` truncates a long filename, but on its own
@@ -429,7 +436,15 @@ export default function ReplayDetailPage() {
                * and the panel on the right, each as tall as the row and
                * scrolling inside itself. Below it they stack, and the page
                * scrolls (#5304). */}
-              <div className="flex flex-col gap-4 p-4 xl:grid xl:min-h-64 xl:flex-1 xl:grid-cols-2 xl:grid-rows-[minmax(0,1fr)]">
+              {/* The stacked page keeps the dock's cap free below the map, which
+               * the dock would cover. In two columns the dock is not over a
+               * column, so nothing is kept (#5356). */}
+              <div
+                className="flex flex-col gap-4 p-4 [--replay-dock-reserve:var(--replay-dock-max)] xl:grid xl:min-h-64 xl:flex-1 xl:grid-cols-2 xl:grid-rows-[minmax(0,1fr)] xl:[--replay-dock-reserve:0px]"
+                style={
+                  { "--replay-dock-max": DOCK_MAX_HEIGHT } as CSSProperties
+                }
+              >
                 {/* A size container when the column has a height of its own,
                  * so the map can be sized to it and not to the window. */}
                 <div className="min-w-0 xl:min-h-0 xl:overflow-y-auto xl:[container-type:size]">

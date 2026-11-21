@@ -23289,6 +23289,10 @@ msgstr ""
 msgid "Fog of war"
 msgstr "Туман війни"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Folder"
@@ -44554,6 +44558,10 @@ msgstr "Показати черговість будівництва"
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
 msgstr "Показати заявлену дальність і сектор обстрілу кожної зброї"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy

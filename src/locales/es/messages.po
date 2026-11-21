@@ -23289,6 +23289,10 @@ msgstr ""
 msgid "Fog of war"
 msgstr "Niebla de guerra"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Folder"
@@ -44554,6 +44558,10 @@ msgstr "Mostrar órdenes de construcción"
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
 msgstr "Mostrar el alcance y el arco de disparo indicados de cada arma"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
