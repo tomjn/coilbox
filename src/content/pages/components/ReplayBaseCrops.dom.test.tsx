@@ -536,6 +536,22 @@ describe("the time window", () => {
     expect(lists()).toBe(before);
   });
 
+  it("ends a window that reaches the match's end at the match's end, not at an order given after it (#5358)", async () => {
+    // The match is 1800 s long, and the last order was read at 1807 s.
+    ORDERS = { ...PLACED, lastFrame: 30 * MIN + 7 * 30 };
+    show();
+    await open();
+    press("Last 5 minutes");
+    expect(
+      await screen.findByText(
+        "Pictures show orders given from 25:00 to 30:00.",
+      ),
+    ).toBeTruthy();
+    expect(
+      help().getByText(/Showing orders given from 25:00 to 30:00\./),
+    ).toBeTruthy();
+  });
+
   it("says a player ordered nothing in an empty window, and draws their start", async () => {
     ORDERS = PLACED;
     show();

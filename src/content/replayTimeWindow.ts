@@ -112,6 +112,34 @@ export function heldWindow(
   };
 }
 
+/**
+ * The last second a caption may name for a window: the match's own length,
+ * unless the layers' axis stops short of it. The axis (`domainSec`) is whole
+ * seconds stretched to the last order or event read, so it can run past the
+ * match's end by the orders given after it, and a caption that read its end
+ * would say a window ran to a time the match never reached. A length that is
+ * not known leaves the axis.
+ */
+export function matchEndSec(domainSec: number, durationSec: number): number {
+  const known = Number.isFinite(durationSec) && durationSec > 0;
+  return known ? Math.min(domainSec, durationSec) : domainSec;
+}
+
+/**
+ * The two ends a caption gives for a window, in seconds and never later than
+ * `endOfMatchSec`. The whole match, `null`, runs from nothing to that end. An
+ * end held open at the match's end is infinite, and is the match's end.
+ */
+export function captionRange(
+  window: TimeWindow | null,
+  endOfMatchSec: number,
+): TimeWindow {
+  return {
+    startSec: Math.min(window?.startSec ?? 0, endOfMatchSec),
+    endSec: Math.min(window?.endSec ?? endOfMatchSec, endOfMatchSec),
+  };
+}
+
 /** The parts of the dock's window box a reader can take hold of. */
 export type WindowPart = "start" | "end" | "move";
 

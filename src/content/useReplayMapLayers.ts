@@ -26,6 +26,7 @@ import {
   activitySeries,
   countInRange,
   filterByFrame,
+  matchEndSec,
   windowPoints,
   windowRange,
 } from "./replayTimeWindow";
@@ -168,6 +169,8 @@ export function useReplayMapLayers({
       (result?.incomplete ?? false) || (allOrders?.incomplete ?? false),
     ),
   );
+  // Where the match ended, for the captions that say what a window covers.
+  const endOfMatchSec = matchEndSec(domainSec, info.durationSec);
   const timeWindow = useReplayTimeWindow(domainSec);
   const inWindow = useMemo(
     () =>
@@ -274,6 +277,7 @@ export function useReplayMapLayers({
     buildLayer,
     windowed,
     domainSec,
+    endOfMatchSec,
     timeWindow,
     inWindow,
     placedCount,

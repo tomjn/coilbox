@@ -2,10 +2,15 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { formatDuration, formatNumber } from "@/lib/format";
-import type { ActivitySeries, TimeWindow } from "../../replayTimeWindow";
+import {
+  type ActivitySeries,
+  captionRange,
+  type TimeWindow,
+} from "../../replayTimeWindow";
 
-/** Match time as the timeline's axis writes it. */
-const axisTime = (sec: number) => formatDuration(Math.round(sec));
+/** Match time as the match's length is written elsewhere on the page, which
+ *  drops the part of a second. */
+const axisTime = (sec: number) => formatDuration(sec);
 
 /** How many of a layer's points are inside the window, out of all of them. */
 export interface WindowCount {
@@ -58,10 +63,10 @@ export function TimeWindowHelp({
  * dock's Heat window lane (#5309), so this only reads it.
  *
  * `window` is the window as the layers have it, `null` is the whole match, and
- * `domainSec` is the whole seconds the layers' axis spans.
+ * `matchEndSec` is where the match ended, which no end the line gives passes.
  */
 export function ReplayTimeWindowNote({
-  domainSec,
+  matchEndSec,
   window,
   count,
   noun,
@@ -69,7 +74,7 @@ export function ReplayTimeWindowNote({
   events = [],
   subject = "orders",
 }: {
-  domainSec: number;
+  matchEndSec: number;
   window: TimeWindow | null;
   /** Null while the layer's points are not known yet. */
   count: WindowCount | null;
@@ -97,13 +102,14 @@ export function ReplayTimeWindowNote({
     return t`${inside} of ${total} ${countNoun}.`;
   };
   const layerNoun = noun ?? t`orders`;
-  if (!(domainSec > 0)) return null;
+  if (!(matchEndSec > 0)) return null;
 
   const subjectLabel = subjectText[subject];
-  const rangeStart = axisTime(window?.startSec ?? 0);
-  const rangeEnd = axisTime(window?.endSec ?? domainSec);
+  const range = captionRange(window, matchEndSec);
+  const rangeStart = axisTime(range.startSec);
+  const rangeEnd = axisTime(range.endSec);
   const matchStart = axisTime(0);
-  const matchEnd = axisTime(domainSec);
+  const matchEnd = axisTime(matchEndSec);
 
   return (
     <p className="text-xs text-muted-foreground" data-testid="time-window">
