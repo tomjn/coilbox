@@ -139,7 +139,7 @@ export function playerOptions(
   return options;
 }
 
-function matchesPlayer(
+export function matchesPlayer(
   event: LogEvent,
   player: string,
   labels: ReadonlyMap<number, string>,
