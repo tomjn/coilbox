@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { labelAnchor, polygonPoints, toPreview, usableExtent } from "./polygon";
+import {
+  cornerAnchor,
+  labelAnchor,
+  pointInPolygon,
+  polygonPoints,
+  toPreview,
+  usableExtent,
+} from "./polygon";
 
 /** Dockside v2 is 14 by 12 map size units: 7168 by 6144 in world units. */
 const DOCKSIDE = { x: 7168, z: 6144 };
@@ -92,5 +99,80 @@ describe("usableExtent", () => {
     expect(usableExtent(DOCKSIDE)).toBe(true);
     expect(usableExtent({ x: 0, z: 6144 })).toBe(false);
     expect(usableExtent(null)).toBe(false);
+  });
+});
+
+describe("pointInPolygon", () => {
+  // An L shape, so a point in its notch is inside the box round it and outside
+  // the shape.
+  const ell: [number, number][] = [
+    [0, 0],
+    [200, 0],
+    [200, 100],
+    [100, 100],
+    [100, 200],
+    [0, 200],
+  ];
+
+  it("holds a point inside and not one outside", () => {
+    expect(pointInPolygon([50, 50], ell)).toBe(true);
+    expect(pointInPolygon([150, 50], ell)).toBe(true);
+    expect(pointInPolygon([50, 150], ell)).toBe(true);
+    expect(pointInPolygon([-10, 50], ell)).toBe(false);
+    expect(pointInPolygon([250, 50], ell)).toBe(false);
+  });
+
+  it("leaves the notch of a concave shape outside", () => {
+    expect(pointInPolygon([150, 150], ell)).toBe(false);
+  });
+
+  it("holds nothing for a polygon with no corners", () => {
+    expect(pointInPolygon([0, 0], [])).toBe(false);
+  });
+});
+
+describe("cornerAnchor", () => {
+  const extent = { x: 1000, z: 500 };
+
+  it("is the top left of the box round every polygon", () => {
+    expect(
+      cornerAnchor(
+        {
+          polygons: [
+            [
+              [200, 100],
+              [300, 100],
+              [300, 200],
+            ],
+            [
+              [600, 50],
+              [700, 400],
+              [650, 300],
+            ],
+          ],
+          points: [],
+        },
+        extent,
+      ),
+    ).toEqual({ left: 20, top: 10 });
+  });
+
+  it("falls back to the start points", () => {
+    expect(
+      cornerAnchor(
+        {
+          polygons: [],
+          points: [
+            [500, 250],
+            [100, 400],
+          ],
+        },
+        extent,
+      ),
+    ).toEqual({ left: 10, top: 50 });
+  });
+
+  it("is null for an area with neither", () => {
+    expect(cornerAnchor({ polygons: [], points: [] }, extent)).toBeNull();
   });
 });
