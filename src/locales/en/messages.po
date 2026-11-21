@@ -2993,13 +2993,9 @@ msgstr "{kind, select, campaign {a campaign} coilbox_campaign {a coilbox campaig
 msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
 msgstr "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "{kind}, {time}"
-msgstr "{kind}, {time}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "{kind}, {time}, {lines}"
-msgstr "{kind}, {time}, {lines}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{kind}, {when}: {text}"
+msgstr "{kind}, {when}: {text}"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 msgid "{kind}: <0>{needName}</0>"
@@ -3970,17 +3966,13 @@ msgstr "{n, plural, =0 {no bots} one {# bot} other {# bots}}"
 msgid "{n, plural, one {{count} match} other {{count} matches}}"
 msgstr "{n, plural, one {{count} match} other {{count} matches}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "{n, plural, one {# chat line from {at}} other {# chat lines from {at}}}"
-msgstr "{n, plural, one {# chat line from {at}} other {# chat lines from {at}}}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n, plural, one {# chat line from {when}} other {# chat lines from {when}}}"
+msgstr "{n, plural, one {# chat line from {when}} other {# chat lines from {when}}}"
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 msgid "{n, plural, one {# entry} other {# entries}}"
 msgstr "{n, plural, one {# entry} other {# entries}}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "{n, plural, one {# event} other {# events}}"
-msgstr "{n, plural, one {# event} other {# events}}"
 
 #: src/hub/removePlan.ts
 msgid "{n, plural, one {# galaxy} other {# galaxies}}"
@@ -3997,10 +3989,6 @@ msgstr "{n, plural, one {# game} other {# games}}"
 msgid "{n, plural, one {# key} other {# keys}}"
 msgstr "{n, plural, one {# key} other {# keys}}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "{n, plural, one {# line} other {# lines}}"
-msgstr "{n, plural, one {# line} other {# lines}}"
-
 #: src/play/presetParts.ts
 msgid "{n, plural, one {# map option} other {# map options}}"
 msgstr "{n, plural, one {# map option} other {# map options}}"
@@ -4013,9 +4001,9 @@ msgstr "{n, plural, one {# order} other {# orders}}"
 msgid "{n, plural, one {# participant} other {# participants}}"
 msgstr "{n, plural, one {# participant} other {# participants}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "{n, plural, one {# player left from {at}} other {# players left from {at}}}"
-msgstr "{n, plural, one {# player left from {at}} other {# players left from {at}}}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n, plural, one {# player event from {when}} other {# player events from {when}}}"
+msgstr "{n, plural, one {# player event from {when}} other {# player events from {when}}}"
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{n, plural, one {# player} other {# players}}"
@@ -4049,9 +4037,9 @@ msgstr "{n, plural, one {Moved # replay ({size}).} other {Moved # replays ({size
 msgid "{n, plural, one {Removed # clip ({size}).} other {Removed # clips ({size}).}}"
 msgstr "{n, plural, one {Removed # clip ({size}).} other {Removed # clips ({size}).}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "{n} units destroyed from {at}"
-msgstr "{n} units destroyed from {at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n} units destroyed from {when}"
+msgstr "{n} units destroyed from {when}"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "{name} — hosted"
@@ -5371,10 +5359,6 @@ msgstr "{stageCount, plural, one {# upgrade} other {# upgrades}}"
 msgid "{staleCount} left behind by a rename"
 msgstr "{staleCount} left behind by a rename"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "{start} to {end}"
-msgstr "{start} to {end}"
-
 #: src/content/pages/MapDetailPage.tsx
 msgid "{startCount, plural, one {Preview · # start position} other {Preview · # start positions}}"
 msgstr "{startCount, plural, one {Preview · # start position} other {Preview · # start positions}}"
@@ -5620,9 +5604,9 @@ msgstr "{terrain, plural, one {# terrain change this game cannot make} other {# 
 msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
 msgstr "{terrain, plural, one {# terrain change} other {# terrain changes}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "{text}, {at}"
-msgstr "{text}, {at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{text}, {when}"
+msgstr "{text}, {when}"
 
 #: src/lego/pages/components/AtlasPicker.tsx
 msgid "{texture} (not installed)"
@@ -8892,7 +8876,7 @@ msgstr "all units"
 msgid "All units"
 msgstr "All units"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Allies"
 msgstr "Allies"
 
@@ -9286,10 +9270,6 @@ msgstr "and"
 #: src/mapconv/pages/components/MetalFigures.tsx
 msgid "and {hidden} more"
 msgstr "and {hidden} more"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "and {hiddenCount} more"
-msgstr "and {hiddenCount} more"
 
 #: src/lego/overlap.ts
 msgid "And {more} more. Buried pieces waste {triangles, plural, one {# triangle} other {# triangles}} in all."
@@ -10635,13 +10615,9 @@ msgstr "Beat 5 different AIs."
 msgid "Becomes true the moment a named actor is destroyed."
 msgstr "Becomes true the moment a named actor is destroyed."
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Before"
-msgstr "Before"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Before the game"
-msgstr "Before the game"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "before the game"
+msgstr "before the game"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Before the health rebalance"
@@ -12277,7 +12253,7 @@ msgstr "Charted metric, showing each metric's shape"
 msgid "Charted values"
 msgstr "Charted values"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/index.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/pages/ChatPage.tsx
@@ -12301,10 +12277,6 @@ msgstr "Chat logs"
 #: src/uberstress/pages/RunPage.tsx
 msgid "chat scenarios"
 msgstr "chat scenarios"
-
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "Chat, {at}: {text}"
-msgstr "Chat, {at}: {text}"
 
 #: src/runlite/pages/RunPage.tsx
 msgid "Cheapest"
@@ -14802,6 +14774,10 @@ msgstr "Could not reach unitsync to read this model."
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "Could not reach unitsync to read this unit's model."
 msgstr "Could not reach unitsync to read this unit's model."
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Could not read"
+msgstr "Could not read"
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 msgid "Could not read {archive}. It may have been moved or removed since it was browsed."
@@ -17348,10 +17324,6 @@ msgstr "Eight legs"
 msgid "Elapsed"
 msgstr "Elapsed"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Eliminated"
-msgstr "Eliminated"
-
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -17826,14 +17798,6 @@ msgstr "Event"
 msgid "Event log downloaded."
 msgstr "Event log downloaded."
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Event, {kind}, {time}"
-msgstr "Event, {kind}, {time}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Event, {kind}, {time}, {count}"
-msgstr "Event, {kind}, {time}, {count}"
-
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Events"
 msgstr "Events"
@@ -18018,7 +17982,7 @@ msgstr "Every view is {sideText} elmos across, the same for every player, and is
 msgid "Everybody who joins has to have exactly this version."
 msgstr "Everybody who joins has to have exactly this version."
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Everyone"
 msgstr "Everyone"
 
@@ -19952,10 +19916,6 @@ msgstr "Gather replays"
 msgid "Gathering the scenario and its dialogue clips…"
 msgstr "Gathering the scenario and its dialogue clips…"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Gave away"
-msgstr "Gave away"
-
 #: src/general/index.ts
 msgid "General"
 msgstr "General"
@@ -21712,6 +21672,10 @@ msgstr "In progress"
 msgid "In the source"
 msgstr "In the source"
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
+msgstr "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 msgid "In the unit definition"
 msgstr "In the unit definition"
@@ -22540,10 +22504,6 @@ msgstr "Joined"
 msgid "joined and left"
 msgstr "joined and left"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Joined late"
-msgstr "Joined late"
-
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "Joined to"
 msgstr "Joined to"
@@ -22840,7 +22800,7 @@ msgstr "Kicks {username} from the server."
 msgid "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch."
 msgstr "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch."
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Kills"
 msgstr "Kills"
 
@@ -23265,7 +23225,6 @@ msgstr "Leaves tracks"
 msgid "left"
 msgstr "left"
 
-#: src/content/pages/components/ReplayTimeline.tsx
 #: src/lego/pivot.ts
 msgid "Left"
 msgstr "Left"
@@ -25924,6 +25883,10 @@ msgstr "Needs an actor or a base"
 #: src/scenario/pages/components/triggers.ts
 msgid "Needs an objective"
 msgstr "Needs an objective"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Needs analysis"
+msgstr "Needs analysis"
 
 #: src/startbox/StartBoxControls.tsx
 msgid "Needs at least two allies with a box"
@@ -29918,10 +29881,6 @@ msgstr "Other"
 msgid "Other engine fields"
 msgstr "Other engine fields"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Other events"
-msgstr "Other events"
-
 #: src/lego/pages/components/ProportionsPanel.tsx
 msgid "Other pieces stay where they are."
 msgstr "Other pieces stay where they are."
@@ -30394,7 +30353,7 @@ msgstr "Path to drive"
 msgid "Patrol"
 msgstr "Patrol"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/placement/SurfaceBars.tsx
 msgid "Pause"
@@ -30415,10 +30374,6 @@ msgstr "Pause music"
 #: src/content/AnalysisQueueBadge.tsx
 msgid "Paused while a game is running. It carries on when the game ends."
 msgstr "Paused while a game is running. It carries on when the game ends."
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Pauses"
-msgstr "Pauses"
 
 #: src/scenario/triggerTypes.ts
 msgid "Pauses the game, in single player only. Unpause from a trigger the player wakes, such as one waiting on a dismissed dialogue line."
@@ -30837,7 +30792,7 @@ msgstr "Plates"
 #: src/content/pages/components/GameHeader.tsx
 #: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/onboarding/pages/AppearancePage.tsx
@@ -30887,7 +30842,7 @@ msgstr "Play all"
 msgid "Play as"
 msgstr "Play as"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Play in reverse"
 msgstr "Play in reverse"
 
@@ -30964,7 +30919,7 @@ msgstr "Playback of {0}"
 msgid "Playback progress"
 msgstr "Playback progress"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Playback speed"
 msgstr "Playback speed"
 
@@ -31056,6 +31011,7 @@ msgstr "Player's own"
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/admin/tools.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Players"
@@ -31084,10 +31040,6 @@ msgstr "Players each"
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Players in the match"
 msgstr "Players in the match"
-
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "Players leaving"
-msgstr "Players leaving"
 
 #: src/multiplayer/battles/zerokBattle.ts
 msgid "Players pick their own sides and the room is yours to set up."
@@ -31157,10 +31109,6 @@ msgstr "PNG image"
 #: src/content/pages/components/ReplayMapView.tsx
 msgid "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
 msgstr "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
-
-#: src/content/pages/components/ReplayChat.tsx
-msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
-msgstr "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
 
 #: src/content/mapAggregate.ts
 msgid "point of damage"
@@ -31279,7 +31227,6 @@ msgid "Pre-fill the file pickers with the folders you used last time."
 msgstr "Pre-fill the file pickers with the folders you used last time."
 
 #: src/content/pages/components/ReplayChat.tsx
-#: src/content/pages/components/ReplayTimeline.tsx
 msgid "Pre-game"
 msgstr "Pre-game"
 
@@ -33791,10 +33738,6 @@ msgstr "Reset to the built shape"
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "Resetting…"
 msgstr "Resetting…"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-msgid "Resigned"
-msgstr "Resigned"
 
 #: src/content/unitFieldNotes.ts
 msgid "Resists being pushed"
@@ -37462,7 +37405,7 @@ msgstr "Spectating"
 msgid "spectator"
 msgstr "spectator"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Spectators"
 msgstr "Spectators"
 
@@ -38460,7 +38403,7 @@ msgstr "Symmetry: a new piece gets a twin or a ring of copies, which follow it (
 msgid "Synced"
 msgstr "Synced"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
 #: src/play/pages/components/CrashDrawer.tsx
@@ -41294,10 +41237,6 @@ msgstr "The texture file has changed."
 msgid "The texture is in a file the game did not start with, so relaunch to see it."
 msgstr "The texture is in a file the game did not start with, so relaunch to see it."
 
-#: src/content/pages/components/ReplayChat.tsx
-msgid "the timeline"
-msgstr "the timeline"
-
 #: src/multiplayer/battles/hostBattle.ts
 msgid "The title cannot contain a tab or another control character."
 msgstr "The title cannot contain a tab or another control character."
@@ -42660,10 +42599,6 @@ msgstr "This replay could not be read to the end, so later orders may be missing
 msgid "This replay could not be read to the end, so the chat log may be incomplete."
 msgstr "This replay could not be read to the end, so the chat log may be incomplete."
 
-#: src/content/pages/components/ReplayChat.tsx
-msgid "This replay could not be read to the end, so the timeline stops at the last line read and may be incomplete."
-msgstr "This replay could not be read to the end, so the timeline stops at the last line read and may be incomplete."
-
 #: src/content/replayAnalysis.ts
 msgid "This replay does not say which engine recorded it, and no other engine is installed."
 msgstr "This replay does not say which engine recorded it, and no other engine is installed."
@@ -43289,7 +43224,7 @@ msgstr "Time"
 msgid "Time between wakes"
 msgstr "Time between wakes"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Time in the match"
 msgstr "Time in the match"
 
@@ -43317,7 +43252,7 @@ msgstr "Time: about {timeNeeded}"
 msgid "Time: unknown"
 msgstr "Time: unknown"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Timeline"
 msgstr "Timeline"
 
@@ -44120,10 +44055,6 @@ msgstr "Under {shortSeconds} seconds"
 msgid "Under attack sound"
 msgstr "Under attack sound"
 
-#: src/content/pages/components/ReplayMapView.tsx
-msgid "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
-msgstr "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
-
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Under your control — your capital."
 msgstr "Under your control — your capital."
@@ -44270,9 +44201,9 @@ msgstr "Unit definitions"
 msgid "Unit defs: {defsError}"
 msgstr "Unit defs: {defsError}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-msgid "Unit destroyed, {at}"
-msgstr "Unit destroyed, {at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Unit destroyed, {when}"
+msgstr "Unit destroyed, {when}"
 
 #: src/campaign/slots.ts
 msgid "Unit model"
@@ -46176,7 +46107,7 @@ msgstr "While this panel is open the viewport's handles are on the point itself,
 msgid "While this panel is open the viewport's handles are on the volume rather than on a piece, so you can drag it to size instead of typing. Move and scale only: a volume has no rotation. Select a piece and they move onto that piece's own box instead, which is the fields at the bottom."
 msgstr "While this panel is open the viewport's handles are on the volume rather than on a piece, so you can drag it to size instead of typing. Move and scale only: a volume has no rotation. Select a piece and they move onto that piece's own box instead, which is the fields at the bottom."
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Whispers"
 msgstr "Whispers"
 

@@ -3661,15 +3661,9 @@ msgstr "{kind, select, campaign {en kampanj} coilbox_campaign {en coilbox-kampan
 msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
 msgstr "{kind, select, campaign {Hubben har inga kampanjer än.} keymap {Hubben har inga tangentuppsättningar än.} module {Hubben har inga moduler än.} other {Hubben har inte den här typen av fil än.}}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{kind}, {time}"
-msgstr "{kind}, {time}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{kind}, {time}, {lines}"
-msgstr "{kind}, {time}, {lines}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{kind}, {when}: {text}"
+msgstr ""
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
@@ -4874,20 +4868,14 @@ msgstr "{n, plural, =0 {inga botar} one {# bot} other {# botar}}"
 msgid "{n, plural, one {{count} match} other {{count} matches}}"
 msgstr "{n, plural, one {{count} match} other {{count} matcher}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{n, plural, one {# chat line from {at}} other {# chat lines from {at}}}"
-msgstr "{n, plural, one {# chattrad från {at}} other {# chattrader från {at}}}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n, plural, one {# chat line from {when}} other {# chat lines from {when}}}"
+msgstr ""
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 #, fuzzy
 msgid "{n, plural, one {# entry} other {# entries}}"
 msgstr "{n, plural, one {# post} other {# poster}}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{n, plural, one {# event} other {# events}}"
-msgstr "{n, plural, one {# händelse} other {# händelser}}"
 
 #: src/hub/removePlan.ts
 #, fuzzy
@@ -4907,11 +4895,6 @@ msgstr "{n, plural, one {# match} other {# matcher}}"
 msgid "{n, plural, one {# key} other {# keys}}"
 msgstr "{n, plural, one {# nyckel} other {# nycklar}}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{n, plural, one {# line} other {# lines}}"
-msgstr "{n, plural, one {# rad} other {# rader}}"
-
 #: src/play/presetParts.ts
 #, fuzzy
 msgid "{n, plural, one {# map option} other {# map options}}"
@@ -4927,10 +4910,9 @@ msgstr "{n, plural, one {# order} other {# order}}"
 msgid "{n, plural, one {# participant} other {# participants}}"
 msgstr "{n, plural, one {# deltagare} other {# deltagare}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{n, plural, one {# player left from {at}} other {# players left from {at}}}"
-msgstr "{n, plural, one {# spelare lämnade från {at}} other {# spelare lämnade från {at}}}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n, plural, one {# player event from {when}} other {# player events from {when}}}"
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -4972,10 +4954,9 @@ msgstr "{n, plural, one {Flyttade # repris ({size}).} other {Flyttade # repriser
 msgid "{n, plural, one {Removed # clip ({size}).} other {Removed # clips ({size}).}}"
 msgstr "{n, plural, one {Tog bort # klipp ({size}).} other {Tog bort # klipp ({size}).}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{n} units destroyed from {at}"
-msgstr "{n} enheter förstörda från {at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n} units destroyed from {when}"
+msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
@@ -6602,11 +6583,6 @@ msgstr "{stageCount, plural, one {# uppgradering} other {# uppgraderingar}}"
 msgid "{staleCount} left behind by a rename"
 msgstr "Kvar efter namnbyte: {staleCount}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{start} to {end}"
-msgstr "{start} till {end}"
-
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "{startCount, plural, one {Preview · # start position} other {Preview · # start positions}}"
@@ -6912,10 +6888,9 @@ msgstr "{terrain, plural, one {# terrängändring som spelet inte kan göra} oth
 msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
 msgstr "{terrain, plural, one {# terrängändring} other {# terrängändringar}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{text}, {at}"
-msgstr "{text}, {at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{text}, {when}"
+msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -10961,7 +10936,7 @@ msgstr "alla enheter"
 msgid "All units"
 msgstr "Alla enheter"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
 msgstr "Allierade"
@@ -11451,11 +11426,6 @@ msgstr "och"
 #, fuzzy
 msgid "and {hidden} more"
 msgstr "och {hidden} till"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "and {hiddenCount} more"
-msgstr "och {hiddenCount} till"
 
 #: src/lego/overlap.ts
 #, fuzzy
@@ -13106,15 +13076,9 @@ msgstr "Besegra 5 olika AI."
 msgid "Becomes true the moment a named actor is destroyed."
 msgstr "Blir sant i samma ögonblick som en namngiven aktör förstörs."
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Before"
-msgstr "Före"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Before the game"
-msgstr "Före matchen"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "before the game"
+msgstr ""
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -15115,7 +15079,7 @@ msgstr "Mått i diagrammet, med varje måtts form"
 msgid "Charted values"
 msgstr "Värden i diagrammet"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/index.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/pages/ChatPage.tsx
@@ -15144,11 +15108,6 @@ msgstr "Chatthistorik"
 #, fuzzy
 msgid "chat scenarios"
 msgstr "chattscenarier"
-
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "Chat, {at}: {text}"
-msgstr "Chatt, {at}: {text}"
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -18192,6 +18151,10 @@ msgstr "Kunde inte nå unitsync för att läsa den här modellen."
 #, fuzzy
 msgid "Could not reach unitsync to read this unit's model."
 msgstr "Kunde inte nå unitsync för att läsa enhetens modell."
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Could not read"
+msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
@@ -21296,11 +21259,6 @@ msgstr "Åtta ben"
 msgid "Elapsed"
 msgstr "Förfluten tid"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Eliminated"
-msgstr "Utslagen"
-
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -21882,16 +21840,6 @@ msgstr "Händelse"
 msgid "Event log downloaded."
 msgstr "Händelseloggen nedladdad."
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Event, {kind}, {time}"
-msgstr "Händelse, {kind}, {time}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Event, {kind}, {time}, {count}"
-msgstr "Händelse, {kind}, {time}, {count}"
-
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Events"
@@ -22121,7 +22069,7 @@ msgstr "Varje vy är {sideText} elmos bred, lika för alla spelare, och är cent
 msgid "Everybody who joins has to have exactly this version."
 msgstr "Alla som går med måste ha exakt den här versionen."
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Everyone"
 msgstr "Alla"
@@ -24500,11 +24448,6 @@ msgstr "Samla repriser"
 msgid "Gathering the scenario and its dialogue clips…"
 msgstr "Samlar ihop scenariot och dess replikklipp…"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Gave away"
-msgstr "Gav bort"
-
 #: src/general/index.ts
 #, fuzzy
 msgid "General"
@@ -26672,6 +26615,10 @@ msgstr "Pågår"
 msgid "In the source"
 msgstr "I källan"
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "In the unit definition"
@@ -27684,11 +27631,6 @@ msgstr "Med"
 msgid "joined and left"
 msgstr "gick med och lämnade"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Joined late"
-msgstr "Gick med sent"
-
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "Joined to"
@@ -28057,7 +27999,7 @@ msgstr "Sparkar ut {username} från servern."
 msgid "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch."
 msgstr "Slår tillbaka eldröret längs sin egen lopp när vapnet skjuter, och för det mjukt tillbaka. En engångshändelse, inte en slinga: förhandsvisningen upprepar den på en timer så att det finns något att titta på."
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Kills"
 msgstr "Dödade"
@@ -28580,7 +28522,6 @@ msgstr "Lämnar spår"
 msgid "left"
 msgstr "vänster"
 
-#: src/content/pages/components/ReplayTimeline.tsx
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Left"
@@ -31838,6 +31779,10 @@ msgstr "Behöver en aktör eller en bas"
 #, fuzzy
 msgid "Needs an objective"
 msgstr "Behöver ett mål"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Needs analysis"
+msgstr ""
 
 #: src/startbox/StartBoxControls.tsx
 #, fuzzy
@@ -36759,11 +36704,6 @@ msgstr "Övrigt"
 msgid "Other engine fields"
 msgstr "Andra motorfält"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Other events"
-msgstr "Andra händelser"
-
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Other pieces stay where they are."
@@ -37341,7 +37281,7 @@ msgstr "Väg att köra"
 msgid "Patrol"
 msgstr "Patrullera"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
@@ -37367,11 +37307,6 @@ msgstr "Pausa musiken"
 #, fuzzy
 msgid "Paused while a game is running. It carries on when the game ends."
 msgstr "Pausad medan ett spel körs. Den fortsätter när spelet är slut."
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Pauses"
-msgstr "Pauser"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -37886,7 +37821,7 @@ msgstr ""
 #: src/content/pages/components/GameHeader.tsx
 #: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/onboarding/pages/AppearancePage.tsx
@@ -37946,7 +37881,7 @@ msgstr "Spela alla"
 msgid "Play as"
 msgstr "Spela som"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Play in reverse"
 msgstr "Spela baklänges"
@@ -38041,7 +37976,7 @@ msgstr "Uppspelning av {0}"
 msgid "Playback progress"
 msgstr "Uppspelningsförlopp"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Playback speed"
 msgstr "Uppspelningshastighet"
@@ -38152,6 +38087,7 @@ msgstr "Spelarens egna"
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/admin/tools.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -38187,11 +38123,6 @@ msgstr "Spelare per sida"
 #, fuzzy
 msgid "Players in the match"
 msgstr "Spelare i matchen"
-
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "Players leaving"
-msgstr "Spelare som lämnar"
 
 #: src/multiplayer/battles/zerokBattle.ts
 #, fuzzy
@@ -38278,11 +38209,6 @@ msgstr "PNG-bild"
 #, fuzzy
 msgid "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
 msgstr "Peka på en enhet för att se dess namn. Klicka på en för att behålla namnet, och klicka på marken för att släppa den."
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
-msgstr "Peka på eller fokusera ett märke för att läsa det. Välj ett chattmärke för att öppna chatthistoriken på den raden."
 
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -38429,7 +38355,6 @@ msgid "Pre-fill the file pickers with the folders you used last time."
 msgstr "Fyll i filväljarna i förväg med mapparna du använde senast."
 
 #: src/content/pages/components/ReplayChat.tsx
-#: src/content/pages/components/ReplayTimeline.tsx
 #, fuzzy
 msgid "Pre-game"
 msgstr "Före spelet"
@@ -41505,11 +41430,6 @@ msgstr "Återställ till den byggda formen"
 #, fuzzy
 msgid "Resetting…"
 msgstr "Återställer…"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Resigned"
-msgstr "Gav upp"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -46005,7 +45925,7 @@ msgstr "Tittar på"
 msgid "spectator"
 msgstr "åskådare"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Spectators"
 msgstr "Åskådare"
@@ -47226,7 +47146,7 @@ msgstr "Symmetri: en ny del får en tvilling eller en ring av kopior, som följe
 msgid "Synced"
 msgstr "Synkad"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
 #: src/play/pages/components/CrashDrawer.tsx
@@ -50712,11 +50632,6 @@ msgstr ""
 msgid "The texture is in a file the game did not start with, so relaunch to see it."
 msgstr "Texturen finns i en fil som spelet inte startade med, så starta om för att se den."
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "the timeline"
-msgstr "tidslinjen"
-
 #: src/multiplayer/battles/hostBattle.ts
 #, fuzzy
 msgid "The title cannot contain a tab or another control character."
@@ -52392,11 +52307,6 @@ msgstr "Reprisen kunde inte läsas till slutet, så senare order kan saknas."
 msgid "This replay could not be read to the end, so the chat log may be incomplete."
 msgstr "Reprisen kunde inte läsas till slutet, så chatthistoriken kan vara ofullständig."
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "This replay could not be read to the end, so the timeline stops at the last line read and may be incomplete."
-msgstr "Reprisen kunde inte läsas till slutet, så tidslinjen slutar vid den sista lästa raden och kan vara ofullständig."
-
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "This replay does not say which engine recorded it, and no other engine is installed."
@@ -53163,7 +53073,7 @@ msgstr "Tid"
 msgid "Time between wakes"
 msgstr "Tid mellan kölvatten"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Time in the match"
 msgstr "Tid i matchen"
@@ -53198,7 +53108,7 @@ msgstr "Tid: cirka {timeNeeded}"
 msgid "Time: unknown"
 msgstr "Tid: okänd"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Timeline"
 msgstr "Tidslinje"
@@ -54188,11 +54098,6 @@ msgstr "Under {shortSeconds} sekunder"
 msgid "Under attack sound"
 msgstr "Ljud vid anfall"
 
-#: src/content/pages/components/ReplayMapView.tsx
-#, fuzzy
-msgid "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
-msgstr "Under kartan ställer reglaget in tiden och knapparna spelar matchen framåt eller bakåt, med hastigheten bredvid dem. En hög stapel är en förstörd enhet, en prick är chatt och en romb är en spelare som lämnar, hämtat från reprisen och dess analys. Märken som skulle nudda varandra ritas som ett, större, och ett klick på det går till den tidigaste händelsen i det. En repris som inte har analyserats har inga dödade enheter. Adressen innehåller tiden, så en länk öppnas vid det ögonblicket."
-
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "Under your control — your capital."
@@ -54369,10 +54274,9 @@ msgstr "Enhetsdefinitioner"
 msgid "Unit defs: {defsError}"
 msgstr "Enhetsdefinitioner: {defsError}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "Unit destroyed, {at}"
-msgstr "Enhet förstörd, {at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Unit destroyed, {when}"
+msgstr ""
 
 #: src/campaign/slots.ts
 #, fuzzy
@@ -56703,7 +56607,7 @@ msgstr "Medan den här panelen är öppen sitter vyns handtag på själva punkte
 msgid "While this panel is open the viewport's handles are on the volume rather than on a piece, so you can drag it to size instead of typing. Move and scale only: a volume has no rotation. Select a piece and they move onto that piece's own box instead, which is the fields at the bottom."
 msgstr "Medan den här panelen är öppen sitter vyns handtag på volymen i stället för på en del, så du kan dra den till rätt storlek i stället för att skriva. Bara flytta och skala: en volym har ingen rotation. Markera en del så flyttas de till den delens egen låda i stället, som är fälten längst ned."
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Whispers"
 msgstr "Viskningar"
