@@ -13864,6 +13864,7 @@ msgid "Commander"
 msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
+#: src/content/replayEntries.ts
 msgid "Commands per minute"
 msgstr ""
 
@@ -19558,6 +19559,10 @@ msgstr ""
 msgid "From the orders and messages recorded during the match."
 msgstr ""
 
+#: src/content/replayEntries.ts
+msgid "From the replay"
+msgstr ""
+
 #: src/blueprint/library.ts
 msgid "From the setup pack {title}"
 msgstr ""
@@ -23586,6 +23591,10 @@ msgstr ""
 #: src/hub/maps/catalogSweep.ts
 #: src/hub/maps/pictureSweep.ts
 msgid "listed twice in the library"
+msgstr ""
+
+#: src/content/replayEntries.ts
+msgid "Living unit value"
 msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
@@ -36514,10 +36523,6 @@ msgstr ""
 msgid "Show build orders"
 msgstr ""
 
-#: src/content/pages/components/CommandRateChart.tsx
-msgid "Show commands per minute"
-msgstr ""
-
 #: src/lego/pages/components/ViewportBar.tsx
 msgid "Show each weapon's stated range and firing arc"
 msgstr ""
@@ -36704,10 +36709,6 @@ msgstr ""
 
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "Show updates"
-msgstr ""
-
-#: src/content/pages/components/LivingValueChart.tsx
-msgid "Show value of living units by kind"
 msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx

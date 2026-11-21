@@ -17019,6 +17019,7 @@ msgid "Commander"
 msgstr "Kommandør"
 
 #: src/content/pages/components/CommandRateChart.tsx
+#: src/content/replayEntries.ts
 #, fuzzy
 msgid "Commands per minute"
 msgstr "Kommandoer per minutt"
@@ -23992,6 +23993,10 @@ msgstr "Fra modellens midtpunkt."
 msgid "From the orders and messages recorded during the match."
 msgstr "Fra ordrene og meldingene registrert under kampen."
 
+#: src/content/replayEntries.ts
+msgid "From the replay"
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From the setup pack {title}"
@@ -28937,6 +28942,10 @@ msgstr "Liste"
 #, fuzzy
 msgid "listed twice in the library"
 msgstr "oppført to ganger i biblioteket"
+
+#: src/content/replayEntries.ts
+msgid "Living unit value"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44785,11 +44794,6 @@ msgstr "Vis utestengelser"
 msgid "Show build orders"
 msgstr "Vis byggeordrer"
 
-#: src/content/pages/components/CommandRateChart.tsx
-#, fuzzy
-msgid "Show commands per minute"
-msgstr "Vis kommandoer per minutt"
-
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
@@ -45022,11 +45026,6 @@ msgstr "Vis dette arket"
 #, fuzzy
 msgid "Show updates"
 msgstr "Vis oppdateringer"
-
-#: src/content/pages/components/LivingValueChart.tsx
-#, fuzzy
-msgid "Show value of living units by kind"
-msgstr "Vis verdien av levende enheter etter type"
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy

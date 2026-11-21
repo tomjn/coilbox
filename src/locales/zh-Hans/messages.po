@@ -16906,6 +16906,7 @@ msgid "Commander"
 msgstr "指挥官"
 
 #: src/content/pages/components/CommandRateChart.tsx
+#: src/content/replayEntries.ts
 #, fuzzy
 msgid "Commands per minute"
 msgstr "每分钟命令数"
@@ -23846,6 +23847,10 @@ msgstr "从模型中心算起。"
 msgid "From the orders and messages recorded during the match."
 msgstr "来自对局期间记录的命令和消息。"
 
+#: src/content/replayEntries.ts
+msgid "From the replay"
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From the setup pack {title}"
@@ -28767,6 +28772,10 @@ msgstr "列表"
 #, fuzzy
 msgid "listed twice in the library"
 msgstr "张在库中被列出两次"
+
+#: src/content/replayEntries.ts
+msgid "Living unit value"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44507,11 +44516,6 @@ msgstr "显示封禁"
 msgid "Show build orders"
 msgstr "显示建造顺序"
 
-#: src/content/pages/components/CommandRateChart.tsx
-#, fuzzy
-msgid "Show commands per minute"
-msgstr "显示每分钟命令数"
-
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
@@ -44744,11 +44748,6 @@ msgstr "显示此列表"
 #, fuzzy
 msgid "Show updates"
 msgstr "显示更新"
-
-#: src/content/pages/components/LivingValueChart.tsx
-#, fuzzy
-msgid "Show value of living units by kind"
-msgstr "按种类显示存活单位的价值"
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy

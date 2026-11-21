@@ -1,7 +1,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, cn, useTheme } from "@picoframe/frame";
+import { cn, useTheme } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -42,8 +42,9 @@ import { SectionHelp } from "./SectionHelp";
 import { StoredListNote } from "./UnitListNotes";
 
 /**
- * What each player's living units were worth, by kind of unit, as its own
- * small charts under the match chart (#1174).
+ * What each player's living units were worth, by kind of unit, as small charts
+ * in the match chart's plot area when its entry in the metric list is picked
+ * (#1174, #5321).
  *
  * It is not a metric in the registry, for the reason commands per minute is
  * not: the registry is the trailer's fields, and this comes from an analysis's
@@ -84,11 +85,23 @@ interface ChartProps {
   periodSec: number;
 }
 
+/**
+ * The small charts share the plot area's width evenly, so two players get half
+ * each. `auto-fit` drops the tracks nothing is in and lets the rest stretch, and
+ * the least a track may be is a quarter of the width less the gaps, so no row
+ * holds more than {@link MOST_COLUMNS} charts and the rest wrap. In a plot area
+ * too narrow for that, {@link LEAST_WIDTH} wins and fewer fit across. The
+ * replay page's two column layout leaves the plot area about 300px, which is
+ * two charts wide at that floor. The gap is `gap-3`, 0.75rem.
+ */
+const MOST_COLUMNS = 4;
+const LEAST_WIDTH = "8rem";
+const PANEL_GRID: React.CSSProperties = {
+  gridTemplateColumns: `repeat(auto-fit, minmax(max(${LEAST_WIDTH}, calc((100% - ${(MOST_COLUMNS - 1) * 0.75}rem) / ${MOST_COLUMNS})), 1fr))`,
+};
+
 const frame = (children: React.ReactNode, help?: React.ReactNode) => (
-  <div
-    className="flex flex-col gap-2 border-t border-border/50 pt-3"
-    data-testid="living-value"
-  >
+  <div className="flex flex-col gap-2" data-testid="living-value">
     <div className="flex items-center gap-1">
       <h3 className="text-sm font-medium">
         <Trans>Value of living units by kind</Trans>
@@ -113,7 +126,6 @@ export function LivingValueChart(props: ChartProps) {
   const stored =
     info.remixed || !info.gameId ? undefined : analyses.get(info.gameId);
   const state = eventState(info, stored, analysisRunHidden());
-  const [open, setOpen] = useState(false);
 
   if (state.kind === "remix")
     return frame(
@@ -144,25 +156,12 @@ export function LivingValueChart(props: ChartProps) {
       ) : undefined,
     );
 
-  if (!open)
-    return (
-      <div className="flex flex-col gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() => setOpen(true)}
-        >
-          <Trans>Show value of living units by kind</Trans>
-        </Button>
-      </div>
-    );
   return <OpenValueChart {...props} state={state} />;
 }
 
-/** The charts once asked for. The events and the game's units are read here
- *  and nowhere above, so nothing is read until the reader asks. */
+/** The charts, drawn only while their entry is picked. The events and the
+ *  game's units are read here and nowhere above, so nothing is read until the
+ *  reader picks it. */
 function OpenValueChart({
   info,
   series,
@@ -323,7 +322,7 @@ function OpenValueChart({
               : t`No finished unit with a ${resourceName} cost belongs to the lines on the chart above.`,
           )
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
+          <div className="grid gap-3" style={PANEL_GRID}>
             {panels.map(({ series: s, teams, rows }) => {
               const lit = emphasis.isLit(teams);
               return (

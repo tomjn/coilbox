@@ -145,10 +145,6 @@ const help = () => {
   );
   return screen.getByRole("dialog").textContent ?? "";
 };
-const open = () =>
-  fireEvent.click(
-    screen.getByRole("button", { name: "Show value of living units by kind" }),
-  );
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -180,9 +176,6 @@ describe("a replay the charts cannot be drawn for", () => {
     expect(help()).toMatch(
       /The replay itself records what was produced and lost, not what a player owned at any moment/,
     );
-    expect(
-      screen.queryByRole("button", { name: /show value of living units/i }),
-    ).toBeNull();
     expect(eventsRead).not.toHaveBeenCalled();
   });
 
@@ -206,14 +199,12 @@ describe("a replay the charts cannot be drawn for", () => {
 });
 
 describe("an analysed replay", () => {
-  it("reads nothing until asked, and then only the kinds the sum needs", async () => {
+  it("reads only the kinds the sum needs", async () => {
     analysed();
     EVENTS = FINISHED;
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
     show();
-    expect(eventsRead).not.toHaveBeenCalled();
-    open();
     await screen.findByTestId("living-value");
     await waitFor(() => expect(eventsRead).toHaveBeenCalledTimes(1));
     expect(eventsRead).toHaveBeenCalledWith({
@@ -228,7 +219,6 @@ describe("an analysed replay", () => {
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
     show();
-    open();
     await waitFor(() =>
       expect(document.querySelectorAll("[data-value-panel]")).toHaveLength(2),
     );
@@ -249,7 +239,6 @@ describe("an analysed replay", () => {
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
     show();
-    open();
     await screen.findByRole("radio", { name: "Metal cost" });
     expect(text()).not.toMatch(/never added together/);
     const said = help();
@@ -271,7 +260,6 @@ describe("an analysed replay", () => {
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
     show();
-    open();
     await screen.findByRole("radio", { name: "Metal cost" });
     expect(text()).not.toMatch(/have no cost in the installed game/);
     expect(help()).toMatch(
@@ -283,7 +271,6 @@ describe("an analysed replay", () => {
     analysed();
     EVENTS = FINISHED;
     show();
-    open();
     await waitFor(() =>
       expect(text()).toMatch(
         /Some Game 1\.0 is not installed, so nothing says what a unit costs or what it is for/,
@@ -298,7 +285,6 @@ describe("an analysed replay", () => {
     GAMES = [game("Some Game 1.1")];
     DATASET = { units: UNITS };
     show();
-    open();
     await waitFor(() =>
       expect(text()).toMatch(
         /played on Some Game 1\.0, which is not installed\. Costs and kinds come from Some Game 1\.1, a different build, and may be wrong/,
@@ -312,7 +298,6 @@ describe("an analysed replay", () => {
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
     show();
-    open();
     await waitFor(() =>
       expect(text()).toMatch(
         /It did not record a unit changing hands, so a unit that was given away or captured is counted for its first owner throughout/,
@@ -328,7 +313,6 @@ describe("an analysed replay", () => {
       throw new Error("gone");
     });
     show();
-    open();
     await waitFor(() =>
       expect(text()).toMatch(
         /events could not be read from this replay's analysis/,

@@ -102,9 +102,10 @@ Under them is the match chart. It draws one figure over the length of the match.
 - Highlight me picks out your own line. It appears when you played in the match and Players is picked.
 - Export CSV saves the figures as a file for a spreadsheet.
 
-Show commands per minute adds a small chart of how many orders each team gave.
+Two more figures are listed last, under From the replay. Picking one replaces the chart. Cumulative or Per minute and Chart or Table are switched off for them.
 
-Value of living units by kind shows what each player's army was worth over time, split by kind of unit. It needs the replay to be analysed first. See [Analyse a replay](#analyse-a-replay).
+- Commands per minute draws a line for each player showing how many orders they gave. coilbox reads the orders from the replay when you first pick it.
+- Living unit value shows what each player's army was worth over time, split by kind of unit, as a small chart for each player. The kinds are named once above the charts. It needs the replay to be analysed first. See [Analyse a replay](#analyse-a-replay). Without an analysis it says so.
 
 ## Build orders
 

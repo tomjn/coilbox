@@ -45,7 +45,6 @@ import {
   endPoints,
   formatChartValue,
   formatRate,
-  metricGroups,
   modeRows,
   partlyHidden,
   playerTeam,
@@ -56,7 +55,11 @@ import {
   tooltipRows,
   valueTable,
 } from "../../matchStats";
-import { labelOfMetric } from "../../metricLabels";
+import {
+  COMMAND_RATE_KEY,
+  LIVING_VALUE_KEY,
+  replayEntry,
+} from "../../replayEntries";
 import { plotInsets } from "../../replayTimeline";
 import { useChartSeries } from "../../useChartSeries";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
@@ -114,6 +117,7 @@ function MetricSelect({
   onChange,
 }: {
   metrics: Metric[];
+  /** A metric's key, or one of the replay entries'. */
   value: string;
   onChange: (key: string) => void;
 }) {
@@ -151,11 +155,14 @@ function Choice<T extends string>({
   options,
   label,
   onChange,
+  disabled,
 }: {
   value: T;
   options: { value: T; label: MessageDescriptor }[];
   label: string;
   onChange: (value: T) => void;
+  /** For an entry the switch does not apply to (#5321). It keeps its last value. */
+  disabled?: boolean;
 }) {
   const { i18n } = useLingui();
   return (
@@ -164,6 +171,7 @@ function Choice<T extends string>({
       variant="outline"
       size="sm"
       value={value}
+      disabled={disabled}
       // Radix clears the value when the lit button is pressed again, and there
       // is no third option to fall back to, so an empty change is ignored.
       onValueChange={(v) => v && onChange(v as T)}
@@ -356,8 +364,8 @@ export function MatchStatsChart({
   info: DemoInfo;
   trailer: DemoTrailer;
   metrics: Metric[];
-  /** Where to read commands per minute from. Left out, the chart has none. */
-  replayPath?: string;
+  /** Where to read commands per minute from. */
+  replayPath: string;
 }) {
   const { t } = useLingui();
   // The metric, the mode and the lines are kept with the page's emphasis, so the
@@ -370,6 +378,11 @@ export function MatchStatsChart({
     setView: setChosen,
   } = useChartChoice();
   const [display, setDisplay] = useState<ChartDisplay>("chart");
+  // Commands per minute and the living unit value are picked from the same list
+  // as the metrics but are drawn from other data (#5321). While one is picked,
+  // `metric` is still the metric the rows below are built from, for the time
+  // axis they share, and nothing of it is drawn.
+  const entry = replayEntry(key);
   const metric = metrics.find((m) => m.key === key) ?? defaultMetric(metrics);
 
   const [storedMode, setColorMode] = useStoredColorMode();
@@ -446,10 +459,10 @@ export function MatchStatsChart({
   // second time, so the two can't answer different questions.
   const table = useMemo(
     () =>
-      metric && !noneDrawn
+      metric && !noneDrawn && !entry
         ? valueTable(drawn, rows, { metric, mode, view })
         : null,
-    [drawn, noneDrawn, rows, metric, mode, view],
+    [drawn, noneDrawn, entry, rows, metric, mode, view],
   );
 
   // Which engine teams each line stands for, so a line, a roster seat and a
@@ -478,9 +491,11 @@ export function MatchStatsChart({
 
   if (!metric || series.length === 0) return null;
   // With every line unchecked the controls stay, so there is a way back.
-  if (!noneDrawn && (!table || rows.length === 0)) return null;
+  if (!noneDrawn && ((!table && !entry) || rows.length === 0)) return null;
 
   const partialLabels = partial.map((s) => s.label).join(", ");
+  // Where the match chart's time axis ends, which the entries' charts share.
+  const endSec = rows[rows.length - 1]?.timeSec ?? 0;
   const litLine = (id: string) => emphasis.isLit(teamsOf.get(id));
   const legendEntries: LegendEntry[] = drawn.map((s) => ({
     id: s.id,
@@ -499,12 +514,17 @@ export function MatchStatsChart({
        * over the trailer, and the last picks whether the answer is drawn or
        * printed, so the table needs nothing the plot didn't already have. */}
       <div className="flex flex-wrap items-center gap-2">
-        <MetricSelect metrics={metrics} value={metric.key} onChange={setKey} />
+        <MetricSelect
+          metrics={metrics}
+          value={entry?.key ?? metric.key}
+          onChange={setKey}
+        />
         <Choice
           value={mode}
           options={MODES}
           label={t`Charted values`}
           onChange={setMode}
+          disabled={!!entry}
         />
         <Choice
           value={view}
@@ -517,6 +537,7 @@ export function MatchStatsChart({
           options={DISPLAYS}
           label={t`Shown as`}
           onChange={setDisplay}
+          disabled={!!entry}
         />
         <CheckField
           label={t`In-game colours`}
@@ -530,30 +551,34 @@ export function MatchStatsChart({
             onChange={setHighlightMe}
           />
         )}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <MatchStatsImageButton
-            input={{
-              info,
-              metric,
-              mode,
-              view,
-              series: imageSeries,
-              rows,
-            }}
-          />
-          <MatchStatsExportButton
-            input={{
-              info,
-              metric,
-              mode,
-              view,
-              series: drawn,
-              allSeries: series,
-              rows,
-            }}
-            hiddenCount={series.length - drawn.length}
-          />
-        </div>
+        {/* Both save a metric's figures. The commands per minute chart has an
+         * export of its own, and the value of living units has none. */}
+        {!entry && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <MatchStatsImageButton
+              input={{
+                info,
+                metric,
+                mode,
+                view,
+                series: imageSeries,
+                rows,
+              }}
+            />
+            <MatchStatsExportButton
+              input={{
+                info,
+                metric,
+                mode,
+                view,
+                series: drawn,
+                allSeries: series,
+                rows,
+              }}
+              hiddenCount={series.length - drawn.length}
+            />
+          </div>
+        )}
       </div>
 
       {view === "teams" && partial.length > 0 && (
@@ -566,7 +591,7 @@ export function MatchStatsChart({
         </p>
       )}
 
-      {noneDrawn || !table ? (
+      {noneDrawn ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-4 text-sm">
           <Trans>Every line is unchecked in the roster.</Trans>
           <Button
@@ -584,12 +609,26 @@ export function MatchStatsChart({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
           <MatchStatsPicker
             groups={tiles}
-            value={metric.key}
+            value={entry?.key ?? metric.key}
             plotHeight={chartHeight(drawn.length)}
             onChange={setKey}
           />
           <div className="order-first min-w-0 flex-1 lg:order-last">
-            {display === "table" ? (
+            {entry?.key === COMMAND_RATE_KEY ? (
+              <CommandRateChart
+                info={info}
+                replayPath={replayPath}
+                series={drawn}
+                endSec={endSec}
+              />
+            ) : entry?.key === LIVING_VALUE_KEY ? (
+              <LivingValueChart
+                info={info}
+                series={drawn}
+                endSec={endSec}
+                periodSec={trailer.teamStatPeriodSec}
+              />
+            ) : display === "table" && table ? (
               <MatchStatsTable table={table} />
             ) : (
               <ResponsiveContainer
@@ -724,23 +763,6 @@ export function MatchStatsChart({
             )}
           </div>
         </div>
-      )}
-
-      {replayPath && !noneDrawn && (
-        <CommandRateChart
-          info={info}
-          replayPath={replayPath}
-          series={drawn}
-          endSec={rows[rows.length - 1]?.timeSec ?? 0}
-        />
-      )}
-      {!noneDrawn && (
-        <LivingValueChart
-          info={info}
-          series={drawn}
-          endSec={rows[rows.length - 1]?.timeSec ?? 0}
-          periodSec={trailer.teamStatPeriodSec}
-        />
       )}
     </div>
   );
