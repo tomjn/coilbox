@@ -98,6 +98,8 @@ export function testTrack(
 export interface Call {
   op: string;
   args: number[];
+  /** What was drawn, for `drawImage`. */
+  image?: unknown;
   fillStyle: string;
   strokeStyle: string;
   globalAlpha: number;
@@ -126,6 +128,7 @@ export function recordingContext(): PaintContext & {
     "lineTo",
     "closePath",
     "rect",
+    "fillRect",
     "arc",
     "fill",
     "stroke",
@@ -140,6 +143,16 @@ export function recordingContext(): PaintContext & {
       });
     };
   }
+  ctx.drawImage = (image: unknown, ...args: number[]) => {
+    calls.push({
+      op: "drawImage",
+      args,
+      image,
+      fillStyle: state.fillStyle,
+      strokeStyle: state.strokeStyle,
+      globalAlpha: state.globalAlpha,
+    });
+  };
   return ctx as unknown as PaintContext & {
     calls: Call[];
     count(op: string): number;

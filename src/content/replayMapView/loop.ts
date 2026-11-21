@@ -1,5 +1,6 @@
 import type { ReplayTrackError, ReplayTrackHandle } from "../replayTrack";
 import type { ReplayClock } from "./clock";
+import type { UnitIcons } from "./icons";
 import {
   LEAST_HALF_MARK,
   type MapViewport,
@@ -28,6 +29,8 @@ export interface MapViewOptions {
   handle: ReplayTrackHandle;
   clock: ReplayClock;
   teams: ReadonlyMap<number, TeamStyle>;
+  /** Draws units as their game icons. Null draws every unit as its footprint. */
+  icons?: UnitIcons | null;
   /** The canvas's context and its size now, or null when there is none. */
   surface(): { ctx: PaintContext; view: MapViewport } | null;
   env: MapViewEnv;
@@ -48,6 +51,8 @@ export interface MapView {
   setHighlight(serial: number | null): void;
   /** Draw the teams in these styles from the next picture. */
   setTeams(teams: ReadonlyMap<number, TeamStyle>): void;
+  /** Draw units as these icons from the next picture, or as footprints. */
+  setIcons(icons: UnitIcons | null): void;
   /** The unit under a point of the canvas, in the canvas's own pixels. */
   pick(
     x: number,
@@ -78,6 +83,7 @@ const PICK_SLOP = 2;
 export function createMapView(options: MapViewOptions): MapView {
   const { handle, clock, env } = options;
   let teams = options.teams;
+  let icons = options.icons ?? null;
   const scene = createMapScene();
   let shown = false;
   let dirty = true;
@@ -112,6 +118,7 @@ export function createMapView(options: MapViewOptions): MapView {
       surface.view,
       teams,
       highlight,
+      icons,
     );
     painted = surface.view;
     say({ kind: "ready" });
@@ -164,15 +171,22 @@ export function createMapView(options: MapViewOptions): MapView {
       teams = next;
       invalidate();
     },
+    setIcons(next) {
+      if (next === icons) return;
+      icons = next;
+      invalidate();
+    },
     pick(x, y) {
       if (!painted || scene.frame < 0) return null;
       const { scale, pixelRatio } = painted;
+      const drawn = icons;
       const found = unitAt(
         scene,
         x / scale,
         y / scale,
         (LEAST_HALF_MARK * pixelRatio) / scale,
         (PICK_SLOP * pixelRatio) / scale,
+        drawn ? (def) => drawn.edge(def, pixelRatio) / 2 / scale : undefined,
       );
       if (found < 0) return null;
       return {

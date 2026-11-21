@@ -1,6 +1,7 @@
 /** What the map view puts on its canvas (#3807), counted on a context that
  *  records the calls made to it. */
 import { describe, expect, it } from "vitest";
+import type { UnitIcons } from "./icons";
 import {
   emphasisedStyles,
   FAINT_UNITS,
@@ -304,5 +305,135 @@ describe("a team the players table leaves out or points past", () => {
     const style = emphasisedStyles(base, { hidden: [0], active: [0, 1] });
     expect(style.get(0)).toMatchObject({ alpha: FAINT_UNITS, lit: false });
     expect(style.get(1)).toMatchObject({ alpha: 1, lit: true });
+  });
+});
+
+/** A sprite the painter can draw, with the colour it was tinted in. */
+interface FakeSprite {
+  def: number;
+  fill: string;
+  lit: boolean;
+  width: number;
+  height: number;
+}
+
+/** Icons for the unit definitions in `edges`, which say each icon's edge in CSS
+ *  pixels. Any other definition has none. */
+function fakeIcons(edges: Record<number, number>): UnitIcons {
+  return {
+    edge: (def, ratio) => (edges[def] ?? 0) * ratio,
+    sprite: (def, fill, lit, ratio) =>
+      def in edges
+        ? ({
+            def,
+            fill,
+            lit,
+            width: edges[def] * ratio,
+            height: edges[def] * ratio,
+          } satisfies FakeSprite as unknown as CanvasImageSource)
+        : null,
+  };
+}
+
+describe("a unit drawn as its game icon", () => {
+  const base = teamStyles(fixtureHeader.teams);
+
+  function paintedWith(
+    scene: MapScene,
+    icons: UnitIcons | null,
+    teams: ReturnType<typeof teamStyles> = base,
+    highlight: number | null = null,
+  ) {
+    const ctx = recordingContext();
+    const counts = paintScene(ctx, scene, view, teams, highlight, icons);
+    return { ctx, counts };
+  }
+
+  it("is drawn from the icon, centred on the unit, with no rectangle", () => {
+    const scene = one({ x: 4096, z: 3072 });
+    scene.unitDef[0] = 3;
+    const { ctx, counts } = paintedWith(scene, fakeIcons({ 3: 12 }));
+    expect(ctx.count("closePath")).toBe(0);
+    expect(ctx.count("drawImage")).toBe(1);
+    const draw = ctx.calls.find((c) => c.op === "drawImage");
+    // The middle of the map is the middle of the canvas, and the icon is 12.
+    expect(draw?.args).toEqual([512 - 6, 384 - 6]);
+    expect(draw?.image).toMatchObject({ def: 3, width: 12 });
+    expect(counts.icons).toBe(1);
+  });
+
+  it("is a rectangle when the unit has no icon, beside one that has", () => {
+    const scene = two();
+    scene.unitDef[0] = 3;
+    scene.unitDef[1] = 4;
+    const { ctx, counts } = paintedWith(scene, fakeIcons({ 3: 12 }));
+    expect(ctx.count("drawImage")).toBe(1);
+    expect(ctx.count("closePath")).toBe(1);
+    expect(counts.icons).toBe(1);
+    expect(counts.units).toBe(2);
+  });
+
+  it("is a rectangle while there are no icons", () => {
+    const scene = one({});
+    const { ctx, counts } = paintedWith(scene, null);
+    expect(ctx.count("drawImage")).toBe(0);
+    expect(ctx.count("closePath")).toBe(1);
+    expect(counts.icons).toBe(0);
+  });
+
+  it("asks for the icon in its team's colour", () => {
+    const named = teamStyles(fixtureHeader.teams, new Map([[0, "#112233"]]));
+    const { ctx } = paintedWith(one({}), fakeIcons({ 0: 12 }), named);
+    const image = ctx.calls.find((c) => c.op === "drawImage")
+      ?.image as FakeSprite;
+    expect(image.fill).toBe("#112233");
+    expect(image.lit).toBe(false);
+  });
+
+  it("asks for the lit icon of the team pointed at, and a plain one of another", () => {
+    const pointed = emphasisedStyles(base, { hidden: [], active: [1] });
+    const scene = two();
+    const { ctx } = paintedWith(scene, fakeIcons({ 0: 12 }), pointed);
+    const lit = ctx.calls
+      .filter((c) => c.op === "drawImage")
+      .map((c) => (c.image as FakeSprite).lit);
+    // Team 0 is left plain and drawn first, then team 1, which is lit.
+    expect(lit).toEqual([false, true]);
+  });
+
+  it("is faint for a team the table leaves out and fainter still while it is built", () => {
+    const faint = emphasisedStyles(base, { hidden: [0], active: null });
+    const alphaOf = (build: number, teams = base) =>
+      paintedWith(one({ build }), fakeIcons({ 0: 12 }), teams).ctx.calls.find(
+        (c) => c.op === "drawImage",
+      )?.globalAlpha ?? Number.NaN;
+    expect(alphaOf(1)).toBe(1);
+    expect(alphaOf(0.5)).toBeLessThan(1);
+    expect(alphaOf(0)).toBeGreaterThan(0);
+    expect(alphaOf(1, faint)).toBe(FAINT_UNITS);
+    expect(alphaOf(0, faint)).toBeLessThan(FAINT_UNITS);
+    expect(alphaOf(0, faint)).toBeGreaterThan(0);
+  });
+
+  it("is drawn above the start of the next team's rectangles and after its own", () => {
+    const scene = two();
+    scene.unitDef[0] = 0;
+    scene.unitDef[1] = 1;
+    const { ctx } = paintedWith(scene, fakeIcons({ 0: 12 }));
+    // Team 0's icon is drawn, then team 1's rectangle.
+    const ops = ctx.calls.map((c) => c.op);
+    expect(ops.indexOf("drawImage")).toBeLessThan(ops.indexOf("closePath"));
+  });
+
+  it("is ringed by a ring that clears the icon", () => {
+    const scene = one({});
+    scene.unitSerial[0] = 5;
+    scene.unitAcross[0] = 1;
+    scene.unitAlong[0] = 1;
+    const { ctx, counts } = paintedWith(scene, fakeIcons({ 0: 20 }), base, 5);
+    expect(counts.highlighted).toBe(true);
+    const arc = ctx.calls.find((c) => c.op === "arc");
+    // Half the icon's edge, 10, reaches 10 root 2 to its corner.
+    expect(arc?.args[2]).toBeGreaterThan(10 * Math.SQRT2);
   });
 });

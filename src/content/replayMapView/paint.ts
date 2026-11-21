@@ -1,4 +1,5 @@
 import type { ReplayTrackTeam } from "../bindings";
+import type { UnitIcons } from "./icons";
 import type { MapScene } from "./scene";
 
 /** The canvas the scene is drawn on. `width` and `height` are its own pixels,
@@ -15,6 +16,8 @@ export interface PaintCounts {
   units: number;
   projectiles: number;
   wrecks: number;
+  /** How many of the units were drawn as their game icon. */
+  icons: number;
   /** Whether the unit asked to be ringed is in the picture. */
   highlighted: boolean;
 }
@@ -29,6 +32,7 @@ export type PaintContext = Pick<
   | "moveTo"
   | "lineTo"
   | "closePath"
+  | "drawImage"
   | "rect"
   | "arc"
   | "fill"
@@ -162,12 +166,12 @@ export function buildAlpha(build: number): number {
 }
 
 /**
- * Draws a scene. Units go down a team at a time: every finished unit of a team
- * is one path, filled once, so a frame with a thousand units is a few dozen
- * canvas calls that paint and not a thousand. A unit under construction has
- * its own opacity and so its own fill.
+ * Draws a scene: the wrecks, then the units, then the projectiles, then a ring
+ * round the unit asked for. Each is its own pass.
  *
  * World x runs along the canvas and world z runs down it, as on the minimap.
+ * `icons` draws each unit that has one as its game icon and every other as its
+ * footprint. With none, every unit is its footprint.
  */
 export function paintScene(
   ctx: PaintContext,
@@ -175,28 +179,98 @@ export function paintScene(
   view: MapViewport,
   teams: ReadonlyMap<number, TeamStyle>,
   highlight: number | null,
+  icons: UnitIcons | null = null,
 ): PaintCounts {
   const { scale, pixelRatio: u } = view;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, view.width, view.height);
 
-  if (scene.wrecks > 0) {
-    const half = HALF_WRECK * u;
+  paintWrecks(ctx, scene, view);
+  const { ringed, iconed } = paintUnits(
+    ctx,
+    scene,
+    view,
+    teams,
+    highlight,
+    icons,
+  );
+  paintProjectiles(ctx, scene, view);
+
+  if (ringed >= 0) {
+    const iconEdge = icons?.edge(scene.unitDef[ringed], u) ?? 0;
+    const reach =
+      (iconEdge > 0
+        ? (iconEdge / 2) * Math.SQRT2
+        : Math.max(
+            scene.unitAlong[ringed] * scale,
+            scene.unitAcross[ringed] * scale,
+            LEAST_HALF_MARK * u,
+          ) * Math.SQRT2) +
+      3 * u;
     ctx.beginPath();
-    for (let i = 0; i < scene.wrecks; i++) {
-      ctx.rect(
-        scene.wreckX[i] * scale - half,
-        scene.wreckZ[i] * scale - half,
-        half * 2,
-        half * 2,
-      );
-    }
-    ctx.fillStyle = WRECK;
-    ctx.fill();
+    ctx.arc(
+      scene.unitX[ringed] * scale,
+      scene.unitZ[ringed] * scale,
+      reach,
+      0,
+      Math.PI * 2,
+    );
+    ctx.lineWidth = 1.5 * u;
+    ctx.strokeStyle = RING;
+    ctx.stroke();
   }
 
+  return {
+    units: scene.units,
+    projectiles: scene.projectiles,
+    wrecks: scene.wrecks,
+    icons: iconed,
+    highlighted: ringed >= 0,
+  };
+}
+
+function paintWrecks(
+  ctx: PaintContext,
+  scene: MapScene,
+  { scale, pixelRatio: u }: MapViewport,
+): void {
+  if (scene.wrecks === 0) return;
+  const half = HALF_WRECK * u;
+  ctx.beginPath();
+  for (let i = 0; i < scene.wrecks; i++) {
+    ctx.rect(
+      scene.wreckX[i] * scale - half,
+      scene.wreckZ[i] * scale - half,
+      half * 2,
+      half * 2,
+    );
+  }
+  ctx.fillStyle = WRECK;
+  ctx.fill();
+}
+
+/**
+ * Units go down a team at a time. Every finished footprint of a team is one
+ * path, filled once, so a frame with a thousand units is a few dozen canvas
+ * calls that paint and not a thousand. A unit under construction has its own
+ * opacity and so its own fill. A unit with an icon is drawn from the icon
+ * after its team's footprints, a picture to a unit. Returns the index of the
+ * unit asked to be ringed, or -1, and how many units were drawn as icons.
+ */
+function paintUnits(
+  ctx: PaintContext,
+  scene: MapScene,
+  view: MapViewport,
+  teams: ReadonlyMap<number, TeamStyle>,
+  highlight: number | null,
+  icons: UnitIcons | null,
+): { ringed: number; iconed: number } {
+  const { scale, pixelRatio: u } = view;
   const least = LEAST_HALF_MARK * u;
+  const hasIcon = (i: number) =>
+    icons !== null && icons.edge(scene.unitDef[i], u) > 0;
+  let iconed = 0;
   const outline = (i: number) => {
     const cx = scene.unitX[i] * scale;
     const cz = scene.unitZ[i] * scale;
@@ -258,7 +332,7 @@ export function paintScene(
     for (let i = 0; i < scene.units; i++) {
       if (scene.unitTeam[i] !== team) continue;
       if (highlight !== null && scene.unitSerial[i] === highlight) ringed = i;
-      if (scene.unitBuild[i] < 1) continue;
+      if (scene.unitBuild[i] < 1 || hasIcon(i)) continue;
       outline(i);
       built++;
     }
@@ -271,14 +345,22 @@ export function paintScene(
       ctx.fill();
       ctx.beginPath();
       for (let i = 0; i < scene.units; i++) {
-        if (scene.unitTeam[i] === team && scene.unitBuild[i] >= 1) facing(i);
+        if (
+          scene.unitTeam[i] === team &&
+          scene.unitBuild[i] >= 1 &&
+          !hasIcon(i)
+        ) {
+          facing(i);
+        }
       }
       ctx.lineWidth = u;
       ctx.strokeStyle = style.fill;
       ctx.stroke();
     }
     for (let i = 0; i < scene.units; i++) {
-      if (scene.unitTeam[i] !== team || scene.unitBuild[i] >= 1) continue;
+      if (scene.unitTeam[i] !== team || scene.unitBuild[i] >= 1 || hasIcon(i)) {
+        continue;
+      }
       const shown = buildAlpha(scene.unitBuild[i]) * teamAlpha;
       ctx.globalAlpha = teamAlpha < 1 ? Math.max(shown, FAINT_FLOOR) : shown;
       ctx.beginPath();
@@ -294,58 +376,63 @@ export function paintScene(
       ctx.strokeStyle = style.fill;
       ctx.stroke();
     }
+    if (icons) {
+      for (let i = 0; i < scene.units; i++) {
+        if (scene.unitTeam[i] !== team) continue;
+        const sprite = icons.sprite(
+          scene.unitDef[i],
+          style.fill,
+          style.lit === true,
+          u,
+        );
+        if (!sprite) continue;
+        const shown = buildAlpha(scene.unitBuild[i]) * teamAlpha;
+        ctx.globalAlpha =
+          scene.unitBuild[i] >= 1
+            ? teamAlpha
+            : teamAlpha < 1
+              ? Math.max(shown, FAINT_FLOOR)
+              : shown;
+        const { width, height } = sprite as { width: number; height: number };
+        ctx.drawImage(
+          sprite,
+          scene.unitX[i] * scale - width / 2,
+          scene.unitZ[i] * scale - height / 2,
+        );
+        iconed++;
+      }
+    }
     ctx.globalAlpha = 1;
   }
 
-  if (scene.projectiles > 0) {
-    ctx.beginPath();
-    for (let i = 0; i < scene.projectiles; i++) {
-      const x = scene.shotX[i] * scale;
-      const z = scene.shotZ[i] * scale;
-      const vx = scene.shotVx[i];
-      const vz = scene.shotVz[i];
-      const speed = Math.hypot(vx, vz);
-      const length = Math.min(
-        Math.max(speed * scale * SHOT_FRAMES, SHOT_SHORTEST * u),
-        SHOT_LONGEST * u,
-      );
-      // One falling straight down has no direction on the map, and is drawn
-      // as the shortest line across.
-      const dx = speed < 1e-6 ? 1 : vx / speed;
-      const dz = speed < 1e-6 ? 0 : vz / speed;
-      ctx.moveTo(x - dx * length, z - dz * length);
-      ctx.lineTo(x, z);
-    }
-    ctx.strokeStyle = SHOT;
-    ctx.stroke();
-  }
+  return { ringed, iconed };
+}
 
-  if (ringed >= 0) {
-    const reach =
-      Math.max(
-        scene.unitAlong[ringed] * scale,
-        scene.unitAcross[ringed] * scale,
-        least,
-      ) *
-        Math.SQRT2 +
-      3 * u;
-    ctx.beginPath();
-    ctx.arc(
-      scene.unitX[ringed] * scale,
-      scene.unitZ[ringed] * scale,
-      reach,
-      0,
-      Math.PI * 2,
+function paintProjectiles(
+  ctx: PaintContext,
+  scene: MapScene,
+  { scale, pixelRatio: u }: MapViewport,
+): void {
+  if (scene.projectiles === 0) return;
+  ctx.beginPath();
+  for (let i = 0; i < scene.projectiles; i++) {
+    const x = scene.shotX[i] * scale;
+    const z = scene.shotZ[i] * scale;
+    const vx = scene.shotVx[i];
+    const vz = scene.shotVz[i];
+    const speed = Math.hypot(vx, vz);
+    const length = Math.min(
+      Math.max(speed * scale * SHOT_FRAMES, SHOT_SHORTEST * u),
+      SHOT_LONGEST * u,
     );
-    ctx.lineWidth = 1.5 * u;
-    ctx.strokeStyle = RING;
-    ctx.stroke();
+    // One falling straight down has no direction on the map, and is drawn as
+    // the shortest line across.
+    const dx = speed < 1e-6 ? 1 : vx / speed;
+    const dz = speed < 1e-6 ? 0 : vz / speed;
+    ctx.moveTo(x - dx * length, z - dz * length);
+    ctx.lineTo(x, z);
   }
-
-  return {
-    units: scene.units,
-    projectiles: scene.projectiles,
-    wrecks: scene.wrecks,
-    highlighted: ringed >= 0,
-  };
+  ctx.lineWidth = u;
+  ctx.strokeStyle = SHOT;
+  ctx.stroke();
 }
