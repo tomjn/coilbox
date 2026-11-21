@@ -73,6 +73,7 @@ vi.mock("recharts", () => {
     YAxis: Nothing,
     usePlotArea: () => undefined,
     useXAxisScale: () => undefined,
+    useXAxisInverseScale: () => undefined,
     useYAxisScale: () => undefined,
   };
 });
@@ -80,6 +81,7 @@ vi.mock("recharts", () => {
 const { ReplayRoster } = await import("./ReplayRoster");
 const { MatchStatsSection } = await import("./MatchStatsSection");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+const { MatchClockProvider } = await import("../../useMatchClock");
 const { isProfileHidden } = await import("../../../profile/hidden");
 const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
@@ -179,12 +181,18 @@ function mount(info: DemoInfo, withSection = true) {
   const section = withSection && !isProfileHidden("analytics.matchStats");
   return render(
     <MemoryRouter>
-      <SeriesEmphasisProvider>
-        <ReplayRoster info={info} replayPath={replayPath} />
-        {section && (
-          <MatchStatsSection info={info} replayPath={replayPath} part="chart" />
-        )}
-      </SeriesEmphasisProvider>
+      <MatchClockProvider durationSec={info.durationSec}>
+        <SeriesEmphasisProvider>
+          <ReplayRoster info={info} replayPath={replayPath} />
+          {section && (
+            <MatchStatsSection
+              info={info}
+              replayPath={replayPath}
+              part="chart"
+            />
+          )}
+        </SeriesEmphasisProvider>
+      </MatchClockProvider>
     </MemoryRouter>,
   );
 }
