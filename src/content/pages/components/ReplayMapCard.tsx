@@ -183,6 +183,8 @@ function MapCard({
               track.handle.header.mapSize[1] > 0 ? (
                 <ReplayMapUnits
                   handle={track.handle}
+                  info={info}
+                  replayPath={replayPath}
                   adopted={adopted}
                   mapName={info.mapName}
                   minimapUrl={minimap.url}

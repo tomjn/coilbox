@@ -23,19 +23,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ChatLine,
   DemoInfo,
+  DemoTrailer,
   ReplayTrackFault,
   ReplayTrackHeader,
   StoredReplayAnalysis,
   StoredReplayTrack,
   TimelineEvent,
 } from "../../bindings";
+import { useStoredColorMode } from "../../chartColorMode";
 import fixture from "../../fixtures/replay-track-window.json";
+import { type ChartColorMode, colorSeries, teamSeries } from "../../matchStats";
 import {
   resetReplayAnalysisForTests,
   seedReplayAnalysisForTests,
 } from "../../replayAnalysis";
 import type { ReplayWatch } from "../../replayEngine";
 import { resetReplayEventReadsForTests } from "../../replayEventRead";
+import { FAINT_UNITS } from "../../replayMapView/paint";
 import { recordingContext } from "../../replayMapView/testTrack";
 import { ReplayTrackError } from "../../replayTrack/fault";
 import {
@@ -117,8 +121,14 @@ vi.mock("@picoframe/frame", async (orig) => ({
   useTheme: () => ({ resolved: "dark" }),
 }));
 vi.mock("../../usePrimaryPlayer", () => ({ usePrimaryPlayer: () => "" }));
+/** The statistics the chart would draw from. None unless a test sets them. */
+let TRAILER: DemoTrailer | null = null;
 vi.mock("../../useMatchStats", () => ({
-  useMatchStats: () => ({ data: null, loading: false, error: null }),
+  useMatchStats: () => ({
+    data: TRAILER ? { trailer: TRAILER, metrics: [] } : null,
+    loading: false,
+    error: null,
+  }),
 }));
 vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => <div data-testid="preview-3d" />,
@@ -249,6 +259,9 @@ const raf = {
   },
 };
 
+/** What a test adds to the replay's info, such as who played. */
+let INFO_OVER: Partial<DemoInfo> = {};
+
 /** What the page hands the section about launching. */
 let WATCH: ReplayWatch;
 let BLOCK: string | null;
@@ -260,6 +273,8 @@ let hidden = false;
 
 beforeEach(() => {
   HEADER_ANSWER = HEADER;
+  TRAILER = null;
+  INFO_OVER = {};
   RUNNING = false;
   launches.length = 0;
   LAUNCH = async (opts) => {
@@ -358,6 +373,13 @@ function GrabStore() {
   return null;
 }
 
+/** The chart's In-game colours switch, which is a stored choice the page reads. */
+let setColourMode: (mode: ChartColorMode) => void;
+function GrabColourMode() {
+  setColourMode = useStoredColorMode()[1];
+  return null;
+}
+
 /**
  * The page as the replay page has it: one match clock and one set of keys over
  * the map and the dock, which sits under it.
@@ -371,7 +393,7 @@ function Page({
   durationSec?: number;
   children?: React.ReactNode;
 }) {
-  const shown = { ...info, remixed } as DemoInfo;
+  const shown = { ...info, ...INFO_OVER, remixed } as DemoInfo;
   return (
     <SeriesEmphasisProvider>
       <MatchClockProvider durationSec={durationSec}>
@@ -391,6 +413,7 @@ function Page({
             game={GAME}
           />
           <GrabStore />
+          <GrabColourMode />
           {children}
         </TimelineKeysProvider>
       </MatchClockProvider>
@@ -2165,5 +2188,119 @@ describe("the Heat window lane (#5309)", () => {
     });
     await settle();
     expect(hook().clock.frame).toBe(30);
+  });
+});
+
+// ---- the players table and the chart's colours (#5311) -----------------------
+
+describe("the units follow the players table and the colour switch", () => {
+  const TWO_SEATS = {
+    players: [
+      {
+        name: "Alice",
+        team: 0,
+        allyTeam: 0,
+        spectator: false,
+        rgbColor: [1, 0, 0],
+      },
+      {
+        name: "Bob",
+        team: 1,
+        allyTeam: 1,
+        spectator: false,
+        rgbColor: [0, 0, 1],
+      },
+    ],
+  } as unknown as Partial<DemoInfo>;
+  const sample = { frame: 0 } as DemoTrailer["teams"][number]["samples"][0];
+  const STATS = {
+    teams: [
+      { team: 0, samples: [sample] },
+      { team: 1, samples: [sample] },
+    ],
+  } as DemoTrailer;
+
+  /** The fill and the share shown of each team's units in the latest picture,
+   *  team 0 first unless it is the one pointed at. */
+  const lastFills = () => {
+    const from = ctx.calls.map((c) => c.op).lastIndexOf("clearRect");
+    const picture = ctx.calls.slice(from);
+    // A wreck is filled too, before any unit's outline is closed.
+    const firstUnit = picture.findIndex((c) => c.op === "closePath");
+    return picture
+      .filter((c, i) => c.op === "fill" && i > firstUnit)
+      .map((c) => ({ fill: c.fillStyle, alpha: c.globalAlpha }));
+  };
+  /** What the chart draws each team's line in, in a mode. */
+  const chartColours = (mode: ChartColorMode) => {
+    const lines = colorSeries(
+      teamSeries(STATS, { ...info, ...TWO_SEATS } as DemoInfo),
+      STATS,
+      { ...info, ...TWO_SEATS } as DemoInfo,
+      mode,
+      "dark",
+    );
+    return [lines[0].color, lines[1].color];
+  };
+  /** The colour of each team's swatch in the rail, as the browser reads it. */
+  const swatches = () =>
+    [
+      ...document.querySelectorAll<HTMLElement>("[data-map-rail] ul li > span"),
+    ].map((el) => el.style.backgroundColor);
+  /** A colour the way an element's style gives it back. */
+  const asStyled = (colour: string) => {
+    const el = document.createElement("span");
+    el.style.backgroundColor = colour;
+    return el.style.backgroundColor;
+  };
+
+  async function open() {
+    INFO_OVER = TWO_SEATS;
+    TRAILER = STATS;
+    await show("current", "/replay?frame=100");
+    // The choice is remembered between tests, so every one starts on palette.
+    await act(async () => setColourMode("palette"));
+    await settle();
+  }
+
+  it("draws a team's units and its rail swatch in its chart line's colour, in both modes", async () => {
+    await open();
+    for (const mode of ["palette", "game"] as const) {
+      await act(async () => setColourMode(mode));
+      await settle();
+      const [first, second] = chartColours(mode);
+      expect(lastFills().map((f) => f.fill)).toEqual([first, second]);
+      expect(swatches()).toEqual([first, second].map(asStyled));
+    }
+    // The two modes are not the same colours, or this would prove nothing.
+    expect(chartColours("palette")).not.toEqual(chartColours("game"));
+  });
+
+  it("draws an unticked player's units faint and leaves the others whole", async () => {
+    await open();
+    expect(lastFills().map((f) => f.alpha)).toEqual([1, 1]);
+    await act(async () => emphasisStore.setShown([0], false));
+    await settle();
+    const fills = lastFills();
+    expect(fills.map((f) => f.alpha)).toEqual([FAINT_UNITS, 1]);
+    // Still there, and still in the same colours.
+    expect(fills).toHaveLength(2);
+    await act(async () => emphasisStore.setShown([0], true));
+    await settle();
+    expect(lastFills().map((f) => f.alpha)).toEqual([1, 1]);
+  });
+
+  it("lights the player the table points at and fades the others", async () => {
+    await open();
+    await act(async () => emphasisStore.hover([0]));
+    await settle();
+    // The lit team goes last, so it is on top.
+    expect(lastFills()).toEqual([
+      { fill: chartColours("palette")[1], alpha: FAINT_UNITS },
+      { fill: chartColours("palette")[0], alpha: 1 },
+    ]);
+    await act(async () => emphasisStore.hover(null));
+    await settle();
+    expect(lastFills().map((f) => f.alpha)).toEqual([1, 1]);
   });
 });

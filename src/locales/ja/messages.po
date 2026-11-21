@@ -9271,6 +9271,10 @@ msgstr "なくなった経路"
 msgid "A picture of this map is not available, so the match is drawn on plain ground."
 msgstr "このマップの画像がないため、試合を無地の地面に描画しています。"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A player unticked in the players table has faint units. Point at a player in the table and their units get a white edge while everyone else's go faint."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A player who is not an ally sees no health bar and no health in the tooltip."
@@ -9321,9 +9325,8 @@ msgid "A ratio is one figure over another for the same army, and is not per minu
 msgstr "比率は同じ軍の 2 つのデータの比で、1 分あたりの値ではありません。小さいほうのデータが 0 のゲームには比率がありません。平均から除外し、横にその数を表示しています。"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
-msgstr "長方形はユニットで、チームの色と占有範囲の大きさで描画し、向いている方向に線を引いています。建設中のユニットは薄く表示されます。大きなマップでは印が 3 ピクセルより小さくならないため、小さなユニットは実際より大きく見えます。"
+msgid "A rectangle is a unit, in the colour of its player's line in the chart and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
+msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

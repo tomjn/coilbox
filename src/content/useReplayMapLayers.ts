@@ -1,18 +1,14 @@
-import { useTheme } from "@picoframe/frame";
 import { useEffect, useMemo } from "react";
 import { buildHeatField } from "@/lib/heatField";
 import { isProfileHidden } from "../profile/hidden";
 import type { DemoInfo } from "./bindings";
-import { useStoredColorMode } from "./chartColorMode";
 import { FRAMES_PER_SECOND } from "./chatClock";
 import { playerTeam } from "./matchStats";
-import { swatch } from "./pages/components/ReplayRoster";
 import {
   buildingHeatPoints,
   buildMarks,
   openingsByTeam,
   startDots,
-  teamColours,
 } from "./replayMapLayers";
 import {
   MAP_LAYERS,
@@ -40,6 +36,7 @@ import { useReplayBuildOrders } from "./useReplayBuildOrders";
 import { useReplayEventLayers } from "./useReplayEventLayers";
 import { useReplayTimeWindow } from "./useReplayTimeWindow";
 import { useReplayUnits } from "./useReplayUnits";
+import { useTeamColours } from "./useTeamColours";
 
 /** What the replay page's flat map and 3D view both read (#1152): the layer
  *  switches, the build orders and order points behind them, the time window the
@@ -125,13 +122,7 @@ export function useReplayMapLayers({
   // The chart's colours, asked the way the chart asks them.
   const statsShown = layersShown && !isProfileHidden("analytics.matchStats");
   const stats = useMatchStats(statsShown && replayPath ? replayPath : null);
-  const [colourMode] = useStoredColorMode();
-  const { resolved: theme } = useTheme();
-  const trailer = stats.data?.trailer ?? null;
-  const colours = useMemo(
-    () => teamColours(info, trailer, colourMode, theme, swatch),
-    [info, trailer, colourMode, theme],
-  );
+  const colours = useTeamColours(info, stats.data?.trailer ?? null);
 
   const primary = usePrimaryPlayer();
   const meTeam = primary ? playerTeam(info, primary) : undefined;

@@ -9335,6 +9335,10 @@ msgstr "een route die er niet meer is"
 msgid "A picture of this map is not available, so the match is drawn on plain ground."
 msgstr "Er is geen afbeelding van deze kaart beschikbaar, dus de wedstrijd wordt op effen grond getekend."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A player unticked in the players table has faint units. Point at a player in the table and their units get a white edge while everyone else's go faint."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "A player who is not an ally sees no health bar and no health in the tooltip."
@@ -9386,9 +9390,8 @@ msgid "A ratio is one figure over another for the same army, and is not per minu
 msgstr "Een verhouding is de ene waarde gedeeld door een andere voor hetzelfde leger, en is niet per minuut. Een spel waarin de onderste waarde nul is, heeft geen verhouding. Dat spel wordt uit het gemiddelde gelaten en ernaast geteld."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
-#, fuzzy
-msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
-msgstr "Een rechthoek is een eenheid, in de kleur van het team en zo groot als de voetafdruk, met een lijn in de kijkrichting. Een eenheid die nog wordt gebouwd, is vaag. Op een grote kaart is een markering nooit kleiner dan 3 pixels, dus kleine eenheden lijken groter dan ze zijn."
+msgid "A rectangle is a unit, in the colour of its player's line in the chart and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
+msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy

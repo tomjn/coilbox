@@ -46,6 +46,8 @@ export interface MapView {
   setShown(shown: boolean): void;
   /** Ring the unit with this serial, or none. */
   setHighlight(serial: number | null): void;
+  /** Draw the teams in these styles from the next picture. */
+  setTeams(teams: ReadonlyMap<number, TeamStyle>): void;
   /** The unit under a point of the canvas, in the canvas's own pixels. */
   pick(
     x: number,
@@ -75,6 +77,7 @@ const PICK_SLOP = 2;
  */
 export function createMapView(options: MapViewOptions): MapView {
   const { handle, clock, env } = options;
+  let teams = options.teams;
   const scene = createMapScene();
   let shown = false;
   let dirty = true;
@@ -107,7 +110,7 @@ export function createMapView(options: MapViewOptions): MapView {
       surface.ctx,
       scene,
       surface.view,
-      options.teams,
+      teams,
       highlight,
     );
     painted = surface.view;
@@ -154,6 +157,11 @@ export function createMapView(options: MapViewOptions): MapView {
     setHighlight(serial) {
       if (serial === highlight) return;
       highlight = serial;
+      invalidate();
+    },
+    setTeams(next) {
+      if (next === teams) return;
+      teams = next;
       invalidate();
     },
     pick(x, y) {
