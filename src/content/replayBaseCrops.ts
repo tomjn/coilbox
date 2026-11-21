@@ -16,8 +16,10 @@ import {
   buildMarks,
   type MapFraction,
   type MapWorld,
+  mapFraction,
   type StartDot,
 } from "./replayMapLayers";
+import type { StartUnitTrack } from "./replayStartUnits";
 
 /**
  * How many of the heatmap's radii a crop is wide. The heat radius is
@@ -178,10 +180,35 @@ function allyTeams(info: DemoInfo): Map<number, number> {
 }
 
 /**
+ * Where each team's first starting unit appeared, from an analysis's tracks.
+ *
+ * A game can place a player's starting unit somewhere other than the start
+ * position the replay recorded. Splinter Faction lets a player pick a spot
+ * after the game begins, and on Tumult every replay records the same start
+ * while the commanders appear elsewhere (#5339). Where the unit appeared is
+ * where the base is.
+ */
+export function spawnedStarts(
+  tracks: readonly StartUnitTrack[],
+): Map<number, { x: number; z: number }> {
+  const out = new Map<number, { x: number; z: number }>();
+  for (const track of tracks) {
+    const first = track.points[0];
+    if (first && !out.has(track.team))
+      out.set(track.team, { x: first.x, z: first.z });
+  }
+  return out;
+}
+
+/**
  * A crop for each start, in order of side and then team, so allies sit
  * together. `orders` are the ones inside the time window, and a crop shows the
  * ones its team gave. These are orders, not buildings: one that was cancelled
  * or never carried out is a mark like any other.
+ *
+ * `spawns` are where each team's starting unit appeared, from `spawnedStarts`.
+ * A team with one on the map has its crop and its start there, and one without
+ * keeps the start the replay recorded.
  */
 export function baseCrops(
   dots: readonly StartDot[],
@@ -189,6 +216,7 @@ export function baseCrops(
   world: MapWorld,
   units: UnitDatasetEntry[] | null,
   info: DemoInfo,
+  spawns: ReadonlyMap<number, { x: number; z: number }> = new Map(),
 ): BaseCrop[] {
   const sides = allyTeams(info);
   const byTeam = new Map<number, BuildOrder[]>();
@@ -200,7 +228,10 @@ export function baseCrops(
   }
   const crops: BaseCrop[] = [];
   for (const dot of dots) {
-    const window = cropWindow(dot, world);
+    const spawn = spawns.get(dot.team);
+    const spawnAt = spawn ? mapFraction(spawn, world) : null;
+    const start = spawn && spawnAt ? { ...spawn, ...spawnAt } : dot;
+    const window = cropWindow(start, world);
     if (!window) continue;
     const own = buildMarks(byTeam.get(dot.team) ?? [], world, units);
     const marks: CropMark[] = [];
@@ -218,7 +249,7 @@ export function baseCrops(
       isMe: dot.isMe,
       opening: dot.opening,
       window,
-      start: cropFraction(dot, window, world),
+      start: cropFraction(start, window, world),
       marks,
       ordered: own.marks.length + own.offMap,
       outside,
