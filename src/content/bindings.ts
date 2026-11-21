@@ -2984,6 +2984,56 @@ const unitBuildpicsCommand = defineCommand<
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");
 
+/** One of a game's map icon types: the picture the engine draws for a unit that
+ *  names it, and the size it draws it at. */
+export interface UnitIconType {
+  /** The picture's PNG in the build-icon cache, served over
+   *  `coilbox://unitsyncbuildpic/`: pass it to `unitsyncBuildpicUrl`. It is as
+   *  the game ships it. Icons are mostly white or grey so the engine can tint
+   *  them in the owning team's colour, and nothing here does. */
+  file?: string;
+  /** The type's `size`, a multiplier on the engine's base icon size. */
+  size: number;
+  /** Why there is no {@link file}. `no-source` is a bitmap the game's
+   *  `icontypes.lua` names and no archive holds. `undecodable` is a picture
+   *  coilbox could not read. `sub-image` is a type that draws part of a larger
+   *  picture, which is not cut out yet. */
+  skipped?:
+    | "no-source"
+    | "undecodable"
+    | "sub-image"
+    | "encode-failed"
+    | "not-written";
+}
+
+export interface UnitIconsResult {
+  /** Every unit's icon type, under the unit's lowercase name. The value is
+   *  always a key of {@link types}: a unit that names no type, or one the game
+   *  does not define, has the type `default`, as in the engine. */
+  unitTypes: Record<string, string>;
+  /** Each of the game's icon types, and the engine's `default` when the game
+   *  defines none. */
+  types: Record<string, UnitIconType>;
+  errors: string[];
+}
+
+/**
+ * The icon type each of a game's units draws on the map, and each type's picture
+ * and size. Lazy on the first call for a game, since it mounts the game's
+ * archive set and runs its `gamedata/icontypes.lua`. After that it is answered
+ * from the cache.
+ *
+ * A type whose picture is missing or unreadable has no `file` and the call still
+ * answers for the rest. The unit names are the keys of the replay recording's
+ * `unitDefs` header.
+ */
+export const unitsyncUnitIcons = (args: GameReadArgs) =>
+  unitIconsCommand(withGameArchivePath(args));
+const unitIconsCommand = defineCommand<GameReadArgs, UnitIconsResult>(
+  "coilbox-unitsync",
+  "unitsync_unit_icons",
+);
+
 /** One side's resolved faction emblem: a PNG plus the source image's longest
  * pixel side (so callers can prefer a crisper image over a 16px upscale). */
 export interface FactionLogoEntry {
