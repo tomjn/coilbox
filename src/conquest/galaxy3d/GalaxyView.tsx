@@ -8,9 +8,9 @@ import {
   CSS2DObject,
   CSS2DRenderer,
 } from "three/addons/renderers/CSS2DRenderer.js";
+import { borrowRenderer, returnRenderer } from "../../lib/keptRenderer";
 import { registerCanvas3D } from "../../lib/renderStats";
 import { drawingPixelRatio } from "../../lib/uiZoom";
-import { release } from "../../lib/useCanvas3D";
 import { attachWheelRelease } from "../../lib/wheelRelease";
 import { groundHit } from "../../mapconv/pages/components/wheelGate";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
@@ -287,6 +287,11 @@ interface GalaxyViewProps {
    */
   paused?: boolean;
   className?: string;
+}
+
+/** The key a map's renderer is kept under. See `../../lib/keptRenderer`. */
+function galaxyRendererKey(antialias: boolean): string {
+  return `galaxy-view:${antialias ? "antialiased" : "plain"}`;
 }
 
 /** How much brighter a lane gets while either end is hovered. */
@@ -623,11 +628,12 @@ export function GalaxyView({
   className,
 }: GalaxyViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // The renderer outlives the scene built on it. WebKit still counts a WebGL
-  // context after it is given back, so one made for every galaxy shown ran the
-  // browser out and another view went blank (issue #5348). Antialiasing is
-  // fixed when a context is made, so a change to it is the one thing that
-  // makes another.
+  // The renderer outlives the scene built on it, and the view that built it.
+  // WebKit still counts a WebGL context after it is given back, so one made
+  // for every galaxy shown, or every time the map was opened, ran the browser
+  // out and another view went blank (issues #5348 and #5351). It is parked
+  // when the view goes and the next map takes it. Antialiasing is fixed when a
+  // context is made, so renderers are kept apart by it.
   const rendererRef = useRef<{
     renderer: THREE.WebGLRenderer;
     antialias: boolean;
@@ -1247,18 +1253,25 @@ export function GalaxyView({
 
     const antialias = !performanceMode;
     if (rendererRef.current && rendererRef.current.antialias !== antialias) {
-      release(rendererRef.current.renderer);
+      returnRenderer(
+        galaxyRendererKey(rendererRef.current.antialias),
+        rendererRef.current.renderer,
+      );
       rendererRef.current = null;
     }
     renderer =
       rendererRef.current?.renderer ??
-      new THREE.WebGLRenderer({
-        antialias,
-        alpha: true,
-        // Ask for the fast GPU on a machine with two. The map redraws every
-        // frame while it is panned, so it is the view that needs it most.
-        powerPreference: "high-performance",
-      });
+      borrowRenderer(
+        galaxyRendererKey(antialias),
+        () =>
+          new THREE.WebGLRenderer({
+            antialias,
+            alpha: true,
+            // Ask for the fast GPU on a machine with two. The map redraws every
+            // frame while it is panned, so it is the view that needs it most.
+            powerPreference: "high-performance",
+          }),
+      );
     rendererRef.current = { renderer, antialias };
     renderer.setClearColor(0x000000, 0); // page background shows through
     container.appendChild(renderer.domElement);
@@ -2134,10 +2147,15 @@ export function GalaxyView({
   ]);
 
   // After the scene's own effect, so on an unmount its cleanup has drawn its
-  // last before the context goes.
+  // last before the renderer is parked for the next map.
   useEffect(
     () => () => {
-      if (rendererRef.current) release(rendererRef.current.renderer);
+      if (rendererRef.current) {
+        returnRenderer(
+          galaxyRendererKey(rendererRef.current.antialias),
+          rendererRef.current.renderer,
+        );
+      }
       rendererRef.current = null;
     },
     [],

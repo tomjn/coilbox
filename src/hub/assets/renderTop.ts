@@ -23,6 +23,7 @@ import type { UnitModelResult } from "@/content/bindings";
 import { buildModel } from "@/content/unitModel";
 import { frameBox } from "@/lego/framing";
 import { readyToCapture } from "@/lego/thumbnail";
+import { borrowRenderer, returnRenderer } from "@/lib/keptRenderer";
 import {
   fittingBleed,
   PLAN_ANGLE,
@@ -36,6 +37,14 @@ export { RENDER_VERSION } from "./vocabulary";
 /** How far above and below the model the camera's clip range reaches, in elmos,
  *  so a model sitting exactly on a clip plane is not shaved. */
 const DEPTH_MARGIN = 16;
+
+/**
+ * The kept renderers a render draws on. A backfill draws every building of every
+ * blueprint, and WebKit counts a WebGL context until its canvas is collected,
+ * so a renderer made for each one ran the browser out and another 3D view went
+ * blank (issue #5351). See `@/lib/keptRenderer`.
+ */
+const UNIT_RENDERS = "unit-renders";
 
 /** One unit's render at one angle, ready for the encoder. */
 export interface UnitRender {
@@ -312,46 +321,54 @@ export async function renderUnit(
   for (const light of renderLights()) scene.add(light);
   scene.add(built.object);
 
-  const renderer = new THREE.WebGLRenderer({
-    canvas: document.createElement("canvas"),
-    alpha: true,
-    antialias: true,
-    // A one-off render that is disposed when it ends, so the fast GPU is only
-    // woken for as long as the picture takes.
-    powerPreference: "high-performance",
-    // Straight alpha out, so the only thing between the framebuffer and the
-    // encoder is the multisample resolve, which `unpremultiply` undoes.
-    premultipliedAlpha: false,
-  });
-
   try {
     await waitForTextures(built.object, timeoutMs);
 
-    // One device pixel per image pixel: the frame is in pixels already and a
-    // retina scale factor would silently render it at twice the size.
-    renderer.setPixelRatio(1);
-    renderer.setSize(widthPx, heightPx, false);
-    renderer.setClearColor(0x000000, 0);
-    renderer.render(
-      scene,
-      angle === PLAN_ANGLE
-        ? topDownCamera(frame, built.box)
-        : pictureCamera(angle, built.box),
+    // Borrowed only once the wait is over, and given back before this returns,
+    // so a render waiting on its textures holds none and one that overlaps it
+    // gets a renderer of its own.
+    const renderer = borrowRenderer(
+      UNIT_RENDERS,
+      () =>
+        new THREE.WebGLRenderer({
+          canvas: document.createElement("canvas"),
+          alpha: true,
+          antialias: true,
+          powerPreference: "high-performance",
+          // Straight alpha out, so the only thing between the framebuffer and
+          // the encoder is the multisample resolve, which `unpremultiply`
+          // undoes.
+          premultipliedAlpha: false,
+        }),
     );
+    try {
+      // One device pixel per image pixel: the frame is in pixels already and a
+      // retina scale factor would silently render it at twice the size.
+      renderer.setPixelRatio(1);
+      renderer.setSize(widthPx, heightPx, false);
+      renderer.setClearColor(0x000000, 0);
+      renderer.render(
+        scene,
+        angle === PLAN_ANGLE
+          ? topDownCamera(frame, built.box)
+          : pictureCamera(angle, built.box),
+      );
 
-    const rgba = new Uint8Array(widthPx * heightPx * 4);
-    const gl = renderer.getContext();
-    gl.readPixels(0, 0, widthPx, heightPx, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+      const rgba = new Uint8Array(widthPx * heightPx * 4);
+      const gl = renderer.getContext();
+      gl.readPixels(0, 0, widthPx, heightPx, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
 
-    return {
-      width: widthPx,
-      height: heightPx,
-      rgba: unpremultiply(flipRows(rgba, widthPx, heightPx)),
-      frame,
-    };
+      return {
+        width: widthPx,
+        height: heightPx,
+        rgba: unpremultiply(flipRows(rgba, widthPx, heightPx)),
+        frame,
+      };
+    } finally {
+      returnRenderer(UNIT_RENDERS, renderer);
+    }
   } finally {
     built.dispose();
-    renderer.dispose();
   }
 }
 

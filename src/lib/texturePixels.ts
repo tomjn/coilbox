@@ -67,40 +67,60 @@ function sourceSize(source: ImageBitmap | HTMLImageElement): {
 }
 
 /** A canvas that is never attached to the document, purely as a WebGL host. */
-function detachedCanvas(
-  width: number,
-  height: number,
-): OffscreenCanvas | HTMLCanvasElement {
+function detachedCanvas(): OffscreenCanvas | HTMLCanvasElement {
+  // One pixel is all it needs: the read is from a framebuffer holding the
+  // texture, not from the canvas's own drawing buffer.
   if (typeof OffscreenCanvas !== "undefined") {
-    return new OffscreenCanvas(width, height);
+    return new OffscreenCanvas(1, 1);
   }
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = 1;
+  canvas.height = 1;
   return canvas;
 }
 
 /**
- * Read `source` back as unpremultiplied RGBA, via an offscreen WebGL context
- * that exists only for this one upload and read.
+ * The context every read goes through. WebKit counts a context from the moment
+ * it is made until the garbage collector reaches its canvas, so one made for
+ * every texture ran the browser out of them and another 3D view went blank
+ * (issue #5351). It is made again only if the browser takes it back.
+ */
+let decoder: WebGLRenderingContext | null = null;
+
+function decodingContext(): WebGLRenderingContext {
+  if (decoder && !decoder.isContextLost()) return decoder;
+  const gl = detachedCanvas().getContext("webgl", {
+    premultipliedAlpha: false,
+  }) as WebGLRenderingContext | null;
+  if (!gl) throw new Error("WebGL is not available to decode this texture.");
+  decoder = gl;
+  return gl;
+}
+
+/** Give the shared context back. For tests, which count contexts. */
+export function releaseDecodingContext(): void {
+  decoder?.getExtension("WEBGL_lose_context")?.loseContext();
+  decoder = null;
+}
+
+/**
+ * Read `source` back as unpremultiplied RGBA, via the offscreen WebGL context
+ * every read shares. The read is synchronous, so two never interleave.
  */
 function readPixelsFromSource(
   source: TexImageSource,
   width: number,
   height: number,
 ): Uint8ClampedArray<ArrayBuffer> {
-  const canvas = detachedCanvas(width, height);
-  const gl = canvas.getContext("webgl", {
-    premultipliedAlpha: false,
-  }) as WebGLRenderingContext | null;
-  if (!gl) throw new Error("WebGL is not available to decode this texture.");
+  const gl = decodingContext();
+  const texture = gl.createTexture();
+  const framebuffer = gl.createFramebuffer();
 
   try {
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
-    const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -108,7 +128,6 @@ function readPixelsFromSource(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 
-    const framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.framebufferTexture2D(
       gl.FRAMEBUFFER,
@@ -125,7 +144,10 @@ function readPixelsFromSource(
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
     return data;
   } finally {
-    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(framebuffer);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.deleteTexture(texture);
   }
 }
 
