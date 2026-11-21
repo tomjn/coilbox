@@ -7,7 +7,12 @@ import {
 } from "../downloads/DownloadQueueProvider";
 import { useDownloadHistory } from "../downloads/downloadHistory";
 import { updatesOffKeys, useGamePrefs } from "../downloads/gamePrefs";
-import { loadGithubReleases } from "../downloads/githubReleases";
+import {
+  loadGithubReleases,
+  refreshGithubReleases,
+  useGithubReleasesAutoRefresh,
+  useGithubReleasesVersion,
+} from "../downloads/githubReleases";
 import {
   loadEvolutionRtsMaps,
   loadHakoraMaps,
@@ -81,6 +86,8 @@ export interface LibraryRecord extends Library {
   filesAnswered: boolean;
   /** Read the disk listing again. */
   refresh: () => Promise<void>;
+  /** Ask GitHub again for the release lists of the asked for repos. */
+  refreshReleases: () => Promise<void>;
   /** Every asked for mirror index has been read or has failed. */
   cataloguesRead: boolean;
   /** The mirror indexes that failed, which the merge leaves out. */
@@ -137,6 +144,18 @@ export function useLibrary({
   const [readFor, setReadFor] = useState<readonly CatalogueRequest[] | null>(
     null,
   );
+  const repos = useMemo(
+    () => requests.flatMap((c) => (c.source === "github" ? [c.repo] : [])),
+    [requests],
+  );
+  useGithubReleasesAutoRefresh(repos);
+  const refreshReleases = useCallback(
+    () => refreshGithubReleases(repos),
+    [repos],
+  );
+  // A release list that changed is read again from the session cache.
+  const releasesVersion = useGithubReleasesVersion();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `releasesVersion` is the signal to read again
   useEffect(() => {
     let live = true;
     Promise.allSettled(requests.map(loadCatalogue)).then((results) => {
@@ -156,7 +175,7 @@ export function useLibrary({
     return () => {
       live = false;
     };
-  }, [requests]);
+  }, [requests, releasesVersion]);
 
   const hubGames = useHubGames();
   // Rebuilt when an item changes state, not on every progress event.
@@ -187,9 +206,19 @@ export function useLibrary({
       filesRead: files !== null,
       filesAnswered,
       refresh: readFiles,
+      refreshReleases,
       cataloguesRead: readFor === requests,
       catalogueFailures: failures,
     }),
-    [library, files, filesAnswered, readFiles, readFor, requests, failures],
+    [
+      library,
+      files,
+      filesAnswered,
+      readFiles,
+      refreshReleases,
+      readFor,
+      requests,
+      failures,
+    ],
   );
 }

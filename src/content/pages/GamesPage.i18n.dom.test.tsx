@@ -81,6 +81,9 @@ vi.mock("../../downloads/githubReleases", () => ({
   loadGithubReleases: async () => {
     throw new Error("no network in tests");
   },
+  refreshGithubReleases: async () => {},
+  useGithubReleasesAutoRefresh: () => {},
+  useGithubReleasesVersion: () => 0,
 }));
 vi.mock("../../hub/gameIcons", async (original) => ({
   ...(await original<typeof import("../../hub/gameIcons")>()),

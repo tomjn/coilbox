@@ -29,6 +29,7 @@ const hoisted = vi.hoisted(() => ({
   hubFailure: null as string | null,
   enqueue: vi.fn(),
   cancel: vi.fn(),
+  refreshReleases: vi.fn(async () => {}),
 }));
 
 vi.mock("../config", () => ({
@@ -55,7 +56,10 @@ vi.mock("../lastKnownScan", () => ({
   }),
 }));
 vi.mock("../useLibrary", () => ({
-  useLibrary: () => buildLibrary(hoisted.input as LibraryInput),
+  useLibrary: () => ({
+    ...buildLibrary(hoisted.input as LibraryInput),
+    refreshReleases: hoisted.refreshReleases,
+  }),
 }));
 vi.mock("../branding", () => ({
   filterUninstalledGames: () => [],
@@ -85,6 +89,9 @@ vi.mock("../../downloads/githubReleases", () => ({
   loadGithubReleases: async () => {
     throw new Error("no network in tests");
   },
+  refreshGithubReleases: async () => {},
+  useGithubReleasesAutoRefresh: () => {},
+  useGithubReleasesVersion: () => 0,
 }));
 vi.mock("../../hub/gameIcons", async (original) => ({
   ...(await original<typeof import("../../hub/gameIcons")>()),
@@ -95,7 +102,11 @@ vi.mock("../../hub/config", () => ({ useTrustedHubUrl: () => null }));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
   NoEngines: () => null,
-  RescanButton: () => null,
+  RescanButton: ({ onRescan }: { onRescan: () => void }) => (
+    <button type="button" onClick={onRescan}>
+      Rescan
+    </button>
+  ),
 }));
 
 import GamesPage from "./GamesPage";
@@ -105,6 +116,7 @@ beforeEach(() => {
   hoisted.hubFailure = null;
   hoisted.enqueue.mockReset();
   hoisted.cancel.mockReset();
+  hoisted.refreshReleases.mockClear();
 });
 afterEach(cleanup);
 
@@ -182,6 +194,14 @@ describe("Games page", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
     expect(cardTitles()).toEqual(["SplinterFaction"]);
+    expect(hoisted.refreshReleases).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks GitHub for new releases when the page is rescanned", () => {
+    renderPage();
+    expect(hoisted.refreshReleases).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Rescan" }));
+    expect(hoisted.refreshReleases).toHaveBeenCalledTimes(1);
   });
 
   it("hides the Updates chip when nothing has an update", () => {

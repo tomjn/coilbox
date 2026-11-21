@@ -199,6 +199,27 @@ describe("downloadHubGame", () => {
     );
   });
 
+  it("installs a release published since the repo was last read", async () => {
+    const release = (tag: string) => ({
+      filename: `g-${tag}.sdz`,
+      url: `https://gh.example/${tag}`,
+      size: 1,
+      tag,
+    });
+    dlGithubReleaseArchives
+      .mockResolvedValueOnce({ archives: [release("1")] })
+      .mockResolvedValueOnce({ archives: [release("2"), release("1")] });
+    dlDownloadFileRaw.mockResolvedValue({});
+
+    await run([{ kind: "github", value: "owner/repo" }]);
+    await run([{ kind: "github", value: "owner/repo" }]);
+
+    expect(dlDownloadFileRaw.mock.calls.map((c) => c[0].filename)).toEqual([
+      "g-1.sdz",
+      "g-2.sdz",
+    ]);
+  });
+
   it("fails naming every source's reason, the last one included, when all fail", async () => {
     dlDownloadFileRaw
       .mockRejectedValueOnce(mismatch("a.example"))

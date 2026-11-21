@@ -143,10 +143,14 @@ export default function GamesPage() {
   // The player's own games until they pick a chip, or the games they could
   // get when they have none yet.
   const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
-  // Looking for updates, by the chip or the topbar badge, reads the hub again.
+  // Looking for updates, by the chip or the topbar badge, reads the hub and
+  // the GitHub release lists again.
+  const { refreshReleases } = library;
   useEffect(() => {
-    if (chip === "updates") refreshHubGames();
-  }, [chip, refreshHubGames]);
+    if (chip !== "updates") return;
+    refreshHubGames();
+    void refreshReleases();
+  }, [chip, refreshHubGames, refreshReleases]);
   const shown = useMemo(
     () =>
       sortGames(
@@ -215,6 +219,7 @@ export default function GamesPage() {
               onRescan={() => {
                 run(true);
                 refreshHubGames();
+                void library.refreshReleases();
               }}
               scanning={loading}
               onCancel={cancel}

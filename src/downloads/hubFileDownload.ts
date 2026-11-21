@@ -63,7 +63,7 @@ export async function fetchHubFile(
   }
 
   o.log.begin("github", { reference: dl.value }, { label: dl.value });
-  const archives = await loadGithubReleases(dl.value);
+  const archives = await loadGithubReleases(dl.value, true);
   if (archives.length === 0) throw new Error(t`no release archives`);
   const asset = dl.asset?.toLowerCase();
   const pick = asset

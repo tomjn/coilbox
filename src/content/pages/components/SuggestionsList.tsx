@@ -109,7 +109,7 @@ export async function suggestionRequest(
       // Games like SplinterFaction ship only via GitHub releases. `resolveGithubRepo`
       // never returns undefined - it throws a clear error instead (issue #525).
       const repo = resolveGithubRepo(repos, dl);
-      const archives = await loadGithubReleases(repo);
+      const archives = await loadGithubReleases(repo, true);
       const pick = dl.asset
         ? archives.find((a) =>
             a.filename.toLowerCase().includes(dl.asset?.toLowerCase() ?? ""),
