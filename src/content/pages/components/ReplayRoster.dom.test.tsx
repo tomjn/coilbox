@@ -181,7 +181,9 @@ function mount(info: DemoInfo, withSection = true) {
     <MemoryRouter>
       <SeriesEmphasisProvider>
         <ReplayRoster info={info} replayPath={replayPath} />
-        {section && <MatchStatsSection info={info} replayPath={replayPath} />}
+        {section && (
+          <MatchStatsSection info={info} replayPath={replayPath} part="chart" />
+        )}
       </SeriesEmphasisProvider>
     </MemoryRouter>,
   );

@@ -31,14 +31,16 @@ import {
 import { SectionHelp } from "./SectionHelp";
 
 /**
- * The tallest a map may be: the window's height less what sits above and below
- * it when the card is scrolled to the top of the page. Measured at an 828 pixel
- * high window: the timeline dock is 151 pixels, and the app bar, the card's
- * heading row and its padding are 113 above the map. That is 264 pixels, which
- * is 16.5rem, so 18rem leaves a margin. The floor keeps a map usable in a very
- * short window, where it scrolls under the dock instead.
+ * The tallest a map may be: the height of the column the card is in, less the
+ * card's own heading row and padding above the map. The page makes that column
+ * a size container when it has two columns (#5304), so `cqh` is the column's
+ * height and the map fits beside the panel and above the timeline dock. When
+ * the page stacks there is no such container and `cqh` is the window's height.
+ * Measured with the Units mode open, the heading row and the card's padding
+ * come to 66 pixels, which is 4.1rem, so 4.5rem leaves a margin. The floor
+ * keeps a map usable in a very short window, where the column scrolls.
  */
-const MAP_VIEW_HEIGHT = "max(16rem, 100vh - 18rem)";
+const MAP_VIEW_HEIGHT = "max(16rem, 100cqh - 4.5rem)";
 
 /**
  * The map and the rail beside it, in every mode of the map card. The rail holds
@@ -60,8 +62,10 @@ export function ReplayMapLayout({
   under?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+    // A container, so the rail goes beside the map when the card has the width
+    // for it, which in the page's two columns is not a matter of the window's.
+    <div className="@container flex flex-col gap-3">
+      <div className="flex flex-col gap-4 @xl:flex-row @xl:items-start">
         <div
           data-map-column
           // All the width the card has, and no wider than lets the map keep its
@@ -70,13 +74,13 @@ export function ReplayMapLayout({
           style={{
             maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
           }}
-          className="min-w-0 lg:flex-1"
+          className="min-w-0 @xl:flex-1"
         >
           {map}
         </div>
         <div
           data-map-rail
-          className="flex min-w-0 flex-col gap-3 lg:w-64 lg:shrink-0"
+          className="flex min-w-0 flex-col gap-3 @xl:w-48 @xl:shrink-0"
         >
           {rail}
         </div>
@@ -135,13 +139,17 @@ function EventToggle({
 }) {
   if (!reason)
     return (
-      <ToggleGroupItem value={value} className="lg:justify-start">
+      <ToggleGroupItem value={value} className="@xl:justify-start">
         {children}
       </ToggleGroupItem>
     );
   return (
     <span title={reason} className="flex">
-      <ToggleGroupItem value={value} disabled className="grow lg:justify-start">
+      <ToggleGroupItem
+        value={value}
+        disabled
+        className="grow @xl:justify-start"
+      >
         {children}
       </ToggleGroupItem>
     </span>
@@ -171,7 +179,7 @@ export function LayerSwitches({
     );
   const plain = (layer: MapLayer, label: string) =>
     has(layer) && (
-      <ToggleGroupItem value={layer} className="lg:justify-start">
+      <ToggleGroupItem value={layer} className="@xl:justify-start">
         {label}
       </ToggleGroupItem>
     );
@@ -182,7 +190,7 @@ export function LayerSwitches({
       size="sm"
       spacing={1}
       aria-label={t`Map layers`}
-      className="w-full flex-wrap items-stretch lg:flex-col lg:flex-nowrap"
+      className="w-full flex-wrap items-stretch @xl:flex-col @xl:flex-nowrap"
       value={layersOn(stored).filter(
         (l) => has(l) && (!ev.block || !EVENT_MAP_LAYERS.includes(l)),
       )}

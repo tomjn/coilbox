@@ -254,12 +254,12 @@ describe("MatchStatsSection", () => {
     bindings.contentReplayTrailer.mockResolvedValueOnce(trailer("A"));
     bindings.contentReplayTrailer.mockReturnValueOnce(second.promise);
     const { rerender } = render(
-      <MatchStatsSection info={info} replayPath={a} />,
+      <MatchStatsSection info={info} replayPath={a} part="chart" />,
     );
     expect(await screen.findByText("chart A")).toBeTruthy();
 
     const before = chartTrailers.length;
-    rerender(<MatchStatsSection info={info} replayPath={b} />);
+    rerender(<MatchStatsSection info={info} replayPath={b} part="chart" />);
     expect(chartTrailers.slice(before)).not.toContain("A");
     expect(screen.queryByText("chart A")).toBeNull();
 
@@ -273,9 +273,9 @@ describe("MatchStatsSection", () => {
     bindings.contentReplayTrailer.mockReturnValueOnce(first.promise);
     bindings.contentReplayTrailer.mockReturnValueOnce(second.promise);
     const { rerender } = render(
-      <MatchStatsSection info={info} replayPath={a} />,
+      <MatchStatsSection info={info} replayPath={a} part="chart" />,
     );
-    rerender(<MatchStatsSection info={info} replayPath={b} />);
+    rerender(<MatchStatsSection info={info} replayPath={b} part="chart" />);
     await act(async () => second.resolve(trailer("B")));
     await act(async () => first.resolve(trailer("A")));
     expect(screen.getByText("chart B")).toBeTruthy();
