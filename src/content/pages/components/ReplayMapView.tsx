@@ -3,8 +3,7 @@ import { useLingui as useLocale } from "@lingui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import { useUnitsyncMinimap } from "../../config";
 import {
@@ -12,24 +11,20 @@ import {
   ANALYSIS_SECTION_ID,
 } from "../../replayAnalysis";
 import type { ReplayWatch } from "../../replayEngine";
-import { createReplayClock, type ReplayClock } from "../../replayMapView/clock";
+import type { ReplayClock } from "../../replayMapView/clock";
 import {
   createMapView,
   type MapView,
   type MapViewStatus,
 } from "../../replayMapView/loop";
 import { teamStyles } from "../../replayMapView/paint";
-import { createPlayback, type Playback } from "../../replayMapView/playback";
 import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
-import {
-  type MarkGroup,
-  toFrameParam,
-  urlFrame,
-} from "../../replayMapView/timelineMarks";
+import type { MarkGroup } from "../../replayMapView/timelineMarks";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useReplayTrack } from "../../replayTrack";
 import { useStoredTracks } from "../../replayTracks";
+import { EnsureMatchClock, useMatchClock } from "../../useMatchClock";
 import { useReplayTimelineMarks } from "../../useReplayTimelineMarks";
 import { OpenInEngineButton } from "./OpenInEngineButton";
 import {
@@ -63,8 +58,9 @@ interface Named {
  * recording section above it, which has the button that records the replay
  * again.
  *
- * The time comes from a {@link ReplayClock} this section owns. The timeline
- * under the map (#3808) sets it, and the view draws whatever the clock says.
+ * The time comes from the page's match clock (#5305), and this section gives
+ * it the track's range. The timeline under the map (#3808) moves it, and the
+ * view draws whatever the clock says.
  */
 export function ReplayMapViewSection({
   info,
@@ -121,16 +117,18 @@ export function ReplayMapViewSection({
         ) : track.status === "ready" ? (
           track.handle.header.mapSize[0] > 0 &&
           track.handle.header.mapSize[1] > 0 ? (
-            <RecordedMatch
-              info={info}
-              replayPath={replayPath}
-              watch={watch}
-              dependencyBlock={dependencyBlock}
-              game={game}
-              handle={track.handle}
-              mapName={info.mapName}
-              minimapUrl={minimap.url}
-            />
+            <EnsureMatchClock durationSec={info.durationSec}>
+              <RecordedMatch
+                info={info}
+                replayPath={replayPath}
+                watch={watch}
+                dependencyBlock={dependencyBlock}
+                game={game}
+                handle={track.handle}
+                mapName={info.mapName}
+                minimapUrl={minimap.url}
+              />
+            </EnsureMatchClock>
           ) : (
             <NotShown
               words={tr`The recorded track does not say how large the map is, so it is not shown.`}
@@ -281,15 +279,12 @@ function ownerWords(header: ReplayTrackHeader, teamId: number): string {
   return team.isAi ? t`${owner} (AI), ${side}` : t`${owner}, ${side}`;
 }
 
-/** The address's name for the time, in frames of the track. */
-const TIME_PARAM = "frame";
-
 /**
  * The map, the canvas over it, and the timeline that sets the time.
  *
- * The time is kept in the page's address as `?frame=`. A link opens at that
- * frame, held inside the match. The address is replaced, never added to, and
- * only when playing stops or a seek ends.
+ * The time is the page's match clock, which keeps it in the address as
+ * `?frame=`. A link opens at that frame, held inside the match. The address is
+ * replaced, never added to, and only when playing stops or a seek ends.
  *
  * Keys act while focus is anywhere in here and nowhere else. A text field, and
  * a control that keeps a key for itself, keep it.
@@ -315,46 +310,18 @@ function RecordedMatch({
 }) {
   const { t: tr } = useLingui();
   const { header } = handle;
-  const [params, setParams] = useSearchParams();
-  // Read once, when the match is opened. The address follows the time after.
-  const [opened] = useState(() =>
-    urlFrame(params.get(TIME_PARAM), {
-      first: header.firstFrame,
-      last: header.lastFrame,
-    }),
+  const { clock, playback, range, adoptTrack } = useMatchClock();
+  // The track's header is the page's range while the match is shown here.
+  const { firstFrame, lastFrame, framesPerSecond } = header;
+  useLayoutEffect(
+    () => adoptTrack({ firstFrame, lastFrame, framesPerSecond }),
+    [adoptTrack, firstFrame, lastFrame, framesPerSecond],
   );
-  const clock = useMemo(
-    () => createReplayClock(opened ?? header.firstFrame),
-    [header.firstFrame, opened],
-  );
-
-  const setParamsRef = useRef(setParams);
-  setParamsRef.current = setParams;
-  const [playback, setPlayback] = useState<Playback | null>(null);
-  useEffect(() => {
-    const made = createPlayback({
-      clock,
-      header,
-      env: {
-        requestFrame: (callback) => requestAnimationFrame(callback),
-        cancelFrame: (id) => cancelAnimationFrame(id),
-      },
-      onSettled: (frame) =>
-        setParamsRef.current(
-          (was) => {
-            const next = new URLSearchParams(was);
-            next.set(TIME_PARAM, toFrameParam(frame));
-            return next;
-          },
-          { replace: true },
-        ),
-    });
-    setPlayback(made);
-    return () => {
-      made.dispose();
-      setPlayback(null);
-    };
-  }, [clock, header]);
+  const adopted =
+    range.source === "track" &&
+    range.firstFrame === firstFrame &&
+    range.lastFrame === lastFrame &&
+    range.framesPerSecond === framesPerSecond;
 
   const marks = useReplayTimelineMarks(info, replayPath);
   const groupsRef = useRef<readonly MarkGroup[]>([]);
@@ -362,7 +329,7 @@ function RecordedMatch({
 
   const onKeyDown = useMemo(
     () =>
-      playback
+      adopted
         ? timelineKeyHandler((action) =>
             performAction(action, {
               playback,
@@ -372,7 +339,7 @@ function RecordedMatch({
             }),
           )
         : undefined,
-    [playback, clock, header],
+    [adopted, playback, clock, header],
   );
 
   return (
@@ -385,14 +352,16 @@ function RecordedMatch({
       onKeyDown={onKeyDown}
       className="flex flex-col gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <RecordedMatchCanvas
-        handle={handle}
-        clock={clock}
-        mapName={mapName}
-        minimapUrl={minimapUrl}
-        onStatus={setStatus}
-      />
-      {playback && onKeyDown && (
+      {adopted && (
+        <RecordedMatchCanvas
+          handle={handle}
+          clock={clock}
+          mapName={mapName}
+          minimapUrl={minimapUrl}
+          onStatus={setStatus}
+        />
+      )}
+      {onKeyDown && (
         <div
           style={{
             width: `min(100%, 44rem, 70vh * ${header.mapSize[0]} / ${header.mapSize[1]})`,
