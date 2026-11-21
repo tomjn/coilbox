@@ -48,6 +48,23 @@ export const ANALYSIS_SECTION_ID = "replay-analysis";
  */
 export const ANALYSIS_ACTION_ATTRIBUTE = "data-analysis-action";
 
+/**
+ * Takes the person to the analysis and recording section's button and presses
+ * it, which opens the same confirmation that says what the run will cost. A
+ * button that cannot be pressed, because the replay cannot run, is only brought
+ * into view, so the reasons beside it can be read. Does nothing when the page
+ * has no such section.
+ */
+export function openAnalysisRun(): void {
+  const section = document.getElementById(ANALYSIS_SECTION_ID);
+  const action = section?.querySelector<HTMLElement>(
+    `[${ANALYSIS_ACTION_ATTRIBUTE}]`,
+  );
+  if (!section) return;
+  (action ?? section).scrollIntoView({ block: "center" });
+  if (action instanceof HTMLButtonElement && !action.disabled) action.click();
+}
+
 /** Whether this distribution hides the analysis run. */
 export function analysisRunHidden(): boolean {
   return isProfileHidden("analytics.run");
