@@ -9783,6 +9783,10 @@ msgstr "Um nome de arma só pode usar letras minúsculas, números e sublinhados
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "Um widget que lista as plantas desta biblioteca enquanto você joga, posiciona uma no cursor como fantasmas e ordens de construção, e salva aqui as construções que você selecionou. Ele também lê o blueprints.json do próprio BAR e nunca grava nele. Ele não abre nenhuma conexão de rede."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "a zone that is gone"
@@ -22218,6 +22222,7 @@ msgstr "bitmap de explosão"
 msgid "Explosion effects"
 msgstr "Efeitos de explosão"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Explosions"
@@ -30130,6 +30135,10 @@ msgstr "Marca um objetivo como concluído."
 #, fuzzy
 msgid "Marks an objective as failed."
 msgstr "Marca um objetivo como fracassado."
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Marks on the unit map"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy

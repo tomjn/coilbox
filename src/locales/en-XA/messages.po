@@ -7952,6 +7952,10 @@ msgstr ""
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr ""
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "a zone that is gone"
 msgstr ""
@@ -18123,6 +18127,7 @@ msgstr ""
 msgid "Explosion effects"
 msgstr ""
 
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Explosions"
 msgstr ""
@@ -24570,6 +24575,10 @@ msgstr ""
 
 #: src/scenario/triggerTypes.ts
 msgid "Marks an objective as failed."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Marks on the unit map"
 msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
