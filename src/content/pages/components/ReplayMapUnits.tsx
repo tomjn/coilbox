@@ -30,6 +30,7 @@ import { useMatchClock } from "../../useMatchClock";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useMapLayerToggles } from "../../useReplayMapLayers";
 import { useReplayStartAreas } from "../../useReplayStartAreas";
+import { useSpawnedStarts } from "../../useSpawnedStarts";
 import { useUnitMapIcons } from "../../useUnitMapIcons";
 import { useUnitMapStyles } from "../../useUnitMapStyles";
 import { LayerSwitches, MapHelp, ReplayMapLayout } from "./ReplayMapRail";
@@ -397,9 +398,11 @@ function UnitsView({
   const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const primary = usePrimaryPlayer();
   const meTeam = primary ? playerTeam(info, primary) : undefined;
+  // Where each starting unit appeared, as the flat map's dots are placed (#5346).
+  const { spawns, loading: spawnsLoading } = useSpawnedStarts(info, on.starts);
   // In the colour the chart gives each team, as the flat map's dots are.
   const dots = useMemo(() => {
-    if (!on.starts) return [];
+    if (!on.starts || spawnsLoading) return [];
     const colours = new Map<number, string>();
     for (const [team, style] of styles) colours.set(team, style.fill);
     return startDots(
@@ -408,8 +411,9 @@ function UnitsView({
       colours,
       meTeam,
       new Map(),
+      spawns,
     );
-  }, [on.starts, info, styles, mapX, mapZ, meTeam]);
+  }, [on.starts, spawnsLoading, spawns, info, styles, mapX, mapZ, meTeam]);
 
   useEffect(() => {
     const ground = groundRef.current;

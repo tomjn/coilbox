@@ -36,6 +36,7 @@ import { useReplayBuildOrders } from "./useReplayBuildOrders";
 import { useReplayEventLayers } from "./useReplayEventLayers";
 import { useReplayTimeWindow } from "./useReplayTimeWindow";
 import { useReplayUnits } from "./useReplayUnits";
+import { useSpawnedStarts } from "./useSpawnedStarts";
 import { useTeamColours } from "./useTeamColours";
 
 /**
@@ -141,9 +142,16 @@ export function useReplayMapLayers({
     () => openingsByTeam(result?.orders ?? [], units.units),
     [result, units.units],
   );
+  // A dot sits where the player's starting unit appeared, when the replay has
+  // an analysis (#5346). It waits for that read rather than draw the recorded
+  // start and then jump.
+  const { spawns, loading: spawnsLoading } = useSpawnedStarts(info, on.starts);
   const dots = useMemo(
-    () => (sized ? startDots(info, world, colours, meTeam, openings) : []),
-    [sized, info, world, colours, meTeam, openings],
+    () =>
+      sized && !spawnsLoading
+        ? startDots(info, world, colours, meTeam, openings, spawns)
+        : [],
+    [sized, spawnsLoading, info, world, colours, meTeam, openings, spawns],
   );
 
   // The time window (#1153). The layers that have a time to filter by are read

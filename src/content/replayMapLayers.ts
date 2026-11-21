@@ -116,6 +116,11 @@ export interface StartDot extends MapFraction {
  *
  * A team with no recorded position has no dot, since 0,0,0 is a real corner
  * and not a missing value. A position off the map has none either.
+ *
+ * `spawns` are where each team's starting unit appeared, from an analysis
+ * (`spawnedStarts`). A game can place a player somewhere other than the
+ * recorded start (#5339), and a dot sits where the base is. A team with a spawn
+ * on the map has its dot there, and one without keeps the recorded start.
  */
 export function startDots(
   info: DemoInfo,
@@ -123,21 +128,25 @@ export function startDots(
   colours: ReadonlyMap<number, string>,
   meTeam: number | undefined,
   openings: ReadonlyMap<number, string>,
+  spawns: ReadonlyMap<number, { x: number; z: number }> = new Map(),
 ): StartDot[] {
   const seats = seatsByTeam(info);
   const dots: StartDot[] = [];
-  for (const start of info.startPositions ?? []) {
-    const at = mapFraction(start, world);
+  for (const recorded of info.startPositions ?? []) {
+    const spawn = spawns.get(recorded.team);
+    const spawnAt = spawn ? mapFraction(spawn, world) : null;
+    const start = spawn && spawnAt ? spawn : recorded;
+    const at = spawnAt ?? mapFraction(recorded, world);
     if (!at) continue;
     dots.push({
       ...at,
-      team: start.team,
+      team: recorded.team,
       x: start.x,
       z: start.z,
-      names: (seats.get(start.team) ?? []).map((seat) => seat.name),
-      colour: colours.get(start.team) ?? NEUTRAL_TEAM_COLOUR,
-      isMe: meTeam !== undefined && start.team === meTeam,
-      opening: openings.get(start.team) ?? null,
+      names: (seats.get(recorded.team) ?? []).map((seat) => seat.name),
+      colour: colours.get(recorded.team) ?? NEUTRAL_TEAM_COLOUR,
+      isMe: meTeam !== undefined && recorded.team === meTeam,
+      opening: openings.get(recorded.team) ?? null,
     });
   }
   return dots;
