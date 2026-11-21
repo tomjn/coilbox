@@ -31,6 +31,7 @@ import type {
   StoredReplayAnalysis,
   StoredReplayTrack,
   TimelineEvent,
+  UnitIconsResult,
 } from "../../bindings";
 import { useStoredColorMode } from "../../chartColorMode";
 import fixture from "../../fixtures/replay-track-window.json";
@@ -53,6 +54,8 @@ import {
   seedReplayTracksForTests,
 } from "../../replayTracks";
 import type { EmphasisStore } from "../../seriesEmphasis";
+import { resetUnitDrawingForTests } from "../../unitMapDrawing";
+import { resetUnitMapIconsForTests } from "../../useUnitMapIcons";
 
 const ID = "00112233445566778899aabbccddeeff";
 const HEADER = fixture.header as ReplayTrackHeader;
@@ -141,6 +144,9 @@ let GAMES: GameItem[] = [];
 let STARTBOXES: StartBoxConfig | null = null;
 const startBoxesAsked = vi.fn();
 
+/** What unitsync says about the game's icons, or null for a failed read. */
+let ICONS: UnitIconsResult | null = null;
+
 /** What the replay file holds, and what the analysis logged. */
 let CHAT: {
   messages: ChatLine[];
@@ -168,6 +174,10 @@ vi.mock("../../bindings", async () => {
     contentStartBoxes: async (args: unknown) => {
       startBoxesAsked(args);
       return { config: STARTBOXES };
+    },
+    unitsyncUnitIcons: async () => {
+      if (ICONS === null) throw new Error("no icons");
+      return ICONS;
     },
     contentDemoChat: async () => CHAT,
     contentDemoBuildOrders: async () => ORDERS,
@@ -2632,5 +2642,148 @@ describe("start boxes and start positions in Units (#5312)", () => {
     expect(dotMarks()).toHaveLength(0);
     expect(screen.queryByRole("toolbar", { name: "Map layers" })).toBeNull();
     screen.getByText("Start boxes per team.");
+  });
+});
+
+describe("units as their game icons (#5316)", () => {
+  /** An icon type that has a picture, and the sub-image kind that has none. */
+  const ICON_TYPES: UnitIconsResult = {
+    unitTypes: { armcom: "commander", armpw: "sub" },
+    types: {
+      commander: { file: "commander.png", size: 2 },
+      sub: { size: 1, skipped: "sub-image" },
+    },
+    errors: [],
+  };
+  /** Draws on a context of its own, so tinting a picture is not counted as
+   *  drawing a unit. */
+  let scratch: ReturnType<typeof recordingContext>;
+  const loaded: string[] = [];
+
+  beforeEach(() => {
+    loaded.length = 0;
+    resetUnitDrawingForTests();
+    resetUnitMapIconsForTests();
+    localStorage.removeItem("coilbox.replayMap.unitDrawing");
+    ICONS = ICON_TYPES;
+    GAMES = [
+      {
+        name: "Some Game 1.0",
+        primaryArchive: { name: "some.sdz" },
+        dependencyArchives: [],
+        info: { shortname: "SG" },
+      } as unknown as GameItem,
+    ];
+    scratch = recordingContext();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      function (this: HTMLCanvasElement) {
+        return (this.dataset.layer === "recorded-units"
+          ? ctx
+          : scratch) as unknown as CanvasRenderingContext2D;
+      },
+    );
+    vi.stubGlobal(
+      "Image",
+      class {
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        width = 64;
+        height = 64;
+        set src(url: string) {
+          loaded.push(url);
+          queueMicrotask(() => this.onload?.());
+        }
+      },
+    );
+  });
+
+  afterEach(() => {
+    localStorage.removeItem("coilbox.replayMap.unitDrawing");
+    resetUnitDrawingForTests();
+    ICONS = null;
+  });
+
+  const drawn = () =>
+    ctx.calls.slice(ctx.calls.map((c) => c.op).lastIndexOf("clearRect"));
+  const switchItem = (name: string) => screen.getByRole("radio", { name });
+
+  it("draws a unit with a known icon from the icon and a unit with none as a rectangle", async () => {
+    await show("current", "/replay?frame=30");
+    await settle();
+    // Unit 0 is an armcom, whose type has a picture. Unit 1 is an armpw, whose
+    // type draws part of a bigger picture and has none cut out yet.
+    const picture = drawn();
+    expect(picture.filter((c) => c.op === "drawImage")).toHaveLength(1);
+    expect(picture.filter((c) => c.op === "closePath")).toHaveLength(1);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toContain("commander.png");
+  });
+
+  it("draws every unit as a rectangle when the game's icons cannot be read", async () => {
+    ICONS = null;
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(0);
+    expect(drawn().filter((c) => c.op === "closePath")).toHaveLength(2);
+  });
+
+  it("draws every unit as a rectangle when the game is not installed", async () => {
+    GAMES = [];
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(0);
+    expect(drawn().filter((c) => c.op === "closePath")).toHaveLength(2);
+  });
+
+  it("has Icons chosen to begin with, and Footprints draws today's rectangles", async () => {
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(switchItem("Icons").getAttribute("aria-checked")).toBe("true");
+    expect(switchItem("Footprints").getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => fireEvent.click(switchItem("Footprints")));
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(0);
+    expect(drawn().filter((c) => c.op === "closePath")).toHaveLength(2);
+
+    await act(async () => fireEvent.click(switchItem("Icons")));
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(1);
+  });
+
+  it("remembers the choice for the next replay", async () => {
+    await show("current", "/replay?frame=30");
+    await act(async () => fireEvent.click(switchItem("Footprints")));
+    expect(localStorage.getItem("coilbox.replayMap.unitDrawing")).toBe(
+      "footprints",
+    );
+    cleanup();
+    resetUnitDrawingForTests();
+    mount("/replay?frame=30");
+    await settle();
+    expect(switchItem("Footprints").getAttribute("aria-checked")).toBe("true");
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(0);
+  });
+
+  it("names a unit when the pointer is on its icon, outside its footprint", async () => {
+    await show("current", "/replay?frame=30");
+    await settle();
+    // Unit 0, the armcom, is at its place on the canvas with a footprint of a
+    // few pixels and an icon 20 pixels across. A point 8 pixels off it is on the
+    // icon and not on the footprint.
+    const at = drawn().find((c) => c.op === "drawImage");
+    const [left, top] = at?.args ?? [0, 0];
+    const x = left + 10 + 8;
+    const y = top + 10;
+    fireEvent.pointerMove(canvas(), { clientX: x, clientY: y });
+    await settle();
+    expect(screen.getByTestId("recorded-unit-name").textContent).toContain(
+      "armcom",
+    );
+
+    await act(async () => fireEvent.click(switchItem("Footprints")));
+    fireEvent.pointerMove(canvas(), { clientX: x + 1, clientY: y });
+    await settle();
+    expect(screen.getByTestId("recorded-unit-name").textContent).toBe("");
   });
 });
