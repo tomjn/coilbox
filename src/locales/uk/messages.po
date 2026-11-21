@@ -1837,7 +1837,7 @@ msgstr "з них ботів: {bots}"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# стартова зона} few {# стартові зони} many {# стартових зон} other {# стартової зони}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Стартова зона {boxTeam}"
@@ -8834,6 +8834,10 @@ msgstr "інший розмір, ніж мапа цієї сторінки, то
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "Активний профіль дистрибуції (завантажено з <0>{source}</0>). Він змінює вигляд і звужує цю збірку:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9509,6 +9513,7 @@ msgid "a start"
 msgstr "старт"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Стартова зона – це місце, де команді дозволено було почати."
@@ -46010,12 +46015,17 @@ msgstr "Усе одно почати"
 msgid "Start boxes"
 msgstr "Стартові зони"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "Стартові зони беруться з налаштувань матчу."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Стартові зони для кожної команди."
@@ -51699,6 +51709,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "У цьому матчі не записано кінця гри – зазвичай тому, що з нього вийшли до завершення. Немає з чим звірити відтворення, тож його неможливо проаналізувати."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Цей матч не задавав стартових зон."
@@ -52106,6 +52117,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "Цей повтор потребує рушія {version}, який не встановлено й не можна тут завантажити."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Цей повтор не записав стартових позицій."

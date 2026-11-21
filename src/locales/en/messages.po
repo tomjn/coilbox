@@ -1535,7 +1535,7 @@ msgstr "{bots} of them bots"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# box} other {# boxes}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 msgid "{boxTeam} start box"
 msgstr "{boxTeam} start box"
 
@@ -7221,6 +7221,10 @@ msgstr "a different size from this page's map, so it is left out"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+
 #: src/content/pages/components/ReplayMapRail.tsx
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
 msgstr "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -7780,6 +7784,7 @@ msgid "a start"
 msgstr "a start"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A start box is where a team was allowed to start."
 msgstr "A start box is where a team was allowed to start."
 
@@ -37750,11 +37755,16 @@ msgstr "Start anyway"
 msgid "Start boxes"
 msgstr "Start boxes"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr "Start boxes and dots are drawn under the units, so they never hide one."
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Start boxes come from the match setup."
 msgstr "Start boxes come from the match setup."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Start boxes per team."
 msgstr "Start boxes per team."
 
@@ -42418,6 +42428,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "This match set no start boxes."
 msgstr "This match set no start boxes."
 
@@ -42750,6 +42761,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "This replay recorded no start positions."
 msgstr "This replay recorded no start positions."
 

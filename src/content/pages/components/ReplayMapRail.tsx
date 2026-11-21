@@ -161,11 +161,16 @@ export function LayerSwitches({
   layers,
   only,
 }: {
-  layers: ReplayMapLayers;
+  /** The unit map has no event layers, so it has no `ev` to say they are
+   *  blocked. */
+  layers: Pick<ReplayMapLayers, "layersShown" | "stored" | "setLayers"> & {
+    ev?: Pick<ReplayMapLayers["ev"], "block">;
+  };
   only: readonly MapLayer[];
 }) {
   const { t } = useLingui();
-  const { stored, setLayers, ev } = layers;
+  const { stored, setLayers } = layers;
+  const ev = layers.ev ?? { block: null };
   if (!layers.layersShown) return null;
   const has = (layer: MapLayer) => only.includes(layer);
   const event = (layer: MapLayer, label: string) =>

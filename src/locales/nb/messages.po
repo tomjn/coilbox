@@ -1857,7 +1857,7 @@ msgstr "{bots} av dem boter"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# område} other {# områder}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Startområde for {boxTeam}"
@@ -8888,6 +8888,10 @@ msgstr "en annen størrelse enn kartet på denne siden, så den er utelatt"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "En distribusjonsprofil er aktiv (lastet fra <0>{source}</0>). Den gir nytt utseende til og avgrenser denne versjonen:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9573,6 +9577,7 @@ msgid "a start"
 msgstr "en start"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Et startområde er der et lag fikk lov til å starte."
@@ -46299,12 +46304,17 @@ msgstr "Start likevel"
 msgid "Start boxes"
 msgstr "Startområder"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "Startområdene kommer fra kampoppsettet."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Startområder per lag."
@@ -52033,6 +52043,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "Denne kampen registrerte aldri en spillslutt, vanligvis fordi den ble avsluttet før den var ferdig. Det er ingenting å sjekke en avspilling mot, så den kan ikke analyseres."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Denne kampen satte ingen startområder."
@@ -52441,6 +52452,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "Denne reprisen trenger motor {version}, som ikke er installert og ikke kan lastes ned her."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Denne reprisen registrerte ingen startposisjoner."

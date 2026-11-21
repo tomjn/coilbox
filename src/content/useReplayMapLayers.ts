@@ -38,6 +38,32 @@ import { useReplayTimeWindow } from "./useReplayTimeWindow";
 import { useReplayUnits } from "./useReplayUnits";
 import { useTeamColours } from "./useTeamColours";
 
+/**
+ * The layer switches the reader left, narrowed to the layers a view draws, and
+ * what is on in it. The start boxes are drawn when the profile hides the
+ * switches, as they always were. Both the flat map and the unit map read this,
+ * so the one set of switches steers both.
+ */
+export function useMapLayerToggles(shown: readonly MapLayer[]) {
+  const layersShown = !isProfileHidden("analytics.spatialLayers");
+  const [stored, setLayers] = useStoredMapLayers();
+  const mine = useMemo(() => {
+    const out = { ...stored };
+    for (const layer of MAP_LAYERS)
+      if (!shown.includes(layer)) out[layer] = false;
+    return out satisfies MapLayerToggles;
+  }, [stored, shown]);
+  const on = {
+    startBoxes: layersShown ? mine.startBoxes : shown.includes("startBoxes"),
+    starts: layersShown && mine.starts,
+    buildings: layersShown && mine.buildings,
+    density: layersShown && mine.density,
+    orderDensity: layersShown && mine.orderDensity,
+    bases: layersShown && mine.bases,
+  };
+  return { layersShown, stored, setLayers, mine, on };
+}
+
 /** What the replay page's flat map and 3D view both read (#1152): the layer
  *  switches, the build orders and order points behind them, the time window the
  *  timeline dock sets (#5309), and the fields and marks worked out from those.
@@ -56,22 +82,8 @@ export function useReplayMapLayers({
    *  not draw reads nothing and takes no part in the time window. */
   shown: readonly MapLayer[];
 }) {
-  const layersShown = !isProfileHidden("analytics.spatialLayers");
-  const [stored, setLayers] = useStoredMapLayers();
-  const mine = useMemo(() => {
-    const out = { ...stored };
-    for (const layer of MAP_LAYERS)
-      if (!shown.includes(layer)) out[layer] = false;
-    return out satisfies MapLayerToggles;
-  }, [stored, shown]);
-  const on = {
-    startBoxes: layersShown ? mine.startBoxes : shown.includes("startBoxes"),
-    starts: layersShown && mine.starts,
-    buildings: layersShown && mine.buildings,
-    density: layersShown && mine.density,
-    orderDensity: layersShown && mine.orderDensity,
-    bases: layersShown && mine.bases,
-  };
+  const { layersShown, stored, setLayers, mine, on } =
+    useMapLayerToggles(shown);
 
   // The engine's heightmap has one sample more than it has squares, and a
   // square is 8 elmos, which is how the 3D preview has always sized this map.

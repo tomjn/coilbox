@@ -1535,7 +1535,7 @@ msgstr ""
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr ""
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 msgid "{boxTeam} start box"
 msgstr ""
 
@@ -7220,6 +7220,10 @@ msgstr ""
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr ""
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
 msgstr ""
@@ -7779,6 +7783,7 @@ msgid "a start"
 msgstr ""
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A start box is where a team was allowed to start."
 msgstr ""
 
@@ -37749,11 +37754,16 @@ msgstr ""
 msgid "Start boxes"
 msgstr ""
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Start boxes come from the match setup."
 msgstr ""
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Start boxes per team."
 msgstr ""
 
@@ -42417,6 +42427,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr ""
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "This match set no start boxes."
 msgstr ""
 
@@ -42749,6 +42760,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr ""
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "This replay recorded no start positions."
 msgstr ""
 

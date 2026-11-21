@@ -1837,7 +1837,7 @@ msgstr "うちボット {bots} 体"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, other {# 個のエリア}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "{boxTeam} の開始エリア"
@@ -8834,6 +8834,10 @@ msgstr "このページのマップと大きさが異なるため除外"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "配布プロファイルが有効です（<0>{source}</0> から読み込み）。このビルドの外見を変え、機能を絞り込んでいます："
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9509,6 +9513,7 @@ msgid "a start"
 msgstr "開始"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "開始エリアは、チームが開始を許可された場所です。"
@@ -46010,12 +46015,17 @@ msgstr "それでも開始"
 msgid "Start boxes"
 msgstr "開始エリア"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "開始エリアは試合の設定から取得します。"
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "チームごとの開始エリア。"
@@ -51699,6 +51709,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "この試合にはゲームオーバーが記録されていません。通常は終了前に退出したためです。再生と照合するものがないため、分析できません。"
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "この試合では開始エリアが設定されていません。"
@@ -52106,6 +52117,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "このリプレイにはエンジン {version} が必要ですが、インストールされておらず、ここではダウンロードできません。"
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "このリプレイには開始位置が記録されていません。"

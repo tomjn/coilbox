@@ -3,12 +3,15 @@ import { useLingui as useLocale } from "@lingui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
+import { playerTeam } from "../../matchStats";
 import {
   ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
 } from "../../replayAnalysis";
+import { startDots } from "../../replayMapLayers";
+import type { MapLayer } from "../../replayMapLayerToggles";
 import type { ReplayClock } from "../../replayMapView/clock";
 import {
   createMapView,
@@ -20,8 +23,11 @@ import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useMatchClock } from "../../useMatchClock";
+import { usePrimaryPlayer } from "../../usePrimaryPlayer";
+import { useMapLayerToggles } from "../../useReplayMapLayers";
 import { useUnitMapStyles } from "../../useUnitMapStyles";
-import { MapHelp, ReplayMapLayout } from "./ReplayMapRail";
+import { LayerSwitches, MapHelp, ReplayMapLayout } from "./ReplayMapRail";
+import { StartAreas, StartDotMarks, startAreas } from "./ReplayStartAreas";
 import { useTimelineKeys } from "./ReplayTimelineDock";
 
 /** Said under the analysis and recording section, which has already said the
@@ -90,8 +96,12 @@ export function NotShown({ words }: { words: string }) {
   );
 }
 
+/** The layers of the map card's rail that the unit map draws. The same two
+ *  switches steer the flat map, so one choice holds in both modes. */
+const UNIT_MAP_LAYERS: readonly MapLayer[] = ["startBoxes", "starts"];
+
 /** What the marks are and how the timeline moves them. Behind the help button. */
-function Legend() {
+function Legend({ boxes, dots }: { boxes: boolean; dots: boolean }) {
   useLocale();
   return (
     <>
@@ -122,6 +132,28 @@ function Legend() {
           square is a wreck, or anything else left on the map during the match.
         </Trans>
       </p>
+      {boxes && (
+        <p>
+          <Trans>A start box is where a team was allowed to start.</Trans>
+        </p>
+      )}
+      {dots && (
+        <p>
+          <Trans>
+            A dot is where a player's start was set before the game. The engine
+            can move a start into its start box, so the commander may have
+            appeared a short way off.
+          </Trans>
+        </p>
+      )}
+      {(boxes || dots) && (
+        <p>
+          <Trans>
+            Start boxes and dots are drawn under the units, so they never hide
+            one.
+          </Trans>
+        </p>
+      )}
       <p>
         <Trans>
           Point at a unit to name it. Click one to keep it named, and click the
@@ -303,6 +335,26 @@ function UnitsView({
   const styles = useUnitMapStyles(info, replayPath, header.teams);
   const stylesRef = useRef(styles);
   stylesRef.current = styles;
+  const layers = useMapLayerToggles(UNIT_MAP_LAYERS);
+  const { on } = layers;
+  const areas = on.startBoxes ? startAreas(info) : [];
+  const hasBoxes = info.allyTeams.some((a) => a.startBox);
+  const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
+  const primary = usePrimaryPlayer();
+  const meTeam = primary ? playerTeam(info, primary) : undefined;
+  // In the colour the chart gives each team, as the flat map's dots are.
+  const dots = useMemo(() => {
+    if (!on.starts) return [];
+    const colours = new Map<number, string>();
+    for (const [team, style] of styles) colours.set(team, style.fill);
+    return startDots(
+      info,
+      { worldWidth: mapX, worldHeight: mapZ },
+      colours,
+      meTeam,
+      new Map(),
+    );
+  }, [on.starts, info, styles, mapX, mapZ, meTeam]);
 
   useEffect(() => {
     const ground = groundRef.current;
@@ -452,6 +504,10 @@ function UnitsView({
                 className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
               />
             )}
+            {/* Under the canvas, so a box or a dot never hides a unit or takes
+                the pointer from it. */}
+            <StartAreas areas={areas} named={false} />
+            <StartDotMarks dots={dots} />
             <canvas
               ref={canvasRef}
               data-layer="recorded-units"
@@ -505,7 +561,7 @@ function UnitsView({
       rail={
         <>
           <MapHelp section={tr`the recorded match`}>
-            <Legend />
+            <Legend boxes={areas.length > 0} dots={dots.length > 0} />
           </MapHelp>
           <p
             ref={countsRef}
@@ -517,6 +573,29 @@ function UnitsView({
           >
             {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
           </p>
+          {layers.layersShown ? (
+            <div data-map-controls className="flex flex-col gap-3">
+              <LayerSwitches layers={layers} only={UNIT_MAP_LAYERS} />
+              <div data-map-notes className="flex flex-col gap-2">
+                {on.startBoxes && !hasBoxes && (
+                  <p className="text-xs text-muted-foreground">
+                    <Trans>This match set no start boxes.</Trans>
+                  </p>
+                )}
+                {noStarts && (
+                  <p className="text-xs text-muted-foreground">
+                    <Trans>This replay recorded no start positions.</Trans>
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            areas.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                <Trans>Start boxes per team.</Trans>
+              </p>
+            )
+          )}
           <TeamKey header={header} styles={styles} />
         </>
       }

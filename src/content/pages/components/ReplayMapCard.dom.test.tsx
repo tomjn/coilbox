@@ -2304,3 +2304,241 @@ describe("the units follow the players table and the colour switch", () => {
     expect(lastFills().map((f) => f.alpha)).toEqual([1, 1]);
   });
 });
+
+describe("start boxes and start positions in Units (#5312)", () => {
+  // Unit 1 is at 3000, 2000 elmos of the fixture's 8192 by 6144 map, which is
+  // 0.37, 0.33 of the way across. Team 1's box is round it.
+  const SETUP = {
+    allyTeams: [
+      {
+        id: 0,
+        startBox: { left: 0, top: 0, right: 0.2, bottom: 0.3 },
+        color: [1, 0, 0],
+      },
+      {
+        id: 1,
+        startBox: { left: 0.3, top: 0.25, right: 0.5, bottom: 0.5 },
+        color: [0, 0.5, 1],
+      },
+    ],
+    startPositions: [
+      { team: 0, x: 1024, y: 0, z: 768 },
+      { team: 1, x: 3072, y: 0, z: 2048 },
+    ],
+  } as unknown as Partial<DemoInfo>;
+  const NO_BOXES = {
+    allyTeams: [{ id: 0 }, { id: 1 }],
+    startPositions: SETUP.startPositions,
+  } as unknown as Partial<DemoInfo>;
+
+  const boxes = () =>
+    [
+      ...document.querySelectorAll<HTMLElement>("[data-layer='startBox']"),
+    ] as HTMLElement[];
+  const dotMarks = () =>
+    [
+      ...document.querySelectorAll<HTMLElement>("[data-layer='startDot']"),
+    ] as HTMLElement[];
+  const switchFor = (name: string) =>
+    within(document.querySelector("[data-map-rail]") as HTMLElement).getByRole(
+      "button",
+      { name },
+    );
+  const pick = async (name: string) => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("radio", { name }));
+    });
+    await settle();
+  };
+  const flip = async (name: string) => {
+    await act(async () => {
+      fireEvent.click(switchFor(name));
+    });
+    await settle();
+  };
+
+  async function open(over: Partial<DemoInfo> = SETUP, url = "/replay") {
+    localStorage.removeItem("coilbox.replayMap.layers");
+    INFO_OVER = over;
+    await show("current", url);
+  }
+
+  it("draws each team's box in its colour with its number, under the units", async () => {
+    await open();
+    const drawn = boxes();
+    expect(drawn.map((b) => b.textContent)).toEqual(["1", "2"]);
+    expect(drawn[1].style.left).toBe("30%");
+    expect(drawn[1].style.top).toBe("25%");
+    expect(drawn[1].style.width).toBe("20%");
+    expect(drawn[1].style.height).toBe("25%");
+    expect(drawn[1].getAttribute("style")).toContain("rgb(0, 128, 255)");
+    // The canvas is later in the box that holds both, so it is in front.
+    for (const el of [...drawn, ...dotMarks()]) {
+      expect(
+        el.compareDocumentPosition(canvas()) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(el.parentElement).toBe(canvas().parentElement);
+    }
+  });
+
+  it("draws a dot at each recorded start, in the team's colour, that the pointer goes through", async () => {
+    await open();
+    const dots = dotMarks();
+    expect(
+      dots.map((d) => [
+        d.dataset.team,
+        Number.parseFloat(d.style.left).toFixed(2),
+        Number.parseFloat(d.style.top).toFixed(2),
+      ]),
+    ).toEqual([
+      ["0", "12.50", "12.50"],
+      ["1", "37.50", "33.33"],
+    ]);
+    for (const dot of dots) {
+      expect(dot.className).toContain("pointer-events-none");
+      expect(dot.getAttribute("aria-hidden")).toBe("true");
+    }
+    expect(
+      screen.queryByRole("button", { name: /^Start position of/ }),
+    ).toBeNull();
+    for (const box of boxes())
+      expect(box.className).toContain("pointer-events-none");
+  });
+
+  it("still names a unit inside a start box when the pointer is on it", async () => {
+    await open();
+    expect(boxes()).toHaveLength(2);
+    await press("PageUp", 3);
+    fireEvent.pointerMove(canvas(), { clientX: 375, clientY: 250 });
+    await settle();
+    expect(screen.getByTestId("recorded-unit-name").textContent).toBe(
+      "armpw, Bot (AI), Team 2",
+    );
+    fireEvent.click(canvas(), { clientX: 375, clientY: 250 });
+    fireEvent.pointerLeave(canvas());
+    await settle();
+    expect(screen.getByTestId("recorded-unit-name").textContent).toBe(
+      "armpw, Bot (AI), Team 2",
+    );
+  });
+
+  it("has one switch for each, which hides them in Units and in Heat", async () => {
+    await open();
+    expect(boxes()).toHaveLength(2);
+    expect(dotMarks()).toHaveLength(2);
+
+    await flip("Start boxes");
+    expect(boxes()).toHaveLength(0);
+    expect(dotMarks()).toHaveLength(2);
+    // The same choice holds in the flat map.
+    await pick("Heat");
+    expect(boxes()).toHaveLength(0);
+    expect(
+      screen.getAllByRole("button", { name: /^Start position of/ }),
+    ).toHaveLength(2);
+
+    await flip("Start positions");
+    expect(
+      screen.queryByRole("button", { name: /^Start position of/ }),
+    ).toBeNull();
+    await pick("Units");
+    expect(boxes()).toHaveLength(0);
+    expect(dotMarks()).toHaveLength(0);
+
+    // And switched on in one mode, on in the other.
+    await flip("Start boxes");
+    await flip("Start positions");
+    expect(boxes()).toHaveLength(2);
+    expect(dotMarks()).toHaveLength(2);
+    await pick("Heat");
+    expect(boxes()).toHaveLength(2);
+    expect(
+      screen.getAllByRole("button", { name: /^Start position of/ }),
+    ).toHaveLength(2);
+  });
+
+  it("gives a box and a dot the same colours in Units as in Heat", async () => {
+    // With the chart's colours, which both modes then draw in.
+    TRAILER = {
+      teams: [
+        { team: 0, samples: [{ frame: 0 }] },
+        { team: 1, samples: [{ frame: 0 }] },
+      ],
+    } as DemoTrailer;
+    await open({
+      ...SETUP,
+      players: [
+        {
+          name: "Alice",
+          team: 0,
+          allyTeam: 0,
+          spectator: false,
+          rgbColor: [1, 0, 0],
+        },
+        {
+          name: "Bob",
+          team: 1,
+          allyTeam: 1,
+          spectator: false,
+          rgbColor: [0, 0, 1],
+        },
+      ],
+    } as unknown as Partial<DemoInfo>);
+    const inUnits = {
+      boxes: boxes().map(
+        (b) => b.getAttribute("style")?.match(/rgb\([^)]*\)/)?.[0],
+      ),
+      dots: dotMarks().map(
+        (d) => (d.firstElementChild as HTMLElement).style.backgroundColor,
+      ),
+    };
+    await pick("Heat");
+    const inHeat = {
+      boxes: boxes().map(
+        (b) => b.getAttribute("style")?.match(/rgb\([^)]*\)/)?.[0],
+      ),
+      dots: screen
+        .getAllByRole("button", { name: /^Start position of/ })
+        .map((d) => (d.firstElementChild as HTMLElement).style.backgroundColor),
+    };
+    expect(inUnits.boxes.every(Boolean)).toBe(true);
+    expect(inUnits).toEqual(inHeat);
+  });
+
+  it("rings the dot of the player the table points at", async () => {
+    await open();
+    const ring = (team: string) =>
+      (
+        dotMarks().find((d) => d.dataset.team === team)
+          ?.firstElementChild as HTMLElement
+      ).className;
+    expect(ring("0")).not.toContain("ring-2 ring-white");
+    await act(async () => emphasisStore.hover([0]));
+    await settle();
+    expect(ring("0")).toContain("ring-2 ring-white");
+    expect(ring("1")).toContain("opacity-40");
+    await act(async () => emphasisStore.hover(null));
+  });
+
+  it("shows no box for a match that set none, and says so", async () => {
+    await open(NO_BOXES);
+    expect(boxes()).toHaveLength(0);
+    screen.getByText("This match set no start boxes.");
+    expect(dotMarks()).toHaveLength(2);
+  });
+
+  it("says a replay recorded no start positions, and draws no dot", async () => {
+    await open({ ...SETUP, startPositions: [] } as Partial<DemoInfo>);
+    expect(dotMarks()).toHaveLength(0);
+    screen.getByText("This replay recorded no start positions.");
+  });
+
+  it("still draws the boxes, with no switches, when the profile hides the layers", async () => {
+    HIDE = ["analytics.spatialLayers"];
+    await open();
+    expect(boxes()).toHaveLength(2);
+    expect(dotMarks()).toHaveLength(0);
+    expect(screen.queryByRole("toolbar", { name: "Map layers" })).toBeNull();
+    screen.getByText("Start boxes per team.");
+  });
+});
