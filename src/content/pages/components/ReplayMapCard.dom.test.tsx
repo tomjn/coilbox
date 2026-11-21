@@ -46,6 +46,7 @@ import {
   resetReplayTracksForTests,
   seedReplayTracksForTests,
 } from "../../replayTracks";
+import type { EmphasisStore } from "../../seriesEmphasis";
 
 const ID = "00112233445566778899aabbccddeeff";
 const HEADER = fixture.header as ReplayTrackHeader;
@@ -189,7 +190,9 @@ const { ReplayTimelineDock, TimelineKeysProvider } = await import(
 );
 const { MatchClockProvider, useMatchClock, useMatchFrame, useSettledFrame } =
   await import("../../useMatchClock");
-const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+const { SeriesEmphasisProvider, useSeriesEmphasis } = await import(
+  "../../useSeriesEmphasis"
+);
 const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
   "../../replayAnalysis"
 );
@@ -338,6 +341,13 @@ async function settle() {
 /** Every navigation the router made, to tell a replace from a push. */
 const navigations: { action: string; search: string }[] = [];
 
+/** The page's emphasis store, so a test can point at a team the way the roster does. */
+let emphasisStore: EmphasisStore;
+function GrabStore() {
+  emphasisStore = useSeriesEmphasis().store;
+  return null;
+}
+
 /**
  * The page as the replay page has it: one match clock and one set of keys over
  * the map and the dock, which sits under it.
@@ -369,6 +379,7 @@ function Page({
             dependencyBlock={BLOCK}
             game={GAME}
           />
+          <GrabStore />
           {children}
         </TimelineKeysProvider>
       </MatchClockProvider>
@@ -1341,6 +1352,71 @@ describe("the lanes of the dock", () => {
     expect(clockFrame()).toBe(100);
     key(view(), "[");
     expect(clockFrame()).toBe(30);
+  });
+
+  describe("team emphasis on the chat lane", () => {
+    const seat = (player: number, team: number, spectator = false) => ({
+      name: `P${player}`,
+      player,
+      team,
+      spectator,
+    });
+    const emphasised = (name: RegExp) =>
+      screen.getByRole("button", { name }).getAttribute("data-emphasised");
+    const original = info.players;
+    afterEach(() => {
+      (info as { players: unknown }).players = original;
+    });
+
+    async function chart() {
+      (info as { players: unknown }).players = [
+        seat(0, 0),
+        seat(1, 1),
+        seat(2, 2, true),
+      ];
+      CHAT = {
+        messages: [
+          line(20, "from zero", { player: 0 }),
+          line(50, "from one", { player: 1 }),
+          line(80, "from spec", { player: 2 }),
+          line(110, "from server", { player: 255 }),
+          line(140, "from nobody", { player: 9 }),
+        ],
+        incomplete: false,
+        events: [],
+      };
+      await show();
+      act(() => emphasisStore.setPlot({ charted: [0, 1], resting: null }));
+    }
+
+    it("lights the pointed team's marks and dims the other team's", async () => {
+      await chart();
+      act(() => emphasisStore.hover([0]));
+      expect(emphasised(/from zero/)).toBe("true");
+      expect(emphasised(/from one/)).toBe("false");
+      expect(
+        screen.getByRole("button", { name: /from one/ }).className,
+      ).toContain("opacity-40");
+    });
+
+    it("leaves spectator, server and unnumbered marks as they are", async () => {
+      await chart();
+      act(() => emphasisStore.hover([0]));
+      for (const name of [/from spec/, /from server/, /from nobody/]) {
+        const mark = screen.getByRole("button", { name });
+        expect(mark.getAttribute("data-emphasised")).toBeNull();
+        expect(mark.className).not.toContain("opacity-40");
+      }
+    });
+
+    it("lights its team across the page when a mark is pointed at", async () => {
+      await chart();
+      const mark = screen.getByRole("button", { name: /from one/ });
+      fireEvent.pointerEnter(mark, { pointerType: "mouse" });
+      expect(emphasisStore.getState().hovered).toEqual([1]);
+      fireEvent.pointerLeave(mark);
+      expect(emphasisStore.getState().hovered).toBeNull();
+    });
   });
 
   it("says what a mark is when the pointer is on it or the keyboard has moved to it", async () => {
