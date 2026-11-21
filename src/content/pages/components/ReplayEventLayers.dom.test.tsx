@@ -471,6 +471,30 @@ describe("metal cost", () => {
     expect(screen.queryByRole("radio", { name: "Metal cost lost" })).toBeNull();
   });
 
+  it("lays its two ways to count in a column the width of the rail, so neither runs past it (#5357)", async () => {
+    analysed();
+    EVENTS = DEATHS;
+    GAMES = [game("Some Game 1.0")];
+    DATASET = { units: UNITS };
+    show();
+    fireEvent.click(toggle("Deaths"));
+    await screen.findByText("Where units died");
+    const group = screen.getByRole("radiogroup", {
+      name: "What the deaths are counted as",
+    });
+    for (const cls of [
+      "w-full",
+      "flex-wrap",
+      "@xl:flex-col",
+      "@xl:flex-nowrap",
+    ])
+      expect(group.className).toContain(cls);
+    for (const name of ["Units lost", "Metal cost lost"])
+      expect(
+        screen.getByRole("radio", { name }).querySelector("span[aria-hidden]"),
+      ).not.toBeNull();
+  });
+
   it("weights each death by cost and says the picture is a different one", async () => {
     analysed();
     EVENTS = DEATHS;

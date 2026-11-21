@@ -2,13 +2,14 @@ import { t as coreT, plural } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import {
   type ComponentProps,
+  type CSSProperties,
   createContext,
   type ReactNode,
   useContext,
 } from "react";
 import { createPortal } from "react-dom";
 import { HeatLegend } from "@/components/HeatLegend";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import { formatNumber } from "@/lib/format";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { DemoInfo } from "../../bindings";
@@ -21,6 +22,7 @@ import {
   oneOfDeathsAndDamage,
 } from "../../replayMapLayerToggles";
 import type { ReplayMapLayers } from "../../useReplayMapLayers";
+import { RailSwitch } from "./RailSwitch";
 import { EventLayerHelp } from "./ReplayEventLayers";
 import { StartUnitHelp } from "./ReplayStartUnitLayer";
 import { ReplayTimeWindowNote, TimeWindowHelp } from "./ReplayTimeWindowNote";
@@ -82,7 +84,12 @@ export function ReplayMapLayout({
         </div>
         <div
           data-map-rail
-          className="flex min-w-0 flex-col gap-3 @xl:w-48 @xl:shrink-0"
+          // Beside the map the rail is no taller than the map may be, and what
+          // is more than that scrolls inside it, so a long list of switches and
+          // legends does not run past the card. Under the map it is as tall as
+          // it needs to be. The padding keeps a focus ring from being clipped.
+          style={{ "--rail-max-height": MAP_VIEW_HEIGHT } as CSSProperties}
+          className="flex min-w-0 flex-col gap-3 @xl:w-52 @xl:shrink-0 @xl:max-h-(--rail-max-height) @xl:overflow-x-hidden @xl:overflow-y-auto @xl:p-1"
         >
           {rail}
         </div>
@@ -138,21 +145,12 @@ function EventToggle({
   reason: string | null;
   children: ReactNode;
 }) {
-  if (!reason)
-    return (
-      <ToggleGroupItem value={value} className="@xl:justify-start">
-        {children}
-      </ToggleGroupItem>
-    );
+  if (!reason) return <RailSwitch value={value}>{children}</RailSwitch>;
   return (
     <span title={reason} className="flex">
-      <ToggleGroupItem
-        value={value}
-        disabled
-        className="grow @xl:justify-start"
-      >
+      <RailSwitch value={value} disabled className="grow">
         {children}
-      </ToggleGroupItem>
+      </RailSwitch>
     </span>
   );
 }
@@ -184,11 +182,7 @@ export function LayerSwitches({
       </EventToggle>
     );
   const plain = (layer: MapLayer, label: string) =>
-    has(layer) && (
-      <ToggleGroupItem value={layer} className="@xl:justify-start">
-        {label}
-      </ToggleGroupItem>
-    );
+    has(layer) && <RailSwitch value={layer}>{label}</RailSwitch>;
   return (
     <ToggleGroup
       type="multiple"

@@ -1,9 +1,9 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useEffect, useRef } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import { formatNumber } from "@/lib/format";
-import { drawHeatField } from "@/lib/heatCanvas";
+import { drawHeatField, HEAT_EDGE_CLASS } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
 import { damageLegend } from "../../replayDamage";
@@ -23,7 +23,14 @@ import { REPLAY_SOURCE_NOTES } from "../../replaySources";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import type { EventLayers } from "../../useReplayEventLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { RailSwitch } from "./RailSwitch";
 import { StoredListNote } from "./UnitListNotes";
+
+/** How a choice between two ways to count a layer is laid out in the rail: a
+ *  column of switches as wide as the rail, as the layer switches are, and a
+ *  row that wraps where the rail is under the map. */
+const RAIL_CHOICE =
+  "w-full flex-wrap items-stretch @xl:flex-col @xl:flex-nowrap";
 
 /** How much of a mark shows when another player is the emphasised one. The
  *  order marks use the same. */
@@ -131,14 +138,14 @@ export function EventLayerCanvases({
         <canvas
           ref={heatRef}
           data-layer="deaths"
-          className="pointer-events-none absolute inset-0 size-full"
+          className={`pointer-events-none absolute inset-0 size-full ${HEAT_EDGE_CLASS}`}
         />
       )}
       {damageField && damageField.peak > 0 && (
         <canvas
           ref={damageRef}
           data-layer="damage"
-          className="pointer-events-none absolute inset-0 size-full"
+          className={`pointer-events-none absolute inset-0 size-full ${HEAT_EDGE_CLASS}`}
         />
       )}
       {finishedMarks && finishedMarks.length > 0 && (
@@ -301,14 +308,16 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
                 type="single"
                 variant="outline"
                 size="sm"
+                spacing={1}
                 aria-label={t`What the deaths are counted as`}
+                className={RAIL_CHOICE}
                 value={ev.weighted ? "cost" : "count"}
                 onValueChange={(v) => {
                   if (v) ev.setCostMode(v === "cost");
                 }}
               >
-                <ToggleGroupItem value="count">{t`Units lost`}</ToggleGroupItem>
-                <ToggleGroupItem value="cost">{t`Metal cost lost`}</ToggleGroupItem>
+                <RailSwitch value="count">{t`Units lost`}</RailSwitch>
+                <RailSwitch value="cost">{t`Metal cost lost`}</RailSwitch>
               </ToggleGroup>
               {ev.weighted && (
                 <StoredListNote source={units.source} subject={t`Costs`} />
@@ -415,14 +424,16 @@ function DamageNotes({ ev }: { ev: EventLayers }) {
         type="single"
         variant="outline"
         size="sm"
+        spacing={1}
         aria-label={t`Which end of the damage is drawn`}
+        className={RAIL_CHOICE}
         value={ev.damageMode}
         onValueChange={(v) => {
           if (v === "at" || v === "origin") ev.setDamageMode(v);
         }}
       >
-        <ToggleGroupItem value="at">{t`Where it landed`}</ToggleGroupItem>
-        <ToggleGroupItem value="origin">{t`Where it came from`}</ToggleGroupItem>
+        <RailSwitch value="at">{t`Where it landed`}</RailSwitch>
+        <RailSwitch value="origin">{t`Where it came from`}</RailSwitch>
       </ToggleGroup>
       {ev.damageField && ev.damageField.peak > 0 ? (
         <HeatLegend
