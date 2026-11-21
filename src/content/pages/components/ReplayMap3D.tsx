@@ -14,7 +14,6 @@ import {
   LayersHelp,
   MapHelp,
   MapTimeWindow,
-  mapBoxWidth,
   ReadNotes,
   ReplayMapLayout,
   SCENE_LAYERS,
@@ -70,22 +69,21 @@ export function ReplayMap3D({
 
   return (
     <ReplayMapLayout
+      shape={{ width: ratio, height: 1 }}
       map={
-        <div style={{ width: mapBoxWidth(ratio, 1) }} className="max-w-full">
-          <div
-            data-map-3d
-            style={{ aspectRatio: aspect }}
-            className="relative w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"
-          >
-            <MapPreview3D
-              {...preview}
-              framed={false}
-              skyboxSrc={skybox.dataUrl}
-              worldWidth={world.worldWidth || 1}
-              worldHeight={world.worldHeight || 1}
-              onScene={setHandle}
-            />
-          </div>
+        <div
+          data-map-3d
+          style={{ aspectRatio: aspect }}
+          className="relative w-full overflow-hidden rounded-md border border-border bg-gradient-to-b from-muted/20 to-muted/40"
+        >
+          <MapPreview3D
+            {...preview}
+            framed={false}
+            skyboxSrc={skybox.dataUrl}
+            worldWidth={world.worldWidth || 1}
+            worldHeight={world.worldHeight || 1}
+            onScene={setHandle}
+          />
         </div>
       }
       rail={

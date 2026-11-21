@@ -20,7 +20,7 @@ import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useMatchClock } from "../../useMatchClock";
-import { MapHelp, mapBoxWidth, ReplayMapLayout } from "./ReplayMapRail";
+import { MapHelp, ReplayMapLayout } from "./ReplayMapRail";
 import { useTimelineKeys } from "./ReplayTimelineDock";
 
 /** Said under the analysis and recording section, which has already said the
@@ -391,6 +391,7 @@ function UnitsView({
 
   return (
     <ReplayMapLayout
+      shape={{ width: mapX, height: mapZ }}
       map={
         // biome-ignore lint/a11y/useSemanticElements: a box that holds the map, which a fieldset would restyle.
         <div
@@ -401,66 +402,59 @@ function UnitsView({
           onKeyDown={keys?.onKeyDown}
           className="flex flex-col gap-1.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {/* All the card gives it, and never taller than most of the window,
-              so a tall map still fits with its controls. */}
           <div
-            style={{ width: mapBoxWidth(mapX, mapZ) }}
-            className="max-w-full"
+            ref={groundRef}
+            data-map-ground
+            style={{ aspectRatio: `${mapX} / ${mapZ}` }}
+            className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
           >
-            <div
-              ref={groundRef}
-              data-map-ground
-              style={{ aspectRatio: `${mapX} / ${mapZ}` }}
-              className="relative w-full overflow-hidden rounded-md border border-border/50 bg-[#0d1117]"
-            >
-              {minimapUrl && (
-                // Dimmed, so a team colour stands out from ground of the same hue.
-                <img
-                  src={minimapUrl}
-                  alt={tr`Minimap of ${mapName}`}
-                  className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
-                />
-              )}
-              <canvas
-                ref={canvasRef}
-                data-layer="recorded-units"
-                role="img"
-                aria-label={tr`Units on ${mapName} at the chosen time`}
-                className="absolute inset-0 size-full"
-                onPointerMove={(event) => {
-                  const found = unitAt(event);
-                  setPointed((was) =>
-                    was?.serial === found?.serial ? was : (found ?? null),
-                  );
-                }}
-                onPointerLeave={() => setPointed(null)}
-                onClick={(event) => setChosen(unitAt(event))}
+            {minimapUrl && (
+              // Dimmed, so a team colour stands out from ground of the same hue.
+              <img
+                src={minimapUrl}
+                alt={tr`Minimap of ${mapName}`}
+                className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
               />
-              {status.kind === "loading" && (
-                <span
-                  role="status"
-                  aria-label={tr`Loading this part of the match`}
-                  className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/70 p-1 text-white"
-                >
-                  <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
+            )}
+            <canvas
+              ref={canvasRef}
+              data-layer="recorded-units"
+              role="img"
+              aria-label={tr`Units on ${mapName} at the chosen time`}
+              className="absolute inset-0 size-full"
+              onPointerMove={(event) => {
+                const found = unitAt(event);
+                setPointed((was) =>
+                  was?.serial === found?.serial ? was : (found ?? null),
+                );
+              }}
+              onPointerLeave={() => setPointed(null)}
+              onClick={(event) => setChosen(unitAt(event))}
+            />
+            {status.kind === "loading" && (
+              <span
+                role="status"
+                aria-label={tr`Loading this part of the match`}
+                className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/70 p-1 text-white"
+              >
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
+              </span>
+            )}
+            {status.kind === "fault" && (
+              <div
+                role="alert"
+                className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/80 px-2 py-1.5 text-xs text-white"
+              >
+                <span>
+                  <Trans>
+                    This part of the match cannot be read from the track.
+                  </Trans>
                 </span>
-              )}
-              {status.kind === "fault" && (
-                <div
-                  role="alert"
-                  className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/80 px-2 py-1.5 text-xs text-white"
-                >
-                  <span>
-                    <Trans>
-                      This part of the match cannot be read from the track.
-                    </Trans>
-                  </span>
-                  <span className="text-white/70">
-                    {capital(status.error.message)}.
-                  </span>
-                </div>
-              )}
-            </div>
+                <span className="text-white/70">
+                  {capital(status.error.message)}.
+                </span>
+              </div>
+            )}
           </div>
           {!minimapUrl && (
             <p className="text-xs text-muted-foreground">

@@ -27,7 +27,6 @@ import {
   LayersHelp,
   MapHelp,
   MapTimeWindow,
-  mapBoxWidth,
   ReadNotes,
   ReplayMapLayout,
 } from "./ReplayMapRail";
@@ -259,92 +258,91 @@ export function ReplayMapHeat({
 
   return (
     <ReplayMapLayout
+      shape={{ width: ratio, height: 1 }}
       map={
-        <div style={{ width: mapBoxWidth(ratio, 1) }} className="max-w-full">
-          <div
-            data-map-ground
-            style={{ aspectRatio: aspect }}
-            className="relative w-full overflow-hidden rounded-md border border-border/50"
-          >
-            <img
-              src={minimapUrl}
-              alt={t`Minimap of ${mapName}`}
-              className="block size-full object-fill"
-            />
-            {/* Orders cover most of a map and buildings a few patches of it,
+        <div
+          data-map-ground
+          style={{ aspectRatio: aspect }}
+          className="relative w-full overflow-hidden rounded-md border border-border/50"
+        >
+          <img
+            src={minimapUrl}
+            alt={t`Minimap of ${mapName}`}
+            className="block size-full object-fill"
+          />
+          {/* Orders cover most of a map and buildings a few patches of it,
                 so the sparser layer goes on top where it can still be seen. */}
-            {orderField && orderField.peak > 0 && (
-              <canvas
-                ref={orderHeatRef}
-                data-layer="orderDensity"
-                className="pointer-events-none absolute inset-0 size-full"
-              />
-            )}
-            {field && field.peak > 0 && (
-              <canvas
-                ref={heatRef}
-                data-layer="density"
-                className="pointer-events-none absolute inset-0 size-full"
-              />
-            )}
-            {boxes.map((a) => {
-              const b = a.startBox as StartBox;
-              const c = swatch(a.color) ?? NEUTRAL_TEAM_COLOUR;
-              const boxTeam = teamLabel(a.id);
-              return (
+          {orderField && orderField.peak > 0 && (
+            <canvas
+              ref={orderHeatRef}
+              data-layer="orderDensity"
+              className="pointer-events-none absolute inset-0 size-full"
+            />
+          )}
+          {field && field.peak > 0 && (
+            <canvas
+              ref={heatRef}
+              data-layer="density"
+              className="pointer-events-none absolute inset-0 size-full"
+            />
+          )}
+          {boxes.map((a) => {
+            const b = a.startBox as StartBox;
+            const c = swatch(a.color) ?? NEUTRAL_TEAM_COLOUR;
+            const boxTeam = teamLabel(a.id);
+            return (
+              <span
+                key={a.id}
+                data-layer="startBox"
+                className="absolute flex items-start justify-start"
+                style={{
+                  left: `${b.left * 100}%`,
+                  top: `${b.top * 100}%`,
+                  width: `${(b.right - b.left) * 100}%`,
+                  height: `${(b.bottom - b.top) * 100}%`,
+                  border: `1.5px solid ${c}`,
+                  backgroundColor: c
+                    .replace("rgb", "rgba")
+                    .replace(")", ", 0.22)"),
+                }}
+                title={t`${boxTeam} start box`}
+              >
                 <span
-                  key={a.id}
-                  data-layer="startBox"
-                  className="absolute flex items-start justify-start"
+                  className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
                   style={{
-                    left: `${b.left * 100}%`,
-                    top: `${b.top * 100}%`,
-                    width: `${(b.right - b.left) * 100}%`,
-                    height: `${(b.bottom - b.top) * 100}%`,
-                    border: `1.5px solid ${c}`,
                     backgroundColor: c
                       .replace("rgb", "rgba")
-                      .replace(")", ", 0.22)"),
+                      .replace(")", ", 0.85)"),
                   }}
-                  title={t`${boxTeam} start box`}
                 >
-                  <span
-                    className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
-                    style={{
-                      backgroundColor: c
-                        .replace("rgb", "rgba")
-                        .replace(")", ", 0.85)"),
-                    }}
-                  >
-                    {a.id + 1}
-                  </span>
+                  {a.id + 1}
                 </span>
-              );
-            })}
-            {marks && marks.length > 0 && (
-              <canvas
-                ref={marksRef}
-                width={marksW}
-                height={marksH}
-                data-layer="buildings"
-                className="pointer-events-none absolute inset-0 size-full"
-              />
-            )}
-            <EventLayerCanvases
-              ev={ev}
-              colours={colours}
-              worldWidth={world.worldWidth}
-              worldHeight={world.worldHeight}
+              </span>
+            );
+          })}
+          {marks && marks.length > 0 && (
+            <canvas
+              ref={marksRef}
+              width={marksW}
+              height={marksH}
+              data-layer="buildings"
+              className="pointer-events-none absolute inset-0 size-full"
             />
-            <StartUnitCanvas
-              ev={ev}
-              info={info}
-              colours={colours}
-              world={world}
-            />
-            {on.starts &&
-              dots.map((dot) => <StartDotButton key={dot.team} dot={dot} />)}
-          </div>
+          )}
+          <EventLayerCanvases
+            ev={ev}
+            colours={colours}
+            worldWidth={world.worldWidth}
+            worldHeight={world.worldHeight}
+          />
+          <StartUnitCanvas
+            ev={ev}
+            info={info}
+            colours={colours}
+            world={world}
+          />
+          {on.starts &&
+            dots.map((dot) => <StartDotButton key={dot.team} dot={dot} />)}
         </div>
       }
       rail={

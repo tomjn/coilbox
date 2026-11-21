@@ -95,6 +95,9 @@ function MapCard({
         }
       : null;
 
+  // Where the heading has room for the help entry of the mode that is open.
+  const [helpHost, setHelpHost] = useState<HTMLElement | null>(null);
+
   // What the card opens on is settled once the tracks have been read, and
   // stays as it was when a recording turns up later: a run that finishes does
   // not move somebody off the mode they are reading.
@@ -118,128 +121,112 @@ function MapCard({
     preview || busy ? null : t`Needs the map's picture and height data.`;
 
   return (
-    <section className="flex flex-col gap-2" aria-label={t`Map`}>
-      <HelpHostBox>
-        {(host) => (
-          <>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <div className="flex items-center gap-1">
-                <h2 className="text-sm font-medium">
-                  <Trans>Map · {infoMapName}</Trans>
-                </h2>
-                {host}
-              </div>
-              <ToggleGroup
-                type="single"
+    <HelpHost.Provider value={helpHost}>
+      <section className="flex flex-col gap-2" aria-label={t`Map`}>
+        <>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex items-center gap-1">
+              <h2 className="text-sm font-medium">
+                <Trans>Map · {infoMapName}</Trans>
+              </h2>
+              <span ref={setHelpHost} className="contents" />
+            </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              spacing={1}
+              aria-label={t`Map view`}
+              value={mode ?? ""}
+              onValueChange={(next) => {
+                if (next) setPicked(next as Mode);
+              }}
+            >
+              <ModeItem value="units" reason={unitsReason}>
+                <Trans>Units</Trans>
+              </ModeItem>
+              <ModeItem value="heat" reason={null}>
+                <Trans>Heat</Trans>
+              </ModeItem>
+              <ModeItem value="3d" reason={sceneReason}>
+                <Trans>3D</Trans>
+              </ModeItem>
+            </ToggleGroup>
+            {!stored && replayPath && !analysisRunHidden() && (
+              <Button
+                type="button"
                 variant="outline"
                 size="sm"
-                spacing={1}
-                aria-label={t`Map view`}
-                value={mode ?? ""}
-                onValueChange={(next) => {
-                  if (next) setPicked(next as Mode);
-                }}
+                className="gap-1.5"
+                onClick={openAnalysisRun}
               >
-                <ModeItem value="units" reason={unitsReason}>
-                  <Trans>Units</Trans>
-                </ModeItem>
-                <ModeItem value="heat" reason={null}>
-                  <Trans>Heat</Trans>
-                </ModeItem>
-                <ModeItem value="3d" reason={sceneReason}>
-                  <Trans>3D</Trans>
-                </ModeItem>
-              </ToggleGroup>
-              {!stored && replayPath && !analysisRunHidden() && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={openAnalysisRun}
-                >
-                  <ScanSearch className="size-4" />
-                  <Trans>Analyse replay</Trans>
-                </Button>
-              )}
-            </div>
-            {stored?.state === "stale" && <NotShown words={staleWords()} />}
-          </>
-        )}
-      </HelpHostBox>
-      <div className="rounded-lg border border-border/50 bg-card p-3 text-sm">
-        {mode === null ? (
-          <Reading />
-        ) : mode === "units" ? (
-          track.status === "error" ? (
-            <NotShown words={faultWords(track.error)} />
-          ) : track.status === "ready" ? (
-            track.handle.header.mapSize[0] > 0 &&
-            track.handle.header.mapSize[1] > 0 ? (
-              <ReplayMapUnits
-                handle={track.handle}
-                adopted={adopted}
+                <ScanSearch className="size-4" />
+                <Trans>Analyse replay</Trans>
+              </Button>
+            )}
+          </div>
+          {stored?.state === "stale" && <NotShown words={staleWords()} />}
+        </>
+        <div className="rounded-lg border border-border/50 bg-card p-3 text-sm">
+          {mode === null ? (
+            <Reading />
+          ) : mode === "units" ? (
+            track.status === "error" ? (
+              <NotShown words={faultWords(track.error)} />
+            ) : track.status === "ready" ? (
+              track.handle.header.mapSize[0] > 0 &&
+              track.handle.header.mapSize[1] > 0 ? (
+                <ReplayMapUnits
+                  handle={track.handle}
+                  adopted={adopted}
+                  mapName={info.mapName}
+                  minimapUrl={minimap.url}
+                />
+              ) : (
+                <NotShown
+                  words={t`The recorded track does not say how large the map is, so it is not shown.`}
+                />
+              )
+            ) : (
+              <Reading />
+            )
+          ) : mode === "heat" ? (
+            minimap.url ? (
+              <ReplayMapHeat
+                info={info}
+                replayPath={replayPath}
                 mapName={info.mapName}
                 minimapUrl={minimap.url}
+                heightmap={heightmap.data}
               />
+            ) : busy ? (
+              <div className="flex h-48 items-center justify-center">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
             ) : (
-              <NotShown
-                words={t`The recorded track does not say how large the map is, so it is not shown.`}
+              <NoPicture
+                info={info}
+                installed={enginePath !== undefined}
+                mapName={info.mapName}
               />
             )
-          ) : (
-            <Reading />
-          )
-        ) : mode === "heat" ? (
-          minimap.url ? (
-            <ReplayMapHeat
+          ) : preview ? (
+            <ReplayMap3D
               info={info}
               replayPath={replayPath}
               mapName={info.mapName}
-              minimapUrl={minimap.url}
+              enginePath={enginePath}
+              dataDir={dataDir}
               heightmap={heightmap.data}
+              preview={preview}
             />
-          ) : busy ? (
+          ) : (
             <div className="flex h-48 items-center justify-center">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
-          ) : (
-            <NoPicture
-              info={info}
-              installed={enginePath !== undefined}
-              mapName={info.mapName}
-            />
-          )
-        ) : preview ? (
-          <ReplayMap3D
-            info={info}
-            replayPath={replayPath}
-            mapName={info.mapName}
-            enginePath={enginePath}
-            dataDir={dataDir}
-            heightmap={heightmap.data}
-            preview={preview}
-          />
-        ) : (
-          <div className="flex h-48 items-center justify-center">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/** Holds the place beside the heading where a mode puts its help entry. */
-function HelpHostBox({
-  children,
-}: {
-  children: (host: ReactNode) => ReactNode;
-}) {
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  return (
-    <HelpHost.Provider value={host}>
-      {children(<span ref={setHost} className="contents" />)}
+          )}
+        </div>
+      </section>
     </HelpHost.Provider>
   );
 }

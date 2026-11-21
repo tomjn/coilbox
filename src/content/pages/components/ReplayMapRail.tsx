@@ -30,17 +30,15 @@ import {
 } from "./ReplayTimeWindowControl";
 import { SectionHelp } from "./SectionHelp";
 
-/** The share of the window's height a map may take, so a tall map still fits
- *  on screen with its card around it. */
-const MAP_VIEW_HEIGHT = "70vh";
-
 /**
- * The width a map is drawn at: all the card gives it, and no wider than lets
- * it keep its shape inside {@link MAP_VIEW_HEIGHT}.
+ * The tallest a map may be: the window's height less what sits above and below
+ * it when the card is scrolled to the top of the page. Measured at an 828 pixel
+ * high window: the timeline dock is 151 pixels, and the app bar, the card's
+ * heading row and its padding are 113 above the map. That is 264 pixels, which
+ * is 16.5rem, so 18rem leaves a margin. The floor keeps a map usable in a very
+ * short window, where it scrolls under the dock instead.
  */
-export function mapBoxWidth(width: number, height: number): string {
-  return `min(100%, ${MAP_VIEW_HEIGHT} * ${width} / ${height})`;
-}
+const MAP_VIEW_HEIGHT = "max(16rem, 100vh - 18rem)";
 
 /**
  * The map and the rail beside it, in every mode of the map card. The rail holds
@@ -50,10 +48,13 @@ export function mapBoxWidth(width: number, height: number): string {
  * like the base pictures, goes in `under`.
  */
 export function ReplayMapLayout({
+  shape,
   map,
   rail,
   under,
 }: {
+  /** The map's width and height, which give the box its shape. */
+  shape: { width: number; height: number };
   map: ReactNode;
   rail: ReactNode;
   under?: ReactNode;
@@ -61,7 +62,16 @@ export function ReplayMapLayout({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div data-map-column className="min-w-0 lg:flex-1">
+        <div
+          data-map-column
+          // All the width the card has, and no wider than lets the map keep its
+          // shape inside the share of the window's height it may take, so a
+          // tall map still fits on screen and the rail sits against it.
+          style={{
+            maxWidth: `calc(${MAP_VIEW_HEIGHT} * ${shape.width} / ${shape.height})`,
+          }}
+          className="min-w-0 lg:flex-1"
+        >
           {map}
         </div>
         <div

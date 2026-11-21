@@ -190,7 +190,6 @@ const { ReplayTimelineDock, TimelineKeysProvider } = await import(
 const { MatchClockProvider, useMatchClock, useMatchFrame, useSettledFrame } =
   await import("../../useMatchClock");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
-const { mapBoxWidth } = await import("./ReplayMapRail");
 const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
   "../../replayAnalysis"
 );
@@ -1917,11 +1916,18 @@ describe("the map card's modes", () => {
     await show();
     const ground = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(ground.style.aspectRatio).toBe("8192 / 6144");
-    // happy-dom drops a `min()` width, so the width is checked as it is made.
-    expect(mapBoxWidth(8192, 6144)).toBe("min(100%, 70vh * 8192 / 6144)");
+    // No wider than lets the map keep its shape inside the window's height
+    // less what is around the map, and no fixed cap.
+    const column = ground.closest("[data-map-column]") as HTMLElement;
+    expect(column.style.maxWidth).toBe(
+      "calc(max(16rem, 100vh - 18rem) * 8192 / 6144)",
+    );
 
     await pick("Heat");
     const flat = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(flat.style.aspectRatio).toBe("513 / 385");
+    expect(
+      (flat.closest("[data-map-column]") as HTMLElement).style.maxWidth,
+    ).toBe(`calc(max(16rem, 100vh - 18rem) * ${513 / 385} / 1)`);
   });
 });
