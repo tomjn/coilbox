@@ -80,47 +80,27 @@ function detachedCanvas(
   return canvas;
 }
 
-/** The one context every read uses. WebKit counts a context after it is given
- *  back, so one made for each texture ran the page out of them and turned the
- *  3D views blank (issue #5348). */
-interface Reader {
-  canvas: OffscreenCanvas | HTMLCanvasElement;
-  gl: WebGLRenderingContext;
-}
-let reader: Reader | undefined;
-
-function readerFor(width: number, height: number): Reader {
-  if (!reader || reader.gl.isContextLost()) {
-    const canvas = detachedCanvas(width, height);
-    const gl = canvas.getContext("webgl", {
-      premultipliedAlpha: false,
-    }) as WebGLRenderingContext | null;
-    if (!gl) throw new Error("WebGL is not available to decode this texture.");
-    reader = { canvas, gl };
-  }
-  reader.canvas.width = width;
-  reader.canvas.height = height;
-  return reader;
-}
-
 /**
  * Read `source` back as unpremultiplied RGBA, via an offscreen WebGL context
- * shared by every read.
+ * that exists only for this one upload and read.
  */
 function readPixelsFromSource(
   source: TexImageSource,
   width: number,
   height: number,
 ): Uint8ClampedArray<ArrayBuffer> {
-  const { gl } = readerFor(width, height);
-  const texture = gl.createTexture();
-  const framebuffer = gl.createFramebuffer();
+  const canvas = detachedCanvas(width, height);
+  const gl = canvas.getContext("webgl", {
+    premultipliedAlpha: false,
+  }) as WebGLRenderingContext | null;
+  if (!gl) throw new Error("WebGL is not available to decode this texture.");
 
   try {
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
+    const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -128,6 +108,7 @@ function readPixelsFromSource(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 
+    const framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.framebufferTexture2D(
       gl.FRAMEBUFFER,
@@ -144,9 +125,7 @@ function readPixelsFromSource(
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
     return data;
   } finally {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.deleteFramebuffer(framebuffer);
-    gl.deleteTexture(texture);
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
 
