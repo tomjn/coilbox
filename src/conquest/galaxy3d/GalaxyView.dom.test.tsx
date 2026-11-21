@@ -15,6 +15,9 @@ const h = vi.hoisted(() => ({
   gameRead: vi.fn(),
   rendererOptions: [] as unknown[],
   lost: vi.fn(),
+  /** Whether a browser has taken a context back, by the renderer's number. */
+  taken: new Set<number>(),
+  made: 0,
 }));
 
 vi.mock("three", async (orig) => {
@@ -22,6 +25,10 @@ vi.mock("three", async (orig) => {
   class FakeRenderer {
     constructor(options: unknown) {
       h.rendererOptions.push(options);
+    }
+    number = h.made++;
+    getContext() {
+      return { isContextLost: () => h.taken.has(this.number) };
     }
     domElement = document.createElement("canvas");
     setClearColor() {}
@@ -74,6 +81,7 @@ vi.mock("./placedModelLoaders", () => ({
 }));
 
 const { GalaxyView } = await import("./GalaxyView");
+const { releaseKeptRenderers } = await import("../../lib/keptRenderer");
 
 class FakeResizeObserver {
   observe() {}
@@ -81,9 +89,12 @@ class FakeResizeObserver {
 }
 
 beforeEach(() => {
+  releaseKeptRenderers();
   h.terrainBuilds.mockReset();
   h.gameRead.mockReset();
   h.rendererOptions.length = 0;
+  h.taken.clear();
+  h.made = 0;
   h.lost.mockReset();
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   window.matchMedia = (() => ({ matches: true })) as never;
@@ -217,6 +228,49 @@ describe("GalaxyView with placed models", () => {
     expect(container.querySelector("canvas")).toBe(canvas);
     expect(h.lost).not.toHaveBeenCalled();
     unmount();
+    // Parked for the next map rather than given back (issue #5351).
+    expect(h.lost).not.toHaveBeenCalled();
+    releaseKeptRenderers();
+    expect(h.lost).toHaveBeenCalledTimes(1);
+  });
+
+  // WebKit counts a context until its canvas is collected, so a map opened
+  // again and again, as the conquest page does each time it is visited, ran the
+  // browser out at the 15th open and another view went blank (issue #5351).
+  it("makes one renderer however many times the map is opened", async () => {
+    const view = (
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />
+    );
+    for (let open = 0; open < 20; open++) {
+      const shown = render(view);
+      expect(shown.container.querySelectorAll("canvas")).toHaveLength(1);
+      shown.unmount();
+    }
+    expect(h.terrainBuilds).toHaveBeenCalledTimes(20);
+    expect(h.rendererOptions).toHaveLength(1);
+    expect(h.lost).not.toHaveBeenCalled();
+  });
+
+  it("does not take a renderer back that the browser has lost", () => {
+    const view = (
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />
+    );
+    render(view).unmount();
+    h.taken.add(0);
+    render(view).unmount();
+    expect(h.rendererOptions).toHaveLength(2);
     expect(h.lost).toHaveBeenCalledTimes(1);
   });
 
@@ -236,8 +290,13 @@ describe("GalaxyView with placed models", () => {
     });
     expect(h.rendererOptions).toHaveLength(2);
     expect(h.rendererOptions[1]).toMatchObject({ antialias: false });
-    expect(h.lost).toHaveBeenCalledTimes(1);
+    // The antialiased one is kept for the next map that wants it.
+    expect(h.lost).not.toHaveBeenCalled();
     expect(container.querySelectorAll("canvas")).toHaveLength(1);
+    await act(async () => {
+      rerender(view(false));
+    });
+    expect(h.rendererOptions).toHaveLength(2);
   });
 
   it("asks for the high performance GPU", () => {
