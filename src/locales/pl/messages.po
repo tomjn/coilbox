@@ -479,7 +479,7 @@ msgstr "(bez nazwy)"
 msgid "(unset)"
 msgstr "(nie ustawiono)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "(you)"
 msgstr "(ty)"
@@ -12767,6 +12767,10 @@ msgstr "Kolor bazowy"
 msgid "Base height"
 msgstr "Wysokość podstawy"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Base swing"
@@ -12777,8 +12781,6 @@ msgstr "Wychylenie podstawy"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr "nazwa bazowa dla .smf/.smt (bez rozszerzenia)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -33108,6 +33110,10 @@ msgstr "Brak rozkazów"
 msgid "No orders were given in this stretch."
 msgstr "W tym odcinku nie wydano rozkazów."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
@@ -36203,7 +36209,6 @@ msgstr "Otwarto zremiksowaną powtórkę — użyj Oglądaj, aby ją uruchomić.
 msgid "opened with {opening}"
 msgstr "otwarcie: {opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
@@ -37427,6 +37432,10 @@ msgstr "Wyeksportowano obrazek."
 #, fuzzy
 msgid "Picture uploads stopped early"
 msgstr "Wysyłanie obrazków zatrzymało się przedwcześnie"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -44881,11 +44890,6 @@ msgstr "obraz grafiki bocznej"
 msgid "side graphic video"
 msgstr "wideo grafiki bocznej"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "Side not described"
-msgstr "Frakcja bez opisu"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -50747,11 +50751,6 @@ msgstr "Nadpisania motywu"
 msgid "Then"
 msgstr "Wtedy"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "Brak widoków bazy, bo ta powtórka nie zawiera pozycji startowej, na której można by je wyśrodkować."
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "There are no blueprints in this file coilbox can read."
@@ -54424,7 +54423,6 @@ msgstr "Kolekcja bez nazwy"
 msgid "Unnamed login"
 msgstr "Dane logowania bez nazwy"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 #, fuzzy
 msgid "Unnamed player"

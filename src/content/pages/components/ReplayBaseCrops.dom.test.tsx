@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 /**
- * The base crops (#1177): one view of the map per player, with the orders that
- * player gave drawn on it. Where a mark lands is `replayBaseCrops.test.ts`, and
- * this file reads the positions the page gives the DOM. Nothing is painted, so
- * what is asserted is the style values, the text and the emphasis state.
+ * The base pictures (#1177) in the build orders section (#5318): each player's
+ * entry holds their picture beside their orders. Where a mark lands is
+ * `replayBaseCrops.test.ts`, and this file reads the positions the page gives
+ * the DOM. Nothing is painted, so what is asserted is the style values, the
+ * text and the emphasis state.
  */
 import {
   act,
@@ -11,6 +12,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -50,6 +52,17 @@ vi.mock("../../config", () => ({
       ? { dataset: DATASET, status: "ready" }
       : { dataset: null, status: archive ? "error" : "idle" },
   useUnitsyncUnitBuildpics: () => ({ units: {}, errors: [] }),
+  useUnitsyncMinimap: () => ({
+    url: "data:image/png;base64,",
+    loading: false,
+    error: null,
+  }),
+  useUnitsyncHeightmap: () => ({
+    data: { width: 513, height: 513 },
+    url: null,
+    loading: false,
+    error: null,
+  }),
 }));
 vi.mock("@picoframe/frame", async (orig) => ({
   ...(await orig<typeof import("@picoframe/frame")>()),
@@ -67,6 +80,8 @@ vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
 const { ReplayMapHeat } = await import("./ReplayMapHeat");
+const { BasePicturesProvider } = await import("./ReplayBaseCrops");
+const { ReplayBuildOrders } = await import("./ReplayBuildOrders");
 const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 const { WindowLane, pressWindowPreset } = await import(
@@ -99,7 +114,8 @@ const read = (list: BuildOrder[]): DemoBuildOrders => ({
 /**
  * Alice's start is on the north edge and Bob's is in the south east corner of a
  * square map 4096 elmos a side, so a crop is 1024 elmos across. Alice orders
- * two buildings near her start, one far away, and one more at 20 minutes.
+ * two buildings near her start, one far away, and one more at 20 minutes. Bob
+ * orders nothing.
  */
 const PLACED = read([
   order({ unitDefId: 1, position: { x: 1124, y: 0, z: 300 } }),
@@ -163,6 +179,7 @@ const INFO = {
 
 const HEIGHTMAP = { width: 513, height: 513 };
 
+/** The map, with its start dots, and the build orders with their pictures. */
 function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
@@ -174,6 +191,14 @@ function show(info: DemoInfo = INFO) {
         minimapUrl="data:image/png;base64,"
         heightmap={HEIGHTMAP}
       />
+      <BasePicturesProvider
+        info={info}
+        replayPath="/replays/a.sdfz"
+        enginePath="/engine"
+        dataDir="/data"
+      >
+        <ReplayBuildOrders replayPath="/replays/a.sdfz" info={info} />
+      </BasePicturesProvider>
     </SeriesEmphasisProvider>,
   );
 }
@@ -196,10 +221,11 @@ afterEach(() => {
   DATASET = null;
 });
 
-const toggle = (name: string) => screen.getByRole("button", { name });
 const press = pressWindowPreset;
 const card = (team: number) =>
   document.querySelector<HTMLElement>(`button[data-crop-team="${team}"]`);
+const entry = (key: string) =>
+  document.querySelector<HTMLElement>(`[data-build-entry="${key}"]`);
 const marks = (team: number) =>
   [...(card(team)?.querySelectorAll<SVGElement>("[data-crop-mark]") ?? [])].map(
     (m) => [Number(m.dataset.left), Number(m.dataset.top)],
@@ -214,59 +240,73 @@ const expectMarks = (team: number, want: number[][]) => {
   });
 };
 
-/** The map's help entry, opened. What the views share is said there. */
+/** The section's help entry, opened. What the pictures share is said there. */
 const help = () => {
-  fireEvent.click(screen.getByRole("button", { name: "About the map" }));
+  fireEvent.click(screen.getByRole("button", { name: "About build orders" }));
   return within(screen.getByRole("dialog"));
 };
 
 async function open() {
-  fireEvent.click(toggle("Bases"));
-  await screen.findByTestId("base-crops");
+  fireEvent.click(screen.getByRole("button", { name: /show build orders/i }));
+  await waitFor(() =>
+    expect(document.querySelector("[data-build-entries]")).not.toBeNull(),
+  );
 }
 
-describe("the Bases layer", () => {
-  it("is off until it is switched on, and reads no build orders before that", () => {
-    show();
-    expect(toggle("Bases").dataset.state).toBe("off");
-    expect(screen.queryByTestId("base-crops")).toBeNull();
-    expect(ordersRead).not.toHaveBeenCalled();
-  });
-
-  it("is remembered with the other layers", () => {
+describe("the map", () => {
+  it("has no Bases switch and no grid of pictures under it", async () => {
     ORDERS = PLACED;
     show();
-    fireEvent.click(toggle("Bases"));
     expect(
-      JSON.parse(localStorage.getItem("coilbox.replayMap.layers") ?? "{}"),
-    ).toMatchObject({ bases: true });
-  });
-
-  it("is gone, with the other spatial layers, when a profile hides them", () => {
-    HIDE = ["analytics.spatialLayers"];
-    show();
+      screen.getByRole("button", { name: "Building density" }),
+    ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Bases" })).toBeNull();
     expect(screen.queryByTestId("base-crops")).toBeNull();
+    await open();
+    expect(screen.queryByTestId("base-crops")).toBeNull();
+    expect(document.querySelector("[data-crop-group]")).toBeNull();
+  });
+
+  it("reads no build orders for a Bases layer an earlier version left on", () => {
+    ORDERS = PLACED;
+    localStorage.setItem(
+      "coilbox.replayMap.layers",
+      JSON.stringify({ bases: true }),
+    );
+    show();
     expect(ordersRead).not.toHaveBeenCalled();
   });
 });
 
-describe("one crop for each player", () => {
-  it("names each player, says what they opened with and says it is orders", async () => {
+describe("one entry for each player", () => {
+  it("holds the player's picture and their orders", async () => {
     ORDERS = PLACED;
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
     show();
     await open();
-    expect(card(0)?.textContent).toContain("Alice");
-    expect(card(0)?.textContent).toContain("Opened with Metal Extractor ×3");
-    expect(card(1)?.textContent).toContain("Bob");
-    expect(card(1)?.textContent).not.toContain("Opened with");
-    // The views carry no explanation of their own. The map's help has it.
+    const alice = entry("team-0");
+    expect(alice?.querySelector("h3")?.textContent).toBe("Alice");
+    expect(alice?.contains(card(0))).toBe(true);
+    // Beside the lists: the picture and the orders are children of one row.
+    const row = card(0)?.parentElement;
+    expect(
+      row?.contains(within(alice as HTMLElement).getByText("Opening")),
+    ).toBe(true);
+    expect(alice?.textContent).toContain("Metal Extractor");
+    expect(alice?.textContent).toContain("×3");
+    expect(within(alice as HTMLElement).getByText("5 orders")).toBeTruthy();
+    expect(entry("team-1")?.querySelector("h3")?.textContent).toBe("Bob");
+    expect(ordersRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains the pictures once, in the section's help", async () => {
+    ORDERS = PLACED;
+    show();
+    await open();
     expect(
       screen.queryByText(/the buildings a player ordered, not the buildings/),
     ).toBeNull();
-    expect(screen.queryByText(/orders and messages recorded/i)).toBeNull();
     const said = help();
     expect(
       said.getByText(
@@ -274,23 +314,35 @@ describe("one crop for each player", () => {
       ),
     ).toBeTruthy();
     expect(said.getAllByText(/orders and messages recorded/i)).toHaveLength(1);
-    expect(ordersRead).toHaveBeenCalledTimes(1);
   });
 
-  it("puts allies together under their side", async () => {
+  it("gives a player who ordered nothing an entry that says so, with their start", async () => {
     ORDERS = PLACED;
     show();
     await open();
-    const groups = [
-      ...document.querySelectorAll<HTMLElement>("[data-crop-group]"),
-    ];
-    expect(groups.map((g) => g.dataset.cropGroup)).toEqual(["0", "1"]);
-    expect(screen.getByText("Team 1")).toBeTruthy();
-    expect(screen.getByText("Team 2")).toBeTruthy();
-    expect(groups[0].querySelector("[data-crop-team='0']")).toBeTruthy();
+    const bob = entry("team-1");
+    expect(bob?.textContent).toContain("No orders were given.");
+    expect(bob?.textContent).toContain("None ordered");
+    expect(card(1)?.querySelector("[data-crop-start]")).toBeTruthy();
+    expect(marks(1)).toEqual([]);
   });
 
-  it("names every player on a shared team", async () => {
+  it("puts allies together, one entry after another in a single grid", async () => {
+    ORDERS = PLACED;
+    show();
+    await open();
+    const grid = document.querySelector<HTMLElement>("[data-build-entries]");
+    expect(
+      [...(grid?.children ?? [])].map((c) =>
+        c.querySelector("[data-build-entry]")?.getAttribute("data-build-entry"),
+      ),
+    ).toEqual(["team-0", "team-1"]);
+    // Two entries are not put in separate grids by side, so they share a row.
+    expect(document.querySelectorAll("[data-build-entries]")).toHaveLength(1);
+    expect(grid?.style.gridTemplateColumns).toContain("repeat(auto-fit");
+  });
+
+  it("names every player on a shared team in one entry", async () => {
     ORDERS = PLACED;
     show({
       ...INFO,
@@ -300,12 +352,46 @@ describe("one crop for each player", () => {
       ],
     } as unknown as DemoInfo);
     await open();
-    expect(card(0)?.textContent).toContain("Alice, Carol");
+    expect(entry("team-0")?.querySelector("h3")?.textContent).toBe(
+      "Alice, Carol",
+    );
+    expect(document.querySelectorAll("[data-crop-team='0']")).toHaveLength(1);
+  });
+
+  it("gives an AI team placed by the server an entry", async () => {
+    ORDERS = PLACED;
+    show({
+      ...INFO,
+      players: [INFO.players[0]],
+      ais: [{ name: "slot 3", shortName: "Some AI", team: 1, allyTeam: 1 }],
+    } as unknown as DemoInfo);
+    await open();
+    expect(entry("team-1")?.querySelector("h3")?.textContent).toBe("Some AI");
+  });
+
+  it("keeps a player's list when the game is not installed, with no opening named", async () => {
+    ORDERS = PLACED;
+    show();
+    await open();
+    expect(entry("team-0")?.textContent).toContain("Unit 1");
+    expect(card(0)?.textContent).toContain("4 ordered");
+    expect(
+      screen.getAllByText(
+        /This replay's game is not installed, so every mark is the same shape/,
+      ),
+    ).toHaveLength(1);
+    const shapes = new Set(
+      [...(card(0)?.querySelectorAll("[data-crop-mark]") ?? [])].map((p) =>
+        p.getAttribute("d"),
+      ),
+    );
+    expect(shapes.size).toBe(1);
+    expect(screen.queryByText("Economy")).toBeNull();
   });
 });
 
 describe("the scale", () => {
-  it("states the crop's side and the bar's length once, above the views, and draws a bar on each", async () => {
+  it("states the picture's side and the bar's length once, in the help, and draws a bar on each", async () => {
     ORDERS = PLACED;
     show();
     await open();
@@ -319,7 +405,7 @@ describe("the scale", () => {
     const bars = document.querySelectorAll("[data-crop-scale-bar]");
     expect(bars).toHaveLength(2);
     expect((bars[0] as HTMLElement).style.width).toBe("25%");
-    // No view repeats it.
+    // No picture repeats it.
     expect(card(0)?.textContent).not.toContain("elmos");
   });
 
@@ -339,7 +425,7 @@ describe("the scale", () => {
   });
 });
 
-describe("where things sit inside a crop", () => {
+describe("where things sit inside a picture", () => {
   it("draws a start at its real place when it is near an edge", async () => {
     ORDERS = PLACED;
     show();
@@ -355,7 +441,7 @@ describe("where things sit inside a crop", () => {
     expect(bob?.style.top).toBe("90.625%");
   });
 
-  it("positions a mark by its distance from the crop's corner", async () => {
+  it("positions a mark by its distance from the picture's corner", async () => {
     ORDERS = PLACED;
     show();
     await open();
@@ -369,7 +455,7 @@ describe("where things sit inside a crop", () => {
     ]);
   });
 
-  it("draws a mark in its player's colour, in the shape of what was ordered", async () => {
+  it("draws a mark in its player's colour, in the shape of what was ordered, and keys the shapes once", async () => {
     ORDERS = PLACED;
     GAMES = [game("Some Game 1.0")];
     DATASET = { units: UNITS };
@@ -379,11 +465,15 @@ describe("where things sit inside a crop", () => {
     expect(paths).toHaveLength(3);
     expect(paths[0].getAttribute("fill")).toMatch(/rgb\(255, 0, 0\)|red|#f00/i);
     expect(new Set(paths.map((p) => p.getAttribute("d"))).size).toBe(2);
-    expect(screen.getByText("Economy")).toBeTruthy();
-    expect(screen.getByText("Factory")).toBeTruthy();
+    const key = within(screen.getByTestId("base-picture-key"));
+    expect(key.getAllByText("Economy")).toHaveLength(1);
+    expect(key.getAllByText("Factory")).toHaveLength(1);
+    expect(
+      document.querySelectorAll("[data-testid='base-picture-key']"),
+    ).toHaveLength(1);
   });
 
-  it("counts the orders outside the view, so they are not taken for orders not given", async () => {
+  it("counts the orders outside the picture, so they are not taken for orders not given", async () => {
     ORDERS = PLACED;
     show();
     await open();
@@ -391,7 +481,6 @@ describe("where things sit inside a crop", () => {
     expect(card(0)?.querySelector("[data-crop-outside]")?.textContent).toBe(
       ", 1 outside this view",
     );
-    // What the two counts are is said once, above the views.
     expect(
       help().getAllByText(
         /Under each view is how many buildings that player ordered, and how many of those fall outside the view/,
@@ -410,6 +499,7 @@ describe("the time window", () => {
       help().getByText(/Showing orders given across the whole match/),
     ).toBeTruthy();
     expect(marks(0)).toHaveLength(3);
+    expect(screen.queryByText(/Pictures show orders given from/)).toBeNull();
   });
 
   it("shows only the orders given inside the window, and says which", async () => {
@@ -418,13 +508,32 @@ describe("the time window", () => {
     await open();
     press("First 5 minutes");
     expect(
-      await help().findByText(/Showing orders given from 0:00 to 5:00/),
+      await screen.findByText("Pictures show orders given from 0:00 to 5:00."),
     ).toBeTruthy();
     expectMarks(0, [
       [59.765625, 29.296875],
       [69.53125, 29.296875],
     ]);
     expect(card(0)?.textContent).toContain("3 ordered, 1 outside this view");
+  });
+
+  it("follows the window as it moves, and leaves the player's lists alone", async () => {
+    ORDERS = PLACED;
+    show();
+    await open();
+    // The column of lists is the picture's neighbour.
+    const lists = () => card(0)?.nextElementSibling?.textContent;
+    const before = lists();
+    expect(before).toContain("Opening");
+    press("First 5 minutes");
+    await screen.findByText(/Pictures show orders given from 0:00 to 5:00/);
+    expect(marks(0)).toHaveLength(2);
+    press("Last 5 minutes");
+    await screen.findByText(/Pictures show orders given from 25:00 to 30:00/);
+    expect(marks(0)).toEqual([]);
+    press("Whole match");
+    await waitFor(() => expect(marks(0)).toHaveLength(3));
+    expect(lists()).toBe(before);
   });
 
   it("says a player ordered nothing in an empty window, and draws their start", async () => {
@@ -434,7 +543,7 @@ describe("the time window", () => {
     expect(card(1)?.textContent).toContain("None ordered");
     expect(card(1)?.textContent).not.toContain("in this window");
     press("Last 5 minutes");
-    await help().findByText(/Showing orders given from 25:00 to 30:00/);
+    await screen.findByText(/Pictures show orders given from 25:00 to 30:00/);
     expect(card(0)?.textContent).toContain("None ordered in this window");
     expect(card(0)?.querySelector("[data-crop-start]")).toBeTruthy();
     expect(marks(0)).toEqual([]);
@@ -442,62 +551,37 @@ describe("the time window", () => {
 });
 
 describe("when there is little to show", () => {
-  it("says why there are no crops for a replay with no start positions", () => {
+  it("lists the orders with no picture for a replay with no start positions", async () => {
     ORDERS = PLACED;
     show({ ...INFO, startPositions: undefined } as unknown as DemoInfo);
-    fireEvent.click(toggle("Bases"));
-    expect(
-      screen.getByText(/holds no start position to centre one on/),
-    ).toBeTruthy();
-    expect(document.querySelector("button[data-crop-team]")).toBeNull();
-  });
-
-  it("gives a crop to an AI team placed by the server", async () => {
-    ORDERS = PLACED;
-    show({
-      ...INFO,
-      players: [INFO.players[0]],
-      ais: [{ name: "slot 3", shortName: "Some AI", team: 1, allyTeam: 1 }],
-    } as unknown as DemoInfo);
     await open();
-    expect(card(1)?.textContent).toContain("Some AI");
+    expect(document.querySelector("button[data-crop-team]")).toBeNull();
+    expect(entry("player-0")?.querySelector("h3")?.textContent).toBe("Alice");
+    expect(entry("player-0")?.textContent).toContain("Opening");
   });
 
-  it("has no opening and says the game is not installed when it is not", async () => {
+  it("draws no pictures when a profile hides the spatial layers, and keeps the lists", async () => {
+    HIDE = ["analytics.spatialLayers"];
     ORDERS = PLACED;
     show();
     await open();
-    expect(card(0)?.textContent).not.toContain("Opened with");
-    expect(card(0)?.textContent).toContain("4 ordered");
-    expect(card(0)?.textContent).not.toContain("not installed");
-    expect(
-      screen.getAllByText(
-        /This replay's game is not installed, so every mark is the same shape/,
-      ),
-    ).toHaveLength(1);
-    // Every mark is one shape, and there is no key to say what a shape means.
-    const shapes = new Set(
-      [...(card(0)?.querySelectorAll("[data-crop-mark]") ?? [])].map((p) =>
-        p.getAttribute("d"),
-      ),
-    );
-    expect(shapes.size).toBe(1);
-    expect(screen.queryByText("Economy")).toBeNull();
+    expect(document.querySelector("button[data-crop-team]")).toBeNull();
+    expect(entry("player-0")?.textContent).toContain("Opening");
   });
 
-  it("draws no crops while the build orders cannot be read", async () => {
+  it("draws no entries while the build orders cannot be read", async () => {
     ORDERS = new Error("damaged");
     show();
-    fireEvent.click(toggle("Bases"));
+    fireEvent.click(screen.getByRole("button", { name: /show build orders/i }));
     expect(
       await screen.findByText(/build orders could not be read/i),
     ).toBeTruthy();
-    expect(screen.queryByTestId("base-crops")).toBeNull();
+    expect(document.querySelector("[data-build-entries]")).toBeNull();
   });
 });
 
 describe("pointing at a player", () => {
-  it("lights the pressed player's crop and fades the others", async () => {
+  it("lights the pressed player's picture and fades the others", async () => {
     ORDERS = PLACED;
     show();
     await open();
@@ -514,7 +598,7 @@ describe("pointing at a player", () => {
     ).toBe("true");
   });
 
-  it("lights a crop when the player is pointed at somewhere else", async () => {
+  it("lights a picture when the player is pointed at somewhere else", async () => {
     ORDERS = PLACED;
     show();
     await open();
@@ -525,14 +609,15 @@ describe("pointing at a player", () => {
     expect(card(0)?.className).toContain("opacity-40");
   });
 
-  it("can be reached by keyboard", async () => {
+  it("can be reached by keyboard, and is named for its player", async () => {
     ORDERS = PLACED;
     show();
     await open();
-    const crop = card(0) as HTMLElement;
-    expect(crop.tagName).toBe("BUTTON");
-    expect(crop.tabIndex).toBe(0);
-    act(() => crop.focus());
-    expect(document.activeElement).toBe(crop);
+    const picture = card(0) as HTMLElement;
+    expect(picture.tagName).toBe("BUTTON");
+    expect(picture.tabIndex).toBe(0);
+    expect(picture.getAttribute("aria-label")).toBe("Base of Alice");
+    act(() => picture.focus());
+    expect(document.activeElement).toBe(picture);
   });
 });

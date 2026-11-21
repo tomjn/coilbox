@@ -59,7 +59,6 @@ export function useMapLayerToggles(shown: readonly MapLayer[]) {
     buildings: layersShown && mine.buildings,
     density: layersShown && mine.density,
     orderDensity: layersShown && mine.orderDensity,
-    bases: layersShown && mine.bases,
   };
   return { layersShown, stored, setLayers, mine, on };
 }
@@ -109,7 +108,7 @@ export function useReplayMapLayers({
   // Build orders are read once for the page. A layer that draws them asks for
   // them when it is switched on, including one left on from the last visit.
   const orders = useReplayBuildOrders(replayPath ?? "");
-  const wantOrders = !!replayPath && (on.buildings || on.density || on.bases);
+  const wantOrders = !!replayPath && (on.buildings || on.density);
   const { status: ordersStatus, load: loadOrders } = orders;
   useEffect(() => {
     if (wantOrders && ordersStatus === "idle") loadOrders();
@@ -149,7 +148,7 @@ export function useReplayMapLayers({
 
   // The time window (#1153). The layers that have a time to filter by are read
   // through it, and the ones that are set before the game are not.
-  const buildLayer = on.buildings || on.density || on.bases;
+  const buildLayer = on.buildings || on.density;
   const windowed = buildLayer || on.orderDensity;
   const domainSec = Math.ceil(
     timelineDomain(

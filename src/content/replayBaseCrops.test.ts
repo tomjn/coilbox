@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { BuildOrder, DemoInfo, UnitDatasetEntry } from "./bindings";
 import {
+  type BaseCrop,
   baseCrops,
+  buildOrderEntries,
   CROP_RADII,
   cropFraction,
   cropImageBox,
   cropSide,
   cropWindow,
 } from "./replayBaseCrops";
+import type { BuildOrderSeat } from "./replayBuildOrders";
 import { mapFraction, type StartDot } from "./replayMapLayers";
 
 /** 4096 by 4096 elmos. */
@@ -300,5 +303,47 @@ describe("the order of the crops", () => {
       info(),
     );
     expect(crops.map((c) => c.team)).toEqual([0, 7]);
+  });
+});
+
+describe("the build order entries", () => {
+  const crop = (team: number) => ({ team }) as BaseCrop;
+  const seat = (key: string, team: number | undefined): BuildOrderSeat => ({
+    key,
+    name: key,
+    team,
+    orders: [],
+  });
+
+  it("has an entry for each picture, in the pictures' order, whether or not the team ordered", () => {
+    const entries = buildOrderEntries([seat("b", 1)], [crop(0), crop(1)]);
+    expect(entries.map((e) => [e.key, e.seats.map((s) => s.key)])).toEqual([
+      ["team-0", []],
+      ["team-1", ["b"]],
+    ]);
+  });
+
+  it("puts the seats of a shared team in one entry", () => {
+    const entries = buildOrderEntries([seat("a", 0), seat("c", 0)], [crop(0)]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].seats.map((s) => s.key)).toEqual(["a", "c"]);
+  });
+
+  it("follows with an entry for a seat that has no picture, in the order the seats came", () => {
+    const entries = buildOrderEntries(
+      [seat("x", undefined), seat("a", 0), seat("y", 5)],
+      [crop(0)],
+    );
+    expect(entries.map((e) => [e.key, e.crop?.team ?? null])).toEqual([
+      ["team-0", 0],
+      ["x", null],
+      ["y", null],
+    ]);
+  });
+
+  it("is one entry for each seat when there are no pictures", () => {
+    const entries = buildOrderEntries([seat("a", 0), seat("b", 1)], []);
+    expect(entries.map((e) => e.key)).toEqual(["a", "b"]);
+    expect(entries.every((e) => e.crop === null)).toBe(true);
   });
 });

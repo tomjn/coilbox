@@ -13,6 +13,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -123,6 +124,9 @@ vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
 vi.mock("./components/ReplayBuildOrders", () => ({
   ReplayBuildOrders: () => <p>build orders section</p>,
+}));
+vi.mock("./components/ReplayBaseCrops", () => ({
+  BasePicturesProvider: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("./components/ReplayEventList", () => ({
   ReplayEventList: ({ showAnalysis }: { showAnalysis: boolean }) => (
