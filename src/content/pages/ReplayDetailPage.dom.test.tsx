@@ -103,6 +103,13 @@ vi.mock("../../profile/profile", async (orig) => ({
   ...(await orig<typeof import("../../profile/profile")>()),
   getProfile: () => ({ version: 1, hide: HIDE }),
 }));
+// The dock's metric lane needs the app's theme and the statistics, which
+// `ReplayMetricLane.dom.test.tsx` covers.
+vi.mock("./components/ReplayMetricLane", () => ({
+  useMetricLane: () => null,
+  MetricLaneLabel: () => null,
+  MetricLanePlot: () => null,
+}));
 vi.mock("./components/MatchStatsSection", () => ({
   MatchStatsSection: ({ part }: { part: string }) => <p>match stats {part}</p>,
 }));

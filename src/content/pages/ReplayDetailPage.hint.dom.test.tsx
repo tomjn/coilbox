@@ -95,6 +95,13 @@ vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
 vi.mock("./components/ReplayEventList", () => ({
   ReplayEventList: () => null,
 }));
+// The dock's metric lane needs the app's theme and the statistics, which
+// `ReplayMetricLane.dom.test.tsx` covers.
+vi.mock("./components/ReplayMetricLane", () => ({
+  useMetricLane: () => null,
+  MetricLaneLabel: () => null,
+  MetricLanePlot: () => null,
+}));
 vi.mock("./components/MatchStatsSection", () => ({
   MatchStatsSection: () => null,
 }));
