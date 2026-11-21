@@ -143,6 +143,11 @@ pub struct UnitDef {
     pub sonar_distance_jam: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seismic_distance: Option<f64>,
+    /// The map icon the engine drew the unit with in the match, which `default`
+    /// is when the definition names none. Absent from a list that did not come
+    /// from the engine's own run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_type: Option<String>,
 }
 
 impl UnitDef {
@@ -195,6 +200,13 @@ pub fn validate(units: &[UnitDef]) -> Result<(), String> {
             .is_some_and(|name| !text_ok(name))
         {
             return Err(format!("unit definition {id} has no usable name"));
+        }
+        if unit
+            .icon_type
+            .as_deref()
+            .is_some_and(|icon| icon.is_empty() || !text_ok(icon))
+        {
+            return Err(format!("unit definition {id} has no usable icon type"));
         }
         if unit.numbers().iter().flatten().any(|n| !n.is_finite()) {
             return Err(format!(
@@ -888,6 +900,27 @@ pub(crate) mod tests {
             for b in &digests[i + 1..] {
                 assert_ne!(a, b);
             }
+        }
+    }
+
+    /// A list with an icon type is not the list without one, and a stored list
+    /// written before the field existed still reads, with no icon type.
+    #[test]
+    fn an_icon_type_is_kept_and_refused_when_unusable() {
+        let mut typed = known();
+        typed[0].icon_type = Some("commander".into());
+        assert_ne!(digest(&typed), digest(&known()));
+        assert!(validate(&typed).is_ok());
+        let text = String::from_utf8(canonical(&typed)).unwrap();
+        assert!(text.contains("\"iconType\":\"commander\""));
+
+        let older: UnitDef = serde_json::from_str("{\"name\":\"tgwall\"}").unwrap();
+        assert_eq!(older.icon_type, None);
+
+        for bad in ["", "bad\nicon"] {
+            let mut list = known();
+            list[1].icon_type = Some(bad.into());
+            assert!(validate(&list).unwrap_err().contains("icon type"));
         }
     }
 

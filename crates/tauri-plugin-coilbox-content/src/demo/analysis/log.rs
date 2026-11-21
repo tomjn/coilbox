@@ -26,7 +26,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 6;
+pub const LOGGER_VERSION: u32 = 7;
 
 /// The first [`LOGGER_VERSION`] that wrote `unit_damage` lines. An analysis from
 /// before it has no line for any unit, which is not the same as every unit
@@ -597,7 +597,7 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                6,
+                7,
                 vec![
                     "damage",
                     "game_over",
@@ -827,6 +827,7 @@ pub(super) mod tests {
             UnitDef {
                 name: "tgcom".into(),
                 human_name: Some("Commander".into()),
+                icon_type: Some("commander".into()),
                 metal_cost: Some(2500.0),
                 energy_cost: Some(25000.5),
                 mobile: true,
@@ -843,6 +844,10 @@ pub(super) mod tests {
         assert_eq!(defs[1].extracts_metal, Some(0.001));
         assert_eq!((defs[1].mobile, defs[1].builder), (false, false));
         assert_eq!(defs[2].human_name, None);
+        // An icon type is read as written, and a definition with none has none.
+        assert_eq!(defs[1].icon_type.as_deref(), Some("default"));
+        assert_eq!(defs[2].icon_type, None);
+        assert_eq!(defs[3].icon_type.as_deref(), Some("tg\"icon"));
         assert_eq!(defs[3].name, "tg\"odd");
         assert_eq!(
             (defs[3].metal_cost, defs[3].transport_capacity),
