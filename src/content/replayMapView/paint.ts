@@ -73,16 +73,16 @@ const HALF_WRECK = 1;
  *  so it can be seen on a large map. A unit's death is the larger. Chosen by
  *  eye on a real battle. */
 const SHOT_BLAST_ELMOS = 20;
-const SHOT_BLAST_LEAST = 4;
+const SHOT_BLAST_LEAST = 5;
 const DEATH_BLAST_ELMOS = 44;
-const DEATH_BLAST_LEAST = 8;
+const DEATH_BLAST_LEAST = 11;
 /** How big a circle is when it begins, as a part of its full size. */
 const BLAST_START = 0.3;
 /** A circle is drawn in this many bands of opacity, so a frame costs this many
  *  fills however many circles it holds. */
 export const BLAST_BANDS = 4;
 /** How solid a circle is when it begins. */
-const BLAST_OPACITY = 0.7;
+const BLAST_OPACITY = 0.9;
 /** How much of a unit shows when construction has only just started. A unit
  *  at 0 would otherwise be invisible while it is on the map. */
 const FAINTEST = 0.25;
@@ -98,7 +98,7 @@ const PALE_EDGE = "rgba(226, 232, 240, 0.85)";
 const WRECK = "rgba(148, 156, 170, 0.85)";
 const SHOT = "rgba(255, 236, 170, 0.95)";
 /** The colour of an explosion's circle. */
-export const BLAST_FILL = "rgb(255, 214, 10)";
+export const BLAST_FILL = "rgb(255, 196, 0)";
 const RING = "rgba(255, 255, 255, 0.95)";
 const NO_TEAM: TeamStyle = { fill: "rgb(148, 156, 170)", edge: DARK_EDGE };
 
