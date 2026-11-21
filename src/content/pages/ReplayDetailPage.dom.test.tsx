@@ -117,8 +117,10 @@ vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
 vi.mock("./components/ReplayBuildOrders", () => ({
   ReplayBuildOrders: () => <p>build orders section</p>,
 }));
-vi.mock("./components/ReplayAnalysisEvents", () => ({
-  ReplayAnalysisEvents: () => <p>analysis events section</p>,
+vi.mock("./components/ReplayEventList", () => ({
+  ReplayEventList: ({ showAnalysis }: { showAnalysis: boolean }) => (
+    <p>event list {showAnalysis ? "with analysis" : "without analysis"}</p>
+  ),
 }));
 vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
 vi.mock("./components/WatchWithRewindButton", () => ({
@@ -183,7 +185,7 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("match stats tiles")).not.toBeNull();
     expect(screen.queryByText("match stats chart")).not.toBeNull();
     expect(screen.queryByText("build orders section")).not.toBeNull();
-    expect(screen.queryByText("analysis events section")).not.toBeNull();
+    expect(screen.queryByText("event list with analysis")).not.toBeNull();
   });
 
   it("hides the match statistics section when the profile hides it", () => {
@@ -194,7 +196,8 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("match stats tiles")).toBeNull();
     expect(screen.queryByText("match stats chart")).toBeNull();
     expect(screen.queryByText("build orders section")).toBeNull();
-    expect(screen.queryByText("analysis events section")).toBeNull();
+    // The chat and player events are read from the file, so the list stays.
+    expect(screen.queryByText("event list without analysis")).not.toBeNull();
   });
 
   describe("the panel's tabs (#5304)", () => {
@@ -224,7 +227,7 @@ describe("ReplayDetailPage", () => {
     it.each([
       ["economy", "Economy", "match stats chart"],
       ["builds", "Build orders", "build orders section"],
-      ["events", "Events and chat", "analysis events section"],
+      ["events", "Events and chat", "event list with analysis"],
     ])("shows the %s tab the address names", (param, name, section) => {
       FILE = "a.sdfz";
       INFO = LOADED_INFO;

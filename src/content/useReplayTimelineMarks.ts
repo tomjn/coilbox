@@ -1,26 +1,12 @@
 import { useMemo } from "react";
-import type { DemoInfo, ReplayPlayer } from "./bindings";
+import type { DemoInfo } from "./bindings";
 import { analysisRunHidden, useStoredAnalyses } from "./replayAnalysis";
 import { DEATH_KINDS, eventBlock, eventState } from "./replayEventLayers";
+import { playerTeams } from "./replayEventList";
 import type { PlacedMark } from "./replayMapView/timelineMarks";
 import { describeEvent, markKind } from "./replayTimeline";
 import { useReplayChat } from "./useReplayChat";
 import { useEventRead } from "./useReplayEventLayers";
-
-/**
- * The engine team of each seated player, by the `[playerN]` number a chat line
- * carries. Spectators and players the file gives no number or team are left
- * out, as is the server (255), so their lines have no team. A name is never
- * matched: two players can share one.
- */
-function playerTeams(players: readonly ReplayPlayer[]): Map<number, number> {
-  const out = new Map<number, number>();
-  for (const p of players) {
-    if (p.spectator || p.player === undefined || p.team === undefined) continue;
-    out.set(p.player, p.team);
-  }
-  return out;
-}
 
 /** Whether the analysis has given the Kills lane its marks. */
 export interface KillsLane {

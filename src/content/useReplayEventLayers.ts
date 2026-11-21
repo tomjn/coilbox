@@ -53,15 +53,21 @@ import { useReplayUnits } from "./useReplayUnits";
 
 export type ReadStatus = "idle" | "loading" | "failed" | "done";
 
-/** One read of some kinds of an analysis's events, made while `wanted`. */
+/**
+ * One read of some kinds of an analysis's events, made while `wanted`. `null`
+ * reads every kind. `kinds` must be the same array from one render to the next.
+ */
 export function useEventRead(
   state: EventState,
-  kinds: readonly string[],
+  kinds: readonly string[] | null,
   wanted: boolean,
 ): { status: ReadStatus; events: LogEvent[] } {
   const gameId = state.kind === "ready" ? state.gameId : null;
   const atMs = state.kind === "ready" ? state.analysedAtMs : 0;
-  const key = wanted && gameId ? `${gameId}\n${atMs}\n${kinds.join()}` : null;
+  const key =
+    wanted && gameId
+      ? `${gameId}\n${atMs}\n${kinds ? kinds.join() : "*"}`
+      : null;
   const [read, setRead] = useState<{
     key: string;
     status: "failed" | "done";

@@ -35,10 +35,9 @@ import { MatchStatsSection } from "./components/MatchStatsSection";
 import { MissingContentNotice } from "./components/MissingContentNotice";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
-import { ReplayAnalysisEvents } from "./components/ReplayAnalysisEvents";
 import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
-import { ReplayChat } from "./components/ReplayChat";
+import { ReplayEventList } from "./components/ReplayEventList";
 import { ReplayMapCard } from "./components/ReplayMapCard";
 import { ReplayNotes } from "./components/ReplayNotes";
 import {
@@ -522,16 +521,11 @@ export default function ReplayDetailPage() {
                           />
                         ) : undefined,
                       events: replay ? (
-                        <>
-                          {showStats && (
-                            <ReplayAnalysisEvents
-                              info={info}
-                              replayPath={replay.path}
-                            />
-                          )}
-                          {/* Read from the replay file, so it needs no engine. */}
-                          <ReplayChat replayPath={replay.path} />
-                        </>
+                        <ReplayEventList
+                          info={info}
+                          replayPath={replay.path}
+                          showAnalysis={showStats}
+                        />
                       ) : undefined,
                     }}
                   />

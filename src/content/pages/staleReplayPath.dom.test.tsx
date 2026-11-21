@@ -11,12 +11,12 @@
 import {
   act,
   cleanup,
-  fireEvent,
   render,
   renderHook,
   screen,
   waitFor,
 } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatLine, DemoInfo, StoredReplayAnalysis } from "../bindings";
 
@@ -59,12 +59,10 @@ vi.mock("./components/MatchStatsChart", () => ({
 }));
 
 const { useDemoInfo } = await import("../config");
-const { ReplayChat } = await import("./components/ReplayChat");
+const { ReplayEventList } = await import("./components/ReplayEventList");
+const { MatchClockProvider } = await import("../useMatchClock");
 const { useReplayChat } = await import("../useReplayChat");
 const { MatchStatsSection } = await import("./components/MatchStatsSection");
-const { ReplayAnalysisEvents } = await import(
-  "./components/ReplayAnalysisEvents"
-);
 const { resetReplayEventReadsForTests } = await import("../replayEventRead");
 const { useReplayCommandRates, resetReplayCommandRates } = await import(
   "../useReplayCommandRates"
@@ -173,51 +171,45 @@ describe("useDemoInfo", () => {
   });
 });
 
-describe("ReplayChat", () => {
+/** The list as the replay page holds it, inside a router and a match clock. */
+function list(path: string, info: DemoInfo) {
+  return (
+    <MemoryRouter>
+      <MatchClockProvider durationSec={600}>
+        <ReplayEventList replayPath={path} info={info} showAnalysis />
+      </MatchClockProvider>
+    </MemoryRouter>
+  );
+}
+
+describe("ReplayEventList chat", () => {
   const chat = (text: string) => ({
     incomplete: false,
+    events: [],
     messages: [
       { frame: 0, time: 0, player: 0, text, system: false } as ChatLine,
     ],
   });
-
-  /** Opens the log once the chat has been read. */
-  async function showLog() {
-    const button = await screen.findByRole("button", {
-      name: /show chat log/i,
-    });
-    await waitFor(() =>
-      expect((button as HTMLButtonElement).disabled).toBe(false),
-    );
-    fireEvent.click(button);
-  }
+  const noAnalysis = { players: [], ais: [] } as unknown as DemoInfo;
 
   it("drops the first replay's chat when the path changes", async () => {
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from a"));
-    const { rerender } = render(<ReplayChat replayPath={a} />);
-    await showLog();
+    const { rerender } = render(list(a, noAnalysis));
     expect(await screen.findByText("gg from a", { exact: false })).toBeTruthy();
 
     bindings.contentDemoChat.mockReturnValueOnce(deferred().promise);
-    rerender(<ReplayChat replayPath={b} />);
+    rerender(list(b, noAnalysis));
     expect(screen.queryByText("gg from a", { exact: false })).toBeNull();
-    expect(
-      (
-        screen.getByRole("button", {
-          name: /reading chat/i,
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
+    expect(screen.getByText("Reading events…")).toBeTruthy();
   });
 
   it("does not let a slow chat for the first replay land on the second", async () => {
     const first = deferred<ReturnType<typeof chat>>();
     bindings.contentDemoChat.mockReturnValueOnce(first.promise);
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from b"));
-    const { rerender } = render(<ReplayChat replayPath={a} />);
+    const { rerender } = render(list(a, noAnalysis));
 
-    rerender(<ReplayChat replayPath={b} />);
-    await showLog();
+    rerender(list(b, noAnalysis));
     expect(await screen.findByText("gg from b", { exact: false })).toBeTruthy();
 
     await act(async () => first.resolve(chat("gg from a")));
@@ -234,11 +226,11 @@ describe("ReplayChat", () => {
     }
     render(
       <>
-        <ReplayChat replayPath={a} />
+        {list(a, noAnalysis)}
         <Dock />
       </>,
     );
-    await screen.findByRole("button", { name: /show chat log/i });
+    await screen.findByText("gg", { exact: false });
     expect(bindings.contentDemoChat).toHaveBeenCalledTimes(1);
   });
 });
@@ -283,17 +275,17 @@ describe("MatchStatsSection", () => {
   });
 });
 
-describe("ReplayAnalysisEvents", () => {
+describe("ReplayEventList events", () => {
   const stored = (gameId: string) =>
     ({
       state: "current",
       kind: "analysis",
       gameId,
       analysedAtMs: 1,
-      counts: { gameStart: 1 },
+      counts: { unitDestroyed: 1 },
     }) as unknown as StoredReplayAnalysis;
-  const eventsOf = (frame: number) => ({
-    events: [{ kind: "game_start", frame }],
+  const killAt = (frame: number) => ({
+    events: [{ kind: "unit_destroyed", frame, def: 1 }],
     total: 1,
   });
   const infoFor = (gameId: string) =>
@@ -301,38 +293,36 @@ describe("ReplayAnalysisEvents", () => {
 
   beforeEach(() => {
     resetReplayEventReadsForTests();
+    bindings.contentDemoChat.mockResolvedValue({
+      messages: [],
+      incomplete: false,
+      events: [],
+    });
     seedReplayAnalysisForTests({ analyses: [stored("one"), stored("two")] });
   });
   afterEach(resetReplayAnalysisForTests);
 
   it("drops the first replay's events when the path changes", async () => {
-    bindings.contentReplayAnalysisEvents.mockResolvedValueOnce(eventsOf(3000));
-    const { rerender } = render(
-      <ReplayAnalysisEvents replayPath={a} info={infoFor("one")} />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: /recorded events/i }));
+    bindings.contentReplayAnalysisEvents.mockResolvedValueOnce(killAt(3000));
+    const { rerender } = render(list(a, infoFor("one")));
     expect(await screen.findByText("1:40")).toBeTruthy();
 
     bindings.contentReplayAnalysisEvents.mockReturnValueOnce(
       deferred().promise,
     );
-    rerender(<ReplayAnalysisEvents replayPath={b} info={infoFor("two")} />);
+    rerender(list(b, infoFor("two")));
     expect(screen.queryByText("1:40")).toBeNull();
-    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("does not let a slow answer for the first replay land on the second", async () => {
-    const first = deferred<ReturnType<typeof eventsOf>>();
+    const first = deferred<ReturnType<typeof killAt>>();
     bindings.contentReplayAnalysisEvents.mockReturnValueOnce(first.promise);
-    bindings.contentReplayAnalysisEvents.mockResolvedValueOnce(eventsOf(900));
-    const { rerender } = render(
-      <ReplayAnalysisEvents replayPath={a} info={infoFor("one")} />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: /recorded events/i }));
-    rerender(<ReplayAnalysisEvents replayPath={b} info={infoFor("two")} />);
+    bindings.contentReplayAnalysisEvents.mockResolvedValueOnce(killAt(900));
+    const { rerender } = render(list(a, infoFor("one")));
+    rerender(list(b, infoFor("two")));
     expect(await screen.findByText("0:30")).toBeTruthy();
 
-    await act(async () => first.resolve(eventsOf(3000)));
+    await act(async () => first.resolve(killAt(3000)));
     expect(screen.queryByText("1:40")).toBeNull();
     expect(screen.getByText("0:30")).toBeTruthy();
   });
