@@ -6,7 +6,9 @@
  * The canvas is replaced by a hook that runs the view's build.
  */
 
+import { ThemeProvider } from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -284,6 +286,51 @@ describe("a part", () => {
       );
     }
     expect(canvases.made).toBe(1);
+  });
+
+  // A player in dark mode, or in system mode on a dark system, reported the app
+  // turning light after colourway clicks (issue #5350).
+  it.each([
+    "dark",
+    "system",
+  ])("leaves the %s theme alone however often the colourway changes", (mode) => {
+    localStorage.setItem("picoframe.theme", JSON.stringify(mode));
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === "(prefers-color-scheme: dark)",
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    function Workshop() {
+      const [selected, setSelected] = useState<InventoryRef>({
+        kind: "part",
+        id: grey.id,
+      });
+      return (
+        <ThemeProvider>
+          <DetailPanel
+            pack={packWith()}
+            selected={selected}
+            compounds={compounds}
+            onSelect={setSelected}
+            onClose={() => {}}
+            moduleActions={actions()}
+          />
+        </ThemeProvider>
+      );
+    }
+    render(<Workshop />);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    for (let n = 0; n < 20; n++) {
+      fireEvent.click(button(n % 2 === 0 ? "Tan" : "Grey") as HTMLElement);
+      expect(document.documentElement.classList.contains("dark")).toBe(true);
+    }
+    expect(button("Grey")?.getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem("picoframe.theme")).toBe(JSON.stringify(mode));
+    localStorage.removeItem("picoframe.theme");
   });
 
   it("offers a colourway whose part has its own mesh", () => {
