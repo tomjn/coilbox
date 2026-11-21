@@ -66,6 +66,7 @@ import { labelOfMetric } from "../../metricLabels";
 import { plotInsets } from "../../replayTimeline";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { CHART_PRESS_TARGET, ChartPlayhead } from "./ChartPlayhead";
 import { CommandRateChart } from "./CommandRateChart";
 import { LivingValueChart } from "./LivingValueChart";
 import { MatchStatsExportButton } from "./MatchStatsExportButton";
@@ -744,6 +745,7 @@ export function MatchStatsChart({
                         legendType="none"
                         tooltipType="none"
                         isAnimationActive={false}
+                        className={CHART_PRESS_TARGET}
                         style={{ cursor: "pointer" }}
                         onMouseEnter={() => emphasis.hover(teams)}
                         onMouseLeave={() => emphasis.hover(null)}
@@ -758,6 +760,7 @@ export function MatchStatsChart({
                       dimming={emphasis.dimming}
                     />
                   )}
+                  <ChartPlayhead />
                 </LineChart>
               </ResponsiveContainer>
             )}
