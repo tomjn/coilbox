@@ -242,6 +242,7 @@ const info = {
   players: [],
   ais: [],
   allyTeams: [],
+  modOptions: {},
   startPositions: [],
 } as unknown as DemoInfo;
 

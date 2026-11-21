@@ -1,13 +1,25 @@
 import { describe, expect, it } from "vitest";
+import type { Arrangement } from "@/startbox/barBoxes";
 import type { DemoInfo, StartBoxConfig } from "./bindings";
 import {
+  barAreas,
   NEUTRAL_AREA_COLOUR,
   rectangleAreas,
+  replayBarArrangement,
   replayRoom,
   zerokAreas,
 } from "./replayStartAreas";
 
 const EXTENT = { x: 8192, z: 4096 };
+
+// The two options of a replay recorded headless in Beyond All Reason, as the
+// engine kept them in the replay's start script (#5314). The host's own areas are
+// a five sided shape and a triangle. The map's set has two shapes for two sides
+// and four rectangles for four.
+const OVERRIDE =
+  "eJyrViouSSwqScqvSC1WsoquVirIz6kEMyqUrAwNdJSAHGODWh0w3xzCN4LxLSF8CxjfFMI3hCuAGmBoYFAbCxJCMRyq2wSu2BihGioCVWJoDtIfq6OUm1gRkJNYmVpUHJBaFAx1OFC-FgAbNTk6";
+const SET =
+  "eJyrVjJSsqpWKi5JLCpJyq9ILVayiq5WKsjPqQQzKpSsDHSUgGyDWh0wzwyVawHhGhrABCB8IyA_FiSCbBBQEEWvoQka3wjdMJgOiHFAA5VMSHIs0CS4iRjOgUmiW4ZXMS63oSlHVwzTDvNILQBzWWi1";
 
 const square = (x: number, z: number, size = 1000): [number, number][] => [
   [x, z],
@@ -238,6 +250,125 @@ describe("rectangleAreas", () => {
 
   it("draws nothing for a match that set none", () => {
     expect(rectangleAreas(replay()).areas).toEqual([]);
+  });
+});
+
+describe("replayBarArrangement", () => {
+  it("is the host's own areas when both options are set", () => {
+    const found = replayBarArrangement(
+      replay({
+        modOptions: {
+          mapmetadata_startbox_override: OVERRIDE,
+          mapmetadata_startboxes_set: SET,
+        },
+      }),
+    );
+    expect(found?.source).toBe("override");
+    expect(found?.arrangement.startboxes).toHaveLength(2);
+    expect(found?.arrangement.startboxes[0].poly).toHaveLength(5);
+  });
+
+  it("is the map's set for the replay's number of sides", () => {
+    const found = replayBarArrangement(
+      replay({ modOptions: { mapmetadata_startboxes_set: SET } }),
+    );
+    expect(found?.source).toBe("set");
+    expect(found?.arrangement.startboxes[0].poly).toHaveLength(4);
+  });
+
+  it("reads the option names whatever their case", () => {
+    expect(
+      replayBarArrangement(
+        replay({ modOptions: { MapMetadata_StartBox_Override: OVERRIDE } }),
+      )?.source,
+    ).toBe("override");
+  });
+
+  it("is null when both options are missing or empty", () => {
+    expect(replayBarArrangement(replay())).toBeNull();
+    expect(
+      replayBarArrangement(
+        replay({
+          modOptions: {
+            mapmetadata_startbox_override: "",
+            mapmetadata_startboxes_set: "",
+          },
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("is null when an option cannot be decoded", () => {
+    expect(
+      replayBarArrangement(
+        replay({
+          modOptions: {
+            mapmetadata_startbox_override: "not base64 at all!",
+            mapmetadata_startboxes_set: "AAAA",
+          },
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("leaves out the option that cannot be decoded and uses the other", () => {
+    expect(
+      replayBarArrangement(
+        replay({
+          modOptions: {
+            mapmetadata_startbox_override: "###",
+            mapmetadata_startboxes_set: SET,
+          },
+        }),
+      )?.source,
+    ).toBe("set");
+  });
+
+  it("is null when the host's areas are fewer than the sides and no set exists", () => {
+    expect(
+      replayBarArrangement(
+        replay({
+          numAllyTeams: 3,
+          modOptions: { mapmetadata_startbox_override: OVERRIDE },
+        }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("barAreas", () => {
+  const arrangement = replayBarArrangement(
+    replay({ modOptions: { mapmetadata_startbox_override: OVERRIDE } }),
+  )?.arrangement as Arrangement;
+
+  it("draws each area in the colour and number of the side at its position", () => {
+    const { areas, extent } = barAreas(arrangement, replay(), EXTENT);
+    expect(extent).toBe(EXTENT);
+    expect(areas.map((a) => [a.key, a.label, a.color])).toEqual([
+      ["0", "1", "#ff0000"],
+      ["1", "2", "#0000ff"],
+    ]);
+    expect(areas[1].title).toBe("Team 2 start box");
+  });
+
+  it("draws shapes, not rectangles, in world units", () => {
+    const { areas } = barAreas(arrangement, replay(), EXTENT);
+    // The first area is a five point shape on the 0 to 200 grid.
+    expect(areas[0].polygons).toHaveLength(1);
+    expect(areas[0].polygons[0].length).toBeGreaterThanOrEqual(5);
+    expect(areas[0].polygons[0][0]).toEqual([
+      (10 * EXTENT.x) / 200,
+      (30 * EXTENT.z) / 200,
+    ]);
+  });
+
+  it("does not draw an area past the last side, which the game never used", () => {
+    const { areas } = barAreas(
+      arrangement,
+      replay({ numAllyTeams: 1, allyTeams: [{ id: 0, color: [1, 0, 0] }] }),
+      EXTENT,
+    );
+    expect(areas.map((a) => a.key)).toEqual(["0"]);
   });
 });
 
