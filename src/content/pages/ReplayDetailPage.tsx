@@ -5,12 +5,11 @@ import {
   Code2,
   Download,
   Eye,
-  ImageOff,
   Loader2,
   Trash2,
   X,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,16 +25,12 @@ import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { useReplayTarget } from "../../play/config";
 import { isProfileHidden } from "../../profile/hidden";
-import type { DemoInfo } from "../bindings";
 import { contentDeleteReplay, contentDeleteReplays } from "../bindings";
 import {
   invalidateMapPreview,
   useDemoInfo,
   useReplays,
   useScanTargetSelection,
-  useUnitsyncHeightmap,
-  useUnitsyncMapSkybox,
-  useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
 import { refreshStoredAnalyses } from "../replayAnalysis";
@@ -63,8 +58,7 @@ import { ReplayAnalysisEvents } from "./components/ReplayAnalysisEvents";
 import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
-import { ReplayMap } from "./components/ReplayMap";
-import { ReplayMapViewSection } from "./components/ReplayMapView";
+import { ReplayMapCard } from "./components/ReplayMapCard";
 import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
 import {
@@ -91,89 +85,6 @@ function playedAt(ms: number): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-/**
- * The map preview for the replay's map. When the map isn't installed,
- * unitsync can't render it. The download control for that now lives in
- * {@link MissingContentNotice} near the top of the page (#495), so this just
- * explains why the preview is blank.
- */
-function ReplayMapPreview({
-  enginePath,
-  dataDir,
-  mapName,
-  info,
-  replayPath,
-  heading,
-}: {
-  enginePath: string;
-  dataDir: string;
-  mapName: string;
-  info: DemoInfo;
-  replayPath: string | undefined;
-  /** The section's heading, which the map's help entry sits beside. */
-  heading: ReactNode;
-}) {
-  const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
-  const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
-  const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
-
-  const busy = minimap.loading || heightmap.loading;
-
-  if (busy) {
-    return (
-      <>
-        {heading}
-        <div className="flex h-48 items-center justify-center rounded-lg border border-border/50 bg-card">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      </>
-    );
-  }
-
-  if (minimap.url) {
-    return (
-      <ReplayMap
-        info={info}
-        replayPath={replayPath}
-        mapName={mapName}
-        heading={heading}
-        minimapUrl={minimap.url}
-        heightmap={heightmap.data}
-        preview={
-          heightmap.data && heightmap.url
-            ? {
-                heightSrc: heightmap.url,
-                heightRange: heightmap.range,
-                textureSrc: minimap.url,
-                appearance: minimap.appearance,
-                skyboxSrc: skybox.dataUrl,
-                minHeight: heightmap.data.minHeight ?? 0,
-                maxHeight: heightmap.data.maxHeight ?? 0,
-              }
-            : null
-        }
-      />
-    );
-  }
-
-  // Map not installed / not renderable: the download control for this sits
-  // in the missing-content notice near the top of the page.
-  return (
-    <>
-      {heading}
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
-        <ImageOff className="size-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          <Trans>
-            <span className="font-medium text-foreground">{mapName}</span> isn't
-            installed, so its preview can't be rendered.
-          </Trans>
-        </p>
-      </div>
-    </>
-  );
 }
 
 /** Best-effort game download (rapid). The demo's `gameType` is a display string,
@@ -713,7 +624,6 @@ export default function ReplayDetailPage() {
   if (!listLoading && !replay)
     return <NotFound backTo="/play/replays" label="replay" />;
 
-  const infoMapName = info?.mapName ?? "";
   const recordedOn = info?.engineVersion || t`an unknown engine`;
   const folderEngineVersion = resolved?.target.engineVersion ?? "";
   const watchingWith =
@@ -946,10 +856,13 @@ export default function ReplayDetailPage() {
                   />
                 )}
 
-                {/* The track the section above records, drawn (#3807). It shows
-                 * itself only when the replay has one. */}
-                <ReplayMapViewSection
+                {/* The one map: the recorded match, the flat map with its layers
+                 * and the 3D view, one mode at a time (#5310). Keyed so a map
+                 * that has just been downloaded is read again. */}
+                <ReplayMapCard
+                  key={previewNonce}
                   info={info}
+                  replayPath={replay?.path}
                   enginePath={selected?.enginePath}
                   dataDir={selected?.rootPath}
                 />
@@ -963,35 +876,6 @@ export default function ReplayDetailPage() {
                 {replay && <ReplayChat replayPath={replay.path} />}
 
                 <ReplayNotes filename={filename} gameId={info.gameId} />
-
-                <section className="flex flex-col gap-2">
-                  {selected && info.mapName ? (
-                    <ReplayMapPreview
-                      heading={
-                        <h2 className="text-sm font-medium">
-                          <Trans>Map · {infoMapName}</Trans>
-                        </h2>
-                      }
-                      key={previewNonce}
-                      enginePath={selected.enginePath}
-                      dataDir={selected.rootPath}
-                      mapName={info.mapName}
-                      info={info}
-                      replayPath={replay?.path}
-                    />
-                  ) : (
-                    <>
-                      <h2 className="text-sm font-medium">
-                        <Trans>Map · {infoMapName}</Trans>
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {info.mapName
-                          ? t`Install an engine to preview this map.`
-                          : t`No map recorded for this replay.`}
-                      </p>
-                    </>
-                  )}
-                </section>
 
                 {/* Pinned to the bottom of the page, and last so it rests at the
                  * end of the page too (#5306). */}

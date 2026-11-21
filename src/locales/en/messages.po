@@ -570,7 +570,7 @@ msgid "{0, plural, one {# factory order names a unit that does not} other {# fac
 msgstr "{0, plural, one {# factory order names a unit that does not} other {# factory orders name a unit that does not}}"
 
 #. placeholder {0}: built.unplaced
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 
@@ -686,27 +686,27 @@ msgid "{0, plural, one {# order that took units off a factory queue is not liste
 msgstr "{0, plural, one {# order that took units off a factory queue is not listed.} other {# orders that took units off a factory queue are not listed.}}"
 
 #. placeholder {0}: allOrders.custom
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{0, plural, one {# order was a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and is left out.} other {# orders were a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and are left out.}}"
 msgstr "{0, plural, one {# order was a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and is left out.} other {# orders were a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and are left out.}}"
 
 #. placeholder {0}: allOrders.unitAimed
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{0, plural, one {# order was aimed at a unit in the whole match, which the window cannot narrow.} other {# orders were aimed at a unit in the whole match, which the window cannot narrow.}}"
 msgstr "{0, plural, one {# order was aimed at a unit in the whole match, which the window cannot narrow.} other {# orders were aimed at a unit in the whole match, which the window cannot narrow.}}"
 
 #. placeholder {0}: allOrders.unitAimed
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{0, plural, one {# order was aimed at a unit.} other {# orders were aimed at a unit.}}"
 msgstr "{0, plural, one {# order was aimed at a unit.} other {# orders were aimed at a unit.}}"
 
 #. placeholder {0}: orderField?.dropped ?? 0
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{0, plural, one {# order was aimed off the map and is not drawn.} other {# orders were aimed off the map and are not drawn.}}"
 msgstr "{0, plural, one {# order was aimed off the map and is not drawn.} other {# orders were aimed off the map and are not drawn.}}"
 
 #. placeholder {0}: built.offMap
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{0, plural, one {# order was placed off the map and is not drawn.} other {# orders were placed off the map and are not drawn.}}"
 msgstr "{0, plural, one {# order was placed off the map and is not drawn.} other {# orders were placed off the map and are not drawn.}}"
 
@@ -758,7 +758,7 @@ msgid "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
 msgstr "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
 
 #. placeholder {0}: counts.projectiles
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "{0, plural, one {# projectile} other {# projectiles}}"
 msgstr "{0, plural, one {# projectile} other {# projectiles}}"
 
@@ -888,7 +888,7 @@ msgstr "{0, plural, one {# unit, in order} other {# units, in order}}"
 #. placeholder {0}: c.units
 #. placeholder {0}: counts.units
 #: src/content/pages/components/GameLibrarySummary.tsx
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
 #: src/workshop/pages/components/ArmorClassPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -939,7 +939,7 @@ msgid "{0, plural, one {# win} other {# wins}}"
 msgstr "{0, plural, one {# win} other {# wins}}"
 
 #. placeholder {0}: counts.wrecks
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "{0, plural, one {# wreck} other {# wrecks}}"
 msgstr "{0, plural, one {# wreck} other {# wrecks}}"
 
@@ -1530,7 +1530,7 @@ msgstr "{bots} of them bots"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# box} other {# boxes}}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "{boxTeam} start box"
 msgstr "{boxTeam} start box"
 
@@ -1829,11 +1829,11 @@ msgstr "{count, plural, one {# mission} other {# missions}}"
 msgid "{count, plural, one {# objective} other {# objectives}}"
 msgstr "{count, plural, one {# objective} other {# objectives}}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
 msgstr "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
 msgstr "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
 
@@ -4071,7 +4071,7 @@ msgstr "{name} (from {fromName}) (locked)"
 msgid "{name} (locked)"
 msgstr "{name} (locked)"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "{name} (you)"
 msgstr "{name} (you)"
 
@@ -4397,11 +4397,11 @@ msgstr "{ordered} ordered"
 msgid "{ordered} ordered in {replays}"
 msgstr "{ordered} ordered in {replays}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
 msgstr "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike."
 msgstr "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike."
 
@@ -4409,11 +4409,11 @@ msgstr "{orders} orders are on it, from the player's own selection, widgets acti
 msgid "{orders} orders given"
 msgstr "{orders} orders given"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
 msgstr "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike."
 msgstr "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike."
 
@@ -4481,11 +4481,11 @@ msgstr "{overlappingCount, plural, one {Building {overlapping} will stand on gro
 msgid "{own} of it a player did to their own units."
 msgstr "{own} of it a player did to their own units."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "{owner} (AI), {side}"
 msgstr "{owner} (AI), {side}"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "{owner}, {side}"
 msgstr "{owner}, {side}"
 
@@ -4910,7 +4910,7 @@ msgstr "{rate} a minute"
 msgid "{reached} reached a unit"
 msgstr "{reached} reached a unit"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "{recordedGame} is not installed, so nothing says what each building is for and every mark is the same shape."
 msgstr "{recordedGame} is not installed, so nothing says what each building is for and every mark is the same shape."
 
@@ -6750,7 +6750,7 @@ msgstr "<0>{gameName}</0> depends on it."
 msgid "<0>{gameName}</0> isn't installed — download it to join, or rescan if it's already on disk."
 msgstr "<0>{gameName}</0> isn't installed — download it to join, or rescan if it's already on disk."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 msgid "<0>{mapName}</0> isn't installed, so its preview can't be rendered."
 msgstr "<0>{mapName}</0> isn't installed, so its preview can't be rendered."
 
@@ -6925,6 +6925,10 @@ msgstr "3 — Insane (whole map; very slow)"
 #: src/content/stats.ts
 msgid "30 minutes to 1 hour"
 msgstr "30 minutes to 1 hour"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "3D"
+msgstr "3D"
 
 #: src/content/unitFieldNotes.ts
 msgid "3D model"
@@ -7204,7 +7208,7 @@ msgstr "a different size from this page's map, so it is left out"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
 msgstr "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
 
@@ -7452,7 +7456,7 @@ msgstr "A map needs both a start and a goal, or neither of them."
 msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
 msgstr "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "A mark is one order, in its player's colour."
 msgstr "A mark is one order, in its player's colour."
 
@@ -7532,7 +7536,7 @@ msgstr "A newer game version is available to download."
 msgid "a number"
 msgstr "a number"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A pale line is a projectile, drawn along the way it is moving. A grey square is a wreck, or anything else left on the map during the match."
 msgstr "A pale line is a projectile, drawn along the way it is moving. A grey square is a wreck, or anything else left on the map during the match."
 
@@ -7560,7 +7564,7 @@ msgstr "A password change is already in progress."
 msgid "a path that is gone"
 msgstr "a path that is gone"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A picture of this map is not available, so the match is drawn on plain ground."
 msgstr "A picture of this map is not available, so the match is drawn on plain ground."
 
@@ -7604,7 +7608,7 @@ msgstr "A queue belongs to the base rather than to the layout, so it is converte
 msgid "A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio. It is left out of the average and counted beside it."
 msgstr "A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio. It is left out of the average and counted beside it."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
 msgstr "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
 
@@ -7758,7 +7762,7 @@ msgstr "A squad of mobile units the mission spawns, wakes and orders as one."
 msgid "a start"
 msgstr "a start"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "A start box is where a team was allowed to start."
 msgstr "A start box is where a team was allowed to start."
 
@@ -9221,6 +9225,10 @@ msgstr "Analyse and record this replay?"
 msgid "Analyse and record with {chosenLabel}"
 msgstr "Analyse and record with {chosenLabel}"
 
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Analyse replay"
+msgstr "Analyse replay"
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Analyse this replay"
 msgstr "Analyse this replay"
@@ -10409,7 +10417,7 @@ msgid "basename for the .smf/.smt (no extension)"
 msgstr "basename for the .smf/.smt (no extension)"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 msgid "Bases"
 msgstr "Bases"
@@ -11353,7 +11361,7 @@ msgid "Building 3D preview…"
 msgstr "Building 3D preview…"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Building density"
 msgstr "Building density"
 
@@ -11361,7 +11369,7 @@ msgstr "Building density"
 msgid "Building mask"
 msgstr "Building mask"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "building orders"
 msgstr "building orders"
 
@@ -11387,15 +11395,15 @@ msgstr "Building the sheet for {folder}"
 msgid "Buildings and metal"
 msgstr "Buildings and metal"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Buildings finished"
 msgstr "Buildings finished"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Buildings ordered"
 msgstr "Buildings ordered"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Buildings ordered shows the orders each player gave, not what was built. An order that was cancelled or never carried out is drawn like any other."
 msgstr "Buildings ordered shows the orders each player gave, not what was built. An order that was cancelled or never carried out is drawn like any other."
 
@@ -13750,7 +13758,7 @@ msgid "Colour texture"
 msgstr "Colour texture"
 
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Colours compare places on this map with each other, not with another picture."
 msgstr "Colours compare places on this map with each other, not with another picture."
 
@@ -15426,7 +15434,7 @@ msgstr "Damage comes from playing a match back, which is run from a replay's own
 
 #: src/content/mapAggregate.ts
 #: src/content/metricLabels.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Damage dealt"
 msgstr "Damage dealt"
 
@@ -15551,7 +15559,7 @@ msgid "deaths"
 msgstr "deaths"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Deaths"
 msgstr "Deaths"
 
@@ -19475,7 +19483,7 @@ msgstr "From outside"
 msgid "From playing the match back with coilbox's own recorder, which is kept only when the playback reproduced the recorded match exactly. These are events, not orders."
 msgstr "From playing the match back with coilbox's own recorder, which is kept only when the playback reproduced the recorded match exactly. These are events, not orders."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "From playing the match back with coilbox's own recorder. Nothing here runs the game."
 msgstr "From playing the match back with coilbox's own recorder. Nothing here runs the game."
 
@@ -20112,7 +20120,7 @@ msgstr "Go duration, e.g. 30s"
 msgid "Go to battle"
 msgstr "Go to battle"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Go to recording"
 msgstr "Go to recording"
 
@@ -20441,6 +20449,10 @@ msgstr "health fraction"
 #: src/multiplayer/RelayIndicator.tsx
 msgid "Heard from in the last 15 seconds"
 msgstr "Heard from in the last 15 seconds"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Heat"
+msgstr "Heat"
 
 #: src/workshop/explosionGenerators.ts
 msgid "Heat cloud"
@@ -21672,7 +21684,7 @@ msgstr "In progress"
 msgid "In the source"
 msgstr "In the source"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
 msgstr "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
 
@@ -21813,7 +21825,7 @@ msgstr "Install an engine first (<0>Settings → Engines</0>)."
 msgid "Install an engine first."
 msgstr "Install an engine first."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 msgid "Install an engine to preview this map."
 msgstr "Install an engine to preview this map."
 
@@ -23673,7 +23685,7 @@ msgstr "Loading the match"
 msgid "Loading this game's skirmish AIs."
 msgstr "Loading this game's skirmish AIs."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Loading this part of the match"
 msgstr "Loading this part of the match"
 
@@ -24194,6 +24206,7 @@ msgstr "map"
 #: src/content/index.ts
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
@@ -24214,7 +24227,7 @@ msgstr "map"
 msgid "Map"
 msgstr "Map"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 msgid "Map · {infoMapName}"
 msgstr "Map · {infoMapName}"
 
@@ -24262,7 +24275,7 @@ msgstr "Map info ({mapinfoCount})"
 msgid "Map keys. Full stop and comma step through what is on the map, including a path's points, which follow the group they belong to. Arrow keys move what is selected one build square north, south, east or west. Hold Shift for ten squares, Alt for one elmo. With nothing selected the arrows move the view's cursor instead. R turns, Shift R turns the other way. Delete removes. T turns everything selected as one shape instead, so a base swings round its own middle rather than each building spinning where it stands, and Shift T swings it the other way. S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. North and east make it bigger, south and west make it smaller. Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. Escape lets go of the selection. More than one thing can be selected at once, and then every one of those keys acts on all of it. Full stop and comma replace the selection rather than growing it. A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. Contents' Shift with Enter on a row adds that row the same way. P reads how many of the buildings on the map cannot be built where they stand. Question mark reads this out again."
 msgstr "Map keys. Full stop and comma step through what is on the map, including a path's points, which follow the group they belong to. Arrow keys move what is selected one build square north, south, east or west. Hold Shift for ten squares, Alt for one elmo. With nothing selected the arrows move the view's cursor instead. R turns, Shift R turns the other way. Delete removes. T turns everything selected as one shape instead, so a base swings round its own middle rather than each building spinning where it stands, and Shift T swings it the other way. S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. North and east make it bigger, south and west make it smaller. Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. Escape lets go of the selection. More than one thing can be selected at once, and then every one of those keys acts on all of it. Full stop and comma replace the selection rather than growing it. A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. Contents' Shift with Enter on a row adds that row the same way. P reads how many of the buildings on the map cannot be built where they stand. Question mark reads this out again."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Map layers"
 msgstr "Map layers"
 
@@ -24351,6 +24364,10 @@ msgstr "Map sizes"
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Map style"
 msgstr "Map style"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Map view"
+msgstr "Map view"
 
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 msgid "Map: {battleMap}"
@@ -24893,8 +24910,8 @@ msgstr "Minimap of {battleMap}"
 
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/direct/LanRooms.tsx
 #: src/hub/assets/picture.ts
 #: src/play/pages/components/MapCard.tsx
@@ -25859,6 +25876,10 @@ msgstr "Needs a name"
 msgid "Needs a piece set as {missingRoles}."
 msgstr "Needs a piece set as {missingRoles}."
 
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Needs a recording of the match."
+msgstr "Needs a recording of the match."
+
 #: src/scenario/pages/components/triggers.ts
 msgid "Needs a team"
 msgstr "Needs a team"
@@ -25907,6 +25928,10 @@ msgstr "Needs runtime {version}"
 #: src/scenario/pages/components/triggers.ts
 msgid "Needs the game's units"
 msgstr "Needs the game's units"
+
+#: src/content/pages/components/ReplayMapCard.tsx
+msgid "Needs the map's picture and height data."
+msgstr "Needs the map's picture and height data."
 
 #: src/content/unitFieldNotes.ts
 msgid "Negative values mean no limit."
@@ -26328,7 +26353,7 @@ msgstr "No builder matches that."
 msgid "No buildings"
 msgstr "No buildings"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "No buildings were ordered in this replay."
 msgstr "No buildings were ordered in this replay."
 
@@ -26887,7 +26912,7 @@ msgstr "No map installed"
 msgid "No map is installed. Download one from Content first."
 msgstr "No map is installed. Download one from Content first."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 msgid "No map recorded for this replay."
 msgstr "No map recorded for this replay."
 
@@ -27074,7 +27099,7 @@ msgstr "No orders"
 msgid "No orders were given in this stretch."
 msgstr "No orders were given in this stretch."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "No orders with a place on the map were given in this replay."
 msgstr "No orders with a place on the map were given in this replay."
 
@@ -27601,7 +27626,7 @@ msgstr "No such loadout."
 msgid "no target given"
 msgstr "no target given"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "no team"
 msgstr "no team"
 
@@ -29600,12 +29625,12 @@ msgstr "Opened from a file"
 msgid "Opened the remixed replay — use Watch to run it."
 msgstr "Opened the remixed replay — use Watch to run it."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "opened with {opening}"
 msgstr "opened with {opening}"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Opened with {opening}"
 msgstr "Opened with {opening}"
 
@@ -29775,11 +29800,11 @@ msgid "Order acknowledged sound"
 msgstr "Order acknowledged sound"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Order density"
 msgstr "Order density"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Order density shows where orders were aimed, which is roughly where attention went."
 msgstr "Order density shows where orders were aimed, which is roughly where attention went."
 
@@ -29820,7 +29845,7 @@ msgstr "Orders a skirmish AI gave. This is an AI's rate and is not comparable wi
 msgid "Orders a widget on the player's machine sent to named units. The engine's actions per minute does not count these, and a widget can send thousands a minute."
 msgstr "Orders a widget on the player's machine sent to named units. The engine's actions per minute does not count these, and a widget can send thousands a minute."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 
@@ -29837,7 +29862,7 @@ msgstr "Orders given and events"
 msgid "Orders given in each {0} second stretch, shown as a rate per minute."
 msgstr "Orders given in each {0} second stretch, shown as a rate per minute."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "orders on the map"
 msgstr "orders on the map"
 
@@ -30978,7 +31003,7 @@ msgstr "Player {player}"
 msgid "Player {playerNumber}"
 msgstr "Player {playerNumber}"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "player {slot}"
 msgstr "player {slot}"
 
@@ -31106,7 +31131,7 @@ msgstr "Playtime"
 msgid "PNG image"
 msgstr "PNG image"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
 msgstr "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
 
@@ -32179,7 +32204,7 @@ msgid "Reading and sending your maps"
 msgstr "Reading and sending your maps"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Reading build orders…"
 msgstr "Reading build orders…"
 
@@ -32237,7 +32262,7 @@ msgid "Reading maps…"
 msgstr "Reading maps…"
 
 #: src/content/pages/components/CommandRateChart.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Reading orders…"
 msgstr "Reading orders…"
 
@@ -32319,7 +32344,7 @@ msgstr "Reading the module's meshes."
 msgid "Reading the rapid index…"
 msgstr "Reading the rapid index…"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 msgid "Reading the recorded track."
 msgstr "Reading the recorded track."
 
@@ -32382,7 +32407,7 @@ msgstr "Reading unit definitions…"
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Reading unit names…"
 msgstr "Reading unit names…"
 
@@ -32593,7 +32618,7 @@ msgstr "Recorded events"
 msgid "Recorded for rewind. The track takes {size}."
 msgstr "Recorded for rewind. The track takes {size}."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Recorded match"
 msgstr "Recorded match"
 
@@ -37672,16 +37697,16 @@ msgstr "Start again"
 msgid "Start anyway"
 msgstr "Start anyway"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #: src/startbox/StartBoxControls.tsx
 msgid "Start boxes"
 msgstr "Start boxes"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Start boxes come from the match setup."
 msgstr "Start boxes come from the match setup."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Start boxes per team."
 msgstr "Start boxes per team."
 
@@ -37768,12 +37793,12 @@ msgstr "Start position {position} (unclaimed)"
 msgid "start position {startPosition}"
 msgstr "start position {startPosition}"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Start position of {says}"
 msgstr "Start position of {says}"
 
 #: src/content/pages/components/MapRecords.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/play/presetParts.ts
 #: src/startbox/StartPosCard.tsx
@@ -37876,11 +37901,11 @@ msgstr "Starting territory"
 msgid "Starting the engine"
 msgstr "Starting the engine"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Starting unit deaths"
 msgstr "Starting unit deaths"
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Starting unit paths"
 msgstr "Starting unit paths"
 
@@ -39056,6 +39081,10 @@ msgstr "The <0>mapcompile</0> sidecar was not found. Bundle SpringMapConvNG or s
 msgid "The <0>mapdecompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPDECOMPILE_SIDECAR</1>."
 msgstr "The <0>mapdecompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPDECOMPILE_SIDECAR</1>."
 
+#: src/content/pages/components/ReplayMap3D.tsx
+msgid "the 3D map"
+msgstr "the 3D map"
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "The addresses the server gives players for the battles they host."
 msgstr "The addresses the server gives players for the battles they host."
@@ -39137,7 +39166,7 @@ msgid "The briefing backdrop: a horizontally-tiling image, a looping muted video
 msgstr "The briefing backdrop: a horizontally-tiling image, a looping muted video, the mission's map as a full-screen spinning 3D preview, or one of the game's units turning on the spot."
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "The build orders could not be read from this replay."
 msgstr "The build orders could not be read from this replay."
 
@@ -40262,7 +40291,7 @@ msgstr "The instructions those bytes hold."
 msgid "The join form opens filled in. Nothing connects until you press Join in it."
 msgstr "The join form opens filled in. Nothing connects until you press Join in it."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The keys work while focus is in the map or the timeline."
 msgstr "The keys work while focus is in the map or the timeline."
 
@@ -40363,7 +40392,7 @@ msgstr "The low-resolution overview image players see in the lobby and the in-ga
 msgid "The lowest foot or wheel is {height} elmos above the ground."
 msgstr "The lowest foot or wheel is {height} elmos above the ground."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #: src/multiplayer/battle/contentBlock.ts
 msgid "the map"
 msgstr "the map"
@@ -40646,7 +40675,7 @@ msgid "The options for {subject} are not available, so this cannot be compared w
 msgstr "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
 
 #: src/content/pages/components/CommandRateChart.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "The orders could not be read from this replay."
 msgstr "The orders could not be read from this replay."
 
@@ -40772,27 +40801,27 @@ msgstr "The province image has the colour {color} at pixel {x}, {y} (counted fro
 msgid "The recorded events are deleted. The replay is not touched, and it can be analysed again."
 msgstr "The recorded events are deleted. The replay is not touched, and it can be analysed again."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "the recorded match"
 msgstr "the recorded match"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The recorded track could not be read. {reason}."
 msgstr "The recorded track could not be read. {reason}."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The recorded track could not be read. It has no window {windowIndex}."
 msgstr "The recorded track could not be read. It has no window {windowIndex}."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 msgid "The recorded track does not say how large the map is, so it is not shown."
 msgstr "The recorded track does not say how large the map is, so it is not shown."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The recorded track is no longer on this computer."
 msgstr "The recorded track is no longer on this computer."
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The recorded track is not shown: its {field} is {found} and this version of coilbox reads {expected}."
 msgstr "The recorded track is not shown: its {field} is {found} and this version of coilbox reads {expected}."
 
@@ -41225,6 +41254,10 @@ msgstr "The surround heightmap \"{file}\" is {wideWidth} by {wideHeight} pixels 
 msgid "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. It must be {wantWidth} by {wantHeight} to reach as far as the surround heightmap."
 msgstr "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. It must be {wantWidth} by {wantHeight} to reach as far as the surround heightmap."
 
+#: src/content/pages/components/ReplayMap3D.tsx
+msgid "The terrain comes from the map's own height data."
+msgstr "The terrain comes from the map's own height data."
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr "The test mutator brings {conditionCount} conditions and {actionCount} actions"
@@ -41273,7 +41306,7 @@ msgstr "the track cannot be read: {message}"
 msgid "the track file failed: {message}"
 msgstr "the track file failed: {message}"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The track has to be recorded again before the match can be shown here."
 msgstr "The track has to be recorded again before the match can be shown here."
 
@@ -41281,7 +41314,7 @@ msgstr "The track has to be recorded again before the match can be shown here."
 msgid "the track in this replay's place is for another game"
 msgstr "the track in this replay's place is for another game"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "The track stored for this replay belongs to another match, so it is not shown."
 msgstr "The track stored for this replay belongs to another match, so it is not shown."
 
@@ -41441,7 +41474,7 @@ msgstr "The units of {gameName} could not be read, so each event shows its unit 
 msgid "The units of {gameName} could not be read, so each order shows the unit definition id the replay recorded."
 msgstr "The units of {gameName} could not be read, so each order shows the unit definition id the replay recorded."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "The units of this replay's game could not be read, so every mark is the same shape."
 msgstr "The units of this replay's game could not be read, so every mark is the same shape."
 
@@ -42333,7 +42366,7 @@ msgstr "This map's skybox is a DDS, but not a cube map, so the preview draws a s
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "This match set no start boxes."
 msgstr "This match set no start boxes."
 
@@ -42469,7 +42502,7 @@ msgstr "This page opens one model out of an archive, and it was not told which. 
 msgid "this page's map"
 msgstr "this page's map"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "This part of the match cannot be read from the track."
 msgstr "This part of the match cannot be read from the track."
 
@@ -42586,12 +42619,12 @@ msgid "This replay already has the engine's unit list."
 msgstr "This replay already has the engine's unit list."
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "This replay could not be read to the end, so later build orders may be missing."
 msgstr "This replay could not be read to the end, so later build orders may be missing."
 
 #: src/content/pages/components/CommandRateChart.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "This replay could not be read to the end, so later orders may be missing."
 msgstr "This replay could not be read to the end, so later orders may be missing."
 
@@ -42665,7 +42698,7 @@ msgstr "This replay is shorter than one {periodSec} second period, so there is n
 msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 msgstr "This replay needs engine {version}, which is not installed and cannot be downloaded here."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "This replay recorded no start positions."
 msgstr "This replay recorded no start positions."
 
@@ -42688,7 +42721,7 @@ msgstr "This replay was played on {recorded}, which is not installed. Unit names
 msgid "This replay was played on {recordedGame}, which is not installed. Costs and kinds come from {installedGame}, a different build, and may be wrong."
 msgstr "This replay was played on {recordedGame}, which is not installed. Costs and kinds come from {installedGame}, a different build, and may be wrong."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "This replay was played on {recordedGame}, which is not installed. Shapes come from {differentBuildName}, a different build, and may be wrong."
 msgstr "This replay was played on {recordedGame}, which is not installed. Shapes come from {differentBuildName}, a different build, and may be wrong."
 
@@ -42719,7 +42752,7 @@ msgstr "This replay's game and map aren't installed. Download them below first."
 msgid "This replay's game is not installed, so every mark is the same shape."
 msgstr "This replay's game is not installed, so every mark is the same shape."
 
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 msgid "This replay's game is not installed, so nothing says what each building is for and every mark is the same shape."
 msgstr "This replay's game is not installed, so nothing says what each building is for and every mark is the same shape."
 
@@ -44312,6 +44345,7 @@ msgstr "Unit volume"
 #: src/content/index.ts
 #: src/content/matchStats.ts
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayMapCard.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/scenario/triggerTypes.ts
@@ -44391,7 +44425,7 @@ msgstr "Units made"
 msgid "units matching \"{query}\""
 msgstr "units matching \"{query}\""
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Units on {mapName} at the chosen time"
 msgstr "Units on {mapName} at the chosen time"
 
@@ -44490,7 +44524,7 @@ msgstr "Unknown size"
 msgid "unknown type"
 msgstr "unknown type"
 
-#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 msgid "unknown unit"
 msgstr "unknown unit"
 
@@ -45880,7 +45914,7 @@ msgid "When you join a battle whose game or map you don't have, start the downlo
 msgstr "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
 
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Where buildings were ordered"
 msgstr "Where buildings were ordered"
 
@@ -45933,7 +45967,7 @@ msgid "Where metal was lost"
 msgstr "Where metal was lost"
 
 #: src/content/pages/components/MapAggregate.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapRail.tsx
 msgid "Where orders were aimed"
 msgstr "Where orders were aimed"
 
@@ -46787,7 +46821,7 @@ msgid "Yesterday"
 msgstr "Yesterday"
 
 #: src/blueprint/pages/components/EquivalentsPanel.tsx
-#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapHeat.tsx
 #: src/multiplayer/chat/PartySection.tsx
 msgid "you"
 msgstr "you"

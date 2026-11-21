@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * The time window control (#1153) on its own: its thumbs, presets and words.
- * What the window does to the map's layers is in `ReplayMap.dom.test.tsx`.
+ * What the window does to the map's layers is in `ReplayMapHeat.dom.test.tsx`.
  */
 import {
   act,

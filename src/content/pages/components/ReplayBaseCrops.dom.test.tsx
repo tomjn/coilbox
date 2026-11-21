@@ -66,7 +66,7 @@ vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
-const { ReplayMap } = await import("./ReplayMap");
+const { ReplayMapHeat } = await import("./ReplayMapHeat");
 const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 
@@ -162,13 +162,12 @@ const HEIGHTMAP = { width: 513, height: 513 };
 function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
-      <ReplayMap
+      <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
         mapName="Some Map"
         minimapUrl="data:image/png;base64,"
         heightmap={HEIGHTMAP}
-        preview={null}
       />
     </SeriesEmphasisProvider>,
   );

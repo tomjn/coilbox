@@ -80,7 +80,7 @@ vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
-const { ReplayMap } = await import("./ReplayMap");
+const { ReplayMapHeat } = await import("./ReplayMapHeat");
 const { ReplayBuildOrders } = await import("./ReplayBuildOrders");
 const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { resetReplayOrderPoints } = await import("../../replayOrderPoints");
@@ -171,13 +171,12 @@ function show(info: DemoInfo = INFO, extra?: React.ReactNode) {
   return render(
     <SeriesEmphasisProvider>
       {extra}
-      <ReplayMap
+      <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
         mapName="Some Map"
         minimapUrl="data:image/png;base64,"
         heightmap={HEIGHTMAP}
-        preview={null}
       />
     </SeriesEmphasisProvider>,
   );
@@ -595,7 +594,7 @@ describe("the time window", () => {
     };
     const view = render(
       <SeriesEmphasisProvider>
-        <ReplayMap {...props} replayPath="/replays/a.sdfz" />
+        <ReplayMapHeat {...props} replayPath="/replays/a.sdfz" />
       </SeriesEmphasisProvider>,
     );
     fireEvent.click(toggle("Building density"));
@@ -604,7 +603,7 @@ describe("the time window", () => {
     await screen.findByText(/2 of 3 orders/);
     view.rerender(
       <SeriesEmphasisProvider>
-        <ReplayMap {...props} replayPath="/replays/b.sdfz" />
+        <ReplayMapHeat {...props} replayPath="/replays/b.sdfz" />
       </SeriesEmphasisProvider>,
     );
     // Read straight after the path changed, before anything is read for it.

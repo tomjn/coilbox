@@ -6,7 +6,7 @@
  * comes. A second decode threw on a bare `%` and looked up the wrong file for
  * `%25` (#3422).
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -215,13 +215,25 @@ describe("ReplayDetailPage", () => {
     ).toBeNull();
   });
 
-  it("has the map view of a recorded track under the one section that analyses and records, and not without a track (#3807, #3962)", () => {
+  it("has one map card under the section that analyses and records, opening on Units with a recording and on Heat without (#5310)", async () => {
     const gameId = "00112233445566778899aabbccddeeff";
     FILE = "a.sdfz";
     INFO = { ...LOADED_INFO, gameId };
 
     const bare = renderAt("a.sdfz");
     expect(screen.queryByRole("region", { name: "Recorded match" })).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("radio", { name: "Heat" })
+          .getAttribute("aria-checked"),
+      ).toBe("true"),
+    );
+    expect(
+      (screen.getByRole("radio", { name: "Units" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    screen.getByRole("button", { name: "Analyse replay" });
     bare.unmount();
 
     seedReplayTracksForTests([
@@ -232,10 +244,16 @@ describe("ReplayDetailPage", () => {
     const recording = screen.getByRole("region", {
       name: "Analysis and recording",
     });
-    const view = screen.getByRole("region", { name: "Recorded match" });
+    const card = screen.getByRole("region", { name: "Map" });
     expect(
-      recording.compareDocumentPosition(view) &
+      recording.compareDocumentPosition(card) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    expect(
+      screen.getByRole("radio", { name: "Units" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(screen.queryByRole("button", { name: "Analyse replay" })).toBeNull();
+    // The map is not a second section further down the page.
+    expect(screen.getAllByRole("region", { name: "Map" })).toHaveLength(1);
   });
 });
