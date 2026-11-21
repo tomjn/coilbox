@@ -72,7 +72,7 @@ export function ReplayPanel({
       onValueChange={(next) => onTab(next as ReplayTab)}
       className="min-h-0 gap-3 xl:h-full"
     >
-      <TabsList className="max-w-full shrink-0 justify-start overflow-x-auto">
+      <TabsList className="max-w-full shrink-0 justify-start">
         {listed.map((id) => (
           <TabsTrigger key={id} value={id}>
             {names[id]}
