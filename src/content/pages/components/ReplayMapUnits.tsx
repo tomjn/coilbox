@@ -4,7 +4,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import { playerTeam } from "../../matchStats";
 import {
@@ -33,6 +33,7 @@ import { useReplayStartAreas } from "../../useReplayStartAreas";
 import { useSpawnedStarts } from "../../useSpawnedStarts";
 import { useUnitMapIcons } from "../../useUnitMapIcons";
 import { useUnitMapStyles } from "../../useUnitMapStyles";
+import { RailSwitch } from "./RailSwitch";
 import { LayerSwitches, MapHelp, ReplayMapLayout } from "./ReplayMapRail";
 import { StartAreas, StartDotMarks } from "./ReplayStartAreas";
 import { useTimelineKeys } from "./ReplayTimelineDock";
@@ -658,12 +659,12 @@ function UnitsView({
               if (next) setDrawing(next as UnitDrawing);
             }}
           >
-            <ToggleGroupItem value="icons" className="@xl:justify-start">
+            <RailSwitch value="icons">
               <Trans>Icons</Trans>
-            </ToggleGroupItem>
-            <ToggleGroupItem value="footprints" className="@xl:justify-start">
+            </RailSwitch>
+            <RailSwitch value="footprints">
               <Trans>Footprints</Trans>
-            </ToggleGroupItem>
+            </RailSwitch>
           </ToggleGroup>
           <ToggleGroup
             type="multiple"
@@ -677,9 +678,9 @@ function UnitsView({
               setExplosions(picked.includes("explosions"))
             }
           >
-            <ToggleGroupItem value="explosions" className="@xl:justify-start">
+            <RailSwitch value="explosions">
               <Trans>Explosions</Trans>
-            </ToggleGroupItem>
+            </RailSwitch>
           </ToggleGroup>
           {layers.layersShown ? (
             <div data-map-controls className="flex flex-col gap-3">

@@ -83,8 +83,8 @@ describe("the ramps together", () => {
 
   it("draw a legend bar in the layer's own ramp", () => {
     expect(heatGradientCss("orders")).not.toBe(heatGradientCss("buildings"));
-    expect(heatGradientCss("orders")).toContain("rgba(0, 120, 143, 0.30) 0%");
-    expect(heatGradientCss("deaths")).toContain("rgba(122, 59, 0, 0.30) 0%");
+    expect(heatGradientCss("orders")).toContain("rgba(0, 120, 143, 0.50) 0%");
+    expect(heatGradientCss("deaths")).toContain("rgba(122, 59, 0, 0.50) 0%");
   });
 
   it("paint the same density in different colours", () => {

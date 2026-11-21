@@ -19,6 +19,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { HEAT_EDGE_CLASS } from "@/lib/heatCanvas";
 import type {
   BuildOrder,
   DemoBuildOrders,
@@ -315,6 +316,45 @@ describe("the toggles", () => {
     expect(toggle("Start boxes").dataset.state).toBe("off");
     expect(boxes()).toHaveLength(0);
   });
+
+  it("show that a layer is on with a ticked box and a border, and not with a fill alone (#5357)", () => {
+    show();
+    const on = toggle("Start boxes");
+    const off = toggle("Building density");
+    expect(on.dataset.state).toBe("on");
+    expect(off.dataset.state).toBe("off");
+    // Every switch has the box, on or off, so its name does not move.
+    for (const button of [on, off])
+      expect(button.querySelector("span[aria-hidden]")).not.toBeNull();
+    expect(on.className).toContain("data-[state=on]:border-primary");
+    expect(on.className).toContain("data-[state=on]:bg-primary/20");
+    expect(on.querySelector("span[aria-hidden]")?.className).toContain(
+      "group-data-[state=on]/switch:bg-primary",
+    );
+  });
+});
+
+describe("the rail's room (#5357)", () => {
+  it("holds every switch and note in one box that is no taller than the map may be, wraps nothing past its width and scrolls the rest", () => {
+    show();
+    const rail = document.querySelector("[data-map-rail]") as HTMLElement;
+    // The cap is the one the map has, so the card is never taller than a map.
+    expect(rail.style.getPropertyValue("--rail-max-height")).toBe(
+      "max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem)",
+    );
+    for (const cls of [
+      "@xl:max-h-(--rail-max-height)",
+      "@xl:overflow-y-auto",
+      "@xl:overflow-x-hidden",
+    ])
+      expect(rail.className).toContain(cls);
+    expect(
+      rail.contains(screen.getByRole("toolbar", { name: "Map layers" })),
+    ).toBe(true);
+    expect(
+      rail.contains(screen.getByRole("button", { name: "Start boxes" })),
+    ).toBe(true);
+  });
 });
 
 describe("a replay with nothing to draw", () => {
@@ -421,6 +461,17 @@ describe("building density", () => {
     expect(screen.getByText("Where buildings were ordered")).toBeTruthy();
     expect(screen.getByText("Least")).toBeTruthy();
     expect(document.querySelector('[data-layer="density"]')).toBeTruthy();
+  });
+
+  it("edges the heat in dark, so a pale end of the ramp shows on pale ground (#5357)", async () => {
+    ORDERS = PLACED;
+    show();
+    fireEvent.click(toggle("Building density"));
+    await screen.findByText("Where buildings were ordered");
+    const layer = document.querySelector(
+      '[data-layer="density"]',
+    ) as HTMLElement;
+    expect(layer.className).toContain(HEAT_EDGE_CLASS);
   });
 
   it("draws no legend and no layer when there is nothing to add up", async () => {

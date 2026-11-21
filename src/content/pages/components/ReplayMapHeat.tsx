@@ -1,7 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { useEffect, useMemo, useRef } from "react";
-import { drawHeatField } from "@/lib/heatCanvas";
+import { drawHeatField, HEAT_EDGE_CLASS } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { DemoInfo } from "../../bindings";
 import {
@@ -272,14 +272,20 @@ export function ReplayMapHeat({
             <canvas
               ref={orderHeatRef}
               data-layer="orderDensity"
-              className="pointer-events-none absolute inset-0 size-full"
+              className={cn(
+                "pointer-events-none absolute inset-0 size-full",
+                HEAT_EDGE_CLASS,
+              )}
             />
           )}
           {field && field.peak > 0 && (
             <canvas
               ref={heatRef}
               data-layer="density"
-              className="pointer-events-none absolute inset-0 size-full"
+              className={cn(
+                "pointer-events-none absolute inset-0 size-full",
+                HEAT_EDGE_CLASS,
+              )}
             />
           )}
           {on.startBoxes && <StartAreas set={startAreas} named />}

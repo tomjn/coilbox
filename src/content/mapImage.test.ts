@@ -484,7 +484,7 @@ describe("drawMapImage", () => {
       HEAT_RAMPS.buildings.length,
     );
     expect(calls.find((c) => c[0] === "addColorStop")?.[2]).toBe(
-      "rgba(85, 30, 166, 0.30)",
+      "rgba(85, 30, 166, 0.50)",
     );
     const text = calls.filter((c) => c[0] === "fillText").map((c) => c[1]);
     expect(text).toEqual(layout.lines.map((l) => l.text));

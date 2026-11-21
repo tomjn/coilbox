@@ -84,8 +84,10 @@ export const HEAT_KIND_OF_LAYER = {
  * Opacity rises with density, so a quiet area lets the map show through and a
  * hotspot covers it. Both ends are display choices with no measurement behind
  * them. The top stops short of 1 so the relief under a hotspot is still there.
+ * The bottom was 0.3, which left the outer part of a blob too faint to tell
+ * from a tan map (#5357).
  */
-export const HEAT_ALPHA_MIN = 0.3;
+export const HEAT_ALPHA_MIN = 0.5;
 export const HEAT_ALPHA_MAX = 0.9;
 
 /**
