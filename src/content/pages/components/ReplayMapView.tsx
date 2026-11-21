@@ -3,14 +3,13 @@ import { useLingui as useLocale } from "@lingui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import { useUnitsyncMinimap } from "../../config";
 import {
   ANALYSIS_ACTION_ATTRIBUTE,
   ANALYSIS_SECTION_ID,
 } from "../../replayAnalysis";
-import type { ReplayWatch } from "../../replayEngine";
 import type { ReplayClock } from "../../replayMapView/clock";
 import {
   createMapView,
@@ -19,19 +18,12 @@ import {
 } from "../../replayMapView/loop";
 import { teamStyles } from "../../replayMapView/paint";
 import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
-import type { MarkGroup } from "../../replayMapView/timelineMarks";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { useReplayTrack } from "../../replayTrack";
 import { useStoredTracks } from "../../replayTracks";
 import { EnsureMatchClock, useMatchClock } from "../../useMatchClock";
-import { useReplayTimelineMarks } from "../../useReplayTimelineMarks";
-import { OpenInEngineButton } from "./OpenInEngineButton";
-import {
-  performAction,
-  ReplayPlaybackBar,
-  timelineKeyHandler,
-} from "./ReplayPlaybackBar";
+import { useTimelineKeys } from "./ReplayTimelineDock";
 import { SectionHelp } from "./SectionHelp";
 
 /** Said under the analysis and recording section, which has already said the
@@ -59,30 +51,18 @@ interface Named {
  * again.
  *
  * The time comes from the page's match clock (#5305), and this section gives
- * it the track's range. The timeline under the map (#3808) moves it, and the
- * view draws whatever the clock says.
+ * it the track's range. The timeline dock (#5306) moves it, and the view draws
+ * whatever the clock says.
  */
 export function ReplayMapViewSection({
   info,
   enginePath,
   dataDir,
-  replayPath,
-  watch,
-  dependencyBlock,
-  game,
 }: {
   info: DemoInfo;
-  /** The replay file, whose chat and leavers are marks on the timeline. */
-  replayPath: string;
   /** For the map's picture. Without them the units are on plain ground. */
   enginePath: string | undefined;
   dataDir: string | undefined;
-  /** The page's engine decision, for the button that opens the engine. */
-  watch: ReplayWatch;
-  /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
-  dependencyBlock: string | null;
-  /** Another installed version of the replay's game, when its own is missing. */
-  game?: string;
 }) {
   const tracks = useStoredTracks();
   // A remix carries its original's game id and has no track of its own.
@@ -119,11 +99,6 @@ export function ReplayMapViewSection({
           track.handle.header.mapSize[1] > 0 ? (
             <EnsureMatchClock durationSec={info.durationSec}>
               <RecordedMatch
-                info={info}
-                replayPath={replayPath}
-                watch={watch}
-                dependencyBlock={dependencyBlock}
-                game={game}
                 handle={track.handle}
                 mapName={info.mapName}
                 minimapUrl={minimap.url}
@@ -233,13 +208,16 @@ function Legend({ header }: { header: ReplayTrackHeader }) {
       </p>
       <p>
         <Trans>
-          Under the map, the knob sets the time and the buttons play the match
-          forward or in reverse, at the speed beside them. A tall bar is a unit
-          destroyed, a dot is chat and a diamond is a player leaving, taken from
-          the replay and its analysis. Marks that would touch are drawn as one,
-          larger, and clicking it goes to the earliest event in it. A replay
-          that has not been analysed has no kills. The address holds the time,
-          so a link opens at that moment.
+          In the timeline at the bottom of the page, the knob sets the time and
+          the buttons play the match forward or in reverse, at the speed beside
+          them. A tall bar is a unit destroyed, a dot is a chat line and a
+          diamond is a player joining, pausing, resigning, giving everything
+          away, leaving or a team dying, taken from the replay and its analysis.
+          A chat dot is green for allies, blue for spectators, violet for
+          whispers and hollow for the system. Marks that would touch are drawn
+          as one, larger, and clicking it goes to the earliest event in it. A
+          replay that has not been analysed has no kills. The address holds the
+          time, so a link opens at that moment.
         </Trans>
       </p>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
@@ -280,37 +258,29 @@ function ownerWords(header: ReplayTrackHeader, teamId: number): string {
 }
 
 /**
- * The map, the canvas over it, and the timeline that sets the time.
+ * The map and the canvas over it. The timeline dock at the bottom of the page
+ * sets the time.
  *
  * The time is the page's match clock, which keeps it in the address as
  * `?frame=`. A link opens at that frame, held inside the match. The address is
  * replaced, never added to, and only when playing stops or a seek ends.
  *
- * Keys act while focus is anywhere in here and nowhere else. A text field, and
- * a control that keeps a key for itself, keep it.
+ * Keys act while focus is anywhere in here, and in the dock, and nowhere else.
+ * A text field, and a control that keeps a key for itself, keep it.
  */
 function RecordedMatch({
-  info,
-  replayPath,
-  watch,
-  dependencyBlock,
-  game,
   handle,
   mapName,
   minimapUrl,
 }: {
-  info: DemoInfo;
-  replayPath: string;
-  watch: ReplayWatch;
-  dependencyBlock: string | null;
-  game?: string;
   handle: ReplayTrackHandle;
   mapName: string;
   minimapUrl: string | null;
 }) {
   const { t: tr } = useLingui();
   const { header } = handle;
-  const { clock, playback, range, adoptTrack } = useMatchClock();
+  const { clock, range, adoptTrack } = useMatchClock();
+  const keys = useTimelineKeys();
   // The track's header is the page's range while the match is shown here.
   const { firstFrame, lastFrame, framesPerSecond } = header;
   useLayoutEffect(
@@ -323,33 +293,14 @@ function RecordedMatch({
     range.lastFrame === lastFrame &&
     range.framesPerSecond === framesPerSecond;
 
-  const marks = useReplayTimelineMarks(info, replayPath);
-  const groupsRef = useRef<readonly MarkGroup[]>([]);
-  const [status, setStatus] = useState<MapViewStatus>({ kind: "ready" });
-
-  const onKeyDown = useMemo(
-    () =>
-      adopted
-        ? timelineKeyHandler((action) =>
-            performAction(action, {
-              playback,
-              clock,
-              header,
-              groups: groupsRef.current,
-            }),
-          )
-        : undefined,
-    [adopted, playback, clock, header],
-  );
-
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a box that holds the map and the bar, which a fieldset would restyle.
+    // biome-ignore lint/a11y/useSemanticElements: a box that holds the map, which a fieldset would restyle.
     <div
       role="group"
       aria-label={tr`Recorded match`}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: the one place keyboard focus lands to use the timeline's keys on the map and the bar together.
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: where keyboard focus lands to use the timeline's keys on the map.
       tabIndex={0}
-      onKeyDown={onKeyDown}
+      onKeyDown={adopted ? keys?.onKeyDown : undefined}
       className="flex flex-col gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {adopted && (
@@ -358,35 +309,7 @@ function RecordedMatch({
           clock={clock}
           mapName={mapName}
           minimapUrl={minimapUrl}
-          onStatus={setStatus}
         />
-      )}
-      {onKeyDown && (
-        <div
-          style={{
-            width: `min(100%, 44rem, 70vh * ${header.mapSize[0]} / ${header.mapSize[1]})`,
-          }}
-        >
-          <ReplayPlaybackBar
-            header={header}
-            clock={clock}
-            playback={playback}
-            marks={marks}
-            groupsRef={groupsRef}
-            loading={status.kind === "loading"}
-            onKeyDown={onKeyDown}
-          />
-          <div className="mt-2 flex justify-end">
-            <OpenInEngineButton
-              replayPath={replayPath}
-              engineVersion={info.engineVersion}
-              watch={watch}
-              dependencyBlock={dependencyBlock}
-              game={game}
-              clock={clock}
-            />
-          </div>
-        </div>
       )}
       {!minimapUrl && (
         <p className="text-xs text-muted-foreground">
@@ -413,14 +336,11 @@ function RecordedMatchCanvas({
   clock,
   mapName,
   minimapUrl,
-  onStatus,
 }: {
   handle: ReplayTrackHandle;
   clock: ReplayClock;
   mapName: string;
   minimapUrl: string | null;
-  /** Tells the timeline when the picture is waiting for a window. */
-  onStatus: (status: MapViewStatus) => void;
 }) {
   const { t: tr } = useLingui();
   const { header } = handle;
@@ -430,8 +350,6 @@ function RecordedMatchCanvas({
   const countsRef = useRef<HTMLParagraphElement | null>(null);
   const viewRef = useRef<MapView | null>(null);
   const [status, setStatus] = useState<MapViewStatus>({ kind: "ready" });
-  const onStatusRef = useRef(onStatus);
-  onStatusRef.current = onStatus;
   const [pointed, setPointed] = useState<Named | null>(null);
   const [chosen, setChosen] = useState<Named | null>(null);
 
@@ -462,10 +380,7 @@ function RecordedMatchCanvas({
         requestFrame: (callback) => requestAnimationFrame(callback),
         cancelFrame: (id) => cancelAnimationFrame(id),
       },
-      onStatus: (next) => {
-        setStatus(next);
-        onStatusRef.current(next);
-      },
+      onStatus: setStatus,
       onPainted: (_frame, counts) => {
         if (!countsRef.current) return;
         countsRef.current.textContent = [

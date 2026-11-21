@@ -95,6 +95,9 @@ vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
 vi.mock("./components/MatchStatsSection", () => ({
   MatchStatsSection: () => null,
 }));
+vi.mock("./components/OpenInEngineButton", () => ({
+  OpenInEngineButton: () => null,
+}));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
 vi.mock("./components/ReplayBuildOrders", () => ({

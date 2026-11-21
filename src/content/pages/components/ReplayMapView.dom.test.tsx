@@ -16,6 +16,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +53,9 @@ const HEADER = fixture.header as ReplayTrackHeader;
 /** What reading the header answers: the header, or a fault. */
 let HEADER_ANSWER: ReplayTrackHeader | ReplayTrackFault = HEADER;
 const headerReads: string[] = [];
+/** Holds the header read back until a test lets it go. */
+let HELD_HEADER = false;
+const headerReleases: (() => void)[] = [];
 /** Windows that are held back until the test lets them go, or fails them. */
 let HELD: Set<number> = new Set();
 const held: {
@@ -71,6 +75,9 @@ function fixtureWindow(k: number): TrackWindow {
 vi.mock("../../replayTrack/commands", () => ({
   readTrackHeader: async (gameId: string) => {
     headerReads.push(gameId);
+    if (HELD_HEADER) {
+      await new Promise<void>((resolve) => headerReleases.push(resolve));
+    }
     if ("kind" in HEADER_ANSWER) throw new ReplayTrackError(HEADER_ANSWER);
     return HEADER_ANSWER;
   },
@@ -141,6 +148,9 @@ vi.mock("../../../play/config", () => ({
 }));
 
 const { ReplayMapViewSection } = await import("./ReplayMapView");
+const { ReplayTimelineDock, TimelineKeysProvider } = await import(
+  "./ReplayTimelineDock"
+);
 const { MatchClockProvider, useMatchClock, useMatchFrame, useSettledFrame } =
   await import("../../useMatchClock");
 const { ANALYSIS_ACTION_ATTRIBUTE, ANALYSIS_SECTION_ID } = await import(
@@ -152,6 +162,8 @@ const info = {
   mapName: "Test Map",
   remixed: false,
   engineVersion: "105.1.1-2511-g4d1de6d",
+  // The fixture track is 150 frames, which is 5 seconds.
+  durationSec: 5,
 } as unknown as DemoInfo;
 
 const track = (state: StoredReplayTrack["state"]): StoredReplayTrack => ({
@@ -202,6 +214,8 @@ beforeEach(() => {
   HELD = new Set();
   held.length = 0;
   headerReads.length = 0;
+  HELD_HEADER = false;
+  headerReleases.length = 0;
   MINIMAP = "asset://minimap.png";
   hidden = false;
   onScreen = undefined;
@@ -277,22 +291,47 @@ async function settle() {
 /** Every navigation the router made, to tell a replace from a push. */
 const navigations: { action: string; search: string }[] = [];
 
-function mount(url: string, remixed = false) {
+/**
+ * The page as the replay page has it: one match clock and one set of keys over
+ * the map and the dock, which sits under it.
+ */
+function Page({
+  remixed = false,
+  durationSec = 5,
+  children,
+}: {
+  remixed?: boolean;
+  durationSec?: number;
+  children?: React.ReactNode;
+}) {
+  const shown = { ...info, remixed } as DemoInfo;
+  return (
+    <MatchClockProvider durationSec={durationSec}>
+      <TimelineKeysProvider>
+        <ReplayMapViewSection
+          info={shown}
+          enginePath="/engine"
+          dataDir="/data"
+        />
+        <ReplayTimelineDock
+          info={shown}
+          replayPath="/replays/a.sdfz"
+          watch={WATCH}
+          dependencyBlock={BLOCK}
+          game={GAME}
+        />
+        {children}
+      </TimelineKeysProvider>
+    </MatchClockProvider>
+  );
+}
+
+function mount(url: string, remixed = false, durationSec = 5) {
   const router = createMemoryRouter(
     [
       {
         path: "*",
-        element: (
-          <ReplayMapViewSection
-            info={{ ...info, remixed } as DemoInfo}
-            enginePath="/engine"
-            dataDir="/data"
-            replayPath="/replays/a.sdfz"
-            watch={WATCH}
-            dependencyBlock={BLOCK}
-            game={GAME}
-          />
-        ),
+        element: <Page remixed={remixed} durationSec={durationSec} />,
       },
     ],
     { initialEntries: [url] },
@@ -329,17 +368,19 @@ const canvas = () =>
   document.querySelector("canvas[data-layer='recorded-units']") as HTMLElement;
 
 describe("when there is nothing to draw", () => {
-  it("shows nothing for a replay with no track", async () => {
-    const { container } = await show(null);
-    expect(container.innerHTML).toBe("");
+  it("shows no map for a replay with no track", async () => {
+    await show(null);
+    expect(screen.queryByRole("group", { name: "Recorded match" })).toBeNull();
+    expect(screen.queryByText("Recorded match")).toBeNull();
     expect(headerReads).toEqual([]);
   });
 
-  it("shows nothing for a remix, which has no track of its own", async () => {
+  it("shows no map for a remix, which has no track of its own", async () => {
     seedReplayTracksForTests([track("current")]);
-    const { container } = mount("/replay", true);
+    mount("/replay", true);
     await settle();
-    expect(container.innerHTML).toBe("");
+    expect(screen.queryByRole("group", { name: "Recorded match" })).toBeNull();
+    expect(headerReads).toEqual([]);
   });
 
   it("says a stale track is not shown, does not read it, and leads to the button that records", async () => {
@@ -736,9 +777,9 @@ describe("opening a link with a time", () => {
     expect(clockFrame()).toBe(frame);
   });
 
-  it("does nothing for a replay with no track", async () => {
-    const { container } = await show(null, "/replay?frame=60");
-    expect(container.innerHTML).toBe("");
+  it("shows no map for a replay with no track, and leaves the address as it came", async () => {
+    await show(null, "/replay?frame=60");
+    expect(canvas()).toBeNull();
     expect(navigations).toEqual([]);
   });
 });
@@ -1040,7 +1081,7 @@ describe("the keys", () => {
   });
 });
 
-describe("marks on the bar", () => {
+describe("the lanes of the dock", () => {
   const analysed = () =>
     seedReplayAnalysisForTests({
       analyses: [
@@ -1054,7 +1095,11 @@ describe("marks on the bar", () => {
     });
   const kills = (frames: number[]) =>
     frames.map((frame) => ({ kind: "unit_destroyed", frame }));
-  const line = (frame: number, text: string) =>
+  const line = (
+    frame: number,
+    text: string,
+    over: Partial<ChatLine> = {},
+  ): ChatLine =>
     ({
       frame,
       time: 0,
@@ -1062,49 +1107,181 @@ describe("marks on the bar", () => {
       playerName: "Ann",
       text,
       system: false,
+      ...over,
     }) as unknown as ChatLine;
-  const group = (name: string) => screen.queryByRole("group", { name });
+  const event = (
+    type: string,
+    frame: number,
+    over: Record<string, unknown> = {},
+  ) =>
+    ({
+      type,
+      frame,
+      time: 0,
+      player: 1,
+      playerName: "Bot",
+      ...over,
+    }) as unknown as TimelineEvent;
+  const lane = (name: string) => screen.getByRole("group", { name });
+  /** Where a mark sits across the axis, from its left edge to the right. */
+  const leftOf = (button: HTMLElement) => Number.parseFloat(button.style.left);
+  /** A mark's centre as a share of the axis, for a frame. 1,024 pixels of axis
+   *  in columns of 8 is 128 columns over the 150 frames. */
+  const centreOf = (frame: number) =>
+    ((Math.min(127, Math.floor((frame / 150) * 128)) + 0.5) / 128) * 100;
 
-  it("has no marks and says nothing about it when the replay has no events", async () => {
-    LOGGED = kills([30, 100]);
+  it("shows all three lanes, with no marks in them, for a replay with no events", async () => {
     await show();
-    expect(group("Kills")).toBeNull();
-    expect(group("Chat")).toBeNull();
-    expect(group("Players leaving")).toBeNull();
-    expect(screen.queryByText(/analys/i)).toBeNull();
+    for (const name of ["Kills", "Chat", "Players"]) {
+      expect(lane(name).querySelectorAll("button")).toHaveLength(0);
+    }
   });
 
-  it("marks kills from the analysis, chat and players leaving from the file, in lanes of their own", async () => {
+  it("marks kills from the analysis, chat and the players from the file, each in its own lane", async () => {
     analysed();
     LOGGED = kills([100]);
     CHAT = {
       messages: [line(45, "gl hf")],
       incomplete: false,
-      events: [
-        {
-          type: "playerLeft",
-          frame: 120,
-          time: 4,
-          player: 1,
-          playerName: "Bot",
-          reason: { kind: "left" },
-        } as unknown as TimelineEvent,
-      ],
+      events: [event("playerLeft", 120, { reason: { kind: "left" } })],
     };
     await show();
     const kill = screen.getByRole("button", { name: /Unit destroyed, 0:03/ });
-    screen.getByRole("button", { name: /Chat, 0:01: Ann: gl hf/ });
-    screen.getByRole("button", { name: /Bot left the game, 0:04/ });
-    expect(group("Kills")?.contains(kill)).toBe(true);
-
-    await act(async () => {
-      fireEvent.click(kill);
+    const chat = screen.getByRole("button", {
+      name: /Everyone, 0:01: Ann: gl hf/,
     });
-    expect(clockFrame()).toBe(100);
-    expect(navigations).toEqual([{ action: "REPLACE", search: "?frame=100" }]);
+    const left = screen.getByRole("button", {
+      name: /Bot left the game, 0:04/,
+    });
+    expect(lane("Kills").contains(kill)).toBe(true);
+    expect(lane("Chat").contains(chat)).toBe(true);
+    expect(lane("Players").contains(left)).toBe(true);
   });
 
-  it("goes to a mark's event from the keyboard", async () => {
+  it("puts a mark where its frame is on the axis, and presses move the clock there", async () => {
+    analysed();
+    LOGGED = kills([30, 75, 150]);
+    await show();
+    const marks = Array.from(lane("Kills").querySelectorAll("button"));
+    expect(marks.map(leftOf)).toEqual([
+      centreOf(30),
+      centreOf(75),
+      centreOf(150),
+    ]);
+    // The middle of the match is the middle of the axis, give or take a column.
+    expect(Math.abs(leftOf(marks[1]) - 50)).toBeLessThan(100 / 128);
+
+    for (const [i, frame] of [30, 75, 150].entries()) {
+      await act(async () => {
+        fireEvent.click(marks[i]);
+      });
+      expect(clockFrame()).toBe(frame);
+    }
+    expect(navigations.at(-1)).toEqual({
+      action: "REPLACE",
+      search: "?frame=150",
+    });
+  });
+
+  it("draws chat sent before the match at the start of the axis, and says so", async () => {
+    CHAT = {
+      messages: [line(-1, "hi all"), line(60, "later")],
+      incomplete: false,
+      events: [],
+    };
+    await show("current", "/replay?frame=100");
+    const early = screen.getByRole("button", {
+      name: "Everyone, before the game: Ann: hi all",
+    });
+    expect(leftOf(early)).toBe(centreOf(0));
+    await act(async () => {
+      fireEvent.click(early);
+    });
+    expect(clockFrame()).toBe(0);
+  });
+
+  it("tells chat lines apart by colour, and names who each was sent to", async () => {
+    CHAT = {
+      messages: [
+        line(10, "all", { dest: { kind: "everyone" } }),
+        line(40, "allies", { dest: { kind: "allies" } }),
+        line(70, "spec", { dest: { kind: "spectators" } }),
+        line(100, "psst", { dest: { kind: "player", player: 1 } }),
+        line(130, "*", { system: true, player: 255, playerName: undefined }),
+      ],
+      incomplete: false,
+      events: [],
+    };
+    await show();
+    const dot = (name: RegExp) =>
+      (screen.getByRole("button", { name }).firstElementChild as HTMLElement)
+        .className;
+    const classes = [
+      dot(/^Everyone, 0:00: Ann: all/),
+      dot(/^Allies, 0:01: Ann: allies/),
+      dot(/^Spectators, 0:02: Ann: spec/),
+      dot(/^Whispers, 0:03: Ann: psst/),
+      dot(/^System, 0:04/),
+    ];
+    expect(new Set(classes).size).toBe(5);
+  });
+
+  it("holds joining, pausing, resigning, giving away, leaving and a team dying, and leaves out an action it does not name", async () => {
+    CHAT = {
+      messages: [],
+      incomplete: false,
+      events: [
+        event("joined", 10, { spectator: false }),
+        event("paused", 30, { paused: true }),
+        event("resigned", 50),
+        event("giveAway", 70),
+        event("playerLeft", 90, { reason: { kind: "kicked" } }),
+        event("teamDied", 110, { players: ["Bot"] }),
+        event("other", 130, { action: 9 }),
+      ],
+    };
+    await show();
+    const names = Array.from(lane("Players").querySelectorAll("button")).map(
+      (b) => b.getAttribute("aria-label"),
+    );
+    expect(names).toEqual([
+      "Bot joined the game, 0:00",
+      "Bot paused the game, 0:01",
+      "Bot resigned, 0:01",
+      "Bot gave away all the units of an army, 0:02",
+      "Bot was kicked, 0:03",
+      "Bot's army was eliminated, 0:03",
+    ]);
+  });
+
+  it("says the Kills lane needs the analysis, and keeps the lane, when there is none", async () => {
+    LOGGED = kills([30, 100]);
+    await show();
+    expect(lane("Kills").textContent).toBe("Needs analysis");
+    expect(lane("Kills").querySelectorAll("button")).toHaveLength(0);
+    // The other lanes do not say it.
+    expect(lane("Chat").textContent).toBe("");
+  });
+
+  it("does not say the Kills lane needs the analysis when there is one", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    await show();
+    expect(screen.queryByText("Needs analysis")).toBeNull();
+    expect(lane("Kills").querySelectorAll("button")).toHaveLength(1);
+  });
+
+  it("says why a remix has no kills of its own, and shows none", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    seedReplayTracksForTests([track("current")]);
+    mount("/replay", true);
+    await settle();
+    expect(canvas()).toBeNull();
+    expect(lane("Kills").textContent).toBe("Needs analysis");
+  });
+
+  it("goes to a mark from the keyboard", async () => {
     analysed();
     LOGGED = kills([30, 100]);
     await show();
@@ -1116,16 +1293,35 @@ describe("marks on the bar", () => {
     expect(clockFrame()).toBe(30);
   });
 
+  it("says what a mark is when the pointer is on it or the keyboard has moved to it", async () => {
+    analysed();
+    LOGGED = kills([30]);
+    CHAT = { messages: [line(100, "gg")], incomplete: false, events: [] };
+    await show();
+    const readout = () => screen.getByTestId("timeline-readout").textContent;
+    expect(readout()).toBe("");
+
+    const chat = screen.getByRole("button", { name: /gg/ });
+    fireEvent.pointerEnter(chat);
+    expect(readout()).toBe("Everyone, 0:03: Ann: gg");
+    fireEvent.pointerLeave(chat);
+    expect(readout()).toBe("");
+
+    key(view(), "]");
+    await settle();
+    expect(readout()).toBe("Unit destroyed, 0:01");
+  });
+
   it("merges marks that fall in one column into one with a count, that seeks to the earliest", async () => {
     analysed();
-    // 1,024 pixels of bar in columns of 8 is 128 columns over 150 frames, so
-    // three kills at one frame share a column and one at 140 has its own.
+    // 128 columns over 150 frames, so three kills at one frame share a column
+    // and one at 140 has its own.
     LOGGED = kills([30, 30, 30, 140]);
     await show();
     const merged = screen.getByRole("button", {
       name: "3 units destroyed from 0:01",
     });
-    expect(group("Kills")?.querySelectorAll("button")).toHaveLength(2);
+    expect(lane("Kills").querySelectorAll("button")).toHaveLength(2);
     await act(async () => {
       fireEvent.click(merged);
     });
@@ -1136,10 +1332,7 @@ describe("marks on the bar", () => {
     analysed();
     LOGGED = kills(Array.from({ length: 5000 }, (_, i) => i % 151));
     await show();
-    const buttons = Array.from(
-      group("Kills")?.querySelectorAll("button") ?? [],
-    );
-    // 1,024 pixels in columns of 8 is 128 columns.
+    const buttons = Array.from(lane("Kills").querySelectorAll("button"));
     expect(buttons.length).toBeGreaterThan(0);
     expect(buttons.length).toBeLessThanOrEqual(128);
     const counted = buttons.reduce((n, b) => {
@@ -1148,14 +1341,155 @@ describe("marks on the bar", () => {
     }, 0);
     expect(counted).toBe(5000);
   });
+});
 
-  it("leaves a remix with no kills of its own", async () => {
-    analysed();
-    LOGGED = kills([30]);
-    seedReplayTracksForTests([track("current")]);
-    mount("/replay", true);
+describe("the playhead", () => {
+  const head = () => screen.getByTestId("playhead");
+
+  it("is at the match time, on the same axis as the marks", async () => {
+    await show("current", "/replay?frame=75");
+    expect(head().style.left).toBe("50%");
+    await act(async () => {
+      hook().clock.set(150);
+    });
+    expect(head().style.left).toBe("100%");
+    await act(async () => {
+      hook().clock.set(0);
+    });
+    expect(head().style.left).toBe("0%");
+  });
+
+  it("is inside the box that holds the scrubber and every lane, and no wider", async () => {
+    await show();
+    const box = head().parentElement as HTMLElement;
+    expect(box.contains(screen.getByRole("slider"))).toBe(true);
+    for (const name of ["Kills", "Chat", "Players"]) {
+      expect(box.contains(screen.getByRole("group", { name }))).toBe(true);
+    }
+    expect(box.contains(screen.getByTestId("timeline-axis"))).toBe(false);
+  });
+});
+
+describe("the dock's place", () => {
+  it("is pinned to the bottom of the page, and reads left to right", async () => {
+    await show();
+    const dock = screen.getByRole("group", { name: "Timeline" });
+    expect(dock.className).toContain("sticky");
+    expect(dock.className).toContain("bottom-0");
+    expect(dock.getAttribute("dir")).toBe("ltr");
+  });
+
+  it("has the transport row, the scrubber, the lanes and a time axis", async () => {
+    await show();
+    const dock = within(screen.getByRole("group", { name: "Timeline" }));
+    dock.getByRole("button", { name: "Play" });
+    dock.getByRole("combobox", { name: "Playback speed" });
+    dock.getByRole("button", { name: "Open in engine" });
+    dock.getByTestId("match-clock");
+    dock.getByRole("slider", { name: "Time in the match" });
+    expect(dock.getByTestId("timeline-axis").textContent).toBe("0:00");
+  });
+});
+
+describe("a replay with no recording", () => {
+  it("still has the dock, with the scrubber and the lanes, and nothing that plays", async () => {
+    CHAT = {
+      messages: [
+        {
+          frame: 60,
+          time: 2,
+          player: 0,
+          playerName: "Ann",
+          text: "gg",
+          system: false,
+        } as unknown as ChatLine,
+      ],
+      incomplete: false,
+      events: [],
+    };
+    await show(null);
+    screen.getByRole("slider", { name: "Time in the match" });
+    for (const name of ["Kills", "Chat", "Players"]) {
+      screen.getByRole("group", { name });
+    }
+    expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Play in reverse" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("combobox", { name: "Playback speed" }),
+    ).toBeNull();
+    // The axis is the replay's duration.
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:00 / 0:05");
+    expect(screen.getByRole("group", { name: "Kills" }).textContent).toBe(
+      "Needs analysis",
+    );
+  });
+
+  it("moves the clock from a mark and from the scrubber's keys, and its play keys do nothing", async () => {
+    CHAT = {
+      messages: [
+        {
+          frame: 60,
+          time: 2,
+          player: 0,
+          playerName: "Ann",
+          text: "gg",
+          system: false,
+        } as unknown as ChatLine,
+      ],
+      incomplete: false,
+      events: [],
+    };
+    await show(null);
+    const frame = () =>
+      Math.round(
+        Number(screen.getByRole("slider").getAttribute("aria-valuenow")),
+      );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /gg/ }));
+    });
+    expect(frame()).toBe(60);
+    expect(navigations.at(-1)).toEqual({
+      action: "REPLACE",
+      search: "?frame=60",
+    });
+
+    const dock = screen.getByRole("group", { name: "Timeline" });
+    key(dock, "ArrowRight");
+    expect(frame()).toBe(90);
+    key(dock, "Home");
+    expect(frame()).toBe(0);
+    key(dock, " ");
+    key(dock, "r");
+    key(dock, "=");
     await settle();
-    expect(document.querySelector("canvas")).toBeNull();
+    expect(raf.waiting.size).toBe(0);
+    expect(frame()).toBe(0);
+  });
+
+  it("has the Open in engine button", async () => {
+    await show(null);
+    screen.getByRole("button", { name: "Open in engine" });
+  });
+});
+
+describe("the dock follows the range", () => {
+  it("takes the replay's duration until the track is read, then the track's", async () => {
+    seedReplayTracksForTests([track("current")]);
+    HELD_HEADER = true;
+    mount("/replay", false, 600);
+    await settle();
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:00 / 10:00");
+    expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
+
+    HELD_HEADER = false;
+    await act(async () => {
+      for (const release of headerReleases) release();
+    });
+    await settle();
+    expect(screen.getByTestId("match-clock").textContent).toBe("0:00 / 0:05");
+    screen.getByRole("button", { name: "Play" });
   });
 });
 
@@ -1266,9 +1600,9 @@ describe("opening the engine at the moment shown", () => {
     screen.getByText("Engine exited with code 3.");
   });
 
-  it("is not there when the track is not shown", async () => {
+  it("is there when the track is not shown, since the replay still opens", async () => {
     await show("stale");
-    expect(screen.queryByRole("button", { name: "Open in engine" })).toBeNull();
+    expect((open() as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
@@ -1298,19 +1632,10 @@ describe("the page's match clock", () => {
         {
           path: "*",
           element: (
-            <MatchClockProvider durationSec={600}>
-              <ReplayMapViewSection
-                info={info}
-                enginePath="/engine"
-                dataDir="/data"
-                replayPath="/replays/a.sdfz"
-                watch={WATCH}
-                dependencyBlock={BLOCK}
-                game={GAME}
-              />
+            <Page durationSec={600}>
               <Elsewhere />
               <Table />
-            </MatchClockProvider>
+            </Page>
           ),
         },
       ],
@@ -1352,7 +1677,7 @@ describe("the page's match clock", () => {
     expect(navigations).toEqual([]);
   });
 
-  it("shows a seek through the playback bar to another section", async () => {
+  it("shows a seek through the dock to another section", async () => {
     await showInPage();
     fireEvent.pointerDown(knobRoot(), { clientX: 0, pointerId: 1, button: 0 });
     fireEvent.pointerMove(knobRoot(), { clientX: 512, pointerId: 1 });

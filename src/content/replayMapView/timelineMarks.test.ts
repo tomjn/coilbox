@@ -52,10 +52,45 @@ describe("grouping marks", () => {
     expect(group.column).toBe(99);
   });
 
-  it("leaves out an event outside the track", () => {
-    expect(
-      groupMarks([mark("chat", -1), mark("kills", 1001)], RANGE, 100),
-    ).toEqual([]);
+  it("holds an event outside the axis to the nearer end, so chat sent before the match is at the start", () => {
+    const groups = groupMarks(
+      [mark("chat", -1), mark("kills", 1001)],
+      RANGE,
+      100,
+    );
+    expect(groups.map((g) => [g.lane, g.column, g.frame, g.before])).toEqual([
+      ["chat", 0, 0, true],
+      ["kills", 99, 1000, false],
+    ]);
+  });
+
+  it("says a group whose earliest event came before the axis did", () => {
+    const [group] = groupMarks(
+      [mark("chat", 3), mark("chat", -1), mark("chat", 5)],
+      RANGE,
+      100,
+    );
+    expect(group).toMatchObject({ frame: 0, count: 3, before: true });
+  });
+
+  it("keeps the kind the events share, and drops it when they differ", () => {
+    const kind = (frame: number, k: string): PlacedMark => ({
+      lane: "chat",
+      frame,
+      kind: k,
+    });
+    const [same] = groupMarks(
+      [kind(1, "allies"), kind(2, "allies")],
+      RANGE,
+      100,
+    );
+    expect(same.kind).toBe("allies");
+    const [mixed] = groupMarks(
+      [kind(1, "allies"), kind(2, "whisper"), kind(3, "allies")],
+      RANGE,
+      100,
+    );
+    expect(mixed.kind).toBeUndefined();
   });
 
   it("makes no marks when there are no events", () => {

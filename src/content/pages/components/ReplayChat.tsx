@@ -3,18 +3,11 @@ import { useLingui as useLocale } from "@lingui/react";
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, MessageSquare } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { formatDuration } from "@/lib/format";
-import type { ChatDest, ChatLine, ReplayPlayer } from "../../bindings";
+import type { ChatDest, ChatLine } from "../../bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "../../chatClock";
-import {
-  playerTeams,
-  timelineDomain,
-  toEventMarks,
-  toMarks,
-} from "../../replayTimeline";
 import { useReplayChat } from "../../useReplayChat";
-import { ReplayTimeline } from "./ReplayTimeline";
 import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
 
@@ -52,40 +45,19 @@ function destLabel(
 }
 
 /** The chat lines, one row each with match time, sender and destination. */
-export function ChatLines({
-  messages,
-  highlight = null,
-}: {
-  messages: ChatLine[];
-  /** The line to scroll to and mark, from the timeline. */
-  highlight?: number | null;
-}) {
+export function ChatLines({ messages }: { messages: ChatLine[] }) {
   useLocale();
-  const list = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    if (highlight === null) return;
-    list.current
-      ?.querySelector(`[data-line="${highlight}"]`)
-      ?.scrollIntoView?.({ block: "nearest" });
-  }, [highlight]);
   const names = new Map<number, string>();
   for (const m of messages) {
     if (m.playerName) names.set(m.player, m.playerName);
   }
   return (
-    <ul
-      ref={list}
-      className="flex max-h-96 flex-col gap-1 overflow-y-auto rounded-lg border border-border/50 bg-card p-3 text-sm"
-    >
+    <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto rounded-lg border border-border/50 bg-card p-3 text-sm">
       {messages.map((m, i) => {
         const dest = destLabel(m.dest, names);
         const key = `${i}-${m.frame}-${m.text}`;
         return (
-          <li
-            key={key}
-            data-line={i}
-            className={`break-words ${i === highlight ? "rounded bg-accent" : ""}`}
-          >
+          <li key={key} className="break-words">
             <span className="mr-1.5 tabular-nums text-xs text-muted-foreground">
               {chatTime(m.frame)}
             </span>
@@ -109,146 +81,65 @@ export function ChatLines({
   );
 }
 
-/** One line as plain text, for the timeline's readout. */
-function describeLine(line: ChatLine, names: Map<number, string>): string {
-  const dest = destLabel(line.dest, names);
-  const who = senderName(line.player, line.playerName, line.system);
-  return `${chatTime(line.frame)} ${who}${dest ? ` ${dest}` : ""} ${line.text}`;
-}
-
 /**
- * The replay's in-demo chat: a timeline along the match, and the log under it.
- * The lines are read once when the replay is shown, for both. The log's list
- * opens on a button, or at a line when its mark on the timeline is selected.
+ * The replay's in-demo chat log. The lines are read once when the replay is
+ * shown. The list opens on a button. The chat along the match is a lane of the
+ * timeline dock, which reads the same lines.
  */
-export function ReplayChat({
-  replayPath,
-  durationSec = 0,
-  players,
-}: {
-  replayPath: string;
-  durationSec?: number;
-  /** The replay's seats, which tie a chat mark to its team on the emphasis. */
-  players?: ReplayPlayer[];
-}) {
+export function ReplayChat({ replayPath }: { replayPath: string }) {
   useLocale();
-  const { loading, failed, messages, incomplete, events } =
-    useReplayChat(replayPath);
+  const { loading, failed, messages, incomplete } = useReplayChat(replayPath);
   // The replay the log was opened for, so another replay starts closed.
-  const [opened, setOpened] = useState<{
-    path: string;
-    line: number | null;
-  } | null>(null);
-  const open = opened?.path === replayPath ? opened : null;
-
-  const marks = useMemo(() => toMarks(messages ?? []), [messages]);
-  const names = useMemo(() => {
-    const out = new Map<number, string>();
-    for (const m of messages ?? []) {
-      if (m.playerName) out.set(m.player, m.playerName);
-    }
-    return out;
-  }, [messages]);
-  const teamOf = useMemo(() => playerTeams(players ?? []), [players]);
-  const eventMarks = useMemo(() => toEventMarks(events), [events]);
-  const totalSec = timelineDomain(
-    [...marks, ...eventMarks],
-    durationSec,
-    incomplete,
-  );
+  const [openedPath, setOpenedPath] = useState<string | null>(null);
+  const open = openedPath === replayPath;
 
   return (
-    <>
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center gap-1">
-          <h2 className="text-sm font-medium">
-            <Trans>Timeline</Trans>
-          </h2>
-          <SectionHelp section={t`the timeline`} source="stream">
-            <p>
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-medium">
+          <Trans>Chat log</Trans>
+        </h2>
+        <SectionHelp section={t`the chat log`} source="stream" />
+      </div>
+      {failed && (
+        <ErrorBanner
+          message={t`The chat could not be read from this replay.`}
+        />
+      )}
+      {messages?.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          <Trans>No chat was recorded in this replay.</Trans>
+        </p>
+      ) : failed ? null : messages === null || !open ? (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpenedPath(replayPath)}
+            disabled={messages === null}
+            className="gap-1.5"
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <MessageSquare className="size-4" />
+            )}
+            {loading ? t`Reading chat…` : t`Show chat log`}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <ChatLines messages={messages} />
+          {incomplete && (
+            <p className="text-xs text-muted-foreground">
               <Trans>
-                Point at or focus a mark to read it. Select a chat mark to open
-                the chat log at that line.
+                This replay could not be read to the end, so the chat log may be
+                incomplete.
               </Trans>
             </p>
-          </SectionHelp>
-        </div>
-        {loading && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            <Trans>Reading chat…</Trans>
-          </p>
-        )}
-        {failed && (
-          <ErrorBanner
-            message={t`The chat could not be read from this replay.`}
-          />
-        )}
-        {messages !== null &&
-          (messages.length === 0 && eventMarks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              <Trans>No chat was recorded in this replay.</Trans>
-            </p>
-          ) : (
-            <ReplayTimeline
-              marks={marks}
-              events={eventMarks}
-              teamOf={teamOf}
-              totalSec={totalSec}
-              describe={(line) => describeLine(line, names)}
-              onOpenLine={(line) => setOpened({ path: replayPath, line })}
-            />
-          ))}
-        {incomplete && (
-          <p className="text-xs text-muted-foreground">
-            <Trans>
-              This replay could not be read to the end, so the timeline stops at
-              the last line read and may be incomplete.
-            </Trans>
-          </p>
-        )}
-      </section>
-
-      {(messages === null || messages.length > 0) && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center gap-1">
-            <h2 className="text-sm font-medium">
-              <Trans>Chat log</Trans>
-            </h2>
-            <SectionHelp section={t`the chat log`} source="stream" />
-          </div>
-          {messages === null || !open ? (
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setOpened({ path: replayPath, line: null })}
-                disabled={messages === null}
-                className="gap-1.5"
-              >
-                {loading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <MessageSquare className="size-4" />
-                )}
-                {loading ? t`Reading chat…` : t`Show chat log`}
-              </Button>
-            </div>
-          ) : (
-            <>
-              <ChatLines messages={messages} highlight={open.line} />
-              {incomplete && (
-                <p className="text-xs text-muted-foreground">
-                  <Trans>
-                    This replay could not be read to the end, so the chat log
-                    may be incomplete.
-                  </Trans>
-                </p>
-              )}
-            </>
           )}
-        </section>
+        </>
       )}
-    </>
+    </section>
   );
 }

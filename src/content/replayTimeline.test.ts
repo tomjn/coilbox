@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ChatLine, ReplayPlayer, TimelineEvent } from "./bindings";
+import type { ChatLine, TimelineEvent } from "./bindings";
 import {
   axisTicks,
-  binMarks,
-  chartAxis,
   describeEvent,
   markKind,
-  markTeams,
-  playerTeams,
-  stripLayout,
   timelineDomain,
-  toEventMarks,
-  toMarks,
 } from "./replayTimeline";
 
 const line = (over: Partial<ChatLine>): ChatLine => ({
@@ -21,62 +14,6 @@ const line = (over: Partial<ChatLine>): ChatLine => ({
   text: "",
   system: false,
   ...over,
-});
-
-describe("chartAxis", () => {
-  const column = { left: 300, right: 1100 };
-
-  it("takes the value axis off the left and the fixed gutter off the right", () => {
-    expect(chartAxis(column, false, 900)).toEqual({
-      left: 352,
-      right: 1092,
-      endSec: 900,
-    });
-  });
-
-  it("leaves room for end labels when the chart draws them", () => {
-    expect(chartAxis(column, true, 900).right).toBe(1012);
-  });
-});
-
-describe("stripLayout", () => {
-  const axis = { left: 352, right: 1012, endSec: 900 };
-
-  it("gives the strip what is left of its box once the axis is taken out", () => {
-    const layout = stripLayout(axis, { left: 100, right: 1024 }, false);
-    expect(layout).toEqual({
-      columns: "252px minmax(0,1fr)",
-      paddingRight: 12,
-      labelsAbove: false,
-    });
-  });
-
-  it("takes the pregame column out of the gap, so zero stays where it was", () => {
-    const layout = stripLayout(axis, { left: 100, right: 1024 }, true);
-    expect(layout.columns).toBe("196px 56px minmax(0,1fr)");
-  });
-
-  it("moves the labels above the strip when the gap is too narrow for them", () => {
-    const narrow = stripLayout(axis, { left: 300, right: 1024 }, false);
-    expect(narrow).toEqual({
-      columns: "52px minmax(0,1fr)",
-      paddingRight: 12,
-      labelsAbove: true,
-    });
-  });
-
-  it("counts the pregame column when deciding there is no room", () => {
-    const box = { left: 252, right: 1024 };
-    expect(stripLayout(axis, box, false).labelsAbove).toBe(false);
-    expect(stripLayout(axis, box, true).labelsAbove).toBe(true);
-    expect(stripLayout(axis, box, true).columns).toBe("100px minmax(0,1fr)");
-  });
-
-  it("never asks for a negative inset when the chart runs past its box", () => {
-    const layout = stripLayout(axis, { left: 400, right: 1000 }, false);
-    expect(layout.columns).toBe("0px minmax(0,1fr)");
-    expect(layout.paddingRight).toBe(0);
-  });
 });
 
 describe("markKind", () => {
@@ -92,79 +29,25 @@ describe("markKind", () => {
   });
 });
 
-describe("toMarks", () => {
-  it("takes match time from the frame at 30 a second", () => {
-    const [m] = toMarks([line({ frame: 30 * 65 + 29 })]);
-    expect(m.second).toBe(65);
-  });
-
-  it("gives a pregame line no match time", () => {
-    const [m] = toMarks([line({ frame: -1 })]);
-    expect(m.second).toBeNull();
-  });
-
-  it("keeps the log position of each line", () => {
-    expect(toMarks([line({}), line({})]).map((m) => m.index)).toEqual([0, 1]);
-  });
-
-  it("returns nothing for an empty log", () => {
-    expect(toMarks([])).toEqual([]);
-  });
-});
+/** A mark at a frame, as the domain reads it: whole seconds at 30 a second. */
+const at = (frame: number) => ({ second: Math.floor(frame / 30) });
 
 describe("timelineDomain", () => {
   it("is the match length", () => {
-    expect(
-      timelineDomain(toMarks([line({ frame: 30 * 10 })]), 600, false),
-    ).toBe(600);
+    expect(timelineDomain([at(30 * 10)], 600, false)).toBe(600);
   });
 
   it("stretches to a line that falls after the stated length", () => {
-    expect(
-      timelineDomain(toMarks([line({ frame: 30 * 700 })]), 600, false),
-    ).toBe(700);
+    expect(timelineDomain([at(30 * 700)], 600, false)).toBe(700);
   });
 
   it("stops at the last line when the stream broke", () => {
-    expect(
-      timelineDomain(toMarks([line({ frame: 30 * 120 })]), 600, true),
-    ).toBe(120);
+    expect(timelineDomain([at(30 * 120)], 600, true)).toBe(120);
   });
 
   it("falls back to the match length for an empty log", () => {
     expect(timelineDomain([], 600, true)).toBe(600);
     expect(timelineDomain([], 0, false)).toBe(0);
-  });
-});
-
-describe("binMarks", () => {
-  it("stacks lines of one kind that share a column", () => {
-    const marks = toMarks([
-      line({ frame: 30 * 10 }),
-      line({ frame: 30 * 11 }),
-      line({ frame: 30 * 500 }),
-    ]);
-    const bins = binMarks(marks, 600, 60);
-    expect(bins.map((b) => [b.slot, b.marks.length])).toEqual([
-      [1, 2],
-      [50, 1],
-    ]);
-  });
-
-  it("keeps kinds in separate bins and puts pregame lines in their own slot", () => {
-    const marks = toMarks([
-      line({ frame: 30 * 10 }),
-      line({ frame: 30 * 10, system: true }),
-      line({ frame: -1 }),
-    ]);
-    const bins = binMarks(marks, 600, 60);
-    expect(bins).toHaveLength(3);
-    expect(bins.find((b) => b.slot === "pregame")?.marks).toHaveLength(1);
-  });
-
-  it("puts a line at the very end in the last column", () => {
-    const bins = binMarks(toMarks([line({ frame: 30 * 600 })]), 600, 60);
-    expect(bins[0].slot).toBe(59);
   });
 });
 
@@ -187,52 +70,6 @@ const event = (over: Partial<TimelineEvent>): TimelineEvent =>
     type: "resigned",
     ...over,
   }) as TimelineEvent;
-
-describe("toEventMarks", () => {
-  it("puts each kind of event in its own row and takes match time from the frame", () => {
-    const marks = toEventMarks([
-      event({ type: "resigned" }),
-      event({ type: "playerLeft", reason: { kind: "kicked" } }),
-      event({ type: "paused", paused: true }),
-      event({ type: "teamDied", team: 1, players: [] }),
-      event({ type: "joined", spectator: true, team: 0 }),
-      event({ type: "giveAway", toTeam: 1, fromTeam: 2 }),
-      event({ type: "other", action: 9, param1: 0, param2: 0 }),
-    ]);
-    expect(marks.map((m) => m.kind)).toEqual([
-      "resigned",
-      "left",
-      "paused",
-      "teamDied",
-      "joined",
-      "giveAway",
-      "other",
-    ]);
-    expect(marks[0].second).toBe(60);
-  });
-
-  it("gives an event before the game no match time", () => {
-    expect(toEventMarks([event({ frame: -1 })])[0].second).toBeNull();
-  });
-
-  it("stacks events of one kind that share a column", () => {
-    const marks = toEventMarks([
-      event({ frame: 30 * 10 }),
-      event({ frame: 30 * 11 }),
-      event({ frame: 30 * 11, type: "paused", paused: true }),
-    ]);
-    const bins = binMarks(marks, 600, 60);
-    expect(bins.map((b) => [b.kind, b.marks.length])).toEqual([
-      ["resigned", 2],
-      ["paused", 1],
-    ]);
-  });
-
-  it("stretches the axis to an event after the stated length", () => {
-    const marks = toEventMarks([event({ frame: 30 * 700 })]);
-    expect(timelineDomain(marks, 600, false)).toBe(700);
-  });
-});
 
 describe("describeEvent", () => {
   it("says what happened in words built from the typed event", () => {
@@ -295,51 +132,5 @@ describe("describeEvent", () => {
     expect(
       describeEvent(event({ type: "other", action: 9, param1: 1, param2: 2 })),
     ).toContain("code 9");
-  });
-});
-
-describe("playerTeams", () => {
-  const seat = (over: Partial<ReplayPlayer>): ReplayPlayer =>
-    ({ name: "x", spectator: false, ...over }) as ReplayPlayer;
-
-  it("maps seated players by number and leaves out spectators and players with no number or team", () => {
-    const teams = playerTeams([
-      seat({ player: 0, team: 3 }),
-      seat({ player: 1, team: 0, spectator: true }),
-      seat({ team: 2 }),
-      seat({ player: 4 }),
-    ]);
-    expect([...teams]).toEqual([[0, 3]]);
-  });
-
-  it("never matches on a name shared by two players", () => {
-    const teams = playerTeams([
-      seat({ name: "Sam", player: 0, team: 0 }),
-      seat({ name: "Sam", player: 1, team: 1 }),
-    ]);
-    const marks = toMarks([line({ player: 1, playerName: "Sam" })]);
-    expect(markTeams(marks, teams)).toEqual([1]);
-  });
-});
-
-describe("markTeams", () => {
-  const teamOf = new Map([
-    [0, 5],
-    [1, 2],
-  ]);
-
-  it("lists each team once, ascending, and skips the server and system lines", () => {
-    const marks = toMarks([
-      line({ player: 0 }),
-      line({ player: 1 }),
-      line({ player: 0 }),
-      line({ player: 255 }),
-      line({ player: 0, system: true }),
-    ]);
-    expect(markTeams(marks, teamOf)).toEqual([2, 5]);
-  });
-
-  it("is empty when nobody in the mark has a team", () => {
-    expect(markTeams(toMarks([line({ player: 9 })]), teamOf)).toEqual([]);
   });
 });

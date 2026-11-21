@@ -2,7 +2,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useTheme } from "@picoframe/frame";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -63,8 +63,7 @@ import {
   valueTable,
 } from "../../matchStats";
 import { labelOfMetric } from "../../metricLabels";
-import { chartAxis, plotInsets } from "../../replayTimeline";
-import { useSetChartAxis } from "../../useChartAxis";
+import { plotInsets } from "../../replayTimeline";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { CommandRateChart } from "./CommandRateChart";
@@ -361,43 +360,6 @@ function EndLabels({
   );
 }
 
-/**
- * The column the plot or the table fills. It tells the timeline where the plot's
- * time axis is (#3856). The table has no plot, so this measures the column rather
- * than the plot: both views fill it, and the insets the plot draws to are fixed,
- * so the axis is the same in either view and follows a resize in both.
- */
-function PlotColumn({
-  endLabels,
-  endSec,
-  children,
-}: {
-  endLabels: boolean;
-  endSec: number;
-  children: React.ReactNode;
-}) {
-  const column = useRef<HTMLDivElement>(null);
-  const setAxis = useSetChartAxis();
-  useLayoutEffect(() => {
-    const el = column.current;
-    if (!el) return;
-    const measure = () =>
-      setAxis(chartAxis(el.getBoundingClientRect(), endLabels, endSec));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      setAxis(null);
-    };
-  }, [setAxis, endLabels, endSec]);
-  return (
-    <div ref={column} className="order-first min-w-0 flex-1 lg:order-last">
-      {children}
-    </div>
-  );
-}
-
 export function MatchStatsChart({
   info,
   trailer,
@@ -667,10 +629,7 @@ export function MatchStatsChart({
             plotHeight={chartHeight(drawn.length)}
             onChange={setKey}
           />
-          <PlotColumn
-            endLabels={labelled}
-            endSec={rows[rows.length - 1]?.timeSec ?? 0}
-          >
+          <div className="order-first min-w-0 flex-1 lg:order-last">
             {display === "table" ? (
               <MatchStatsTable table={table} />
             ) : (
@@ -802,7 +761,7 @@ export function MatchStatsChart({
                 </LineChart>
               </ResponsiveContainer>
             )}
-          </PlotColumn>
+          </div>
         </div>
       )}
 

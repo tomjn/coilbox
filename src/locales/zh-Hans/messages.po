@@ -3628,15 +3628,9 @@ msgstr "{kind, select, campaign {战役} coilbox_campaign {coilbox 战役} prese
 msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
 msgstr "{kind, select, campaign {中心暂不支持战役。} keymap {中心暂不支持键位方案。} module {中心暂不支持模块。} other {中心暂不支持此类文件。}}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{kind}, {time}"
-msgstr "{kind}，{time}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{kind}, {time}, {lines}"
-msgstr "{kind}，{time}，{lines}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{kind}, {when}: {text}"
+msgstr ""
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
@@ -4837,20 +4831,14 @@ msgstr "{n, plural, =0 {没有机器人} other {# 个机器人}}"
 msgid "{n, plural, one {{count} match} other {{count} matches}}"
 msgstr "{n, plural, other {{count} 场对局}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{n, plural, one {# chat line from {at}} other {# chat lines from {at}}}"
-msgstr "{n, plural, other {{at} 起的 # 条聊天}}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n, plural, one {# chat line from {when}} other {# chat lines from {when}}}"
+msgstr ""
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 #, fuzzy
 msgid "{n, plural, one {# entry} other {# entries}}"
 msgstr "{n, plural, other {# 个条目}}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{n, plural, one {# event} other {# events}}"
-msgstr "{n, plural, other {# 个事件}}"
 
 #: src/hub/removePlan.ts
 #, fuzzy
@@ -4870,11 +4858,6 @@ msgstr "{n, plural, other {# 场对局}}"
 msgid "{n, plural, one {# key} other {# keys}}"
 msgstr "{n, plural, other {# 个键}}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{n, plural, one {# line} other {# lines}}"
-msgstr "{n, plural, other {# 行}}"
-
 #: src/play/presetParts.ts
 #, fuzzy
 msgid "{n, plural, one {# map option} other {# map options}}"
@@ -4890,10 +4873,9 @@ msgstr "{n, plural, other {# 个命令}}"
 msgid "{n, plural, one {# participant} other {# participants}}"
 msgstr "{n, plural, other {# 个参与者}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{n, plural, one {# player left from {at}} other {# players left from {at}}}"
-msgstr "{n, plural, other {{at} 起有 # 名玩家离开}}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n, plural, one {# player event from {when}} other {# player events from {when}}}"
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -4935,10 +4917,9 @@ msgstr "{n, plural, other {已移动 # 个回放（{size}）。}}"
 msgid "{n, plural, one {Removed # clip ({size}).} other {Removed # clips ({size}).}}"
 msgstr "{n, plural, other {已移除 # 个片段（{size}）。}}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{n} units destroyed from {at}"
-msgstr "{at} 起有 {n} 个单位被摧毁"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{n} units destroyed from {when}"
+msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
@@ -6553,11 +6534,6 @@ msgstr "{stageCount, plural, other {# 个升级}}"
 msgid "{staleCount} left behind by a rename"
 msgstr "重命名后遗留的 {staleCount}"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "{start} to {end}"
-msgstr "{start} 到 {end}"
-
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "{startCount, plural, one {Preview · # start position} other {Preview · # start positions}}"
@@ -6858,10 +6834,9 @@ msgstr ""
 msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
 msgstr ""
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "{text}, {at}"
-msgstr "{text}，{at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "{text}, {when}"
+msgstr ""
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -10890,7 +10865,7 @@ msgstr "所有单位"
 msgid "All units"
 msgstr "所有单位"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
 msgstr "盟友"
@@ -11376,11 +11351,6 @@ msgstr "和"
 #, fuzzy
 msgid "and {hidden} more"
 msgstr "还有 {hidden} 个"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "and {hiddenCount} more"
-msgstr "还有 {hiddenCount} 个"
 
 #: src/lego/overlap.ts
 #, fuzzy
@@ -13025,15 +12995,9 @@ msgstr "击败 5 种不同的 AI。"
 msgid "Becomes true the moment a named actor is destroyed."
 msgstr "指定的参与者被摧毁的那一刻变为真。"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Before"
-msgstr "之前"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Before the game"
-msgstr "游戏开始前"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "before the game"
+msgstr ""
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -15024,7 +14988,7 @@ msgstr "图表指标，显示每个指标的走势"
 msgid "Charted values"
 msgstr "图表数值"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/index.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/pages/ChatPage.tsx
@@ -15053,11 +15017,6 @@ msgstr "聊天记录"
 #, fuzzy
 msgid "chat scenarios"
 msgstr "聊天场景"
-
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "Chat, {at}: {text}"
-msgstr "聊天，{at}：{text}"
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -18069,6 +18028,10 @@ msgstr "无法连接 unitsync 读取此模型。"
 #, fuzzy
 msgid "Could not reach unitsync to read this unit's model."
 msgstr "无法连接 unitsync 读取此单位的模型。"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Could not read"
+msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
@@ -21159,11 +21122,6 @@ msgstr "八条腿"
 msgid "Elapsed"
 msgstr "已用时间"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Eliminated"
-msgstr "已被消灭"
-
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -21738,16 +21696,6 @@ msgstr "事件"
 msgid "Event log downloaded."
 msgstr "已下载事件日志。"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Event, {kind}, {time}"
-msgstr "事件，{kind}，{time}"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Event, {kind}, {time}, {count}"
-msgstr "事件，{kind}，{time}，{count}"
-
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Events"
@@ -21977,7 +21925,7 @@ msgstr "每个视图宽 {sideText} elmo，所有玩家相同，并以该玩家�
 msgid "Everybody who joins has to have exactly this version."
 msgstr "所有加入的人都必须使用完全相同的版本。"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Everyone"
 msgstr "所有人"
@@ -24342,11 +24290,6 @@ msgstr "收集回放"
 msgid "Gathering the scenario and its dialogue clips…"
 msgstr "正在收集场景及其对白片段…"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Gave away"
-msgstr "转让部队"
-
 #: src/general/index.ts
 #, fuzzy
 msgid "General"
@@ -26502,6 +26445,10 @@ msgstr "进行中"
 msgid "In the source"
 msgstr "在源文件中"
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
+msgstr ""
+
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
 msgid "In the unit definition"
@@ -27512,11 +27459,6 @@ msgstr "已加入"
 msgid "joined and left"
 msgstr "加入后又离开了"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Joined late"
-msgstr "中途加入"
-
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
 msgid "Joined to"
@@ -27883,7 +27825,7 @@ msgstr "将 {username} 踢出服务器。"
 msgid "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch."
 msgstr "开火时让炮管沿炮膛向后坐，再缓缓复位。这是一次性动作而非循环：预览会定时重复它，以便观看。"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Kills"
 msgstr "击杀"
@@ -28404,7 +28346,6 @@ msgstr "留下履带痕迹"
 msgid "left"
 msgstr "左"
 
-#: src/content/pages/components/ReplayTimeline.tsx
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Left"
@@ -31637,6 +31578,10 @@ msgstr "需要参与者或基地"
 #, fuzzy
 msgid "Needs an objective"
 msgstr "需要目标"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Needs analysis"
+msgstr ""
 
 #: src/startbox/StartBoxControls.tsx
 #, fuzzy
@@ -36517,11 +36462,6 @@ msgstr "其他"
 msgid "Other engine fields"
 msgstr "其他引擎字段"
 
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Other events"
-msgstr "其他事件"
-
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
 msgid "Other pieces stay where they are."
@@ -37096,7 +37036,7 @@ msgstr "行驶路径"
 msgid "Patrol"
 msgstr "巡逻"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
@@ -37122,11 +37062,6 @@ msgstr "暂停音乐"
 #, fuzzy
 msgid "Paused while a game is running. It carries on when the game ends."
 msgstr "游戏运行时暂停。游戏结束后继续。"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Pauses"
-msgstr "暂停"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -37640,7 +37575,7 @@ msgstr ""
 #: src/content/pages/components/GameHeader.tsx
 #: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/onboarding/pages/AppearancePage.tsx
@@ -37700,7 +37635,7 @@ msgstr "全部播放"
 msgid "Play as"
 msgstr "使用阵营"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Play in reverse"
 msgstr "倒放"
@@ -37794,7 +37729,7 @@ msgstr "{0} 的播放"
 msgid "Playback progress"
 msgstr "播放进度"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Playback speed"
 msgstr "播放速度"
@@ -37904,6 +37839,7 @@ msgstr "玩家自身"
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/multiplayer/admin/tools.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
@@ -37938,11 +37874,6 @@ msgstr "每队人数"
 #, fuzzy
 msgid "Players in the match"
 msgstr "对局中的玩家"
-
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "Players leaving"
-msgstr "玩家离开"
 
 #: src/multiplayer/battles/zerokBattle.ts
 #, fuzzy
@@ -38028,11 +37959,6 @@ msgstr "PNG 图片"
 #, fuzzy
 msgid "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
 msgstr "指向单位可显示其名称。点击单位可保持显示，点击地面即可取消。"
-
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
-msgstr "指向或聚焦标记即可阅读。选择聊天标记可在该行打开聊天记录。"
 
 #: src/content/mapAggregate.ts
 msgid "point of damage"
@@ -38175,7 +38101,6 @@ msgid "Pre-fill the file pickers with the folders you used last time."
 msgstr "在文件选择器中预先填入上次使用的文件夹。"
 
 #: src/content/pages/components/ReplayChat.tsx
-#: src/content/pages/components/ReplayTimeline.tsx
 #, fuzzy
 msgid "Pre-game"
 msgstr "开局前"
@@ -41229,11 +41154,6 @@ msgstr "重置为建造时的形状"
 #, fuzzy
 msgid "Resetting…"
 msgstr "重置中…"
-
-#: src/content/pages/components/ReplayTimeline.tsx
-#, fuzzy
-msgid "Resigned"
-msgstr "投降"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -45699,7 +45619,7 @@ msgstr "观战中"
 msgid "spectator"
 msgstr "观战者"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Spectators"
 msgstr "观战者"
@@ -46914,7 +46834,7 @@ msgstr "对称：新部件会获得一个镜像副本或一圈副本，它们会
 msgid "Synced"
 msgstr "已同步"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
 #: src/play/pages/components/CrashDrawer.tsx
@@ -50364,11 +50284,6 @@ msgstr ""
 msgid "The texture is in a file the game did not start with, so relaunch to see it."
 msgstr "纹理所在的文件不是游戏启动时就有的，所以请重新启动以查看。"
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "the timeline"
-msgstr "时间轴"
-
 #: src/multiplayer/battles/hostBattle.ts
 msgid "The title cannot contain a tab or another control character."
 msgstr ""
@@ -52040,11 +51955,6 @@ msgstr "无法读完此回放，所以可能缺少后面的命令。"
 msgid "This replay could not be read to the end, so the chat log may be incomplete."
 msgstr "无法读完此回放，所以聊天记录可能不完整。"
 
-#: src/content/pages/components/ReplayChat.tsx
-#, fuzzy
-msgid "This replay could not be read to the end, so the timeline stops at the last line read and may be incomplete."
-msgstr "无法读完此回放，所以时间轴会停在读取到的最后一行，可能不完整。"
-
 #: src/content/replayAnalysis.ts
 #, fuzzy
 msgid "This replay does not say which engine recorded it, and no other engine is installed."
@@ -52804,7 +52714,7 @@ msgstr "时间"
 msgid "Time between wakes"
 msgstr "唤醒间隔"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Time in the match"
 msgstr "对局内时间"
@@ -52839,7 +52749,7 @@ msgstr "时间：约 {timeNeeded}"
 msgid "Time: unknown"
 msgstr "时间：未知"
 
-#: src/content/pages/components/ReplayChat.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Timeline"
 msgstr "时间轴"
@@ -53827,11 +53737,6 @@ msgstr "不足 {shortSeconds} 秒"
 msgid "Under attack sound"
 msgstr "受到攻击时的音效"
 
-#: src/content/pages/components/ReplayMapView.tsx
-#, fuzzy
-msgid "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
-msgstr "在地图下方，滑块用于设置时间，按钮会以旁边显示的速度正向或反向播放对局。高条表示一个单位被摧毁，圆点表示聊天，菱形表示有玩家离开，这些都取自回放及其分析。会相互重叠的标记会合并成一个更大的标记，点击它会跳到其中最早的事件。未分析的回放没有击杀记录。地址中包含时间，所以链接会在那一刻打开。"
-
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
 msgid "Under your control — your capital."
@@ -54007,10 +53912,9 @@ msgstr "单位定义"
 msgid "Unit defs: {defsError}"
 msgstr "单位定义：{defsError}"
 
-#: src/content/pages/components/ReplayPlaybackBar.tsx
-#, fuzzy
-msgid "Unit destroyed, {at}"
-msgstr "单位被摧毁，{at}"
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Unit destroyed, {when}"
+msgstr ""
 
 #: src/campaign/slots.ts
 #, fuzzy
@@ -56324,7 +56228,7 @@ msgstr "此面板打开时，视口的控制柄在该点上，所以可以把它
 msgid "While this panel is open the viewport's handles are on the volume rather than on a piece, so you can drag it to size instead of typing. Move and scale only: a volume has no rotation. Select a piece and they move onto that piece's own box instead, which is the fields at the bottom."
 msgstr "此面板打开时，视口的控制柄在体积上而不是部件上，所以可以拖动调整大小，而不必输入。只能移动和缩放：体积没有旋转。选中一个部件后，控制柄会移到该部件自己的碰撞盒上，即底部的字段。"
 
-#: src/content/pages/components/ReplayTimeline.tsx
+#: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Whispers"
 msgstr "悄悄话"
