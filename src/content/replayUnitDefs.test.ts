@@ -7,6 +7,7 @@ import type {
 import dataset from "./fixtures/splinter-faction-unit-dataset.json";
 import { orderedCost, orderedSplit } from "./replayOpening";
 import {
+  iconTypesByName,
   listDate,
   misfits,
   orderFit,
@@ -134,6 +135,24 @@ describe("storedListFor", () => {
     expect(storedListFor(null, "stream")).toBeNull();
     expect(storedListFor({ ...sets, stream: null }, "stream")).toBeNull();
     expect(storedListFor({ ...sets, sets: {} }, "events")).toBeNull();
+  });
+});
+
+describe("a stored unit's icon type (#5340)", () => {
+  it("comes back on the dataset entry, and an older stored unit has none", () => {
+    expect(
+      storedToUnit({ name: "armcom", iconType: "commander" }).iconType,
+    ).toBe("commander");
+    expect(storedToUnit({ name: "armcom" })).not.toHaveProperty("iconType");
+  });
+
+  it("is listed by lowercase name, leaving out a unit that names none", () => {
+    const types = iconTypesByName([
+      storedToUnit({ name: "ArmCom", iconType: "commander" }),
+      storedToUnit({ name: "armpw" }),
+    ]);
+    expect([...types]).toEqual([["armcom", "commander"]]);
+    expect(iconTypesByName(undefined).size).toBe(0);
   });
 });
 

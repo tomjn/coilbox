@@ -11,10 +11,20 @@ local M = {}
 local KILLED_BY_SCRIPT = -21
 
 local function read(lines, json)
-	local byKind = { replaced = {}, created = { [0] = {}, [1] = {} }, destroyed = {} }
+	local byKind = {
+		replaced = {}, created = { [0] = {}, [1] = {} }, destroyed = {},
+		definitions = 0, withIconType = 0, listed = 0,
+	}
 	for _, text in ipairs(lines) do
 		local line = json.decode(text)
-		if line.kind == "start_unit_replaced" then
+		if line.kind == "header" then
+			byKind.listed = line.unitDefs
+		elseif line.kind == "unit_def" then
+			byKind.definitions = byKind.definitions + 1
+			if type(line.iconType) == "string" and line.iconType ~= "" then
+				byKind.withIconType = byKind.withIconType + 1
+			end
+		elseif line.kind == "start_unit_replaced" then
 			byKind.replaced[#byKind.replaced + 1] = line
 		elseif line.kind == "unit_created" and byKind.created[line.team] then
 			local list = byKind.created[line.team]
@@ -43,7 +53,16 @@ end
 
 local CLAIMS = {}
 
+-- The engine hands the unsynced half every definition's icon type, "default"
+-- when the definition names none, so no definition may be without one.
+local function claimIconTypes(log, claim)
+	claim("the logger wrote the engine's unit definitions", log.definitions > 0, true)
+	claim("the header counts them all", log.definitions, log.listed)
+	claim("every unit definition has an icon type", log.withIconType, log.definitions)
+end
+
 function CLAIMS.building(log, claim)
+	claimIconTypes(log, claim)
 	local first, second = log.created[0], log.created[1]
 	local followed = ofTeam(log.replaced, 0)
 	claim("team 0 made its start building and two replacements", #first, 3)
@@ -70,6 +89,7 @@ function CLAIMS.building(log, claim)
 end
 
 function CLAIMS.two_gadgets(log, claim)
+	claimIconTypes(log, claim)
 	local first, second = log.created[0], log.created[1]
 	local followed = ofTeam(log.replaced, 0)
 	-- The start unit, the spawner's unit, the upgrade, the spawner's unit, the
