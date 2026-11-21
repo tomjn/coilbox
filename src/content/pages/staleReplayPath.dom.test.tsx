@@ -60,7 +60,7 @@ vi.mock("./components/MatchStatsChart", () => ({
 
 const { useDemoInfo } = await import("../config");
 const { ReplayChat } = await import("./components/ReplayChat");
-const { SeriesEmphasisProvider } = await import("../useSeriesEmphasis");
+const { useReplayChat } = await import("../useReplayChat");
 const { MatchStatsSection } = await import("./components/MatchStatsSection");
 const { ReplayAnalysisEvents } = await import(
   "./components/ReplayAnalysisEvents"
@@ -181,43 +181,43 @@ describe("ReplayChat", () => {
     ],
   });
 
+  /** Opens the log once the chat has been read. */
+  async function showLog() {
+    const button = await screen.findByRole("button", {
+      name: /show chat log/i,
+    });
+    await waitFor(() =>
+      expect((button as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(button);
+  }
+
   it("drops the first replay's chat when the path changes", async () => {
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from a"));
-    const { rerender } = render(
-      <SeriesEmphasisProvider>
-        <ReplayChat replayPath={a} />
-      </SeriesEmphasisProvider>,
-    );
-    fireEvent.click(await screen.findByRole("button", { name: /everyone/i }));
+    const { rerender } = render(<ReplayChat replayPath={a} />);
+    await showLog();
     expect(await screen.findByText("gg from a", { exact: false })).toBeTruthy();
 
     bindings.contentDemoChat.mockReturnValueOnce(deferred().promise);
-    rerender(
-      <SeriesEmphasisProvider>
-        <ReplayChat replayPath={b} />
-      </SeriesEmphasisProvider>,
-    );
+    rerender(<ReplayChat replayPath={b} />);
     expect(screen.queryByText("gg from a", { exact: false })).toBeNull();
-    expect(screen.queryByRole("button", { name: /everyone/i })).toBeNull();
-    expect(screen.getByText("Reading chat…", { selector: "p" })).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /reading chat/i,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 
   it("does not let a slow chat for the first replay land on the second", async () => {
     const first = deferred<ReturnType<typeof chat>>();
     bindings.contentDemoChat.mockReturnValueOnce(first.promise);
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from b"));
-    const { rerender } = render(
-      <SeriesEmphasisProvider>
-        <ReplayChat replayPath={a} />
-      </SeriesEmphasisProvider>,
-    );
+    const { rerender } = render(<ReplayChat replayPath={a} />);
 
-    rerender(
-      <SeriesEmphasisProvider>
-        <ReplayChat replayPath={b} />
-      </SeriesEmphasisProvider>,
-    );
-    fireEvent.click(await screen.findByRole("button", { name: /everyone/i }));
+    rerender(<ReplayChat replayPath={b} />);
+    await showLog();
     expect(await screen.findByText("gg from b", { exact: false })).toBeTruthy();
 
     await act(async () => first.resolve(chat("gg from a")));
@@ -227,12 +227,18 @@ describe("ReplayChat", () => {
 
   it("reads the chat once for the page, not once per surface", async () => {
     bindings.contentDemoChat.mockResolvedValue(chat("gg"));
+    // The timeline dock reads the same lines, through the same hook.
+    function Dock() {
+      useReplayChat(a);
+      return null;
+    }
     render(
-      <SeriesEmphasisProvider>
+      <>
         <ReplayChat replayPath={a} />
-      </SeriesEmphasisProvider>,
+        <Dock />
+      </>,
     );
-    await screen.findByRole("button", { name: /everyone/i });
+    await screen.findByRole("button", { name: /show chat log/i });
     expect(bindings.contentDemoChat).toHaveBeenCalledTimes(1);
   });
 });

@@ -19,7 +19,6 @@ vi.mock("../../bindings", () => ({
 }));
 
 const { ReplayChat, chatTime } = await import("./ReplayChat");
-const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
 const line = (over: Partial<ChatLine>): ChatLine => ({
@@ -35,11 +34,7 @@ afterEach(cleanup);
 
 function open(result: typeof RESULT) {
   RESULT = result;
-  render(
-    <SeriesEmphasisProvider>
-      <ReplayChat replayPath="/replays/a.sdfz" durationSec={600} />
-    </SeriesEmphasisProvider>,
-  );
+  render(<ReplayChat replayPath="/replays/a.sdfz" />);
 }
 
 /** Opens the log once the chat has been read. */
@@ -111,7 +106,6 @@ describe("ReplayChat", () => {
     });
     await showLog();
     expect(await screen.findByText(/chat log may be incomplete/)).toBeTruthy();
-    expect(screen.getByText(/timeline stops at the last line/)).toBeTruthy();
   });
 
   it("says plainly when the chat could not be read, without naming a tool", async () => {
@@ -128,34 +122,29 @@ describe("ReplayChat", () => {
     expect(screen.queryByRole("button", { name: /show chat log/i })).toBeNull();
   });
 
-  it("keeps how to read the timeline in its help and not under it", async () => {
+  it("has no timeline of its own, since the dock at the bottom of the page has the chat", async () => {
     open({
       incomplete: false,
       messages: [line({ player: 0, playerName: "Alice", text: "gg" })],
     });
     await screen.findByRole("button", { name: /show chat log/i });
-    expect(screen.queryByText(/Point at or focus a mark/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "About the timeline" }));
-    const said = within(screen.getByRole("dialog"));
-    expect(said.getByText(/Point at or focus a mark to read it/)).toBeTruthy();
-    expect(said.getByText(/open the chat log at that line/)).toBeTruthy();
+    expect(screen.queryByText("Timeline")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "About the timeline" }),
+    ).toBeNull();
   });
 
-  it("says the timeline and the log come from the recorded orders and messages", async () => {
+  it("says the log comes from the recorded orders and messages", async () => {
     open({
       incomplete: false,
       messages: [line({ player: 0, playerName: "Alice", text: "gg" })],
     });
     await screen.findByRole("button", { name: /show chat log/i });
-    // Neither section carries its source in the page. Each help does.
+    // The section does not carry its source in the page. Its help does.
     expect(screen.queryByText(REPLAY_SOURCE_NOTES.stream)).toBeNull();
-    for (const name of ["About the timeline", "About the chat log"]) {
-      fireEvent.click(screen.getByRole("button", { name }));
-      expect(
-        within(screen.getAllByRole("dialog").at(-1) as HTMLElement).getByText(
-          REPLAY_SOURCE_NOTES.stream,
-        ),
-      ).toBeTruthy();
-    }
+    fireEvent.click(screen.getByRole("button", { name: "About the chat log" }));
+    expect(
+      within(screen.getByRole("dialog")).getByText(REPLAY_SOURCE_NOTES.stream),
+    ).toBeTruthy();
   });
 });

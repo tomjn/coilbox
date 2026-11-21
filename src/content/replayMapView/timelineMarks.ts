@@ -1,35 +1,45 @@
 /**
- * Marks on the timeline's bar (#3808), and the time kept in the page's address.
- * Arithmetic on plain values.
+ * Marks on the replay page's timeline dock (#3808, #5306), and the time kept in
+ * the page's address. Arithmetic on plain values.
  */
 
-export type MarkLane = "kills" | "chat" | "left";
+export type MarkLane = "kills" | "chat" | "players";
 
-/** An event on the bar, at a frame of the track. */
+/** An event on the axis, at a frame of the match. */
 export interface PlacedMark {
   lane: MarkLane;
+  /** Before the first frame is held to the first, as chat sent before the match
+   *  started is, and after the last is held to the last. */
   frame: number;
   /** What the event was, in words, when it is worth saying alone. */
   text?: string;
+  /** What sort of event it is within its lane, where the lane tells them apart.
+   *  A chat line's is who it was sent to. */
+  kind?: string;
 }
 
 /** The marks of one lane that share a column of the bar. */
 export interface MarkGroup {
   lane: MarkLane;
   column: number;
-  /** The earliest frame in the group, which is where a click seeks to. */
+  /** The earliest frame in the group, held inside the axis, which is where a
+   *  click seeks to. */
   frame: number;
   count: number;
   /** The words of the earliest event in the group. */
   text?: string;
+  /** The kind every event in the group has, or undefined when they differ. */
+  kind?: string;
+  /** Whether the earliest event was before the axis starts. */
+  before: boolean;
 }
 
 /**
- * Cuts the bar into `columns` and puts the marks of each lane that fall in one
+ * Cuts the axis into `columns` and puts the marks of each lane that fall in one
  * column into one group. A match with thousands of kills then draws at most one
  * mark per column per lane, however many events there are. An event outside the
- * track has no place on the bar and is left out. Groups come back in the order
- * of the lanes they first appear in, and by column within a lane.
+ * axis is held to its nearer end, so chat sent before the match started sits at
+ * the start. Groups come back by column, and by frame within a column.
  */
 export function groupMarks(
   marks: readonly PlacedMark[],
@@ -39,8 +49,10 @@ export function groupMarks(
   if (columns <= 0) return [];
   const length = range.last - range.first;
   const groups = new Map<string, MarkGroup>();
-  for (const { lane, frame, text } of marks) {
-    if (frame < range.first || frame > range.last) continue;
+  // The frame each group's earliest event was recorded at, before it was held.
+  const earliest = new Map<string, number>();
+  for (const { lane, frame: recorded, text, kind } of marks) {
+    const frame = Math.min(range.last, Math.max(range.first, recorded));
     const column =
       length <= 0
         ? 0
@@ -52,12 +64,24 @@ export function groupMarks(
     const held = groups.get(key);
     if (held) {
       held.count++;
-      if (frame < held.frame) {
+      if (held.kind !== kind) held.kind = undefined;
+      if (recorded < (earliest.get(key) ?? recorded)) {
+        earliest.set(key, recorded);
         held.frame = frame;
         held.text = text;
+        held.before = recorded < range.first;
       }
     } else {
-      groups.set(key, { lane, column, frame, count: 1, text });
+      groups.set(key, {
+        lane,
+        column,
+        frame,
+        count: 1,
+        text,
+        kind,
+        before: recorded < range.first,
+      });
+      earliest.set(key, recorded);
     }
   }
   return [...groups.values()].sort(

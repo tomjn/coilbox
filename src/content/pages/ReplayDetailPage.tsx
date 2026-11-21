@@ -51,7 +51,6 @@ import { teamResultLabel } from "../replaySideLabel";
 import { refreshStoredTracks } from "../replayTracks";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
-import { ChartAxisProvider } from "../useChartAxis";
 import { MatchClockProvider } from "../useMatchClock";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { useReplaysRoot } from "../useReplaysRoot";
@@ -68,6 +67,10 @@ import { ReplayMap } from "./components/ReplayMap";
 import { ReplayMapViewSection } from "./components/ReplayMapView";
 import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
+import {
+  ReplayTimelineDock,
+  TimelineKeysProvider,
+} from "./components/ReplayTimelineDock";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
   DependencyBlocked,
@@ -902,10 +905,10 @@ export default function ReplayDetailPage() {
            * you to the next one. It reaches down to the map, so the sections
            * between are inside it too and read nothing from it. */}
           <SeriesEmphasisProvider key={filename}>
-            <ChartAxisProvider>
-              {/* One match time for every section (#5305). Inside the keyed
-               * provider, so it starts again for each replay. */}
-              <MatchClockProvider durationSec={info.durationSec}>
+            {/* One match time for every section (#5305). Inside the keyed
+             * provider, so it starts again for each replay. */}
+            <MatchClockProvider durationSec={info.durationSec}>
+              <TimelineKeysProvider>
                 <ReplayRoster info={info} replayPath={replay?.path} />
 
                 {/* Directly under the roster (#1200). The roster is where a player
@@ -949,10 +952,6 @@ export default function ReplayDetailPage() {
                   info={info}
                   enginePath={selected?.enginePath}
                   dataDir={selected?.rootPath}
-                  replayPath={replay?.path ?? ""}
-                  watch={engine.watch}
-                  dependencyBlock={playbackBlock}
-                  game={playbackGame?.name}
                 />
 
                 {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
@@ -961,13 +960,7 @@ export default function ReplayDetailPage() {
                 )}
 
                 {/* Read from the replay file, so it needs no engine. */}
-                {replay && (
-                  <ReplayChat
-                    replayPath={replay.path}
-                    durationSec={info.durationSec}
-                    players={info.players}
-                  />
-                )}
+                {replay && <ReplayChat replayPath={replay.path} />}
 
                 <ReplayNotes filename={filename} gameId={info.gameId} />
 
@@ -999,8 +992,20 @@ export default function ReplayDetailPage() {
                     </>
                   )}
                 </section>
-              </MatchClockProvider>
-            </ChartAxisProvider>
+
+                {/* Pinned to the bottom of the page, and last so it rests at the
+                 * end of the page too (#5306). */}
+                {replay && (
+                  <ReplayTimelineDock
+                    info={info}
+                    replayPath={replay.path}
+                    watch={engine.watch}
+                    dependencyBlock={playbackBlock}
+                    game={playbackGame?.name}
+                  />
+                )}
+              </TimelineKeysProvider>
+            </MatchClockProvider>
           </SeriesEmphasisProvider>
         </>
       ) : null}
