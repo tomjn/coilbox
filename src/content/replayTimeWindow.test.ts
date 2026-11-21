@@ -11,12 +11,14 @@ import { METRIC_LABEL } from "./metricLabels";
 import {
   activityPath,
   activitySeries,
+  captionRange,
   countInRange,
   dragWindow,
   filterByFrame,
   frameIndexes,
   heldWindow,
   keyedWindow,
+  matchEndSec,
   PRESET_MINUTES,
   toWindow,
   WHOLE_MATCH,
@@ -42,6 +44,47 @@ describe("heldWindow", () => {
 
   it("keeps an end inside the match as it is", () => {
     expect(heldWindow(60, 120, 600)).toEqual({ startSec: 60, endSec: 120 });
+  });
+});
+
+describe("matchEndSec", () => {
+  it("is the match's length when the axis runs past it", () => {
+    expect(matchEndSec(508, 501.4)).toBe(501.4);
+  });
+
+  it("is the axis when the axis stops short of the length", () => {
+    expect(matchEndSec(300, 501.4)).toBe(300);
+  });
+
+  it("is the axis when the length is not known", () => {
+    expect(matchEndSec(508, 0)).toBe(508);
+    expect(matchEndSec(508, Number.NaN)).toBe(508);
+  });
+});
+
+describe("captionRange", () => {
+  it("gives a window held open at the match's end the match's end", () => {
+    expect(
+      captionRange({ startSec: 450, endSec: Number.POSITIVE_INFINITY }, 501.4),
+    ).toEqual({ startSec: 450, endSec: 501.4 });
+  });
+
+  it("never passes the match's end at either end", () => {
+    expect(captionRange({ startSec: 505, endSec: 508 }, 501.4)).toEqual({
+      startSec: 501.4,
+      endSec: 501.4,
+    });
+  });
+
+  it("keeps a window inside the match as it is", () => {
+    expect(captionRange({ startSec: 60, endSec: 120 }, 501.4)).toEqual({
+      startSec: 60,
+      endSec: 120,
+    });
+  });
+
+  it("is the whole match for none", () => {
+    expect(captionRange(null, 501.4)).toEqual({ startSec: 0, endSec: 501.4 });
   });
 });
 

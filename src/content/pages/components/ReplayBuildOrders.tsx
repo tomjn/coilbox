@@ -187,7 +187,7 @@ function SeatOpening({
                     size="sm"
                   />
                 )}
-                <span className="min-w-0 truncate">
+                <span className="min-w-0 break-words">
                   {unitLabel(unit, t`Unit ${entry.unitDefId}`)}
                 </span>
                 {entry.count > 1 && (
@@ -327,7 +327,7 @@ function SeatLists({
                       size="sm"
                     />
                   )}
-                  <span className="min-w-0 truncate">
+                  <span className="min-w-0 break-words">
                     {unitLabel(unit, t`Unit ${order.unitDefId}`)}
                   </span>
                   {order.count > 1 && (
@@ -583,7 +583,7 @@ export function ReplayBuildOrders({
               value={cut}
               onChange={(e) => setCut(e.target.value)}
               placeholder={t`Whole match`}
-              className="h-8 w-24"
+              className="h-8 w-40"
               autoComplete="off"
             />
           </Field>

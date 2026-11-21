@@ -210,6 +210,24 @@ describe("ReplayBuildOrders", () => {
     expect(rows[2]).toContain("Unit 9");
   });
 
+  it("wraps a unit's name and the opening length's placeholder instead of cutting them short (#5358)", async () => {
+    GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+    DATASET = { units: UNITS };
+    await open(opening);
+    // A name is in the opening and in the list of all orders.
+    const names = screen.getAllByText("Land Factory");
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      expect(name.className).not.toContain("truncate");
+      expect(name.className).toContain("break-words");
+    }
+    // The placeholder is "Whole match", which a 6rem box cut to "Whole mat".
+    const box = screen.getByRole("textbox", {
+      name: /Opening length in minutes/i,
+    });
+    expect(box.className).not.toMatch(/(^|\s)w-24(\s|$)/);
+  });
+
   it("shows the ids and says why when the game is not installed", async () => {
     GAMES = [game("Metal Factions v2.58", "metal_factions-v2.58.sdz")];
     DATASET = { units: UNITS };

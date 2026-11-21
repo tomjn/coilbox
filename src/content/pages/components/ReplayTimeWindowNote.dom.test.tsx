@@ -16,7 +16,7 @@ function show(
 ) {
   return render(
     <ReplayTimeWindowNote
-      domainSec={1800}
+      matchEndSec={1800}
       window={null}
       count={{ inside: 3605, total: 3605 }}
       {...over}
@@ -41,7 +41,7 @@ describe("the whole match", () => {
   });
 
   it("says nothing for a match with no length", () => {
-    show({ domainSec: 0 });
+    show({ matchEndSec: 0 });
     expect(screen.queryByTestId("time-window")).toBeNull();
   });
 });
@@ -57,6 +57,31 @@ describe("a window", () => {
         /Orders given from 10:00 to 15:00\. 12 of 3,605 orders\./,
       ),
     ).toBeTruthy();
+  });
+
+  it("ends at the match's end when the window is held open to it (#5358)", () => {
+    // The dock holds a window that reaches the match's end as Infinity.
+    show({
+      matchEndSec: 501.4,
+      window: { startSec: 450, endSec: Number.POSITIVE_INFINITY },
+      count: null,
+    });
+    expect(screen.getByText("Orders given from 7:30 to 8:21.")).toBeTruthy();
+  });
+
+  it("never gives an end later than the match's end", () => {
+    // The layers' axis ran on to 508 s for an order given after the match.
+    show({
+      matchEndSec: 501.4,
+      window: { startSec: 450, endSec: 508 },
+      count: null,
+    });
+    expect(screen.getByText("Orders given from 7:30 to 8:21.")).toBeTruthy();
+  });
+
+  it("ends the whole match at the match's end", () => {
+    show({ matchEndSec: 501.4, count: null });
+    expect(screen.getByText("The whole match, 0:00 to 8:21.")).toBeTruthy();
   });
 
   it("says none, and not that the layer is broken, when the window is empty", () => {

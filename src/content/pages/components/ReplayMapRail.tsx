@@ -284,7 +284,7 @@ export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
     buildLayer,
     windowed,
     ev,
-    domainSec,
+    endOfMatchSec,
     timeWindow,
     orderCount,
     result,
@@ -294,7 +294,7 @@ export function MapTimeWindow({ layers }: { layers: ReplayMapLayers }) {
   return (
     <div data-map-window className="w-full max-w-3xl">
       <ReplayTimeWindowNote
-        domainSec={domainSec}
+        matchEndSec={endOfMatchSec}
         window={timeWindow}
         // With the order layer on as well there are two kinds of point to
         // count, and each is counted under its own name.

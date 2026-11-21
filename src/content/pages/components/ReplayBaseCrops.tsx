@@ -18,7 +18,7 @@ import {
   NEUTRAL_SHAPE,
   NEUTRAL_TEAM_COLOUR,
 } from "../../replayMapLayers";
-import type { TimeWindow } from "../../replayTimeWindow";
+import { captionRange, type TimeWindow } from "../../replayTimeWindow";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
@@ -40,7 +40,8 @@ interface BasePictures {
   minimapUrl: string;
   /** The window the dock's Heat window lane has set, or null for the whole match. */
   timeWindow: TimeWindow | null;
-  domainSec: number;
+  /** Where the match ended, which no end the captions give passes. */
+  endOfMatchSec: number;
   /** The replay's game is not installed or its units are unread, so every mark
    *  has one shape. */
   unitsMissing: boolean;
@@ -86,8 +87,15 @@ export function BasePicturesProvider({
     heightmap: heightmap.data,
     shown: [],
   });
-  const { layersShown, world, dots, inWindow, units, timeWindow, domainSec } =
-    layers;
+  const {
+    layersShown,
+    world,
+    dots,
+    inWindow,
+    units,
+    timeWindow,
+    endOfMatchSec,
+  } = layers;
   // Where each starting unit appeared, when the replay has an analysis, since
   // a game can start a player somewhere other than the recorded start (#5339).
   const { spawns, loading: spawnsLoading } = useSpawnedStarts(
@@ -107,7 +115,7 @@ export function BasePicturesProvider({
       world,
       minimapUrl,
       timeWindow,
-      domainSec,
+      endOfMatchSec,
       unitsMissing: unitList === null,
     };
   }, [
@@ -121,7 +129,7 @@ export function BasePicturesProvider({
     info,
     spawns,
     timeWindow,
-    domainSec,
+    endOfMatchSec,
   ]);
   return (
     <BasePicturesContext.Provider value={value}>
@@ -260,11 +268,10 @@ export function BasePictureKey() {
   const { t } = useLingui();
   const pictures = useBasePictures();
   if (!pictures) return null;
-  const { crops, timeWindow, domainSec, unitsMissing } = pictures;
-  const from = timeWindow ? formatDuration(timeWindow.startSec) : "";
-  const to = timeWindow
-    ? formatDuration(Math.min(timeWindow.endSec, domainSec))
-    : "";
+  const { crops, timeWindow, endOfMatchSec, unitsMissing } = pictures;
+  const range = captionRange(timeWindow, endOfMatchSec);
+  const from = formatDuration(range.startSec);
+  const to = formatDuration(range.endSec);
   const used = UNIT_CATEGORIES.filter((category) =>
     crops.some((c) => c.marks.some((m) => m.category === category)),
   );
@@ -315,11 +322,10 @@ export function BaseCropsHelp() {
   const { t } = useLingui();
   const pictures = useBasePictures();
   if (!pictures) return null;
-  const { world, timeWindow, domainSec } = pictures;
-  const from = timeWindow ? formatDuration(timeWindow.startSec) : "";
-  const to = timeWindow
-    ? formatDuration(Math.min(timeWindow.endSec, domainSec))
-    : "";
+  const { world, timeWindow, endOfMatchSec } = pictures;
+  const range = captionRange(timeWindow, endOfMatchSec);
+  const from = formatDuration(range.startSec);
+  const to = formatDuration(range.endSec);
   const windowText = timeWindow
     ? t`Showing orders given from ${from} to ${to}.`
     : t`Showing orders given across the whole match.`;
