@@ -33,7 +33,7 @@ use sidecar::{
     build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metal_field_args,
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
     build_unit_buildpics_args, build_unit_dataset_args, build_unit_defs_args,
-    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_unit_icons_args, build_unit_model_args, build_unit_models_args, build_unit_render_args,
     build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
@@ -1323,6 +1323,54 @@ async fn unitsync_unit_defs<R: Runtime>(
     run_worker(bin, args, envs, SCAN_TIMEOUT, "unit defs", None).await
 }
 
+/// `unitsync_unit_icons`: the icon type each of a game's units draws on the map,
+/// and each icon type's picture and size.
+///
+/// Answers `{ unitTypes: { unit: type }, types: { type: { file?, size,
+/// skipped? } }, errors }`. A unit that names no icon type, or one the game does
+/// not define, has the type `default`. A type's `file` is a PNG in the build icon
+/// cache, which the webview loads over `coilbox://unitsyncbuildpic/` like a build
+/// picture, as the game ships it with no team colour. A type whose picture is
+/// missing or unreadable has no `file` and says why in `skipped`, and the call
+/// still answers for the rest.
+///
+/// Answered from the cache, with no worker, once a game has been read and its
+/// pictures are all still on disk. `archive_path` is the game's file, which is
+/// what the cache is keyed on.
+#[tauri::command]
+async fn unitsync_unit_icons<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    archive_path: Option<String>,
+) -> CliResult {
+    let cache_dir = buildpic_cache_dir(&app);
+    if let Some(hit) = answered(
+        "unit icons",
+        cache_dir
+            .as_deref()
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::unit_icons(dir, Path::new(path)))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let cache_arg = cache_dir.map(|p| p.to_string_lossy().into_owned());
+    let args = build_unit_icons_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        cache_arg.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit icons", None).await
+}
+
 /// `unitsync_custom_params`: load one game's archives and index which of its own
 /// Lua files name each custom parameter (issue #2661).
 ///
@@ -2571,6 +2619,26 @@ pub fn unit_defs_blocking(
     run_page_blocking(bin, args, envs, SCAN_TIMEOUT, "unit defs")
 }
 
+/// The worker's `unitsync_unit_icons` answer for `archive`, written to and read
+/// from `cache_dir`. Blocking, and not a command of its own: the test that runs
+/// it against a real game reads the answer without an app.
+pub fn unit_icons_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    cache_dir: &Path,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_unit_icons_args(
+        &libpath.to_string_lossy(),
+        data_dir,
+        archive,
+        Some(&cache_dir.to_string_lossy()),
+    );
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_page_blocking(bin, args, envs, SCAN_TIMEOUT, "unit icons")
+}
+
 /// The game environment a def script expects under unitsync, for a script
 /// [`lua_exec_blocking`] runs that loads the game's defs.
 pub use coilbox_unitsync_worker::defsenv::DEFS_ENV_SHIM;
@@ -2972,6 +3040,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_faction_logos,
             unitsync_unit_dataset,
             unitsync_unit_defs,
+            unitsync_unit_icons,
             unitsync_custom_params,
             unitsync_unit_model,
             unitsync_unit_models,

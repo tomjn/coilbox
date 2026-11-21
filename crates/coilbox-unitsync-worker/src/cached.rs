@@ -21,7 +21,7 @@ use crate::model::{
     ArchiveFileEntry, ArchiveTreeOutput, FactionLogoEntry, FactionLogosOutput, GameHeaderItem,
     GameHeadersOutput, HeightWindow, HeightmapOutput, MapAppearance, MapMeta, MapMetaOutput,
     MapSkyboxOutput, MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput, UnitBuildpicsOutput,
-    UnitDisplay, UnitModelFile, UnitModelsOutput,
+    UnitDisplay, UnitIconsOutput, UnitModelFile, UnitModelsOutput,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -301,6 +301,37 @@ pub fn unit_buildpics(
         units: resolved,
         errors: Vec::new(),
     })
+}
+
+// ---- unit icon types
+
+/// The file a game's unit icon type record is written to, named after
+/// [`cachekey::unit_icons_key`]. It sits in the build icon cache directory beside
+/// the pictures it names.
+pub fn unit_icons_record_name(base: &str) -> String {
+    format!("{base}_unit_icons.json")
+}
+
+/// A game's cached unit icon types, when the record is there and every picture
+/// it names is still on disk. A cache clean removes the PNGs and leaves the
+/// record, and answering from it would hand the page files that are gone, so
+/// that reads as a miss. An unreadable record is a miss too.
+pub fn read_unit_icons(dir: &Path, base: &str) -> Option<UnitIconsOutput> {
+    let raw = std::fs::read_to_string(dir.join(unit_icons_record_name(base))).ok()?;
+    let out: UnitIconsOutput = serde_json::from_str(&raw).ok()?;
+    let pictures_present = out
+        .types
+        .values()
+        .filter_map(|t| t.file.as_ref())
+        .all(|name| dir.join(name).exists());
+    pictures_present.then_some(out)
+}
+
+/// The icon types of `game_archive` when the worker has already resolved them,
+/// as it would answer them. `None` sends the caller to a worker.
+pub fn unit_icons(dir: &Path, game_archive: &Path) -> Option<UnitIconsOutput> {
+    let base = cachekey::unit_icons_key(&ArchiveStamp::of(game_archive)?);
+    read_unit_icons(dir, &base)
 }
 
 // ---- faction logos

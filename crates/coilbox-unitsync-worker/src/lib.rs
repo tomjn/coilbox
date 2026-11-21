@@ -75,6 +75,7 @@ pub enum Mode {
     FactionLogos(FactionLogosArgs),
     UnitDataset(UnitDatasetArgs),
     UnitDefs(UnitDefsArgs),
+    UnitIcons(UnitIconsArgs),
     DefsProbe(DefsProbeArgs),
     CustomParams(CustomParamsArgs),
     UnitModel(UnitModelArgs),
@@ -120,6 +121,7 @@ impl Mode {
             Mode::FactionLogos(args) => args.to_args(),
             Mode::UnitDataset(args) => args.to_args(),
             Mode::UnitDefs(args) => args.to_args(),
+            Mode::UnitIcons(args) => args.to_args(),
             Mode::DefsProbe(args) => args.to_args(),
             Mode::CustomParams(args) => args.to_args(),
             Mode::UnitModel(args) => args.to_args(),
@@ -1583,6 +1585,56 @@ impl UnitDefsArgs {
     }
 }
 
+/// `--unit-icons`: the icon type each of `game`'s units draws on the map, and
+/// each icon type's picture and size, with the pictures written as PNG files
+/// under `cache_dir`.
+///
+/// A mode of its own rather than part of `--unit-buildpics`. A build picture is
+/// the one a unit shows in a menu and is read per unit out of `unitpics/`. A map
+/// icon belongs to a type that many units share, and comes from the game's
+/// `gamedata/icontypes.lua`, which has to be run as Lua.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct UnitIconsArgs {
+    pub game: String,
+    pub cache_dir: Option<String>,
+}
+
+impl UnitIconsArgs {
+    /// Build the flags for `--unit-icons` mode: the flag itself, the game and
+    /// the cache directory the pictures and the record go to.
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "--unit-icons".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
+    }
+
+    /// Recover a `--unit-icons` invocation from a worker argv, as the other
+    /// modes' `from_args` functions do.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut cache_dir = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(UnitIconsArgs {
+            game: game.unwrap_or_default(),
+            cache_dir,
+        })
+    }
+}
+
 /// `--defs-probe`: load `game`'s definitions once per run in the JSON at
 /// `source_file`, each time with that run's files on top, and read numbers
 /// back out of the loaded tables (issue #3059).
@@ -2965,6 +3017,21 @@ mod tests {
         let original = unit_defs_args();
         let recovered = UnitDefsArgs::from_args(&original.to_args()).expect("valid argv");
         assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn unit_icons_round_trips_through_to_args_and_from_args() {
+        let original = UnitIconsArgs {
+            game: "SplinterFaction.sdd".into(),
+            cache_dir: Some("/cache/buildpics".into()),
+        };
+        let recovered = UnitIconsArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+        assert!(original.to_args().contains(&"--unit-icons".to_string()));
+        assert_eq!(
+            Mode::UnitIcons(original.clone()).to_args(),
+            original.to_args()
+        );
     }
 
     #[test]

@@ -230,6 +230,28 @@ pub fn build_unit_defs_args(
     args
 }
 
+/// Build args for `--unit-icons` mode: the game whose units' map icon types to
+/// read, and the cache directory the pictures and the record are written to.
+///
+/// The mode's fields live once in `coilbox_unitsync_worker::UnitIconsArgs`, so
+/// this function only has to add `--lib`/`--datadir`.
+pub fn build_unit_icons_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::UnitIcons(coilbox_unitsync_worker::UnitIconsArgs {
+            game: game.into(),
+            cache_dir: cache_dir.map(String::from),
+        })
+        .to_args(),
+    );
+    args
+}
+
 /// Build args for `--defs-probe` mode: the game to load and the JSON file
 /// holding the runs (issue #3059).
 pub fn build_defs_probe_args(
@@ -1838,6 +1860,32 @@ mod tests {
         let recovered = UnitDatasetArgs::from_args(&without).expect("valid argv");
         assert_eq!(recovered.cache_dir, None);
         assert_eq!(recovered.match_setup_file, None);
+    }
+
+    /// What `build_unit_icons_args` writes, the worker's own `from_args` reads
+    /// back.
+    #[test]
+    fn build_unit_icons_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::UnitIconsArgs;
+
+        let a = build_unit_icons_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "SplinterFaction.sdd",
+            Some("/cache/buildpics"),
+        );
+        assert!(a.contains(&"--unit-icons".to_string()));
+        let recovered = UnitIconsArgs::from_args(&a).expect("valid argv");
+        assert_eq!(
+            recovered,
+            UnitIconsArgs {
+                game: "SplinterFaction.sdd".into(),
+                cache_dir: Some("/cache/buildpics".into()),
+            }
+        );
+        // The neighbouring def reads are named by their own flags.
+        assert!(!a.contains(&"--unit-defs".to_string()));
+        assert!(!a.contains(&"--unit-buildpics".to_string()));
     }
 
     /// What `build_unit_defs_args` writes, the worker's own `from_args` reads

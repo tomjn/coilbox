@@ -64,6 +64,7 @@ mod smf;
 mod texture;
 mod typemap;
 mod unitdefs;
+mod uniticons;
 mod unitmodel;
 mod unitmodels;
 mod unitrender;
@@ -195,6 +196,10 @@ struct Args {
     /// `coilbox_unitsync_worker::UnitDefsArgs`, shared with the sidecar plugin
     /// that builds this flag's argv (issue #2448).
     unit_defs: Option<Mode>,
+    /// `--unit-icons`: the icon type each of a game's units draws on the map,
+    /// with each type's picture and size. Its fields live once in
+    /// `coilbox_unitsync_worker::UnitIconsArgs`.
+    unit_icons: Option<Mode>,
     /// `--defs-probe`: load a game's definitions with some files on top and
     /// read numbers back (issue #3059). Its fields live once in
     /// `coilbox_unitsync_worker::DefsProbeArgs`.
@@ -539,6 +544,18 @@ fn dispatch(args: &Args) -> i32 {
             || unitdefs::render(&args.lib, &mode.game, cache_dir),
             print_ok,
             || unitdefs::emit_error("worker panicked while reading unit defs".into()),
+        );
+    }
+
+    // Unit icons: the icon type of each unit and each type's picture, in one
+    // Init, disk-cached beside the build icons. Keys off --game, so checked
+    // before the --game game-detail mode.
+    if let Some(Mode::UnitIcons(mode)) = &args.unit_icons {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        return run_mode(
+            || uniticons::render(&args.lib, &mode.game, cache_dir),
+            print_ok,
+            || uniticons::emit_error("worker panicked while reading unit icons".into()),
         );
     }
 
@@ -1132,6 +1149,9 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     // locals here for its own use: `Mode::UnitDefs`'s `from_args` below
     // re-scans `raw` for those (issue #2448).
     let mut unit_defs_flag = false;
+    // `--unit-icons`' own fields (game, cache directory) are read by
+    // `Mode::UnitIcons`'s `from_args` below.
+    let mut unit_icons_flag = false;
     // `--defs-probe`'s fields (game, source file) are read by its own
     // `from_args` below.
     let mut defs_probe_flag = false;
@@ -1250,6 +1270,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--unit-buildpics" => unit_buildpics_flag = true,
             "--unit-dataset" => unit_dataset_flag = true,
             "--unit-defs" => unit_defs_flag = true,
+            "--unit-icons" => unit_icons_flag = true,
             "--defs-probe" => defs_probe_flag = true,
             "--custom-params" => custom_params_flag = true,
             "--unit-model" => unit_model_flag = true,
@@ -1464,6 +1485,13 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         unit_defs: if unit_defs_flag {
             Some(Mode::UnitDefs(
                 coilbox_unitsync_worker::UnitDefsArgs::from_args(raw)?,
+            ))
+        } else {
+            None
+        },
+        unit_icons: if unit_icons_flag {
+            Some(Mode::UnitIcons(
+                coilbox_unitsync_worker::UnitIconsArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -1797,6 +1825,15 @@ fn absolutize(args: &mut Args) {
     // from `raw` in `parse_args`, so it needs the same treatment. `--game` is a
     // unitsync name, not a path, so it is left alone.
     if let Some(Mode::UnitDefs(mode)) = args.unit_defs.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
+    // `Mode::UnitIcons` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment.
+    if let Some(Mode::UnitIcons(mode)) = args.unit_icons.as_mut() {
         if let Some(dir) = &mut mode.cache_dir {
             if let Some(abs) = absolute_path(dir) {
                 *dir = abs;
@@ -2490,6 +2527,7 @@ mod tests {
             unit_buildpics: None,
             unit_dataset: None,
             unit_defs: None,
+            unit_icons: None,
             defs_probe: None,
             custom_params: None,
             unit_model: None,

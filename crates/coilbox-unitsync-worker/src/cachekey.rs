@@ -121,6 +121,10 @@ pub const MODEL_CACHE_VERSION: u32 = 5;
 /// not named after the unit was cached as having none.
 pub const BUILDPIC_CACHE_VERSION: u32 = 8;
 
+/// Salts the unit icon type cache key. Bump when the picture encoding, the cache
+/// record or the way icon types are read changes.
+pub const UNIT_ICONS_CACHE_VERSION: u32 = 1;
+
 /// Salts the faction-logo cache key. Bump when the encoding, chroma-key rule, or
 /// cache format changes so stale entries are ignored.
 /// v2: the emblem is a PNG file named by the record rather than base64 inside it
@@ -385,6 +389,13 @@ pub fn buildpic_key(stamp: &ArchiveStamp) -> String {
     stamp_hash(Some(BUILDPIC_CACHE_VERSION), None, stamp)
 }
 
+/// The base the unit icon type record and pictures under one game are named
+/// after. These files share the build icon cache directory, so the key carries a
+/// namespace and never equals [`buildpic_key`].
+pub fn unit_icons_key(stamp: &ArchiveStamp) -> String {
+    stamp_hash(Some(UNIT_ICONS_CACHE_VERSION), Some("uniticons"), stamp)
+}
+
 /// The base every faction logo record under one game is named after.
 pub fn faction_logo_key(stamp: &ArchiveStamp) -> String {
     stamp_hash(Some(FACTION_LOGO_CACHE_VERSION), None, stamp)
@@ -428,6 +439,14 @@ mod tests {
         assert_eq!(buildpic_key(&game()), "d79fec1abd8cf793");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
         assert_eq!(header_key(&game()), "7628cfa0c7249680");
+    }
+
+    /// The icon type files sit in the build icon cache directory, so a key that
+    /// matched the build icon key would let their records overwrite each other.
+    #[test]
+    fn the_unit_icons_key_is_not_the_build_icon_key() {
+        assert_ne!(unit_icons_key(&game()), buildpic_key(&game()));
+        assert_eq!(unit_icons_key(&game()), unit_icons_key(&game()));
     }
 
     #[test]

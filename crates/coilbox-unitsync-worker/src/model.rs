@@ -1423,6 +1423,61 @@ pub struct UnitBuildpicsOutput {
     pub errors: Vec<String>,
 }
 
+/// Why an icon type has no picture. Every one is a different answer, and only
+/// some of them are anyone's bug.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum IconPictureSkip {
+    /// The game's `icontypes.lua` names a bitmap that no archive holds.
+    NoSource,
+    /// A file is there and coilbox could not decode it.
+    Undecodable,
+    /// The type draws one part of a larger picture (`u0`, `v0`, `u1`, `v1`).
+    /// Cutting that part out is not done yet, and drawing the whole picture
+    /// instead would show the wrong one.
+    SubImage,
+    /// The PNG encoder refused the picture.
+    EncodeFailed,
+    /// Decoded and encoded, and the PNG could not be written to the cache.
+    NotWritten,
+}
+
+/// One icon type from a game's `gamedata/icontypes.lua`: its picture and its
+/// size. Also part of the on-disk cache record.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct IconType {
+    /// The picture as a PNG in the build icon cache, served over
+    /// `coilbox://unitsyncbuildpic/`. It is as the game ships it: the engine
+    /// tints these in the owning team's colour as it draws them, and nothing
+    /// here does.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file: Option<String>,
+    /// The type's `size`: a multiplier on the engine's base icon size.
+    pub size: f32,
+    /// Why there is no `file`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub skipped: Option<IconPictureSkip>,
+}
+
+/// Output of `--unit-icons`: the icon type each unit draws on the map, and each
+/// icon type's picture and size. Also the on-disk cache record.
+///
+/// Every unit is in `unit_types`, under the lowercase name its definition has
+/// in `gamedata/defs.lua`. Its value is always a key of `types`: a unit that
+/// names no type, or one the game does not define, has the type `default`, as
+/// in the engine (`CIconHandler::GetIconIdxOrDefault`).
+#[derive(Serialize, Deserialize, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitIconsOutput {
+    #[serde(default)]
+    pub unit_types: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub types: std::collections::BTreeMap<String, IconType>,
+    #[serde(default)]
+    pub errors: Vec<String>,
+}
+
 /// One side's resolved faction emblem: a PNG plus the source image's longest
 /// pixel side. The dimension lets the UI demote a tiny (16px) archive sidepic
 /// below a crisper curated (catalog/profile) image instead of upscaling it.
