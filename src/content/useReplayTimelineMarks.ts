@@ -1,11 +1,26 @@
 import { useMemo } from "react";
-import type { DemoInfo } from "./bindings";
+import type { DemoInfo, ReplayPlayer } from "./bindings";
 import { analysisRunHidden, useStoredAnalyses } from "./replayAnalysis";
 import { DEATH_KINDS, eventBlock, eventState } from "./replayEventLayers";
 import type { PlacedMark } from "./replayMapView/timelineMarks";
 import { describeEvent, markKind } from "./replayTimeline";
 import { useReplayChat } from "./useReplayChat";
 import { useEventRead } from "./useReplayEventLayers";
+
+/**
+ * The engine team of each seated player, by the `[playerN]` number a chat line
+ * carries. Spectators and players the file gives no number or team are left
+ * out, as is the server (255), so their lines have no team. A name is never
+ * matched: two players can share one.
+ */
+function playerTeams(players: readonly ReplayPlayer[]): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const p of players) {
+    if (p.spectator || p.player === undefined || p.team === undefined) continue;
+    out.set(p.player, p.team);
+  }
+  return out;
+}
 
 /** Whether the analysis has given the Kills lane its marks. */
 export interface KillsLane {
@@ -33,6 +48,7 @@ export function useReplayTimelineMarks(
   replayPath: string,
 ): { marks: PlacedMark[]; kills: KillsLane } {
   const chat = useReplayChat(replayPath);
+  const players = info.players;
   const analyses = useStoredAnalyses();
   const stored =
     info.remixed || !info.gameId ? undefined : analyses.get(info.gameId);
@@ -41,12 +57,14 @@ export function useReplayTimelineMarks(
 
   const marks = useMemo(() => {
     const out: PlacedMark[] = [];
+    const teamOf = playerTeams(players);
     for (const line of chat.messages ?? []) {
       out.push({
         lane: "chat",
         frame: line.frame,
         text: line.playerName ? `${line.playerName}: ${line.text}` : line.text,
         kind: markKind(line),
+        team: line.system ? undefined : teamOf.get(line.player),
       });
     }
     for (const event of chat.events) {
@@ -64,7 +82,7 @@ export function useReplayTimelineMarks(
       }
     }
     return out;
-  }, [chat.messages, chat.events, deaths.events]);
+  }, [chat.messages, chat.events, deaths.events, players]);
 
   const kills: KillsLane =
     state.kind !== "ready"

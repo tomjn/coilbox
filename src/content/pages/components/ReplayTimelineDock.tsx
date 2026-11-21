@@ -50,6 +50,7 @@ import {
   type KillsLane,
   useReplayTimelineMarks,
 } from "../../useReplayTimelineMarks";
+import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { OpenInEngineButton } from "./OpenInEngineButton";
 
 /**
@@ -518,6 +519,7 @@ export function ReplayTimelineDock({
   const { t: tr, i18n } = useLingui();
   const { clock, playback, range } = useMatchClock();
   const keys = useTimelineKeys();
+  const emphasis = useSeriesEmphasis();
   const settled = useSettledFrame();
   const { marks, kills } = useReplayTimelineMarks(info, replayPath);
   const animates = range.source === "track";
@@ -636,35 +638,65 @@ export function ReplayTimelineDock({
                         {note.words}
                       </span>
                     )}
-                    {row.map((group) => (
-                      <button
-                        key={group.column}
-                        type="button"
-                        // Reached from the keyboard with [ and ], which keeps a
-                        // match with a mark in every column from being a
-                        // hundred tab stops.
-                        tabIndex={-1}
-                        aria-label={groupWords(range, group)}
-                        title={groupWords(range, group)}
-                        onClick={() => playback.seek(group.frame)}
-                        onPointerEnter={() =>
-                          setPointed({ lane, column: group.column })
-                        }
-                        onPointerLeave={() => setPointed(null)}
-                        onFocus={() =>
-                          setPointed({ lane, column: group.column })
-                        }
-                        onBlur={() => setPointed(null)}
-                        className="absolute inset-y-0 flex items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-                        style={{
-                          left: `${((group.column + 0.5) / columns) * 100}%`,
-                          width: `${100 / columns}%`,
-                          transform: "translateX(-50%)",
-                        }}
-                      >
-                        <Glyph group={group} />
-                      </button>
-                    ))}
+                    {row.map((group) => {
+                      // A chat mark stands for the teams of whoever spoke in
+                      // it, and lights and dims with them as a roster row does.
+                      // Only teams with a line can be pointed at.
+                      const shown = group.teams.filter((team) =>
+                        emphasis.isShown(team),
+                      );
+                      const lit = shown.length > 0 && emphasis.isLit(shown);
+                      const faded =
+                        group.teams.length > 0 && emphasis.dimming && !lit;
+                      const point =
+                        shown.length > 0 ? emphasis.pointTo(shown) : undefined;
+                      const focus =
+                        shown.length > 0 ? emphasis.focusOn(shown) : undefined;
+                      return (
+                        <button
+                          key={group.column}
+                          type="button"
+                          // Reached from the keyboard with [ and ], which keeps
+                          // a match with a mark in every column from being a
+                          // hundred tab stops.
+                          tabIndex={-1}
+                          aria-label={groupWords(range, group)}
+                          title={groupWords(range, group)}
+                          data-emphasised={
+                            group.teams.length > 0 ? lit : undefined
+                          }
+                          onClick={() => playback.seek(group.frame)}
+                          onPointerEnter={(ev) => {
+                            setPointed({ lane, column: group.column });
+                            point?.onPointerEnter(ev);
+                          }}
+                          onPointerLeave={() => {
+                            setPointed(null);
+                            point?.onPointerLeave();
+                          }}
+                          onFocus={(ev) => {
+                            setPointed({ lane, column: group.column });
+                            focus?.onFocus(ev);
+                          }}
+                          onBlur={() => {
+                            setPointed(null);
+                            focus?.onBlur();
+                          }}
+                          className={`absolute inset-y-0 flex items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring ${
+                            lit
+                              ? "bg-accent/60 ring-2 ring-ring/40 ring-inset"
+                              : ""
+                          } ${faded ? "opacity-40" : ""}`}
+                          style={{
+                            left: `${((group.column + 0.5) / columns) * 100}%`,
+                            width: `${100 / columns}%`,
+                            transform: "translateX(-50%)",
+                          }}
+                        >
+                          <Glyph group={group} />
+                        </button>
+                      );
+                    })}
                   </div>
                 );
               })}

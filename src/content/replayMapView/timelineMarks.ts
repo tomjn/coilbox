@@ -16,6 +16,10 @@ export interface PlacedMark {
   /** What sort of event it is within its lane, where the lane tells them apart.
    *  A chat line's is who it was sent to. */
   kind?: string;
+  /** The engine team of the player who sent a chat line. Absent for a line with
+   *  no team: a spectator's, the server's, a system line, or a player the
+   *  replay gives no number. */
+  team?: number;
 }
 
 /** The marks of one lane that share a column of the bar. */
@@ -32,6 +36,8 @@ export interface MarkGroup {
   kind?: string;
   /** Whether the earliest event was before the axis starts. */
   before: boolean;
+  /** The teams behind the group's marks, ascending. Empty when none has one. */
+  teams: number[];
 }
 
 /**
@@ -51,7 +57,7 @@ export function groupMarks(
   const groups = new Map<string, MarkGroup>();
   // The frame each group's earliest event was recorded at, before it was held.
   const earliest = new Map<string, number>();
-  for (const { lane, frame: recorded, text, kind } of marks) {
+  for (const { lane, frame: recorded, text, kind, team } of marks) {
     const frame = Math.min(range.last, Math.max(range.first, recorded));
     const column =
       length <= 0
@@ -65,6 +71,10 @@ export function groupMarks(
     if (held) {
       held.count++;
       if (held.kind !== kind) held.kind = undefined;
+      if (team !== undefined && !held.teams.includes(team)) {
+        held.teams.push(team);
+        held.teams.sort((a, b) => a - b);
+      }
       if (recorded < (earliest.get(key) ?? recorded)) {
         earliest.set(key, recorded);
         held.frame = frame;
@@ -80,6 +90,7 @@ export function groupMarks(
         text,
         kind,
         before: recorded < range.first,
+        teams: team === undefined ? [] : [team],
       });
       earliest.set(key, recorded);
     }
