@@ -20,6 +20,7 @@ import {
   Fragment,
   type ReactNode,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -791,47 +792,66 @@ function Preview({
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Puts a new object on the canvas the hook built, or none.
+  const showRef = useRef<((next: Built | null) => void) | null>(null);
 
+  // The canvas is remade when `spin` changes, not when the object does: a
+  // browser allows only a few WebGL contexts, and one remade per colourway
+  // click ran WebKit out of them (issue #5344).
   useCanvas3D(
     containerRef,
     ({ renderer, host }) => {
-      const built = build();
-      if (!built) return;
-
       const scene = new THREE.Scene();
       addStandardLights(scene);
-      scene.add(built.object);
 
-      // Frame the object rather than the scene, so a sliver fills the view as
-      // much as a hull section does.
-      const radius = Math.max(built.size, 0.001);
-      const camera = new THREE.PerspectiveCamera(
-        35,
-        1,
-        radius / 100,
-        radius * 100,
-      );
-      camera.position.set(radius * 1.6, radius * 1.2, radius * 1.9);
-
+      const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100);
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enablePan = false;
-      controls.minDistance = radius * 0.8;
-      controls.maxDistance = radius * 6;
 
       const render = () => renderer.render(scene, camera);
       controls.addEventListener("change", render);
 
       // The panel sits in a page that scrolls, so a wheel over empty space
       // belongs to the page and one over the object zooms (issue #2328). The
-      // object's own bounding box, measured once: it does not move, only the
-      // camera does.
-      const box = new THREE.Box3().setFromObject(built.object);
+      // object's own bounding box, measured when it is shown: it does not
+      // move, only the camera does.
+      const box = new THREE.Box3();
       const detachWheel = attachWheelRelease(
         host,
         renderer.domElement,
         () => camera,
-        (ray) => boxHit(ray.origin, ray.direction, box.min, box.max),
+        (ray) =>
+          !box.isEmpty() && boxHit(ray.origin, ray.direction, box.min, box.max),
       );
+
+      let shown: Built | null = null;
+      const clear = () => {
+        if (!shown) return;
+        scene.remove(shown.object);
+        shown.dispose?.();
+        shown = null;
+      };
+      showRef.current = (next) => {
+        clear();
+        box.makeEmpty();
+        if (next) {
+          shown = next;
+          scene.add(next.object);
+          box.setFromObject(next.object);
+          // Frame the object rather than the scene, so a sliver fills the
+          // view as much as a hull section does.
+          const radius = Math.max(next.size, 0.001);
+          camera.near = radius / 100;
+          camera.far = radius * 100;
+          camera.position.set(radius * 1.6, radius * 1.2, radius * 1.9);
+          camera.updateProjectionMatrix();
+          controls.minDistance = radius * 0.8;
+          controls.maxDistance = radius * 6;
+          controls.target.set(0, 0, 0);
+          controls.update();
+        }
+        render();
+      };
 
       // `update` turns the camera and fires "change", which draws.
       controls.autoRotate = spin;
@@ -849,17 +869,24 @@ function Preview({
           camera.updateProjectionMatrix();
         },
         dispose: () => {
+          showRef.current = null;
           cancelAnimationFrame(frame);
           detachWheel();
           controls.removeEventListener("change", render);
           controls.dispose();
-          scene.remove(built.object);
-          built.dispose?.();
+          clear();
         },
       };
     },
-    [...deps, spin],
+    [spin],
   );
+
+  // Declared after the hook, so on a mount or a `spin` change the canvas
+  // exists by the time this runs.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the caller passes what its own build reads, the way useMemo takes a list
+  useLayoutEffect(() => {
+    showRef.current?.(build());
+  }, [...deps, spin]);
 
   return (
     <div

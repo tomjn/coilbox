@@ -39,6 +39,7 @@ vi.mock("three", async (orig) => {
     }
     setRenderTarget() {}
     dispose() {}
+    forceContextLoss() {}
   }
   return { ...actual, WebGLRenderer: FakeRenderer };
 });

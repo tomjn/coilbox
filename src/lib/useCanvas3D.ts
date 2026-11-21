@@ -46,6 +46,20 @@ export interface Canvas3DScene {
 }
 
 /**
+ * Free a renderer and give its WebGL context back to the browser.
+ *
+ * `dispose()` frees what three allocated but leaves the context alive until
+ * the garbage collector reaches the canvas. A browser allows only a handful of
+ * live contexts and drops the oldest past that, so a view rebuilt on every
+ * click used up the allowance and blanked the main model view (issue #5344).
+ */
+function release(renderer: THREE.WebGLRenderer): void {
+  renderer.dispose();
+  renderer.forceContextLoss();
+  renderer.domElement.remove();
+}
+
+/**
  * Run `build` against a fresh canvas inside `hostRef`, and tear it all down
  * when `deps` change or the view unmounts.
  *
@@ -98,8 +112,7 @@ export function useCanvas3D(
     scene = build({ renderer, host, render, resize });
 
     if (!scene) {
-      renderer.dispose();
-      renderer.domElement.remove();
+      release(renderer);
       return;
     }
 
@@ -123,6 +136,11 @@ export function useCanvas3D(
     // A texture the view is already drawing with is a change like any other,
     // and the only one three does not report to whoever is drawing.
     const stopWatchingTextures = onTextureArrived(render);
+    // A browser that is over its limit of live contexts takes one back from the
+    // oldest view. three reinitialises on restore, but nothing draws until
+    // something asks, so a restored canvas would stay blank. Registered after
+    // three's own listener, so the renderer is ready by the time this runs.
+    renderer.domElement.addEventListener("webglcontextrestored", render);
     resize();
 
     return () => {
@@ -136,10 +154,10 @@ export function useCanvas3D(
       unregisterStats();
       stopWatchingTextures();
       window.removeEventListener("resize", onWindowResize);
+      renderer.domElement.removeEventListener("webglcontextrestored", render);
       observer.disconnect();
       scene?.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
+      release(renderer);
     };
     // Spread rather than passed straight through, because the lint rule wants
     // to see an array literal here. The contents are still the caller's.
