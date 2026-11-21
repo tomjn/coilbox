@@ -12,12 +12,15 @@ import {
   ariaSort,
   buildRoster,
   cellValue,
+  lastAtOrBefore,
   nextSort,
   parseRating,
   type RosterRow,
   rosterMetrics,
   rowApm,
+  sampleTimes,
   sortRows,
+  teamFiguresAt,
   teamFinals,
 } from "./replayRoster";
 
@@ -166,6 +169,69 @@ describe("teamFinals", () => {
     const finals = teamFinals(trailer, [metric(KEY_A)]);
     expect(finals.has(0)).toBe(false);
     expect(finals.has(1)).toBe(true);
+  });
+});
+
+describe("teamFiguresAt", () => {
+  const trailer: DemoTrailer = {
+    winningAllyTeams: [],
+    teamStatPeriodSec: 15,
+    teams: [
+      {
+        team: 0,
+        samples: samplesOf({ [KEY_A]: 5 }, { [KEY_A]: 40 }, { [KEY_A]: 90 }),
+      },
+      // Recorded for the first two samples only.
+      { team: 1, samples: samplesOf({ [KEY_A]: 7 }, { [KEY_A]: 8 }) },
+      { team: 2, samples: [] },
+    ],
+  };
+  const figures = (sec: number) => teamFiguresAt(trailer, [metric(KEY_A)], sec);
+
+  it("is each team's last sample at or before the time", () => {
+    expect(figures(14.9).get(0)).toEqual({ [KEY_A]: 5 });
+    expect(figures(15).get(0)).toEqual({ [KEY_A]: 40 });
+    expect(figures(29).get(0)).toEqual({ [KEY_A]: 40 });
+  });
+
+  it("is the whole match's figure at the last sample's time and after it", () => {
+    const finals = teamFinals(trailer, [metric(KEY_A)]);
+    expect(figures(30)).toEqual(finals);
+    expect(figures(9999)).toEqual(finals);
+  });
+
+  it("keeps a team's last figure after the team stops being recorded", () => {
+    expect(figures(30).get(1)).toEqual({ [KEY_A]: 8 });
+  });
+
+  it("leaves out a team with no sample yet, and one with none at all", () => {
+    expect(figures(-1).size).toBe(0);
+    expect(figures(0).has(2)).toBe(false);
+  });
+});
+
+describe("sampleTimes and lastAtOrBefore", () => {
+  const trailer: DemoTrailer = {
+    winningAllyTeams: [],
+    teamStatPeriodSec: 15,
+    teams: [
+      { team: 0, samples: samplesOf({}, {}, {}) },
+      { team: 1, samples: samplesOf({}, {}) },
+    ],
+  };
+
+  it("lists each time a team was sampled once, in seconds", () => {
+    expect(sampleTimes(trailer)).toEqual([0, 15, 30]);
+  });
+
+  it("finds the last time at or before a second, or -1 before the first", () => {
+    const times = [0, 15, 30];
+    expect(lastAtOrBefore(times, -1)).toBe(-1);
+    expect(lastAtOrBefore(times, 0)).toBe(0);
+    expect(lastAtOrBefore(times, 14.99)).toBe(0);
+    expect(lastAtOrBefore(times, 15)).toBe(1);
+    expect(lastAtOrBefore(times, 500)).toBe(2);
+    expect(lastAtOrBefore([], 5)).toBe(-1);
   });
 });
 

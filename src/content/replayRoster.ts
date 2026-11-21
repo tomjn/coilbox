@@ -4,7 +4,9 @@ import type {
   Metric,
   ReplayAi,
   ReplayPlayer,
+  TeamStatSample,
 } from "./bindings";
+import { secondsPerFrame } from "./matchStats";
 import {
   compareFigures,
   libraryMetrics,
@@ -91,15 +93,69 @@ export function teamFinals(
   const finals = new Map<number, Record<string, number>>();
   for (const t of trailer.teams) {
     const last = t.samples.at(-1);
-    if (!last) continue;
-    const figures: Record<string, number> = {};
-    for (const m of metrics) {
-      const v = last[m.key];
-      if (typeof v === "number") figures[m.key] = v;
-    }
-    finals.set(t.team, figures);
+    if (last) finals.set(t.team, figuresOf(last, metrics));
   }
   return finals;
+}
+
+function figuresOf(
+  sample: TeamStatSample,
+  metrics: Metric[],
+): Record<string, number> {
+  const figures: Record<string, number> = {};
+  for (const m of metrics) {
+    const v = sample[m.key];
+    if (typeof v === "number") figures[m.key] = v;
+  }
+  return figures;
+}
+
+/**
+ * Every time a team was sampled, once, in seconds from the start of the match
+ * and ascending. The chart's x axis counts the same way.
+ */
+export function sampleTimes(trailer: DemoTrailer): number[] {
+  const spf = secondsPerFrame(trailer);
+  const frames = new Set(
+    trailer.teams.flatMap((t) => t.samples.map((s) => s.frame)),
+  );
+  return [...frames].sort((a, b) => a - b).map((f) => f * spf);
+}
+
+/**
+ * The index of the last of `ascending` that is at or before `value`, or -1
+ * when every one is after it.
+ */
+export function lastAtOrBefore(ascending: number[], value: number): number {
+  let low = 0;
+  let high = ascending.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (ascending[mid] <= value) low = mid + 1;
+    else high = mid;
+  }
+  return low - 1;
+}
+
+/**
+ * Each team's figures as they stood at `atSec`: the last sample at or before
+ * that time, since every field is a running total. A team with no sample yet at
+ * that time is not in the map, so its cells are empty and not zero. From the
+ * time of a team's last sample on, this is what {@link teamFinals} gives.
+ */
+export function teamFiguresAt(
+  trailer: DemoTrailer,
+  metrics: Metric[],
+  atSec: number,
+): Map<number, Record<string, number>> {
+  const spf = secondsPerFrame(trailer);
+  const at = new Map<number, Record<string, number>>();
+  for (const t of trailer.teams) {
+    const times = t.samples.map((s) => s.frame * spf);
+    const i = lastAtOrBefore(times, atSec);
+    if (i >= 0) at.set(t.team, figuresOf(t.samples[i], metrics));
+  }
+  return at;
 }
 
 /**

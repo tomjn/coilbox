@@ -267,6 +267,39 @@ export function useSettledFrame(): number {
   return useSyncExternalStore(settled.subscribe, settled.get);
 }
 
+/**
+ * Something worked out from the frame, which re-renders only when `select`
+ * answers something different. For a table that follows the match as it plays
+ * but changes less often than the frame does: select the second, or the sample
+ * a time falls in, and the component renders when that changes.
+ *
+ * While the match plays this follows the clock. At any other time it follows
+ * the settled frame, so a drag on the scrubber changes nothing until it ends.
+ * `select` must answer a string, number, boolean or null, which is what is
+ * compared.
+ */
+export function useMatchFrameValue<T extends string | number | boolean | null>(
+  select: (frame: number) => T,
+): T {
+  const { clock, playback, settled } = useMatchClock();
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      const stops = [
+        clock.subscribe(listener),
+        playback.subscribe(listener),
+        settled.subscribe(listener),
+      ];
+      return () => {
+        for (const stop of stops) stop();
+      };
+    },
+    [clock, playback, settled],
+  );
+  return useSyncExternalStore(subscribe, () =>
+    select(playback.getSnapshot().playing ? clock.frame : settled.get()),
+  );
+}
+
 /** Whether it is playing, which way, and at what speed. */
 export function usePlaybackState(): PlaybackState {
   const { playback } = useMatchClock();

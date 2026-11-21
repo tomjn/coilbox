@@ -8,6 +8,7 @@
  * draws nothing without a measured container.
  */
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -53,6 +54,18 @@ vi.mock("@picoframe/frame", async (orig) => ({
   useTheme: () => ({ resolved: "dark" }),
 }));
 vi.mock("../../usePrimaryPlayer", () => ({ usePrimaryPlayer: () => "" }));
+// Each cell of a render formats one figure, so these calls count renders.
+const figureCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock("../../replayMatchFigures", async (orig) => {
+  const actual = await orig<typeof import("../../replayMatchFigures")>();
+  return {
+    ...actual,
+    formatFigure: (value: number | undefined) => {
+      figureCalls.count++;
+      return actual.formatFigure(value);
+    },
+  };
+});
 vi.mock("recharts", () => {
   const Wrap = ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
@@ -81,7 +94,10 @@ vi.mock("recharts", () => {
 const { ReplayRoster } = await import("./ReplayRoster");
 const { MatchStatsSection } = await import("./MatchStatsSection");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
-const { MatchClockProvider } = await import("../../useMatchClock");
+const { MatchClockProvider, useMatchClock } = await import(
+  "../../useMatchClock"
+);
+type MatchClock = ReturnType<typeof useMatchClock>;
 const { isProfileHidden } = await import("../../../profile/hidden");
 const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
@@ -175,6 +191,12 @@ function twoVTwo(over: Partial<DemoInfo> = {}): DemoInfo {
   } as unknown as DemoInfo;
 }
 
+let clock: MatchClock;
+function ClockProbe() {
+  clock = useMatchClock();
+  return null;
+}
+
 let path = 0;
 function mount(info: DemoInfo, withSection = true) {
   const replayPath = `/replays/${++path}.sdfz`;
@@ -182,6 +204,7 @@ function mount(info: DemoInfo, withSection = true) {
   return render(
     <MemoryRouter>
       <MatchClockProvider durationSec={info.durationSec}>
+        <ClockProbe />
         <SeriesEmphasisProvider>
           <ReplayRoster info={info} replayPath={replayPath} />
           {section && (
@@ -469,6 +492,182 @@ describe("sorting", () => {
     const header = await screen.findByRole("columnheader", { name: /apm/i });
     fireEvent.click(within(header).getByRole("button"));
     expect(names()).toEqual(["Cat", "Ann", "Ben", "Dan"]);
+  });
+});
+
+describe("the figures at the scrubber's time (#5319)", () => {
+  /** Samples at 0, 15, 30 and 45 seconds, one list of A's figures per team. */
+  function trailerOver(series: number[][]): DemoTrailer {
+    return {
+      winningAllyTeams: [],
+      teamStatPeriodSec: 15,
+      teams: series.map((values, team) => ({
+        team,
+        samples: values.map((v, i) => ({ ...sample(i * 450), [ROSTER_A]: v })),
+      })),
+    };
+  }
+  const SECONDS = 60;
+  const FPS = 30;
+  const frameOf = (sec: number) => sec * FPS;
+  // Ann's final figure is the biggest, but at 15 seconds she is the smallest.
+  const SERIES = [
+    [0, 10, 200, 400],
+    [0, 20, 150, 300],
+    [0, 30, 100, 200],
+    [0, 40, 50, 100],
+  ];
+
+  function open(over: Partial<DemoInfo> = {}) {
+    TRAILER = trailerOver(SERIES);
+    mount(
+      twoVTwo({
+        durationSec: SECONDS,
+        winnersKnown: true,
+        winningAllyTeams: [0],
+        ...over,
+      }),
+      false,
+    );
+  }
+  const seek = (sec: number) => act(() => clock.playback.seek(frameOf(sec)));
+  const choose = (name: RegExp) =>
+    fireEvent.click(screen.getByRole("radio", { name }));
+  const column = (label: string) =>
+    screen
+      .getAllByRole("columnheader")
+      .findIndex((h) => new RegExp(label).test(h.textContent ?? ""));
+  /** A player's figure for the first roster metric, as printed. */
+  const figure = (player: string) =>
+    within(screen.getByText(player).closest("tr") as HTMLElement).getAllByRole(
+      "cell",
+    )[column(LABEL_A)].textContent;
+
+  it("opens on the whole match, with the final figures and every column", async () => {
+    open();
+    await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
+    expect(
+      screen
+        .getByRole("radio", { name: "Whole match" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(screen.getByRole("radio", { name: "At 0:00" })).toBeTruthy();
+    expect(figure("Ann")).toBe("400");
+    expect(screen.getByRole("columnheader", { name: /apm/i })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /result/i })).toBeTruthy();
+  });
+
+  it("shows the last sample at or before the clock's time, named in the switch", async () => {
+    open();
+    await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
+    choose(/^At /);
+    // Nothing is sampled before the first sample's frame, which is 0.
+    expect(figure("Ann")).toBe("0");
+
+    seek(15);
+    await screen.findByRole("radio", { name: "At 0:15" });
+    expect(figure("Ann")).toBe("10");
+    expect(figure("Dan")).toBe("40");
+
+    // A time between samples shows the sample before it.
+    seek(29);
+    await screen.findByRole("radio", { name: "At 0:29" });
+    expect(figure("Ann")).toBe("10");
+    seek(30);
+    expect(figure("Ann")).toBe("200");
+  });
+
+  it("shows the whole match's figure at the end of the match", async () => {
+    open();
+    await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
+    const whole = [figure("Ann"), figure("Dan")];
+    choose(/^At /);
+    seek(SECONDS);
+    expect([figure("Ann"), figure("Dan")]).toEqual(whole);
+  });
+
+  it("hides the columns with no history, and the winner, and brings them back", async () => {
+    open();
+    await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
+    expect(screen.queryAllByText("Winner")).toHaveLength(1);
+    choose(/^At /);
+    expect(screen.queryByRole("columnheader", { name: /apm/i })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: /result/i })).toBeNull();
+    expect(screen.queryAllByText("Won")).toHaveLength(0);
+    expect(screen.queryAllByText("Winner")).toHaveLength(0);
+    expect(
+      screen.getByRole("columnheader", { name: new RegExp(LABEL_A) }),
+    ).toBeTruthy();
+
+    choose(/^Whole match$/);
+    expect(screen.getByRole("columnheader", { name: /apm/i })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /result/i })).toBeTruthy();
+  });
+
+  it("sorts on the figures shown, and re-sorts as the time moves", async () => {
+    open();
+    const header = await screen.findByRole("columnheader", {
+      name: new RegExp(LABEL_A),
+    });
+    choose(/^At /);
+    seek(15);
+    fireEvent.click(within(header).getByRole("button"));
+    // 40, 30, 20, 10.
+    expect(names()).toEqual(["Dan", "Cat", "Ben", "Ann"]);
+    seek(45);
+    expect(names()).toEqual(["Ann", "Ben", "Cat", "Dan"]);
+  });
+
+  it("drops a sort by a column that is hidden, and sorts by it again when it is back", async () => {
+    open();
+    const apm = await screen.findByRole("columnheader", { name: /apm/i });
+    fireEvent.click(within(apm).getByRole("button"));
+    expect(names()).toEqual(["Cat", "Ann", "Ben", "Dan"]);
+
+    choose(/^At /);
+    expect(names()).toEqual(["Ann", "Ben", "Cat", "Dan"]);
+    choose(/^Whole match$/);
+    expect(names()).toEqual(["Cat", "Ann", "Ben", "Dan"]);
+  });
+
+  it("has no switch for a replay with no statistics", async () => {
+    TRAILER = trailerWith([0, 0, 0, 0], false);
+    mount(twoVTwo({ durationSec: SECONDS }), false);
+    await screen.findByText("Ann");
+    await waitFor(() => expect(trailerRead).toHaveBeenCalled());
+    expect(screen.queryByRole("radio")).toBeNull();
+  });
+
+  it("waits for the scrubber to settle: a drag changes nothing until it ends", async () => {
+    open();
+    await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
+    choose(/^At /);
+    seek(0);
+    act(() => clock.playback.seek(frameOf(35), { settle: false, pause: true }));
+    expect(figure("Ann")).toBe("0");
+    act(() => clock.playback.settle());
+    expect(figure("Ann")).toBe("200");
+  });
+
+  it("does not render the table on every frame of playback, only as a sample is passed", async () => {
+    open();
+    await screen.findByRole("columnheader", { name: new RegExp(LABEL_A) });
+    choose(/^At /);
+    seek(0);
+    act(() => clock.playback.play());
+    const before = figureCalls.count;
+    // Every frame from 0:01 to 0:14, which is inside the first sample.
+    for (let frame = 30; frame < frameOf(15); frame++)
+      act(() => clock.clock.set(frame));
+    expect(figureCalls.count).toBe(before);
+    expect(figure("Ann")).toBe("0");
+
+    // The next sample is passed: one render of the four rows.
+    const settledAt = figureCalls.count;
+    act(() => clock.clock.set(frameOf(15)));
+    expect(figureCalls.count).toBeGreaterThan(settledAt);
+    expect(figure("Ann")).toBe("10");
+    act(() => clock.playback.pause());
   });
 });
 
