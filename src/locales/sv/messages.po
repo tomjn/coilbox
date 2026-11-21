@@ -9786,6 +9786,10 @@ msgstr "Ett vapennamn får bara innehålla gemener, siffror och understreck."
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "En widget som listar ritningarna i det här biblioteket medan du spelar, placerar en vid markören som spöken och byggorder, och sparar byggnaderna du har markerat tillbaka hit. Den läser också BAR:s egen blueprints.json och skriver aldrig till den. Den öppnar ingen nätverksanslutning."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "a zone that is gone"
@@ -22227,6 +22231,7 @@ msgstr "explosionsbitmapp"
 msgid "Explosion effects"
 msgstr "Explosionseffekter"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Explosions"
@@ -30141,6 +30146,10 @@ msgstr "Markerar ett mål som uppfyllt."
 #, fuzzy
 msgid "Marks an objective as failed."
 msgstr "Markerar ett mål som misslyckat."
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Marks on the unit map"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy

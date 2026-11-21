@@ -25,6 +25,7 @@ import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
 import { type UnitDrawing, useUnitDrawing } from "../../unitMapDrawing";
+import { useUnitMapExplosions } from "../../unitMapExplosions";
 import { useMatchClock } from "../../useMatchClock";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useMapLayerToggles } from "../../useReplayMapLayers";
@@ -164,6 +165,13 @@ function Legend({
         <Trans>
           A pale line is a projectile, drawn along the way it is moving. A grey
           square is a wreck, or anything else left on the map during the match.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
+          A yellow circle that grows and fades is an explosion: a projectile
+          landing, or, larger, a unit destroyed. Debris landing makes none. The
+          Explosions switch turns them off.
         </Trans>
       </p>
       {boxes && (
@@ -374,6 +382,9 @@ function UnitsView({
   const icons = drawing === "icons" ? loaded : null;
   const iconsRef = useRef(icons);
   iconsRef.current = icons;
+  const [explosions, setExplosions] = useUnitMapExplosions();
+  const explosionsRef = useRef(explosions);
+  explosionsRef.current = explosions;
   const layers = useMapLayerToggles(UNIT_MAP_LAYERS);
   const { on } = layers;
   // The map's size in world units, which a Zero-K file's areas are placed in.
@@ -412,6 +423,7 @@ function UnitsView({
       clock,
       teams: stylesRef.current,
       icons: iconsRef.current,
+      explosions: explosionsRef.current,
       surface: () =>
         ctx && canvas.width > 0
           ? {
@@ -504,6 +516,10 @@ function UnitsView({
   useEffect(() => {
     viewRef.current?.setIcons(icons);
   }, [icons]);
+
+  useEffect(() => {
+    viewRef.current?.setExplosions(explosions);
+  }, [explosions]);
 
   // The ring goes round the unit the pointer is on, or the chosen one.
   const named = pointed ?? chosen;
@@ -643,6 +659,22 @@ function UnitsView({
             </ToggleGroupItem>
             <ToggleGroupItem value="footprints" className="@xl:justify-start">
               <Trans>Footprints</Trans>
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <ToggleGroup
+            type="multiple"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            aria-label={tr`Marks on the unit map`}
+            className="w-full flex-wrap items-stretch @xl:flex-col @xl:flex-nowrap"
+            value={explosions ? ["explosions"] : []}
+            onValueChange={(picked) =>
+              setExplosions(picked.includes("explosions"))
+            }
+          >
+            <ToggleGroupItem value="explosions" className="@xl:justify-start">
+              <Trans>Explosions</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
           {layers.layersShown ? (

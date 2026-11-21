@@ -7953,6 +7953,10 @@ msgstr "A weapon name can only use lowercase letters, numbers and underscores."
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
+msgstr "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "a zone that is gone"
 msgstr "a zone that is gone"
@@ -18124,6 +18128,7 @@ msgstr "explosion bitmap"
 msgid "Explosion effects"
 msgstr "Explosion effects"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Explosions"
 msgstr "Explosions"
@@ -24572,6 +24577,10 @@ msgstr "Marks an objective as done."
 #: src/scenario/triggerTypes.ts
 msgid "Marks an objective as failed."
 msgstr "Marks an objective as failed."
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Marks on the unit map"
+msgstr "Marks on the unit map"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Marks where reclaimable/extractable metal is. The <0>red channel</0> sets metal density (brighter red = more); paint small red spots where you want metal spots in game."

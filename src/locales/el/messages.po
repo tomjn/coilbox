@@ -9786,6 +9786,10 @@ msgstr "Ένα όνομα όπλου μπορεί να περιέχει μόνο
 msgid "A widget that lists the blueprints in this library while you play, places one at the cursor as ghosts and build orders, and saves the buildings you have selected back here. It reads BAR's own blueprints.json too, and never writes it. It opens no network connection."
 msgstr "Ένα widget που εμφανίζει τα σχέδια αυτής της βιβλιοθήκης όσο παίζετε, τοποθετεί ένα στον κέρσορα ως φαντάσματα και εντολές κατασκευής, και αποθηκεύει εδώ τα κτίρια που έχετε επιλέξει. Διαβάζει και το blueprints.json του BAR, και δεν το γράφει ποτέ. Δεν ανοίγει καμία σύνδεση δικτύου."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "a zone that is gone"
@@ -22227,6 +22231,7 @@ msgstr "bitmap έκρηξης"
 msgid "Explosion effects"
 msgstr "Εφέ έκρηξης"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Explosions"
@@ -30141,6 +30146,10 @@ msgstr "Σημειώνει έναν στόχο ως ολοκληρωμένο."
 #, fuzzy
 msgid "Marks an objective as failed."
 msgstr "Σημειώνει έναν στόχο ως αποτυχημένο."
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Marks on the unit map"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy

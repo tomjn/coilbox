@@ -10,6 +10,7 @@ import {
   type TransformValue,
   transformAt,
 } from "./curves";
+import { type ExplosionMark, forEachExplosion } from "./explosions";
 import type { ReplayTrackError } from "./fault";
 import type { TrackWindow } from "./trackWindow";
 import {
@@ -91,6 +92,21 @@ export interface ReplayTrackHandle {
   forEachProjectile(
     frame: number,
     visit: (projectile: ProjectileMark) => void,
+  ): boolean;
+  /**
+   * Calls `visit` for every shot that landed and every unit that died in the
+   * `span` frames before `frame` (#5317). False if not ready.
+   *
+   * Only the end of a shot or a unit that is not followed by a later stretch of
+   * the recording counts, and debris never does. What ended in the window
+   * before is found when that window is held, so the first frames of a window
+   * can be missing a circle while it loads. The view draws again when it
+   * arrives.
+   */
+  forEachExplosion(
+    frame: number,
+    span: number,
+    visit: (explosion: ExplosionMark) => void,
   ): boolean;
   /** Why the window that has `frame` could not be read, if it could not. */
   windowFault(frame: number): ReplayTrackError | undefined;
@@ -188,6 +204,12 @@ export function createReplayTrackHandle(
         projectile.vz = shot.vz;
         visit(projectile);
       });
+      return true;
+    },
+    forEachExplosion(frame, span, visit) {
+      const w = store.windowFor(frame);
+      if (!w) return false;
+      forEachExplosion(w, store.windowAt(w.index - 1), frame, span, visit);
       return true;
     },
     windowFault: (frame) => store.failure(windowOfFrame(header, frame)),

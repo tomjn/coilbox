@@ -35,7 +35,19 @@ export interface MapScene {
   wrecks: number;
   wreckX: Float32Array;
   wreckZ: Float32Array;
+  /** Where a shot landed or a unit died in the last few frames (#5317). */
+  blasts: number;
+  blastX: Float32Array;
+  blastZ: Float32Array;
+  /** How far through its fade each is: above 0, and below 1. */
+  blastProgress: Float32Array;
+  /** 1 for a unit's death and 0 for a shot landing. */
+  blastDeath: Uint8Array;
 }
+
+/** How long a circle takes to fade, in seconds of match time. A fraction of a
+ *  second, chosen by eye on a real battle. */
+export const EXPLOSION_SECONDS = 0.4;
 
 /** Room for this many of each to begin with. The arrays double when a frame
  *  has more, so this is where they start and not a limit. */
@@ -63,6 +75,11 @@ export function createMapScene(): MapScene {
     wrecks: 0,
     wreckX: new Float32Array(START),
     wreckZ: new Float32Array(START),
+    blasts: 0,
+    blastX: new Float32Array(START),
+    blastZ: new Float32Array(START),
+    blastProgress: new Float32Array(START),
+    blastDeath: new Uint8Array(START),
   };
 }
 
@@ -101,6 +118,10 @@ function growShots(s: MapScene): void {
  * as it was, while the frame's window is still loading: the view keeps the
  * picture it has.
  *
+ * `explosions` also collects the circles for shots that landed and units that
+ * died just before `frame`. They depend on the frame alone, so a frame has the
+ * same circles however time got to it.
+ *
  * A wreck is a feature that appeared after the track's first frame. A feature
  * that was there from the start is the map's own scenery, a tree or a rock,
  * and the map's picture already shows it.
@@ -109,9 +130,11 @@ export function collectScene(
   handle: ReplayTrackHandle,
   frame: number,
   scene: MapScene,
+  explosions = false,
 ): boolean {
   if (!handle.isReady(frame)) return false;
-  const { unitFootprints, features, firstFrame } = handle.header;
+  const { unitFootprints, features, firstFrame, framesPerSecond } =
+    handle.header;
 
   let units = 0;
   handle.forEachUnit(frame, (u) => {
@@ -155,7 +178,26 @@ export function collectScene(
     wrecks++;
   }
 
+  let blasts = 0;
+  if (explosions) {
+    const span = Math.max(Math.round(EXPLOSION_SECONDS * framesPerSecond), 1);
+    handle.forEachExplosion(frame, span, (e) => {
+      if (blasts === scene.blastX.length) {
+        scene.blastX = grown(scene.blastX);
+        scene.blastZ = grown(scene.blastZ);
+        scene.blastProgress = grown(scene.blastProgress);
+        scene.blastDeath = grown(scene.blastDeath);
+      }
+      scene.blastX[blasts] = e.x;
+      scene.blastZ[blasts] = e.z;
+      scene.blastProgress[blasts] = e.age / (span + 1);
+      scene.blastDeath[blasts] = e.death ? 1 : 0;
+      blasts++;
+    });
+  }
+
   scene.frame = frame;
+  scene.blasts = blasts;
   scene.units = units;
   scene.projectiles = shots;
   scene.wrecks = wrecks;

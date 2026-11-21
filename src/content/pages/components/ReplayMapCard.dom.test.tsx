@@ -42,7 +42,7 @@ import {
 } from "../../replayAnalysis";
 import type { ReplayWatch } from "../../replayEngine";
 import { resetReplayEventReadsForTests } from "../../replayEventRead";
-import { FAINT_UNITS } from "../../replayMapView/paint";
+import { BLAST_FILL, FAINT_UNITS } from "../../replayMapView/paint";
 import { recordingContext } from "../../replayMapView/testTrack";
 import { ReplayTrackError } from "../../replayTrack/fault";
 import {
@@ -55,6 +55,7 @@ import {
 } from "../../replayTracks";
 import type { EmphasisStore } from "../../seriesEmphasis";
 import { resetUnitDrawingForTests } from "../../unitMapDrawing";
+import { resetExplosionsForTests } from "../../unitMapExplosions";
 import { resetUnitMapIconsForTests } from "../../useUnitMapIcons";
 
 const ID = "00112233445566778899aabbccddeeff";
@@ -2254,9 +2255,13 @@ describe("the units follow the players table and the colour switch", () => {
     const picture = ctx.calls.slice(from);
     // A wreck is filled too, before any unit's outline is closed.
     const firstUnit = picture.findIndex((c) => c.op === "closePath");
-    return picture
-      .filter((c, i) => c.op === "fill" && i > firstUnit)
-      .map((c) => ({ fill: c.fillStyle, alpha: c.globalAlpha }));
+    return (
+      picture
+        .filter((c, i) => c.op === "fill" && i > firstUnit)
+        // The explosion circles of the frame are filled after the units.
+        .filter((c) => c.fillStyle !== BLAST_FILL)
+        .map((c) => ({ fill: c.fillStyle, alpha: c.globalAlpha }))
+    );
   };
   /** What the chart draws each team's line in, in a mode. */
   const chartColours = (mode: ChartColorMode) => {
@@ -2785,5 +2790,58 @@ describe("units as their game icons (#5316)", () => {
     fireEvent.pointerMove(canvas(), { clientX: x + 1, clientY: y });
     await settle();
     expect(screen.getByTestId("recorded-unit-name").textContent).toBe("");
+  });
+});
+
+describe("the explosions switch (#5317)", () => {
+  const drawn = () =>
+    ctx.calls.slice(ctx.calls.map((c) => c.op).lastIndexOf("clearRect"));
+  const blastFills = () =>
+    drawn().filter((c) => c.op === "fill" && c.fillStyle === BLAST_FILL);
+  const explosions = () => screen.getByRole("button", { name: "Explosions" });
+
+  beforeEach(() => {
+    resetExplosionsForTests();
+    localStorage.removeItem("coilbox.replayMap.explosions");
+  });
+
+  afterEach(() => {
+    localStorage.removeItem("coilbox.replayMap.explosions");
+    resetExplosionsForTests();
+  });
+
+  it("is on to begin with and marks the unit that died at frame 89", async () => {
+    // The fixture's unit 1 is last seen at frame 89, so frame 95 is six frames
+    // into its circle.
+    await show("current", "/replay?frame=95");
+    await settle();
+    expect(explosions().getAttribute("aria-pressed")).toBe("true");
+    expect(blastFills()).toHaveLength(1);
+    expect(drawn().filter((c) => c.op === "arc")).toHaveLength(1);
+  });
+
+  it("draws no circle once it is turned off, and again when it is turned on", async () => {
+    await show("current", "/replay?frame=95");
+    await settle();
+    await act(async () => fireEvent.click(explosions()));
+    await settle();
+    expect(explosions().getAttribute("aria-pressed")).toBe("false");
+    expect(blastFills()).toHaveLength(0);
+    expect(localStorage.getItem("coilbox.replayMap.explosions")).toBe("off");
+
+    await act(async () => fireEvent.click(explosions()));
+    await settle();
+    expect(blastFills()).toHaveLength(1);
+  });
+
+  it("stays off for the next replay", async () => {
+    await show("current", "/replay?frame=95");
+    await act(async () => fireEvent.click(explosions()));
+    cleanup();
+    resetExplosionsForTests();
+    mount("/replay?frame=95");
+    await settle();
+    expect(explosions().getAttribute("aria-pressed")).toBe("false");
+    expect(blastFills()).toHaveLength(0);
   });
 });

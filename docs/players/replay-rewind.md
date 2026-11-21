@@ -34,7 +34,7 @@ The replays list has a badge for each replay with a track. "Track recorded" mean
 
 When a replay has a current track, a "Recorded match" section draws the match on the map inside coilbox. It does not run the game.
 
-A rectangle is a unit. It has its team's colour, the size of its footprint and a line for the way it faces. A unit still being built is faint. A pale line is a projectile, drawn along the way it moves. A grey square is a wreck or anything else left on the map. Point at a unit to see its name and owner, and click it to keep the name on screen. Click the ground to let it go.
+A rectangle is a unit. It has its team's colour, the size of its footprint and a line for the way it faces. A unit still being built is faint. A pale line is a projectile, drawn along the way it moves. A grey square is a wreck or anything else left on the map. A yellow circle that grows and fades is an explosion: a projectile landing, or a larger one for a unit destroyed. Debris landing makes none, and the Explosions switch beside the map turns them off. Point at a unit to see its name and owner, and click it to keep the name on screen. Click the ground to let it go.
 
 Under the map is the timeline.
 

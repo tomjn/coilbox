@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import type { UnitIcons } from "./icons";
 import {
+  BLAST_FILL,
   emphasisedStyles,
   FAINT_UNITS,
   paintScene,
@@ -435,5 +436,102 @@ describe("a unit drawn as its game icon", () => {
     const arc = ctx.calls.find((c) => c.op === "arc");
     // Half the icon's edge, 10, reaches 10 root 2 to its corner.
     expect(arc?.args[2]).toBeGreaterThan(10 * Math.SQRT2);
+  });
+});
+
+describe("the explosions in a picture", () => {
+  /** A scene with only these circles: x, progress and whether it is a death. */
+  function blasts(...circles: [number, number, boolean][]): MapScene {
+    const scene = createMapScene();
+    scene.blasts = circles.length;
+    circles.forEach(([x, progress, death], i) => {
+      scene.blastX[i] = x;
+      scene.blastZ[i] = 3000;
+      scene.blastProgress[i] = progress;
+      scene.blastDeath[i] = death ? 1 : 0;
+    });
+    return scene;
+  }
+
+  function drawn(scene: MapScene) {
+    const ctx = recordingContext();
+    const counts = paintScene(ctx, scene, view, styles, null);
+    return {
+      counts,
+      arcs: ctx.calls.filter((c) => c.op === "arc"),
+      fills: ctx.calls.filter((c) => c.op === "fill"),
+    };
+  }
+
+  it("draws a circle for each, in one fill for each band of opacity and no more", () => {
+    // Five circles in two of the four bands: 0.1 and 0.2 are in the first, and
+    // 0.6 to 0.74 in the third.
+    const { counts, arcs, fills } = drawn(
+      blasts(
+        [1000, 0.1, false],
+        [2000, 0.2, true],
+        [3000, 0.6, false],
+        [4000, 0.7, false],
+        [5000, 0.74, true],
+      ),
+    );
+    expect(counts.explosions).toBe(5);
+    expect(arcs).toHaveLength(5);
+    expect(fills).toHaveLength(2);
+    expect(fills.every((f) => f.fillStyle === BLAST_FILL)).toBe(true);
+  });
+
+  it("costs the same number of fills for a thousand circles as for ten", () => {
+    const many = (n: number) =>
+      drawn(
+        blasts(
+          ...Array.from({ length: n }, (_, i): [number, number, boolean] => [
+            (i * 7) % 8000,
+            ((i % 12) + 1) / 13,
+            i % 5 === 0,
+          ]),
+        ),
+      ).fills.length;
+    expect(many(1000)).toBe(many(10));
+    expect(many(1000)).toBeLessThanOrEqual(4);
+  });
+
+  it("fades as it ages and grows as it ages", () => {
+    const young = drawn(blasts([4000, 0.1, false]));
+    const old = drawn(blasts([4000, 0.9, false]));
+    expect(old.fills[0].globalAlpha).toBeLessThan(young.fills[0].globalAlpha);
+    expect(old.arcs[0].args[2]).toBeGreaterThan(young.arcs[0].args[2]);
+    // Faded out by the end, but still there while it is drawn.
+    expect(old.fills[0].globalAlpha).toBeGreaterThan(0);
+  });
+
+  it("draws a unit's death larger than a shot landing", () => {
+    const shot = drawn(blasts([4000, 0.5, false]));
+    const death = drawn(blasts([4000, 0.5, true]));
+    expect(death.arcs[0].args[2]).toBeGreaterThan(shot.arcs[0].args[2]);
+  });
+
+  it("draws the circle where the explosion was, with z down the picture", () => {
+    const { arcs } = drawn(blasts([4000, 0.5, false]));
+    expect(arcs[0].args[0]).toBeCloseTo(4000 * view.scale);
+    expect(arcs[0].args[1]).toBeCloseTo(3000 * view.scale);
+  });
+
+  it("draws the circles of the fixture's frame, from the track", async () => {
+    const track = testTrack();
+    await track.seek(56);
+    const scene = createMapScene();
+    collectScene(track.handle, 56, scene, true);
+    const { counts, arcs } = drawn(scene);
+    // Shot 0 landed six frames before at 500, 400.
+    expect(counts.explosions).toBe(1);
+    expect(arcs).toHaveLength(1);
+    expect(arcs[0].args[0]).toBeCloseTo(500 * view.scale);
+  });
+
+  it("draws nothing for a picture with none", async () => {
+    const { ctx, counts } = await painted(56);
+    expect(counts.explosions).toBe(0);
+    expect(ctx.count("arc")).toBe(0);
   });
 });

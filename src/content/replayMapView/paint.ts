@@ -16,6 +16,8 @@ export interface PaintCounts {
   units: number;
   projectiles: number;
   wrecks: number;
+  /** How many circles marked a shot landing or a unit dying. */
+  explosions: number;
   /** How many of the units were drawn as their game icon. */
   icons: number;
   /** Whether the unit asked to be ringed is in the picture. */
@@ -67,6 +69,20 @@ const SHOT_SHORTEST = 2;
 const SHOT_LONGEST = 9;
 const SHOT_FRAMES = 3;
 const HALF_WRECK = 1;
+/** An explosion's circle at its fullest, in elmos and as least in CSS pixels,
+ *  so it can be seen on a large map. A unit's death is the larger. Chosen by
+ *  eye on a real battle. */
+const SHOT_BLAST_ELMOS = 20;
+const SHOT_BLAST_LEAST = 5;
+const DEATH_BLAST_ELMOS = 44;
+const DEATH_BLAST_LEAST = 11;
+/** How big a circle is when it begins, as a part of its full size. */
+const BLAST_START = 0.3;
+/** A circle is drawn in this many bands of opacity, so a frame costs this many
+ *  fills however many circles it holds. */
+export const BLAST_BANDS = 4;
+/** How solid a circle is when it begins. */
+const BLAST_OPACITY = 0.9;
 /** How much of a unit shows when construction has only just started. A unit
  *  at 0 would otherwise be invisible while it is on the map. */
 const FAINTEST = 0.25;
@@ -81,6 +97,8 @@ const DARK_EDGE = "rgba(9, 13, 22, 0.9)";
 const PALE_EDGE = "rgba(226, 232, 240, 0.85)";
 const WRECK = "rgba(148, 156, 170, 0.85)";
 const SHOT = "rgba(255, 236, 170, 0.95)";
+/** The colour of an explosion's circle. */
+export const BLAST_FILL = "rgb(255, 196, 0)";
 const RING = "rgba(255, 255, 255, 0.95)";
 const NO_TEAM: TeamStyle = { fill: "rgb(148, 156, 170)", edge: DARK_EDGE };
 
@@ -166,8 +184,8 @@ export function buildAlpha(build: number): number {
 }
 
 /**
- * Draws a scene: the wrecks, then the units, then the projectiles, then a ring
- * round the unit asked for. Each is its own pass.
+ * Draws a scene: the wrecks, then the units, then the projectiles, then the
+ * explosions, then a ring round the unit asked for. Each is its own pass.
  *
  * World x runs along the canvas and world z runs down it, as on the minimap.
  * `icons` draws each unit that has one as its game icon and every other as its
@@ -196,6 +214,7 @@ export function paintScene(
     icons,
   );
   paintProjectiles(ctx, scene, view);
+  paintExplosions(ctx, scene, view);
 
   if (ringed >= 0) {
     const iconEdge = icons?.edge(scene.unitDef[ringed], u) ?? 0;
@@ -225,6 +244,7 @@ export function paintScene(
     units: scene.units,
     projectiles: scene.projectiles,
     wrecks: scene.wrecks,
+    explosions: scene.blasts,
     icons: iconed,
     highlighted: ringed >= 0,
   };
@@ -435,4 +455,50 @@ function paintProjectiles(
   ctx.lineWidth = u;
   ctx.strokeStyle = SHOT;
   ctx.stroke();
+}
+
+/**
+ * A yellow circle for each shot that landed and each unit that died, growing
+ * and fading with how far through its fade the scene has it (#5317). A circle
+ * is drawn from its progress alone, so a frame looks the same however it was
+ * reached.
+ *
+ * One fill has one opacity, so circles are gathered into {@link BLAST_BANDS}
+ * bands of progress and each band is one path and one fill. A frame costs that
+ * many fills whether it holds ten circles or a thousand.
+ */
+function paintExplosions(
+  ctx: PaintContext,
+  scene: MapScene,
+  { scale, pixelRatio: u }: MapViewport,
+): void {
+  if (scene.blasts === 0) return;
+  ctx.fillStyle = BLAST_FILL;
+  for (let band = 0; band < BLAST_BANDS; band++) {
+    let any = false;
+    ctx.beginPath();
+    for (let i = 0; i < scene.blasts; i++) {
+      const progress = scene.blastProgress[i];
+      if (
+        Math.min(Math.floor(progress * BLAST_BANDS), BLAST_BANDS - 1) !== band
+      ) {
+        continue;
+      }
+      const full = scene.blastDeath[i]
+        ? Math.max(DEATH_BLAST_ELMOS * scale, DEATH_BLAST_LEAST * u)
+        : Math.max(SHOT_BLAST_ELMOS * scale, SHOT_BLAST_LEAST * u);
+      // Quick at first and slower after, as a burst spreads.
+      const radius =
+        full * (BLAST_START + (1 - BLAST_START) * Math.sqrt(progress));
+      const x = scene.blastX[i] * scale;
+      const z = scene.blastZ[i] * scale;
+      ctx.moveTo(x + radius, z);
+      ctx.arc(x, z, radius, 0, Math.PI * 2);
+      any = true;
+    }
+    if (!any) continue;
+    ctx.globalAlpha = BLAST_OPACITY * (1 - (band + 0.5) / BLAST_BANDS);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
