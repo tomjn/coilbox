@@ -30563,6 +30563,10 @@ msgstr "Metallunderhåll (gammalt namn)"
 msgid "Metal used"
 msgstr "Förbrukad metall"
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "Metric in the timeline: {name}"
+msgstr ""
+
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Middle"
@@ -37391,6 +37395,10 @@ msgstr "Personer på det här nätverket ser ditt rum utan att få någon adress
 msgid "People whose messages coilbox hides from you."
 msgstr "Personer vars meddelanden coilbox döljer för dig."
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "per minute"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -42157,6 +42165,10 @@ msgstr "Har körts i {elapsed}. Du kan lämna den här sidan."
 #, fuzzy
 msgid "Running the engine"
 msgstr "Kör motorn"
+
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "running total"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy

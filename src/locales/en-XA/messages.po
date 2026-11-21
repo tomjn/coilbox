@@ -24903,6 +24903,10 @@ msgstr ""
 msgid "Metal used"
 msgstr ""
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "Metric in the timeline: {name}"
+msgstr ""
+
 #: src/lego/pivot.ts
 msgid "Middle"
 msgstr ""
@@ -30457,6 +30461,10 @@ msgstr ""
 msgid "People whose messages coilbox hides from you."
 msgstr ""
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "per minute"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 msgid "Per minute"
@@ -34345,6 +34353,10 @@ msgstr ""
 
 #: src/lego/pages/components/TestDrawer.tsx
 msgid "Running the engine"
+msgstr ""
+
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "running total"
 msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx

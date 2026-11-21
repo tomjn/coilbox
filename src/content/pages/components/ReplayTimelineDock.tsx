@@ -52,6 +52,11 @@ import {
 } from "../../useReplayTimelineMarks";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { OpenInEngineButton } from "./OpenInEngineButton";
+import {
+  MetricLaneLabel,
+  MetricLanePlot,
+  useMetricLane,
+} from "./ReplayMetricLane";
 
 /**
  * Width of a column of the axis in CSS pixels, which is the width of a mark.
@@ -487,9 +492,12 @@ interface Pointed {
 
 /**
  * The page's timeline dock (#5306), pinned to the bottom of the page: a
- * transport row, the scrubber, a lane each for kills, chat and players, and a
- * time axis, all on one axis with one playhead line across them. Pressing a mark
- * moves the match to it, through the page's match clock.
+ * transport row, the scrubber, a lane each for kills, chat and players, a metric
+ * lane, and a time axis, all on one axis with one playhead line across them.
+ * Pressing a mark moves the match to it, through the page's match clock. The
+ * metric lane draws the metric the statistics chart has picked (#5308), and has
+ * the chart's list of metrics behind its label. A replay with no statistics has
+ * no metric lane.
  *
  * The axis is the clock's range, which is the replay's duration until a
  * recorded track is opened and the track's after. A replay with no recording
@@ -505,10 +513,13 @@ export function ReplayTimelineDock({
   watch,
   dependencyBlock,
   game,
+  showStats,
 }: {
   info: DemoInfo;
   /** The replay file, whose chat and players are marks on the lanes. */
   replayPath: string;
+  /** Whether the profile shows match statistics, which the metric lane draws. */
+  showStats: boolean;
   /** The page's engine decision, for the button that opens the engine. */
   watch: ReplayWatch;
   /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
@@ -523,6 +534,13 @@ export function ReplayTimelineDock({
   const settled = useSettledFrame();
   const { marks, kills } = useReplayTimelineMarks(info, replayPath);
   const animates = range.source === "track";
+  const totalSec = (range.lastFrame - range.firstFrame) / range.framesPerSecond;
+  // Null with no statistics, and then there is no metric lane.
+  const metricLane = useMetricLane(
+    info,
+    showStats ? replayPath : null,
+    totalSec,
+  );
 
   const labelId = useId();
   const lanesRef = useRef<HTMLDivElement | null>(null);
@@ -563,7 +581,6 @@ export function ReplayTimelineDock({
       ? groups.find((g) => g.frame === settled)
       : undefined);
 
-  const totalSec = (range.lastFrame - range.firstFrame) / range.framesPerSecond;
   const ticks = axisTicks(totalSec);
 
   return (
@@ -600,7 +617,7 @@ export function ReplayTimelineDock({
           />
         </div>
         <div className="flex gap-2 text-xs">
-          <div className="flex w-[4.5rem] shrink-0 flex-col text-muted-foreground">
+          <div className="flex w-24 shrink-0 flex-col text-muted-foreground">
             <span className="h-5" />
             {LANES.map(({ lane, name }) => (
               <span
@@ -611,6 +628,11 @@ export function ReplayTimelineDock({
                 {i18n._(name)}
               </span>
             ))}
+            {metricLane && (
+              <div className="h-12">
+                <MetricLaneLabel lane={metricLane} id={`${labelId}-metric`} />
+              </div>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             {/* The scrubber and the lanes, which the playhead crosses. It is
@@ -700,6 +722,20 @@ export function ReplayTimelineDock({
                   </div>
                 );
               })}
+              {/* Not made of marks, so it is a sibling of the rows above and
+               * not one of them. It is the one lane taller than a line of
+               * text, because a line chart needs the height to be read. */}
+              {metricLane && (
+                // biome-ignore lint/a11y/useSemanticElements: a box the chart is drawn in, which a fieldset's box would not allow.
+                <div
+                  role="group"
+                  aria-labelledby={`${labelId}-metric`}
+                  data-testid="metric-lane"
+                  className="relative h-12 border-t border-border/40"
+                >
+                  <MetricLanePlot lane={metricLane} />
+                </div>
+              )}
               <Playhead range={range} />
             </div>
             <div

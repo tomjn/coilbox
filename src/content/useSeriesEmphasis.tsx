@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { type ChartChoiceStore, createChartChoiceStore } from "./chartChoice";
 import {
   activeTeams,
   checkState,
@@ -24,14 +25,35 @@ import {
  * the next.
  */
 const EmphasisContext = createContext<EmphasisStore | null>(null);
+const ChoiceContext = createContext<ChartChoiceStore | null>(null);
 
 export function SeriesEmphasisProvider({ children }: { children: ReactNode }) {
   const [store] = useState(createEmphasisStore);
+  const [choice] = useState(createChartChoiceStore);
   return (
     <EmphasisContext.Provider value={store}>
-      {children}
+      <ChoiceContext.Provider value={choice}>{children}</ChoiceContext.Provider>
     </EmphasisContext.Provider>
   );
+}
+
+/**
+ * The metric, the cumulative or per minute choice and the players or teams
+ * choice the statistics chart and the timeline dock's metric lane share
+ * (#5308). They are kept with the emphasis because they are what the page's
+ * statistics are asked, as the emphasis is who they are asked about.
+ */
+export function useChartChoice() {
+  const store = useContext(ChoiceContext);
+  if (!store)
+    throw new Error("useChartChoice needs a SeriesEmphasisProvider above it");
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  return {
+    ...state,
+    setMetric: store.setMetric,
+    setMode: store.setMode,
+    setView: store.setView,
+  };
 }
 
 /**

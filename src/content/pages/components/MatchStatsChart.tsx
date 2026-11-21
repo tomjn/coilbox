@@ -20,9 +20,6 @@ import { CheckField } from "@/components/Field";
 import {
   Select,
   SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -33,7 +30,6 @@ import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import { useStoredColorMode } from "../../chartColorMode";
 import { useStoredHighlightMe } from "../../highlightMe";
 import {
-  allySeries,
   autoColorMode,
   type ChartDisplay,
   type ChartMode,
@@ -43,7 +39,6 @@ import {
   chartHeight,
   colorSeries,
   createTileCache,
-  defaultChartView,
   defaultMetric,
   END_LABEL_MAX_SERIES,
   type EndPoint,
@@ -58,14 +53,14 @@ import {
   seriesTeams,
   shownSeries,
   spreadLabels,
-  teamSeries,
   tooltipRows,
   valueTable,
 } from "../../matchStats";
 import { labelOfMetric } from "../../metricLabels";
 import { plotInsets } from "../../replayTimeline";
+import { useChartSeries } from "../../useChartSeries";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
-import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { useChartChoice, useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { CHART_PRESS_TARGET, ChartPlayhead } from "./ChartPlayhead";
 import { CommandRateChart } from "./CommandRateChart";
 import { LivingValueChart } from "./LivingValueChart";
@@ -73,6 +68,7 @@ import { MatchStatsExportButton } from "./MatchStatsExportButton";
 import { MatchStatsImageButton } from "./MatchStatsImageButton";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
+import { MetricSelectGroups } from "./MetricSelectGroups";
 import { type LegendEntry, SeriesLegend } from "./SeriesLegend";
 
 /**
@@ -122,7 +118,6 @@ function MetricSelect({
   onChange: (key: string) => void;
 }) {
   const { t } = useLingui();
-  const groups = useMemo(() => metricGroups(metrics), [metrics]);
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
@@ -133,16 +128,7 @@ function MetricSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {groups.map((g) => (
-          <SelectGroup key={g.group}>
-            <SelectLabel>{g.label}</SelectLabel>
-            {g.metrics.map((m) => (
-              <SelectItem key={m.key} value={m.key}>
-                {labelOfMetric(m)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
+        <MetricSelectGroups metrics={metrics} />
       </SelectContent>
     </Select>
   );
@@ -374,56 +360,28 @@ export function MatchStatsChart({
   replayPath?: string;
 }) {
   const { t } = useLingui();
-  const opening = defaultMetric(metrics);
-  const [key, setKey] = useState(opening?.key ?? "");
-  const [mode, setMode] = useState<ChartMode>("cumulative");
-  // Null until the reader picks one, so the opening view follows the match's own
-  // size without an effect that would overwrite what they chose.
-  const [chosen, setChosen] = useState<ChartView | null>(null);
+  // The metric, the mode and the lines are kept with the page's emphasis, so the
+  // timeline dock's metric lane asks the same question (#5308).
+  const {
+    metric: key,
+    mode,
+    setMetric: setKey,
+    setMode,
+    setView: setChosen,
+  } = useChartChoice();
   const [display, setDisplay] = useState<ChartDisplay>("chart");
-  const metric = metrics.find((m) => m.key === key) ?? opening;
+  const metric = metrics.find((m) => m.key === key) ?? defaultMetric(metrics);
 
   const [storedMode, setColorMode] = useStoredColorMode();
   const [highlightMe, setHighlightMe] = useStoredHighlightMe();
   const { resolved: theme } = useTheme();
 
-  const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
-  const sides = useMemo(() => allySeries(trailer, info), [trailer, info]);
-  const view = chosen ?? defaultChartView(players, sides);
-  // Until the toggle has been used the mode is the match's own pick, which also
-  // follows the theme because contrast depends on the card.
-  const colorMode = useMemo(
-    () => storedMode ?? autoColorMode(players, sides, info, theme),
-    [storedMode, players, sides, info, theme],
-  );
-  // Painted last, from the view's lines, so the colour a team wears depends on
-  // the match and the mode and never on which lines are showing.
-  const series = useMemo(
-    () =>
-      colorSeries(
-        view === "teams" ? sides : players,
-        trailer,
-        info,
-        colorMode,
-        theme,
-      ),
-    [view, sides, players, trailer, info, colorMode, theme],
-  );
-
-  // Every team the chart measures, whether its line is showing or not.
-  const chartedTeams = useMemo(
-    () => players.flatMap((s) => seriesTeams(s, info)).sort((a, b) => a - b),
-    [players, info],
-  );
   const emphasis = useSeriesEmphasis();
   const { hidden } = emphasis.state;
-  // The roster's unchecked teams come out here, after the painting above, so a
-  // line keeps its colour whatever else is showing. Everything below draws from
-  // `drawn`. `series` is only there to say how many lines the match has.
-  const drawn = useMemo(
-    () => shownSeries(series, info, chartedTeams, hidden),
-    [series, info, chartedTeams, hidden],
-  );
+  // Everything below draws from `drawn`. `series` is only there to say how many
+  // lines the match has.
+  const { players, sides, view, colorMode, series, chartedTeams, drawn } =
+    useChartSeries(info, trailer);
   const noneDrawn = drawn.length === 0;
   // The exported picture is always on white, so its lines are coloured for the
   // light card whatever theme the app is in.

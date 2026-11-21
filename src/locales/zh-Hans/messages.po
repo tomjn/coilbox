@@ -30369,6 +30369,10 @@ msgstr "金属维持消耗（旧名称）"
 msgid "Metal used"
 msgstr ""
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "Metric in the timeline: {name}"
+msgstr ""
+
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Middle"
@@ -37146,6 +37150,10 @@ msgstr "此网络上的人无需地址即可看到你的房间。关闭后，他
 msgid "People whose messages coilbox hides from you."
 msgstr "coilbox 会对你隐藏其消息的人。"
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "per minute"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -41877,6 +41885,10 @@ msgstr "已运行 {elapsed}。你可以离开此页面。"
 #, fuzzy
 msgid "Running the engine"
 msgstr "正在运行引擎"
+
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "running total"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
