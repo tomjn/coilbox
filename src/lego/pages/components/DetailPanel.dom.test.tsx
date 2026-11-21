@@ -16,6 +16,8 @@ import type { LegoPartInfo, LoadedPack } from "../../pack";
 import { SHAPE_KINDS } from "../../shapes";
 
 const motion = vi.hoisted(() => ({ reduce: false }));
+/** One per canvas the preview asked the hook for. */
+const canvases = vi.hoisted(() => ({ made: 0 }));
 
 vi.mock("@/lib/useCanvas3D", async () => {
   const { useLayoutEffect } = await import("react");
@@ -26,6 +28,7 @@ vi.mock("@/lib/useCanvas3D", async () => {
       deps: unknown[],
     ) => {
       useLayoutEffect(() => {
+        canvases.made++;
         const renderer = {
           domElement: document.createElement("canvas"),
           render() {},
@@ -259,6 +262,28 @@ describe("a part", () => {
     expect(button("Grey")?.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(button("Tan") as HTMLElement);
     expect(onSelect).toHaveBeenCalledWith({ kind: "part", id: tan.id });
+  });
+
+  // A browser allows a few WebGL contexts at once, and a canvas remade on each
+  // click used them up (issue #5344).
+  it("keeps one canvas however often the colourway changes", () => {
+    canvases.made = 0;
+    const { rerender, ...props } = show({ kind: "part", id: grey.id });
+    expect(canvases.made).toBe(1);
+    for (let n = 0; n < 20; n++) {
+      const id = n % 2 === 0 ? tan.id : grey.id;
+      rerender(
+        <DetailPanel
+          pack={packWith()}
+          selected={{ kind: "part", id }}
+          compounds={compounds}
+          onSelect={props.onSelect}
+          onClose={props.onClose}
+          moduleActions={props.moduleActions}
+        />,
+      );
+    }
+    expect(canvases.made).toBe(1);
   });
 
   it("offers a colourway whose part has its own mesh", () => {
