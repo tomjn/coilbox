@@ -3474,7 +3474,7 @@ msgstr "{infoCount, plural, one {# примітка} few {# примітки} ma
 msgid "{inProgress} in progress"
 msgstr "Триває: {inProgress}"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} з {total}: {countNoun}."
@@ -6737,7 +6737,7 @@ msgstr "{subject}: зі списку юнітів, який записав ру�
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel} з {rangeStart} до {rangeEnd}."
@@ -13062,10 +13062,9 @@ msgstr "Почати Шлях війни"
 msgid "Beginner guide"
 msgstr "Посібник для початківців"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "За діапазоном: {activityLabel} усіх команд."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21720,7 +21719,7 @@ msgstr "Подія"
 msgid "Event log downloaded."
 msgstr "Журнал подій завантажено."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "Події"
@@ -23449,7 +23448,7 @@ msgstr "Для Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "Для більшості зброї базовий імпульс дорівнює завданій шкоді. Для зброї ближнього бою це натомість маса нападника."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "Для наказів проміжок – це час, коли їх віддано, а не коли щось збудовано. Для подій – коли вони сталися у відтворенні."
@@ -24973,6 +24972,18 @@ msgstr "Теплова хмара"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "растр теплової хмари"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -29990,11 +30001,6 @@ msgstr "Статистику матчу експортовано."
 msgid "Match statistics image exported."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "Часовий проміжок матчу"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32000,7 +32006,7 @@ msgstr "Кошмар"
 msgid "No"
 msgstr "Ні"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "Немає: {countNoun}."
@@ -32943,10 +32949,9 @@ msgstr "У вашій бібліотеці ще немає матчів на ц�
 msgid "No match on this map passes these filters."
 msgstr "Жоден матч на цій мапі не проходить ці фільтри."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "За діапазоном не показано статистики матчу."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36430,7 +36435,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Вартість замовленого: метал {metal}, енергія {energy}."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "накази"
@@ -36450,12 +36455,12 @@ msgstr "Накази, які віджет на комп’ютері гравц�
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Накази, спрямовані на юніт, не показано на ньому, бо повтор зберігає юніт, а не його позицію."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "Віддані накази"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "Віддані накази й події"
@@ -44029,7 +44034,7 @@ msgstr "Пакети налаштування"
 msgid "Several"
 msgstr "Кілька"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "Затінено: {activityLabel}"
@@ -50661,7 +50666,7 @@ msgstr "Уся папка зникає, звільняючи {freedBytes}. Що�
 msgid "the whole match"
 msgstr "весь матч"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "Увесь матч, з {matchStart} по {matchEnd}."
@@ -50680,12 +50685,12 @@ msgstr ""
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "Проміжок: {when} кожного матчу за його власним годинником, у цілих хвилинах."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "Проміжок – це час, коли віддано наказ, а не коли щось збудовано."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "Проміжок – це час, коли кожна подія сталася у відтворенні."
@@ -52782,11 +52787,6 @@ msgstr "Час у матчі"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "Час на землі"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "Часовий проміжок"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56342,8 +56342,8 @@ msgstr "Ціла"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "Увесь матч"

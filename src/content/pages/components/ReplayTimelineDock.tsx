@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { formatDuration } from "@/lib/format";
+import { isProfileHidden } from "../../../profile/hidden";
 import type { DemoInfo } from "../../bindings";
 import type { ReplayWatch } from "../../replayEngine";
 import type { ReplayClock } from "../../replayMapView/clock";
@@ -52,6 +53,11 @@ import {
 } from "../../useReplayTimelineMarks";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { OpenInEngineButton } from "./OpenInEngineButton";
+import {
+  HeatWindowLabel,
+  HeatWindowPlot,
+  useHeatWindowLane,
+} from "./ReplayHeatWindow";
 import {
   MetricLaneLabel,
   MetricLanePlot,
@@ -497,7 +503,11 @@ interface Pointed {
  * Pressing a mark moves the match to it, through the page's match clock. The
  * metric lane draws the metric the statistics chart has picked (#5308), and has
  * the chart's list of metrics behind its label. A replay with no statistics has
- * no metric lane.
+ * no metric lane. The Heat window lane under it (#5309) holds a box that is
+ * dragged over the stretch of the match the map's layers add up, with the
+ * presets behind its label. It shows in every mode of the map, and in Units
+ * mode, where no layer reads it, it keeps the window for the next mode. A
+ * replay with no statistics has the lane and no shading.
  *
  * The axis is the clock's range, which is the replay's duration until a
  * recorded track is opened and the track's after. A replay with no recording
@@ -541,6 +551,15 @@ export function ReplayTimelineDock({
     showStats ? replayPath : null,
     totalSec,
   );
+  // The stretch the map's layers add up. It goes with the layers when a profile
+  // hides them, and its shading goes with the statistics.
+  const heatWindow = useHeatWindowLane(
+    info,
+    showStats ? replayPath : null,
+    totalSec,
+  );
+  const heatShown =
+    heatWindow !== null && !isProfileHidden("analytics.spatialLayers");
 
   const labelId = useId();
   const lanesRef = useRef<HTMLDivElement | null>(null);
@@ -631,6 +650,11 @@ export function ReplayTimelineDock({
             {metricLane && (
               <div className="h-12">
                 <MetricLaneLabel lane={metricLane} id={`${labelId}-metric`} />
+              </div>
+            )}
+            {heatShown && (
+              <div className="h-8">
+                <HeatWindowLabel lane={heatWindow} id={`${labelId}-heat`} />
               </div>
             )}
           </div>
@@ -735,6 +759,11 @@ export function ReplayTimelineDock({
                 >
                   <MetricLanePlot lane={metricLane} />
                 </div>
+              )}
+              {/* Also not made of marks. Its box is what the map's layers add
+               * up, and is dragged on this axis. */}
+              {heatShown && (
+                <HeatWindowPlot lane={heatWindow} labelId={`${labelId}-heat`} />
               )}
               <Playhead range={range} />
             </div>

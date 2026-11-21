@@ -2870,7 +2870,7 @@ msgstr "{infoCount, plural, one {# note} other {# notes}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} in progress"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} of {total} {countNoun}."
 
@@ -5525,7 +5525,7 @@ msgstr "{subject} come from the unit list the engine wrote when this replay was 
 msgid "{subject} progress"
 msgstr "{subject} progress"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel} from {rangeStart} to {rangeEnd}."
 
@@ -10678,9 +10678,9 @@ msgstr "Begin warpath"
 msgid "Beginner guide"
 msgstr "Beginner guide"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "Behind the range, {activityLabel} across all teams."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr "Behind the box on the Heat window lane, {activityLabel} across all teams."
 
 #: src/lego/drive.ts
 msgid "Behind the unit"
@@ -17826,7 +17826,7 @@ msgstr "Event"
 msgid "Event log downloaded."
 msgstr "Event log downloaded."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "Events"
 msgstr "Events"
 
@@ -19234,7 +19234,7 @@ msgstr "For Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 
@@ -20486,6 +20486,18 @@ msgstr "Heat cloud"
 #: src/lego/effectBitmaps.ts
 msgid "heat cloud bitmap"
 msgstr "heat cloud bitmap"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr "Heat window"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr "Heat window end"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr "Heat window start"
 
 #: src/workshop/explosionGenerators.ts
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
@@ -24590,10 +24602,6 @@ msgstr "Match statistics exported."
 msgid "Match statistics image exported."
 msgstr "Match statistics image exported."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "Match time window"
-msgstr "Match time window"
-
 #: src/content/replayMatchFigures.ts
 msgid "match total"
 msgstr "match total"
@@ -26244,7 +26252,7 @@ msgstr "Nightmare"
 msgid "No"
 msgstr "No"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "No {countNoun}."
 msgstr "No {countNoun}."
 
@@ -27015,9 +27023,9 @@ msgstr "No match on this map is in your library yet."
 msgid "No match on this map passes these filters."
 msgstr "No match on this map passes these filters."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "No match statistics are drawn behind the range."
-msgstr "No match statistics are drawn behind the range."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr "No match statistics are drawn behind the box."
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "No matches"
@@ -29871,7 +29879,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Ordered cost: {metal} metal and {energy} energy."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "orders"
 msgstr "orders"
 
@@ -29887,11 +29895,11 @@ msgstr "Orders a widget on the player's machine sent to named units. The engine'
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "Orders given"
 msgstr "Orders given"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "Orders given and events"
 msgstr "Orders given and events"
 
@@ -36119,7 +36127,7 @@ msgstr "Setup packs"
 msgid "Several"
 msgstr "Several"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 msgid "Shaded: {activityLabel}"
 msgstr "Shaded: {activityLabel}"
 
@@ -41574,7 +41582,7 @@ msgstr "The whole folder goes, freeing {freedBytes}. You would have to download 
 msgid "the whole match"
 msgstr "the whole match"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "The whole match, {matchStart} to {matchEnd}."
 
@@ -41590,11 +41598,11 @@ msgstr "The widgets you have added to your games."
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "The window is {when} of each match by its own clock, in whole minutes."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "The window is when an order was given, not when anything was built."
 msgstr "The window is when an order was given, not when anything was built."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "The window is when each event happened in the playback."
 msgstr "The window is when each event happened in the playback."
 
@@ -43302,10 +43310,6 @@ msgstr "Time in the match"
 #: src/lego/animPresets.ts
 msgid "Time on the ground"
 msgstr "Time on the ground"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "Time window"
-msgstr "Time window"
 
 #: src/content/mapImage.ts
 msgid "Time window: {window} of each match, by its own clock."
@@ -46224,8 +46228,8 @@ msgstr "Whole"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Whole match"
 msgstr "Whole match"
 

@@ -131,6 +131,14 @@ let CHAT: {
   events: TimelineEvent[];
 };
 let LOGGED: { kind: string; frame: number }[] = [];
+/** The build orders the replay holds, for the layers that draw them. */
+let ORDERS: unknown = {
+  orders: [],
+  players: [],
+  removals: 0,
+  lastFrame: 0,
+  incomplete: false,
+};
 
 vi.mock("../../bindings", async () => {
   const actual =
@@ -141,6 +149,7 @@ vi.mock("../../bindings", async () => {
       throw new Error("seeded in the test");
     },
     contentDemoChat: async () => CHAT,
+    contentDemoBuildOrders: async () => ORDERS,
     contentReplayAnalysisEvents: async (args: { kinds?: string[] }) => ({
       events: LOGGED.filter((e) => !args.kinds || args.kinds.includes(e.kind)),
     }),
@@ -184,6 +193,7 @@ vi.mock("../../../play/config", () => ({
   }),
 }));
 
+const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { ReplayMapCard } = await import("./ReplayMapCard");
 const { ReplayTimelineDock, TimelineKeysProvider } = await import(
   "./ReplayTimelineDock"
@@ -420,7 +430,7 @@ async function show(
 
 /** Moves the temporary slider with its own keys, as a keyboard user would. */
 async function press(key: string, times = 1) {
-  const thumb = screen.getByRole("slider");
+  const thumb = screen.getByRole("slider", { name: "Time in the match" });
   for (let i = 0; i < times; i++) fireEvent.keyDown(thumb, { key });
   await settle();
 }
@@ -1489,8 +1499,10 @@ describe("the playhead", () => {
   it("is inside the box that holds the scrubber and every lane, and no wider", async () => {
     await show();
     const box = head().parentElement as HTMLElement;
-    expect(box.contains(screen.getByRole("slider"))).toBe(true);
-    for (const name of ["Kills", "Chat", "Players"]) {
+    expect(
+      box.contains(screen.getByRole("slider", { name: "Time in the match" })),
+    ).toBe(true);
+    for (const name of ["Kills", "Chat", "Players", "Heat window"]) {
       expect(box.contains(screen.getByRole("group", { name }))).toBe(true);
     }
     expect(box.contains(screen.getByTestId("timeline-axis"))).toBe(false);
@@ -1571,7 +1583,11 @@ describe("a replay with no recording", () => {
     await show(null);
     const frame = () =>
       Math.round(
-        Number(screen.getByRole("slider").getAttribute("aria-valuenow")),
+        Number(
+          screen
+            .getByRole("slider", { name: "Time in the match" })
+            .getAttribute("aria-valuenow"),
+        ),
       );
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /gg/ }));
@@ -2007,5 +2023,147 @@ describe("the map card's modes", () => {
     expect(
       (flat.closest("[data-map-column]") as HTMLElement).style.maxWidth,
     ).toBe(`calc(max(16rem, 100cqh - 4.5rem) * ${513 / 385} / 1)`);
+  });
+});
+
+describe("the Heat window lane (#5309)", () => {
+  const lane = () => screen.getByTestId("heat-window-lane");
+  const pick = async (name: string) => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("radio", { name }));
+    });
+    await settle();
+  };
+
+  afterEach(() => {
+    // The layer a test switched on is remembered between visits.
+    localStorage.removeItem("coilbox.replayMap.layers");
+    resetReplayBuildOrders();
+  });
+
+  it("is the last lane of the dock, inside the box the playhead crosses, with its label in the label column", async () => {
+    await show();
+    const box = screen.getByTestId("playhead").parentElement as HTMLElement;
+    expect(box.contains(lane())).toBe(true);
+    // After the lanes of marks, which come first.
+    const kills = screen.getByRole("group", { name: "Kills" });
+    expect(
+      kills.compareDocumentPosition(lane()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(screen.getByRole("group", { name: "Timeline" })).getByRole(
+        "button",
+        { name: "Heat window" },
+      ),
+    ).toBeTruthy();
+    // The label column is as wide as every other lane's.
+    expect(lane().getAttribute("aria-labelledby")).toBeTruthy();
+  });
+
+  it("is there in every mode of the map, and in Units where no layer reads it", async () => {
+    await show();
+    expect(screen.getAllByRole("slider", { name: /Heat window/ })).toHaveLength(
+      2,
+    );
+    await pick("Heat");
+    expect(screen.getAllByRole("slider", { name: /Heat window/ })).toHaveLength(
+      2,
+    );
+    await pick("3D");
+    expect(screen.getAllByRole("slider", { name: /Heat window/ })).toHaveLength(
+      2,
+    );
+  });
+
+  it("keeps the window when the map changes mode", async () => {
+    await show();
+    fireEvent.keyDown(
+      screen.getByRole("slider", { name: "Heat window start" }),
+      {
+        key: "ArrowRight",
+      },
+    );
+    await pick("Heat");
+    expect(
+      screen
+        .getByRole("slider", { name: "Heat window start" })
+        .getAttribute("aria-valuenow"),
+    ).toBe("1");
+  });
+
+  it("goes with the spatial layers when a profile hides them", async () => {
+    HIDE = ["analytics.spatialLayers"];
+    await show();
+    expect(screen.queryByTestId("heat-window-lane")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Heat window" })).toBeNull();
+  });
+
+  it("sets the window the map's layers read, which says so under the map", async () => {
+    ORDERS = {
+      orders: [
+        {
+          frame: 10,
+          player: 0,
+          team: 0,
+          origin: { kind: "selection" },
+          unitDefId: 1,
+          count: 1,
+          slot: { kind: "append" },
+          builders: 1,
+          options: 0,
+          position: { x: 1024, y: 0, z: 2048 },
+        },
+        {
+          frame: 100,
+          player: 0,
+          team: 0,
+          origin: { kind: "selection" },
+          unitDefId: 1,
+          count: 1,
+          slot: { kind: "append" },
+          builders: 1,
+          options: 0,
+          position: { x: 1040, y: 0, z: 2060 },
+        },
+      ],
+      players: [{ player: 0, name: "Alice" }],
+      removals: 0,
+      lastFrame: 150,
+      incomplete: false,
+    };
+    // The marks are painted with paths, and this environment has none. What
+    // is painted is not asserted here.
+    vi.stubGlobal("Path2D", class {});
+    await show();
+    await pick("Heat");
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Buildings ordered" }),
+      );
+    });
+    await settle();
+    screen.getByText(/The whole match, 0:00 to 0:05\. 2 of 2 orders/);
+
+    // The order at frame 10 is in the first second.
+    const start = screen.getByRole("slider", { name: "Heat window start" });
+    fireEvent.keyDown(start, { key: "ArrowRight" });
+    await settle();
+    screen.getByText(/Orders given from 0:01 to 0:05\. 1 of 2 orders/);
+  });
+
+  it("keeps an arrow on an end from also stepping the match", async () => {
+    await show();
+    expect(hook().clock.frame).toBe(0);
+    const start = screen.getByRole("slider", { name: "Heat window start" });
+    fireEvent.keyDown(start, { key: "ArrowRight" });
+    fireEvent.keyDown(start, { key: "ArrowRight", shiftKey: true });
+    await settle();
+    expect(hook().clock.frame).toBe(0);
+    // The same key anywhere else in the dock does step it.
+    fireEvent.keyDown(screen.getByRole("group", { name: "Timeline" }), {
+      key: "ArrowRight",
+    });
+    await settle();
+    expect(hook().clock.frame).toBe(30);
   });
 });

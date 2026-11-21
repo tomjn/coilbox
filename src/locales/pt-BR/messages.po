@@ -3505,7 +3505,7 @@ msgstr "{infoCount, plural, one {# observação} other {# observações}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} em andamento"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} de {total} {countNoun}."
@@ -6785,7 +6785,7 @@ msgstr "{subject} vêm da lista de unidades que a engine gravou quando este repl
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel} de {rangeStart} a {rangeEnd}."
@@ -13140,10 +13140,9 @@ msgstr "Iniciar Trilha de guerra"
 msgid "Beginner guide"
 msgstr "Guia para iniciantes"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "Atrás do intervalo, {activityLabel} de todas as equipes."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21855,7 +21854,7 @@ msgstr "Evento"
 msgid "Event log downloaded."
 msgstr "Log de eventos baixado."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "Eventos"
@@ -23594,7 +23593,7 @@ msgstr "Para o Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "Para a maioria das armas, o impulso base é igual ao dano causado. Para armas corpo a corpo, é a massa do atacante."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "Para ordens, o intervalo é quando cada uma foi dada, não quando algo foi construído. Para eventos, é quando cada um aconteceu na reprodução."
@@ -25124,6 +25123,18 @@ msgstr "Nuvem de calor"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "bitmap de nuvem de calor"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -30167,11 +30178,6 @@ msgstr "Estatísticas da partida exportadas."
 msgid "Match statistics image exported."
 msgstr "Imagem das estatísticas da partida exportada."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "Intervalo da partida"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32185,7 +32191,7 @@ msgstr "Pesadelo"
 msgid "No"
 msgstr "Não"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "{countNoun}: nenhum."
@@ -33134,10 +33140,9 @@ msgstr "Nenhuma partida neste mapa está na sua biblioteca ainda."
 msgid "No match on this map passes these filters."
 msgstr "Nenhuma partida neste mapa passa por estes filtros."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "Nenhuma estatística da partida é desenhada atrás do intervalo."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36654,7 +36659,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Custo encomendado: {metal} de metal e {energy} de energia."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "ordens"
@@ -36674,12 +36679,12 @@ msgstr "Ordens que um widget na máquina do jogador enviou a unidades nomeadas. 
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Ordens dadas a uma unidade não aparecem nela, pois o replay guarda a unidade e não a posição dela."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "Ordens dadas"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "Ordens dadas e eventos"
@@ -44307,7 +44312,7 @@ msgstr "Pacotes de configuração"
 msgid "Several"
 msgstr "Vários"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "Sombreado: {activityLabel}"
@@ -50993,7 +50998,7 @@ msgstr "A pasta inteira é removida, liberando {freedBytes}. Você teria que bai
 msgid "the whole match"
 msgstr "a partida inteira"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "A partida inteira, de {matchStart} a {matchEnd}."
@@ -51013,12 +51018,12 @@ msgstr "Os widgets que você adicionou aos seus jogos."
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "O intervalo é {when} de cada partida pelo próprio relógio, em minutos inteiros."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "O intervalo é quando uma ordem foi dada, não quando algo foi construído."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "O intervalo é quando cada evento aconteceu na reprodução."
@@ -53124,11 +53129,6 @@ msgstr "Tempo na partida"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "Tempo no chão"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "Intervalo de tempo"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56698,8 +56698,8 @@ msgstr "Inteiro"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "Partida inteira"

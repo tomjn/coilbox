@@ -3507,7 +3507,7 @@ msgstr "{infoCount, plural, one {# σημείωση} other {# σημειώσει
 msgid "{inProgress} in progress"
 msgstr "Σε εξέλιξη: {inProgress}"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} από {total} {countNoun}."
@@ -6787,7 +6787,7 @@ msgstr "{subject}: προέρχονται από τη λίστα μονάδων 
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel} από {rangeStart} έως {rangeEnd}."
@@ -13143,10 +13143,9 @@ msgstr "Έναρξη Μονοπατιού Μάχης"
 msgid "Beginner guide"
 msgstr "Οδηγός για αρχάριους"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "Πίσω από το εύρος, {activityLabel} σε όλες τις ομάδες."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21864,7 +21863,7 @@ msgstr "Γεγονός"
 msgid "Event log downloaded."
 msgstr "Το αρχείο καταγραφής γεγονότων λήφθηκε."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "Γεγονότα"
@@ -23604,7 +23603,7 @@ msgstr "Για Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "Για τα περισσότερα όπλα, η βασική ώθηση ισούται με τη ζημιά που προκαλείται. Για όπλα σώμα με σώμα είναι η μάζα του επιτιθέμενου."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "Για τις εντολές, το χρονικό διάστημα είναι όταν δόθηκε η καθεμία, όχι όταν κατασκευάστηκε κάτι. Για τα γεγονότα είναι όταν συνέβη το καθένα στην αναπαραγωγή."
@@ -25134,6 +25133,18 @@ msgstr "Θερμικό νέφος"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "bitmap θερμικού νέφους"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -30178,11 +30189,6 @@ msgstr "Τα στατιστικά του αγώνα εξήχθησαν."
 msgid "Match statistics image exported."
 msgstr "Η εικόνα των στατιστικών του αγώνα εξήχθη."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "Χρονικό διάστημα αγώνα"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32201,7 +32207,7 @@ msgstr "Εφιάλτης"
 msgid "No"
 msgstr "Όχι"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "{countNoun}: κανένα."
@@ -33151,10 +33157,9 @@ msgstr "Κανένας αγώνας σε αυτόν τον χάρτη δεν β�
 msgid "No match on this map passes these filters."
 msgstr "Κανένας αγώνας σε αυτόν τον χάρτη δεν περνά αυτά τα φίλτρα."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "Δεν σχεδιάζονται στατιστικά αγώνα πίσω από το εύρος."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36671,7 +36676,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Κόστος εντολών: {metal} μέταλλο και {energy} ενέργεια."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "εντολές"
@@ -36691,12 +36696,12 @@ msgstr "Εντολές που έστειλε ένα widget στον υπολογ
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Οι εντολές που στοχεύουν μονάδα δεν εμφανίζονται σε αυτόν, επειδή η επανάληψη κρατά τη μονάδα και όχι τη θέση της."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "Εντολές που δόθηκαν"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "Εντολές που δόθηκαν και συμβάντα"
@@ -44324,7 +44329,7 @@ msgstr "Πακέτα ρύθμισης"
 msgid "Several"
 msgstr "Πολλά"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "Σκιασμένο: {activityLabel}"
@@ -51010,7 +51015,7 @@ msgstr "Διαγράφεται ολόκληρος ο φάκελος, απελε�
 msgid "the whole match"
 msgstr "ολόκληρος ο αγώνας"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "Ολόκληρος ο αγώνας, από {matchStart} έως {matchEnd}."
@@ -51030,12 +51035,12 @@ msgstr "Τα widgets που έχετε προσθέσει στα παιχνίδ�
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "Το χρονικό διάστημα είναι {when} κάθε αγώνα με το δικό του ρολόι, σε ακέραια λεπτά."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "Το χρονικό διάστημα αφορά το πότε δόθηκε μια εντολή, όχι το πότε κατασκευάστηκε κάτι."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "Το χρονικό διάστημα αφορά το πότε συνέβη κάθε συμβάν στην αναπαραγωγή."
@@ -53141,11 +53146,6 @@ msgstr "Χρόνος στον αγώνα"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "Χρόνος στο έδαφος"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "Χρονικό διάστημα"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56722,8 +56722,8 @@ msgstr "Ολόκληρο"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "Ολόκληρος ο αγώνας"

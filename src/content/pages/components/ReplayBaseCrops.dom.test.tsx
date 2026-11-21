@@ -69,6 +69,9 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 const { ReplayMapHeat } = await import("./ReplayMapHeat");
 const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+const { WindowLane, pressWindowPreset } = await import(
+  "../../heatWindowFixture"
+);
 
 const MIN = 60 * 30;
 
@@ -162,6 +165,7 @@ const HEIGHTMAP = { width: 513, height: 513 };
 function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
+      <WindowLane info={info} />
       <ReplayMapHeat
         info={info}
         replayPath="/replays/a.sdfz"
@@ -192,8 +196,7 @@ afterEach(() => {
 });
 
 const toggle = (name: string) => screen.getByRole("button", { name });
-const press = (name: string) =>
-  fireEvent.click(screen.getByRole("button", { name }));
+const press = pressWindowPreset;
 const card = (team: number) =>
   document.querySelector<HTMLElement>(`button[data-crop-team="${team}"]`);
 const marks = (team: number) =>

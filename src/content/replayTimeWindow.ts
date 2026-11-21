@@ -6,7 +6,8 @@
  * parts: a window in seconds, the frames it covers, and the filter that keeps
  * the points inside it. The filter takes a parallel array of frames, or a list
  * of objects that each have one, so a layer built from either shape calls the
- * same code. The control that edits the window is `ReplayTimeWindowControl`.
+ * same code. The window is edited on the timeline dock's Heat window lane,
+ * `ReplayHeatWindow`.
  */
 
 import { t } from "@lingui/core/macro";
@@ -22,6 +23,7 @@ import {
   teamSeries,
 } from "./matchStats";
 import { labelOfMetric } from "./metricLabels";
+import { LARGE_STEP_SECONDS, STEP_SECONDS } from "./replayMapView/timelineKeys";
 
 /** A stretch of match time in whole seconds from the start of the game. */
 export interface TimeWindow {
@@ -88,6 +90,106 @@ export function toWindow(
   return start <= 0 && end >= domainSec
     ? null
     : { startSec: start, endSec: end };
+}
+
+/**
+ * A window as the dock's lane hands it to the store (#5309): the same as
+ * {@link toWindow}, except that an end at the match's end is held open, as
+ * `Infinity`. A layer whose own axis runs a little past the dock's, because an
+ * order came after the match's recorded length, then still reaches its end.
+ */
+export function heldWindow(
+  startSec: number,
+  endSec: number,
+  domainSec: number,
+): TimeWindow | null {
+  const window = toWindow(startSec, endSec, domainSec);
+  if (!window) return null;
+  return {
+    startSec: window.startSec,
+    endSec:
+      window.endSec >= domainSec ? Number.POSITIVE_INFINITY : window.endSec,
+  };
+}
+
+/** The parts of the dock's window box a reader can take hold of. */
+export type WindowPart = "start" | "end" | "move";
+
+/**
+ * Where a window's ends are after the pointer has dragged a part of its box
+ * `deltaSec` seconds from where the drag began. An end cannot cross the other,
+ * and a box that is slid keeps its width and stops at the match's edges. A
+ * drag that reaches the last half second of the match ends at `domainSec`, the
+ * whole second at or after the match's end, which is the end of the match.
+ *
+ * `totalSec` is the length of the axis the pointer moves over and `domainSec`
+ * is the whole seconds the window can span.
+ */
+export function dragWindow(
+  part: WindowPart,
+  from: readonly [number, number],
+  deltaSec: number,
+  { domainSec, totalSec }: { domainSec: number; totalSec: number },
+): [number, number] {
+  const [start, end] = from;
+  const delta = Math.round(deltaSec);
+  const reach = Math.round(totalSec);
+  switch (part) {
+    case "start":
+      return [Math.max(0, Math.min(start + delta, end - 1)), end];
+    case "end": {
+      const next = Math.max(end + delta, start + 1);
+      return [start, next >= reach ? domainSec : next];
+    }
+    case "move": {
+      let by = Math.max(-start, Math.min(delta, domainSec - end));
+      if (end + by >= reach) by = domainSec - end;
+      return [start + by, end + by];
+    }
+  }
+}
+
+/**
+ * Where an end of the window goes when a key is pressed on it, or null when the
+ * key is not one that moves it. The arrows move a second and with Shift ten,
+ * Page Up and Page Down move ten, and Home and End go to the least and the most
+ * the end can be, as a slider's do.
+ */
+export function keyedWindow(
+  part: "start" | "end",
+  from: readonly [number, number],
+  key: string,
+  shift: boolean,
+  domainSec: number,
+): [number, number] | null {
+  const [start, end] = from;
+  const step = shift ? LARGE_STEP_SECONDS : STEP_SECONDS;
+  let delta: number;
+  switch (key) {
+    case "ArrowRight":
+    case "ArrowUp":
+      delta = step;
+      break;
+    case "ArrowLeft":
+    case "ArrowDown":
+      delta = -step;
+      break;
+    case "PageUp":
+      delta = LARGE_STEP_SECONDS;
+      break;
+    case "PageDown":
+      delta = -LARGE_STEP_SECONDS;
+      break;
+    case "Home":
+      return part === "start" ? [0, end] : [start, start + 1];
+    case "End":
+      return part === "start" ? [end - 1, end] : [start, domainSec];
+    default:
+      return null;
+  }
+  return part === "start"
+    ? [Math.max(0, Math.min(start + delta, end - 1)), end]
+    : [start, Math.min(domainSec, Math.max(end + delta, start + 1))];
 }
 
 /** The indexes of the frames inside a range, in order. */

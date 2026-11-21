@@ -3505,7 +3505,7 @@ msgstr "{infoCount, plural, one {# merknad} other {# merknader}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} pågår"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} av {total} {countNoun}."
@@ -6785,7 +6785,7 @@ msgstr "{subject} kommer fra enhetslisten motoren skrev da denne reprisen ble an
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{subjectLabel} fra {rangeStart} til {rangeEnd}."
@@ -13140,10 +13140,9 @@ msgstr "Start Krigsstien"
 msgid "Beginner guide"
 msgstr "Nybegynnerguide"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "Bak området, {activityLabel} på tvers av alle lag."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21855,7 +21854,7 @@ msgstr "Hendelse"
 msgid "Event log downloaded."
 msgstr "Hendelseslogg lastet ned."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "Hendelser"
@@ -23594,7 +23593,7 @@ msgstr "For Blender"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "For de fleste våpen er grunnimpulsen lik skaden som gjøres. For nærkampvåpen er det angriperens masse i stedet."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "For ordrer er tidsrommet når hver ble gitt, ikke når noe ble bygget. For hendelser er det når hver skjedde i avspillingen."
@@ -25124,6 +25123,18 @@ msgstr "Varmesky"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "varmeskybitmap"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -30167,11 +30178,6 @@ msgstr "Kampstatistikken er eksportert."
 msgid "Match statistics image exported."
 msgstr "Bilde av kampstatistikken er eksportert."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "Tidsrom i kampen"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32185,7 +32191,7 @@ msgstr "Mareritt"
 msgid "No"
 msgstr "Nei"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "{countNoun}: ingen."
@@ -33134,10 +33140,9 @@ msgstr "Ingen kamp på dette kartet er i biblioteket ditt ennå."
 msgid "No match on this map passes these filters."
 msgstr "Ingen kamp på dette kartet passer til disse filtrene."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "Ingen kampstatistikk tegnes bak området."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36654,7 +36659,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "Bestilt kostnad: {metal} metall og {energy} energi."
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "ordrer"
@@ -36674,12 +36679,12 @@ msgstr "Ordrer som en widget på spillerens maskin sendte til navngitte enheter.
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "Ordrer rettet mot en enhet er ikke på den, fordi reprisen holder enheten og ikke posisjonen."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "Gitte ordrer"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "Gitte ordrer og hendelser"
@@ -44307,7 +44312,7 @@ msgstr "Oppsettspakker"
 msgid "Several"
 msgstr "Flere"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "Skyggelagt: {activityLabel}"
@@ -50993,7 +50998,7 @@ msgstr "Hele mappen forsvinner og frigjør {freedBytes}. Du må laste ned denne 
 msgid "the whole match"
 msgstr "hele kampen"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "Hele kampen, {matchStart} til {matchEnd}."
@@ -51013,12 +51018,12 @@ msgstr "Widgetene du har lagt til i spillene dine."
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "Tidsrommet er {when} av hver kamp etter dens egen klokke, i hele minutter."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "Tidsrommet er når en ordre ble gitt, ikke når noe ble bygget."
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "Tidsrommet er når hver hendelse skjedde i avspillingen."
@@ -53124,11 +53129,6 @@ msgstr "Tid i kampen"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "Tid på bakken"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "Tidsrom"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56698,8 +56698,8 @@ msgstr "Hel"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "Hele kampen"

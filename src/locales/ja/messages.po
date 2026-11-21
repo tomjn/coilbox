@@ -3474,7 +3474,7 @@ msgstr "{infoCount, plural, other {# 件の注記}}"
 msgid "{inProgress} in progress"
 msgstr "{inProgress} 件が進行中"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{inside} of {total} {countNoun}."
 msgstr "{inside} / {total} {countNoun}。"
@@ -6737,7 +6737,7 @@ msgstr "{subject} は、{date} にこのリプレイを分析したときに、�
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr "{rangeStart} から {rangeEnd} までの {subjectLabel}。"
@@ -13062,10 +13062,9 @@ msgstr "ウォーパスを開始"
 msgid "Beginner guide"
 msgstr "初心者ガイド"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Behind the range, {activityLabel} across all teams."
-msgstr "範囲の後ろに、全チームの {activityLabel}。"
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
+msgstr ""
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -21720,7 +21719,7 @@ msgstr "イベント"
 msgid "Event log downloaded."
 msgstr "イベントログをダウンロードしました。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Events"
 msgstr "イベント"
@@ -23449,7 +23448,7 @@ msgstr "Blender 用"
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr "ほとんどの武器では、基本の衝撃は与えたダメージと同じです。近接武器では攻撃者の質量になります。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr "命令の時間帯は、建設された時刻ではなく、命令が出された時刻です。イベントの時間帯は、再生中にそれぞれが起きた時刻です。"
@@ -24973,6 +24972,18 @@ msgstr "ヒートクラウド"
 #, fuzzy
 msgid "heat cloud bitmap"
 msgstr "ヒートクラウドのビットマップ"
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
+msgstr ""
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -29990,11 +30001,6 @@ msgstr "試合の統計をエクスポートしました。"
 msgid "Match statistics image exported."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Match time window"
-msgstr "試合の時間帯"
-
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "match total"
@@ -32000,7 +32006,7 @@ msgstr "ナイトメア"
 msgid "No"
 msgstr "いいえ"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "No {countNoun}."
 msgstr "{countNoun} はありません。"
@@ -32943,10 +32949,9 @@ msgstr "このマップの試合はまだライブラリにありません。"
 msgid "No match on this map passes these filters."
 msgstr "これらのフィルターに一致する、このマップの試合はありません。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "No match statistics are drawn behind the range."
-msgstr "範囲の背後に描画される試合の統計はありません。"
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
+msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -36430,7 +36435,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr "命令したコスト：メタル {metal}、エネルギー {energy}。"
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "orders"
 msgstr "命令"
@@ -36450,12 +36455,12 @@ msgstr "プレイヤーのマシン上のウィジェットが名前付きユニ
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr "ユニットを対象にした命令は、そのユニットの位置には表示されません。リプレイにはユニットが記録され、位置は記録されないためです。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given"
 msgstr "出した命令"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "Orders given and events"
 msgstr "出した命令とイベント"
@@ -44029,7 +44034,7 @@ msgstr "セットアップパック"
 msgid "Several"
 msgstr "複数"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #, fuzzy
 msgid "Shaded: {activityLabel}"
 msgstr "網掛け：{activityLabel}"
@@ -50661,7 +50666,7 @@ msgstr "フォルダー全体が削除され、{freedBytes} が解放されま�
 msgid "the whole match"
 msgstr "試合全体"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "試合全体（{matchStart} から {matchEnd}）。"
@@ -50680,12 +50685,12 @@ msgstr ""
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "時間帯は、各試合自身の時計での {when} です（分単位）。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when an order was given, not when anything was built."
 msgstr "時間帯は命令が出された時点で、何かが建設された時点ではありません。"
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
 msgid "The window is when each event happened in the playback."
 msgstr "時間帯は再生中に各イベントが起きた時点です。"
@@ -52782,11 +52787,6 @@ msgstr "試合内の時間"
 #, fuzzy
 msgid "Time on the ground"
 msgstr "地上にいる時間"
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-#, fuzzy
-msgid "Time window"
-msgstr "時間帯"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -56342,8 +56342,8 @@ msgstr "全体"
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
 msgid "Whole match"
 msgstr "試合全体"

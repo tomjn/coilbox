@@ -2869,7 +2869,7 @@ msgstr ""
 msgid "{inProgress} in progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "{inside} of {total} {countNoun}."
 msgstr ""
 
@@ -5524,7 +5524,7 @@ msgstr ""
 msgid "{subject} progress"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr ""
 
@@ -10677,8 +10677,8 @@ msgstr ""
 msgid "Beginner guide"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "Behind the range, {activityLabel} across all teams."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
 msgstr ""
 
 #: src/lego/drive.ts
@@ -17825,7 +17825,7 @@ msgstr ""
 msgid "Event log downloaded."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "Events"
 msgstr ""
 
@@ -19233,7 +19233,7 @@ msgstr ""
 msgid "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
 msgstr ""
 
@@ -20484,6 +20484,18 @@ msgstr ""
 
 #: src/lego/effectBitmaps.ts
 msgid "heat cloud bitmap"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window end"
+msgstr ""
+
+#: src/content/pages/components/ReplayHeatWindow.tsx
+msgid "Heat window start"
 msgstr ""
 
 #: src/workshop/explosionGenerators.ts
@@ -24589,10 +24601,6 @@ msgstr ""
 msgid "Match statistics image exported."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "Match time window"
-msgstr ""
-
 #: src/content/replayMatchFigures.ts
 msgid "match total"
 msgstr ""
@@ -26243,7 +26251,7 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "No {countNoun}."
 msgstr ""
 
@@ -27014,8 +27022,8 @@ msgstr ""
 msgid "No match on this map passes these filters."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "No match statistics are drawn behind the range."
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
+msgid "No match statistics are drawn behind the box."
 msgstr ""
 
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -29870,7 +29878,7 @@ msgid "Ordered cost: {metal} metal and {energy} energy."
 msgstr ""
 
 #: src/content/mapAggregate.ts
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "orders"
 msgstr ""
 
@@ -29886,11 +29894,11 @@ msgstr ""
 msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "Orders given"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "Orders given and events"
 msgstr ""
 
@@ -36118,7 +36126,7 @@ msgstr ""
 msgid "Several"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 msgid "Shaded: {activityLabel}"
 msgstr ""
 
@@ -41573,7 +41581,7 @@ msgstr ""
 msgid "the whole match"
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr ""
 
@@ -41589,11 +41597,11 @@ msgstr ""
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "The window is when an order was given, not when anything was built."
 msgstr ""
 
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
+#: src/content/pages/components/ReplayTimeWindowNote.tsx
 msgid "The window is when each event happened in the playback."
 msgstr ""
 
@@ -43300,10 +43308,6 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 msgid "Time on the ground"
-msgstr ""
-
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
-msgid "Time window"
 msgstr ""
 
 #: src/content/mapImage.ts
@@ -46223,8 +46227,8 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayHeatWindow.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Whole match"
 msgstr ""
 
