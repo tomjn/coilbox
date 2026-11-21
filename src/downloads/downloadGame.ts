@@ -127,7 +127,7 @@ async function downloadGameAnySourceImpl(opts: {
         const source = githubSourceForGame(repos, gameName);
         if (!source || !writePath) return null;
         const repo = source.repo;
-        const archives = await loadGithubReleases(repo);
+        const archives = await loadGithubReleases(repo, true);
         // No releases at all: this source genuinely has nothing, same as any
         // other step finding no candidate. Move on to the next source.
         if (archives.length === 0) return null;
