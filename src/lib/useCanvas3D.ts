@@ -15,7 +15,12 @@
  * any animation loop. Those are interaction and content, not canvas lifetime.
  */
 
-import { type DependencyList, type RefObject, useLayoutEffect } from "react";
+import {
+  type DependencyList,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import * as THREE from "three";
 
 import { registerCanvas3D } from "./renderStats";
@@ -50,30 +55,51 @@ export interface Canvas3DScene {
  *
  * `dispose()` frees what three allocated but leaves the context alive until
  * the garbage collector reaches the canvas. A browser allows only a handful of
- * live contexts and drops the oldest past that, so a view rebuilt on every
- * click used up the allowance and blanked the main model view (issue #5344).
+ * live contexts and drops the oldest past that, so a view that never gave its
+ * context back blanked the main model view (issue #5344).
  */
-function release(renderer: THREE.WebGLRenderer): void {
+export function release(renderer: THREE.WebGLRenderer): void {
   renderer.dispose();
   renderer.forceContextLoss();
   renderer.domElement.remove();
 }
 
+/** The canvas a view holds, and the scene on it while there is one. */
+interface Live {
+  renderer: THREE.WebGLRenderer;
+  host: HTMLElement;
+  resize: () => void;
+  scene?: Canvas3DScene;
+  /** Everything the renderer has been asked to draw since the last scene went. */
+  drawing: Set<object>;
+  /** What the renderer now refuses to draw. */
+  letGo: WeakSet<object>;
+  /** Let the scene go, if there is one. `clear` blanks what it drew. */
+  dropScene?: (clear: boolean) => void;
+}
+
 /**
- * Run `build` against a fresh canvas inside `hostRef`, and tear it all down
- * when `deps` change or the view unmounts.
+ * Run `build` against a canvas inside `hostRef`, and again on the same canvas
+ * when `deps` change. Everything is freed when the view unmounts.
  *
- * `build` returning nothing means there is nothing to draw yet, and no canvas
- * is left behind. `deps` are the caller's own, as `useMemo` takes them.
+ * The renderer, and with it the WebGL context, is made once and kept. WebKit
+ * still counts a context after `forceContextLoss`, so a canvas remade on every
+ * change runs the browser out of contexts and another view goes blank (issues
+ * #5344 and #5348). A change to `deps` disposes the scene `build` returned and
+ * builds the next one on the same renderer. `deps` are the caller's own, as
+ * `useMemo` takes them.
  *
- * A layout effect rather than a plain one: the size a view is first drawn at,
- * and anything it publishes from that size, has to be settled before the frame
- * is painted.
+ * `build` returning nothing means there is nothing to draw yet. The canvas is
+ * blanked and kept, because the view is usually between two builds, as a map
+ * preview is while its sources load.
+ *
+ * Both effects are layout effects rather than plain ones: the size a view is
+ * first drawn at, and anything it publishes from that size, has to be settled
+ * before the frame is painted.
  *
  * `ready` is whether the view has anything to build yet. A view whose inputs
- * are still arriving says false, and no renderer is made until it says true: a
- * WebGL context made and thrown away for a build that returns nothing is not
- * free, and a map preview's sources settle in several steps.
+ * are still arriving says false, and no renderer is made until it says true.
+ * Going back to false gives the renderer up.
  */
 export function useCanvas3D(
   hostRef: RefObject<HTMLElement | null>,
@@ -81,7 +107,11 @@ export function useCanvas3D(
   deps: DependencyList,
   ready = true,
 ): void {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the caller passes what its own build reads, the way useMemo takes a list
+  const liveRef = useRef<Live | null>(null);
+
+  // The canvas. Declared before the scene effect, so on a mount it exists by
+  // the time the scene is built.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a ref is read when the effect runs, and `ready` is what says the host exists
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host || !ready) return;
@@ -92,11 +122,30 @@ export function useCanvas3D(
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
 
-    let scene: Canvas3DScene | undefined;
+    const live: Live = {
+      renderer,
+      host,
+      resize: () => {},
+      drawing: new Set(),
+      letGo: new WeakSet(),
+    };
+
+    // A scene's own layers draw on it after it has been let go, from a passive
+    // effect cleanup React runs once the next scene is built, and the renderer
+    // is alive by then. Nothing they hold can tell, so the renderer refuses a
+    // scene that has been let go: drawing it would re-allocate storage for the
+    // textures that were freed with it (issue #1740).
+    const draw = renderer.render.bind(renderer);
+    renderer.render = (scene, camera) => {
+      if (live.letGo.has(scene)) return;
+      live.drawing.add(scene);
+      draw(scene, camera);
+    };
+
     // The pixel ratio the buffer was last sized at, so a window resize that did
     // not move it costs nothing.
     let ratio = 0;
-    const render = () => scene?.render();
+    const render = () => live.scene?.render();
     const resize = () => {
       const { clientWidth, clientHeight } = host;
       if (clientWidth === 0 || clientHeight === 0) return;
@@ -105,20 +154,11 @@ export function useCanvas3D(
       ratio = drawingPixelRatio();
       renderer.setPixelRatio(ratio);
       renderer.setSize(clientWidth, clientHeight, false);
-      scene?.resize(clientWidth, clientHeight);
+      live.scene?.resize(clientWidth, clientHeight);
       render();
     };
-
-    scene = build({ renderer, host, render, resize });
-
-    if (!scene) {
-      release(renderer);
-      return;
-    }
-
-    // Every 3D view passes through here, so this is the one place that can say
-    // what any of them cost to draw (issue #2292).
-    const unregisterStats = registerCanvas3D({ renderer, render, host });
+    live.resize = resize;
+    liveRef.current = live;
 
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -144,21 +184,55 @@ export function useCanvas3D(
     resize();
 
     return () => {
-      // A view hands its own render out to whatever draws on its scene, and a
-      // layer that draws asks for one more frame as it goes, from a passive
-      // effect cleanup React runs after this one. Nothing it holds can tell
-      // that the canvas is already gone, so the renderer says so itself: a
-      // disposed one draws nothing rather than re-allocating storage for a
-      // texture that already has it (issue #1740).
+      // Nothing draws after this, whatever still holds a render.
       renderer.render = () => {};
-      unregisterStats();
+      liveRef.current = null;
+      live.dropScene?.(false);
       stopWatchingTextures();
       window.removeEventListener("resize", onWindowResize);
       renderer.domElement.removeEventListener("webglcontextrestored", render);
       observer.disconnect();
-      scene?.dispose();
       release(renderer);
     };
+  }, [ready]);
+
+  // The scene, on whatever canvas the effect above made.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the caller passes what its own build reads, the way useMemo takes a list
+  useLayoutEffect(() => {
+    const live = liveRef.current;
+    if (!live) return;
+    const { renderer, host } = live;
+
+    const scene = build({
+      renderer,
+      host,
+      render: () => live.scene?.render(),
+      resize: live.resize,
+    });
+    live.scene = scene;
+    if (!scene) return;
+
+    // Every 3D view passes through here, so this is the one place that can say
+    // what any of them cost to draw (issue #2292).
+    const unregisterStats = registerCanvas3D({
+      renderer,
+      render: () => scene.render(),
+      host,
+    });
+    live.dropScene = (clear) => {
+      live.dropScene = undefined;
+      live.scene = undefined;
+      unregisterStats();
+      // Before the scene's own dispose, which may ask for a frame as it goes.
+      for (const drawn of live.drawing) live.letGo.add(drawn);
+      live.drawing.clear();
+      scene.dispose();
+      // The canvas stays, so what the scene drew would stay with it.
+      if (clear) renderer.clear();
+    };
+    live.resize();
+
+    return () => live.dropScene?.(true);
     // Spread rather than passed straight through, because the lint rule wants
     // to see an array literal here. The contents are still the caller's.
   }, [ready, ...deps]);

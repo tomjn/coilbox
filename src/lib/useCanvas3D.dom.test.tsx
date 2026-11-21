@@ -36,6 +36,7 @@ vi.mock("three", () => ({
     forceContextLoss() {
       lost();
     }
+    clear() {}
     render(...args: unknown[]) {
       drawn(...args);
     }
@@ -92,17 +93,44 @@ function Gated({ ready }: { ready: boolean }) {
   return <div ref={hostRef} />;
 }
 
+/** One call per scene a view built, and one per scene it let go. */
+const built = vi.fn();
+const disposed = vi.fn();
+/** The render each build handed out, oldest first, each drawing its own scene. */
+const renders: (() => void)[] = [];
+
 /** A view rebuilt whenever `n` changes, the way a preview follows a choice. */
 function Counted({ n }: { n: number }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   useCanvas3D(
     hostRef,
-    ({ renderer }) => ({
-      render: () => renderer.render(scene, camera),
-      resize: () => {},
-      dispose: () => {},
-    }),
+    ({ renderer }) => {
+      built();
+      const own = {} as THREE.Scene;
+      const render = () => renderer.render(own, camera);
+      renders.push(render);
+      return {
+        render,
+        resize: () => {},
+        dispose: disposed,
+      };
+    },
     [n],
+  );
+  return <div ref={hostRef} />;
+}
+
+/** A view that has nothing to draw while `shown` is false, the way a map
+ *  preview does between one set of sources and the next. */
+function Sometimes({ shown }: { shown: boolean }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  useCanvas3D(
+    hostRef,
+    () =>
+      shown
+        ? { render: () => {}, resize: () => {}, dispose: () => {} }
+        : undefined,
+    [shown],
   );
   return <div ref={hostRef} />;
 }
@@ -133,21 +161,60 @@ describe("useCanvas3D", () => {
     expect(lost).toHaveBeenCalledTimes(1);
   });
 
-  it("gives each context back when the view is rebuilt", () => {
-    const view = render(<Counted n={0} />);
+  // WebKit still counts a context after `forceContextLoss`, so giving each one
+  // back is not enough: a view that makes a new one for every change runs the
+  // browser out and another view goes blank (issues #5344, #5348). The canvas
+  // stays and only the scene on it is rebuilt.
+  it("keeps one renderer when what the view shows changes", () => {
+    made.mockClear();
     lost.mockClear();
+    built.mockClear();
+    disposed.mockClear();
+    const view = render(<Counted n={0} />);
     for (let n = 1; n <= 20; n++) view.rerender(<Counted n={n} />);
-    expect(lost).toHaveBeenCalledTimes(20);
+    expect(made).toHaveBeenCalledTimes(1);
+    expect(lost).not.toHaveBeenCalled();
+    expect(built).toHaveBeenCalledTimes(21);
+    expect(disposed).toHaveBeenCalledTimes(20);
+    expect(view.container.querySelectorAll("canvas")).toHaveLength(1);
     view.unmount();
-    expect(lost).toHaveBeenCalledTimes(21);
+    expect(lost).toHaveBeenCalledTimes(1);
+    expect(disposed).toHaveBeenCalledTimes(21);
   });
 
-  it("gives back the context of a build that drew nothing", () => {
+  it("keeps its renderer through a build that has nothing to draw", () => {
+    made.mockClear();
     lost.mockClear();
-    const view = render(<Empty />);
-    expect(lost).toHaveBeenCalledTimes(1);
+    const view = render(<Sometimes shown={true} />);
+    view.rerender(<Sometimes shown={false} />);
+    view.rerender(<Sometimes shown={true} />);
+    expect(made).toHaveBeenCalledTimes(1);
+    expect(lost).not.toHaveBeenCalled();
     view.unmount();
     expect(lost).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives back the context of a view that never had anything to draw", () => {
+    lost.mockClear();
+    const view = render(<Empty />);
+    view.unmount();
+    expect(lost).toHaveBeenCalledTimes(1);
+  });
+
+  // The renderer outlives the scene, so the guard against a late frame has to
+  // be about the scene (issue #1740): a layer that redraws as it goes asks the
+  // scene it was on, after that scene's textures are freed.
+  it("draws nothing for a scene that has been let go", () => {
+    renders.length = 0;
+    const view = render(<Counted n={0} />);
+    const [old] = renders;
+    old();
+    view.rerender(<Counted n={1} />);
+    drawn.mockClear();
+    old();
+    expect(drawn).not.toHaveBeenCalled();
+    renders[1]();
+    expect(drawn).toHaveBeenCalledTimes(1);
   });
 
   it("draws again when the browser restores a lost context", () => {
