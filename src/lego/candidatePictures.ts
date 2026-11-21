@@ -5,12 +5,14 @@
  * `thumbnail.ts` borrows the builder's live scene, so it can only draw the unit
  * that is open. This draws any number of units through one renderer of its
  * own, from the same camera, so a candidate looks the way its thumbnail will
- * once it is opened. The renderer is let go as soon as the batch is drawn,
- * because a page can only hold a few WebGL contexts at once.
+ * once it is opened. A page can only hold a few WebGL contexts at once and
+ * WebKit counts one until its canvas is collected, so the renderer is kept for
+ * the next batch rather than made again (issue #5351).
  */
 
 import * as THREE from "three";
 
+import { borrowRenderer, returnRenderer } from "../lib/keptRenderer";
 import { teamColourPending } from "../lib/springTexture";
 import { addStandardLights } from "./geometry";
 import type { LegoProject } from "./model";
@@ -19,6 +21,9 @@ import { seatPieceMesh } from "./pivot";
 import { worldMatrix } from "./reparent";
 import { getShapeGeometry } from "./shapes";
 import { THUMBNAIL_PIXELS, thumbnailCamera } from "./thumbnail";
+
+/** The kept renderers this draws on. See `../lib/keptRenderer`. */
+const PICTURES = "candidate-pictures";
 
 /** Whether the material's texture and team colour have arrived. Drawn before
  *  then, every part is black. */
@@ -71,7 +76,10 @@ export function drawUnitPictures(
   pixels: number = THUMBNAIL_PIXELS,
 ): string[] {
   if (units.length === 0) return [];
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = borrowRenderer(
+    PICTURES,
+    () => new THREE.WebGLRenderer({ antialias: true, alpha: true }),
+  );
   try {
     renderer.setPixelRatio(1);
     renderer.setSize(pixels, pixels, false);
@@ -87,7 +95,6 @@ export function drawUnitPictures(
       return renderer.domElement.toDataURL("image/png");
     });
   } finally {
-    renderer.dispose();
-    renderer.forceContextLoss();
+    returnRenderer(PICTURES, renderer);
   }
 }
