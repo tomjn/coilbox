@@ -283,7 +283,7 @@ describe("ReplayBuildOrders", () => {
     expect(screen.queryByRole("button", { name: /more of/ })).toBeNull();
   });
 
-  it("keeps several players' lists closed until one is opened", async () => {
+  it("gives each player an entry with their opening, and keeps every order closed until one is opened", async () => {
     await open(
       orders([order({ player: 0 }), order({ player: 1, team: 1 })], {
         players: [
@@ -292,8 +292,19 @@ describe("ReplayBuildOrders", () => {
         ],
       }),
     );
+    const entries = document.querySelectorAll("[data-build-entry]");
+    expect(entries).toHaveLength(2);
+    expect([...entries].map((e) => e.querySelector("h3")?.textContent)).toEqual(
+      ["Alice", "Bob"],
+    );
+    for (const e of entries)
+      expect(within(e as HTMLElement).getByText("Opening")).toBeTruthy();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: /Bob/ }));
+    fireEvent.click(
+      within(entries[1] as HTMLElement).getByRole("button", {
+        name: /All orders/,
+      }),
+    );
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 

@@ -479,7 +479,7 @@ msgstr "（未命名）"
 msgid "(unset)"
 msgstr "（未设置）"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "(you)"
 msgstr "（你）"
@@ -12767,6 +12767,10 @@ msgstr "基础色"
 msgid "Base height"
 msgstr "底座高度"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Base swing"
@@ -12777,8 +12781,6 @@ msgstr "底座摆动"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr ".smf/.smt 的基本名称（不含扩展名）"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -33108,6 +33110,10 @@ msgstr "无命令"
 msgid "No orders were given in this stretch."
 msgstr "这段时间内没有下达命令。"
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
@@ -36203,7 +36209,6 @@ msgstr "已打开改编后的回放，使用“观看”即可运行。"
 msgid "opened with {opening}"
 msgstr "开局：{opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
@@ -37427,6 +37432,10 @@ msgstr "已导出图片。"
 #, fuzzy
 msgid "Picture uploads stopped early"
 msgstr "图片上传提前停止"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -44881,11 +44890,6 @@ msgstr "侧边图像（图片）"
 msgid "side graphic video"
 msgstr "侧边图像（视频）"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "Side not described"
-msgstr "阵营未描述"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -50747,11 +50751,6 @@ msgstr "主题覆盖"
 msgid "Then"
 msgstr "然后"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "没有基地视图，因为此回放没有可作为中心的出生点。"
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "There are no blueprints in this file coilbox can read."
@@ -54424,7 +54423,6 @@ msgstr "无名合集"
 msgid "Unnamed login"
 msgstr "无名登录信息"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 #, fuzzy
 msgid "Unnamed player"

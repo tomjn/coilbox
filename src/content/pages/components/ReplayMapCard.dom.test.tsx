@@ -1986,9 +1986,11 @@ describe("the map card's modes", () => {
     expect(chosen()).toEqual(["Heat"]);
     expect(canvas()).toBeNull();
     const layers = within(rail()).getByRole("toolbar", { name: "Map layers" });
-    for (const name of ["Start boxes", "Buildings ordered", "Bases"]) {
+    for (const name of ["Start boxes", "Buildings ordered"]) {
       within(layers).getByRole("button", { name });
     }
+    // The base pictures are in the build orders now (#5318).
+    expect(within(layers).queryByRole("button", { name: "Bases" })).toBeNull();
   });
 
   it("shows the 3D view with only the layers that paint on terrain in its rail", async () => {

@@ -36,6 +36,7 @@ import { MissingContentNotice } from "./components/MissingContentNotice";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
+import { BasePicturesProvider } from "./components/ReplayBaseCrops";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayEventList } from "./components/ReplayEventList";
 import { ReplayMapCard } from "./components/ReplayMapCard";
@@ -515,10 +516,17 @@ export default function ReplayDetailPage() {
                         ) : undefined,
                       builds:
                         replay && showStats ? (
-                          <ReplayBuildOrders
+                          <BasePicturesProvider
                             info={info}
                             replayPath={replay.path}
-                          />
+                            enginePath={selected?.enginePath}
+                            dataDir={selected?.rootPath}
+                          >
+                            <ReplayBuildOrders
+                              info={info}
+                              replayPath={replay.path}
+                            />
+                          </BasePicturesProvider>
                         ) : undefined,
                       events: replay ? (
                         <ReplayEventList

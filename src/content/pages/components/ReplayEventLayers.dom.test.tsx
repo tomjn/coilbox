@@ -309,10 +309,10 @@ describe("a replay with no analysis", () => {
     );
     show();
     expect(toggle("Deaths").dataset.state).toBe("off");
-    fireEvent.click(toggle("Bases"));
+    fireEvent.click(toggle("Start positions"));
     expect(
       JSON.parse(localStorage.getItem("coilbox.replayMap.layers") ?? "{}"),
-    ).toMatchObject({ deaths: true, bases: true });
+    ).toMatchObject({ deaths: true, starts: false });
     expect(eventsRead).not.toHaveBeenCalled();
   });
 });

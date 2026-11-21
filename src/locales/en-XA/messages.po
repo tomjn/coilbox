@@ -389,7 +389,7 @@ msgstr ""
 msgid "(unset)"
 msgstr ""
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "(you)"
 msgstr ""
 
@@ -10439,6 +10439,10 @@ msgstr ""
 msgid "Base height"
 msgstr ""
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 msgid "Base swing"
 msgstr ""
@@ -10447,8 +10451,6 @@ msgstr ""
 msgid "basename for the .smf/.smt (no extension)"
 msgstr ""
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 msgid "Bases"
 msgstr ""
@@ -27157,6 +27159,10 @@ msgstr ""
 msgid "No orders were given in this stretch."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 msgid "No orders with a place on the map were given in this replay."
 msgstr ""
@@ -29692,7 +29698,6 @@ msgstr ""
 msgid "opened with {opening}"
 msgstr ""
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Opened with {opening}"
 msgstr ""
@@ -30693,6 +30698,10 @@ msgstr ""
 
 #: src/hub/uploadOutcomes.ts
 msgid "Picture uploads stopped early"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
 msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
@@ -36819,10 +36828,6 @@ msgstr ""
 msgid "side graphic video"
 msgstr ""
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-msgid "Side not described"
-msgstr ""
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -41653,10 +41658,6 @@ msgstr ""
 msgid "Then"
 msgstr ""
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr ""
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "There are no blueprints in this file coilbox can read."
 msgstr ""
@@ -44659,7 +44660,6 @@ msgstr ""
 msgid "Unnamed login"
 msgstr ""
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 msgid "Unnamed player"
 msgstr ""

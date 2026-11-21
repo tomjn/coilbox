@@ -483,7 +483,7 @@ msgstr "(naamloos)"
 msgid "(unset)"
 msgstr "(niet ingesteld)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "(you)"
 msgstr "(jij)"
@@ -12848,6 +12848,10 @@ msgstr "Basiskleur"
 msgid "Base height"
 msgstr "Basishoogte"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Base swing"
@@ -12858,8 +12862,6 @@ msgstr "Basiszwaai"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr "basisnaam voor de .smf/.smt (zonder extensie)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -33317,6 +33319,10 @@ msgstr "Geen orders"
 msgid "No orders were given in this stretch."
 msgstr "In dit stuk zijn geen orders gegeven."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
@@ -36440,7 +36446,6 @@ msgstr "De geremixte replay is geopend. Gebruik Bekijken om hem af te spelen."
 msgid "opened with {opening}"
 msgstr "geopend met {opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
@@ -37672,6 +37677,10 @@ msgstr "Afbeelding geëxporteerd."
 #, fuzzy
 msgid "Picture uploads stopped early"
 msgstr "Uploaden van afbeeldingen vroegtijdig gestopt"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -45177,11 +45186,6 @@ msgstr "zijafbeelding (foto)"
 msgid "side graphic video"
 msgstr "zijafbeelding (video)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "Side not described"
-msgstr "Factie niet beschreven"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -51097,11 +51101,6 @@ msgstr "Thema-aanpassingen"
 msgid "Then"
 msgstr "Dan"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "Er zijn geen basisweergaven, omdat deze replay geen startpositie bevat om er een op te centreren."
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "There are no blueprints in this file coilbox can read."
@@ -54793,7 +54792,6 @@ msgstr "Naamloze collectie"
 msgid "Unnamed login"
 msgstr "Naamloze aanmeldgegevens"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 #, fuzzy
 msgid "Unnamed player"

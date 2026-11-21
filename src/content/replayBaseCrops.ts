@@ -10,6 +10,7 @@
 
 import { DEFAULT_RADIUS_FRACTION } from "@/lib/heatField";
 import type { BuildOrder, DemoInfo, UnitDatasetEntry } from "./bindings";
+import type { BuildOrderSeat } from "./replayBuildOrders";
 import {
   type BuildMark,
   buildMarks,
@@ -131,6 +132,40 @@ export interface BaseCrop {
   ordered: number;
   /** Of those, how many are not in the crop, including ones off the map. */
   outside: number;
+}
+
+/**
+ * One entry of the build orders section: a team's picture, when there is one,
+ * and the seats that gave its orders.
+ */
+export interface BuildOrderEntry {
+  key: string;
+  crop: BaseCrop | null;
+  /** Empty for a team that ordered nothing. More than one when a team is shared. */
+  seats: BuildOrderSeat[];
+}
+
+/**
+ * The entries for a section's seats. Each team with a picture has an entry, in
+ * the pictures' order and whether or not it ordered anything, so a player who
+ * ordered nothing still shows their start. A seat with no picture, because its
+ * team has no recorded start or there is no picture to draw, follows as an entry
+ * of its own, in the order the seats came.
+ */
+export function buildOrderEntries(
+  seats: readonly BuildOrderSeat[],
+  crops: readonly BaseCrop[],
+): BuildOrderEntry[] {
+  const pictured = new Set(crops.map((c) => c.team));
+  const entries: BuildOrderEntry[] = crops.map((crop) => ({
+    key: `team-${crop.team}`,
+    crop,
+    seats: seats.filter((seat) => seat.team === crop.team),
+  }));
+  for (const seat of seats)
+    if (seat.team === undefined || !pictured.has(seat.team))
+      entries.push({ key: seat.key, crop: null, seats: [seat] });
+  return entries;
 }
 
 /** The side each engine team is on. */

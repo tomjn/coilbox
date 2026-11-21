@@ -18,7 +18,6 @@ import {
 import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useReplayStartAreas } from "../../useReplayStartAreas";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { ReplayBaseCrops } from "./ReplayBaseCrops";
 import { EventLayerCanvases, EventLayerNotes } from "./ReplayEventLayers";
 import {
   FLAT_LAYERS,
@@ -207,8 +206,6 @@ export function ReplayMapHeat({
     placed,
     categorised,
     usedCategories,
-    inWindow,
-    timeWindow,
   } = layers;
 
   const emphasis = useSeriesEmphasis();
@@ -390,24 +387,7 @@ export function ReplayMapHeat({
           )}
         </>
       }
-      under={
-        layersShown && (
-          <>
-            <MapTimeWindow layers={layers} />
-            {on.bases && (
-              <ReplayBaseCrops
-                info={info}
-                dots={layers.dots}
-                orders={inWindow}
-                world={world}
-                units={units.units}
-                minimapUrl={minimapUrl}
-                timeWindow={timeWindow}
-              />
-            )}
-          </>
-        )
-      }
+      under={layersShown && <MapTimeWindow layers={layers} />}
     />
   );
 }

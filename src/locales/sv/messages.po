@@ -483,7 +483,7 @@ msgstr "(namnlös)"
 msgid "(unset)"
 msgstr "(inte angiven)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "(you)"
 msgstr "(du)"
@@ -12848,6 +12848,10 @@ msgstr "Grundfärg"
 msgid "Base height"
 msgstr "Basens höjd"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Base swing"
@@ -12858,8 +12862,6 @@ msgstr "Bassvängning"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr "basnamn för .smf/.smt (utan filändelse)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -33317,6 +33319,10 @@ msgstr "Inga order"
 msgid "No orders were given in this stretch."
 msgstr "Inga order gavs under den här perioden."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
@@ -36440,7 +36446,6 @@ msgstr "Öppnade den remixade reprisen – använd Titta för att köra den."
 msgid "opened with {opening}"
 msgstr "öppnade med {opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
@@ -37672,6 +37677,10 @@ msgstr "Bilden exporterad."
 #, fuzzy
 msgid "Picture uploads stopped early"
 msgstr "Bilduppladdningen stoppades i förtid"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -45177,11 +45186,6 @@ msgstr "sidografikbild"
 msgid "side graphic video"
 msgstr "sidografikvideo"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "Side not described"
-msgstr "Sidan är inte beskriven"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -51097,11 +51101,6 @@ msgstr "Temaåsidosättningar"
 msgid "Then"
 msgstr "Sedan"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "Det finns inga basvyer, eftersom reprisen inte har någon startposition att centrera en på."
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "There are no blueprints in this file coilbox can read."
@@ -54793,7 +54792,6 @@ msgstr "Namnlös samling"
 msgid "Unnamed login"
 msgstr "Namnlös inloggning"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 #, fuzzy
 msgid "Unnamed player"

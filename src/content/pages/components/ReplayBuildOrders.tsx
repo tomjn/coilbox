@@ -16,6 +16,7 @@ import type {
   UnitDatasetEntry,
 } from "../../bindings";
 import { useUnitsyncUnitBuildpics } from "../../config";
+import { type BuildOrderEntry, buildOrderEntries } from "../../replayBaseCrops";
 import {
   type BuildOrderSeat,
   buildOrderSeats,
@@ -24,6 +25,7 @@ import {
   slotNote,
   type UnitSource,
 } from "../../replayBuildOrders";
+import { startDotName } from "../../replayMapLayers";
 import {
   collapseOrders,
   orderedCost,
@@ -35,6 +37,12 @@ import { orderFit } from "../../replayUnitDefs";
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
 import { useKeepUnitList, useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import {
+  BaseCropsHelp,
+  BasePicture,
+  BasePictureKey,
+  useBasePictures,
+} from "./ReplayBaseCrops";
 import { OpeningSplitHelp, ReplayOpeningSplit } from "./ReplayOpeningSplit";
 import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
@@ -44,6 +52,18 @@ import { OrderFitNote, StoredListNote, UnitListHelp } from "./UnitListNotes";
 /** How many of a seat's orders are drawn at first, and added per press. A long
  *  match has hundreds per player, and all of them at once is thousands of rows. */
 const PAGE = 100;
+
+/** The least width an entry is given before the row takes one fewer. A display
+ *  choice. The page's right column measured 600 pixels in a 1440 pixel wide
+ *  window, which two entries of 17rem fit in. An entry
+ *  narrower than 22rem stacks its picture above its lists, because beside them
+ *  the lists have too little room for a unit name. */
+const ENTRY_MIN_WIDTH = "17rem";
+
+/** The most entries in a row. More players wrap onto another row. Two keeps an
+ *  entry wide enough for its picture to sit beside its lists whenever the panel
+ *  is wider than about 45rem, where three to a row would stack it. */
+const ENTRY_MAX_PER_ROW = 2;
 
 /** Where the unit names came from, or why there are none. */
 function SourceNote({
@@ -140,10 +160,10 @@ function SeatOpening({
   const metal = cost ? formatNumber(cost.metal) : "";
   const energy = cost ? formatNumber(cost.energy) : "";
   return (
-    <div className="flex flex-col gap-1 border-t border-border/50 p-3 text-sm">
-      <h3 className="text-xs font-medium">
+    <div className="flex flex-col gap-1 text-sm">
+      <h4 className="text-xs font-medium">
         {cutMinutes === null ? t`Opening` : t`Opening, first ${cutMinutes} min`}
-      </h3>
+      </h4>
       {entries.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           <Trans>No orders were given in this stretch.</Trans>
@@ -232,8 +252,10 @@ function SeatOpening({
   );
 }
 
-function SeatOrders({
+/** One seat's opening, and under it every order it gave, which opens on request. */
+function SeatLists({
   seat,
+  showName,
   units,
   pics,
   noPictures,
@@ -242,6 +264,8 @@ function SeatOrders({
   differentBuild,
 }: {
   seat: BuildOrderSeat;
+  /** Said when a team is shared and the entry holds more than one seat. */
+  showName: boolean;
   units: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
   noPictures: boolean;
@@ -251,97 +275,162 @@ function SeatOrders({
 }) {
   const { t } = useLingui();
   const [shown, setShown] = useState(PAGE);
-  const { pointTo } = useSeriesEmphasis();
   const left = seat.orders.length - shown;
   const moreCount = Math.min(PAGE, left);
   const orderCount = seat.orders.length;
   return (
-    <Collapsible
-      defaultOpen={defaultOpen}
-      className="rounded-lg border border-border/50 bg-card"
-      {...(seat.team === undefined ? {} : pointTo([seat.team]))}
-    >
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="group w-full justify-start gap-1.5"
-        >
-          <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-          <span className="font-medium">{seat.name}</span>
-          <span className="text-xs text-muted-foreground">
-            {plural(orderCount, { one: "# order", other: "# orders" })}
-          </span>
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <SeatOpening
-          seat={seat}
-          units={units}
-          pics={pics}
-          noPictures={noPictures}
-          cutMinutes={cutMinutes}
-          differentBuild={differentBuild}
-        />
-        <h3 className="border-t border-border/50 px-3 pt-3 text-xs font-medium">
-          <Trans>All orders</Trans>
-        </h3>
-        <ol className="flex max-h-96 flex-col gap-1 overflow-y-auto p-3 text-sm">
-          {seat.orders.slice(0, shown).map((order, i) => {
-            const unit = resolveBuildUnit(order.unitDefId, units);
-            const note = slotNote(order);
-            return (
-              // Orders are never reordered, and two can be identical.
-              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list with no other identity
-              <li key={i} className="flex items-center gap-2">
-                <span className="w-12 shrink-0 tabular-nums text-xs text-muted-foreground">
-                  {buildOrderTime(order.frame)}
-                </span>
-                {unit && (
-                  <UnitIcon
-                    display={pics?.units[unit.name]}
-                    pending={pics === null && !noPictures}
-                    size="sm"
-                  />
-                )}
-                <span className="min-w-0 truncate">
-                  {unitLabel(unit, t`Unit ${order.unitDefId}`)}
-                </span>
-                {order.count > 1 && (
-                  <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
-                    ×{order.count}
+    <div className="flex min-w-0 flex-col gap-2">
+      {showName && <h4 className="text-xs font-medium">{seat.name}</h4>}
+      <SeatOpening
+        seat={seat}
+        units={units}
+        pics={pics}
+        noPictures={noPictures}
+        cutMinutes={cutMinutes}
+        differentBuild={differentBuild}
+      />
+      <Collapsible
+        defaultOpen={defaultOpen}
+        className="rounded-md border border-border/50"
+      >
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="group w-full justify-start gap-1.5"
+          >
+            <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+            <span className="text-xs font-medium">
+              <Trans>All orders</Trans>
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {plural(orderCount, { one: "# order", other: "# orders" })}
+            </span>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ol className="flex max-h-96 flex-col gap-1 overflow-y-auto p-3 text-sm">
+            {seat.orders.slice(0, shown).map((order, i) => {
+              const unit = resolveBuildUnit(order.unitDefId, units);
+              const note = slotNote(order);
+              return (
+                // Orders are never reordered, and two can be identical.
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list with no other identity
+                <li key={i} className="flex items-center gap-2">
+                  <span className="w-12 shrink-0 tabular-nums text-xs text-muted-foreground">
+                    {buildOrderTime(order.frame)}
                   </span>
-                )}
-                {note && (
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {note}
+                  {unit && (
+                    <UnitIcon
+                      display={pics?.units[unit.name]}
+                      pending={pics === null && !noPictures}
+                      size="sm"
+                    />
+                  )}
+                  <span className="min-w-0 truncate">
+                    {unitLabel(unit, t`Unit ${order.unitDefId}`)}
                   </span>
-                )}
-                {order.position && (
-                  <span className="ml-auto shrink-0 tabular-nums text-xs text-muted-foreground">
-                    {Math.round(order.position.x)},{" "}
-                    {Math.round(order.position.z)}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-        {left > 0 && (
-          <div className="border-t border-border/50 p-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShown((n) => n + PAGE)}
-            >
-              <Trans>
-                Show {moreCount} more of {orderCount}
-              </Trans>
-            </Button>
+                  {order.count > 1 && (
+                    <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                      ×{order.count}
+                    </span>
+                  )}
+                  {note && (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {note}
+                    </span>
+                  )}
+                  {order.position && (
+                    <span className="ml-auto shrink-0 tabular-nums text-xs text-muted-foreground">
+                      {Math.round(order.position.x)},{" "}
+                      {Math.round(order.position.z)}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+          {left > 0 && (
+            <div className="border-t border-border/50 p-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShown((n) => n + PAGE)}
+              >
+                <Trans>
+                  Show {moreCount} more of {orderCount}
+                </Trans>
+              </Button>
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
+/**
+ * One entry: the player's name, their base picture on one side and their
+ * opening and orders on the other. A player who ordered nothing still has an
+ * entry, which says so beside the picture of their start. Pointing at it lights
+ * the player across the page.
+ */
+function BuildOrderEntryView({
+  entry,
+  defaultOpen,
+  ...shared
+}: {
+  entry: BuildOrderEntry;
+  defaultOpen: boolean;
+  units: UnitDatasetEntry[] | null;
+  pics: UnitBuildpicsResult | null;
+  noPictures: boolean;
+  cutMinutes: number | null;
+  differentBuild: boolean;
+}) {
+  const { t } = useLingui();
+  const pictures = useBasePictures();
+  const { pointTo } = useSeriesEmphasis();
+  const { crop, seats } = entry;
+  const team = crop?.team ?? seats[0]?.team;
+  const name = crop
+    ? `${startDotName(crop)}${crop.isMe ? ` ${t`(you)`}` : ""}`
+    : (seats[0]?.name ?? "");
+  return (
+    // A size container, so the picture goes beside the lists or above them by
+    // the room the entry has and not the window's.
+    <div className="@container min-w-0">
+      <section
+        data-build-entry={entry.key}
+        aria-label={name}
+        className="flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3"
+        {...(team === undefined ? {} : pointTo([team]))}
+      >
+        <h3 className="text-sm font-medium">{name}</h3>
+        <div className="flex flex-col gap-3 @min-[22rem]:flex-row">
+          {crop && pictures && (
+            <BasePicture crop={crop} name={name} pictures={pictures} />
+          )}
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            {seats.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                <Trans>No orders were given.</Trans>
+              </p>
+            ) : (
+              seats.map((seat) => (
+                <SeatLists
+                  key={seat.key}
+                  seat={seat}
+                  showName={seats.length > 1}
+                  defaultOpen={defaultOpen}
+                  {...shared}
+                />
+              ))
+            )}
           </div>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -407,6 +496,8 @@ export function ReplayBuildOrders({
   );
 
   const seats = result ? buildOrderSeats(result, info) : [];
+  const pictures = useBasePictures();
+  const entries = buildOrderEntries(seats, pictures?.crops ?? []);
 
   return (
     <section className="flex flex-col gap-2">
@@ -430,6 +521,7 @@ export function ReplayBuildOrders({
                   with repeats shown as a count.
                 </Trans>
               </p>
+              <BaseCropsHelp />
               {units && <OpeningSplitHelp />}
               <UnitListHelp fit={fit} />
               {result && result.removals > 0 && (
@@ -509,18 +601,30 @@ export function ReplayBuildOrders({
               differentBuild={source?.kind === "differentBuild"}
             />
           )}
-          {seats.map((seat) => (
-            <SeatOrders
-              key={seat.key}
-              seat={seat}
-              units={units}
-              pics={pics}
-              noPictures={picturesArchive === undefined}
-              defaultOpen={seats.length === 1}
-              cutMinutes={parseCutMinutes(cut)}
-              differentBuild={source?.kind === "differentBuild"}
-            />
-          ))}
+          <BasePictureKey />
+          {/* Entries share the width evenly: as many to a row as fit at the
+           * least width an entry can use, and never more than the most a row
+           * takes, so two players get half each and a big match wraps. */}
+          <div
+            data-build-entries
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: `repeat(auto-fit, minmax(max(${ENTRY_MIN_WIDTH}, calc((100% - ${ENTRY_MAX_PER_ROW - 1} * 0.75rem) / ${ENTRY_MAX_PER_ROW})), 1fr))`,
+            }}
+          >
+            {entries.map((entry) => (
+              <BuildOrderEntryView
+                key={entry.key}
+                entry={entry}
+                defaultOpen={entries.length === 1}
+                units={units}
+                pics={pics}
+                noPictures={picturesArchive === undefined}
+                cutMinutes={parseCutMinutes(cut)}
+                differentBuild={source?.kind === "differentBuild"}
+              />
+            ))}
+          </div>
         </>
       )}
       {result?.incomplete && (

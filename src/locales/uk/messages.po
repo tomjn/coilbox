@@ -479,7 +479,7 @@ msgstr "(без назви)"
 msgid "(unset)"
 msgstr "(не задано)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "(you)"
 msgstr "(ви)"
@@ -12767,6 +12767,10 @@ msgstr "Основний колір"
 msgid "Base height"
 msgstr "Висота основи"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Base swing"
@@ -12777,8 +12781,6 @@ msgstr "Розмах основи"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr "базова назва для .smf/.smt (без розширення)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -33108,6 +33110,10 @@ msgstr "Без наказів"
 msgid "No orders were given in this stretch."
 msgstr "На цьому відрізку не було наказів."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
@@ -36203,7 +36209,6 @@ msgstr "Відкрито реміксований повтор – натисн�
 msgid "opened with {opening}"
 msgstr "дебют: {opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
@@ -37427,6 +37432,10 @@ msgstr "Зображення експортовано."
 #, fuzzy
 msgid "Picture uploads stopped early"
 msgstr "Вивантаження зображень зупинилося передчасно"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -44881,11 +44890,6 @@ msgstr "зображення бічної графіки"
 msgid "side graphic video"
 msgstr "відео бічної графіки"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "Side not described"
-msgstr "Фракцію не описано"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -50747,11 +50751,6 @@ msgstr "Перевизначення теми"
 msgid "Then"
 msgstr "Потім"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "Немає видів бази, бо цей повтор не містить стартової позиції, на якій їх можна відцентрувати."
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "There are no blueprints in this file coilbox can read."
@@ -54424,7 +54423,6 @@ msgstr "Колекція без назви"
 msgid "Unnamed login"
 msgstr "Дані входу без назви"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 #, fuzzy
 msgid "Unnamed player"

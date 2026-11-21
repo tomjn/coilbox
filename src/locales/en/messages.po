@@ -389,7 +389,7 @@ msgstr "(unnamed)"
 msgid "(unset)"
 msgstr "(unset)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "(you)"
 msgstr "(you)"
 
@@ -10440,6 +10440,10 @@ msgstr "Base color"
 msgid "Base height"
 msgstr "Base height"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr "Base of {name}"
+
 #: src/lego/animPresets.ts
 msgid "Base swing"
 msgstr "Base swing"
@@ -10448,8 +10452,6 @@ msgstr "Base swing"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr "basename for the .smf/.smt (no extension)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 msgid "Bases"
 msgstr "Bases"
@@ -27158,6 +27160,10 @@ msgstr "No orders"
 msgid "No orders were given in this stretch."
 msgstr "No orders were given in this stretch."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr "No orders were given."
+
 #: src/content/pages/components/ReplayMapRail.tsx
 msgid "No orders with a place on the map were given in this replay."
 msgstr "No orders with a place on the map were given in this replay."
@@ -29693,7 +29699,6 @@ msgstr "Opened the remixed replay — use Watch to run it."
 msgid "opened with {opening}"
 msgstr "opened with {opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 msgid "Opened with {opening}"
 msgstr "Opened with {opening}"
@@ -30695,6 +30700,10 @@ msgstr "Picture exported."
 #: src/hub/uploadOutcomes.ts
 msgid "Picture uploads stopped early"
 msgstr "Picture uploads stopped early"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr "Pictures show orders given from {from} to {to}."
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 msgid "Piece"
@@ -36820,10 +36829,6 @@ msgstr "side graphic image"
 msgid "side graphic video"
 msgstr "side graphic video"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-msgid "Side not described"
-msgstr "Side not described"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr "Side trips to every town"
@@ -41654,10 +41659,6 @@ msgstr "Theme overrides"
 msgid "Then"
 msgstr "Then"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "There are no base views, because this replay holds no start position to centre one on."
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "There are no blueprints in this file coilbox can read."
 msgstr "There are no blueprints in this file coilbox can read."
@@ -44660,7 +44661,6 @@ msgstr "Unnamed collection"
 msgid "Unnamed login"
 msgstr "Unnamed login"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 msgid "Unnamed player"
 msgstr "Unnamed player"

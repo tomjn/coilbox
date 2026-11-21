@@ -1,8 +1,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
-import { useMemo } from "react";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { formatDuration, formatNumber } from "@/lib/format";
-import type { BuildOrder, DemoInfo, UnitDatasetEntry } from "../../bindings";
+import type { DemoInfo } from "../../bindings";
+import { useUnitsyncHeightmap, useUnitsyncMinimap } from "../../config";
 import {
   type BaseCrop,
   baseCrops,
@@ -16,11 +17,10 @@ import {
   type MapWorld,
   NEUTRAL_SHAPE,
   NEUTRAL_TEAM_COLOUR,
-  type StartDot,
 } from "../../replayMapLayers";
-import { teamLabel } from "../../replaySideLabel";
 import type { TimeWindow } from "../../replayTimeWindow";
 import { UNIT_CATEGORIES } from "../../unitCategory";
+import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 
 /**
@@ -31,42 +31,128 @@ import { useSeriesEmphasis } from "../../useSeriesEmphasis";
  */
 const CROP_MARK_SIZE = 3;
 
-/** One player's view: the minimap cut to the crop, their orders as marks, and
- *  where their start really is. A button, so it can be pointed at, tabbed to
- *  and pressed, and the rest of the page lights the same player. */
-function CropCard({
-  crop,
-  world,
-  minimapUrl,
-  windowed,
-}: {
-  crop: BaseCrop;
+/** What the base pictures are drawn from, once there is something to draw. */
+interface BasePictures {
+  /** One for each start, allies together. */
+  crops: readonly BaseCrop[];
   world: MapWorld;
   minimapUrl: string;
-  windowed: boolean;
+  /** The window the dock's Heat window lane has set, or null for the whole match. */
+  timeWindow: TimeWindow | null;
+  domainSec: number;
+  /** The replay's game is not installed or its units are unread, so every mark
+   *  has one shape. */
+  unitsMissing: boolean;
+}
+
+const BasePicturesContext = createContext<BasePictures | null>(null);
+
+/** The base pictures, or null when there are none to draw: no minimap, no
+ *  start positions, no orders read yet, or a profile that hides the layers. */
+export function useBasePictures(): BasePictures | null {
+  return useContext(BasePicturesContext);
+}
+
+/**
+ * Works out each player's base picture (#1177) and hands it to the build orders
+ * below, which put each beside its player's orders (#5318).
+ *
+ * A picture is the minimap cut to a square round the player's start, with the
+ * orders they gave in the dock's Heat window drawn on it. It reads the build
+ * orders the page has read, and asks for none itself. Mount it under a
+ * `SeriesEmphasisProvider`.
+ */
+export function BasePicturesProvider({
+  info,
+  replayPath,
+  enginePath,
+  dataDir,
+  children,
+}: {
+  info: DemoInfo;
+  replayPath: string | undefined;
+  enginePath: string | undefined;
+  dataDir: string | undefined;
+  children: ReactNode;
+}) {
+  const minimap = useUnitsyncMinimap(enginePath, dataDir, info.mapName);
+  const heightmap = useUnitsyncHeightmap(enginePath, dataDir, info.mapName);
+  // No layer takes part: the pictures read the build orders, the window and the
+  // start positions, and nothing the map's switches steer.
+  const layers = useReplayMapLayers({
+    info,
+    replayPath,
+    heightmap: heightmap.data,
+    shown: [],
+  });
+  const { layersShown, world, dots, inWindow, units, timeWindow, domainSec } =
+    layers;
+  const minimapUrl = minimap.url;
+  const unitList = units.units;
+  const value = useMemo(() => {
+    if (!layersShown || !minimapUrl || !inWindow) return null;
+    const crops = baseCrops(dots, inWindow, world, unitList, info);
+    if (crops.length === 0) return null;
+    return {
+      crops,
+      world,
+      minimapUrl,
+      timeWindow,
+      domainSec,
+      unitsMissing: unitList === null,
+    };
+  }, [
+    layersShown,
+    minimapUrl,
+    inWindow,
+    dots,
+    world,
+    unitList,
+    info,
+    timeWindow,
+    domainSec,
+  ]);
+  return (
+    <BasePicturesContext.Provider value={value}>
+      {children}
+    </BasePicturesContext.Provider>
+  );
+}
+
+/** One player's picture: the minimap cut to the crop, their orders as marks,
+ *  and where their start really is. A button, so it can be pointed at, tabbed
+ *  to and pressed, and the rest of the page lights the same player. */
+export function BasePicture({
+  crop,
+  name,
+  pictures,
+}: {
+  crop: BaseCrop;
+  /** The player the entry is for, which is what names the button. */
+  name: string;
+  pictures: BasePictures;
 }) {
   const { t } = useLingui();
   const { isLit, dimming, pointTo, focusOn, toggleSelected } =
     useSeriesEmphasis();
   const teams = [crop.team];
   const lit = isLit(teams);
-  const image = cropImageBox(crop.window, world);
-  const name =
-    crop.names.length > 0 ? crop.names.join(", ") : t`Unnamed player`;
-  const opening = crop.opening;
+  const image = cropImageBox(crop.window, pictures.world);
   const ordered = formatNumber(crop.ordered);
   const outside = formatNumber(crop.outside);
   const faded = dimming && !lit;
+  const windowed = pictures.timeWindow !== null;
   return (
     <button
       type="button"
       data-crop-team={crop.team}
+      aria-label={t`Base of ${name}`}
       aria-pressed={lit}
       onClick={() => toggleSelected(teams)}
       {...pointTo(teams)}
       {...focusOn(teams)}
       className={cn(
-        "flex min-w-0 flex-col gap-1 rounded-md p-0.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex w-full min-w-0 max-w-48 flex-col gap-1 self-start rounded-md p-0.5 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @min-[22rem]:w-32 @min-[22rem]:shrink-0",
         lit && "ring-2 ring-white",
         faded && "opacity-40",
       )}
@@ -76,7 +162,7 @@ function CropCard({
         className="relative block aspect-square w-full overflow-hidden rounded border border-border/50 bg-card"
       >
         <img
-          src={minimapUrl}
+          src={pictures.minimapUrl}
           alt=""
           data-crop-image
           className="absolute max-w-none object-fill"
@@ -130,83 +216,95 @@ function CropCard({
             backgroundColor: crop.colour,
           }}
         />
-        {/* What the bar measures is said once, above the views. */}
+        {/* What the bar measures is said once, in the section's help. */}
         <span
           data-crop-scale-bar
           className="pointer-events-none absolute bottom-1 left-1 block h-1 border-x-2 border-b-2 border-white shadow-[0_0_2px_rgba(9,13,22,1)]"
           style={{ width: "25%" }}
         />
       </span>
-      <span className="flex flex-col text-xs leading-tight">
-        <span className="font-medium">
-          {name}
-          {crop.isMe ? ` ${t`(you)`}` : ""}
-        </span>
-        {crop.opening && (
-          <span className="text-muted-foreground">
-            <Trans>Opened with {opening}</Trans>
+      <span className="text-xs leading-tight text-muted-foreground">
+        {crop.ordered === 0
+          ? windowed
+            ? t`None ordered in this window`
+            : t`None ordered`
+          : t`${ordered} ordered`}
+        {crop.outside > 0 && (
+          <span data-crop-outside>
+            {", "}
+            <Trans>{outside} outside this view</Trans>
           </span>
         )}
-        <span className="text-muted-foreground">
-          {crop.ordered === 0
-            ? windowed
-              ? t`None ordered in this window`
-              : t`None ordered`
-            : t`${ordered} ordered`}
-          {crop.outside > 0 && (
-            <span data-crop-outside>
-              {", "}
-              <Trans>{outside} outside this view</Trans>
-            </span>
-          )}
-        </span>
       </span>
     </button>
   );
 }
 
-/** The shapes the marks are drawn in, and what each stands for. */
-function ShapeKey({ crops }: { crops: readonly BaseCrop[] }) {
+/**
+ * What every picture shares, once, above the entries: the window they follow
+ * when the reader has set one, a note when no game says what a building is, and
+ * what each mark shape stands for.
+ */
+export function BasePictureKey() {
+  const { t } = useLingui();
+  const pictures = useBasePictures();
+  if (!pictures) return null;
+  const { crops, timeWindow, domainSec, unitsMissing } = pictures;
+  const from = timeWindow ? formatDuration(timeWindow.startSec) : "";
+  const to = timeWindow
+    ? formatDuration(Math.min(timeWindow.endSec, domainSec))
+    : "";
   const used = UNIT_CATEGORIES.filter((category) =>
     crops.some((c) => c.marks.some((m) => m.category === category)),
   );
-  if (used.length === 0) return null;
   return (
-    <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      {used.map((category) => (
-        <li key={category} className="flex items-center gap-1">
-          <svg
-            viewBox="-1.3 -1.3 2.6 2.6"
-            className="size-3 fill-current"
-            aria-hidden="true"
-          >
-            <path
-              d={MARK_SHAPES[CATEGORY_SHAPE[category]]}
-              fillRule="evenodd"
-            />
-          </svg>
-          {CATEGORY_LABEL[category]}
-        </li>
-      ))}
-    </ul>
+    <div data-testid="base-picture-key" className="flex flex-col gap-1">
+      {timeWindow && (
+        <p className="text-xs text-muted-foreground">
+          {t`Pictures show orders given from ${from} to ${to}.`}
+        </p>
+      )}
+      {unitsMissing && (
+        <p className="text-xs text-muted-foreground">
+          <Trans>
+            This replay's game is not installed, so every mark is the same
+            shape.
+          </Trans>
+        </p>
+      )}
+      {used.length > 0 && (
+        <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {used.map((category) => (
+            <li key={category} className="flex items-center gap-1">
+              <svg
+                viewBox="-1.3 -1.3 2.6 2.6"
+                className="size-3 fill-current"
+                aria-hidden="true"
+              >
+                <path
+                  d={MARK_SHAPES[CATEGORY_SHAPE[category]]}
+                  fillRule="evenodd"
+                />
+              </svg>
+              {CATEGORY_LABEL[category]}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
 /**
- * What the base views mean, for the map's help entry. It says once what every
- * view shares, so a view's own caption is its player, their opening and two
- * counts. Mount it only when the views are shown.
+ * What the base pictures mean, for the build orders' help entry. It says once
+ * what every picture shares, so a picture's own caption is two counts. Mount it
+ * only when there are pictures.
  */
-export function BaseCropsHelp({
-  world,
-  timeWindow,
-  domainSec,
-}: {
-  world: MapWorld;
-  timeWindow: TimeWindow | null;
-  domainSec: number;
-}) {
+export function BaseCropsHelp() {
   const { t } = useLingui();
+  const pictures = useBasePictures();
+  if (!pictures) return null;
+  const { world, timeWindow, domainSec } = pictures;
   const from = timeWindow ? formatDuration(timeWindow.startSec) : "";
   const to = timeWindow
     ? formatDuration(Math.min(timeWindow.endSec, domainSec))
@@ -235,108 +333,5 @@ export function BaseCropsHelp({
         view.
       </Trans>
     </p>
-  );
-}
-
-/**
- * A crop of the map round each player's start, side by side, so openings
- * compare as pictures of a base (#1177): who walled, who spread, who put a
- * factory somewhere odd.
- *
- * `orders` are the build orders inside the map's time window, already
- * filtered, and the crops draw the ones with a position. Every crop is the same
- * size in elmos, on the same minimap image the map above uses, with marks
- * drawn from the same shapes and colours. Allies sit together. It takes the
- * width it is given and wraps, so mount it across the section and not in the
- * minimap's column. Mount it under a
- * `SeriesEmphasisProvider`: a crop lights its player on the chart, the roster
- * and the map, and they light the crop.
- */
-export function ReplayBaseCrops({
-  info,
-  dots,
-  orders,
-  world,
-  units,
-  minimapUrl,
-  timeWindow,
-}: {
-  info: DemoInfo;
-  dots: readonly StartDot[];
-  /** Null until the build orders have been read. */
-  orders: readonly BuildOrder[] | null;
-  world: MapWorld;
-  /** Null when the replay's game is not installed or its units are unread. */
-  units: UnitDatasetEntry[] | null;
-  minimapUrl: string;
-  timeWindow: TimeWindow | null;
-}) {
-  const { t } = useLingui();
-  const crops = useMemo(
-    () => (orders ? baseCrops(dots, orders, world, units, info) : []),
-    [dots, orders, world, units, info],
-  );
-  const groups = useMemo(() => {
-    const out: { ally: number | undefined; crops: BaseCrop[] }[] = [];
-    for (const crop of crops) {
-      const last = out[out.length - 1];
-      if (last && last.ally === crop.allyTeam) last.crops.push(crop);
-      else out.push({ ally: crop.allyTeam, crops: [crop] });
-    }
-    return out;
-  }, [crops]);
-
-  if (dots.length === 0)
-    return (
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          There are no base views, because this replay holds no start position
-          to centre one on.
-        </Trans>
-      </p>
-    );
-  if (!orders) return null;
-
-  return (
-    <section
-      aria-label={t`Bases`}
-      data-testid="base-crops"
-      className="flex flex-col gap-2"
-    >
-      {units === null && (
-        <p className="text-xs text-muted-foreground">
-          <Trans>
-            This replay's game is not installed, so every mark is the same
-            shape.
-          </Trans>
-        </p>
-      )}
-      <ShapeKey crops={crops} />
-      {groups.map((group) => (
-        <div key={group.ally ?? "none"} className="flex flex-col gap-1">
-          {groups.length > 1 && (
-            <h4 className="text-xs font-medium text-muted-foreground">
-              {group.ally === undefined
-                ? t`Side not described`
-                : teamLabel(group.ally)}
-            </h4>
-          )}
-          <div
-            data-crop-group={group.ally ?? "none"}
-            className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2"
-          >
-            {group.crops.map((crop) => (
-              <CropCard
-                key={crop.team}
-                crop={crop}
-                world={world}
-                minimapUrl={minimapUrl}
-                windowed={timeWindow !== null}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </section>
   );
 }

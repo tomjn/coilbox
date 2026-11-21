@@ -21,7 +21,6 @@ import {
   oneOfDeathsAndDamage,
 } from "../../replayMapLayerToggles";
 import type { ReplayMapLayers } from "../../useReplayMapLayers";
-import { BaseCropsHelp } from "./ReplayBaseCrops";
 import { EventLayerHelp } from "./ReplayEventLayers";
 import { StartUnitHelp } from "./ReplayStartUnitLayer";
 import { ReplayTimeWindowNote, TimeWindowHelp } from "./ReplayTimeWindowNote";
@@ -43,8 +42,8 @@ const MAP_VIEW_HEIGHT = "max(16rem, 100cqh - 4.5rem)";
  * The map and the rail beside it, in every mode of the map card. The rail holds
  * what steers the map and what the map is read by, so a mode puts its switches
  * there and, under them, the legend for each thing that is on. Below a wide
- * window the rail drops under the map. What belongs to the whole card width,
- * like the base pictures, goes in `under`.
+ * window the rail drops under the map. What belongs to the whole card width
+ * goes in `under`.
  */
 export function ReplayMapLayout({
   shape,
@@ -107,7 +106,6 @@ export const FLAT_LAYERS: readonly MapLayer[] = [
   "buildings",
   "density",
   "orderDensity",
-  "bases",
   "deaths",
   "damage",
   "finished",
@@ -207,7 +205,6 @@ export function LayerSwitches({
       {plain("buildings", t`Buildings ordered`)}
       {plain("density", t`Building density`)}
       {plain("orderDensity", t`Order density`)}
-      {plain("bases", t`Bases`)}
       {event("deaths", t`Deaths`)}
       {event("damage", t`Damage dealt`)}
       {event("finished", t`Buildings finished`)}
@@ -419,9 +416,7 @@ export function LayersHelp({
     ev,
     activity,
     on,
-    world,
     timeWindow,
-    domainSec,
     wantOrders,
     wantPoints,
     built,
@@ -430,8 +425,6 @@ export function LayersHelp({
     bySender,
     orderField,
     field,
-    dots,
-    inWindow,
   } = layers;
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
   const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
@@ -440,7 +433,6 @@ export function LayersHelp({
     (field?.peak ?? 0) > 0 ||
     (ev.field?.peak ?? 0) > 0 ||
     (ev.damageField?.peak ?? 0) > 0;
-  const basesShown = on.bases && dots.length > 0 && !!inWindow;
   const orderDensityCount = orderDensitySentence(
     orderField?.counted ?? 0,
     bySender?.lua ?? 0,
@@ -563,13 +555,6 @@ export function LayersHelp({
       )}
       {layersShown && <EventLayerHelp ev={ev} />}
       {flat && layersShown && <StartUnitHelp ev={ev} />}
-      {flat && basesShown && (
-        <BaseCropsHelp
-          world={world}
-          timeWindow={timeWindow}
-          domainSec={domainSec}
-        />
-      )}
     </>
   );
 }

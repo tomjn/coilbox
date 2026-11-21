@@ -712,20 +712,6 @@ describe("order density in the time window", () => {
     ).toBeTruthy();
   });
 
-  it("counts the bases layer's build orders and this layer's points under their own names", async () => {
-    POINTS = POINTS_OVER_TIME;
-    ORDERS = {
-      ...PLACED,
-      lastFrame: 30 * MIN,
-      orders: PLACED.orders.map((o) => ({ ...o, frame: 100 })),
-    };
-    show(LONG);
-    fireEvent.click(toggle("Bases"));
-    fireEvent.click(toggle("Order density"));
-    await screen.findByText(/4 of 4 orders on the map/);
-    expect(screen.getByText(/3 of 3 building orders/)).toBeTruthy();
-  });
-
   it("counts each layer's points under its own name when both are on", async () => {
     POINTS = POINTS_OVER_TIME;
     ORDERS = {
@@ -853,7 +839,6 @@ describe("what stays in the page and what moves to the help", () => {
     show();
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Order density"));
-    fireEvent.click(toggle("Bases"));
     await screen.findByText(/3 of 3 building orders/);
     const moved = [
       /orders and messages recorded/i,
@@ -866,7 +851,6 @@ describe("what stays in the page and what moves to the help", () => {
       /Colours compare places on this map/,
       /not when anything was built/i,
       /draw events from an analysis/,
-      /Every view is/,
     ];
     for (const said of moved) expect(screen.queryByText(said)).toBeNull();
     const dialog = help();

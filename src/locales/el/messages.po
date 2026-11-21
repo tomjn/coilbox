@@ -483,7 +483,7 @@ msgstr "(χωρίς όνομα)"
 msgid "(unset)"
 msgstr "(δεν έχει οριστεί)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
 #, fuzzy
 msgid "(you)"
 msgstr "(εσείς)"
@@ -12848,6 +12848,10 @@ msgstr "Βασικό χρώμα"
 msgid "Base height"
 msgstr "Ύψος βάσης"
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Base of {name}"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Base swing"
@@ -12858,8 +12862,6 @@ msgstr "Αιώρηση βάσης"
 msgid "basename for the .smf/.smt (no extension)"
 msgstr "βασικό όνομα για τα .smf/.smt (χωρίς επέκταση)"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#: src/content/pages/components/ReplayMapRail.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Bases"
@@ -33317,6 +33319,10 @@ msgstr "Καμία εντολή"
 msgid "No orders were given in this stretch."
 msgstr "Δεν δόθηκαν εντολές σε αυτό το διάστημα."
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "No orders with a place on the map were given in this replay."
@@ -36440,7 +36446,6 @@ msgstr "Άνοιξε η επανάληψη με remix — χρησιμοποιή
 msgid "opened with {opening}"
 msgstr "άνοιγμα με {opening}"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Opened with {opening}"
@@ -37672,6 +37677,10 @@ msgstr "Η εικόνα εξήχθη."
 #, fuzzy
 msgid "Picture uploads stopped early"
 msgstr "Οι μεταφορτώσεις εικόνων σταμάτησαν νωρίς"
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Pictures show orders given from {from} to {to}."
+msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -45177,11 +45186,6 @@ msgstr "εικόνα πλευρικού γραφικού"
 msgid "side graphic video"
 msgstr "βίντεο πλευρικού γραφικού"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "Side not described"
-msgstr "Η φατρία δεν περιγράφεται"
-
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Side trips to every town"
 msgstr ""
@@ -51097,11 +51101,6 @@ msgstr "Παρακάμψεις θέματος"
 msgid "Then"
 msgstr "Τότε"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
-#, fuzzy
-msgid "There are no base views, because this replay holds no start position to centre one on."
-msgstr "Δεν υπάρχουν προβολές βάσης, επειδή αυτή η επανάληψη δεν έχει θέση εκκίνησης για να κεντραριστεί μία."
-
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "There are no blueprints in this file coilbox can read."
@@ -54793,7 +54792,6 @@ msgstr "Συλλογή χωρίς όνομα"
 msgid "Unnamed login"
 msgstr "Στοιχεία σύνδεσης χωρίς όνομα"
 
-#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 #, fuzzy
 msgid "Unnamed player"
