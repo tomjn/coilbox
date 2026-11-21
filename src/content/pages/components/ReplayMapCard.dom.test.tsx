@@ -24,8 +24,10 @@ import type {
   ChatLine,
   DemoInfo,
   DemoTrailer,
+  GameItem,
   ReplayTrackFault,
   ReplayTrackHeader,
+  StartBoxConfig,
   StoredReplayAnalysis,
   StoredReplayTrack,
   TimelineEvent,
@@ -112,7 +114,7 @@ vi.mock("../../config", () => ({
   useScanTargetSelection: () => ({
     selected: { enginePath: "/engine", rootPath: "/data" },
   }),
-  useUnitsyncScan: () => ({ data: { games: [] }, loading: false }),
+  useUnitsyncScan: () => ({ data: { games: GAMES }, loading: false }),
   useUnitsyncUnitDataset: () => ({ dataset: null, status: "idle" }),
   useUnitsyncUnitBuildpics: () => ({ units: {}, errors: [] }),
 }));
@@ -133,6 +135,11 @@ vi.mock("../../useMatchStats", () => ({
 vi.mock("../../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => <div data-testid="preview-3d" />,
 }));
+
+/** The installed games, and the start boxes a Zero-K file gives (#5313). */
+let GAMES: GameItem[] = [];
+let STARTBOXES: StartBoxConfig | null = null;
+const startBoxesAsked = vi.fn();
 
 /** What the replay file holds, and what the analysis logged. */
 let CHAT: {
@@ -157,6 +164,10 @@ vi.mock("../../bindings", async () => {
     ...actual,
     contentReplayTracks: async () => {
       throw new Error("seeded in the test");
+    },
+    contentStartBoxes: async (args: unknown) => {
+      startBoxesAsked(args);
+      return { config: STARTBOXES };
     },
     contentDemoChat: async () => CHAT,
     contentDemoBuildOrders: async () => ORDERS,
@@ -275,6 +286,9 @@ beforeEach(() => {
   HEADER_ANSWER = HEADER;
   TRAILER = null;
   INFO_OVER = {};
+  GAMES = [];
+  STARTBOXES = null;
+  startBoxesAsked.mockClear();
   RUNNING = false;
   launches.length = 0;
   LAUNCH = async (opts) => {
@@ -2335,6 +2349,13 @@ describe("start boxes and start positions in Units (#5312)", () => {
     [
       ...document.querySelectorAll<HTMLElement>("[data-layer='startBox']"),
     ] as HTMLElement[];
+  const labels = () =>
+    [
+      ...document.querySelectorAll<HTMLElement>("[data-layer='startBoxLabel']"),
+    ] as HTMLElement[];
+  /** The colour an area is outlined in. */
+  const outline = (box: Element) =>
+    box.querySelectorAll("polygon")[1]?.getAttribute("stroke");
   const dotMarks = () =>
     [
       ...document.querySelectorAll<HTMLElement>("[data-layer='startDot']"),
@@ -2366,14 +2387,18 @@ describe("start boxes and start positions in Units (#5312)", () => {
   it("draws each team's box in its colour with its number, under the units", async () => {
     await open();
     const drawn = boxes();
-    expect(drawn.map((b) => b.textContent)).toEqual(["1", "2"]);
-    expect(drawn[1].style.left).toBe("30%");
-    expect(drawn[1].style.top).toBe("25%");
-    expect(drawn[1].style.width).toBe("20%");
-    expect(drawn[1].style.height).toBe("25%");
-    expect(drawn[1].getAttribute("style")).toContain("rgb(0, 128, 255)");
+    expect(labels().map((b) => b.textContent)).toEqual(["1", "2"]);
+    // Team 2's box is the 30% to 50% across and 25% to 50% down.
+    expect(drawn[1].querySelector("polygon")?.getAttribute("points")).toBe(
+      "30,25 50,25 50,50 30,50",
+    );
+    expect(outline(drawn[1])).toBe("#0080ff");
     // The canvas is later in the box that holds both, so it is in front.
-    for (const el of [...drawn, ...dotMarks()]) {
+    for (const el of [
+      ...drawn.map((b) => b.closest("svg") as Element),
+      ...labels(),
+      ...dotMarks(),
+    ]) {
       expect(
         el.compareDocumentPosition(canvas()) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
@@ -2401,8 +2426,11 @@ describe("start boxes and start positions in Units (#5312)", () => {
     expect(
       screen.queryByRole("button", { name: /^Start position of/ }),
     ).toBeNull();
-    for (const box of boxes())
-      expect(box.className).toContain("pointer-events-none");
+    for (const el of [
+      ...boxes().map((b) => b.closest("svg") as Element),
+      ...labels(),
+    ])
+      expect(el.getAttribute("class")).toContain("pointer-events-none");
   });
 
   it("still names a unit inside a start box when the pointer is on it", async () => {
@@ -2485,18 +2513,14 @@ describe("start boxes and start positions in Units (#5312)", () => {
       ],
     } as unknown as Partial<DemoInfo>);
     const inUnits = {
-      boxes: boxes().map(
-        (b) => b.getAttribute("style")?.match(/rgb\([^)]*\)/)?.[0],
-      ),
+      boxes: boxes().map(outline),
       dots: dotMarks().map(
         (d) => (d.firstElementChild as HTMLElement).style.backgroundColor,
       ),
     };
     await pick("Heat");
     const inHeat = {
-      boxes: boxes().map(
-        (b) => b.getAttribute("style")?.match(/rgb\([^)]*\)/)?.[0],
-      ),
+      boxes: boxes().map(outline),
       dots: screen
         .getAllByRole("button", { name: /^Start position of/ })
         .map((d) => (d.firstElementChild as HTMLElement).style.backgroundColor),
@@ -2518,6 +2542,71 @@ describe("start boxes and start positions in Units (#5312)", () => {
     expect(ring("0")).toContain("ring-2 ring-white");
     expect(ring("1")).toContain("opacity-40");
     await act(async () => emphasisStore.hover(null));
+  });
+
+  it("draws Zero-K's polygon areas in Units, in the colour and number of the side that started in each (#5313)", async () => {
+    GAMES = [
+      {
+        name: "Zero-K v1.12.0",
+        primaryArchive: { name: "zk.sdz" },
+        dependencyArchives: [],
+        info: { shortname: "ZK" },
+      } as unknown as GameItem,
+    ];
+    const square = (x: number, z: number): [number, number][] => [
+      [x, z],
+      [x + 1500, z],
+      [x + 1500, z + 1500],
+      [x, z + 1500],
+    ];
+    // Side 1 started at 1024, 768 and side 2 at 3072, 2048, and Zero-K dealt
+    // the first area to the side in the second.
+    STARTBOXES = {
+      source: "game",
+      file: "Zk Units Map.lua",
+      teams: [
+        { id: 0, startPoints: [], boxes: [square(2500, 1500)] },
+        { id: 1, startPoints: [], boxes: [square(300, 100)] },
+        { id: 2, startPoints: [], boxes: [square(6000, 4000)] },
+      ],
+    };
+    await open({
+      ...NO_BOXES,
+      gameType: "Zero-K v1.12.0",
+      mapName: "Zk Units Map",
+      allyTeams: [
+        { id: 0, color: [1, 0, 0] },
+        { id: 1, color: [0, 0.5, 1] },
+      ],
+      players: [
+        { name: "Alice", team: 0, allyTeam: 0, spectator: false },
+        { name: "Bob", team: 1, allyTeam: 1, spectator: false },
+      ],
+    } as unknown as Partial<DemoInfo>);
+    await vi.waitFor(() => expect(boxes()).toHaveLength(3));
+    expect(labels().map((l) => l.textContent)).toEqual(["2", "1"]);
+    expect(boxes().map(outline)).toEqual(["#0080ff", "#ff0000", "#94a3b8"]);
+    expect(startBoxesAsked).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mapName: "Zk Units Map",
+        mapSizeX: 8192,
+        mapSizeZ: 6144,
+      }),
+    );
+    // Under the canvas and out of the pointer's way, as the rectangles were.
+    for (const el of [
+      ...boxes().map((b) => b.closest("svg") as Element),
+      ...labels(),
+    ]) {
+      expect(el.getAttribute("class")).toContain("pointer-events-none");
+      expect(
+        el.compareDocumentPosition(canvas()) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    // And they are still there in Heat, in the same colours.
+    await pick("Heat");
+    await vi.waitFor(() => expect(boxes()).toHaveLength(3));
+    expect(boxes().map(outline)).toEqual(["#0080ff", "#ff0000", "#94a3b8"]);
   });
 
   it("shows no box for a match that set none, and says so", async () => {

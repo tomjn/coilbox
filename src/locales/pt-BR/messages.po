@@ -1857,10 +1857,9 @@ msgstr "{bots} deles são bots"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# área} other {# áreas}}"
 
-#: src/content/pages/components/ReplayStartAreas.tsx
-#, fuzzy
+#: src/content/replayStartAreas.ts
 msgid "{boxTeam} start box"
-msgstr "Área inicial de {boxTeam}"
+msgstr ""
 
 #: src/lego/buildList.ts
 #, fuzzy

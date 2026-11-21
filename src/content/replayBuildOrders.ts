@@ -116,6 +116,28 @@ export function pickUnitSource(
     : { kind: "notInstalled" };
 }
 
+/**
+ * The installed game that stands for the one a replay names: the exact name
+ * and version, else the highest version of the same family. For what every
+ * version of a game agrees on, such as a map's start areas. Null when no
+ * version is installed.
+ */
+export function closestInstalledGame(
+  recorded: string,
+  games: GameItem[],
+): GameItem | null {
+  return (
+    games.find((g) => gameNamesMatch(g.name, recorded)) ??
+    games
+      .filter((g) => sameGameFamily(g.name, recorded))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+      )
+      .at(-1) ??
+    null
+  );
+}
+
 /** The installed game a source reads its units from through unitsync, or null
  *  for a source that has no need to. */
 export function liveGame(source: UnitSource | null): GameItem | null {

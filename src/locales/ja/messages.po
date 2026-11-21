@@ -1837,10 +1837,9 @@ msgstr "うちボット {bots} 体"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, other {# 個のエリア}}"
 
-#: src/content/pages/components/ReplayStartAreas.tsx
-#, fuzzy
+#: src/content/replayStartAreas.ts
 msgid "{boxTeam} start box"
-msgstr "{boxTeam} の開始エリア"
+msgstr ""
 
 #: src/lego/buildList.ts
 #, fuzzy

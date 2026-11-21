@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { DemoInfo } from "../../bindings";
@@ -16,6 +16,7 @@ import {
   startDotName,
 } from "../../replayMapLayers";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
+import { useReplayStartAreas } from "../../useReplayStartAreas";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ReplayBaseCrops } from "./ReplayBaseCrops";
 import { EventLayerCanvases, EventLayerNotes } from "./ReplayEventLayers";
@@ -29,7 +30,7 @@ import {
   ReadNotes,
   ReplayMapLayout,
 } from "./ReplayMapRail";
-import { StartAreas, StartDotMark, startAreas } from "./ReplayStartAreas";
+import { StartAreas, StartDotMark } from "./ReplayStartAreas";
 import { StartUnitCanvas, StartUnitNotes } from "./ReplayStartUnitLayer";
 import { StoredListNote } from "./UnitListNotes";
 
@@ -238,8 +239,16 @@ export function ReplayMapHeat({
       drawHeatField(canvas, orderField, HEAT_KIND_OF_LAYER.orderDensity);
   }, [orderField]);
 
-  const hasBoxes = info.allyTeams.some((a) => a.startBox);
-  const boxes = on.startBoxes ? startAreas(info) : [];
+  // The map's size in world units, which a Zero-K file's areas are placed in.
+  const extent = useMemo(
+    () => (layers.sized ? { x: world.worldWidth, z: world.worldHeight } : null),
+    [layers.sized, world.worldWidth, world.worldHeight],
+  );
+  const startAreas = useReplayStartAreas({
+    info,
+    extent: on.startBoxes ? extent : null,
+  });
+  const hasBoxes = startAreas.loading || startAreas.areas.length > 0;
   const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const [marksW, marksH] = [MARKS_WIDTH, Math.round(MARKS_WIDTH / ratio)];
   const recordedGame = units.recorded;
@@ -276,7 +285,7 @@ export function ReplayMapHeat({
               className="pointer-events-none absolute inset-0 size-full"
             />
           )}
-          <StartAreas areas={boxes} named />
+          {on.startBoxes && <StartAreas set={startAreas} named />}
           {marks && marks.length > 0 && (
             <canvas
               ref={marksRef}
@@ -312,7 +321,7 @@ export function ReplayMapHeat({
             <LayersHelp layers={layers} info={info} flat />
           </MapHelp>
 
-          {!layersShown && boxes.length > 0 && (
+          {!layersShown && startAreas.areas.length > 0 && (
             <p className="text-xs text-muted-foreground">
               <Trans>Start boxes per team.</Trans>
             </p>

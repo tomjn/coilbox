@@ -1837,10 +1837,9 @@ msgstr "з них ботів: {bots}"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# стартова зона} few {# стартові зони} many {# стартових зон} other {# стартової зони}}"
 
-#: src/content/pages/components/ReplayStartAreas.tsx
-#, fuzzy
+#: src/content/replayStartAreas.ts
 msgid "{boxTeam} start box"
-msgstr "Стартова зона {boxTeam}"
+msgstr ""
 
 #: src/lego/buildList.ts
 #, fuzzy
