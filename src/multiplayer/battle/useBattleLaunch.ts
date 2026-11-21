@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { loadReplays } from "@/content/replayList";
 import { useReplayUserState } from "@/content/replayUserState";
 import { describeError } from "@/i18n/uiError";
@@ -112,6 +112,11 @@ async function vetHostAddress(
  * start signal, the manual Rejoin), so refusing here is what makes sure nobody
  * points the engine at a game or map they do not have and watches it fail with
  * nothing said (issue #1572).
+ *
+ * `replace` is for a new match the server sent us to. Zero-K can end a match
+ * and start the next while our engine is still loading the first, so the
+ * battle engine we already have up is stopped and the new one launched in its
+ * place, as Chobby does. Any other kind of run still refuses the launch.
  */
 export function useBattleLaunch(
   serverKey: string | null,
@@ -119,16 +124,27 @@ export function useBattleLaunch(
   host = false,
   blocked: string | null = null,
 ) {
-  const { running, launch } = usePlay();
+  const { running, kind, launch, cancel } = usePlay();
   const { setProvenance } = useReplayUserState();
   const [error, setError] = useState<string | null>(null);
+  // Read at the moment of launching rather than from the render that built
+  // the callback, which may be one behind.
+  const kindRef = useRef(kind);
+  kindRef.current = kind;
+  // Counts launches, so one that a newer launch replaced neither starts an
+  // engine nor reports how the engine it lost ended.
+  const latestRef = useRef(0);
 
   const doLaunch = useCallback(
     async (opts?: {
       /** Called once the engine process exists. */
       onEngineStarted?: () => void;
+      /** Stop the battle engine already up and launch this one instead. */
+      replace?: boolean;
     }) => {
       if (!serverKey || !target) return;
+      const mine = ++latestRef.current;
+      const current = () => latestRef.current === mine;
       if (blocked) {
         setError(blocked);
         return;
@@ -182,6 +198,9 @@ export function useBattleLaunch(
           }
           config = built.config;
         }
+        if (!current()) return;
+        if (opts?.replace && kindRef.current === "battle") await cancel();
+        if (!current()) return;
         const tellTheRelay = tellTheRelayAboutTheEngine(relayed, serverKey);
         const res = await launch("battle", {
           config,
@@ -193,6 +212,7 @@ export function useBattleLaunch(
             tellTheRelay?.(runId);
           },
         });
+        if (!current()) return;
         if (res.exitCode && res.exitCode !== 0) {
           const code = res.exitCode;
           setError(t`Engine exited with code ${code}.`);
@@ -206,10 +226,10 @@ export function useBattleLaunch(
           );
         }
       } catch (e) {
-        setError(describeError(e));
+        if (current()) setError(describeError(e));
       }
     },
-    [serverKey, target, host, blocked, launch, setProvenance],
+    [serverKey, target, host, blocked, launch, cancel, setProvenance],
   );
 
   return { running, error, launch: doLaunch };
