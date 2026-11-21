@@ -26,13 +26,20 @@ export function windowOfFrame(g: WindowGeometry, frame: number): number {
 
 /**
  * The windows of one track that the frontend holds (#3806): the window the time
- * is in, and the next one in the direction of travel. Every other window is
- * dropped as soon as {@link follow} says time has moved away from it.
+ * is in, the next one in the direction of travel, and the one before the
+ * current. Every other window is dropped as soon as {@link follow} says time has
+ * moved away from it.
  *
  * Why the next window in the direction of travel and not always the later one:
  * the timeline can play in reverse, and then the window about to be needed is
  * the earlier one. Holding two windows keeps a boundary crossing from waiting on
  * a load, since both sides are in memory before time reaches it.
+ *
+ * Why the one before the current as well: an explosion fades over a few frames,
+ * and one just after a window begins comes from what ended just before it
+ * (#5317). Playing in reverse already holds that window. Playing forward would
+ * have dropped it, and the same frame would draw differently by the way it was
+ * reached.
  *
  * A window that cannot be read is recorded against its own index and the others
  * go on loading. It is asked for again only once time has moved off it and come
@@ -42,12 +49,14 @@ export function windowOfFrame(g: WindowGeometry, frame: number): number {
 export interface WindowStore {
   /**
    * Say where time is and which way it is going. Starts any load that is
-   * needed and drops any window that is not the current or the next. Cheap to
-   * call on every animation frame.
+   * needed and drops any window that is not the current, the next or the one
+   * before. Cheap to call on every animation frame.
    */
   follow(frame: number, direction: Direction): void;
   /** The held window that has `frame`, or none while it is still loading. */
   windowFor(frame: number): TrackWindow | undefined;
+  /** Window `index` if it is held. */
+  windowAt(index: number): TrackWindow | undefined;
   /** The indexes of the windows held, rising. */
   held(): readonly number[];
   /** Why window `index` could not be read, if it could not. */
@@ -112,7 +121,7 @@ export function createWindowStore(
         Math.max(current + direction, 0),
         geometry.windowCount - 1,
       );
-      wanted = new Set([current, next]);
+      wanted = new Set([Math.max(current - 1, 0), current, next]);
 
       let changed = false;
       for (const index of [...held.keys()]) {
@@ -140,6 +149,8 @@ export function createWindowStore(
       const before = held.get(k - 1);
       return before && frame === before.endFrame ? before : undefined;
     },
+
+    windowAt: (index) => held.get(index),
 
     held: () => [...held.keys()].sort((a, b) => a - b),
 

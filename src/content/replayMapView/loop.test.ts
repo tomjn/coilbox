@@ -30,25 +30,30 @@ function frames() {
   };
 }
 
-function setup(frame = 45) {
+function setup(frame = 45, explosions = false) {
   const track = testTrack();
   const clock = createReplayClock(frame);
   const raf = frames();
   const ctx = recordingContext();
   const statuses: MapViewStatus[] = [];
   const painted: { frame: number; units: number }[] = [];
+  const blasts: number[] = [];
   const lost = vi.fn();
   const view = createMapView({
     handle: track.handle,
     clock,
     teams: teamStyles(fixtureHeader.teams),
+    explosions,
     surface: () => ({
       ctx,
       view: { width: 1024, height: 768, scale: 1024 / 8192, pixelRatio: 1 },
     }),
     env: raf.env,
     onStatus: (s) => statuses.push(s),
-    onPainted: (f, counts) => painted.push({ frame: f, units: counts.units }),
+    onPainted: (f, counts) => {
+      painted.push({ frame: f, units: counts.units });
+      blasts.push(counts.explosions);
+    },
     onHighlightLost: lost,
   });
   const pictures = () => ctx.count("clearRect");
@@ -65,11 +70,43 @@ function setup(frame = 45) {
     view,
     statuses,
     painted,
+    blasts,
     pictures,
     load,
     lost,
   };
 }
+
+describe("the explosions of a map view (#5317)", () => {
+  it("marks them when it is made to, and not otherwise", async () => {
+    // Frame 56 is six frames after shot 0 landed.
+    const on = setup(56, true);
+    on.view.setShown(true);
+    on.raf.run();
+    await on.load();
+    expect(on.blasts).toEqual([1]);
+
+    const off = setup(56);
+    off.view.setShown(true);
+    off.raf.run();
+    await off.load();
+    expect(off.blasts).toEqual([0]);
+  });
+
+  it("draws again when switched, and not when set to what it already is", async () => {
+    const s = setup(56, true);
+    s.view.setShown(true);
+    s.raf.run();
+    await s.load();
+    s.view.setExplosions(true);
+    expect(s.raf.waiting()).toBe(0);
+    s.view.setExplosions(false);
+    s.raf.run();
+    s.view.setExplosions(true);
+    s.raf.run();
+    expect(s.blasts).toEqual([1, 0, 1]);
+  });
+});
 
 describe("createMapView", () => {
   it("draws nothing until it is shown", () => {

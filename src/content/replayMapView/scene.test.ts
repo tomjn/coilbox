@@ -175,3 +175,80 @@ describe("unitAt", () => {
     expect(unitAt(scene, 100, 118, 0, 0)).toBe(-1);
   });
 });
+
+/** How a frame was reached, for the tests that it does not matter. */
+async function reached(
+  how: "forwards" | "backwards" | "seeking",
+  target: number,
+) {
+  const track = testTrack();
+  const letArrive = async () => {
+    for (const k of track.waiting()) await track.arrive(k);
+  };
+  if (how === "seeking") {
+    await track.seek(target);
+  } else if (how === "forwards") {
+    for (let f = 0; f <= target; f++) {
+      track.handle.follow(f, 1);
+      await letArrive();
+    }
+  } else {
+    for (let f = 150; f >= target; f--) {
+      track.handle.follow(f, -1);
+      await letArrive();
+    }
+  }
+  const scene = createMapScene();
+  expect(collectScene(track.handle, target, scene, true)).toBe(true);
+  return Array.from({ length: scene.blasts }, (_, i) => [
+    scene.blastX[i],
+    scene.blastZ[i],
+    scene.blastProgress[i],
+    scene.blastDeath[i],
+  ]).sort();
+}
+
+describe("the explosions in a scene", () => {
+  it("are collected only when asked for", async () => {
+    const track = testTrack();
+    await track.seek(52);
+    const scene = createMapScene();
+    collectScene(track.handle, 52, scene);
+    expect(scene.blasts).toBe(0);
+    collectScene(track.handle, 52, scene, true);
+    expect(scene.blasts).toBe(1);
+  });
+
+  it("have a progress from how many frames ago it ended, out of the fade and one more", async () => {
+    // 0.4 s at the fixture's 30 frames a second is 12 frames. Shot 0 landed at
+    // frame 50, so frame 56 is 6 frames in and frame 62 is the last that shows.
+    expect(fixtureHeader.framesPerSecond).toBe(30);
+    const six = await reached("seeking", 56);
+    expect(six).toEqual([[500, 400, Math.fround(6 / 13), 0]]);
+    const last = await reached("seeking", 62);
+    expect(last).toEqual([[500, 400, Math.fround(12 / 13), 0]]);
+    expect(await reached("seeking", 63)).toEqual([]);
+  });
+
+  it("mark a unit's death apart from a shot landing", async () => {
+    expect(await reached("seeking", 95)).toEqual([
+      [3300, 2200, Math.fround(6 / 13), 1],
+    ]);
+  });
+
+  it("are the same at a frame however time got there", async () => {
+    // Inside a window, just after the edge between two, and where a shot's
+    // circle spans the edge.
+    for (const frame of [51, 56, 61, 62, 76, 90, 101]) {
+      const seeked = await reached("seeking", frame);
+      expect(seeked.length, `frame ${frame} has something to compare`).toBe(1);
+      expect(await reached("forwards", frame), `forwards to ${frame}`).toEqual(
+        seeked,
+      );
+      expect(
+        await reached("backwards", frame),
+        `backwards to ${frame}`,
+      ).toEqual(seeked);
+    }
+  });
+});

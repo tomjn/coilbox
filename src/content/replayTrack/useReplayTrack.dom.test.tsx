@@ -174,7 +174,7 @@ describe("useReplayTrack", () => {
     expect(handle.heldWindows()).toEqual([0, 1]);
     act(() => handle.follow(70, 1));
     await arrive(2);
-    expect(handle.heldWindows()).toEqual([1, 2]);
+    expect(handle.heldWindows()).toEqual([0, 1, 2]);
 
     expect(latest?.handle).toBe(handle);
     expect(renders).toBe(rendersWhenReady);

@@ -1,3 +1,4 @@
+export type { ExplosionMark } from "./explosions";
 export { ReplayTrackError } from "./fault";
 export type {
   ProjectileMark,

@@ -1,6 +1,7 @@
 /**
- * Which windows of a track the frontend holds (#3806): the one the time is in
- * and the next one in the direction of travel, and no others.
+ * Which windows of a track the frontend holds (#3806): the one the time is in,
+ * the next one in the direction of travel and the one before the current (for
+ * explosions, #5317), and no others.
  */
 import { describe, expect, it, vi } from "vitest";
 import { ReplayTrackError } from "./fault";
@@ -81,13 +82,13 @@ describe("the windows held", () => {
     expect(store.held()).toEqual([2, 3]);
   });
 
-  it("holds one window at the end of the track in the direction of travel", async () => {
+  it("holds no window past the end of the track in the direction of travel", async () => {
     const l = loader();
     const store = createWindowStore(geometry, l.load);
     store.follow(399, 1);
-    await l.arrive(4);
-    expect(store.held()).toEqual([4]);
-    expect(l.load).toHaveBeenCalledTimes(1);
+    await l.arrive(3, 4);
+    expect(store.held()).toEqual([3, 4]);
+    expect(l.load).toHaveBeenCalledTimes(2);
     store.follow(105, -1);
     await l.arrive(0);
     expect(store.held()).toEqual([0]);
@@ -100,22 +101,22 @@ describe("the windows held", () => {
     await l.arrive(0, 1);
     store.follow(170, 1);
     await l.arrive(2);
-    expect(store.held()).toEqual([1, 2]);
+    expect(store.held()).toEqual([0, 1, 2]);
     store.follow(230, 1);
     await l.arrive(3);
-    expect(store.held()).toEqual([2, 3]);
+    expect(store.held()).toEqual([1, 2, 3]);
     expect(store.windowFor(110)).toBeUndefined();
     expect(store.windowFor(230)?.index).toBe(2);
     expect(store.windowFor(290)?.index).toBe(3);
   });
 
-  it("never holds more than two windows, however far time jumps", async () => {
+  it("never holds more than three windows, however far time jumps", async () => {
     const l = loader();
     const store = createWindowStore(geometry, l.load);
     for (const frame of [110, 390, 250, 120, 330]) {
       store.follow(frame, 1);
       await l.arrive(0, 1, 2, 3, 4);
-      expect(store.held().length).toBeLessThanOrEqual(2);
+      expect(store.held().length).toBeLessThanOrEqual(3);
     }
   });
 
@@ -123,15 +124,19 @@ describe("the windows held", () => {
     const l = loader();
     const store = createWindowStore(geometry, l.load);
     store.follow(230, 1);
-    await l.arrive(2, 3);
-    expect(store.held()).toEqual([2, 3]);
+    await l.arrive(1, 2, 3);
+    expect(store.held()).toEqual([1, 2, 3]);
     l.load.mockClear();
     store.follow(231, -1);
-    expect(l.load.mock.calls.map((c) => c[0])).toEqual([1]);
-    // The window ahead is no longer wanted, so it goes at once.
-    expect(store.held()).toEqual([2]);
-    await l.arrive(1);
+    // The window behind was held already, and the one ahead is no longer wanted,
+    // so it goes at once.
+    expect(l.load).not.toHaveBeenCalled();
     expect(store.held()).toEqual([1, 2]);
+    // Going on backward, the window two behind is the next to load.
+    store.follow(171, -1);
+    expect(l.load.mock.calls.map((c) => c[0])).toEqual([0]);
+    await l.arrive(0);
+    expect(store.held()).toEqual([0, 1]);
   });
 
   it("does not load a window again while it is held or on its way", async () => {
@@ -173,7 +178,7 @@ describe("the windows held", () => {
     expect(store.held()).toEqual([0, 1]);
     store.follow(160, 1);
     await l.arrive(2);
-    expect(store.held()).toEqual([1, 2]);
+    expect(store.held()).toEqual([0, 1, 2]);
   });
 
   it("answers a boundary frame from the earlier window when only that one is held", async () => {

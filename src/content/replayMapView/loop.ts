@@ -31,6 +31,8 @@ export interface MapViewOptions {
   teams: ReadonlyMap<number, TeamStyle>;
   /** Draws units as their game icons. Null draws every unit as its footprint. */
   icons?: UnitIcons | null;
+  /** Marks where shots landed and units died. Left out it is off. */
+  explosions?: boolean;
   /** The canvas's context and its size now, or null when there is none. */
   surface(): { ctx: PaintContext; view: MapViewport } | null;
   env: MapViewEnv;
@@ -53,6 +55,8 @@ export interface MapView {
   setTeams(teams: ReadonlyMap<number, TeamStyle>): void;
   /** Draw units as these icons from the next picture, or as footprints. */
   setIcons(icons: UnitIcons | null): void;
+  /** Mark where shots landed and units died from the next picture, or not. */
+  setExplosions(on: boolean): void;
   /** The unit under a point of the canvas, in the canvas's own pixels. */
   pick(
     x: number,
@@ -84,6 +88,7 @@ export function createMapView(options: MapViewOptions): MapView {
   const { handle, clock, env } = options;
   let teams = options.teams;
   let icons = options.icons ?? null;
+  let explosions = options.explosions ?? false;
   const scene = createMapScene();
   let shown = false;
   let dirty = true;
@@ -107,7 +112,7 @@ export function createMapView(options: MapViewOptions): MapView {
     handle.follow(frame, clock.direction);
     const surface = options.surface();
     if (!surface) return null;
-    if (!collectScene(handle, frame, scene)) {
+    if (!collectScene(handle, frame, scene, explosions)) {
       const error = handle.windowFault(frame);
       say(error ? { kind: "fault", error } : { kind: "loading" });
       return null;
@@ -174,6 +179,11 @@ export function createMapView(options: MapViewOptions): MapView {
     setIcons(next) {
       if (next === icons) return;
       icons = next;
+      invalidate();
+    },
+    setExplosions(next) {
+      if (next === explosions) return;
+      explosions = next;
       invalidate();
     },
     pick(x, y) {
