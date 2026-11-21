@@ -7,6 +7,7 @@ import type {
   UnitDatasetEntry,
 } from "./bindings";
 import { colorSeries, teamSeries } from "./matchStats";
+import { spawnedStarts } from "./replayBaseCrops";
 import {
   buildingHeatPoints,
   buildMarks,
@@ -17,6 +18,7 @@ import {
   startDots,
   teamColours,
 } from "./replayMapLayers";
+import { startUnitTracks } from "./replayStartUnits";
 
 const swatch = (rgb?: [number, number, number]) =>
   rgb ? `rgb(${rgb.map((v) => Math.round(v * 255)).join(", ")})` : undefined;
@@ -181,6 +183,69 @@ describe("start dots", () => {
     );
     expect(dots[0].opening).toBe("Land Factory");
     expect(dots[1].opening).toBeNull();
+  });
+});
+
+/**
+ * Tumult's numbers (#5339, #5346), from the replay 2026-10-20_23-13-32. The map
+ * is 7168 elmos a side. Splinter Faction records the same start in every replay
+ * and the commanders appear where the players pick after the game begins.
+ */
+describe("start dots on a game that moves the start", () => {
+  const TUMULT = { worldWidth: 7168, worldHeight: 7168 };
+  const tumult = info({
+    players: TWO_SEATS.players,
+    startPositions: [
+      { team: 0, x: 2537, y: 0, z: 918 },
+      { team: 1, x: 4631, y: 0, z: 6250 },
+    ],
+  });
+  const colours = new Map<number, string>();
+  const spawns = spawnedStarts(
+    startUnitTracks(
+      [
+        [0, 560, 5952],
+        [1, 6464, 3696],
+      ].map(([team, x, z]) => ({
+        kind: "unit_created",
+        frame: 327,
+        unit: 1000 + team,
+        def: 20,
+        team,
+        x,
+        y: 0,
+        z,
+        startUnit: true,
+      })),
+    ),
+  );
+
+  it("puts a dot where the starting unit appeared when there is an analysis", () => {
+    const dots = startDots(
+      tumult,
+      TUMULT,
+      colours,
+      undefined,
+      new Map(),
+      spawns,
+    );
+    expect(dots[0]).toMatchObject({ team: 0, x: 560, z: 5952 });
+    expect(dots[0].left).toBeCloseTo(560 / 7168);
+    expect(dots[0].top).toBeCloseTo(5952 / 7168);
+    expect(dots[1]).toMatchObject({ team: 1, x: 6464, z: 3696 });
+  });
+
+  it("keeps the recorded start when there is no analysis", () => {
+    const dots = startDots(tumult, TUMULT, colours, undefined, new Map());
+    expect(dots[0]).toMatchObject({ team: 0, x: 2537, z: 918 });
+    expect(dots[0].left).toBeCloseTo(2537 / 7168);
+    expect(dots[0].top).toBeCloseTo(918 / 7168);
+  });
+
+  it("keeps the recorded start for a team whose unit appeared off the map", () => {
+    const off = new Map([[0, { x: -10, z: 5952 }]]);
+    const dots = startDots(tumult, TUMULT, colours, undefined, new Map(), off);
+    expect(dots[0]).toMatchObject({ x: 2537, z: 918 });
   });
 });
 

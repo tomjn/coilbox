@@ -380,12 +380,37 @@ describe("an analysis from before starting units were logged", () => {
   });
 });
 
-describe("starting unit paths", () => {
-  it("reads the five kinds a track is built from, once the layer is on", async () => {
+describe("where a start dot sits (#5346)", () => {
+  const dot = () => document.querySelector("button[data-team='0'][data-x]");
+
+  it("is where the starting unit appeared when the replay has an analysis", async () => {
     analysed();
     EVENTS = MATCH;
     show();
+    // The recorded start is 1024,512. Alice's commander appeared at 600,3000.
+    await waitFor(() => expect(dot()?.getAttribute("data-x")).toBe("600"));
+    expect(dot()?.getAttribute("data-z")).toBe("3000");
+    const style = (dot() as HTMLElement).style;
+    expect(Number.parseFloat(style.left)).toBeCloseTo((600 / 4096) * 100);
+    expect(Number.parseFloat(style.top)).toBeCloseTo((3000 / 4096) * 100);
+  });
+
+  it("is the recorded start when there is no analysis", () => {
+    show();
+    expect(dot()?.getAttribute("data-x")).toBe("1024");
+    expect(dot()?.getAttribute("data-z")).toBe("512");
     expect(eventsRead).not.toHaveBeenCalled();
+  });
+});
+
+describe("starting unit paths", () => {
+  it("reads the five kinds a track is built from, once, for the start dots and the layer", async () => {
+    analysed();
+    EVENTS = MATCH;
+    show();
+    // The start positions are on, and they sit where the starting units
+    // appeared (#5346), so that read is made before the layer is on.
+    await waitFor(() => expect(eventsRead).toHaveBeenCalledTimes(1));
     fireEvent.click(toggle("Starting unit paths"));
     await screen.findByTestId("start-units");
     expect(eventsRead).toHaveBeenCalledTimes(1);

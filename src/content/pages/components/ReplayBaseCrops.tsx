@@ -4,15 +4,12 @@ import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { formatDuration, formatNumber } from "@/lib/format";
 import type { DemoInfo } from "../../bindings";
 import { useUnitsyncHeightmap, useUnitsyncMinimap } from "../../config";
-import { analysisRunHidden, useStoredAnalyses } from "../../replayAnalysis";
 import {
   type BaseCrop,
   baseCrops,
   cropImageBox,
   cropSide,
-  spawnedStarts,
 } from "../../replayBaseCrops";
-import { eventState } from "../../replayEventLayers";
 import {
   CATEGORY_LABEL,
   CATEGORY_SHAPE,
@@ -21,12 +18,11 @@ import {
   NEUTRAL_SHAPE,
   NEUTRAL_TEAM_COLOUR,
 } from "../../replayMapLayers";
-import { START_UNIT_KINDS, startUnitTracks } from "../../replayStartUnits";
 import type { TimeWindow } from "../../replayTimeWindow";
 import { UNIT_CATEGORIES } from "../../unitCategory";
-import { useEventRead } from "../../useReplayEventLayers";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { useSpawnedStarts } from "../../useSpawnedStarts";
 
 /**
  * A mark's half width as a percentage of a crop's width. On a square map this
@@ -94,25 +90,16 @@ export function BasePicturesProvider({
     layers;
   // Where each starting unit appeared, when the replay has an analysis, since
   // a game can start a player somewhere other than the recorded start (#5339).
-  const analyses = useStoredAnalyses();
-  const stored =
-    info.remixed || !info.gameId ? undefined : analyses.get(info.gameId);
-  const state = eventState(info, stored, analysisRunHidden());
-  const startRead = useEventRead(
-    state,
-    START_UNIT_KINDS,
-    layersShown && state.kind === "ready",
-  );
-  const spawns = useMemo(
-    () => spawnedStarts(startUnitTracks(startRead.events)),
-    [startRead.events],
+  const { spawns, loading: spawnsLoading } = useSpawnedStarts(
+    info,
+    layersShown,
   );
   const minimapUrl = minimap.url;
   const unitList = units.units;
   const value = useMemo(() => {
     if (!layersShown || !minimapUrl || !inWindow) return null;
     // Wait for the analysis rather than centre on the recorded start and jump.
-    if (startRead.status === "loading") return null;
+    if (spawnsLoading) return null;
     const crops = baseCrops(dots, inWindow, world, unitList, info, spawns);
     if (crops.length === 0) return null;
     return {
@@ -127,7 +114,7 @@ export function BasePicturesProvider({
     layersShown,
     minimapUrl,
     inWindow,
-    startRead.status,
+    spawnsLoading,
     dots,
     world,
     unitList,

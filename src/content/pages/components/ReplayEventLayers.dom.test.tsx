@@ -229,6 +229,21 @@ beforeAll(() => {
   };
 });
 
+/**
+ * The reads the layers asked for. The start dots read the starting units on
+ * their own (#5346), so a read of those kinds is not a layer's.
+ */
+const START_UNIT_READ = [
+  "unit_created",
+  "unit_destroyed",
+  "unit_given",
+  "start_unit_position",
+  "start_unit_replaced",
+];
+const layerReads = () =>
+  eventsRead.mock.calls
+    .map(([args]) => args as { gameId: string; kinds?: string[] })
+    .filter((args) => !args.kinds?.includes("start_unit_position"));
 const toggle = (name: string) => screen.getByRole("button", { name });
 /** The map's help entry, opened. What the layers mean is said there. */
 const help = () => {
@@ -339,19 +354,18 @@ describe("a replay whose analysis cannot be drawn", () => {
 });
 
 describe("deaths", () => {
-  it("reads only the deaths, and only once the layer is on", async () => {
+  it("asks for no read of its own, since the start dots' read holds the deaths", async () => {
     analysed();
     EVENTS = [...DEATHS, ...FINISHED];
     show();
-    expect(eventsRead).not.toHaveBeenCalled();
+    expect(layerReads()).toEqual([]);
     expect((toggle("Deaths") as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(toggle("Deaths"));
     await screen.findByText("Where units died");
-    expect(eventsRead).toHaveBeenCalledTimes(1);
-    expect(eventsRead).toHaveBeenCalledWith({
-      gameId: "game-a",
-      kinds: ["unit_destroyed"],
-    });
+    // The one read is the start dots', which includes `unit_destroyed`.
+    expect(eventsRead.mock.calls.map(([a]) => a.kinds)).toEqual([
+      START_UNIT_READ,
+    ]);
   });
 
   it("draws the layer and a legend that reads in deaths", async () => {
@@ -568,9 +582,10 @@ describe("buildings finished", () => {
     await screen.findByText("Where units died");
     fireEvent.click(toggle("Buildings finished"));
     await screen.findByText(/2 buildings finished/);
-    expect(eventsRead).toHaveBeenCalledTimes(2);
+    // The deaths come from the start dots' read, so only the finished units
+    // are read for the layers.
     expect(eventsRead.mock.calls.map(([a]) => a.kinds)).toEqual([
-      ["unit_destroyed"],
+      START_UNIT_READ,
       ["unit_finished"],
     ]);
   });
@@ -686,7 +701,7 @@ describe("the time window with events", () => {
         /The window is when an order was given, not when anything was built\./,
       ),
     ).toBeTruthy();
-    await waitFor(() => expect(eventsRead).not.toHaveBeenCalled());
+    await waitFor(() => expect(layerReads()).toEqual([]));
   });
 });
 
@@ -733,14 +748,12 @@ describe("damage dealt", () => {
     analysed({ loggerVersion: 4 });
     EVENTS = [...DEATHS, ...DAMAGE];
     show();
-    expect(eventsRead).not.toHaveBeenCalled();
+    expect(layerReads()).toEqual([]);
     fireEvent.click(toggle("Damage dealt"));
     await screen.findByText("Where damage landed");
-    expect(eventsRead).toHaveBeenCalledTimes(1);
-    expect(eventsRead).toHaveBeenCalledWith({
-      gameId: "game-a",
-      kinds: ["header", "damage"],
-    });
+    expect(layerReads()).toEqual([
+      { gameId: "game-a", kinds: ["header", "damage"] },
+    ]);
   });
 
   it("draws where damage landed, with a legend that reads in damage", async () => {
