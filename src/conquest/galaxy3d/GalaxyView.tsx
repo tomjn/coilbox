@@ -10,6 +10,7 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { registerCanvas3D } from "../../lib/renderStats";
 import { drawingPixelRatio } from "../../lib/uiZoom";
+import { release } from "../../lib/useCanvas3D";
 import { attachWheelRelease } from "../../lib/wheelRelease";
 import { groundHit } from "../../mapconv/pages/components/wheelGate";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
@@ -622,6 +623,15 @@ export function GalaxyView({
   className,
 }: GalaxyViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // The renderer outlives the scene built on it. WebKit still counts a WebGL
+  // context after it is given back, so one made for every galaxy shown ran the
+  // browser out and another view went blank (issue #5348). Antialiasing is
+  // fixed when a context is made, so a change to it is the one thing that
+  // makes another.
+  const rendererRef = useRef<{
+    renderer: THREE.WebGLRenderer;
+    antialias: boolean;
+  } | null>(null);
   // The label icons the scene build asks for, drawn through portals because
   // the labels are DOM the build makes itself.
   const [labelIcons, setLabelIcons] = useState<LabelIcon[]>([]);
@@ -1235,13 +1245,21 @@ export function GalaxyView({
 
     /* ------------------------ renderer + camera ---------------------------- */
 
-    renderer = new THREE.WebGLRenderer({
-      antialias: !performanceMode,
-      alpha: true,
-      // Ask for the fast GPU on a machine with two. The map redraws every
-      // frame while it is panned, so it is the view that needs it most.
-      powerPreference: "high-performance",
-    });
+    const antialias = !performanceMode;
+    if (rendererRef.current && rendererRef.current.antialias !== antialias) {
+      release(rendererRef.current.renderer);
+      rendererRef.current = null;
+    }
+    renderer =
+      rendererRef.current?.renderer ??
+      new THREE.WebGLRenderer({
+        antialias,
+        alpha: true,
+        // Ask for the fast GPU on a machine with two. The map redraws every
+        // frame while it is panned, so it is the view that needs it most.
+        powerPreference: "high-performance",
+      });
+    rendererRef.current = { renderer, antialias };
     renderer.setClearColor(0x000000, 0); // page background shows through
     container.appendChild(renderer.domElement);
     renderer.domElement.style.cssText =
@@ -2084,10 +2102,9 @@ export function GalaxyView({
       disposeLanePair(pathTaken);
       for (const d of disposables) d.dispose();
       labelRenderer?.domElement.remove();
-      if (renderer) {
-        renderer.domElement.remove();
-        renderer.dispose();
-      }
+      // The canvas stays for the next scene, so blank what this one drew. The
+      // renderer goes with the view, below.
+      renderer?.clear();
       renderRef.current = null;
       holdRef.current = null;
       applyOwnersRef.current = null;
@@ -2115,6 +2132,16 @@ export function GalaxyView({
     forestPending,
     plantedForest,
   ]);
+
+  // After the scene's own effect, so on an unmount its cleanup has drawn its
+  // last before the context goes.
+  useEffect(
+    () => () => {
+      if (rendererRef.current) release(rendererRef.current.renderer);
+      rendererRef.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     pausedRef.current = paused;

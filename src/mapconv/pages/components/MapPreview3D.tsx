@@ -565,8 +565,9 @@ export function MapPreview3D({
     forceWireframe,
   ]);
 
-  // Build the three.js scene from the loaded maps + dimensions. Fully torn down
-  // on any dependency change or unmount, so navigating away leaks no GL context.
+  // Build the three.js scene from the loaded maps + dimensions. The scene is
+  // torn down on any dependency change or unmount. The canvas and its GL
+  // context stay across a change and go on unmount.
   useCanvas3D(
     containerRef,
     ({ renderer, host, resize: fitCanvas }) => {

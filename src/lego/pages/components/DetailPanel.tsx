@@ -795,9 +795,9 @@ function Preview({
   // Puts a new object on the canvas the hook built, or none.
   const showRef = useRef<((next: Built | null) => void) | null>(null);
 
-  // The canvas is remade when `spin` changes, not when the object does: a
-  // browser allows only a few WebGL contexts, and one remade per colourway
-  // click ran WebKit out of them (issue #5344).
+  // The scene is rebuilt when `spin` changes, not when the object does: the
+  // hook keeps the canvas, but rebuilding a scene for every colourway click is
+  // work the object swap below avoids (issue #5344).
   useCanvas3D(
     containerRef,
     ({ renderer, host }) => {

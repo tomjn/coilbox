@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   terrainBuilds: vi.fn(),
   gameRead: vi.fn(),
   rendererOptions: [] as unknown[],
+  lost: vi.fn(),
 }));
 
 vi.mock("three", async (orig) => {
@@ -39,7 +40,10 @@ vi.mock("three", async (orig) => {
     }
     setRenderTarget() {}
     dispose() {}
-    forceContextLoss() {}
+    clear() {}
+    forceContextLoss() {
+      h.lost();
+    }
   }
   return { ...actual, WebGLRenderer: FakeRenderer };
 });
@@ -80,6 +84,7 @@ beforeEach(() => {
   h.terrainBuilds.mockReset();
   h.gameRead.mockReset();
   h.rendererOptions.length = 0;
+  h.lost.mockReset();
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   window.matchMedia = (() => ({ matches: true })) as never;
   // Each frame the view asks for is dropped, so no draw runs.
@@ -185,6 +190,54 @@ describe("GalaxyView with placed models", () => {
     });
     expect(h.terrainBuilds).toHaveBeenCalledTimes(1);
     expect(h.gameRead).toHaveBeenCalledTimes(1);
+  });
+
+  // WebKit counts a context after it is given back, so a map rebuilt for every
+  // galaxy it is shown made another view blank (issue #5348).
+  it("keeps one renderer while it is shown one galaxy after another", async () => {
+    const view = (n: number) => (
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined, title: `Shores ${n}` }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false }}
+      />
+    );
+    const { rerender, container, unmount } = render(view(0));
+    const canvas = container.querySelector("canvas");
+    for (let n = 1; n <= 20; n++) {
+      await act(async () => {
+        rerender(view(n));
+      });
+    }
+    expect(h.terrainBuilds).toHaveBeenCalledTimes(21);
+    expect(h.rendererOptions).toHaveLength(1);
+    expect(container.querySelectorAll("canvas")).toHaveLength(1);
+    expect(container.querySelector("canvas")).toBe(canvas);
+    expect(h.lost).not.toHaveBeenCalled();
+    unmount();
+    expect(h.lost).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes a new renderer when performance mode changes its antialiasing", async () => {
+    const view = (performanceMode: boolean) => (
+      <GalaxyView
+        galaxy={{ ...galaxy, models: undefined }}
+        playerFactionId="a"
+        owners={{}}
+        terrainPixels={terrainPixels}
+        display={{ reduceMotion: true, effects: false, performanceMode }}
+      />
+    );
+    const { rerender, container } = render(view(false));
+    await act(async () => {
+      rerender(view(true));
+    });
+    expect(h.rendererOptions).toHaveLength(2);
+    expect(h.rendererOptions[1]).toMatchObject({ antialias: false });
+    expect(h.lost).toHaveBeenCalledTimes(1);
+    expect(container.querySelectorAll("canvas")).toHaveLength(1);
   });
 
   it("asks for the high performance GPU", () => {
