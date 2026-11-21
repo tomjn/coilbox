@@ -539,6 +539,7 @@ export default function ReplayDetailPage() {
                 <ReplayTimelineDock
                   info={info}
                   replayPath={replay.path}
+                  showStats={showStats}
                   watch={engine.watch}
                   dependencyBlock={playbackBlock}
                   game={playbackGame?.name}

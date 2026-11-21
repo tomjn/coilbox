@@ -30563,6 +30563,10 @@ msgstr "Συντήρηση μετάλλου (παλιό όνομα)"
 msgid "Metal used"
 msgstr "Μέταλλο που χρησιμοποιήθηκε"
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "Metric in the timeline: {name}"
+msgstr ""
+
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Middle"
@@ -37391,6 +37395,10 @@ msgstr "Οι χρήστες αυτού του δικτύου βλέπουν τη
 msgid "People whose messages coilbox hides from you."
 msgstr "Άτομα των οποίων τα μηνύματα κρύβει το coilbox από εσάς."
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "per minute"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -42157,6 +42165,10 @@ msgstr "Σε εκτέλεση εδώ και {elapsed}. Μπορείτε να φ�
 #, fuzzy
 msgid "Running the engine"
 msgstr "Εκτέλεση της μηχανής"
+
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "running total"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy

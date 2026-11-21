@@ -1147,12 +1147,16 @@ function sparkPath(
  * without the axis' rounding to a tick. Every series in a tile shares that
  * scale, so two lines in a tile can be compared with each other, and no two
  * tiles share one, because a tile is a shape and not a figure.
+ *
+ * `spanSec` is the time the full width stands for, where it is not the last
+ * reading's: the timeline dock's metric lane draws on the dock's own axis.
  */
 export function sparkLines(
   series: ChartSeries[],
   rows: ChartRow[],
+  spanSec?: number,
 ): SparkLine[] {
-  const lastTime = rows.at(-1)?.timeSec ?? 0;
+  const lastTime = spanSec ?? rows.at(-1)?.timeSec ?? 0;
   let top = 0;
   for (const row of rows)
     for (const s of series) {

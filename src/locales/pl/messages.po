@@ -30369,6 +30369,10 @@ msgstr "Utrzymanie w metalu (stara nazwa)"
 msgid "Metal used"
 msgstr ""
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "Metric in the timeline: {name}"
+msgstr ""
+
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Middle"
@@ -37146,6 +37150,10 @@ msgstr "Osoby w tej sieci widzą Twój pokój bez podawania adresu. Po wyłącze
 msgid "People whose messages coilbox hides from you."
 msgstr "Osoby, których wiadomości coilbox przed Tobą ukrywa."
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "per minute"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -41877,6 +41885,10 @@ msgstr "Trwa od {elapsed}. Możesz opuścić tę stronę."
 #, fuzzy
 msgid "Running the engine"
 msgstr "Uruchamianie silnika"
+
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "running total"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy

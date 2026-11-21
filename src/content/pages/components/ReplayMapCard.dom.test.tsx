@@ -375,6 +375,7 @@ function Page({
           <ReplayTimelineDock
             info={shown}
             replayPath="/replays/a.sdfz"
+            showStats
             watch={WATCH}
             dependencyBlock={BLOCK}
             game={GAME}

@@ -30563,6 +30563,10 @@ msgstr "Metaalonderhoud (oude naam)"
 msgid "Metal used"
 msgstr "Metaal verbruikt"
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "Metric in the timeline: {name}"
+msgstr ""
+
 #: src/lego/pivot.ts
 #, fuzzy
 msgid "Middle"
@@ -37391,6 +37395,10 @@ msgstr "Mensen op dit netwerk zien je ruimte zonder dat ze een adres hoeven te w
 msgid "People whose messages coilbox hides from you."
 msgstr "Mensen van wie coilbox de berichten voor je verbergt."
 
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "per minute"
+msgstr ""
+
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
@@ -42157,6 +42165,10 @@ msgstr "Al {elapsed} bezig. Je kunt deze pagina verlaten."
 #, fuzzy
 msgid "Running the engine"
 msgstr "De engine draait"
+
+#: src/content/pages/components/ReplayMetricLane.tsx
+msgid "running total"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
