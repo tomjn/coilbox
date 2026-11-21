@@ -575,7 +575,7 @@ export function ReplayTimelineDock({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: where keyboard focus lands to use the timeline's keys on the scrubber and the lanes together.
         tabIndex={0}
         onKeyDown={keys?.onKeyDown}
-        className="sticky bottom-0 z-20 -mx-4 -mb-4 flex flex-col gap-1.5 border-t border-border bg-background/95 px-4 py-2 outline-none backdrop-blur focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className="sticky bottom-0 z-20 flex shrink-0 flex-col gap-1.5 border-t border-border bg-background/95 px-4 py-2 outline-none backdrop-blur focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <div className="flex min-h-7 items-center gap-2">
           {animates && <Transport />}

@@ -1912,15 +1912,16 @@ describe("the map card's modes", () => {
     expect(navigations).toEqual([]);
   });
 
-  it("gives the map all the card's width, in its own shape, limited by the window's height", async () => {
+  it("gives the map all the card's width, in its own shape, limited by its column's height", async () => {
     await show();
     const ground = document.querySelector("[data-map-ground]") as HTMLElement;
     expect(ground.style.aspectRatio).toBe("8192 / 6144");
-    // No wider than lets the map keep its shape inside the window's height
-    // less what is around the map, and no fixed cap.
+    // No wider than lets the map keep its shape inside the height of the
+    // column the page puts the card in, less what is around the map, and no
+    // fixed cap.
     const column = ground.closest("[data-map-column]") as HTMLElement;
     expect(column.style.maxWidth).toBe(
-      "calc(max(16rem, 100vh - 18rem) * 8192 / 6144)",
+      "calc(max(16rem, 100cqh - 4.5rem) * 8192 / 6144)",
     );
 
     await pick("Heat");
@@ -1928,6 +1929,6 @@ describe("the map card's modes", () => {
     expect(flat.style.aspectRatio).toBe("513 / 385");
     expect(
       (flat.closest("[data-map-column]") as HTMLElement).style.maxWidth,
-    ).toBe(`calc(max(16rem, 100vh - 18rem) * ${513 / 385} / 1)`);
+    ).toBe(`calc(max(16rem, 100cqh - 4.5rem) * ${513 / 385} / 1)`);
   });
 });

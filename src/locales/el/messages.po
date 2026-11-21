@@ -10408,7 +10408,7 @@ msgstr "Προσθήκη εμφάνισης"
 msgid "Add start position"
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Add tag…"
 msgstr "Νέα ετικέτα…"
@@ -11384,6 +11384,7 @@ msgid "analysed"
 msgstr "αναλυμένες"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Analysed"
 msgstr "Αναλυμένες"
@@ -13163,7 +13164,7 @@ msgstr "bench"
 msgid "Bench & database"
 msgstr "Bench και βάση δεδομένων"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Best effort — an exact version match isn't guaranteed."
 msgstr "Καλύτερη προσπάθεια — δεν είναι εγγυημένη ακριβής αντιστοίχιση έκδοσης."
@@ -13818,6 +13819,7 @@ msgid "build orders"
 msgstr "σειρές κατασκευής"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #, fuzzy
 msgid "Build orders"
 msgstr "Σειρές κατασκευής"
@@ -14479,6 +14481,7 @@ msgstr "Δεν μπορεί να βλάψει τη δική του μονάδα"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -14491,7 +14494,6 @@ msgstr "Δεν μπορεί να βλάψει τη δική του μονάδα"
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/FoldersSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
@@ -19380,8 +19382,8 @@ msgstr "Καθυστέρηση ανάμεσα στις βολές μιας ρι�
 #: src/content/pages/components/ClearUnfinishedButton.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/MapRecords.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
@@ -19681,7 +19683,7 @@ msgstr "Διαγραφή αυτού του σημείου ελέγχου"
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "Διαγραφή αυτής της συλλογής. Οι υποσυλλογές της μετακινούνται ένα επίπεδο πάνω."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "Delete this replay?"
 msgstr "Διαγραφή αυτής της επανάληψης;"
@@ -20419,7 +20421,7 @@ msgstr "Η λήψη ακυρώθηκε"
 msgid "Download complete"
 msgstr "Η λήψη ολοκληρώθηκε"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/play/pages/components/NoEngineNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -20446,7 +20448,7 @@ msgstr "Η λήψη απέτυχε: {downloadError}"
 msgid "Download failed: {reason}"
 msgstr "Η λήψη απέτυχε: {reason}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "Download game"
@@ -20463,7 +20465,7 @@ msgid "Download log"
 msgstr "Λήψη αρχείου καταγραφής"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -20530,7 +20532,7 @@ msgstr "Ο φάκελος εγγραφής λήψεων βρίσκεται έξ�
 msgid "Downloaded"
 msgstr "Λήφθηκε"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Downloaded {gameType}."
 msgstr "Λήφθηκε το {gameType}."
@@ -20948,7 +20950,6 @@ msgid "Durability"
 msgstr "Ανθεκτικότητα"
 
 #: src/content/pages/components/MatchStatsSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -21128,6 +21129,7 @@ msgstr "Εύκολο"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -21562,7 +21564,6 @@ msgstr "μηχανή"
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -21599,7 +21600,7 @@ msgstr "Μηχανή {engineVersion}"
 msgid "Engine {engineVersion} has no headless build, which the playback needs."
 msgstr "Η μηχανή {engineVersion} δεν έχει έκδοση headless, που χρειάζεται η αναπαραγωγή."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine {engineVersion} is not installed, and no download was found for it on this platform. Install it yourself in Settings, Engines."
 msgstr "Η μηχανή {engineVersion} δεν είναι εγκατεστημένη, και δεν βρέθηκε λήψη της για αυτή την πλατφόρμα. Εγκαταστήστε τη μόνοι σας στις Ρυθμίσεις, Μηχανές."
@@ -21614,7 +21615,7 @@ msgstr "Η μηχανή {engineVersion} δεν είναι εγκατεστημέ
 msgid "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr "Η μηχανή {engineVersion} δεν είναι εγκατεστημένη, και καμία από τις εγκατεστημένες μηχανές δεν μπορεί να εκτελέσει ανάλυση, που χρειάζεται μηχανή με έκδοση headless."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine {engineVersion} is not installed. Set a download folder in <0>Content folders settings</0> to download it."
 msgstr "Η μηχανή {engineVersion} δεν είναι εγκατεστημένη. Ορίστε φάκελο λήψεων στις <0>ρυθμίσεις Φακέλων περιεχομένου</0> για να την κατεβάσετε."
@@ -21687,7 +21688,7 @@ msgstr "Καταγραφή μηχανής"
 msgid "Engine missing"
 msgstr "Λείπει η μηχανή"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine not installed"
 msgstr "Η μηχανή δεν είναι εγκατεστημένη"
@@ -21852,6 +21853,10 @@ msgstr "Το αρχείο καταγραφής γεγονότων λήφθηκε
 #, fuzzy
 msgid "Events"
 msgstr "Γεγονότα"
+
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Events and chat"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22772,6 +22777,7 @@ msgid "file"
 msgstr "αρχείο"
 
 #: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/activityRows.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -24108,7 +24114,6 @@ msgstr "παιχνίδι"
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -24139,12 +24144,12 @@ msgstr "Παιχνίδι"
 msgid "Game AIs (Lua)"
 msgstr "AI παιχνιδιού (Lua)"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and engine not installed"
 msgstr "Το παιχνίδι και η μηχανή δεν είναι εγκατεστημένα"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and map not installed"
 msgstr "Το παιχνίδι και ο χάρτης δεν είναι εγκατεστημένα"
@@ -24209,7 +24214,7 @@ msgstr "Παιχνίδι σε εξέλιξη. {started}"
 msgid "Game missing"
 msgstr "Λείπει το παιχνίδι"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #, fuzzy
 msgid "Game not installed"
@@ -24323,7 +24328,7 @@ msgstr "Παιχνίδι του οποίου οι αντιστοιχίσεις �
 msgid "Game whose units to measure with"
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game, map and engine not installed"
 msgstr "Το παιχνίδι, ο χάρτης και η μηχανή δεν είναι εγκατεστημένα"
@@ -24334,7 +24339,7 @@ msgstr "Το παιχνίδι, ο χάρτης και η μηχανή δεν ε�
 msgid "Game: {0}"
 msgstr "Παιχνίδι: {0}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game: {gameType}"
 msgstr "Παιχνίδι: {gameType}"
@@ -27484,7 +27489,7 @@ msgid "its position is not three numbers"
 msgstr "η θέση του δεν είναι τρεις αριθμοί"
 
 #. placeholder {0}: formatBytes(track.bytes) ?? "0 B"
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "Its recorded track is deleted too, freeing {0}."
 msgstr "Διαγράφεται επίσης το καταγεγραμμένο ίχνος της, και ελευθερώνονται {0}."
@@ -29771,7 +29776,7 @@ msgstr "Χάρτης (με υφές)"
 msgid "Map (wireframe)"
 msgstr "Χάρτης (πλέγμα)"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Map and engine not installed"
 msgstr "Ο χάρτης και η μηχανή δεν είναι εγκατεστημένα"
@@ -29829,7 +29834,7 @@ msgstr "Λείπει ο χάρτης"
 msgid "Map not found."
 msgstr "Ο χάρτης δεν βρέθηκε."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
 msgid "Map not installed"
@@ -29930,7 +29935,7 @@ msgstr "Χάρτης: {mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
 msgid "Map: {mapName}"
@@ -30042,7 +30047,7 @@ msgstr "Ορισμός ως τρέχουσα έκδοση"
 msgid "Mark unwatched"
 msgstr "Σήμανση ως μη παρακολουθημένη"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Mark watched"
@@ -34400,6 +34405,7 @@ msgid "not analysed"
 msgstr "δεν αναλύθηκε"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Not analysed"
 msgstr "Δεν αναλύθηκε"
@@ -39001,8 +39007,8 @@ msgstr "Σε ουρά. Ξεκινά όταν τελειώσει το παιχν�
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/content/pages/components/SuggestionsList.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
@@ -40059,7 +40065,7 @@ msgstr "Καταγράφηκε για γύρισμα πίσω. Το ίχνος �
 msgid "Recorded match"
 msgstr "Καταγεγραμμένος αγώνας"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Recorded on {engineVersion}. A replay only plays on that version."
 msgstr "Καταγράφηκε στην {engineVersion}. Μια επανάληψη παίζει μόνο σε αυτή την έκδοση."
@@ -40735,7 +40741,7 @@ msgstr "Αφαίρεση σκελετού"
 msgid "Remove spawn"
 msgstr "Αφαίρεση εμφάνισης"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Remove tag {tag}"
 msgstr "Αφαίρεση της ετικέτας {tag}"
@@ -41178,6 +41184,10 @@ msgstr "Εκκαθάριση επαναλήψεων"
 msgid "Replay deleted"
 msgstr "Η επανάληψη διαγράφηκε"
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Replay facts"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Replay map"
@@ -41598,7 +41608,6 @@ msgstr "Μάχη με περιορισμούς — {summary}"
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Result"
 msgstr "Αποτέλεσμα"
@@ -43963,7 +43972,7 @@ msgstr "ορίστηκε"
 msgid "Set"
 msgstr "Ορισμός"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Set a download folder in <0>Content folders settings</0> first."
 msgstr "Ορίστε πρώτα φάκελο λήψεων στις <0>ρυθμίσεις Φακέλων περιεχομένου</0>."
@@ -44167,9 +44176,9 @@ msgstr "Σύνολο: {activeSetName} ({missingCount} εκτός βιβλιοθ�
 msgid "Set: {setName}"
 msgstr "Σύνολο: {setName}"
 
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Sets"
 msgstr "Σύνολα"
@@ -47010,6 +47019,10 @@ msgstr "Προτάθηκαν από το πώς ονομάζει αυτό το �
 msgid "Suggested map"
 msgstr "Προτεινόμενος χάρτης"
 
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Summary"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 msgid "Sun colour"
 msgstr ""
@@ -48661,7 +48674,7 @@ msgstr "Το αρχείο υπάρχει στο έγγραφο αλλά δεν �
 msgid "The file is larger than the mirror takes."
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "The file is permanently removed from your demos folder — this can't be undone. If this replay has been analysed, its stored analysis is deleted with it."
 msgstr "Το αρχείο αφαιρείται οριστικά από τον φάκελο demos σας — αυτό δεν αναιρείται. Αν η επανάληψη έχει αναλυθεί, η αποθηκευμένη ανάλυσή της διαγράφεται μαζί της."
@@ -55807,7 +55820,7 @@ msgstr "Παρακολούθηση της καλύτερης επανάληψη�
 msgid "Watch with rewind"
 msgstr "Παρακολούθηση με γύρισμα πίσω"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Watched"
@@ -57951,7 +57964,7 @@ msgstr "Το όνομά σας"
 msgid "Your network gave no answer over the relay's usual route, so coilbox reaches the relay over TLS instead. This can add delay to the game."
 msgstr "Το δίκτυό σας δεν απάντησε μέσω της συνηθισμένης διαδρομής της αναμετάδοσης, οπότε το coilbox φτάνει στην αναμετάδοση μέσω TLS. Αυτό μπορεί να προσθέσει καθυστέρηση στο παιχνίδι."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Your notes"
 msgstr "Οι σημειώσεις σας"

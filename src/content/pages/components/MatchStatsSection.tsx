@@ -102,15 +102,29 @@ function Headlines({
   );
 }
 
+/**
+ * The page shows the headline tiles on its Summary tab and the chart on its
+ * Economy tab (#5304), so `part` says which this renders. Both read the one
+ * trailer, which is held for the session. The tiles say nothing while the
+ * trailer loads or when it has no statistics, as the chart's tab says why.
+ */
 export function MatchStatsSection({
   info,
   replayPath,
+  part,
 }: {
   info: DemoInfo;
   replayPath: string;
+  part: "tiles" | "chart";
 }) {
   const { t } = useLingui();
   const { data, loading, error } = useMatchStats(replayPath);
+
+  if (part === "tiles") {
+    return data && hasStatistics(data.trailer) ? (
+      <Headlines info={info} trailer={data.trailer} metrics={data.metrics} />
+    ) : null;
+  }
 
   function body() {
     if (loading) {
@@ -138,18 +152,15 @@ export function MatchStatsSection({
       );
     }
     return (
-      <>
-        <Headlines info={info} trailer={data.trailer} metrics={data.metrics} />
-        {/* The chart owns its own controls, so the per-minute view (#1137), the
-         * players/sides view (#1138) and the value table (#1140) go in there
-         * rather than here. */}
-        <MatchStatsChart
-          info={info}
-          trailer={data.trailer}
-          metrics={data.metrics}
-          replayPath={replayPath}
-        />
-      </>
+      /* The chart owns its own controls, so the per-minute view (#1137), the
+       * players/sides view (#1138) and the value table (#1140) go in there
+       * rather than here. */
+      <MatchStatsChart
+        info={info}
+        trailer={data.trailer}
+        metrics={data.metrics}
+        replayPath={replayPath}
+      />
     );
   }
 

@@ -26,7 +26,7 @@ vi.mock("../bindings", async () => {
   };
 });
 
-const { DeleteReplayButton } = await import("./ReplayDetailPage");
+const { DeleteReplayButton } = await import("./components/DeleteReplayButton");
 
 afterEach(() => {
   cleanup();

@@ -48,6 +48,9 @@ export function ReplayMapCard(props: {
   /** For the map's pictures. Without them there is no picture. */
   enginePath: string | undefined;
   dataDir: string | undefined;
+  /** What the Analyse replay button does. Without it, the button presses the
+   *  analysis section's own, which is right when that is on the page already. */
+  onAnalyse?: () => void;
 }) {
   return (
     <EnsureMatchClock durationSec={props.info.durationSec}>
@@ -61,11 +64,13 @@ function MapCard({
   replayPath,
   enginePath,
   dataDir,
+  onAnalyse = openAnalysisRun,
 }: {
   info: DemoInfo;
   replayPath: string | undefined;
   enginePath: string | undefined;
   dataDir: string | undefined;
+  onAnalyse?: () => void;
 }) {
   const { t } = useLingui();
   const infoMapName = info.mapName;
@@ -158,7 +163,7 @@ function MapCard({
                 variant="outline"
                 size="sm"
                 className="gap-1.5"
-                onClick={openAnalysisRun}
+                onClick={onAnalyse}
               >
                 <ScanSearch className="size-4" />
                 <Trans>Analyse replay</Trans>

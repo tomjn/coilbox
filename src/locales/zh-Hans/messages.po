@@ -10339,7 +10339,7 @@ msgstr "添加生成"
 msgid "Add start position"
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Add tag…"
 msgstr "添加标签…"
@@ -11309,6 +11309,7 @@ msgid "analysed"
 msgstr "已分析"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Analysed"
 msgstr "已分析"
@@ -13082,7 +13083,7 @@ msgstr "bench"
 msgid "Bench & database"
 msgstr "bench 和数据库"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Best effort — an exact version match isn't guaranteed."
 msgstr "尽力匹配——不保证版本完全一致。"
@@ -13734,6 +13735,7 @@ msgid "build orders"
 msgstr "建造顺序"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #, fuzzy
 msgid "Build orders"
 msgstr "建造顺序"
@@ -14394,6 +14396,7 @@ msgstr "不会伤害自己的单位"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -14406,7 +14409,6 @@ msgstr "不会伤害自己的单位"
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/FoldersSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
@@ -19246,8 +19248,8 @@ msgstr "连射中每发之间的间隔"
 #: src/content/pages/components/ClearUnfinishedButton.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/MapRecords.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
@@ -19547,7 +19549,7 @@ msgstr "删除此检查点"
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "删除此合集。其子项会上移到它的父级。"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "Delete this replay?"
 msgstr "删除此回放？"
@@ -20283,7 +20285,7 @@ msgstr "已取消下载"
 msgid "Download complete"
 msgstr "下载完成"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/play/pages/components/NoEngineNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -20310,7 +20312,7 @@ msgstr "下载失败：{downloadError}"
 msgid "Download failed: {reason}"
 msgstr "下载失败：{reason}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "Download game"
@@ -20327,7 +20329,7 @@ msgid "Download log"
 msgstr "下载日志"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -20394,7 +20396,7 @@ msgstr "下载写入文件夹位于安装包外"
 msgid "Downloaded"
 msgstr "已下载"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Downloaded {gameType}."
 msgstr "已下载 {gameType}。"
@@ -20811,7 +20813,6 @@ msgid "Durability"
 msgstr "耐久"
 
 #: src/content/pages/components/MatchStatsSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -20991,6 +20992,7 @@ msgstr "简单"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -21420,7 +21422,6 @@ msgstr "引擎"
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -21457,7 +21458,7 @@ msgstr "引擎 {engineVersion}"
 msgid "Engine {engineVersion} has no headless build, which the playback needs."
 msgstr "引擎 {engineVersion} 没有播放所需的无头版本。"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine {engineVersion} is not installed, and no download was found for it on this platform. Install it yourself in Settings, Engines."
 msgstr "引擎 {engineVersion} 未安装，并且在此平台上找不到它的下载。请在“设置”的“引擎”中自行安装。"
@@ -21472,7 +21473,7 @@ msgstr "引擎 {engineVersion} 未安装，也没有安装其他引擎。"
 msgid "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr "引擎 {engineVersion} 未安装，而已安装的引擎都无法运行分析，分析需要有无头版本的引擎。"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine {engineVersion} is not installed. Set a download folder in <0>Content folders settings</0> to download it."
 msgstr "引擎 {engineVersion} 未安装。请在<0>内容文件夹设置</0>中设置下载文件夹后下载它。"
@@ -21545,7 +21546,7 @@ msgstr "引擎日志"
 msgid "Engine missing"
 msgstr "缺少引擎"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine not installed"
 msgstr "引擎未安装"
@@ -21708,6 +21709,10 @@ msgstr "已下载事件日志。"
 #, fuzzy
 msgid "Events"
 msgstr "事件"
+
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Events and chat"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22622,6 +22627,7 @@ msgid "file"
 msgstr "文件"
 
 #: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/activityRows.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -23952,7 +23958,6 @@ msgstr "游戏"
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -23983,12 +23988,12 @@ msgstr "游戏"
 msgid "Game AIs (Lua)"
 msgstr "游戏 AI（Lua）"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and engine not installed"
 msgstr "游戏和引擎未安装"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and map not installed"
 msgstr "游戏和地图未安装"
@@ -24052,7 +24057,7 @@ msgstr "游戏进行中。{started}"
 msgid "Game missing"
 msgstr "缺少游戏"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #, fuzzy
 msgid "Game not installed"
@@ -24166,7 +24171,7 @@ msgstr "要显示其绑定的游戏"
 msgid "Game whose units to measure with"
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game, map and engine not installed"
 msgstr "游戏、地图和引擎未安装"
@@ -24176,7 +24181,7 @@ msgstr "游戏、地图和引擎未安装"
 msgid "Game: {0}"
 msgstr "游戏：{0}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game: {gameType}"
 msgstr "游戏：{gameType}"
@@ -27312,7 +27317,7 @@ msgid "its position is not three numbers"
 msgstr "position 不是三个数字"
 
 #. placeholder {0}: formatBytes(track.bytes) ?? "0 B"
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "Its recorded track is deleted too, freeing {0}."
 msgstr "其录制轨道也会被删除，释放 {0}。"
@@ -29584,7 +29589,7 @@ msgstr "地图（纹理）"
 msgid "Map (wireframe)"
 msgstr "地图（线框）"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Map and engine not installed"
 msgstr "地图和引擎未安装"
@@ -29642,7 +29647,7 @@ msgstr "缺少地图"
 msgid "Map not found."
 msgstr "未找到地图。"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
 msgid "Map not installed"
@@ -29743,7 +29748,7 @@ msgstr "地图：{mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
 msgid "Map: {mapName}"
@@ -29855,7 +29860,7 @@ msgstr "标记为当前版本"
 msgid "Mark unwatched"
 msgstr "标为未观看"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Mark watched"
@@ -34190,6 +34195,7 @@ msgid "not analysed"
 msgstr "未分析"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Not analysed"
 msgstr "未分析"
@@ -38741,8 +38747,8 @@ msgstr "已加入队列。你正在玩的游戏结束后开始。"
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/content/pages/components/SuggestionsList.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
@@ -39790,7 +39796,7 @@ msgstr "已为倒带录制。录制轨道占用 {size}。"
 msgid "Recorded match"
 msgstr "已录制的对局"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Recorded on {engineVersion}. A replay only plays on that version."
 msgstr "录制于 {engineVersion}。回放只能在该版本上播放。"
@@ -40463,7 +40469,7 @@ msgstr "移除骨架"
 msgid "Remove spawn"
 msgstr "移除生成项"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Remove tag {tag}"
 msgstr "移除标签 {tag}"
@@ -40903,6 +40909,10 @@ msgstr "回放清理"
 msgid "Replay deleted"
 msgstr "已删除回放"
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Replay facts"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Replay map"
@@ -41320,7 +41330,6 @@ msgstr "受限对局 — {summary}"
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Result"
 msgstr "结果"
@@ -43672,7 +43681,7 @@ msgstr "已设置"
 msgid "Set"
 msgstr "设置"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Set a download folder in <0>Content folders settings</0> first."
 msgstr "请先在<0>内容文件夹设置</0>中设置下载文件夹。"
@@ -43873,9 +43882,9 @@ msgstr "回放集：{activeSetName}（{missingCount} 个不在库中）"
 msgid "Set: {setName}"
 msgstr "回放集：{setName}"
 
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Sets"
 msgstr "回放集"
@@ -46699,6 +46708,10 @@ msgstr "根据此游戏对各阵营单位的称呼推荐，且仅在游戏中有
 msgid "Suggested map"
 msgstr "推荐地图"
 
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Summary"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 msgid "Sun colour"
 msgstr ""
@@ -48332,7 +48345,7 @@ msgstr "该文件在文档中，但无法读回，所以任务中也会缺少它
 msgid "The file is larger than the mirror takes."
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "The file is permanently removed from your demos folder — this can't be undone. If this replay has been analysed, its stored analysis is deleted with it."
 msgstr "该文件会从你的 demos 文件夹中永久删除，此操作无法撤销。如果此回放已被分析过，其保存的分析也会一并删除。"
@@ -55433,7 +55446,7 @@ msgstr "观看 {presetName} 的最佳回放"
 msgid "Watch with rewind"
 msgstr "带倒带观看"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Watched"
@@ -57561,7 +57574,7 @@ msgstr "你的名称"
 msgid "Your network gave no answer over the relay's usual route, so coilbox reaches the relay over TLS instead. This can add delay to the game."
 msgstr "你的网络在中继的常用路径上没有响应，所以 coilbox 改为通过 TLS 连接中继。这可能会增加游戏延迟。"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Your notes"
 msgstr "你的备注"

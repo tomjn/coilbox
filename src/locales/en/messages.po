@@ -8449,7 +8449,7 @@ msgstr "Add spawn"
 msgid "Add start position"
 msgstr "Add start position"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 msgid "Add tag…"
 msgstr "Add tag…"
 
@@ -9238,6 +9238,7 @@ msgid "analysed"
 msgstr "analysed"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 msgid "Analysed"
 msgstr "Analysed"
 
@@ -10687,7 +10688,7 @@ msgstr "bench"
 msgid "Bench & database"
 msgstr "Bench & database"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Best effort — an exact version match isn't guaranteed."
 msgstr "Best effort — an exact version match isn't guaranteed."
 
@@ -11220,6 +11221,7 @@ msgid "build orders"
 msgstr "build orders"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 msgid "Build orders"
 msgstr "Build orders"
 
@@ -11761,6 +11763,7 @@ msgstr "Can't damage its own unit"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -11773,7 +11776,6 @@ msgstr "Can't damage its own unit"
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/FoldersSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
@@ -15782,8 +15784,8 @@ msgstr "Delay between shots in a burst"
 #: src/content/pages/components/ClearUnfinishedButton.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/MapRecords.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
@@ -16030,7 +16032,7 @@ msgstr "Delete this checkpoint"
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "Delete this collection. Its children move up to its own parent."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 msgid "Delete this replay?"
 msgstr "Delete this replay?"
 
@@ -16637,7 +16639,7 @@ msgstr "Download canceled"
 msgid "Download complete"
 msgstr "Download complete"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/play/pages/components/NoEngineNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "Download engine"
@@ -16659,7 +16661,7 @@ msgstr "Download failed: {downloadError}"
 msgid "Download failed: {reason}"
 msgstr "Download failed: {reason}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "Download game"
 msgstr "Download game"
@@ -16673,7 +16675,7 @@ msgid "Download log"
 msgstr "Download log"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "Download map"
@@ -16727,7 +16729,7 @@ msgstr "Download write root is outside the package"
 msgid "Downloaded"
 msgstr "Downloaded"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Downloaded {gameType}."
 msgstr "Downloaded {gameType}."
 
@@ -17070,7 +17072,6 @@ msgid "Durability"
 msgstr "Durability"
 
 #: src/content/pages/components/MatchStatsSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "Duration"
@@ -17218,6 +17219,7 @@ msgstr "Easy"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 msgid "Economy"
@@ -17573,7 +17575,6 @@ msgstr "engine"
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -17604,7 +17605,7 @@ msgstr "Engine {engineVersion}"
 msgid "Engine {engineVersion} has no headless build, which the playback needs."
 msgstr "Engine {engineVersion} has no headless build, which the playback needs."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Engine {engineVersion} is not installed, and no download was found for it on this platform. Install it yourself in Settings, Engines."
 msgstr "Engine {engineVersion} is not installed, and no download was found for it on this platform. Install it yourself in Settings, Engines."
 
@@ -17616,7 +17617,7 @@ msgstr "Engine {engineVersion} is not installed, and no other engine is installe
 msgid "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Engine {engineVersion} is not installed. Set a download folder in <0>Content folders settings</0> to download it."
 msgstr "Engine {engineVersion} is not installed. Set a download folder in <0>Content folders settings</0> to download it."
 
@@ -17676,7 +17677,7 @@ msgstr "Engine log"
 msgid "Engine missing"
 msgstr "Engine missing"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Engine not installed"
 msgstr "Engine not installed"
 
@@ -17809,6 +17810,10 @@ msgstr "Event log downloaded."
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Events"
 msgstr "Events"
+
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Events and chat"
+msgstr "Events and chat"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Every <0>.3do</0> under <1>objects3d/</1> becomes an <2>.s3o</2>. Each folder's models share one texture, so the engine binds one sheet for a faction rather than one per unit. This archive has {models} of them."
@@ -18555,6 +18560,7 @@ msgid "file"
 msgstr "file"
 
 #: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/activityRows.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -19634,7 +19640,6 @@ msgstr "game"
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -19663,11 +19668,11 @@ msgstr "Game"
 msgid "Game AIs (Lua)"
 msgstr "Game AIs (Lua)"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Game and engine not installed"
 msgstr "Game and engine not installed"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Game and map not installed"
 msgstr "Game and map not installed"
 
@@ -19719,7 +19724,7 @@ msgstr "Game in progress. {started}"
 msgid "Game missing"
 msgstr "Game missing"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 msgid "Game not installed"
 msgstr "Game not installed"
@@ -19812,7 +19817,7 @@ msgstr "Game whose bindings to show"
 msgid "Game whose units to measure with"
 msgstr "Game whose units to measure with"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Game, map and engine not installed"
 msgstr "Game, map and engine not installed"
 
@@ -19821,7 +19826,7 @@ msgstr "Game, map and engine not installed"
 msgid "Game: {0}"
 msgstr "Game: {0}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Game: {gameType}"
 msgstr "Game: {gameType}"
 
@@ -22386,7 +22391,7 @@ msgid "its position is not three numbers"
 msgstr "its position is not three numbers"
 
 #. placeholder {0}: formatBytes(track.bytes) ?? "0 B"
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 msgid "Its recorded track is deleted too, freeing {0}."
 msgstr "Its recorded track is deleted too, freeing {0}."
 
@@ -24247,7 +24252,7 @@ msgstr "Map (textured)"
 msgid "Map (wireframe)"
 msgstr "Map (wireframe)"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Map and engine not installed"
 msgstr "Map and engine not installed"
 
@@ -24295,7 +24300,7 @@ msgstr "Map missing"
 msgid "Map not found."
 msgstr "Map not found."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 msgid "Map not installed"
 msgstr "Map not installed"
@@ -24379,7 +24384,7 @@ msgstr "Map: {mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 msgid "Map: {mapName}"
 msgstr "Map: {mapName}"
@@ -24471,7 +24476,7 @@ msgstr "Mark as current"
 msgid "Mark unwatched"
 msgstr "Mark unwatched"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 msgid "Mark watched"
 msgstr "Mark watched"
@@ -28024,6 +28029,7 @@ msgid "not analysed"
 msgstr "not analysed"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 msgid "Not analysed"
 msgstr "Not analysed"
 
@@ -31759,8 +31765,8 @@ msgstr "Queued. It starts when the game you are playing ends."
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/content/pages/components/SuggestionsList.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
@@ -32622,7 +32628,7 @@ msgstr "Recorded for rewind. The track takes {size}."
 msgid "Recorded match"
 msgstr "Recorded match"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Recorded on {engineVersion}. A replay only plays on that version."
 msgstr "Recorded on {engineVersion}. A replay only plays on that version."
 
@@ -33174,7 +33180,7 @@ msgstr "Remove skeleton"
 msgid "Remove spawn"
 msgstr "Remove spawn"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 msgid "Remove tag {tag}"
 msgstr "Remove tag {tag}"
 
@@ -33534,6 +33540,10 @@ msgstr "Replay cleanup"
 msgid "Replay deleted"
 msgstr "Replay deleted"
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Replay facts"
+msgstr "Replay facts"
+
 #: src/content/pages/ReplaysPage.tsx
 msgid "Replay map"
 msgstr "Replay map"
@@ -33879,7 +33889,6 @@ msgstr "Restricted battle — {summary}"
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 msgid "Result"
 msgstr "Result"
 
@@ -35813,7 +35822,7 @@ msgstr "set"
 msgid "Set"
 msgstr "Set"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 msgid "Set a download folder in <0>Content folders settings</0> first."
 msgstr "Set a download folder in <0>Content folders settings</0> first."
 
@@ -35977,9 +35986,9 @@ msgstr "Set: {activeSetName} ({missingCount} not in library)"
 msgid "Set: {setName}"
 msgstr "Set: {setName}"
 
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 msgid "Sets"
 msgstr "Sets"
 
@@ -38297,6 +38306,10 @@ msgstr "Suggested from what this game calls each side's units, and only where th
 msgid "Suggested map"
 msgstr "Suggested map"
 
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Summary"
+msgstr "Summary"
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 msgid "Sun colour"
 msgstr "Sun colour"
@@ -39640,7 +39653,7 @@ msgstr "The file is in the document but could not be read back, so it will be mi
 msgid "The file is larger than the mirror takes."
 msgstr "The file is larger than the mirror takes."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 msgid "The file is permanently removed from your demos folder — this can't be undone. If this replay has been analysed, its stored analysis is deleted with it."
 msgstr "The file is permanently removed from your demos folder — this can't be undone. If this replay has been analysed, its stored analysis is deleted with it."
 
@@ -45466,7 +45479,7 @@ msgstr "Watch the best replay for {presetName}"
 msgid "Watch with rewind"
 msgstr "Watch with rewind"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 msgid "Watched"
 msgstr "Watched"
@@ -47205,7 +47218,7 @@ msgstr "Your name"
 msgid "Your network gave no answer over the relay's usual route, so coilbox reaches the relay over TLS instead. This can add delay to the game."
 msgstr "Your network gave no answer over the relay's usual route, so coilbox reaches the relay over TLS instead. This can add delay to the game."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 msgid "Your notes"
 msgstr "Your notes"
 

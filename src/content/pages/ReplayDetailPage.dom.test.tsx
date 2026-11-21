@@ -6,7 +6,13 @@
  * comes. A second decode threw on a bare `%` and looked up the wrong file for
  * `%25` (#3422).
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -98,7 +104,7 @@ vi.mock("../../profile/profile", async (orig) => ({
   getProfile: () => ({ version: 1, hide: HIDE }),
 }));
 vi.mock("./components/MatchStatsSection", () => ({
-  MatchStatsSection: () => <p>match stats section</p>,
+  MatchStatsSection: ({ part }: { part: string }) => <p>match stats {part}</p>,
 }));
 vi.mock("../../play/LaunchContentProvider", () => ({
   useLaunchContent: () => ({ ensureContent: async () => ({ ready: true }) }),
@@ -144,9 +150,9 @@ const NAMES = [
   "Ünïcode 名前.sdfz",
 ];
 
-function renderAt(name: string) {
+function renderAt(name: string, search = "") {
   // The path every replay link builds.
-  window.location.hash = `#/play/replays/${encodeURIComponent(name)}`;
+  window.location.hash = `#/play/replays/${encodeURIComponent(name)}${search}`;
   return render(
     <HashRouter>
       <Routes>
@@ -174,7 +180,8 @@ describe("ReplayDetailPage", () => {
     FILE = "a.sdfz";
     INFO = LOADED_INFO;
     renderAt("a.sdfz");
-    expect(screen.queryByText("match stats section")).not.toBeNull();
+    expect(screen.queryByText("match stats tiles")).not.toBeNull();
+    expect(screen.queryByText("match stats chart")).not.toBeNull();
     expect(screen.queryByText("build orders section")).not.toBeNull();
     expect(screen.queryByText("analysis events section")).not.toBeNull();
   });
@@ -184,9 +191,92 @@ describe("ReplayDetailPage", () => {
     HIDE = ["analytics.matchStats"];
     INFO = LOADED_INFO;
     renderAt("a.sdfz");
-    expect(screen.queryByText("match stats section")).toBeNull();
+    expect(screen.queryByText("match stats tiles")).toBeNull();
+    expect(screen.queryByText("match stats chart")).toBeNull();
     expect(screen.queryByText("build orders section")).toBeNull();
     expect(screen.queryByText("analysis events section")).toBeNull();
+  });
+
+  describe("the panel's tabs (#5304)", () => {
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    const selected = () =>
+      screen
+        .getAllByRole("tab")
+        .filter((t) => t.getAttribute("aria-selected") === "true")
+        .map((t) => t.textContent);
+    /** Whether a section is in the open tab. The other tabs stay mounted and
+     *  are hidden by their `data-state` in the stylesheet. */
+    const shown = (text: string) =>
+      screen
+        .getByText(text)
+        .closest("[role=tabpanel]")
+        ?.getAttribute("data-state") === "active";
+
+    it("opens on the Summary when the address names no tab", () => {
+      FILE = "a.sdfz";
+      INFO = LOADED_INFO;
+      renderAt("a.sdfz");
+      expect(selected()).toEqual(["Summary"]);
+      expect(shown("match stats tiles")).toBe(true);
+      expect(shown("match stats chart")).toBe(false);
+    });
+
+    it.each([
+      ["economy", "Economy", "match stats chart"],
+      ["builds", "Build orders", "build orders section"],
+      ["events", "Events and chat", "analysis events section"],
+    ])("shows the %s tab the address names", (param, name, section) => {
+      FILE = "a.sdfz";
+      INFO = LOADED_INFO;
+      renderAt("a.sdfz", `?tab=${param}`);
+      expect(selected()).toEqual([name]);
+      expect(shown(section)).toBe(true);
+      expect(shown("match stats tiles")).toBe(false);
+    });
+
+    it("puts the chosen tab in the address and keeps the rest of it", () => {
+      FILE = "a.sdfz";
+      INFO = LOADED_INFO;
+      renderAt("a.sdfz", "?frame=300");
+      fireEvent.mouseDown(tab("Build orders"));
+      expect(selected()).toEqual(["Build orders"]);
+      const query = new URLSearchParams(window.location.hash.split("?")[1]);
+      expect(query.get("tab")).toBe("builds");
+      expect(query.get("frame")).toBe("300");
+
+      fireEvent.mouseDown(tab("Summary"));
+      expect(
+        new URLSearchParams(window.location.hash.split("?")[1]).get("tab"),
+      ).toBe("summary");
+    });
+
+    it("opens the Summary when the map card's Analyse replay is pressed from another tab", async () => {
+      FILE = "a.sdfz";
+      INFO = { ...LOADED_INFO, gameId: "00112233445566778899aabbccddeeff" };
+      renderAt("a.sdfz", "?tab=events");
+      expect(selected()).toEqual(["Events and chat"]);
+      fireEvent.click(screen.getByRole("button", { name: "Analyse replay" }));
+      await waitFor(() => expect(selected()).toEqual(["Summary"]));
+    });
+
+    it("opens on the Summary for a tab that is not one", () => {
+      FILE = "a.sdfz";
+      INFO = LOADED_INFO;
+      renderAt("a.sdfz", "?tab=nonsense");
+      expect(selected()).toEqual(["Summary"]);
+    });
+
+    it("does not list the tabs a distribution profile hides, and opens the Summary for one", () => {
+      FILE = "a.sdfz";
+      HIDE = ["analytics.matchStats"];
+      INFO = LOADED_INFO;
+      renderAt("a.sdfz", "?tab=economy");
+      expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+        "Summary",
+        "Events and chat",
+      ]);
+      expect(selected()).toEqual(["Summary"]);
+    });
   });
 
   it("says whether the replay's track is current or out of date (#3786, #3788)", () => {
@@ -215,7 +305,7 @@ describe("ReplayDetailPage", () => {
     ).toBeNull();
   });
 
-  it("has one map card under the section that analyses and records, opening on Units with a recording and on Heat without (#5310)", async () => {
+  it("has one map card beside the section that analyses and records, opening on Units with a recording and on Heat without (#5310)", async () => {
     const gameId = "00112233445566778899aabbccddeeff";
     FILE = "a.sdfz";
     INFO = { ...LOADED_INFO, gameId };
@@ -245,8 +335,9 @@ describe("ReplayDetailPage", () => {
       name: "Analysis and recording",
     });
     const card = screen.getByRole("region", { name: "Map" });
+    // The map is the left column and the section is in the panel on the right.
     expect(
-      recording.compareDocumentPosition(card) &
+      card.compareDocumentPosition(recording) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(

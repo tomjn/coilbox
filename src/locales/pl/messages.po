@@ -10339,7 +10339,7 @@ msgstr "Dodaj punkt pojawienia się"
 msgid "Add start position"
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Add tag…"
 msgstr "Dodaj tag…"
@@ -11309,6 +11309,7 @@ msgid "analysed"
 msgstr "przeanalizowane"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Analysed"
 msgstr "Przeanalizowane"
@@ -13082,7 +13083,7 @@ msgstr "bench"
 msgid "Bench & database"
 msgstr "Bench i baza danych"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Best effort — an exact version match isn't guaranteed."
 msgstr "Najlepsza próba, dokładna zgodność wersji nie jest gwarantowana."
@@ -13734,6 +13735,7 @@ msgid "build orders"
 msgstr "kolejności budowy"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #, fuzzy
 msgid "Build orders"
 msgstr "Kolejności budowy"
@@ -14394,6 +14396,7 @@ msgstr "Nie może ranić własnej jednostki"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -14406,7 +14409,6 @@ msgstr "Nie może ranić własnej jednostki"
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/FoldersSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
@@ -19246,8 +19248,8 @@ msgstr "Opóźnienie między strzałami w serii"
 #: src/content/pages/components/ClearUnfinishedButton.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/DeleteEngineButton.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #: src/content/pages/components/MapRecords.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
@@ -19547,7 +19549,7 @@ msgstr "Usuń ten punkt kontrolny"
 msgid "Delete this collection. Its children move up to its own parent."
 msgstr "Usuń tę kolekcję. Jej elementy podrzędne przejdą do jej rodzica."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "Delete this replay?"
 msgstr "Usunąć tę powtórkę?"
@@ -20283,7 +20285,7 @@ msgstr "Anulowano pobieranie"
 msgid "Download complete"
 msgstr "Pobieranie zakończone"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/play/pages/components/NoEngineNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -20310,7 +20312,7 @@ msgstr "Pobieranie nie powiodło się: {downloadError}"
 msgid "Download failed: {reason}"
 msgstr "Pobieranie nie powiodło się: {reason}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
 msgid "Download game"
@@ -20327,7 +20329,7 @@ msgid "Download log"
 msgstr "Pobierz dziennik"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -20394,7 +20396,7 @@ msgstr "Folder zapisu pobierania jest poza pakietem"
 msgid "Downloaded"
 msgstr "Pobrano"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Downloaded {gameType}."
 msgstr "Pobrano {gameType}."
@@ -20811,7 +20813,6 @@ msgid "Durability"
 msgstr "Wytrzymałość"
 
 #: src/content/pages/components/MatchStatsSection.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -20991,6 +20992,7 @@ msgstr "Łatwy"
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/pages/components/ReplayPanel.tsx
 #: src/runlite/pages/components/ArsenalOverlay.tsx
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -21420,7 +21422,6 @@ msgstr "silnik"
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
@@ -21457,7 +21458,7 @@ msgstr "Silnik {engineVersion}"
 msgid "Engine {engineVersion} has no headless build, which the playback needs."
 msgstr "Silnik {engineVersion} nie ma wersji headless, której wymaga odtwarzanie."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine {engineVersion} is not installed, and no download was found for it on this platform. Install it yourself in Settings, Engines."
 msgstr "Silnik {engineVersion} nie jest zainstalowany i nie znaleziono dla niego pobierania na tę platformę. Zainstaluj go samodzielnie w Ustawienia, Silniki."
@@ -21472,7 +21473,7 @@ msgstr "Silnik {engineVersion} nie jest zainstalowany i nie ma żadnego innego z
 msgid "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr "Silnik {engineVersion} nie jest zainstalowany, a żaden z zainstalowanych silników nie może przeprowadzić analizy, która wymaga wersji headless."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine {engineVersion} is not installed. Set a download folder in <0>Content folders settings</0> to download it."
 msgstr "Silnik {engineVersion} nie jest zainstalowany. Ustaw folder pobierania w <0>ustawieniach folderów zawartości</0>, aby go pobrać."
@@ -21545,7 +21546,7 @@ msgstr "Dziennik silnika"
 msgid "Engine missing"
 msgstr "Brak silnika"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Engine not installed"
 msgstr "Silnik niezainstalowany"
@@ -21708,6 +21709,10 @@ msgstr "Pobrano dziennik zdarzeń."
 #, fuzzy
 msgid "Events"
 msgstr "Zdarzenia"
+
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Events and chat"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22622,6 +22627,7 @@ msgid "file"
 msgstr "plik"
 
 #: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/activityRows.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -23952,7 +23958,6 @@ msgstr "gra"
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
@@ -23983,12 +23988,12 @@ msgstr "Gra"
 msgid "Game AIs (Lua)"
 msgstr "AI gry (Lua)"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and engine not installed"
 msgstr "Gra i silnik niezainstalowane"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game and map not installed"
 msgstr "Gra i mapa niezainstalowane"
@@ -24052,7 +24057,7 @@ msgstr "Gra w toku. {started}"
 msgid "Game missing"
 msgstr "Brak gry"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #, fuzzy
 msgid "Game not installed"
@@ -24166,7 +24171,7 @@ msgstr "Gra, której przypisania pokazać"
 msgid "Game whose units to measure with"
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game, map and engine not installed"
 msgstr "Gra, mapa i silnik niezainstalowane"
@@ -24176,7 +24181,7 @@ msgstr "Gra, mapa i silnik niezainstalowane"
 msgid "Game: {0}"
 msgstr "Gra: {0}"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Game: {gameType}"
 msgstr "Gra: {gameType}"
@@ -27312,7 +27317,7 @@ msgid "its position is not three numbers"
 msgstr "jego pozycja nie jest trzema liczbami"
 
 #. placeholder {0}: formatBytes(track.bytes) ?? "0 B"
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "Its recorded track is deleted too, freeing {0}."
 msgstr "Jej nagrana ścieżka też zostanie usunięta, co zwolni {0}."
@@ -29584,7 +29589,7 @@ msgstr "Mapa (z teksturą)"
 msgid "Map (wireframe)"
 msgstr "Mapa (siatka)"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Map and engine not installed"
 msgstr "Mapa i silnik niezainstalowane"
@@ -29642,7 +29647,7 @@ msgstr "Brak mapy"
 msgid "Map not found."
 msgstr "Nie znaleziono mapy."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
 msgid "Map not installed"
@@ -29743,7 +29748,7 @@ msgstr "Mapa: {mapFilter}"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #, fuzzy
 msgid "Map: {mapName}"
@@ -29855,7 +29860,7 @@ msgstr "Oznacz jako aktualne"
 msgid "Mark unwatched"
 msgstr "Oznacz jako nieobejrzane"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Mark watched"
@@ -34190,6 +34195,7 @@ msgid "not analysed"
 msgstr "nieprzeanalizowane"
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Not analysed"
 msgstr "Nieprzeanalizowane"
@@ -38741,8 +38747,8 @@ msgstr "W kolejce. Rozpocznie się, gdy skończy się gra, w którą grasz."
 
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #: src/content/pages/components/SuggestionsList.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
@@ -39790,7 +39796,7 @@ msgstr "Nagrano do przewijania wstecz. Ścieżka zajmuje {size}."
 msgid "Recorded match"
 msgstr "Nagrany mecz"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Recorded on {engineVersion}. A replay only plays on that version."
 msgstr "Nagrano na {engineVersion}. Powtórka działa tylko na tej wersji."
@@ -40463,7 +40469,7 @@ msgstr "Usuń szkielet"
 msgid "Remove spawn"
 msgstr "Usuń punkt pojawienia się"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Remove tag {tag}"
 msgstr "Usuń tag {tag}"
@@ -40903,6 +40909,10 @@ msgstr "Czyszczenie powtórek"
 msgid "Replay deleted"
 msgstr "Usunięto powtórkę"
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Replay facts"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Replay map"
@@ -41320,7 +41330,6 @@ msgstr "Mecz z ograniczeniami — {summary}"
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Result"
 msgstr "Wynik"
@@ -43672,7 +43681,7 @@ msgstr "ustawiono"
 msgid "Set"
 msgstr "Ustaw"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
 msgid "Set a download folder in <0>Content folders settings</0> first."
 msgstr "Najpierw ustaw folder pobierania w <0>ustawieniach folderów zawartości</0>."
@@ -43873,9 +43882,9 @@ msgstr "Zestaw: {activeSetName} (poza biblioteką: {missingCount})"
 msgid "Set: {setName}"
 msgstr "Zestaw: {setName}"
 
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/components/ReplaySetPicker.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
-#: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
 msgid "Sets"
 msgstr "Zestawy"
@@ -46699,6 +46708,10 @@ msgstr "Zaproponowane na podstawie tego, jak ta gra nazywa jednostki każdej fra
 msgid "Suggested map"
 msgstr "Proponowana mapa"
 
+#: src/content/pages/components/ReplayPanel.tsx
+msgid "Summary"
+msgstr ""
+
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 msgid "Sun colour"
 msgstr ""
@@ -48332,7 +48345,7 @@ msgstr "Plik jest w dokumencie, ale nie udało się go odczytać, więc zabrakni
 msgid "The file is larger than the mirror takes."
 msgstr ""
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
 msgid "The file is permanently removed from your demos folder — this can't be undone. If this replay has been analysed, its stored analysis is deleted with it."
 msgstr "Plik zostanie trwale usunięty z folderu demos — tego nie można cofnąć. Jeśli ta powtórka była analizowana, zapisana analiza zostanie usunięta razem z nią."
@@ -55433,7 +55446,7 @@ msgstr "Obejrzyj najlepszą powtórkę dla {presetName}"
 msgid "Watch with rewind"
 msgstr "Oglądaj z przewijaniem wstecz"
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Watched"
@@ -57561,7 +57574,7 @@ msgstr "Twoja nazwa"
 msgid "Your network gave no answer over the relay's usual route, so coilbox reaches the relay over TLS instead. This can add delay to the game."
 msgstr "Twoja sieć nie odpowiedziała zwykłą drogą przekaźnika, więc coilbox łączy się z przekaźnikiem przez TLS. Może to dodać opóźnienie w grze."
 
-#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
 msgid "Your notes"
 msgstr "Twoje notatki"
