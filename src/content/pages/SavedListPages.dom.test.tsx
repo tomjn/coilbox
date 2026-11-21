@@ -108,6 +108,9 @@ vi.mock("../../downloads/mirrorIndex", () => ({
 }));
 vi.mock("../../downloads/githubReleases", () => ({
   loadGithubReleases: async () => [],
+  refreshGithubReleases: async () => {},
+  useGithubReleasesAutoRefresh: () => {},
+  useGithubReleasesVersion: () => 0,
 }));
 // The Maps page asks the hub about the cards on screen and draws the map
 // packs banner, both of which read the hub address from settings.

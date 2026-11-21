@@ -12,6 +12,7 @@ import {
 import {
   heldGithubReleases,
   loadGithubReleases,
+  useGithubReleasesVersion,
 } from "../downloads/githubReleases";
 import type { GameCatalog } from "./gameOffer";
 
@@ -32,7 +33,9 @@ export function useGameCatalog(): GameCatalog {
   const [archives, setArchives] = useState<ReadonlyMap<string, string>>(
     new Map(),
   );
+  const releasesVersion = useGithubReleasesVersion();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `releasesVersion` is the signal to read again
   useEffect(() => {
     let cancelled = false;
     for (const s of suggested) {
@@ -54,7 +57,7 @@ export function useGameCatalog(): GameCatalog {
     return () => {
       cancelled = true;
     };
-  }, [suggested, repos]);
+  }, [suggested, repos, releasesVersion]);
 
   return useMemo(
     () => ({
