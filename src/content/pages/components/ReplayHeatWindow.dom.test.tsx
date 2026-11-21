@@ -184,6 +184,25 @@ describe("dragging", () => {
     expect(received()).toEqual({ startSec: 0, endSec: 1080 });
   });
 
+  it("still drags when the browser will not capture the pointer", () => {
+    show();
+    const part = end();
+    part.setPointerCapture = () => {
+      throw new DOMException("no such pointer", "NotFoundError");
+    };
+    const at = (clientX: number) => ({ clientX, pointerId: 1 });
+    fireEvent.pointerDown(part, at(1000));
+    fireEvent.pointerMove(part, at(500));
+    fireEvent.pointerUp(part, at(500));
+    expect(received()).toEqual({ startSec: 0, endSec: 900 });
+  });
+
+  it("reads the end as the match's own length, not the second after it", () => {
+    show(1800.4);
+    expect(end().getAttribute("aria-valuenow")).toBe("1801");
+    expect(end().getAttribute("aria-valuetext")).toBe("30:00");
+  });
+
   it("ignores a drag that does not start on the lane's own pointer", () => {
     show();
     const part = end();

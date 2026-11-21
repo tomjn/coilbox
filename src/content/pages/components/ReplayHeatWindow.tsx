@@ -233,8 +233,14 @@ export function HeatWindowPlot({
       if (!(width > 0)) return;
       // An end sits inside the box, which would start a slide.
       ev.stopPropagation();
-      ev.currentTarget.setPointerCapture?.(ev.pointerId);
       drag.current = { part, x: ev.clientX, width, from: [shown[0], shown[1]] };
+      try {
+        // So the drag goes on when the pointer leaves the box.
+        ev.currentTarget.setPointerCapture?.(ev.pointerId);
+      } catch {
+        // A pointer the browser no longer has. The drag still follows the
+        // pointer while it is over the box.
+      }
     },
     onPointerMove(ev: PointerEvent<HTMLElement>) {
       const d = drag.current;
@@ -330,7 +336,7 @@ export function HeatWindowPlot({
           aria-valuemin={shown[0] + 1}
           aria-valuemax={domainSec}
           aria-valuenow={shown[1]}
-          aria-valuetext={formatDuration(shown[1])}
+          aria-valuetext={formatDuration(Math.min(shown[1], totalSec))}
           data-testid="heat-window-end"
           className={`${handle} -right-3`}
           onKeyDown={key("end")}
