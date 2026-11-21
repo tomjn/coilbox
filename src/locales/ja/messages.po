@@ -11255,6 +11255,10 @@ msgstr "型名のないエントリ"
 msgid "An extra gap the unit keeps from other moving units, on top of its own size. The engine suggests 32 or less. It does not affect pathing near buildings or terrain."
 msgstr "ユニット自身の大きさに加えて、他の移動ユニットとの間に空ける追加の間隔です。エンジンは 32 以下を推奨しています。建物や地形の近くの経路探索には影響しません。"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "An icon is a unit, drawn as the game draws it on its own map, in the colour of its player's line in the chart. A unit still being built is faint. An icon is never smaller than {leastIcon} pixels, so small units look bigger than they are. A unit whose icon is not known is a rectangle, as is every unit while the icons load."
+msgstr ""
+
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
 msgid "An internal name can only use lowercase letters, numbers and underscores."
@@ -23428,6 +23432,14 @@ msgstr "占有範囲は確認していません。ユニットに形状があり
 msgid "Footprint width"
 msgstr "占有範囲の幅"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Footprints"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Footprints, in the switch beside the map, draws each unit as a rectangle the size of its footprint instead."
+msgstr ""
+
 #: src/lego/pages/components/UnitGamePicker.tsx
 #, fuzzy
 msgid "for"
@@ -26048,6 +26060,10 @@ msgstr "アイコンと背景を設定済み"
 #, fuzzy
 msgid "Icon set, no background"
 msgstr "アイコンのみ設定、背景なし"
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Icons"
+msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
@@ -53984,6 +54000,10 @@ msgstr "ユニット定義：{defsError}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Unit destroyed, {when}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Unit drawing"
 msgstr ""
 
 #: src/campaign/slots.ts

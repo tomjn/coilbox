@@ -1,6 +1,7 @@
 /** When the map view draws and when it does not (#3807). */
 import { describe, expect, it, vi } from "vitest";
 import { createReplayClock } from "./clock";
+import type { UnitIcons } from "./icons";
 import { createMapView, type MapViewStatus } from "./loop";
 import { teamStyles } from "./paint";
 import { fixtureHeader, recordingContext, testTrack } from "./testTrack";
@@ -213,6 +214,37 @@ describe("createMapView", () => {
     // A mark is at least 3 pixels, so 1 pixel off the middle still finds it.
     expect(s.view.pick(376, 251)?.serial).toBe(1);
     expect(s.view.pick(600, 600)).toBeNull();
+  });
+
+  it("finds a unit by its icon's bounds while icons are on, and by its footprint after", async () => {
+    const s = setup(30);
+    s.view.setShown(true);
+    s.raf.run();
+    await s.load();
+    // Unit 1 is at 3000, 2000 elmos, which is 375, 250 on the canvas.
+    // Its icon is 40 pixels across, where its footprint is 2.
+    const icons: UnitIcons = {
+      edge: (def) => (def === 1 ? 40 : 0),
+      sprite: () => null,
+    };
+    expect(s.view.pick(390, 250)).toBeNull();
+    s.view.setIcons(icons);
+    expect(s.view.pick(390, 250)?.serial).toBe(1);
+    expect(s.view.pick(390, 280)).toBeNull();
+    s.view.setIcons(null);
+    expect(s.view.pick(390, 250)).toBeNull();
+  });
+
+  it("draws again when the icons change", async () => {
+    const s = setup(45);
+    s.view.setShown(true);
+    s.raf.run();
+    await s.load();
+    expect(s.pictures()).toBe(1);
+    s.view.setIcons({ edge: () => 0, sprite: () => null });
+    expect(s.raf.waiting()).toBe(1);
+    s.raf.run();
+    expect(s.pictures()).toBe(2);
   });
 
   it("rings the unit it is told to, and says when that unit is gone", async () => {

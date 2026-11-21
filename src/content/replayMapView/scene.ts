@@ -171,6 +171,11 @@ export function collectScene(
  * widens every mark by that much, for a pointer that is nearly on one. Where
  * marks overlap it takes the unit whose middle is nearest.
  *
+ * `iconHalf` is given when units are drawn as icons. It says, for a unit
+ * definition, half the icon's edge in elmos, or 0 for a unit drawn as its
+ * footprint. An icon does not turn, so a point is on it when it is within that
+ * half on both axes.
+ *
  * This is one pass over the scene for each pointer event, not for each
  * animation frame.
  */
@@ -180,12 +185,23 @@ export function unitAt(
   z: number,
   least: number,
   slop: number,
+  iconHalf?: (def: number) => number,
 ): number {
   let found = -1;
   let nearest = Number.POSITIVE_INFINITY;
   for (let i = 0; i < scene.units; i++) {
     const dx = x - scene.unitX[i];
     const dz = z - scene.unitZ[i];
+    const half = iconHalf ? iconHalf(scene.unitDef[i]) : 0;
+    if (half > 0) {
+      if (Math.abs(dx) > half + slop || Math.abs(dz) > half + slop) continue;
+      const near = dx * dx + dz * dz;
+      if (near < nearest) {
+        nearest = near;
+        found = i;
+      }
+      continue;
+    }
     let fx = scene.unitFx[i];
     let fz = scene.unitFz[i];
     const length = Math.hypot(fx, fz);

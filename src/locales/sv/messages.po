@@ -11330,6 +11330,10 @@ msgstr "en post utan typnamn"
 msgid "An extra gap the unit keeps from other moving units, on top of its own size. The engine suggests 32 or less. It does not affect pathing near buildings or terrain."
 msgstr "Ett extra avstånd som enheten håller till andra rörliga enheter, utöver sin egen storlek. Motorn föreslår 32 eller mindre. Det påverkar inte vägsökning nära byggnader eller terräng."
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "An icon is a unit, drawn as the game draws it on its own map, in the colour of its player's line in the chart. A unit still being built is faint. An icon is never smaller than {leastIcon} pixels, so small units look bigger than they are. A unit whose icon is not known is a rectangle, as is every unit while the icons load."
+msgstr ""
+
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
 msgid "An internal name can only use lowercase letters, numbers and underscores."
@@ -23583,6 +23587,14 @@ msgstr "Fotavtrycket är inte kontrollerat. Enheten har ingen geometri."
 msgid "Footprint width"
 msgstr "Fotavtryckets bredd"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Footprints"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Footprints, in the switch beside the map, draws each unit as a rectangle the size of its footprint instead."
+msgstr ""
+
 #: src/lego/pages/components/UnitGamePicker.tsx
 #, fuzzy
 msgid "for"
@@ -26213,6 +26225,10 @@ msgstr "Ikon och bakgrund valda"
 #, fuzzy
 msgid "Icon set, no background"
 msgstr "Ikon vald, ingen bakgrund"
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Icons"
+msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
@@ -54346,6 +54362,10 @@ msgstr "Enhetsdefinitioner: {defsError}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Unit destroyed, {when}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Unit drawing"
 msgstr ""
 
 #: src/campaign/slots.ts

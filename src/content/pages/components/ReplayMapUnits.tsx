@@ -4,6 +4,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { DemoInfo, ReplayTrackHeader } from "../../bindings";
 import { playerTeam } from "../../matchStats";
 import {
@@ -13,6 +14,7 @@ import {
 import { startDots } from "../../replayMapLayers";
 import type { MapLayer } from "../../replayMapLayerToggles";
 import type { ReplayClock } from "../../replayMapView/clock";
+import { LEAST_ICON_EDGE } from "../../replayMapView/icons";
 import {
   createMapView,
   type MapView,
@@ -22,10 +24,12 @@ import type { TeamStyle } from "../../replayMapView/paint";
 import { TIMELINE_KEYS } from "../../replayMapView/timelineKeys";
 import { teamLabel } from "../../replaySideLabel";
 import type { ReplayTrackError, ReplayTrackHandle } from "../../replayTrack";
+import { type UnitDrawing, useUnitDrawing } from "../../unitMapDrawing";
 import { useMatchClock } from "../../useMatchClock";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useMapLayerToggles } from "../../useReplayMapLayers";
 import { useReplayStartAreas } from "../../useReplayStartAreas";
+import { useUnitMapIcons } from "../../useUnitMapIcons";
 import { useUnitMapStyles } from "../../useUnitMapStyles";
 import { LayerSwitches, MapHelp, ReplayMapLayout } from "./ReplayMapRail";
 import { StartAreas, StartDotMarks } from "./ReplayStartAreas";
@@ -102,8 +106,17 @@ export function NotShown({ words }: { words: string }) {
 const UNIT_MAP_LAYERS: readonly MapLayer[] = ["startBoxes", "starts"];
 
 /** What the marks are and how the timeline moves them. Behind the help button. */
-function Legend({ boxes, dots }: { boxes: boolean; dots: boolean }) {
+function Legend({
+  boxes,
+  dots,
+  drawing,
+}: {
+  boxes: boolean;
+  dots: boolean;
+  drawing: UnitDrawing;
+}) {
   useLocale();
+  const leastIcon = LEAST_ICON_EDGE;
   return (
     <>
       <p className="text-muted-foreground">
@@ -112,14 +125,34 @@ function Legend({ boxes, dots }: { boxes: boolean; dots: boolean }) {
           runs the game.
         </Trans>
       </p>
-      <p>
-        <Trans>
-          A rectangle is a unit, in the colour of its player's line in the chart
-          and the size of its footprint, with a line the way it faces. A unit
-          still being built is faint. On a large map a mark is never smaller
-          than 3 pixels, so small units look bigger than they are.
-        </Trans>
-      </p>
+      {drawing === "icons" ? (
+        <>
+          <p>
+            <Trans>
+              An icon is a unit, drawn as the game draws it on its own map, in
+              the colour of its player's line in the chart. A unit still being
+              built is faint. An icon is never smaller than {leastIcon} pixels,
+              so small units look bigger than they are. A unit whose icon is not
+              known is a rectangle, as is every unit while the icons load.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Footprints, in the switch beside the map, draws each unit as a
+              rectangle the size of its footprint instead.
+            </Trans>
+          </p>
+        </>
+      ) : (
+        <p>
+          <Trans>
+            A rectangle is a unit, in the colour of its player's line in the
+            chart and the size of its footprint, with a line the way it faces. A
+            unit still being built is faint. On a large map a mark is never
+            smaller than 3 pixels, so small units look bigger than they are.
+          </Trans>
+        </p>
+      )}
       <p>
         <Trans>
           A player unticked in the players table has faint units. Point at a
@@ -336,6 +369,11 @@ function UnitsView({
   const styles = useUnitMapStyles(info, replayPath, header.teams);
   const stylesRef = useRef(styles);
   stylesRef.current = styles;
+  const [drawing, setDrawing] = useUnitDrawing();
+  const loaded = useUnitMapIcons(info, header.unitDefs, drawing === "icons");
+  const icons = drawing === "icons" ? loaded : null;
+  const iconsRef = useRef(icons);
+  iconsRef.current = icons;
   const layers = useMapLayerToggles(UNIT_MAP_LAYERS);
   const { on } = layers;
   // The map's size in world units, which a Zero-K file's areas are placed in.
@@ -373,6 +411,7 @@ function UnitsView({
       handle,
       clock,
       teams: stylesRef.current,
+      icons: iconsRef.current,
       surface: () =>
         ctx && canvas.width > 0
           ? {
@@ -461,6 +500,10 @@ function UnitsView({
   useEffect(() => {
     viewRef.current?.setTeams(styles);
   }, [styles]);
+
+  useEffect(() => {
+    viewRef.current?.setIcons(icons);
+  }, [icons]);
 
   // The ring goes round the unit the pointer is on, or the chosen one.
   const named = pointed ?? chosen;
@@ -570,6 +613,7 @@ function UnitsView({
             <Legend
               boxes={on.startBoxes && startAreas.areas.length > 0}
               dots={dots.length > 0}
+              drawing={drawing}
             />
           </MapHelp>
           <p
@@ -582,6 +626,25 @@ function UnitsView({
           >
             {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
           </p>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            aria-label={tr`Unit drawing`}
+            className="w-full flex-wrap items-stretch @xl:flex-col @xl:flex-nowrap"
+            value={drawing}
+            onValueChange={(next) => {
+              if (next) setDrawing(next as UnitDrawing);
+            }}
+          >
+            <ToggleGroupItem value="icons" className="@xl:justify-start">
+              <Trans>Icons</Trans>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="footprints" className="@xl:justify-start">
+              <Trans>Footprints</Trans>
+            </ToggleGroupItem>
+          </ToggleGroup>
           {layers.layersShown ? (
             <div data-map-controls className="flex flex-col gap-3">
               <LayerSwitches layers={layers} only={UNIT_MAP_LAYERS} />

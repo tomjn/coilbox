@@ -126,6 +126,41 @@ describe("unitAt", () => {
     expect(scene.unitSerial[unitAt(scene, 108, 100, 0, 0)]).toBe(8);
   });
 
+  it("finds a unit by its icon's bounds, which do not turn, when it has an icon", () => {
+    const scene = createMapScene();
+    scene.units = 2;
+    scene.unitX.set([100, 300]);
+    scene.unitZ.set([100, 100]);
+    // The first faces along x and is 2 elmos across. The second has no icon.
+    scene.unitFx.set([1, 1]);
+    scene.unitFz.set([0, 0]);
+    scene.unitAcross.set([1, 1]);
+    scene.unitAlong.set([1, 1]);
+    scene.unitDef.set([0, 1]);
+    const half = (def: number) => (def === 0 ? 10 : 0);
+    // Ten elmos either way on both axes, with no turning to the facing.
+    expect(unitAt(scene, 109, 91, 0, 0, half)).toBe(0);
+    expect(unitAt(scene, 111, 100, 0, 0, half)).toBe(-1);
+    expect(unitAt(scene, 100, 111, 0, 0, half)).toBe(-1);
+    // Without icons the same point is nowhere near the unit.
+    expect(unitAt(scene, 109, 91, 0, 0)).toBe(-1);
+    // The unit with no icon is still found by its footprint.
+    expect(unitAt(scene, 300.5, 100, 0, 0, half)).toBe(1);
+    expect(unitAt(scene, 309, 100, 0, 0, half)).toBe(-1);
+  });
+
+  it("widens an icon by the slop and takes the nearer of two icons", () => {
+    const scene = createMapScene();
+    scene.units = 2;
+    scene.unitX.set([100, 112]);
+    scene.unitZ.set([100, 100]);
+    scene.unitSerial.set([7, 8]);
+    scene.unitDef.set([0, 0]);
+    expect(unitAt(scene, 111, 100, 0, 3, () => 10)).toBe(1);
+    expect(unitAt(scene, 123, 100, 0, 3, () => 10)).toBe(1);
+    expect(unitAt(scene, 126, 100, 0, 3, () => 10)).toBe(-1);
+  });
+
   it("measures along the way a unit faces", () => {
     const scene = createMapScene();
     scene.units = 1;
