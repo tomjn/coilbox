@@ -5,7 +5,9 @@ import type { DemoInfo } from "./bindings";
 import { useScanTargetSelection, useUnitsyncScan } from "./config";
 import { closestInstalledGame, recordedGame } from "./replayBuildOrders";
 import {
+  barAreas,
   rectangleAreas,
+  replayBarArrangement,
   replayRoom,
   type StartAreaSet,
   zerokAreas,
@@ -20,6 +22,12 @@ import {
  * it gives are drawn as polygons. When there is no such file, or the game is
  * not Zero-K, or is not installed, the replay's own rectangles are what is
  * drawn, as they always were. A replay of another game never asks for the file.
+ *
+ * A Beyond All Reason replay carries its shaped areas in its game options
+ * (#5314). When they decode and the map's size is known, they are drawn in place
+ * of the rectangles, as the game used them. A host's own areas win over the
+ * map's set. Options that are missing, empty or cannot be read leave the
+ * rectangles.
  *
  * `extent` is the map's size in world units, which the file's script reads and
  * which places its points. Without it nothing is asked. The answer is kept for
@@ -52,6 +60,11 @@ export function useReplayStartAreas({
   return useMemo(() => {
     if (config && extent)
       return { ...zerokAreas(config, info, extent), loading };
+    const arrangement = extent ? replayBarArrangement(info) : null;
+    if (arrangement && extent) {
+      const bar = barAreas(arrangement.arrangement, info, extent);
+      if (bar.areas.length > 0) return { ...bar, loading };
+    }
     return { ...rectangleAreas(info), loading };
   }, [config, extent, info, loading]);
 }

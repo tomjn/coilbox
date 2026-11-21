@@ -1,4 +1,12 @@
 import { t } from "@lingui/core/macro";
+import { scriptTagKey } from "@/multiplayer/battle/battleOptions";
+import {
+  type Arrangement,
+  arrangementAreas,
+  type ResolvedArrangement,
+  resolveArrangement,
+  startBoxOptions,
+} from "@/startbox/barBoxes";
 import {
   pointInPolygon,
   type StartArea,
@@ -134,5 +142,45 @@ export function zerokAreas(
       };
     return { ...area, ...sideNaming(side), color: hex(colours.get(side)) };
   });
+  return { areas, extent };
+}
+
+/**
+ * The start areas Beyond All Reason's game used for a replay, or null when its
+ * options give none. The two hidden options are read and chosen between as the
+ * game does, for the replay's own number of sides: the host's areas win over the
+ * map's set. An option that cannot be decoded counts as missing.
+ */
+export function replayBarArrangement(
+  info: DemoInfo,
+): ResolvedArrangement | null {
+  const tags = Object.fromEntries(
+    Object.entries(info.modOptions).map(([key, value]) => [
+      scriptTagKey("mod", key),
+      value,
+    ]),
+  );
+  const { override, set } = startBoxOptions(tags);
+  return resolveArrangement(override, set, info.numAllyTeams);
+}
+
+/**
+ * A Beyond All Reason arrangement as the replay's areas. The game gives the
+ * first area to side 1, the second to side 2 and so on, so each area takes the
+ * colour and number of the side at its position. An area past the last side is
+ * one the game never used, and is not drawn.
+ */
+export function barAreas(
+  arrangement: Arrangement,
+  info: DemoInfo,
+  extent: WorldExtent,
+): StartAreaSet {
+  const colours = new Map(info.allyTeams.map((a) => [a.id, a.color]));
+  const areas = arrangementAreas(arrangement, extent).flatMap(
+    (area, side): StartArea[] =>
+      colours.has(side)
+        ? [{ ...area, ...sideNaming(side), color: hex(colours.get(side)) }]
+        : [],
+  );
   return { areas, extent };
 }
