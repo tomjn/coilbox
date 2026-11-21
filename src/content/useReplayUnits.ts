@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   type BuildOrder,
   contentUnitDefSet,
@@ -24,6 +24,7 @@ import {
   type UnitSource,
 } from "./replayBuildOrders";
 import {
+  iconTypesByName,
   misfits,
   orderFit,
   storedListFor,
@@ -217,6 +218,24 @@ export function useKeptUnitLinks(
 ): { links: readonly UnitDefLink[]; ready: boolean } {
   const { sets, ready } = useKeptUnitLists(gameId, wanted);
   return { links: sets?.links ?? NO_LINKS, ready };
+}
+
+/**
+ * The map icon the engine drew each unit with in a replay's analysed match, by
+ * lowercase unit name (#5340). Empty when the replay has no analysis, or one
+ * made before the logger wrote icon types. `ready` is false until the store has
+ * answered. The map is the same object until the store's answer changes.
+ */
+export function useMatchIconTypes(
+  gameId: string | undefined,
+  wanted: boolean,
+): { types: ReadonlyMap<string, string>; ready: boolean } {
+  const { sets, ready } = useKeptUnitLists(gameId, wanted);
+  const types = useMemo(
+    () => iconTypesByName(storedListFor(sets, "events")?.units),
+    [sets],
+  );
+  return useMemo(() => ({ types, ready }), [types, ready]);
 }
 
 /**

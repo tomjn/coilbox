@@ -13,17 +13,36 @@ import {
   type IconType,
   type UnitIcons,
 } from "./replayMapView/icons";
+import { useMatchIconTypes } from "./useReplayUnits";
+
+/** The icon type to draw a type the game does not define with. The engine
+ *  draws the `default` one, and so does the game's answer from unitsync. */
+const FALLBACK_TYPE = "default";
 
 /**
  * The icon type of each of a recording's unit definitions, in the order of its
- * `unitDefs`, and null for a unit the game does not define. A unit that names
- * no type has the game's `default`, which unitsync has already filled in.
+ * `unitDefs`, and null for a unit with no type to draw. A unit that names no
+ * type has the game's `default`, which unitsync has already filled in.
+ *
+ * `matchTypes` is what the replay's analysis recorded for the units, by
+ * lowercase name (#5340). The type the engine drew a unit with in that match
+ * wins over the game's own, since a mod option or a tweak can change it. A type
+ * the game's files do not define has no picture to draw, so the unit is drawn
+ * as the `default` type, as the engine does.
  */
 export function iconTypesOf(
   unitDefs: readonly string[],
-  icons: Pick<UnitIconsResult, "unitTypes">,
+  icons: Pick<UnitIconsResult, "unitTypes" | "types">,
+  matchTypes?: ReadonlyMap<string, string>,
 ): (string | null)[] {
-  return unitDefs.map((name) => icons.unitTypes[name.toLowerCase()] ?? null);
+  return unitDefs.map((name) => {
+    const key = name.toLowerCase();
+    const matched = matchTypes?.get(key);
+    if (matched !== undefined) {
+      return Object.hasOwn(icons.types, matched) ? matched : FALLBACK_TYPE;
+    }
+    return icons.unitTypes[key] ?? null;
+  });
 }
 
 /** What unitsync said about each game's icons, by engine, data folder and game. */
@@ -58,13 +77,14 @@ async function loadUnitIcons(
   key: string,
   args: { enginePath: string; dataDir: string; gameArchive: string },
   unitDefs: readonly string[],
+  matchTypes: ReadonlyMap<string, string>,
 ): Promise<UnitIcons | null> {
   let result = answers.get(key);
   if (!result) {
     result = await shareInFlight(asked, key, () => unitsyncUnitIcons(args));
     answers.set(key, result);
   }
-  const unitIcon = iconTypesOf(unitDefs, result);
+  const unitIcon = iconTypesOf(unitDefs, result, matchTypes);
   const used = [...new Set(unitIcon)].filter(
     (name): name is string => name !== null,
   );
@@ -84,9 +104,10 @@ async function loadUnitIcons(
  * The game's map icons for the units of a recording (#5316), or null while they
  * load and when the game has none, which the unit map draws as footprints.
  *
- * The game is the replay's own, or the nearest version installed, since an
- * icon type is a property of the game and not of the match. Nothing is asked of
- * unitsync until `wanted` is true.
+ * The game is the replay's own, or the nearest version installed, which gives
+ * the pictures and each unit's icon type as the game's files say it. Where the
+ * replay's analysis recorded a unit's icon type for the match, that wins
+ * (#5340). Nothing is asked of unitsync until `wanted` is true.
  */
 export function useUnitMapIcons(
   info: DemoInfo,
@@ -105,29 +126,41 @@ export function useUnitMapIcons(
     wanted && enginePath && dataDir && gameArchive
       ? `${dataDir}::${enginePath}::${gameArchive}`
       : undefined;
+  // Waited for, so the icons are drawn once and not redrawn when it answers.
+  const match = useMatchIconTypes(info.gameId, wanted);
   const [loaded, setLoaded] = useState<{
     key: string;
     icons: UnitIcons | null;
     unitDefs: readonly string[];
+    matchTypes: ReadonlyMap<string, string>;
   } | null>(null);
 
   useEffect(() => {
-    if (!key || !enginePath || !dataDir || !gameArchive) return;
+    if (!key || !enginePath || !dataDir || !gameArchive || !match.ready) return;
+    const matchTypes = match.types;
     let cancelled = false;
-    loadUnitIcons(key, { enginePath, dataDir, gameArchive }, unitDefs)
+    loadUnitIcons(
+      key,
+      { enginePath, dataDir, gameArchive },
+      unitDefs,
+      matchTypes,
+    )
       .then((icons) => {
-        if (!cancelled) setLoaded({ key, icons, unitDefs });
+        if (!cancelled) setLoaded({ key, icons, unitDefs, matchTypes });
       })
       // A game whose icons cannot be read is drawn as footprints.
       .catch(() => {
-        if (!cancelled) setLoaded({ key, icons: null, unitDefs });
+        if (!cancelled) setLoaded({ key, icons: null, unitDefs, matchTypes });
       });
     return () => {
       cancelled = true;
     };
-  }, [key, enginePath, dataDir, gameArchive, unitDefs]);
+  }, [key, enginePath, dataDir, gameArchive, unitDefs, match]);
 
-  return loaded && loaded.key === key && loaded.unitDefs === unitDefs
+  return loaded &&
+    loaded.key === key &&
+    loaded.unitDefs === unitDefs &&
+    loaded.matchTypes === match.types
     ? loaded.icons
     : null;
 }

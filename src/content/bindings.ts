@@ -1970,6 +1970,9 @@ export interface StoredUnitDef {
   radarDistanceJam?: number;
   sonarDistanceJam?: number;
   seismicDistance?: number;
+  /** The map icon the engine drew the unit with in the match. Only the engine's
+   *  own list has it. */
+  iconType?: string;
 }
 
 /**
@@ -3158,6 +3161,13 @@ export interface UnitDatasetEntry {
    * the same as a unit that morphs nowhere: draw no edge either way.
    */
   morphTargets?: ({ into: string } & Record<string, unknown>)[];
+  /**
+   * The map icon the engine drew this unit with in the match (issue #5340), as
+   * the replay analysis's unit list has it. Only that list sets it. Absent from
+   * a unit read through unitsync and from an analysis made before the logger
+   * wrote it, which the unit map answers with the game's own icon type.
+   */
+  iconType?: string;
 }
 
 export interface UnitDatasetResult {
