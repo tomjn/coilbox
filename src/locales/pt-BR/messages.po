@@ -1857,7 +1857,7 @@ msgstr "{bots} deles são bots"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# área} other {# áreas}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Área inicial de {boxTeam}"
@@ -8888,6 +8888,10 @@ msgstr "um tamanho diferente do mapa desta página, então fica de fora"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "Um perfil de distribuição está ativo (carregado de <0>{source}</0>). Ele muda a aparência e restringe esta versão:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9573,6 +9577,7 @@ msgid "a start"
 msgstr "um início"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Uma área inicial é onde uma equipe podia começar."
@@ -46299,12 +46304,17 @@ msgstr "Iniciar mesmo assim"
 msgid "Start boxes"
 msgstr "Áreas iniciais"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "As áreas iniciais vêm da configuração da partida."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Áreas iniciais por equipe."
@@ -52033,6 +52043,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "Esta partida nunca registrou um fim de jogo, geralmente porque saíram antes de ela terminar. Não há com o que comparar uma reprodução, então ela não pode ser analisada."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Esta partida não definiu áreas iniciais."
@@ -52441,6 +52452,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "Este replay precisa da engine {version}, que não está instalada e não pode ser baixada aqui."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Este replay não registrou posições iniciais."

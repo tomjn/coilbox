@@ -1858,7 +1858,7 @@ msgstr "{bots} από αυτούς bots"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# περιοχή} other {# περιοχές}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Περιοχή εκκίνησης {boxTeam}"
@@ -8891,6 +8891,10 @@ msgstr "διαφορετικό μέγεθος από τον χάρτη αυτή�
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "Είναι ενεργό ένα προφίλ διανομής (φορτώθηκε από <0>{source}</0>). Αλλάζει την εμφάνιση και περιορίζει αυτή την έκδοση:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9576,6 +9580,7 @@ msgid "a start"
 msgstr "μια εκκίνηση"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Η περιοχή εκκίνησης είναι το σημείο όπου επιτρεπόταν να ξεκινήσει μια ομάδα."
@@ -46316,12 +46321,17 @@ msgstr "Έναρξη παρ’ όλα αυτά"
 msgid "Start boxes"
 msgstr "Περιοχές εκκίνησης"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "Οι περιοχές εκκίνησης προέρχονται από τη ρύθμιση του αγώνα."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Περιοχές εκκίνησης ανά ομάδα."
@@ -52050,6 +52060,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "Αυτός ο αγώνας δεν κατέγραψε ποτέ τέλος παιχνιδιού, συνήθως επειδή έκλεισε πριν τελειώσει. Δεν υπάρχει κάτι για σύγκριση με την αναπαραγωγή, οπότε δεν μπορεί να αναλυθεί."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Αυτός ο αγώνας δεν όρισε περιοχές εκκίνησης."
@@ -52458,6 +52469,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "Αυτή η επανάληψη χρειάζεται τη μηχανή {version}, που δεν είναι εγκατεστημένη και δεν μπορεί να ληφθεί εδώ."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Αυτή η επανάληψη δεν κατέγραψε θέσεις εκκίνησης."

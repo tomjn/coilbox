@@ -1837,7 +1837,7 @@ msgstr "boty: {bots}"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# strefa} few {# strefy} many {# stref} other {# strefy}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Strefa startowa: {boxTeam}"
@@ -8834,6 +8834,10 @@ msgstr "inny rozmiar niż mapa na tej stronie, więc pominięto"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "Aktywny jest profil dystrybucji (wczytany z <0>{source}</0>). Zmienia wygląd i zawęża tę wersję:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9509,6 +9513,7 @@ msgid "a start"
 msgstr "start"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Strefa startowa to miejsce, w którym drużyna mogła zacząć."
@@ -46010,12 +46015,17 @@ msgstr "Rozpocznij mimo to"
 msgid "Start boxes"
 msgstr "Strefy startowe"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "Strefy startowe pochodzą z ustawień meczu."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Strefy startowe według drużyn."
@@ -51699,6 +51709,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "Ten mecz nigdy nie zapisał końca gry, zwykle dlatego, że zakończono go przed czasem. Nie ma z czym porównać odtwarzania, więc nie można go przeanalizować."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Ten mecz nie miał stref startowych."
@@ -52106,6 +52117,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "Ta powtórka wymaga silnika {version}, który nie jest zainstalowany i nie można go tu pobrać."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Ta powtórka nie zapisała pozycji startowych."

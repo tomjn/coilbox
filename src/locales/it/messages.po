@@ -1858,7 +1858,7 @@ msgstr "di cui {bots} bot"
 msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# area} other {# aree}}"
 
-#: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayStartAreas.tsx
 #, fuzzy
 msgid "{boxTeam} start box"
 msgstr "Area di partenza {boxTeam}"
@@ -8891,6 +8891,10 @@ msgstr "di dimensioni diverse dalla mappa di questa pagina, quindi è esclusa"
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr "È attivo un profilo di distribuzione (caricato da <0>{source}</0>). Cambia l’aspetto e restringe questa build:"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
@@ -9576,6 +9580,7 @@ msgid "a start"
 msgstr "una partenza"
 
 #: src/content/pages/components/ReplayMapRail.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "A start box is where a team was allowed to start."
 msgstr "Un’area di partenza è dove una squadra poteva partire."
@@ -46316,12 +46321,17 @@ msgstr "Avvia comunque"
 msgid "Start boxes"
 msgstr "Aree di partenza"
 
+#: src/content/pages/components/ReplayMapUnits.tsx
+msgid "Start boxes and dots are drawn under the units, so they never hide one."
+msgstr ""
+
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
 msgid "Start boxes come from the match setup."
 msgstr "Le aree di partenza vengono dalla configurazione della partita."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "Start boxes per team."
 msgstr "Aree di partenza per squadra."
@@ -52050,6 +52060,7 @@ msgid "This match never recorded a game over, usually because it was quit before
 msgstr "Questa partita non ha mai registrato una fine, di solito perché è stata abbandonata prima di finire. Non c’è nulla con cui verificare una riproduzione, quindi non può essere analizzata."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This match set no start boxes."
 msgstr "Questa partita non ha impostato aree di partenza."
@@ -52458,6 +52469,7 @@ msgid "This replay needs engine {version}, which is not installed and cannot be 
 msgstr "Questo replay richiede il motore {version}, che non è installato e non si può scaricare qui."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
+#: src/content/pages/components/ReplayMapUnits.tsx
 #, fuzzy
 msgid "This replay recorded no start positions."
 msgstr "Questo replay non ha registrato posizioni iniziali."

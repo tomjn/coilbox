@@ -3,7 +3,7 @@ import { cn } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
-import type { DemoInfo, StartBox } from "../../bindings";
+import type { DemoInfo } from "../../bindings";
 import {
   type BuildMark,
   CATEGORY_LABEL,
@@ -15,7 +15,6 @@ import {
   type StartDot,
   startDotName,
 } from "../../replayMapLayers";
-import { teamLabel } from "../../replaySideLabel";
 import { useReplayMapLayers } from "../../useReplayMapLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ReplayBaseCrops } from "./ReplayBaseCrops";
@@ -30,7 +29,7 @@ import {
   ReadNotes,
   ReplayMapLayout,
 } from "./ReplayMapRail";
-import { swatch } from "./ReplayRoster";
+import { StartAreas, StartDotMark, startAreas } from "./ReplayStartAreas";
 import { StartUnitCanvas, StartUnitNotes } from "./ReplayStartUnitLayer";
 import { StoredListNote } from "./UnitListNotes";
 
@@ -123,16 +122,7 @@ function StartDotButton({ dot }: { dot: StartDot }) {
       )}
       style={{ left: `${dot.left * 100}%`, top: `${dot.top * 100}%` }}
     >
-      <span
-        className={cn(
-          "block size-3 rounded-full border-2 border-white shadow-[0_0_0_1.5px_rgba(9,13,22,0.9)] transition-opacity group-focus-visible:ring-2 group-focus-visible:ring-ring",
-          // Emphasis is a ring and a fade, never a change of colour.
-          lit && "ring-2 ring-white ring-offset-2 ring-offset-black/80",
-          dot.isMe && !lit && "outline-2 outline-offset-2 outline-white",
-          dimming && !lit && "opacity-40",
-        )}
-        style={{ backgroundColor: dot.colour }}
-      />
+      <StartDotMark dot={dot} lit={lit} dimming={dimming} />
       {lit && (
         <span className="pointer-events-none absolute bottom-full left-1/2 mb-0.5 w-max max-w-40 -translate-x-1/2 rounded bg-black/80 px-1.5 py-0.5 text-left text-[10px] leading-tight text-white">
           <span className="block font-medium">
@@ -248,8 +238,8 @@ export function ReplayMapHeat({
       drawHeatField(canvas, orderField, HEAT_KIND_OF_LAYER.orderDensity);
   }, [orderField]);
 
-  const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
+  const boxes = on.startBoxes ? startAreas(info) : [];
   const noStarts = on.starts && (info.startPositions?.length ?? 0) === 0;
   const [marksW, marksH] = [MARKS_WIDTH, Math.round(MARKS_WIDTH / ratio)];
   const recordedGame = units.recorded;
@@ -286,40 +276,7 @@ export function ReplayMapHeat({
               className="pointer-events-none absolute inset-0 size-full"
             />
           )}
-          {boxes.map((a) => {
-            const b = a.startBox as StartBox;
-            const c = swatch(a.color) ?? NEUTRAL_TEAM_COLOUR;
-            const boxTeam = teamLabel(a.id);
-            return (
-              <span
-                key={a.id}
-                data-layer="startBox"
-                className="absolute flex items-start justify-start"
-                style={{
-                  left: `${b.left * 100}%`,
-                  top: `${b.top * 100}%`,
-                  width: `${(b.right - b.left) * 100}%`,
-                  height: `${(b.bottom - b.top) * 100}%`,
-                  border: `1.5px solid ${c}`,
-                  backgroundColor: c
-                    .replace("rgb", "rgba")
-                    .replace(")", ", 0.22)"),
-                }}
-                title={t`${boxTeam} start box`}
-              >
-                <span
-                  className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
-                  style={{
-                    backgroundColor: c
-                      .replace("rgb", "rgba")
-                      .replace(")", ", 0.85)"),
-                  }}
-                >
-                  {a.id + 1}
-                </span>
-              </span>
-            );
-          })}
+          <StartAreas areas={boxes} named />
           {marks && marks.length > 0 && (
             <canvas
               ref={marksRef}
