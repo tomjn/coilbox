@@ -1,13 +1,18 @@
+import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
 import { Fragment, memo } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { MetricKey } from "../../bindings";
 import {
   type MetricTileGroup,
   type SparkLine,
   TILE_BOX,
 } from "../../matchStats";
 import { labelOfMetric } from "../../metricLabels";
+import {
+  labelOfEntry,
+  REPLAY_ENTRIES,
+  REPLAY_ENTRIES_HEADING,
+} from "../../replayEntries";
 
 /**
  * Which metric the chart draws, picked by looking at all of them (#1141).
@@ -69,6 +74,63 @@ const Spark = memo(function Spark({ lines }: { lines: SparkLine[] }) {
   );
 });
 
+/**
+ * The preview of an entry whose data is read only when it is picked (#5321): a
+ * dashed baseline in the space a shape would take, so its tile lines up with
+ * its neighbours and says no shape is drawn yet.
+ */
+function Unread() {
+  return (
+    <svg
+      viewBox={`0 0 ${TILE_BOX.width} ${TILE_BOX.height}`}
+      preserveAspectRatio="none"
+      style={{ width: "100%", height: SPARK_HEIGHT }}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <line
+        x1={0}
+        x2={TILE_BOX.width}
+        y1={TILE_BOX.height - 1}
+        y2={TILE_BOX.height - 1}
+        stroke="currentColor"
+        strokeOpacity={0.35}
+        strokeWidth={1.25}
+        strokeDasharray="3 3"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+function Tile({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <ToggleGroupItem
+      value={value}
+      // `justify-between` keeps the sparklines on one line of the grid
+      // level with each other when a neighbour's label takes two lines.
+      // Without it the tiles stretch to the tallest in the row and each
+      // shape sits wherever its own label left it.
+      //
+      // The label is wrapped, not truncated. Six across at 810px leaves 95px
+      // for one and "Damage received" needs 100px, and a metric whose name you
+      // can't read is a tile nobody clicks. `whitespace-normal` is not spare:
+      // the toggle item sets `whitespace-nowrap` on itself and the span
+      // inherits it, so dropping `truncate` alone would spill the label out of
+      // the tile instead of wrapping it.
+      className="h-auto w-full flex-col items-start justify-between gap-0.5 rounded-md border border-border/60 px-2 py-1.5 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+    >
+      {children}
+    </ToggleGroupItem>
+  );
+}
+
 export function MatchStatsPicker({
   groups,
   value,
@@ -76,10 +138,11 @@ export function MatchStatsPicker({
   onChange,
 }: {
   groups: MetricTileGroup[];
-  value: MetricKey;
+  /** A metric's key, or one of the replay entries'. */
+  value: string;
   /** How tall the plot beside it is, so the column ends where the plot does. */
   plotHeight: number;
-  onChange: (key: MetricKey) => void;
+  onChange: (key: string) => void;
 }) {
   const { t } = useLingui();
   return (
@@ -89,7 +152,7 @@ export function MatchStatsPicker({
       value={value}
       // Radix clears the value when the lit tile is pressed again, and a chart
       // with no metric has nothing to draw, so an empty change is ignored.
-      onValueChange={(v) => v && onChange(v as MetricKey)}
+      onValueChange={(v) => v && onChange(v)}
       aria-label={t`Charted metric, showing each metric's shape`}
       style={{ "--plot-h": `${plotHeight}px` } as React.CSSProperties}
       // Beside the plot on a wide window and under it on a narrow one, where a
@@ -109,29 +172,25 @@ export function MatchStatsPicker({
             {g.label}
           </p>
           {g.tiles.map((t) => (
-            <ToggleGroupItem
-              key={t.metric.key}
-              value={t.metric.key}
-              // `justify-between` keeps the sparklines on one line of the grid
-              // level with each other when a neighbour's label takes two lines.
-              // Without it the tiles stretch to the tallest in the row and each
-              // shape sits wherever its own label left it.
-              className="h-auto w-full flex-col items-start justify-between gap-0.5 rounded-md border border-border/60 px-2 py-1.5 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
-            >
-              {/* Wrapped, not truncated. Six across at 810px leaves 95px for a
-               * label and "Damage received" needs 100px, and a metric whose
-               * name you can't read is a tile nobody clicks. Every label is two
-               * words, so it breaks at the space. `whitespace-normal` is not
-               * spare: the toggle item sets `whitespace-nowrap` on itself and
-               * the span inherits it, so dropping `truncate` alone would spill
-               * the label out of the tile instead of wrapping it. */}
+            <Tile key={t.metric.key} value={t.metric.key}>
               <span className="w-full text-left text-xs whitespace-normal">
                 {labelOfMetric(t.metric)}
               </span>
               <Spark lines={t.lines} />
-            </ToggleGroupItem>
+            </Tile>
           ))}
         </Fragment>
+      ))}
+      <p className="col-span-full px-1 pt-1 text-[11px] font-medium text-muted-foreground">
+        {i18n._(REPLAY_ENTRIES_HEADING)}
+      </p>
+      {REPLAY_ENTRIES.map((e) => (
+        <Tile key={e.key} value={e.key}>
+          <span className="w-full text-left text-xs whitespace-normal">
+            {labelOfEntry(e)}
+          </span>
+          <Unread />
+        </Tile>
       ))}
     </ToggleGroup>
   );

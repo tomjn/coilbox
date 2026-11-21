@@ -76,9 +76,6 @@ async function show() {
       />
     </SeriesEmphasisProvider>,
   );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Show commands per minute" }),
-  );
   await screen.findByRole("radio", { name: "Player's own" });
 }
 
@@ -132,9 +129,6 @@ describe("CommandRateChart", () => {
           endSec={60}
         />
       </SeriesEmphasisProvider>,
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Show commands per minute" }),
     );
     await waitFor(() =>
       expect(screen.getByText(/holds no orders to count/)).toBeTruthy(),

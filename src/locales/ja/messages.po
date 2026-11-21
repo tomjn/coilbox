@@ -16906,6 +16906,7 @@ msgid "Commander"
 msgstr "コマンダー"
 
 #: src/content/pages/components/CommandRateChart.tsx
+#: src/content/replayEntries.ts
 #, fuzzy
 msgid "Commands per minute"
 msgstr "1 分あたりのコマンド数"
@@ -23846,6 +23847,10 @@ msgstr "モデルの中心から。"
 msgid "From the orders and messages recorded during the match."
 msgstr "試合中に記録された命令とメッセージから。"
 
+#: src/content/replayEntries.ts
+msgid "From the replay"
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From the setup pack {title}"
@@ -28767,6 +28772,10 @@ msgstr "リスト"
 #, fuzzy
 msgid "listed twice in the library"
 msgstr "個はライブラリに 2 回登録されたもの"
+
+#: src/content/replayEntries.ts
+msgid "Living unit value"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44507,11 +44516,6 @@ msgstr "BAN を表示"
 msgid "Show build orders"
 msgstr "ビルドオーダーを表示"
 
-#: src/content/pages/components/CommandRateChart.tsx
-#, fuzzy
-msgid "Show commands per minute"
-msgstr "1 分あたりのコマンド数を表示"
-
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
@@ -44744,11 +44748,6 @@ msgstr "この一覧を表示"
 #, fuzzy
 msgid "Show updates"
 msgstr "アップデートを表示"
-
-#: src/content/pages/components/LivingValueChart.tsx
-#, fuzzy
-msgid "Show value of living units by kind"
-msgstr "生存ユニットの価値を種類別に表示"
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy

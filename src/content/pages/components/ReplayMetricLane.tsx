@@ -19,6 +19,7 @@ import {
   TILE_BOX,
 } from "../../matchStats";
 import { labelOfMetric } from "../../metricLabels";
+import { labelOfEntry, replayEntry } from "../../replayEntries";
 import { useChartSeries } from "../../useChartSeries";
 import { useMatchStats } from "../../useMatchStats";
 import { useChartChoice, useSeriesEmphasis } from "../../useSeriesEmphasis";
@@ -42,9 +43,14 @@ export interface MetricLaneLine extends SparkLine {
 export interface MetricLane {
   /** What the label's list offers. */
   metrics: Metric[];
-  metric: Metric;
+  /** The picked entry's key and name: a metric's, or one of the replay entries'. */
+  metricKey: string;
+  name: string;
   mode: ChartMode;
+  /** Empty for the replay entries, which the lane has no data for. */
   lines: MetricLaneLine[];
+  /** True when the picked entry is a metric, so the mode applies to it. */
+  isMetric: boolean;
   pick: (key: string) => void;
 }
 
@@ -54,6 +60,12 @@ export interface MetricLane {
  *
  * `spanSec` is what the dock's axis is long, so a line's time lines up with the
  * marks above it.
+ *
+ * Commands per minute and the living unit value are in the list the chart and
+ * the lane share (#5321), but the lane draws nothing for them: they are read
+ * from the replay when the chart shows them, and a one line sketch of a stack
+ * of unit kinds says nothing. The lane keeps its name and goes blank, so the
+ * two surfaces still agree on what is picked.
  */
 export function useMetricLane(
   info: DemoInfo,
@@ -65,21 +77,30 @@ export function useMetricLane(
   const { series, drawn } = useChartSeries(info, trailer);
   const { metric: key, mode, setMetric } = useChartChoice();
   const metrics = data?.metrics;
+  const entry = replayEntry(key);
   const metric =
     metrics?.find((m) => m.key === key) ??
     (metrics ? defaultMetric(metrics) : undefined);
 
   const lines = useMemo(() => {
-    if (!trailer || !metric) return [];
+    if (!trailer || !metric || entry) return [];
     const rows = modeRows(drawn, metric.key, secondsPerFrame(trailer), mode);
     return sparkLines(drawn, rows, spanSec).map((line, i) => ({
       ...line,
       teams: seriesTeams(drawn[i], info),
     }));
-  }, [trailer, metric, drawn, mode, spanSec, info]);
+  }, [trailer, metric, entry, drawn, mode, spanSec, info]);
 
   if (!metrics || !metric || series.length === 0) return null;
-  return { metrics, metric, mode, lines, pick: setMetric };
+  return {
+    metrics,
+    metricKey: entry?.key ?? metric.key,
+    name: entry ? labelOfEntry(entry) : labelOfMetric(metric),
+    mode,
+    lines,
+    isMetric: !entry,
+    pick: setMetric,
+  };
 }
 
 /**
@@ -94,9 +115,9 @@ export function MetricLaneLabel({
   id: string;
 }) {
   const { t } = useLingui();
-  const name = labelOfMetric(lane.metric);
+  const { name } = lane;
   return (
-    <Select value={lane.metric.key} onValueChange={lane.pick}>
+    <Select value={lane.metricKey} onValueChange={lane.pick}>
       <SelectTrigger
         id={id}
         size="sm"
@@ -122,12 +143,12 @@ const DIM_OPACITY = 0.2;
 export function MetricLanePlot({ lane }: { lane: MetricLane }) {
   const { t } = useLingui();
   const emphasis = useSeriesEmphasis();
-  const name = labelOfMetric(lane.metric);
+  const { name } = lane;
   const values = lane.mode === "perMinute" ? t`per minute` : t`running total`;
   return (
     <svg
       role="img"
-      aria-label={`${name}, ${values}`}
+      aria-label={lane.isMetric ? `${name}, ${values}` : name}
       data-testid="metric-lane-plot"
       viewBox={`0 0 ${TILE_BOX.width} ${TILE_BOX.height}`}
       // Stretched to the lane rather than fitted: the width is the match and the

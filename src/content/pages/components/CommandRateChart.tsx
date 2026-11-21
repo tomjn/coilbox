@@ -1,6 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -27,18 +26,18 @@ import { CommandRateExportButton } from "./CommandRateExportButton";
 import { SectionHelp } from "./SectionHelp";
 
 /**
- * Commands per minute, as its own small chart under the match chart (#1149).
+ * Commands per minute, drawn in the match chart's plot area when its entry in
+ * the metric list is picked (#1149, #5321).
  *
  * It is not a metric in the registry. The registry is the trailer's decoded
  * fields and the chart's series are running totals of them, sampled by the
  * engine. These counts come from walking the order stream, are rates from the
- * start, and have no cumulative form, so they do not fit the picker, the small
- * multiples or the cumulative toggle. This chart takes the match chart's own
- * lines, so colours, names, the Players and Teams view and the roster's
- * unchecked seats carry over, and its time axis ends where the match chart's
- * does.
+ * start, and have no cumulative form, so the Cumulative or Per minute switch
+ * does not apply to it. It takes the match chart's own lines, so colours,
+ * names, the Players and Teams view and the roster's unchecked seats carry
+ * over, and its time axis ends where the match chart's does.
  *
- * The stream is walked when the reader asks for this chart, and not before.
+ * The stream is walked when this mounts, which is when the entry is picked.
  */
 
 const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
@@ -63,11 +62,14 @@ export function CommandRateChart({
   endSec: number;
 }) {
   const { t, i18n } = useLingui();
-  const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<OrderSource>("selection");
   const read = useReplayCommandRates(replayPath);
   const emphasis = useSeriesEmphasis();
   const rates = read.result;
+  // The chart is mounted only while its entry is picked, so this is the first
+  // time the order stream is walked, and a later pick finds it already read.
+  const { load } = read;
+  useEffect(() => load(), [load]);
 
   const present = useMemo(() => (rates ? sendersPresent(rates) : []), [rates]);
   // The reader's pick, unless this replay has none of that sender's orders.
@@ -81,25 +83,6 @@ export function CommandRateChart({
     [rates, lines, source],
   );
   const shown = series.filter((s) => built?.ids.includes(s.id));
-
-  if (!open) {
-    return (
-      <div className="flex flex-col gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() => {
-            setOpen(true);
-            read.load();
-          }}
-        >
-          <Trans>Show commands per minute</Trans>
-        </Button>
-      </div>
-    );
-  }
 
   const body = () => {
     if (read.loading || read.status === "idle")
@@ -232,7 +215,7 @@ export function CommandRateChart({
   const pregameCount = formatNumber(rates?.pregame ?? 0);
   const unattributedCount = formatNumber(rates?.unattributed ?? 0);
   return (
-    <div className="flex flex-col gap-2 border-t border-border/50 pt-3">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
         <h3 className="text-sm font-medium">
           <Trans>Commands per minute</Trans>

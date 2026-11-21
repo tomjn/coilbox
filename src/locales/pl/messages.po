@@ -16906,6 +16906,7 @@ msgid "Commander"
 msgstr "Dowódca"
 
 #: src/content/pages/components/CommandRateChart.tsx
+#: src/content/replayEntries.ts
 #, fuzzy
 msgid "Commands per minute"
 msgstr "Polecenia na minutę"
@@ -23846,6 +23847,10 @@ msgstr "Od środka modelu."
 msgid "From the orders and messages recorded during the match."
 msgstr "Z rozkazów i wiadomości zapisanych podczas meczu."
 
+#: src/content/replayEntries.ts
+msgid "From the replay"
+msgstr ""
+
 #: src/blueprint/library.ts
 #, fuzzy
 msgid "From the setup pack {title}"
@@ -28767,6 +28772,10 @@ msgstr "Lista"
 #, fuzzy
 msgid "listed twice in the library"
 msgstr "wymieniona dwa razy w bibliotece"
+
+#: src/content/replayEntries.ts
+msgid "Living unit value"
+msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44507,11 +44516,6 @@ msgstr "Pokaż bany"
 msgid "Show build orders"
 msgstr "Pokaż kolejność budowy"
 
-#: src/content/pages/components/CommandRateChart.tsx
-#, fuzzy
-msgid "Show commands per minute"
-msgstr "Pokaż polecenia na minutę"
-
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
@@ -44744,11 +44748,6 @@ msgstr "Pokaż tę ściągę"
 #, fuzzy
 msgid "Show updates"
 msgstr "Pokaż aktualizacje"
-
-#: src/content/pages/components/LivingValueChart.tsx
-#, fuzzy
-msgid "Show value of living units by kind"
-msgstr "Pokaż wartość żywych jednostek według rodzaju"
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy

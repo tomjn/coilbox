@@ -91,7 +91,8 @@ describe("the metric picker's layout", () => {
 
   it("wraps a label instead of cutting it", () => {
     const tiles = tileClasses();
-    expect(tiles.length, "the tiles are not buttons any more").toBe(3);
+    // The three metrics above, then the two entries drawn from the replay.
+    expect(tiles.length, "the tiles are not buttons any more").toBe(5);
     for (const { label } of tiles) {
       expect(label).not.toMatch(/(^| )truncate( |$)/);
       // The toggle item sets `whitespace-nowrap`, which the label inherits, so
