@@ -23442,6 +23442,10 @@ msgstr ""
 msgid "Fog of war"
 msgstr "Ομίχλη πολέμου"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Folder"
@@ -44849,6 +44853,10 @@ msgstr "Εμφάνιση σειρών κατασκευής"
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
 msgstr "Εμφάνιση της δηλωμένης εμβέλειας και του τόξου βολής κάθε όπλου"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy

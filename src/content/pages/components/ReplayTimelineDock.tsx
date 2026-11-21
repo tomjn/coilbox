@@ -2,7 +2,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg, plural, t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Pause, Play } from "lucide-react";
+import { ChevronsDown, ChevronsUp, Pause, Play } from "lucide-react";
 import { Slider as SliderPrimitive } from "radix-ui";
 import {
   createContext,
@@ -10,6 +10,7 @@ import {
   type MutableRefObject,
   type ReactNode,
   useContext,
+  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -26,6 +27,11 @@ import {
 import { formatDuration } from "@/lib/format";
 import { isProfileHidden } from "../../../profile/hidden";
 import type { DemoInfo } from "../../bindings";
+import {
+  DOCK_MAX_HEIGHT,
+  type DockLane,
+  fittingLanes,
+} from "../../replayDockRows";
 import type { ReplayWatch } from "../../replayEngine";
 import type { ReplayClock } from "../../replayMapView/clock";
 import { type Playback, SPEEDS } from "../../replayMapView/playback";
@@ -490,6 +496,17 @@ function SpeedSelect() {
   );
 }
 
+/** The height of the window, which the dock takes its share of. */
+function useWindowHeight(): number {
+  const [height, setHeight] = useState(() => window.innerHeight);
+  useEffect(() => {
+    const onResize = () => setHeight(window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return height;
+}
+
 /** The mark the pointer or focus is on, which a lane puts in the readout. */
 interface Pointed {
   lane: MarkLane;
@@ -558,8 +575,29 @@ export function ReplayTimelineDock({
     showStats ? replayPath : null,
     totalSec,
   );
-  const heatShown =
+  const heatPresent =
     heatWindow !== null && !isProfileHidden("analytics.spatialLayers");
+
+  // The dock takes a share of the window's height and no more. In a window too
+  // short for every lane the last lanes fold away, and the button in the
+  // transport row opens them again inside the same cap, scrolling.
+  const windowHeight = useWindowHeight();
+  const [opened, setOpened] = useState(false);
+  const present = useMemo<DockLane[]>(
+    () => [
+      "kills",
+      "chat",
+      "players",
+      ...(metricLane ? (["metric"] as const) : []),
+      ...(heatPresent ? (["heat"] as const) : []),
+    ],
+    [metricLane, heatPresent],
+  );
+  const fitting = fittingLanes(windowHeight, present);
+  const folded = fitting.length < present.length;
+  const shows = (lane: DockLane) => opened || fitting.includes(lane);
+  const heatShown = heatPresent && shows("heat");
+  const metricShown = metricLane !== null && shows("metric");
 
   const labelId = useId();
   const lanesRef = useRef<HTMLDivElement | null>(null);
@@ -601,6 +639,7 @@ export function ReplayTimelineDock({
       : undefined);
 
   const ticks = axisTicks(totalSec);
+  const shownLanes = LANES.filter(({ lane }) => shows(lane));
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -613,9 +652,10 @@ export function ReplayTimelineDock({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: where keyboard focus lands to use the timeline's keys on the scrubber and the lanes together.
         tabIndex={0}
         onKeyDown={keys?.onKeyDown}
+        style={{ maxHeight: DOCK_MAX_HEIGHT }}
         className="sticky bottom-0 z-20 flex shrink-0 flex-col gap-1.5 border-t border-border bg-background/95 px-4 py-2 outline-none backdrop-blur focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <div className="flex min-h-7 items-center gap-2">
+        <div className="flex min-h-7 shrink-0 items-center gap-2">
           {animates && <Transport />}
           <ClockText range={range} />
           <p
@@ -626,6 +666,29 @@ export function ReplayTimelineDock({
             {reading ? groupWords(range, reading) : ""}
           </p>
           {animates && <SpeedSelect />}
+          {folded && (
+            <Tip
+              label={opened ? tr`Fold the extra lanes` : tr`Show every lane`}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label={
+                  opened ? tr`Fold the extra lanes` : tr`Show every lane`
+                }
+                aria-expanded={opened}
+                onClick={() => setOpened((was) => !was)}
+              >
+                {opened ? (
+                  <ChevronsDown className="size-4" />
+                ) : (
+                  <ChevronsUp className="size-4" />
+                )}
+              </Button>
+            </Tip>
+          )}
           <OpenInEngineButton
             replayPath={replayPath}
             engineVersion={info.engineVersion}
@@ -635,10 +698,12 @@ export function ReplayTimelineDock({
             clock={clock}
           />
         </div>
-        <div className="flex gap-2 text-xs">
-          <div className="flex w-24 shrink-0 flex-col text-muted-foreground">
+        {/* Scrolls when the lanes are opened past the dock's cap. The side
+         * padding is the knob's, which reaches past the lanes. */}
+        <div className="-mx-2 flex min-h-0 gap-2 overflow-y-auto px-2 text-xs">
+          <div className="flex w-24 shrink-0 flex-col text-muted-foreground [&>*]:shrink-0">
             <span className="h-5" />
-            {LANES.map(({ lane, name }) => (
+            {shownLanes.map(({ lane, name }) => (
               <span
                 key={lane}
                 id={`${labelId}-${lane}`}
@@ -647,7 +712,7 @@ export function ReplayTimelineDock({
                 {i18n._(name)}
               </span>
             ))}
-            {metricLane && (
+            {metricShown && (
               <div className="h-12">
                 <MetricLaneLabel lane={metricLane} id={`${labelId}-metric`} />
               </div>
@@ -665,7 +730,7 @@ export function ReplayTimelineDock({
               <div className="h-5">
                 <Knob range={range} onKeyDown={keys?.onKeyDown} />
               </div>
-              {LANES.map(({ lane }) => {
+              {shownLanes.map(({ lane }) => {
                 const row = groups.filter((g) => g.lane === lane);
                 const note = laneNote(lane, kills);
                 return (
@@ -749,7 +814,7 @@ export function ReplayTimelineDock({
               {/* Not made of marks, so it is a sibling of the rows above and
                * not one of them. It is the one lane taller than a line of
                * text, because a line chart needs the height to be read. */}
-              {metricLane && (
+              {metricShown && (
                 // biome-ignore lint/a11y/useSemanticElements: a box the chart is drawn in, which a fieldset's box would not allow.
                 <div
                   role="group"

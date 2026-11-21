@@ -35,8 +35,14 @@ import { SectionHelp } from "./SectionHelp";
  * Measured with the Units mode open, the heading row and the card's padding
  * come to 66 pixels, which is 4.1rem, so 4.5rem leaves a margin. The floor
  * keeps a map usable in a very short window, where the column scrolls.
+ *
+ * The stacked page is a size container too (#5356), so there `cqh` is the
+ * height the page shows, and `--replay-dock-reserve` takes the dock's cap off
+ * it, so the whole map shows above the dock. It is unset, and so nothing, where
+ * the page has two columns and the dock is under them.
  */
-const MAP_VIEW_HEIGHT = "max(16rem, 100cqh - 4.5rem)";
+const MAP_VIEW_HEIGHT =
+  "max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem)";
 
 /**
  * The map and the rail beside it, in every mode of the map card. The rail holds

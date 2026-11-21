@@ -23432,6 +23432,10 @@ msgstr ""
 msgid "Fog of war"
 msgstr "Krigståke"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Folder"
@@ -44832,6 +44836,10 @@ msgstr "Vis byggeordrer"
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
 msgstr "Vis hvert våpens oppgitte rekkevidde og skuddbue"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy

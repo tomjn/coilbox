@@ -23442,6 +23442,10 @@ msgstr ""
 msgid "Fog of war"
 msgstr "Mist van oorlog"
 
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Fold the extra lanes"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Folder"
@@ -44849,6 +44853,10 @@ msgstr "Bouwvolgorde tonen"
 #, fuzzy
 msgid "Show each weapon's stated range and firing arc"
 msgstr "Het opgegeven bereik en de vuurboog van elk wapen tonen"
+
+#: src/content/pages/components/ReplayTimelineDock.tsx
+msgid "Show every lane"
+msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy

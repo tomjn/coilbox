@@ -352,6 +352,8 @@ beforeEach(() => {
     configurable: true,
     get: () => hidden,
   });
+  // A window tall enough for every lane of the dock, which jsdom's 768 is not.
+  vi.stubGlobal("innerHeight", 1000);
   // A canvas 1,024 by 768 CSS pixels at the page's corner, for the fixture's
   // 8,192 by 6,144 elmo map: an eighth of a pixel for each elmo.
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
@@ -1579,6 +1581,64 @@ describe("the dock's place", () => {
   });
 });
 
+describe("the dock's height (#5356)", () => {
+  const resizeTo = (height: number) =>
+    act(() => {
+      window.innerHeight = height;
+      window.dispatchEvent(new Event("resize"));
+    });
+
+  it("is capped at a share of the window", async () => {
+    await show();
+    const dock = screen.getByRole("group", { name: "Timeline" });
+    expect(dock.style.maxHeight).toBe("30vh");
+  });
+
+  it("has every lane and no button to open any in a window tall enough for them", async () => {
+    await show();
+    resizeTo(940);
+    for (const name of ["Kills", "Chat", "Players", "Heat window"]) {
+      screen.getByRole("group", { name });
+    }
+    expect(
+      screen.queryByRole("button", { name: "Show every lane" }),
+    ).toBeNull();
+  });
+
+  it("folds the last lanes in a short window, which the button opens and folds again", async () => {
+    await show();
+    resizeTo(450);
+    expect(screen.queryByRole("group", { name: "Heat window" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Players" })).toBeNull();
+    screen.getByRole("group", { name: "Kills" });
+    screen.getByRole("group", { name: "Chat" });
+
+    const open = screen.getByRole("button", { name: "Show every lane" });
+    expect(open.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(open);
+    for (const name of ["Kills", "Chat", "Players", "Heat window"]) {
+      screen.getByRole("group", { name });
+    }
+    // Opened, the dock is still inside its cap, and scrolls inside it.
+    expect(
+      screen.getByRole("group", { name: "Timeline" }).style.maxHeight,
+    ).toBe("30vh");
+    const fold = screen.getByRole("button", { name: "Fold the extra lanes" });
+    expect(fold.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(fold);
+    expect(screen.queryByRole("group", { name: "Players" })).toBeNull();
+  });
+
+  it("keeps the transport row, the scrubber and the axis in a very short window", async () => {
+    await show();
+    resizeTo(300);
+    screen.getByRole("slider", { name: "Time in the match" });
+    screen.getByTestId("timeline-axis");
+    screen.getByTestId("match-clock");
+    expect(screen.queryByRole("group", { name: "Kills" })).toBeNull();
+  });
+});
+
 describe("a replay with no recording", () => {
   it("still has the dock, with the scrubber and the lanes, and nothing that plays", async () => {
     CHAT = {
@@ -2065,7 +2125,7 @@ describe("the map card's modes", () => {
     // fixed cap.
     const column = ground.closest("[data-map-column]") as HTMLElement;
     expect(column.style.maxWidth).toBe(
-      "calc(max(16rem, 100cqh - 4.5rem) * 8192 / 6144)",
+      "calc(max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem) * 8192 / 6144)",
     );
 
     await pick("Heat");
@@ -2073,7 +2133,9 @@ describe("the map card's modes", () => {
     expect(flat.style.aspectRatio).toBe("513 / 385");
     expect(
       (flat.closest("[data-map-column]") as HTMLElement).style.maxWidth,
-    ).toBe(`calc(max(16rem, 100cqh - 4.5rem) * ${513 / 385} / 1)`);
+    ).toBe(
+      `calc(max(16rem, 100cqh - var(--replay-dock-reserve, 0px) - 4.5rem) * ${513 / 385} / 1)`,
+    );
   });
 });
 
