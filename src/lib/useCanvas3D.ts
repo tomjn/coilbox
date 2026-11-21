@@ -64,30 +64,108 @@ export function release(renderer: THREE.WebGLRenderer): void {
   renderer.domElement.remove();
 }
 
+/**
+ * A renderer that outlives the view that made it.
+ *
+ * A browser counts a context from the moment it is made until the garbage
+ * collector reaches its canvas, which is not when `forceContextLoss` runs. A
+ * view mounted and unmounted again and again, as the replay page's 3D mode is
+ * by its switch, used the allowance up one context at a time and another view
+ * went blank (issue #5348). So a view's renderer is parked when it goes and
+ * the next view to mount takes it.
+ */
+interface Pooled {
+  renderer: THREE.WebGLRenderer;
+  /** Whether a view has it. Nothing is drawn on a parked one. */
+  owned: boolean;
+  /** Everything it has been asked to draw since the last scene went. */
+  drawing: Set<object>;
+  /** What it now refuses to draw. */
+  letGo: WeakSet<object>;
+}
+
+/** Renderers no view has, most recently parked last. */
+const parked: Pooled[] = [];
+
+function makePooled(): Pooled {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.domElement.style.display = "block";
+  renderer.domElement.style.width = "100%";
+  renderer.domElement.style.height = "100%";
+  const pooled: Pooled = {
+    renderer,
+    owned: false,
+    drawing: new Set(),
+    letGo: new WeakSet(),
+  };
+  // A scene's own layers draw on it after it has been let go, from a passive
+  // effect cleanup React runs once the next scene is built, and the renderer
+  // may be another view's by then. Nothing they hold can tell, so the renderer
+  // refuses a scene that has been let go, and anything at all while it is
+  // parked: drawing a freed scene re-allocates storage for the textures that
+  // went with it (issue #1740).
+  const draw = renderer.render.bind(renderer);
+  renderer.render = (scene, camera) => {
+    if (!pooled.owned || pooled.letGo.has(scene)) return;
+    pooled.drawing.add(scene);
+    draw(scene, camera);
+  };
+  return pooled;
+}
+
+/** A renderer for a view, a parked one if a browser has not taken it back. */
+function takeRenderer(): Pooled {
+  for (let one = parked.pop(); one; one = parked.pop()) {
+    if (!one.renderer.getContext().isContextLost()) {
+      one.owned = true;
+      // What the last view set, put back to what three starts with.
+      one.renderer.localClippingEnabled = false;
+      one.renderer.setClearColor(0x000000, 0);
+      one.renderer.clear();
+      return one;
+    }
+    release(one.renderer);
+  }
+  const fresh = makePooled();
+  fresh.owned = true;
+  return fresh;
+}
+
+/** Take a renderer off its view and its page, and keep it for the next one. */
+function parkRenderer(one: Pooled): void {
+  one.owned = false;
+  one.drawing.clear();
+  one.renderer.domElement.remove();
+  parked.push(one);
+}
+
+/** Give every parked renderer's context back. For tests, which count them. */
+export function releaseParkedRenderers(): void {
+  for (const one of parked.splice(0)) release(one.renderer);
+}
+
 /** The canvas a view holds, and the scene on it while there is one. */
 interface Live {
+  pooled: Pooled;
   renderer: THREE.WebGLRenderer;
   host: HTMLElement;
   resize: () => void;
   scene?: Canvas3DScene;
-  /** Everything the renderer has been asked to draw since the last scene went. */
-  drawing: Set<object>;
-  /** What the renderer now refuses to draw. */
-  letGo: WeakSet<object>;
   /** Let the scene go, if there is one. `clear` blanks what it drew. */
   dropScene?: (clear: boolean) => void;
 }
 
 /**
  * Run `build` against a canvas inside `hostRef`, and again on the same canvas
- * when `deps` change. Everything is freed when the view unmounts.
+ * when `deps` change. The scene is freed when the view unmounts, and the
+ * renderer is parked for the next view.
  *
- * The renderer, and with it the WebGL context, is made once and kept. WebKit
- * still counts a context after `forceContextLoss`, so a canvas remade on every
- * change runs the browser out of contexts and another view goes blank (issues
- * #5344 and #5348). A change to `deps` disposes the scene `build` returned and
- * builds the next one on the same renderer. `deps` are the caller's own, as
- * `useMemo` takes them.
+ * The renderer, and with it the WebGL context, is kept. WebKit still counts a
+ * context after `forceContextLoss`, so a canvas remade on every change, or on
+ * every mount, runs the browser out of contexts and another view goes blank
+ * (issues #5344 and #5348). A change to `deps` disposes the scene `build`
+ * returned and builds the next one on the same renderer. `deps` are the
+ * caller's own, as `useMemo` takes them.
  *
  * `build` returning nothing means there is nothing to draw yet. The canvas is
  * blanked and kept, because the view is usually between two builds, as a map
@@ -116,31 +194,11 @@ export function useCanvas3D(
     const host = hostRef.current;
     if (!host || !ready) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const pooled = takeRenderer();
+    const { renderer } = pooled;
     host.appendChild(renderer.domElement);
-    renderer.domElement.style.display = "block";
-    renderer.domElement.style.width = "100%";
-    renderer.domElement.style.height = "100%";
 
-    const live: Live = {
-      renderer,
-      host,
-      resize: () => {},
-      drawing: new Set(),
-      letGo: new WeakSet(),
-    };
-
-    // A scene's own layers draw on it after it has been let go, from a passive
-    // effect cleanup React runs once the next scene is built, and the renderer
-    // is alive by then. Nothing they hold can tell, so the renderer refuses a
-    // scene that has been let go: drawing it would re-allocate storage for the
-    // textures that were freed with it (issue #1740).
-    const draw = renderer.render.bind(renderer);
-    renderer.render = (scene, camera) => {
-      if (live.letGo.has(scene)) return;
-      live.drawing.add(scene);
-      draw(scene, camera);
-    };
+    const live: Live = { pooled, renderer, host, resize: () => {} };
 
     // The pixel ratio the buffer was last sized at, so a window resize that did
     // not move it costs nothing.
@@ -184,15 +242,13 @@ export function useCanvas3D(
     resize();
 
     return () => {
-      // Nothing draws after this, whatever still holds a render.
-      renderer.render = () => {};
       liveRef.current = null;
       live.dropScene?.(false);
       stopWatchingTextures();
       window.removeEventListener("resize", onWindowResize);
       renderer.domElement.removeEventListener("webglcontextrestored", render);
       observer.disconnect();
-      release(renderer);
+      parkRenderer(pooled);
     };
   }, [ready]);
 
@@ -224,8 +280,8 @@ export function useCanvas3D(
       live.scene = undefined;
       unregisterStats();
       // Before the scene's own dispose, which may ask for a frame as it goes.
-      for (const drawn of live.drawing) live.letGo.add(drawn);
-      live.drawing.clear();
+      for (const drawn of live.pooled.drawing) live.pooled.letGo.add(drawn);
+      live.pooled.drawing.clear();
       scene.dispose();
       // The canvas stays, so what the scene drew would stay with it.
       if (clear) renderer.clear();
