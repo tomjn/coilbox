@@ -154,6 +154,7 @@ const INFO = {
   ],
   ais: [],
   allyTeams: [{ id: 0 }, { id: 1 }],
+  modOptions: {},
   startPositions: [
     { team: 0, x: 1024, y: 0, z: 200 },
     { team: 1, x: 4000, y: 0, z: 4000 },

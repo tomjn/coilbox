@@ -110,6 +110,7 @@ const INFO = {
   ],
   ais: [],
   allyTeams: [],
+  modOptions: {},
   startPositions: [{ team: 0, x: 1024, y: 0, z: 512 }],
 } as unknown as DemoInfo;
 
