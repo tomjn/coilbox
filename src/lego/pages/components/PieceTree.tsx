@@ -24,7 +24,7 @@ import {
   Lock,
   LockOpen,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import { roleLabel } from "../../animPresets";
 import type { JoinSummary } from "../../connectors";
@@ -38,6 +38,7 @@ import {
 import { mountContents } from "../../mountPoints";
 import type { RawGeometry } from "../../rawGeometry";
 import { canReparent } from "../../reparent";
+import { type HoverStore, useIsHovered } from "./hoverStore";
 
 /** How far the pointer moves before a press on a row counts as a drag. */
 const DRAG_THRESHOLD = 4;
@@ -58,12 +59,10 @@ interface Props {
    *  for a unit that was not generated, which shows no locks. */
   locks?: RerollLocks | null;
   onToggleLocked?: (pieceId: string) => void;
-  /** The piece to highlight as hovered, e.g. because the pointer is over its
-   *  mesh in the 3D view instead of over its row here. */
-  hoveredId?: string | null;
-  /** Told when the pointer starts or stops being over a row, so the 3D view
-   *  can highlight the matching piece. */
-  onHoverChange?: (pieceId: string | null) => void;
+  /** The hovered piece, shared with the 3D view. A row sets it when the
+   *  pointer is over it, and highlights when it holds that row's piece, e.g.
+   *  because the pointer is over its mesh in the 3D view instead. */
+  hover?: HoverStore;
   /** The pieces whose branches are folded away. Held by the page rather than
    *  here, so they stay folded when the sidebar changes tab and back. */
   collapsedIds: ReadonlySet<string>;
@@ -95,8 +94,7 @@ export function PieceTree({
   onToggleHidden,
   locks,
   onToggleLocked,
-  hoveredId,
-  onHoverChange,
+  hover,
   collapsedIds,
   onToggleCollapsed,
   joins,
@@ -174,8 +172,7 @@ export function PieceTree({
         onToggleLocked={onToggleLocked}
         draggingId={drag?.pieceId ?? null}
         overId={drag?.over ?? null}
-        hoveredId={hoveredId ?? null}
-        onHoverChange={onHoverChange}
+        hover={hover}
         collapsedIds={collapsedIds}
         onToggleCollapsed={onToggleCollapsed}
         joins={joins}
@@ -210,8 +207,7 @@ function Rows({
   onToggleLocked,
   draggingId,
   overId,
-  hoveredId,
-  onHoverChange,
+  hover,
   collapsedIds,
   onToggleCollapsed,
   joins,
@@ -227,8 +223,7 @@ function Rows({
   onToggleLocked?: (pieceId: string) => void;
   draggingId: string | null;
   overId: string | null;
-  hoveredId: string | null;
-  onHoverChange?: (pieceId: string | null) => void;
+  hover: HoverStore | undefined;
   collapsedIds: ReadonlySet<string>;
   onToggleCollapsed: (pieceId: string) => void;
   joins?: ReadonlyMap<string, JoinSummary>;
@@ -263,23 +258,18 @@ function Rows({
             }
             style={depth > 0 ? { marginLeft: 14 } : undefined}
           >
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: a visual hover cue for the 3D view, the row's own actions stay reachable through the nested button */}
-            <div
-              data-piece-id={piece.id}
-              // Dragging a row over another already means something (a
-              // reparent target), so a hover report from mid-drag is
-              // suppressed rather than fighting that with a second highlight.
-              onMouseEnter={() => !draggingId && onHoverChange?.(piece.id)}
-              onMouseLeave={() => !draggingId && onHoverChange?.(null)}
-              className={`group flex items-center pr-1 text-sm ${
+            <RowBox
+              pieceId={piece.id}
+              hover={hover}
+              dragging={draggingId !== null}
+              look={
                 piece.id === overId
-                  ? "bg-primary/25 ring-1 ring-inset ring-primary"
+                  ? "over"
                   : selectedIds.includes(piece.id)
-                    ? "bg-primary/15 text-foreground"
-                    : piece.id === hoveredId
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-muted/50"
-              } ${piece.id === draggingId ? "opacity-50" : ""}`}
+                    ? "selected"
+                    : "plain"
+              }
+              carried={piece.id === draggingId}
             >
               {/* A slot on every row, empty on a leaf, so names line up
                   whether or not the piece has a branch to fold. */}
@@ -409,7 +399,7 @@ function Rows({
               >
                 {piece.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
               </Button>
-            </div>
+            </RowBox>
             {collapsed ? null : (
               <Rows
                 project={project}
@@ -422,8 +412,7 @@ function Rows({
                 onToggleLocked={onToggleLocked}
                 draggingId={draggingId}
                 overId={overId}
-                hoveredId={hoveredId}
-                onHoverChange={onHoverChange}
+                hover={hover}
                 collapsedIds={collapsedIds}
                 onToggleCollapsed={onToggleCollapsed}
                 joins={joins}
@@ -434,6 +423,51 @@ function Rows({
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * A piece's own row, the one part of the tree that follows the hovered piece,
+ * so a change of hovered piece re-renders the two rows it moves between rather
+ * than the whole tree (#5417).
+ */
+function RowBox({
+  pieceId,
+  hover,
+  dragging,
+  look,
+  carried,
+  children,
+}: {
+  pieceId: string;
+  hover: HoverStore | undefined;
+  dragging: boolean;
+  look: "over" | "selected" | "plain";
+  carried: boolean;
+  children: ReactNode;
+}) {
+  const hovered = useIsHovered(hover, pieceId);
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: a visual hover cue for the 3D view, the row's own actions stay reachable through the nested button
+    <div
+      data-piece-id={pieceId}
+      // Dragging a row over another already means something (a reparent
+      // target), so a hover report from mid-drag is suppressed rather than
+      // fighting that with a second highlight.
+      onMouseEnter={() => !dragging && hover?.set(pieceId)}
+      onMouseLeave={() => !dragging && hover?.set(null)}
+      className={`group flex items-center pr-1 text-sm ${
+        look === "over"
+          ? "bg-primary/25 ring-1 ring-inset ring-primary"
+          : look === "selected"
+            ? "bg-primary/15 text-foreground"
+            : hovered
+              ? "bg-accent text-accent-foreground"
+              : "hover:bg-muted/50"
+      } ${carried ? "opacity-50" : ""}`}
+    >
+      {children}
+    </div>
   );
 }
 
