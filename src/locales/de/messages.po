@@ -44897,9 +44897,14 @@ msgstr "Schließt die Tore, wenn das Bauen stoppt, und eine Aktion, die einmal s
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+#, fuzzy
+msgid "Side"
+msgstr "Seite"
+
 #: src/content/pages/components/useUnitRenders.ts
 #: src/lego/buildPicture.ts
 #, fuzzy
+msgctxt "camera angle"
 msgid "Side"
 msgstr "Seite"
 

@@ -49,7 +49,7 @@ export function angleLabel(angle: string): string {
     case "front":
       return t`Front`;
     case "side":
-      return t`Side`;
+      return t({ message: "Side", context: "camera angle" });
     case "angled":
       return t`Angled`;
     default:
