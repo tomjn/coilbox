@@ -316,6 +316,7 @@ import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import type { TileDrag } from "./components/TileGrid";
+import { TimelineTab } from "./components/TimelineTab";
 import { TransformFields } from "./components/TransformFields";
 import { UnitCard } from "./components/UnitCard";
 import { UnitGamePicker } from "./components/UnitGamePicker";
@@ -475,11 +476,21 @@ function Builder({ id }: { id: string | undefined }) {
   // onto its own texture rather than onto the pack's sheet, so a part dropped
   // into it would sample the wrong image and nothing could put that right.
   const imported = draft?.imported ?? null;
-  const [strip, setStrip] = useState<"inventory" | "script">("inventory");
+  const [strip, setStrip] = useState<"inventory" | "script" | "timeline">(
+    "inventory",
+  );
+  /** The action the Timeline tab shows. The tab falls back to the first action
+   *  when this is not one the unit has. */
+  const [timelineActionId, setTimelineActionId] = useState<string | null>(null);
   // Parts and Compounds have nothing for a unit imported whole (issue #712):
-  // it has no parts to build with. Script is the one tab that still applies,
-  // since an imported unit is usually the one carrying its game's own script.
-  const effectiveStrip = imported ? "script" : strip;
+  // it has no parts to build with. Script is the tab that still applies, since
+  // an imported unit is usually the one carrying its game's own script, and
+  // Timeline stays for the same reason: its actions came from that script.
+  const effectiveStrip = imported
+    ? strip === "timeline"
+      ? "timeline"
+      : "script"
+    : strip;
   // Open or closed is remembered between runs. Which tab is showing is not, so
   // the side panel always comes back on Pieces. See `../panels`.
   const [stripOpen, setStripOpen] = usePanelOpen("strip");
@@ -3127,10 +3138,14 @@ function Builder({ id }: { id: string | undefined }) {
                     stripOpen
                       ? effectiveStrip === "script"
                         ? t`Hide the script`
-                        : t`Hide the parts`
+                        : effectiveStrip === "timeline"
+                          ? t`Hide the timeline`
+                          : t`Hide the parts`
                       : effectiveStrip === "script"
                         ? t`Show the script`
-                        : t`Show the parts`
+                        : effectiveStrip === "timeline"
+                          ? t`Show the timeline`
+                          : t`Show the parts`
                   }
                 >
                   {stripOpen ? (
@@ -3168,6 +3183,19 @@ function Builder({ id }: { id: string | undefined }) {
                     aria-pressed={effectiveStrip === "script"}
                   >
                     <Trans>Script</Trans>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={
+                      effectiveStrip === "timeline" ? "default" : "outline"
+                    }
+                    onClick={() => {
+                      setStrip("timeline");
+                      setStripOpen(true);
+                    }}
+                    aria-pressed={effectiveStrip === "timeline"}
+                  >
+                    <Trans>Timeline</Trans>
                   </Button>
                 </ButtonGroup>
 
@@ -3217,6 +3245,31 @@ function Builder({ id }: { id: string | undefined }) {
                       onCompiledReload={reloadCompiled}
                       onScriptImport={(lua) => importUnitScript(lua)}
                       lastRun={lastScriptRun}
+                    />
+                  ) : effectiveStrip === "timeline" ? (
+                    <TimelineTab
+                      project={draft}
+                      actionId={timelineActionId}
+                      onActionChange={setTimelineActionId}
+                      onEdit={edit}
+                      playing={playing}
+                      onPlayingChange={setPlaying}
+                      scriptTimeline={scriptTimeline}
+                      onScriptTimeline={setScriptTimeline}
+                      scriptPaused={scriptPaused}
+                      onScriptPausedChange={setScriptPaused}
+                      scriptFrame={scriptFrame}
+                      onScriptFrameChange={setScriptFrame}
+                      onRunReplaced={() => {
+                        // What the Animation panel's run put beside the unit
+                        // describes a run that is no longer on screen.
+                        setLastScriptRun(null);
+                        setStandIn({ track: null, attachPieces: new Map() });
+                      }}
+                      onShowScript={() => {
+                        setStrip("script");
+                        setStripOpen(true);
+                      }}
                     />
                   ) : pack ? (
                     <InventoryGrids
@@ -3471,6 +3524,12 @@ function Builder({ id }: { id: string | undefined }) {
                     edit((project) => ({ ...project, animations }))
                   }
                   onActionsEdit={edit}
+                  timelineRun={scriptTimeline?.action !== undefined}
+                  onOpenAction={(id) => {
+                    setTimelineActionId(id);
+                    setStrip("timeline");
+                    setStripOpen(true);
+                  }}
                   onScriptTimeline={setScriptTimeline}
                   onScriptRun={setLastScriptRun}
                   pack={loaded}
