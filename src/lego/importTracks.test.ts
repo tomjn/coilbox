@@ -316,6 +316,15 @@ describe("a script that does not fit stays the unit's own", () => {
     expect(result.project.script).toBe(lua);
   });
 
+  it("still writes a blended action the same from its normalised tracks", () => {
+    const tracks = (FIXTURES.staggered.actions?.[0] as LegoAction).tracks ?? [];
+    const options = { loop: false, trigger: "Shot1", blendIn: 0.5 };
+
+    expect(written(tracked(normaliseTracks(tracks), options))).toBe(
+      written(tracked(tracks, options)),
+    );
+  });
+
   it("keeps a script of tracks on a unit that already has presets", () => {
     const project = bare(FIXTURES.staggered);
     const lua = buildLuaScript(FIXTURES.staggered);
