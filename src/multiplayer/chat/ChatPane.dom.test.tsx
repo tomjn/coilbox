@@ -77,3 +77,18 @@ it("puts the time inside the bubble, on every message", () => {
   expect(times).toHaveLength(2);
   expect(times[0].parentElement?.textContent).toBe(`one${time}`);
 });
+
+const clock = (at: number) =>
+  new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+it("puts the time after a join notice", () => {
+  draw([msg("alice", "said", "hello"), msg("bob", "join")]);
+  const line = screen.getByText("bob").parentElement?.parentElement;
+  expect(line?.textContent).toBe(`bob joined${clock(NOON)}`);
+});
+
+it("gives a folded run the times of its first and last notice", () => {
+  const later = NOON + 2 * 60_000;
+  draw([msg("a", "join"), { ...msg("b", "join"), at: later }]);
+  expect(screen.getByText(`${clock(NOON)} - ${clock(later)}`)).toBeTruthy();
+});
