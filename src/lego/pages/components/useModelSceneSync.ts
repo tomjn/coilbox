@@ -3,7 +3,7 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { showBaked } from "./bakedPlayback";
-import { applySceneScale, frameObject } from "./cameraFraming";
+import { applySceneScale, frameObject, showFourViews } from "./cameraFraming";
 import { type SceneState, syncScene } from "./sceneState";
 
 /**
@@ -22,6 +22,7 @@ export function useModelSceneSync(
   project: LegoProject,
   playing: boolean,
   reduceMotion: boolean,
+  fourViewsFirst: boolean,
 ) {
   useEffect(() => {
     const state = sceneRef.current;
@@ -41,7 +42,11 @@ export function useModelSceneSync(
     // first, geometry-less attempt. Once it succeeds, `framed` stops it ever
     // running again for this scene, so it never fights a camera the user has
     // since moved.
-    if (!state.framed && frameObject(state, state.root)) state.framed = true;
+    if (!state.framed && frameObject(state, state.root)) {
+      state.framed = true;
+      // After the frame, so the perspective view starts on the framed unit.
+      if (fourViewsFirst) showFourViews(state, true, []);
+    }
     state.render();
-  }, [sceneRef, pack, raw, project, playing, reduceMotion]);
+  }, [sceneRef, pack, raw, project, playing, reduceMotion, fourViewsFirst]);
 }

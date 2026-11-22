@@ -374,6 +374,9 @@ const AIM_DOT = 13;
 /** The script events the effects layer draws. See `effectsPlayback.ts`. */
 const EFFECT_KINDS = new Set(["nano", "flare", "shot", "sfx"]);
 
+/** A unit opens in four views, and the player can switch to one (#5392). */
+const FOUR_VIEWS_BY_DEFAULT = true;
+
 /** Where the camera starts, and where Reset view puts it back. */
 export const HOME_CAMERA: [number, number, number] = [9, 7, 11];
 
@@ -1737,6 +1740,7 @@ export function ModelViewport({
     project,
     playing || posingOn,
     reduceMotion && !posingOn,
+    FOUR_VIEWS_BY_DEFAULT,
   );
 
   useCollisionAndAimVisibility(sceneRef, {
