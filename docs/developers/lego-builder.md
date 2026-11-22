@@ -412,6 +412,29 @@ An action can ease in and out. Set a blend time on the action, or one for the un
 
 A unit that blends gives a piece two actions share to whichever started last: the other action's thread ends, and its stop no longer sends that piece home. The script keeps its own record of where each axis is, from the speed of the last call and `Spring.GetGameFrame`. It does not call `GetPieceRotation`, because the preview's script runtime has no such call. Only moves an action makes are recorded, so a blend does not start from where a preset left a piece.
 
+#### Keys per piece and axis
+
+An action holds either pose keys or tracks, never both. A track is one channel, a piece with `turn` or `move` and an axis, and its keys, each a whole frame and a value. A turn is in radians and a move in elmos, the numbers `Turn` and `Move` take. There is no easing, because the engine moves a piece at a constant speed between two calls. An action with tracks has `keys: []`. Nothing converts a pose key action on load, and a unit saved before tracks existed opens and exports as it did. The unit file's version does not change, because the field is additive. A build from before tracks reads an action with tracks as one with no keys.
+
+`actionTracks` in `src/lego/actions.ts` lowers pose keys to tracks, and `withTracks` puts the result on the action. Every channel a pose moves gets a key on each key's frame, 0 where that pose leaves it alone. A frame is the running sum of each key's seconds, each rounded to whole frames as the script rounds it. A track has one key to a frame, so a key with no seconds of its own goes one frame after the key before it, and keys with no seconds on frame 0 are one pose, the last.
+
+`planAction` turns tracks into the calls the thread makes, and it is the one place timing is decided. `emitActions` prints the plan as Lua and `bakeAction` plays it into a `ScriptTimeline`. Pose key actions go through `actionTracks` first, so there is one writer. The rules:
+
+- A channel with a segment that starts on a frame gets one call there, to its next key's value at the speed that arrives on that key's frame. A channel whose value does not change gets no call.
+- Calls on one frame are written with those that put a piece there first, then in piece order, turn before move, then x, y, z. One `Sleep` waits for the next frame that has calls.
+- A channel's first key is reached from rest starting on frame 0. A key on frame 0 is a call with no speed.
+- A looping action is as long as its last key frame over every channel. Each channel wraps from its last key to its first, arriving that many frames after its first key. The lead covers frames 0 to the length and the `while true do` body covers one lap. An action with one key frame has no lap. An action that does not loop ends after its last calls with no `Sleep`.
+- With a blend in, every channel that moves blends to its value on the first key frame over the blend time, and the lead goes on from there. A channel keyed later than that is part way along its way from rest on that frame, so it blends to where that is and goes on to its first key.
+- Signals, stop functions, the blend helpers and the start lines are as for pose keys.
+
+For an action made of poses this writes the script it always wrote, except that two keys in a row that write no calls share one `Sleep`, and a looping action that cannot loop ends with a `Sleep` as before.
+
+`bakeAction` plays the plan from rest, one frame at a time, as the engine and the Rust script runtime move a piece: at a constant speed, with a turn taking the shorter way round. The engine's step is `fmod(dest - cur + 3π, 2π) - π` (`UnitScript.cpp:142`), so a turn of more than half a circle between two keys goes the other way round, and exactly half goes the negative way (`shortestTurn`). The problems list names such a turn with its action, piece, axis and frames, and asks for a key between them. The script is still written as the engine will play it. The bake and the printed script agree on every frame to four places, which `actionTracks.test.ts` checks under luajit.
+
+`normaliseTracks` drops keys that start no change and end no change, such as a repeat of the previous value at the end of an action that does not loop. The script does not write them, so a reader cannot bring them back. It keeps a key on the first frame, which a blend uses, and for a looping action a key on the last, which sets the lap.
+
+A track whose piece was deleted stays in the document, is skipped when written and is counted in the problems list, as a pose naming a deleted piece is.
+
 ### Units that build
 
 The engine asks a builder and a factory different questions, so they get different presets.
