@@ -175,6 +175,14 @@ export interface ScriptTimeline {
   /** What the script announced, in frame order: effects, sound, and carrying
    *  the stand-in. */
   events: ScriptOutput[];
+  /** Set on a timeline that plays one action on its own, from the Timeline
+   *  tab: the action's id. Lets the tab and the Animation panel tell whose run
+   *  the viewport is playing. */
+  action?: string;
+  /** What playback does after the last frame. Absent loops from frame 0, as a
+   *  scenario's run does. `{ loopFrom }` repeats the frames from there on, and
+   *  `"hold"` stays on the last frame. */
+  end?: "hold" | { loopFrom: number };
 }
 
 /** What one call-in that answers with a piece said. */
@@ -821,12 +829,20 @@ export function scenarioById(id: string): Scenario | undefined {
  * Which frame of the timeline a moment belongs to, looping.
  *
  * A run that stopped early is looped at the length it reached, so a script that
- * threw two seconds in plays those two seconds over rather than freezing.
+ * threw two seconds in plays those two seconds over rather than freezing. A
+ * timeline with an `end` carries on from its `loopFrom`, or holds its last
+ * frame.
  */
 export function frameAt(timeline: ScriptTimeline, seconds: number): number {
   const count = timeline.frames.length;
   if (count === 0) return -1;
   const frame = Math.floor(seconds * timeline.fps);
+  const { end } = timeline;
+  if (end === "hold") return Math.min(Math.max(frame, 0), count - 1);
+  if (end && end.loopFrom > 0 && end.loopFrom < count && frame >= count) {
+    const lap = count - end.loopFrom;
+    return end.loopFrom + ((frame - end.loopFrom) % lap);
+  }
   return ((frame % count) + count) % count;
 }
 

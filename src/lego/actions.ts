@@ -27,7 +27,7 @@ import { luaString } from "./unitDef";
 import { scriptWeapons } from "./weaponModule";
 
 /** Sim frames per second, the engine's `GAME_SPEED`. */
-const FPS = 30;
+export const FPS = 30;
 
 /** Milliseconds per frame as the framework's `Sleep` counts them. See
  *  `SLEEP_FRAME_MS` in `animPresets.ts`. */
@@ -679,7 +679,8 @@ export function planAction(
  * wrote, not wrapped into one turn.
  *
  * The timeline has the unit's pieces in order and no frames when the action
- * moves none that the unit has.
+ * moves none that the unit has. It carries the action's id, and what playback
+ * does at its end: a looping action repeats its lap, a one shot action holds.
  */
 export function bakeAction(
   action: LegoAction,
@@ -697,9 +698,12 @@ export function bakeAction(
     linesRun: [],
     offsetsRun: [],
     events: [],
+    action: action.id,
   };
   const plan = planAction(action, project);
   if (!plan) return timeline;
+  // A lap goes on from where the lead ended, and a one shot action holds.
+  timeline.end = plan.looping ? { loopFrom: plan.leadFrames } : "hold";
 
   const slotOf = (call: PlanCall) =>
     project.pieces.findIndex((piece) => piece.id === call.piece) * 6 +

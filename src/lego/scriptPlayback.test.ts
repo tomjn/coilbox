@@ -434,6 +434,26 @@ describe("frameAt", () => {
   it("has no frame at all for a run that produced none", () => {
     expect(frameAt(timeline({ frames: [] }), 0)).toBe(-1);
   });
+
+  it("goes on from its loop frame rather than the first, once it has run the lead", () => {
+    // Three frames, looping the last two: 0 1 2 1 2 1 2.
+    const lap = timeline({ end: { loopFrom: 1 } });
+    expect([0, 1, 2, 3, 4, 5, 6].map((n) => frameAt(lap, n / 30))).toEqual([
+      0, 1, 2, 1, 2, 1, 2,
+    ]);
+  });
+
+  it("holds the last frame of a run that is to hold", () => {
+    const held = timeline({ end: "hold" });
+    expect([0, 1, 2, 3, 40].map((n) => frameAt(held, n / 30))).toEqual([
+      0, 1, 2, 2, 2,
+    ]);
+  });
+
+  it("loops from the first frame when the loop frame is not inside the run", () => {
+    const odd = timeline({ end: { loopFrom: 3 } });
+    expect(frameAt(odd, 3 / 30)).toBe(0);
+  });
 });
 
 describe("poseAt", () => {
