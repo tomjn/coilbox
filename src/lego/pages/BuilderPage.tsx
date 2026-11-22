@@ -321,6 +321,7 @@ import { UnitGamePicker } from "./components/UnitGamePicker";
 import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
 import { useMoreBelow } from "./components/useMoreBelow";
+import { useScrollTopOnChange } from "./components/useScrollTopOnChange";
 import { VariantMenu } from "./components/VariantMenu";
 import { openNewProject } from "./openNewProject";
 
@@ -369,6 +370,9 @@ function Builder({ id }: { id: string | undefined }) {
   } | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: clears on selection
   useEffect(() => setJoinNotice(null), [selectedId]);
+  const detailsScrollRef = useScrollTopOnChange<HTMLDivElement>(
+    selectedId ?? "",
+  );
   const shown = useMemo(
     () =>
       draft && skeletonPlan && proportionPreview
@@ -3656,7 +3660,10 @@ function Builder({ id }: { id: string | undefined }) {
                           </Button>
                         </div>
                         {detailsOpen ? (
-                          <div className="min-h-0 overflow-y-auto px-3 pb-2">
+                          <div
+                            ref={detailsScrollRef}
+                            className="min-h-0 overflow-y-auto px-3 pb-2"
+                          >
                             <label
                               className="text-xs text-muted-foreground"
                               htmlFor="lego-piece-name"
