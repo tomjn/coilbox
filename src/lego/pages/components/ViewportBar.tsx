@@ -6,36 +6,26 @@
  * that open a popover of their own come in as slots, because what they need to
  * do their job is the viewport's business, not the bar's.
  *
- * The front, side and top views are not in the bar. They open as a column
+ * The on and off overlays are in one "Show" menu, so a player reads names
+ * instead of icons. The front, side and top views are not in the bar. They open as a column
  * above the reset button when it is hovered or focused, which is where somebody
  * looking for a way to put the camera somewhere known already is.
  */
 
 import { t } from "@lingui/core/macro";
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { Button } from "@picoframe/frame";
 import {
-  Bone,
-  Crosshair,
   Cuboid,
-  Eye,
-  EyeOff,
-  Footprints,
   Keyboard,
   Layers,
+  ListChecks,
   type LucideIcon,
   PanelLeft,
   PanelTop,
-  Radar,
   RulerDimensionLine,
-  Scale,
-  Scissors,
-  Shield,
-  Sparkles,
   Square,
   SquareDashed,
-  SquaresIntersect,
-  Target,
-  Video,
 } from "lucide-react";
 import {
   type KeyboardEvent,
@@ -45,10 +35,15 @@ import {
   useState,
 } from "react";
 import * as THREE from "three";
-
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
-  GridToggle,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ViewButton,
   ViewControls,
   ViewToggle,
@@ -178,86 +173,69 @@ export function ViewportBar({
 }: ViewportBarProps) {
   const { t } = useLingui();
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
-  const skeletonKey = shortcutLabel("skeleton");
   const measureKey = shortcutLabel("measure");
+  const skeletonKey = shortcutLabel("skeleton");
+  /** The plain on and off overlays, in the order the menu lists them. A toggle
+   *  the page does not offer is left out. */
+  const items: ShowItem[] = [
+    { id: "grid", name: t`Grid`, ...grid },
+    { id: "collision", name: t`Collision volume`, ...collision },
+    ...(skeleton
+      ? [
+          {
+            id: "skeleton",
+            name: t`Skeleton`,
+            shortcut: skeletonKey,
+            ...skeleton,
+          },
+        ]
+      : []),
+    { id: "balance", name: t`Balance check`, ...balance },
+    { id: "overlap", name: t`Overlap check`, ...overlap },
+    ...(footprint
+      ? [{ id: "footprint", name: t`Footprint check`, ...footprint }]
+      : []),
+    ...(footprint?.on
+      ? [
+          {
+            id: "footprint-leave-out",
+            name: t`Leave the barrel and similar out of the footprint`,
+            on: footprint.leaveOut,
+            onChange: footprint.onLeaveOutChange,
+          },
+        ]
+      : []),
+    { id: "aim", name: t`Aim point`, ...aim },
+    ...(reach ? [{ id: "reach", name: t`Weapon ranges`, ...reach }] : []),
+    ...(guideVisibility
+      ? [{ id: "guides", name: t`Guides`, ...guideVisibility }]
+      : []),
+    ...(standIn
+      ? [{ id: "stand-in", name: t`Stand-in unit`, ...standIn }]
+      : []),
+    ...(followDrive
+      ? [
+          {
+            id: "follow-drive",
+            name: t`Follow the driving unit`,
+            ...followDrive,
+          },
+        ]
+      : []),
+    ...(effects
+      ? [{ id: "effects", name: t`Script effects`, ...effects }]
+      : []),
+  ];
   return (
     <ViewControls className="pointer-events-auto shrink-0">
       {problems}
-      <GridToggle
-        on={grid.on}
-        onChange={grid.onChange}
-        showTitle={t`Show the ground grid, marked in footprint steps and plate sizes`}
-      />
+      <ShowMenu items={items} />
       <ViewButton
         title={DRAW_MODE_TITLES[drawMode](shortcutLabel("draw-mode"))}
         onClick={onNextDrawMode}
       >
         <DrawModeFace className="size-4" />
       </ViewButton>
-      <ViewToggle
-        icon={Shield}
-        on={collision.on}
-        onChange={collision.onChange}
-        hideTitle={t`Hide the collision volume`}
-        showTitle={t`Show the collision volume, the shape the engine hits and clicks`}
-      />
-      {skeleton ? (
-        <ViewToggle
-          icon={Bone}
-          on={skeleton.on}
-          onChange={skeleton.onChange}
-          hideTitle={t`Hide the skeleton (${skeletonKey})`}
-          showTitle={t`Show the skeleton: a line from each bone to its parent, a dot on each joint and its role (${skeletonKey})`}
-        />
-      ) : null}
-      <ViewToggle
-        icon={Scale}
-        on={balance.on}
-        onChange={balance.onChange}
-        hideTitle={t`Hide the balance check`}
-        showTitle={t`Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance`}
-      />
-      <ViewToggle
-        icon={SquaresIntersect}
-        on={overlap.on}
-        onChange={overlap.onChange}
-        hideTitle={t`Hide the overlap check`}
-        showTitle={t`Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes`}
-      />
-      {footprint ? (
-        <ViewToggle
-          icon={Footprints}
-          on={footprint.on}
-          onChange={footprint.onChange}
-          hideTitle={t`Hide the footprint check`}
-          showTitle={t`Show the footprint check: the footprint the export writes, drawn on the ground under the unit`}
-        />
-      ) : null}
-      {footprint?.on ? (
-        <ViewToggle
-          icon={Scissors}
-          on={footprint.leaveOut}
-          onChange={footprint.onLeaveOutChange}
-          hideTitle={t`Count the barrel, muzzle flare, aim point and build nozzle in the base footprint`}
-          showTitle={t`Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint`}
-        />
-      ) : null}
-      <ViewToggle
-        icon={Crosshair}
-        on={aim.on}
-        onChange={aim.onChange}
-        hideTitle={t`Hide the aim point`}
-        showTitle={t`Show the aim point, the one point another unit shoots at`}
-      />
-      {reach ? (
-        <ViewToggle
-          icon={Radar}
-          on={reach.on}
-          onChange={reach.onChange}
-          hideTitle={t`Hide weapon ranges`}
-          showTitle={t`Show each weapon's stated range and firing arc`}
-        />
-      ) : null}
       <ViewToggle
         icon={RulerDimensionLine}
         on={measure.on}
@@ -267,45 +245,8 @@ export function ViewportBar({
       />
       {poses}
       {guides}
-      {guideVisibility ? (
-        <ViewToggle
-          icon={EyeOff}
-          onIcon={Eye}
-          on={guideVisibility.on}
-          onChange={guideVisibility.onChange}
-          hideTitle={t`Hide the guides`}
-          showTitle={t`Show the guides`}
-        />
-      ) : null}
       {environment}
       {reference}
-      {standIn ? (
-        <ViewToggle
-          icon={Target}
-          on={standIn.on}
-          onChange={standIn.onChange}
-          hideTitle={t`Hide the stand-in unit`}
-          showTitle={t`Show the stand-in unit, the thing a scenario aims at, builds or carries`}
-        />
-      ) : null}
-      {followDrive ? (
-        <ViewToggle
-          icon={Video}
-          on={followDrive.on}
-          onChange={followDrive.onChange}
-          hideTitle={t`Keep the camera still while the unit drives`}
-          showTitle={t`Follow the driving unit with the camera`}
-        />
-      ) : null}
-      {effects ? (
-        <ViewToggle
-          icon={Sparkles}
-          on={effects.on}
-          onChange={effects.onChange}
-          hideTitle={t`Hide script effects`}
-          showTitle={t`Show script effects, such as nano spray, from the unit's own script`}
-        />
-      ) : null}
       <ViewButton title={t`Keyboard shortcuts (?)`} onClick={onShortcuts}>
         <Keyboard className="size-4" />
       </ViewButton>
@@ -313,6 +254,42 @@ export function ViewportBar({
         <AxisCompass svgRef={compassRef} onClick={onResetView} />
       </ViewsFlyout>
     </ViewControls>
+  );
+}
+
+interface ShowItem extends Toggle {
+  id: string;
+  name: string;
+  /** The key that flips it, where it has one. */
+  shortcut?: string;
+}
+
+/** The overlays that can be switched on and off, as one labelled menu. */
+function ShowMenu({ items }: { items: ShowItem[] }) {
+  const { t } = useLingui();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" aria-label={t`Show`}>
+          <ListChecks className="size-4" />
+          <Trans>Show</Trans>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top">
+        {items.map((item) => (
+          <DropdownMenuCheckboxItem
+            key={item.id}
+            checked={item.on}
+            onCheckedChange={item.onChange}
+          >
+            {item.name}
+            {item.shortcut ? (
+              <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>
+            ) : null}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

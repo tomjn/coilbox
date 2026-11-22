@@ -151,41 +151,74 @@ function lucideName(svg: Element) {
   );
 }
 
-describe("toggles and tools", () => {
-  it("gives every toggle aria-pressed and flips it when the state changes", () => {
-    const { rerender } = render(<ViewportBar {...props(everything())} />);
-    const pressed = barButtons().filter((b) => b.hasAttribute("aria-pressed"));
-    // Grid, collision, skeleton, balance, overlap, footprint, leave out, aim,
-    // ranges, measure, guides, guide visibility, reference, stand-in, follow
-    // and effects.
-    expect(pressed).toHaveLength(16);
+/** Opens the Show menu the way a keyboard does, which Radix answers in jsdom. */
+function openShowMenu() {
+  const trigger = screen.getByRole("button", { name: "Show" });
+  fireEvent.keyDown(trigger, { key: "Enter" });
+  return screen.getByRole("menu");
+}
 
-    const before = screen.getByRole("button", {
-      name: "Show the collision volume, the shape the engine hits and clicks",
-    });
-    expect(before.getAttribute("aria-pressed")).toBe("false");
-    rerender(
-      <ViewportBar {...props({ ...everything(), collision: toggle(true) })} />,
+describe("the Show menu", () => {
+  it("lists every overlay by name with its state", () => {
+    render(<ViewportBar {...props(everything())} />);
+    const items = within(openShowMenu()).getAllByRole("menuitemcheckbox");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Grid",
+      "Collision volume",
+      "SkeletonK",
+      "Balance check",
+      "Overlap check",
+      "Footprint check",
+      "Leave the barrel and similar out of the footprint",
+      "Aim point",
+      "Weapon ranges",
+      "Guides",
+      "Stand-in unit",
+      "Follow the driving unit",
+      "Script effects",
+    ]);
+    expect(items[0].getAttribute("aria-checked")).toBe("true");
+    expect(items[1].getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("leaves out what the page does not offer", () => {
+    render(<ViewportBar {...props()} />);
+    const names = within(openShowMenu())
+      .getAllByRole("menuitemcheckbox")
+      .map((item) => item.textContent);
+    expect(names).toEqual([
+      "Grid",
+      "Collision volume",
+      "Balance check",
+      "Overlap check",
+      "Footprint check",
+      "Aim point",
+      "Guides",
+    ]);
+  });
+
+  it("calls the toggle's onChange when an item is chosen", () => {
+    const collision = toggle();
+    render(<ViewportBar {...props({ collision })} />);
+    fireEvent.click(
+      within(openShowMenu()).getByRole("menuitemcheckbox", {
+        name: "Collision volume",
+      }),
     );
-    const after = screen.getByRole("button", {
-      name: "Hide the collision volume",
-    });
-    expect(after.getAttribute("aria-pressed")).toBe("true");
+    expect(collision.onChange).toHaveBeenCalledWith(true);
   });
 
-  it("draws a toggle that is on the way the gizmo's chosen mode is drawn", () => {
-    render(<ViewportBar {...props({ collision: toggle(true) })} />);
-    const on = screen.getByRole("button", {
-      name: "Hide the collision volume",
-    });
-    const off = screen.getByRole("button", {
-      name: "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance",
-    });
-    expect(on.className).toContain("bg-primary");
-    expect(off.className).not.toContain("bg-primary");
-    expect(off.className).toContain("border");
+  it("turns an overlay that is on off", () => {
+    const grid = toggle(true);
+    render(<ViewportBar {...props({ grid })} />);
+    fireEvent.click(
+      within(openShowMenu()).getByRole("menuitemcheckbox", { name: "Grid" }),
+    );
+    expect(grid.onChange).toHaveBeenCalledWith(false);
   });
+});
 
+describe("tools in the bar", () => {
   it("shows the measure tool as on while it is on", () => {
     const { rerender } = render(<ViewportBar {...props()} />);
     const idle = screen.getByRole("button", {
@@ -242,8 +275,9 @@ describe("icons", () => {
 describe("the fixed views", () => {
   it("keeps them out of the bar, which is shorter for it", () => {
     render(<ViewportBar {...props()} />);
-    // The screenshot's bar held 17 buttons, three of them the views.
-    expect(barButtons()).toHaveLength(14);
+    // The screenshot's bar held 17 buttons, three of them the views. The
+    // overlay toggles have since moved into the Show menu.
+    expect(barButtons()).toHaveLength(8);
     expect(screen.queryByRole("button", { name: /front/ })).toBeNull();
   });
 
