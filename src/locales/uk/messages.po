@@ -14343,6 +14343,11 @@ msgstr "Викликати функцію"
 msgid "Calls a function the game already has, by name."
 msgstr "Викликає функцію, яка вже є в грі, за назвою."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera"
+msgstr "Камера"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "Camera angle"
@@ -14352,6 +14357,11 @@ msgstr "Кут камери"
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "Режим камери, прокручування біля краю та миша."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera navigation"
+msgstr "Навігація камери"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -16091,6 +16101,7 @@ msgstr "Інструменти .cob"
 msgid "Code"
 msgstr "Код"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -28525,6 +28536,11 @@ msgstr "Залишилося після перейменування {builtByNam
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "Залишилося після перейменування {projectName}. Його файли досі є в цій грі, тож гра має два юніти. Приберіть їх у панелі експорту конструктора юнітів."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Left drag"
+msgstr "Перетягування лівою"
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Left out of the start positions:"
@@ -30473,6 +30489,11 @@ msgstr ""
 #, fuzzy
 msgid "Middle"
 msgstr "Середина"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Middle drag"
+msgstr "Перетягування середньою"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -36486,6 +36507,11 @@ msgstr "Помаранчевий"
 msgid "orange dwarf"
 msgstr "помаранчевий карлик"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Orbit"
+msgstr "Орбіта"
+
 #: src/content/mapAggregate.ts
 #, fuzzy
 msgid "order"
@@ -36882,6 +36908,7 @@ msgstr "Сторінка {current} з {lastPage}"
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -41727,6 +41754,11 @@ msgstr "праворуч"
 #, fuzzy
 msgid "Right"
 msgstr "Праворуч"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Right drag"
+msgstr "Перетягування правою"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -56054,6 +56086,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "Усе, що вже встигло записатися, залишається в папці виводу."
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 #, fuzzy
 msgid "Wheel"
 msgstr "Колесо"
@@ -57942,3 +57975,8 @@ msgstr "Назва зони"
 #, fuzzy
 msgid "Zones"
 msgstr "Зони"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Zoom"
+msgstr "Масштаб"

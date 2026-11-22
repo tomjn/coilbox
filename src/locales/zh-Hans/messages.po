@@ -14343,6 +14343,11 @@ msgstr "调用函数"
 msgid "Calls a function the game already has, by name."
 msgstr "按名称调用游戏中已有的函数。"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera"
+msgstr "相机"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "Camera angle"
@@ -14352,6 +14357,11 @@ msgstr "相机角度"
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "相机模式、边缘滚动和鼠标。"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera navigation"
+msgstr "相机导航"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -16091,6 +16101,7 @@ msgstr "COB 工具"
 msgid "Code"
 msgstr "验证码"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -28525,6 +28536,11 @@ msgstr "{builtByName} 重命名后遗留下来。它的文件仍在 {gameLabel} 
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "{projectName} 重命名后遗留下来。它的文件仍在此游戏中，所以游戏中有两个单位。请在单位构建器的导出抽屉中清除它们。"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Left drag"
+msgstr "左键拖动"
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Left out of the start positions:"
@@ -30473,6 +30489,11 @@ msgstr ""
 #, fuzzy
 msgid "Middle"
 msgstr "中间"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Middle drag"
+msgstr "中键拖动"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -36486,6 +36507,11 @@ msgstr "橙色"
 msgid "orange dwarf"
 msgstr "橙矮星"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Orbit"
+msgstr "环绕"
+
 #: src/content/mapAggregate.ts
 #, fuzzy
 msgid "order"
@@ -36882,6 +36908,7 @@ msgstr "第 {current} / {lastPage} 页"
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -41727,6 +41754,11 @@ msgstr "右"
 #, fuzzy
 msgid "Right"
 msgstr "右"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Right drag"
+msgstr "右键拖动"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -56054,6 +56086,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "已经写入的内容仍在输出文件夹中。"
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 #, fuzzy
 msgid "Wheel"
 msgstr "轮子"
@@ -57942,3 +57975,8 @@ msgstr "区域名称"
 #, fuzzy
 msgid "Zones"
 msgstr "区域"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Zoom"
+msgstr "缩放"
