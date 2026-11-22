@@ -30,7 +30,7 @@ const AXIS_COLOURS = { x: "#f87171", y: "#4ade80", z: "#60a5fa" } as const;
 
 export interface AxisCompassProps {
   /** The element `paintCompass` moves the ends of. */
-  compassRef: RefObject<HTMLDivElement | null>;
+  compassRef: RefObject<HTMLFieldSetElement | null>;
   /** Which standard view the camera is in, if any. */
   view: StandardView | null;
   /** Asked for when an axis end is pressed. */
@@ -98,11 +98,10 @@ export function AxisCompass({
   };
 
   return (
-    <div
+    <fieldset
       ref={compassRef}
-      role="group"
       aria-label={t`View axes`}
-      className="pointer-events-auto relative shrink-0 rounded-full bg-background/60 backdrop-blur"
+      className="pointer-events-auto relative m-0 min-w-0 shrink-0 rounded-full border-0 bg-background/60 p-0 backdrop-blur"
       style={{ width: COMPASS_SIZE, height: COMPASS_SIZE }}
     >
       <svg
@@ -167,6 +166,6 @@ export function AxisCompass({
       >
         <span aria-hidden className="size-1.5 rounded-full bg-foreground" />
       </Button>
-    </div>
+    </fieldset>
   );
 }

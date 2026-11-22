@@ -762,7 +762,7 @@ export function ModelViewport({
   const editingVolume = editCollision || editPieceCollisionId !== null;
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
-  const compassRef = useRef<HTMLDivElement>(null);
+  const compassRef = useRef<HTMLFieldSetElement>(null);
   const reduceMotion = useReduceMotion();
   const [mode, setMode] = useState<GizmoMode>("translate");
   const [snapped, setSnapped] = useState(false);

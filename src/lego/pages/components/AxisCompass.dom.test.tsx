@@ -95,14 +95,14 @@ describe("the middle", () => {
 
 describe("paintCompass", () => {
   function painted(position: [number, number, number]) {
-    const ref = { current: null as HTMLDivElement | null };
+    const ref = { current: null as HTMLFieldSetElement | null };
     compass({ compassRef: ref });
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
     camera.position.set(...position);
     camera.up.set(0, 1, 0);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld(true);
-    paintCompass(ref.current as HTMLDivElement, camera);
+    paintCompass(ref.current as HTMLFieldSetElement, camera);
     const at = (id: string) => {
       const button = document.querySelector(
         `[data-end="${id}"]`,

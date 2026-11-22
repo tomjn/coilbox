@@ -12,7 +12,6 @@
  */
 
 import {
-  act,
   cleanup,
   fireEvent,
   render,
