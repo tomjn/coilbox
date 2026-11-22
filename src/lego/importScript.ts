@@ -9,18 +9,31 @@
  * model whose piece is `arm` fails to load. Anything else is left as written
  * and reported, for the Script tab to offer a rename.
  *
- * A simple script is read back as actions of poses (`actions.ts`), so the
- * builder can edit it. Anything else becomes the unit's own script, exactly as
- * imported apart from the case renames. Reading back is all or nothing: if any
- * part of the script is outside what {@link readActions} recognises, none of
- * it is taken apart.
+ * A simple script is read back as actions (`actions.ts`), so the builder can
+ * edit it: poses when every piece arrives as the next `Sleep` ends, tracks when
+ * pieces arrive on different frames. Anything else becomes the unit's own
+ * script, exactly as imported apart from the case renames. Reading back is all
+ * or nothing: if any part of the script is outside what {@link readActions}
+ * recognises, none of it is taken apart.
  */
 
 import { plural, t } from "@lingui/core/macro";
-import { actionHooks, STOP_CALLIN, triggerProblem } from "./actions";
+import {
+  actionHooks,
+  type PlanCall,
+  planAction,
+  STOP_CALLIN,
+  triggerProblem,
+} from "./actions";
 import { pieceNameLiterals, renameScriptPieces } from "./luaPieces";
 import { buildLuaScript } from "./luaScript";
-import type { LegoAction, LegoPiece, LegoPose, LegoProject } from "./model";
+import type {
+  LegoAction,
+  LegoActionTrack,
+  LegoPiece,
+  LegoPose,
+  LegoProject,
+} from "./model";
 import { freePoseName } from "./pose";
 
 /** Sim frames per second, and milliseconds per frame as `Sleep` counts them.
@@ -397,6 +410,222 @@ function keysOf(
   return { poses: loopPoses, seconds, loop: true };
 }
 
+// --- Reading pieces that arrive on different frames. ------------------------
+
+/** One call as the script makes it, in the terms of a plan's. */
+interface Made {
+  frame: number;
+  piece: string;
+  kind: "turn" | "move";
+  axis: number;
+  dest: number;
+  speed: number | null;
+}
+
+/** A channel's keys so far: one piece, `turn` or `move`, and an axis. */
+interface Channel {
+  piece: string;
+  kind: "turn" | "move";
+  axis: 0 | 1 | 2;
+  keys: { frame: number; value: number }[];
+}
+
+/**
+ * The whole frames a piece takes to go `distance` at `speed` a second, or null
+ * when no whole number of frames makes the builder write that speed. The
+ * builder writes the distance over the seconds to four places, so a speed that
+ * does not come out of a whole number of frames does not fit. The nearest
+ * frames are tried first, because the four places can nudge the sum across a
+ * frame.
+ */
+function framesTaken(distance: number, speed: number): number | null {
+  const exact = (distance / speed) * FPS;
+  const near = Math.round(exact);
+  return (
+    [near - 1, near, near + 1]
+      .filter((n) => n >= 1)
+      .sort((a, b) => Math.abs(a - exact) - Math.abs(b - exact))
+      .find((n) => round4(distance / (n / FPS)) === round4(speed)) ?? null
+  );
+}
+
+/**
+ * A thread's calls as keys on channels of their own, or null when it is not the
+ * motion `planAction` writes for some set of tracks. A call on frame s that goes
+ * to d at speed v makes a key on s holding the channel's value there, and a key
+ * on the frame it arrives, `s + |d - value| / v * 30` rounded to a whole frame.
+ *
+ * - A channel's first call from rest on frame 0 is its first key's arrival, as
+ *   the plan has it. A first call later has a key at rest on its frame.
+ * - A call with no speed is a key on frame 0, because a track cannot hold two
+ *   values on one frame anywhere else.
+ * - A call has to come after the channel's last one has arrived, and has to
+ *   change the channel's value.
+ * - A looping thread's lead has to be as long as its lap. The last call of each
+ *   channel in the lead goes back to its first key, arriving after the lap's
+ *   length, and that arrival is not a key of its own. A lap longer than any
+ *   channel's last key gets a key at its end that holds the value of the first
+ *   channel that ends where it began.
+ *
+ * The keys are then written again with `planAction` and the calls compared
+ * with the script's, which is what makes all of the above all or nothing.
+ */
+function tracksOf(
+  thread: Thread,
+  pieceIds: Map<string, string>,
+  project: LegoProject,
+  trigger: string,
+): LegoAction | null {
+  const channels = new Map<string, Channel>();
+  const lead: Made[] = [];
+  const lap: Made[] = [];
+
+  const place = (move: MoveCall, at: number): Made | null => {
+    const piece = pieceIds.get(move.piece);
+    if (!piece) return null;
+    return {
+      frame: at,
+      piece,
+      kind: move.kind,
+      axis: move.axis,
+      dest: round4(move.value),
+      speed: move.speed === null ? null : round4(move.speed),
+    };
+  };
+
+  const play = (segments: Segment[], into: Made[], keyed: boolean) => {
+    let at = 0;
+    for (const segment of segments) {
+      for (const move of segment.moves) {
+        const made = place(move, at);
+        if (!made) return null;
+        into.push(made);
+        if (keyed && !keyCall(channels, made)) return null;
+      }
+      if (segment.sleepMs !== null) {
+        const frames = sleepFrames(segment.sleepMs);
+        if (frames === 0) return null;
+        at += frames;
+      }
+    }
+    return at;
+  };
+
+  const leadFrames = play(thread.lead, lead, true);
+  if (leadFrames === null) return null;
+  const looping = thread.loop.length > 0;
+  const lapFrames = looping ? play(thread.loop, lap, false) : 0;
+  if (lapFrames === null || (looping && leadFrames !== lapFrames)) return null;
+  if (channels.size === 0) return null;
+
+  const order = (channel: Channel) =>
+    project.pieces.findIndex((p) => p.id === channel.piece);
+  const sorted = [...channels.values()].sort(
+    (a, b) =>
+      order(a) - order(b) ||
+      (a.kind === b.kind ? 0 : a.kind === "turn" ? -1 : 1) ||
+      a.axis - b.axis,
+  );
+  const lastOf = (channel: Channel) => channel.keys[channel.keys.length - 1];
+
+  if (looping) {
+    for (const channel of sorted) {
+      const [first] = channel.keys;
+      if (lastOf(channel).frame <= lapFrames) continue;
+      if (lastOf(channel).frame !== lapFrames + first.frame) return null;
+      if (lastOf(channel).value !== first.value) return null;
+      channel.keys.pop();
+    }
+    if (
+      Math.max(...sorted.map((channel) => lastOf(channel).frame)) < lapFrames
+    ) {
+      // The lap waits after every channel's last key. A key at its end that
+      // holds a value goes on a channel that has no wrap to move, because
+      // putting one on a channel that wraps would start that wrap later.
+      const holder = sorted.find(
+        (channel) => lastOf(channel).value === channel.keys[0].value,
+      );
+      if (!holder) return null;
+      holder.keys.push({ frame: lapFrames, value: lastOf(holder).value });
+    }
+  }
+
+  const tracks: LegoActionTrack[] = sorted.map(
+    ({ piece, kind, axis, keys }) => ({ piece, kind, axis, keys }),
+  );
+  const action: LegoAction = {
+    id: "",
+    name: "",
+    trigger,
+    loop: looping,
+    keys: [],
+    tracks,
+  };
+
+  const plan = planAction(action, { ...project, actionBlend: 0 });
+  if (!plan || plan.looping !== looping) return null;
+  if (
+    looping &&
+    (plan.leadFrames !== leadFrames || plan.lapFrames !== lapFrames)
+  ) {
+    return null;
+  }
+  if (!sameCalls(lead, plan.lead)) return null;
+  if (looping && !sameCalls(lap, plan.lap)) return null;
+  return action;
+}
+
+/** Add the keys a call makes. False when the call does not fit. */
+function keyCall(channels: Map<string, Channel>, call: Made): boolean {
+  const id = `${call.piece}:${call.kind}:${call.axis}`;
+  const channel = channels.get(id) ?? {
+    piece: call.piece,
+    kind: call.kind,
+    axis: call.axis as 0 | 1 | 2,
+    keys: [],
+  };
+  const last = channel.keys[channel.keys.length - 1];
+  const was = last?.value ?? 0;
+  if (call.dest === was) return false;
+  if (last && last.frame > call.frame) return false;
+  const { speed } = call;
+  if (speed === null) {
+    if (last || call.frame !== 0) return false;
+    channel.keys.push({ frame: 0, value: call.dest });
+  } else {
+    if (speed <= 0) return false;
+    const frames = framesTaken(Math.abs(call.dest - was), speed);
+    if (frames === null) return false;
+    if (!last && call.frame > 0)
+      channel.keys.push({ frame: call.frame, value: 0 });
+    else if (last && last.frame < call.frame) {
+      channel.keys.push({ frame: call.frame, value: was });
+    }
+    channel.keys.push({ frame: call.frame + frames, value: call.dest });
+  }
+  channels.set(id, channel);
+  return true;
+}
+
+/** Whether the script's calls are the plan's, whatever order they are in on
+ *  one frame. */
+function sameCalls(made: Made[], planned: PlanCall[]): boolean {
+  const text = (c: {
+    frame: number;
+    piece: string;
+    kind: string;
+    axis: number;
+    dest: number;
+    speed?: number | null;
+  }) =>
+    `${c.frame}|${c.piece}|${c.kind}|${c.axis}|${round4(c.dest)}|${
+      c.speed == null ? "-" : round4(c.speed)
+    }`;
+  const a = made.map(text).sort();
+  const b = planned.map(text).sort();
+  return a.length === b.length && a.every((line, at) => line === b[at]);
+}
+
 /** The script lines `actions.ts` writes to start and stop its own threads,
  *  which are not compared with the import's. */
 function isActionLine(line: string): boolean {
@@ -467,22 +696,25 @@ export function readActions(
     const trigger = triggers[0];
     if (triggerProblem(project, trigger)) return null;
     const keys = keysOf(thread);
-    if (!keys) return null;
+    const wide = keys ? null : tracksOf(thread, pieceIds, project, trigger);
+    if (!keys && !wide) return null;
+    const looping = keys?.loop ?? wide?.loop ?? false;
     const stopCallin = STOP_CALLIN[trigger] ?? `${trigger}Stop`;
     const hasStop = stopped.has(stopCallin);
     const custom = !actionHooks(project).includes(trigger);
-    if (keys.loop && (STOP_CALLIN[trigger] || custom) && !hasStop) return null;
-    if (!keys.loop && hasStop) return null;
+    if (looping && (STOP_CALLIN[trigger] || custom) && !hasStop) return null;
+    if (!looping && hasStop) return null;
 
     const name = thread.name.replace(/^action_/, "") || thread.name;
     const action: LegoAction = {
       id: newId(),
       name,
       trigger,
-      loop: keys.loop,
+      loop: looping,
       keys: [],
+      ...(wide ? { tracks: wide.tracks } : {}),
     };
-    keys.poses.forEach((state, at) => {
+    keys?.poses.forEach((state, at) => {
       const pieces: LegoPose["pieces"] = {};
       for (const [variable, values] of state) {
         const id = pieceIds.get(variable);
@@ -502,7 +734,7 @@ export function readActions(
       };
       named.poses.push(pose);
       poses.push(pose);
-      action.keys.push({ pose: pose.id, seconds: keys.seconds[at] });
+      action.keys.push({ pose: pose.id, seconds: keys?.seconds[at] ?? 0 });
     });
     actions.push(action);
   }

@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 
 import {
   type LegoAction,
+  type LegoActionTrack,
   type LegoPiece,
   type LegoProject,
   newProject,
@@ -257,5 +258,83 @@ export function poseUnits(): Record<string, LegoProject> {
       actions: [action({ loop: false, trigger: "Shot1", blendIn: 0.5 })],
     }),
     defaultBlend: unit({ actionBlend: 0.4 }),
+  };
+}
+
+export function track(
+  pieceId: string,
+  kind: "turn" | "move",
+  axis: 0 | 1 | 2,
+  keys: [number, number][],
+): LegoActionTrack {
+  return {
+    piece: pieceId,
+    kind,
+    axis,
+    keys: keys.map(([frame, value]) => ({ frame, value })),
+  };
+}
+
+/** An action of tracks. Poses are not needed, so the unit has none. */
+export function tracked(
+  tracks: LegoActionTrack[],
+  extra: Partial<LegoAction> = {},
+): LegoProject {
+  return unit({
+    poses: undefined,
+    actions: [action({ keys: [], tracks, ...extra })],
+  });
+}
+
+/** The units made of tracks that the plan and reader tests share (#5394,
+ *  #5395): channels that key at different frames, a loop whose channels start
+ *  and end on different frames, a key on frame 0 and a single key. */
+export function trackUnits(): Record<
+  "staggered" | "loopOffsets" | "frameZero" | "oneKey",
+  LegoProject
+> {
+  return {
+    staggered: tracked(
+      [
+        track("arm", "turn", 0, [
+          [10, -0.5],
+          [20, 0],
+        ]),
+        track("hatch", "move", 1, [
+          [15, 3],
+          [30, 0],
+        ]),
+      ],
+      { loop: false, trigger: "Shot1" },
+    ),
+    loopOffsets: tracked([
+      track("arm", "turn", 0, [
+        [10, 1],
+        [40, -1],
+      ]),
+      track("arm", "turn", 2, [
+        [20, 0.5],
+        [50, 0],
+      ]),
+      track("hatch", "move", 1, [
+        [5, 4],
+        [30, 0],
+      ]),
+    ]),
+    frameZero: tracked([
+      track("arm", "turn", 0, [
+        [0, 1],
+        [30, -0.5],
+        [45, 0.25],
+      ]),
+      track("hatch", "move", 1, [
+        [0, 2],
+        [45, 0],
+      ]),
+    ]),
+    oneKey: tracked([track("arm", "turn", 0, [[30, 1]])], {
+      loop: false,
+      trigger: "Shot1",
+    }),
   };
 }
