@@ -10701,6 +10701,7 @@ msgstr "Richten"
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
 msgstr "Richtpunt"
@@ -12671,6 +12672,11 @@ msgstr "slechte afb."
 #, fuzzy
 msgid "Balance"
 msgstr "Balans"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Balance check"
+msgstr "Balanscontrole"
 
 #: src/lego/balance.ts
 #, fuzzy
@@ -16871,6 +16877,11 @@ msgstr "Schadedrempel bij botsing"
 msgid "Collision size"
 msgstr "Botsingsgrootte"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Collision volume"
+msgstr "Botsingsvolume"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Collision volume axis"
@@ -18557,11 +18568,6 @@ msgstr "Kan voorinstelling niet opslaan"
 #, fuzzy
 msgid "Count"
 msgstr "Aantal"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
-msgstr "De loop, mondingsvlam, het richtpunt en het bouwmondstuk meetellen in de voetafdruk van de basis"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -23494,8 +23500,8 @@ msgstr "Systeem volgen"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
-msgid "Follow the driving unit with the camera"
-msgstr "De rijdende eenheid volgen met de camera"
+msgid "Follow the driving unit"
+msgstr "De rijdende eenheid volgen"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -23575,6 +23581,11 @@ msgstr "Voetafdruk breed"
 #, fuzzy
 msgid "Footprint and placement"
 msgstr "Voetafdruk en plaatsing"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Footprint check"
+msgstr "Voetafdrukcontrole"
 
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #, fuzzy
@@ -24855,6 +24866,11 @@ msgstr "Groen"
 msgid "Grew {step}, now {size}."
 msgstr "{step} gegroeid, nu {size}."
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Grid"
+msgstr "Raster"
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "Grid only"
@@ -24970,6 +24986,7 @@ msgstr "Bewaken"
 
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
 msgstr "Hulplijnen"
@@ -25341,11 +25358,6 @@ msgstr "Locaties verbergen die meer dan twee sprongen van je gebied liggen."
 msgid "Hide model"
 msgstr "Model verbergen"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide script effects"
-msgstr "Scripteffecten verbergen"
-
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Hide sidebar when collapsed"
@@ -25361,40 +25373,10 @@ msgstr "Model {label} verbergen"
 msgid "Hide the {unplaceable} this game cannot place at all"
 msgstr "De {unplaceable} verbergen die dit spel helemaal niet kan plaatsen"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the aim point"
-msgstr "Het richtpunt verbergen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the balance check"
-msgstr "De balanscontrole verbergen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the collision volume"
-msgstr "Het botsingsvolume verbergen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the footprint check"
-msgstr "De voetafdrukcontrole verbergen"
-
 #: src/components/ViewControls.tsx
 #, fuzzy
 msgid "Hide the ground grid"
 msgstr "Het grondraster verbergen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the guides"
-msgstr "De hulplijnen verbergen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the overlap check"
-msgstr "De overlapcontrole verbergen"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -25416,25 +25398,10 @@ msgstr "Het zijpaneel verbergen"
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Verberg de zijbalk en open hem in plaats daarvan via een menuknop."
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the skeleton ({skeletonKey})"
-msgstr "Het skelet verbergen ({skeletonKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the stand-in unit"
-msgstr "De stand-in verbergen"
-
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Hide this map"
 msgstr "Deze kaart verbergen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide weapon ranges"
-msgstr "Wapenbereik verbergen"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -27853,11 +27820,6 @@ msgstr "Opties behouden die deze voorinstelling niet instelt"
 msgid "Keep playing"
 msgstr "Verder spelen"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Keep the camera still while the unit drives"
-msgstr "De camera stil houden terwijl de eenheid rijdt"
-
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
 #, fuzzy
@@ -28519,8 +28481,8 @@ msgstr "Poseren stoppen"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
-msgid "Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
-msgstr "De loop, mondingsvlam, het richtpunt en het bouwmondstuk buiten de voetafdruk van de basis laten"
+msgid "Leave the barrel and similar out of the footprint"
+msgstr "Loop en dergelijke buiten de voetafdruk laten"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 #, fuzzy
@@ -36945,6 +36907,11 @@ msgstr "Overgeklokte reactor"
 msgid "Overlap"
 msgstr "Overlap"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Overlap check"
+msgstr "Overlapcontrole"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "overlapping another building, in red"
@@ -43042,6 +43009,11 @@ msgstr "script"
 msgid "Script"
 msgstr "Script"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Script effects"
+msgstr "Scripteffecten"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Script imported"
@@ -44780,6 +44752,7 @@ msgstr "Schoten per salvo"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ProblemsButton.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show"
 msgstr "Tonen"
@@ -44848,11 +44821,6 @@ msgstr "Bans tonen"
 #, fuzzy
 msgid "Show build orders"
 msgstr "Bouwvolgorde tonen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show each weapon's stated range and firing arc"
-msgstr "Het opgegeven bereik en de vuurboog van elk wapen tonen"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Show every lane"
@@ -44961,11 +44929,6 @@ msgstr "Het skelet tonen of verbergen"
 msgid "Show replays under a minute long"
 msgstr "Replays korter dan een minuut tonen"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show script effects, such as nano spray, from the unit's own script"
-msgstr "Scripteffecten tonen, zoals de nanostraal, uit het eigen script van de eenheid"
-
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "Show server IP"
@@ -44981,20 +44944,10 @@ msgstr "Acties van het serverteam van vóór je verbinding tonen, tenzij een mod
 msgid "Show the {label} model"
 msgstr "Het model {label} tonen"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the aim point, the one point another unit shoots at"
-msgstr "Het richtpunt tonen, het ene punt waarop een andere eenheid schiet"
-
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "De navigatieknoppen terug en vooruit in de bovenbalk tonen."
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
-msgstr "De balanscontrole tonen: waar het gewicht gecentreerd lijkt, tegenover de grond die de voeten of wielen bedekken. Een schatting uit de volumes van de delen bij één dichtheid, geen massa. De engine simuleert geen balans"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
@@ -45006,11 +44959,6 @@ msgstr "Het merkscherm tonen als Coilbox start. Klik erop of druk op Escape om h
 msgid "Show the build grid the blueprint stands on"
 msgstr "Het bouwraster tonen waarop de blauwdruk staat"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the collision volume, the shape the engine hits and clicks"
-msgstr "Het botsingsvolume tonen, de vorm die de engine raakt en aanklikt"
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -45021,30 +44969,10 @@ msgstr "Het bestand tonen dat dit zou schrijven"
 msgid "Show the file this writes"
 msgstr "Het bestand tonen dat dit schrijft"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
-msgstr "De voetafdrukcontrole tonen: de voetafdruk die de export schrijft, op de grond onder de eenheid getekend"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the ground grid, marked in footprint steps and plate sizes"
-msgstr "Het grondraster tonen, gemarkeerd in voetafdrukstappen en plaatmaten"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the guides"
-msgstr "De hulplijnen tonen"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Show the nanoframe"
 msgstr "Het nanoframe tonen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
-msgstr "De overlapcontrole tonen: omlijnt delen die helemaal in een ander deel begraven zijn, die het model nog steeds tekent en de export nog steeds schrijft"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -45065,16 +44993,6 @@ msgstr "Het script tonen"
 #, fuzzy
 msgid "Show the side panel"
 msgstr "Het zijpaneel tonen"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the skeleton: a line from each bone to its parent, a dot on each joint and its role ({skeletonKey})"
-msgstr "Het skelet tonen: een lijn van elk bot naar zijn ouder, een punt op elk gewricht en zijn rol ({skeletonKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the stand-in unit, the thing a scenario aims at, builds or carries"
-msgstr "De stand-in tonen, waarop een scenario richt, die het bouwt of draagt"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -45517,6 +45435,7 @@ msgid "Sizing the caches..."
 msgstr "De omvang van de caches bepalen..."
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #: src/lego/problems.ts
 #: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
@@ -46233,6 +46152,11 @@ msgstr "Baas laten aftreden"
 #, fuzzy
 msgid "Stand it beside the build"
 msgstr "Naast de build zetten"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Stand-in unit"
+msgstr "Vervangende eenheid"
 
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -56007,6 +55931,11 @@ msgstr "Wapen weggelaten: {line}"
 #, fuzzy
 msgid "Weapon name"
 msgstr "Naam van het wapen"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Weapon ranges"
+msgstr "Wapenbereiken"
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy

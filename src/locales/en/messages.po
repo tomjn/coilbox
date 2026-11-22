@@ -8696,6 +8696,7 @@ msgstr "Aim"
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Aim point"
 msgstr "Aim point"
 
@@ -10299,6 +10300,10 @@ msgstr "bad pic"
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 msgid "Balance"
 msgstr "Balance"
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Balance check"
+msgstr "Balance check"
 
 #: src/lego/balance.ts
 msgid "Balance not checked."
@@ -13745,6 +13750,10 @@ msgstr "Collision damage threshold"
 msgid "Collision size"
 msgstr "Collision size"
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Collision volume"
+msgstr "Collision volume"
+
 #: src/content/unitFieldNotes.ts
 msgid "Collision volume axis"
 msgstr "Collision volume axis"
@@ -15124,10 +15133,6 @@ msgstr "Couldn't save preset"
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Count"
 msgstr "Count"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
-msgstr "Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "Counted"
@@ -19152,8 +19157,8 @@ msgid "Follow system"
 msgstr "Follow system"
 
 #: src/lego/pages/components/ViewportBar.tsx
-msgid "Follow the driving unit with the camera"
-msgstr "Follow the driving unit with the camera"
+msgid "Follow the driving unit"
+msgstr "Follow the driving unit"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Followed {name} into their battle"
@@ -19218,6 +19223,10 @@ msgstr "Footprint across"
 #: src/workshop/unitSections.ts
 msgid "Footprint and placement"
 msgstr "Footprint and placement"
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Footprint check"
+msgstr "Footprint check"
 
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 msgid "Footprint deep"
@@ -20267,6 +20276,10 @@ msgstr "Green"
 msgid "Grew {step}, now {size}."
 msgstr "Grew {step}, now {size}."
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Grid"
+msgstr "Grid"
+
 #: src/lego/environment.ts
 msgid "Grid only"
 msgstr "Grid only"
@@ -20362,6 +20375,7 @@ msgstr "Guard"
 
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Guides"
 msgstr "Guides"
 
@@ -20666,10 +20680,6 @@ msgstr "Hide locations more than two jumps from your territory."
 msgid "Hide model"
 msgstr "Hide model"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide script effects"
-msgstr "Hide script effects"
-
 #: src/i18n/frameStrings.ts
 msgid "Hide sidebar when collapsed"
 msgstr "Hide sidebar when collapsed"
@@ -20682,33 +20692,9 @@ msgstr "Hide the {label} model"
 msgid "Hide the {unplaceable} this game cannot place at all"
 msgstr "Hide the {unplaceable} this game cannot place at all"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the aim point"
-msgstr "Hide the aim point"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the balance check"
-msgstr "Hide the balance check"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the collision volume"
-msgstr "Hide the collision volume"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the footprint check"
-msgstr "Hide the footprint check"
-
 #: src/components/ViewControls.tsx
 msgid "Hide the ground grid"
 msgstr "Hide the ground grid"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the guides"
-msgstr "Hide the guides"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the overlap check"
-msgstr "Hide the overlap check"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Hide the parts"
@@ -20726,21 +20712,9 @@ msgstr "Hide the side panel"
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Hide the sidebar and open it from a menu button instead."
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the skeleton ({skeletonKey})"
-msgstr "Hide the skeleton ({skeletonKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide the stand-in unit"
-msgstr "Hide the stand-in unit"
-
 #: src/content/pages/MapDetailPage.tsx
 msgid "Hide this map"
 msgstr "Hide this map"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Hide weapon ranges"
-msgstr "Hide weapon ranges"
 
 #: src/profile/health.ts
 msgid "hideSettings id ''{id}'' matches nothing"
@@ -22707,10 +22681,6 @@ msgstr "Keep options this preset does not set"
 msgid "Keep playing"
 msgstr "Keep playing"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Keep the camera still while the unit drives"
-msgstr "Keep the camera still while the unit drives"
-
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
 msgid "Keep the changes?"
@@ -23247,8 +23217,8 @@ msgid "Leave posing"
 msgstr "Leave posing"
 
 #: src/lego/pages/components/ViewportBar.tsx
-msgid "Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
-msgstr "Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
+msgid "Leave the barrel and similar out of the footprint"
+msgstr "Leave the barrel and similar out of the footprint"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Leave the depot"
@@ -30110,6 +30080,10 @@ msgstr "Overclocked Reactor"
 msgid "Overlap"
 msgstr "Overlap"
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Overlap check"
+msgstr "Overlap check"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "overlapping another building, in red"
 msgstr "overlapping another building, in red"
@@ -35093,6 +35067,10 @@ msgstr "script"
 msgid "Script"
 msgstr "Script"
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Script effects"
+msgstr "Script effects"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "Script imported"
 msgstr "Script imported"
@@ -36507,6 +36485,7 @@ msgstr "Shots per burst"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ProblemsButton.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Show"
 msgstr "Show"
 
@@ -36561,10 +36540,6 @@ msgstr "Show bans"
 #: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "Show build orders"
 msgstr "Show build orders"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show each weapon's stated range and firing arc"
-msgstr "Show each weapon's stated range and firing arc"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Show every lane"
@@ -36654,10 +36629,6 @@ msgstr "Show or hide the skeleton"
 msgid "Show replays under a minute long"
 msgstr "Show replays under a minute long"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show script effects, such as nano spray, from the unit's own script"
-msgstr "Show script effects, such as nano spray, from the unit's own script"
-
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Show server IP"
 msgstr "Show server IP"
@@ -36670,17 +36641,9 @@ msgstr "Show staff actions from before you connected, unless a moderator already
 msgid "Show the {label} model"
 msgstr "Show the {label} model"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the aim point, the one point another unit shoots at"
-msgstr "Show the aim point, the one point another unit shoots at"
-
 #: src/i18n/frameStrings.ts
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "Show the back and forward navigation buttons in the top bar."
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
-msgstr "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
@@ -36690,10 +36653,6 @@ msgstr "Show the brand splash when Coilbox launches. Click it or press Escape to
 msgid "Show the build grid the blueprint stands on"
 msgstr "Show the build grid the blueprint stands on"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the collision volume, the shape the engine hits and clicks"
-msgstr "Show the collision volume, the shape the engine hits and clicks"
-
 #: src/content/pages/components/BindingList.tsx
 msgid "Show the file this would write"
 msgstr "Show the file this would write"
@@ -36702,25 +36661,9 @@ msgstr "Show the file this would write"
 msgid "Show the file this writes"
 msgstr "Show the file this writes"
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
-msgstr "Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the ground grid, marked in footprint steps and plate sizes"
-msgstr "Show the ground grid, marked in footprint steps and plate sizes"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the guides"
-msgstr "Show the guides"
-
 #: src/content/unitFieldNotes.ts
 msgid "Show the nanoframe"
 msgstr "Show the nanoframe"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
-msgstr "Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Show the parts"
@@ -36737,14 +36680,6 @@ msgstr "Show the script"
 #: src/lego/pages/BuilderPage.tsx
 msgid "Show the side panel"
 msgstr "Show the side panel"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the skeleton: a line from each bone to its parent, a dot on each joint and its role ({skeletonKey})"
-msgstr "Show the skeleton: a line from each bone to its parent, a dot on each joint and its role ({skeletonKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Show the stand-in unit, the thing a scenario aims at, builds or carries"
-msgstr "Show the stand-in unit, the thing a scenario aims at, builds or carries"
 
 #: src/lego/shortcuts.ts
 msgid "Show this sheet"
@@ -37106,6 +37041,7 @@ msgid "Sizing the caches..."
 msgstr "Sizing the caches..."
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #: src/lego/problems.ts
 #: src/widgets/pages/CoilboxWidgets.tsx
 msgid "Skeleton"
@@ -37693,6 +37629,10 @@ msgstr "Stand boss down"
 #: src/lego/pages/components/ReferencePicker.tsx
 msgid "Stand it beside the build"
 msgstr "Stand it beside the build"
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Stand-in unit"
+msgstr "Stand-in unit"
 
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "Standalone missions: a map, a starting force and something to do. Play one on its own, without a campaign around it."
@@ -45666,6 +45606,10 @@ msgstr "Weapon left out: {line}"
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 msgid "Weapon name"
 msgstr "Weapon name"
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Weapon ranges"
+msgstr "Weapon ranges"
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "Weapon slot"

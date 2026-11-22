@@ -10630,6 +10630,7 @@ msgstr "照準"
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
 msgstr "照準点"
@@ -12591,6 +12592,11 @@ msgstr "画像不良"
 #, fuzzy
 msgid "Balance"
 msgstr "バランス"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Balance check"
+msgstr "バランスチェック"
 
 #: src/lego/balance.ts
 #, fuzzy
@@ -16755,6 +16761,11 @@ msgstr "衝突ダメージのしきい値"
 msgid "Collision size"
 msgstr "当たり判定の大きさ"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Collision volume"
+msgstr "衝突ボリューム"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Collision volume axis"
@@ -18429,11 +18440,6 @@ msgstr "プリセットを保存できませんでした"
 #, fuzzy
 msgid "Count"
 msgstr "数"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
-msgstr "砲身、マズルフラッシュ、照準点、建設ノズルをベースの占有範囲に含める"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -23340,8 +23346,8 @@ msgstr "システムに従う"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
-msgid "Follow the driving unit with the camera"
-msgstr "走行中のユニットをカメラで追う"
+msgid "Follow the driving unit"
+msgstr "走行中のユニットを追う"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -23420,6 +23426,11 @@ msgstr "占有範囲の幅"
 #, fuzzy
 msgid "Footprint and placement"
 msgstr "占有範囲と配置"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Footprint check"
+msgstr "フットプリントチェック"
 
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #, fuzzy
@@ -24695,6 +24706,11 @@ msgstr "緑"
 msgid "Grew {step}, now {size}."
 msgstr "{step} 大きくしました。現在 {size}。"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Grid"
+msgstr "グリッド"
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "Grid only"
@@ -24810,6 +24826,7 @@ msgstr "ガード"
 
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
 msgstr "ガイド"
@@ -25180,11 +25197,6 @@ msgstr "自分の領土から 2 ジャンプより遠い場所を非表示にし
 msgid "Hide model"
 msgstr "モデルを非表示"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide script effects"
-msgstr "スクリプトのエフェクトを非表示"
-
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Hide sidebar when collapsed"
@@ -25200,40 +25212,10 @@ msgstr "{label} のモデルを非表示"
 msgid "Hide the {unplaceable} this game cannot place at all"
 msgstr "このゲームでは配置できない {unplaceable} を非表示"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the aim point"
-msgstr "照準点を非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the balance check"
-msgstr "バランスチェックを非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the collision volume"
-msgstr "当たり判定を非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the footprint check"
-msgstr "占有範囲チェックを非表示"
-
 #: src/components/ViewControls.tsx
 #, fuzzy
 msgid "Hide the ground grid"
 msgstr "地面のグリッドを非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the guides"
-msgstr "ガイドを非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the overlap check"
-msgstr "重なりチェックを非表示"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -25255,25 +25237,10 @@ msgstr "サイドパネルを非表示"
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "サイドバーを隠し、代わりにメニューボタンから開きます。"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the skeleton ({skeletonKey})"
-msgstr "スケルトン（{skeletonKey}）を非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the stand-in unit"
-msgstr "代役ユニットを非表示"
-
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Hide this map"
 msgstr "このマップを非表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide weapon ranges"
-msgstr "武器の射程を非表示"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -27680,11 +27647,6 @@ msgstr "このプリセットが設定しないオプションを維持"
 msgid "Keep playing"
 msgstr "プレイを続ける"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Keep the camera still while the unit drives"
-msgstr "ユニットの走行中はカメラを固定"
-
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
 #, fuzzy
@@ -28343,8 +28305,8 @@ msgstr "ポーズ編集を終了"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
-msgid "Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
-msgstr "砲身、マズルフラッシュ、照準点、建設ノズルを基本の占有範囲から除外"
+msgid "Leave the barrel and similar out of the footprint"
+msgstr "砲身などをフットプリントから除く"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 #, fuzzy
@@ -36702,6 +36664,11 @@ msgstr "オーバークロック炉"
 msgid "Overlap"
 msgstr "重なり"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Overlap check"
+msgstr "重なりチェック"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "overlapping another building, in red"
@@ -42753,6 +42720,11 @@ msgstr "スクリプト"
 msgid "Script"
 msgstr "スクリプト"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Script effects"
+msgstr "スクリプトエフェクト"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Script imported"
@@ -44485,6 +44457,7 @@ msgstr "バーストあたりの発射数"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ProblemsButton.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show"
 msgstr "表示"
@@ -44553,11 +44526,6 @@ msgstr "BAN を表示"
 #, fuzzy
 msgid "Show build orders"
 msgstr "ビルドオーダーを表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show each weapon's stated range and firing arc"
-msgstr "各武器の設定上の射程と射角を表示"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Show every lane"
@@ -44666,11 +44634,6 @@ msgstr "スケルトンの表示を切り替え"
 msgid "Show replays under a minute long"
 msgstr "1 分未満のリプレイを表示"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show script effects, such as nano spray, from the unit's own script"
-msgstr "ナノスプレーなど、ユニット自身のスクリプトによるエフェクトを表示"
-
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "Show server IP"
@@ -44686,20 +44649,10 @@ msgstr "モデレーターがすでに <0>#moderator</0> の履歴をオンに�
 msgid "Show the {label} model"
 msgstr "{label} のモデルを表示"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the aim point, the one point another unit shoots at"
-msgstr "照準点を表示（他のユニットが狙う 1 点）"
-
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "トップバーに戻る・進むのナビゲーションボタンを表示します。"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
-msgstr "バランスチェックを表示：重心と見られる位置を、足や車輪が接する地面と比べます。ピースの体積から 1 つの密度で見積もったもので、質量ではありません。エンジンはバランスをシミュレートしません"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
@@ -44711,11 +44664,6 @@ msgstr "Coilbox の起動時にブランドのスプラッシュ画面を表示�
 msgid "Show the build grid the blueprint stands on"
 msgstr "設計図が置かれた建設グリッドを表示"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the collision volume, the shape the engine hits and clicks"
-msgstr "当たり判定を表示（エンジンが被弾とクリックに使う形状）"
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -44726,30 +44674,10 @@ msgstr "これが書き出すファイルを表示"
 msgid "Show the file this writes"
 msgstr "これが書き出すファイルを表示"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
-msgstr "占有範囲チェックを表示：エクスポートで書き出す占有範囲を、ユニットの下の地面に描きます"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the ground grid, marked in footprint steps and plate sizes"
-msgstr "地面のグリッドを表示（占有範囲の単位とプレートサイズで目盛り）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the guides"
-msgstr "ガイドを表示"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Show the nanoframe"
 msgstr "ナノフレームを表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
-msgstr "重なりチェックを表示：別のピースの中に完全に埋もれたピースを縁取ります。これらもモデルに描画され、エクスポートで書き出されます"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -44770,16 +44698,6 @@ msgstr "スクリプトを表示"
 #, fuzzy
 msgid "Show the side panel"
 msgstr "サイドパネルを表示"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the skeleton: a line from each bone to its parent, a dot on each joint and its role ({skeletonKey})"
-msgstr "スケルトンを表示：各ボーンから親への線、各関節の点とその役割（{skeletonKey}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the stand-in unit, the thing a scenario aims at, builds or carries"
-msgstr "代役ユニットを表示（シナリオで狙う、建設する、運ぶ対象）"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -45218,6 +45136,7 @@ msgid "Sizing the caches..."
 msgstr "キャッシュのサイズを計測中…"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #: src/lego/problems.ts
 #: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
@@ -45927,6 +45846,11 @@ msgstr "ボスを解任"
 #, fuzzy
 msgid "Stand it beside the build"
 msgstr "ビルドの隣に並べる"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Stand-in unit"
+msgstr "代役ユニット"
 
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -55633,6 +55557,11 @@ msgstr "除外した武器：{line}"
 #, fuzzy
 msgid "Weapon name"
 msgstr "武器名"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Weapon ranges"
+msgstr "武器の射程"
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
