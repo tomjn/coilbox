@@ -326,3 +326,41 @@ export function placeModule(
       }
     : inserted;
 }
+
+/**
+ * A module put under `parentId` at a place in the parent's axes, joined to no
+ * face and mounted by nothing: every root of it moves by `position`, keeping the
+ * spacing between roots. This is where a module dropped on the ground goes.
+ * Null for a module the unit cannot take (`liftedModuleRefusal`). A module put
+ * while the unit has loadouts goes into the loadout on screen.
+ */
+export function placeModuleAt(
+  project: LegoProject,
+  module: LegoProject,
+  parentId: string,
+  position: [number, number, number],
+  newId: () => string,
+): ReturnType<typeof insertCompound> | null {
+  if (liftedModuleRefusal(project, module)) return null;
+  const inserted = insertCompound(project, module, parentId, newId, true);
+  const roots = new Set(inserted.rootPieceIds);
+  const shifted = inserted.project.pieces.map((piece) =>
+    roots.has(piece.id)
+      ? {
+          ...piece,
+          position: [
+            piece.position[0] + position[0],
+            piece.position[1] + position[1],
+            piece.position[2] + position[2],
+          ] as [number, number, number],
+        }
+      : piece,
+  );
+  return {
+    ...inserted,
+    project: claimForLoadout(
+      { ...inserted.project, pieces: shifted },
+      inserted.rootPieceIds,
+    ),
+  };
+}

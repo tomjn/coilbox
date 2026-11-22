@@ -84,6 +84,20 @@ describe("addShape", () => {
     });
   });
 
+  it("puts the shape at a given position in the parent's axes", () => {
+    const next = addShape(
+      unit(),
+      kindOf("cone"),
+      pack(),
+      "root",
+      "new1",
+      [2, 0.5, -1],
+    );
+    expect(next?.pieces.find((p) => p.id === "new1")?.position).toEqual([
+      2, 0.5, -1,
+    ]);
+  });
+
   it("copies the size and options, so editing the piece cannot change the default", () => {
     const piece = added("tube");
     expect(piece?.shape?.size).not.toBe(kindOf("tube").size);

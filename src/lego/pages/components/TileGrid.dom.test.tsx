@@ -422,7 +422,7 @@ describe("dragging a tile", () => {
     const { container } = render(
       <TileGrid
         pack={pack}
-        sections={sections({ shapes: [cylinder] })}
+        sections={sections({ parts: [part("beam")] })}
         drag={drag}
       />,
     );
@@ -431,6 +431,66 @@ describe("dragging a tile", () => {
     fireEvent.pointerUp(window, { clientX: 60, clientY: 10 });
     expect(drag.move).not.toHaveBeenCalled();
     expect(drag.end).not.toHaveBeenCalled();
+  });
+
+  it("drags a shape, which the page decides what to do with", () => {
+    const onPick = vi.fn<(item: GridItem, alt: boolean) => void>();
+    const drag = dragger();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ shapes: [cylinder] })}
+        onPick={onPick}
+        drag={drag}
+      />,
+    );
+    const [tile] = tiles(container);
+    press(tile);
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    expect(drag.start).toHaveBeenCalledWith({ kind: "shape", shape: cylinder });
+    fireEvent.pointerUp(window, { clientX: 80, clientY: 20 });
+    expect(drag.end).toHaveBeenCalledWith(80, 20);
+    fireEvent.click(tile);
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it("drags a module, mesh-bearing or not, and releases outside as an end", () => {
+    const meshes = {
+      ...module("lifted"),
+      pieces: [{ id: "a", meshId: "mesh-1" }],
+    } as unknown as LegoProject;
+    const drag = dragger();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ modules: [meshes] })}
+        drag={drag}
+      />,
+    );
+    press(tiles(container)[0]);
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    expect(drag.start).toHaveBeenCalledWith({ kind: "module", module: meshes });
+    // The page checks where the release landed, so an off-screen release is
+    // still an end and not a cancel.
+    fireEvent.pointerUp(window, { clientX: -50, clientY: -50 });
+    expect(drag.end).toHaveBeenCalledWith(-50, -50);
+    expect(drag.cancel).not.toHaveBeenCalled();
+  });
+
+  it("cancels once, whichever of Escape or the system ends the drag first", () => {
+    const drag = dragger();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ shapes: [cylinder] })}
+        drag={drag}
+      />,
+    );
+    press(tiles(container)[0]);
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerCancel(window);
+    expect(drag.cancel).toHaveBeenCalledTimes(1);
   });
 });
 
