@@ -163,9 +163,16 @@ describe("a unit with an aim point of its own", () => {
   });
 });
 
+/** The explanations are behind the aim point's help icon (#5376). */
+function openHelp() {
+  fireEvent.click(screen.getByRole("button", { name: "About the aim point" }));
+}
+
 describe("what the panel says moves with the point", () => {
   it("names the collision sphere and the collision volume", () => {
     show(unit());
+    expect(screen.queryByText(/collision sphere is centred here/)).toBeNull();
+    openHelp();
     expect(screen.getByText(/collision sphere is centred here/)).toBeTruthy();
     expect(screen.getByText(/stays on the geometry/)).toBeTruthy();
   });
@@ -176,6 +183,7 @@ describe("what the panel says about dragging the point", () => {
    *  this panel is open, so this panel is where that has to be said. */
   it("says the handles are on the point and that they only move it", () => {
     show(unit());
+    openHelp();
     expect(screen.getByText(/handles are on the point itself/)).toBeTruthy();
     expect(screen.getByText(/Move only/)).toBeTruthy();
   });

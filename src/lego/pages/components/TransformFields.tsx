@@ -120,12 +120,15 @@ export function Vec3Row({
   unit,
   onCommit,
   action,
+  help,
 }: {
   label: string;
   values: Vec3;
   unit?: string;
   onCommit: (axis: number, value: number) => void;
   action?: React.ReactNode;
+  /** A help icon for the row, shown beside its label. */
+  help?: React.ReactNode;
 }) {
   const { t } = useLingui();
   // i18n: the row's label and the axis letter stay two placeholders, so a
@@ -134,9 +137,10 @@ export function Vec3Row({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {label}
           {unit ? ` (${unit})` : ""}
+          {help}
         </span>
         {action}
       </div>
