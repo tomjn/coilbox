@@ -70,6 +70,7 @@ function toggle(on = false) {
 function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
   return {
     grid: toggle(true),
+    snapping: toggle(true),
     drawMode: "solid",
     onNextDrawMode: vi.fn(),
     collision: toggle(),
@@ -148,6 +149,7 @@ describe("the Show menu", () => {
     const items = within(openShowMenu()).getAllByRole("menuitemcheckbox");
     expect(items.map((item) => item.textContent)).toEqual([
       "Grid",
+      "SnappingP",
       "Collision volume",
       "SkeletonK",
       "Balance check",
@@ -162,7 +164,8 @@ describe("the Show menu", () => {
       "Script effects",
     ]);
     expect(items[0].getAttribute("aria-checked")).toBe("true");
-    expect(items[1].getAttribute("aria-checked")).toBe("false");
+    expect(items[1].getAttribute("aria-checked")).toBe("true");
+    expect(items[2].getAttribute("aria-checked")).toBe("false");
   });
 
   it("leaves out what the page does not offer", () => {
@@ -172,6 +175,7 @@ describe("the Show menu", () => {
       .map((item) => item.textContent);
     expect(names).toEqual([
       "Grid",
+      "SnappingP",
       "Collision volume",
       "Balance check",
       "Overlap check",
@@ -190,6 +194,17 @@ describe("the Show menu", () => {
       }),
     );
     expect(collision.onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("calls the snapping onChange, naming its key", () => {
+    const snapping = toggle(true);
+    render(<ViewportBar {...props({ snapping })} />);
+    const item = within(openShowMenu()).getByRole("menuitemcheckbox", {
+      name: /^Snapping/,
+    });
+    expect(item.textContent).toContain("P");
+    fireEvent.click(item);
+    expect(snapping.onChange).toHaveBeenCalledWith(false);
   });
 
   it("turns an overlay that is on off", () => {

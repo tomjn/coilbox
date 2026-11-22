@@ -45384,6 +45384,11 @@ msgstr "已吸附到 {elmos} elmo，{units} 格"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "已吸附。按住 Alt 可自由放置"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "吸附"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53397,6 +53402,11 @@ msgstr "转向速度 {turnValue}，来自游戏的定义。"
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "转向速度 {turnValue}，未设置，所以使用引擎的最小值。"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "开启或关闭吸附"
 
 #: src/lego/animPresets.ts
 #, fuzzy

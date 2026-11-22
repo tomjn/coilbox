@@ -49,6 +49,8 @@ export interface ViewportBarProps {
   /** The problems button, absent when the page has no checks to list. */
   problems?: ReactNode;
   grid: Toggle;
+  /** Whether a drag snaps. Alt frees one drag whatever this says. */
+  snapping: Toggle;
   drawMode: DrawMode;
   onNextDrawMode: () => void;
   collision: Toggle;
@@ -102,6 +104,7 @@ const DRAW_MODE_TITLES: Record<DrawMode, (key: string) => string> = {
 export function ViewportBar({
   problems,
   grid,
+  snapping,
   drawMode,
   onNextDrawMode,
   collision,
@@ -130,6 +133,12 @@ export function ViewportBar({
    *  the page does not offer is left out. */
   const items: ShowItem[] = [
     { id: "grid", name: t`Grid`, ...grid },
+    {
+      id: "snapping",
+      name: t`Snapping`,
+      shortcut: shortcutLabel("snapping"),
+      ...snapping,
+    },
     { id: "collision", name: t`Collision volume`, ...collision },
     ...(skeleton
       ? [

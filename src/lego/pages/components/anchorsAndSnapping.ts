@@ -682,7 +682,8 @@ function paintProximity(
 }
 
 /**
- * Draw the selected piece's origin and its snap anchors.
+ * Draw the selected piece's origin and, when `snapPoints` is set, its snap
+ * anchors.
  *
  * The dots are a child of the piece's group, so they follow it without being
  * repositioned, and they sit in part space alongside the mesh, which is why
@@ -696,6 +697,7 @@ export function showAnchors(
   pack: LoadedPack,
   project: LegoProject,
   pieceId: string | null,
+  snapPoints = true,
 ) {
   clearAnchors(state);
   if (!pieceId) return;
@@ -709,6 +711,11 @@ export function showAnchors(
   // The origin is its own object, drawn larger. There is one of it, and it is
   // the one you go looking for.
   marks.add(points([0, 0, 0], null, state.originDot));
+  if (!snapPoints) {
+    group.add(marks);
+    state.anchors = marks;
+    return;
+  }
 
   const positions: number[] = [];
   const colours: number[] = [];

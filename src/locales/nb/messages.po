@@ -45669,6 +45669,11 @@ msgstr "Festet til {elmos} elmo, {units} rutenettenheter"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Festet. Hold Alt for å plassere fritt"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Snapping"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53741,6 +53746,11 @@ msgstr "Svinghastighet {turnValue}, fra spillets definisjon."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Svinghastighet {turnValue}, ingen satt, så motorens laveste."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Slå snapping av eller på"
 
 #: src/lego/animPresets.ts
 #, fuzzy

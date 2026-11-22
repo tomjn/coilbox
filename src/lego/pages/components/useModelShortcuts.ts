@@ -3,6 +3,7 @@ import {
   type RefObject,
   type SetStateAction,
   useEffect,
+  useRef,
 } from "react";
 import { isShortcut } from "../../shortcuts";
 import { focusSelection, showView } from "./cameraFraming";
@@ -10,6 +11,7 @@ import { type DrawMode, nextDrawMode } from "./drawMode";
 import { attachGizmo } from "./gizmoCommit";
 import type { GizmoMode } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
+import { snappingActive } from "./snapAnchorsShown";
 
 export interface ModelShortcutsDeps {
   selectedIdsRef: RefObject<string[]>;
@@ -22,6 +24,10 @@ export interface ModelShortcutsDeps {
   setDrawMode: Dispatch<SetStateAction<DrawMode>>;
   /** Flips the skeleton overlay from whatever it is showing now. */
   toggleSkeleton: () => void;
+  /** Whether snapping is switched on in the Show menu. Alt still frees a drag. */
+  snapEnabled: boolean;
+  /** Flips snapping from whatever it is now. */
+  toggleSnapping: () => void;
 }
 
 /**
@@ -43,8 +49,35 @@ export function useModelShortcuts(
     setShortcutsOpen,
     setDrawMode,
     toggleSkeleton,
+    snapEnabled,
+    toggleSnapping,
   }: ModelShortcutsDeps,
 ) {
+  const altHeld = useRef(false);
+  const enabled = useRef(snapEnabled);
+  /** Brings the scene's snapping into line with the menu and the Alt key. */
+  const applySnapping = useRef(() => {});
+  applySnapping.current = () => {
+    const state = sceneRef.current;
+    const on = snappingActive(enabled.current, altHeld.current);
+    if (!state || state.snapping === on) return;
+    state.snapping = on;
+    // A joined piece's handle shows two axes while it slides and three once
+    // snapping is off. Not mid-drag, because that would swap what is held.
+    if (state.dragging) return;
+    attachGizmo(
+      state,
+      state.projectRef.current,
+      state.selectedIdsRef.current,
+      state.placingAnchorRef.current,
+    );
+    state.render();
+  };
+  useEffect(() => {
+    enabled.current = snapEnabled;
+    applySnapping.current();
+  }, [snapEnabled]);
+
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
@@ -59,27 +92,17 @@ export function useModelShortcuts(
     };
   }, [sceneRef, setSnapped, setSnappedTo, setSteppedBy, setSlidBy]);
 
-  // Held rather than toggled: snapping is on, and letting go of it is a
-  // deliberate act for the one piece that has to sit off the grid.
+  // Alt is held rather than toggled: letting go of snapping is a deliberate act
+  // for the one piece that has to sit off the grid.
   useEffect(() => {
-    const setSnapping = (on: boolean) => {
-      const state = sceneRef.current;
-      if (!state || state.snapping === on) return;
-      state.snapping = on;
-      // A joined piece's handle shows two axes while it slides and three once
-      // Alt has freed it. Not mid-drag, because that would swap what is held.
-      if (state.dragging) return;
-      attachGizmo(
-        state,
-        state.projectRef.current,
-        state.selectedIdsRef.current,
-        state.placingAnchorRef.current,
-      );
-      state.render();
+    const setAlt = (held: boolean) => {
+      altHeld.current = held;
+      applySnapping.current();
     };
     const down = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement) return;
-      if (isShortcut("snap-hold", event)) setSnapping(false);
+      if (isShortcut("snap-hold", event)) setAlt(true);
+      if (isShortcut("snapping", event)) toggleSnapping();
       if (isShortcut("translate", event)) setMode("translate");
       if (isShortcut("rotate", event)) setMode("rotate");
       if (isShortcut("scale", event)) setMode("scale");
@@ -97,7 +120,7 @@ export function useModelShortcuts(
       if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
     };
     const up = (event: KeyboardEvent) => {
-      if (!isShortcut("snap-hold", event)) setSnapping(true);
+      if (!isShortcut("snap-hold", event)) setAlt(false);
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -112,5 +135,6 @@ export function useModelShortcuts(
     setShortcutsOpen,
     setDrawMode,
     toggleSkeleton,
+    toggleSnapping,
   ]);
 }

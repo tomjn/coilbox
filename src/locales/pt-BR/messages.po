@@ -45669,6 +45669,11 @@ msgstr "Encaixado em {elmos} elmos, {units} unidades de grade"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Encaixado. Segure Alt para posicionar livremente"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Ajuste"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53741,6 +53746,11 @@ msgstr "Taxa de giro {turnValue}, da definição do jogo."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Taxa de giro {turnValue}, nenhuma definida, então o mínimo da engine."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Ativar ou desativar o ajuste"
 
 #: src/lego/animPresets.ts
 #, fuzzy

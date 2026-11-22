@@ -186,6 +186,14 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "k", mod: false, shift: false }],
   },
   {
+    id: "snapping",
+    group: "View",
+    get description() {
+      return t`Turn snapping on or off`;
+    },
+    combos: [{ key: "p", mod: false, shift: false }],
+  },
+  {
     id: "measure",
     group: "View",
     get description() {

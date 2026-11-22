@@ -45686,6 +45686,11 @@ msgstr "Agganciato a {elmos} elmo, {units} unità di griglia"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Agganciato. Tieni premuto Alt per piazzare liberamente"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Aggancio"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53758,6 +53763,11 @@ msgstr "Velocità di rotazione {turnValue}, dalla definizione del gioco."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Velocità di rotazione {turnValue}, non impostata, quindi il minimo del motore."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Attiva o disattiva l'aggancio"
 
 #: src/lego/animPresets.ts
 #, fuzzy

@@ -45686,6 +45686,11 @@ msgstr "Uitgelijnd op {elmos} elmo, {units} rastereenheden"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Uitgelijnd. Houd Alt ingedrukt om vrij te plaatsen"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Uitlijnen"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53758,6 +53763,11 @@ msgstr "Draaisnelheid {turnValue}, uit de definitie van het spel."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Draaisnelheid {turnValue}, niet ingesteld, dus het minimum van de engine."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Uitlijnen aan- of uitzetten"
 
 #: src/lego/animPresets.ts
 #, fuzzy

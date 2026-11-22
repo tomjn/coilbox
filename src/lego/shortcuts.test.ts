@@ -81,6 +81,32 @@ describe("isShortcut", () => {
     expect(isShortcut("skeleton", key("K", { shiftKey: true }))).toBe(false);
   });
 
+  it("turns snapping on and off with P, unmodified only", () => {
+    expect(isShortcut("snapping", key("p"))).toBe(true);
+    expect(isShortcut("snapping", key("p", { metaKey: true }))).toBe(false);
+    expect(isShortcut("snapping", key("P", { shiftKey: true }))).toBe(false);
+  });
+
+  it("gives no key to more than one unmodified shortcut", () => {
+    const plain = SHORTCUTS.filter(
+      (s) => !s.matches && s.combos[0].mod !== true,
+    ).filter((s) => s.id !== "add-to-selection");
+    for (const shortcut of plain) {
+      const clashes = plain.filter(
+        (other) =>
+          other !== shortcut &&
+          other.combos.some((o) =>
+            shortcut.combos.some(
+              (c) => c.key.toLowerCase() === o.key.toLowerCase(),
+            ),
+          ),
+      );
+      // Escape is shared on purpose by what it stops, one at a time.
+      if (shortcut.combos[0].key === "Escape") continue;
+      expect(clashes.map((s) => s.id)).toEqual([]);
+    }
+  });
+
   it("measures on L, clear of Cmd L, and leaves on Escape", () => {
     expect(isShortcut("measure", key("l"))).toBe(true);
     expect(isShortcut("measure", key("l", { metaKey: true }))).toBe(false);

@@ -37247,6 +37247,10 @@ msgstr ""
 msgid "Snapped. Hold Alt to place freely"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Snapping"
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "snapshot"
 msgstr ""
@@ -43821,6 +43825,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Turn rate {turnValue}, none set, so the engine's least."
+msgstr ""
+
+#: src/lego/shortcuts.ts
+msgid "Turn snapping on or off"
 msgstr ""
 
 #: src/lego/animPresets.ts
