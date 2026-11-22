@@ -140,6 +140,22 @@ export function maxAsideWidth(available: number): number {
   return Math.max(MIN_ASIDE_WIDTH, available - KEEP_VIEW_WIDTH);
 }
 
+/**
+ * The width of a row that is really on screen, for the side panel to clamp
+ * against.
+ *
+ * A row can be laid out wider than the window when something in it refuses to
+ * shrink, and the panel sharing it then runs off the right edge. The part of
+ * the row left of the window's edge is the space the panel can actually use.
+ */
+export function visibleWidth(
+  rowWidth: number,
+  rowLeft: number,
+  windowWidth: number,
+): number {
+  return Math.max(0, Math.min(rowWidth, windowWidth - rowLeft));
+}
+
 /** The details panel's height a drag asked for, brought inside what the window
  *  can show. The tree and the details share `available`, the height of the
  *  column they sit in. */
