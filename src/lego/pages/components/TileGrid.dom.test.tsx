@@ -73,8 +73,8 @@ vi.mock("../../pack", async (importOriginal) => ({
 import {
   type GridItem,
   type GridSection,
-  TileGrid,
   type TileDrag,
+  TileGrid,
 } from "./TileGrid";
 
 const part = (id: string): LegoPartInfo =>

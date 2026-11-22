@@ -286,7 +286,6 @@ import { ProblemErrors } from "./components/ProblemErrors";
 import type { CheckStatus } from "./components/ProblemsButton";
 import { ProportionsPanel } from "./components/ProportionsPanel";
 import type { DragView, Placing } from "./components/placeByFace";
-import type { TileDrag } from "./components/TileGrid";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type {
   ModuleLabels,
@@ -302,6 +301,7 @@ import { SwapPartDrawer } from "./components/SwapPartDrawer";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
+import type { TileDrag } from "./components/TileGrid";
 import { TransformFields } from "./components/TransformFields";
 import { UnitGamePicker } from "./components/UnitGamePicker";
 import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
