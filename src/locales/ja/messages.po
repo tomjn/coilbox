@@ -5781,11 +5781,6 @@ msgstr ""
 msgid "{planLabel}, fitted to this unit's pieces"
 msgstr "{planLabel}、このユニットのピースに合わせ済み"
 
-#: src/lego/pages/components/ProportionsPanel.tsx
-#, fuzzy
-msgid "{planLabel}. Drag a handle in the view or set a number."
-msgstr "{planLabel}。ビューでハンドルをドラッグするか、数値を設定してください。"
-
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "{played} played, {decidedCount} with a recorded result."
@@ -9798,15 +9793,130 @@ msgstr "リレーまで約 {ms} ms。"
 msgid "About {section}"
 msgstr "{section} について"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About {subject}"
+msgstr "{subject} について"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About actions"
+msgstr "アクションについて"
+
+#: src/lego/pages/components/MovementSection.tsx
+#, fuzzy
+msgid "About banking"
+msgstr "バンクについて"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About calling a function"
+msgstr "関数の呼び出しについて"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About clicking on each piece"
+msgstr "各ピースのクリックについて"
+
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
 msgid "About Coilbox"
 msgstr "Coilbox について"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About empty pieces"
+msgstr "空のピースについて"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About fixing UVs and normals"
+msgstr "UV と法線の修正について"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About mirroring"
+msgstr "反転について"
+
+#: src/lego/pages/components/SetPanel.tsx
+#, fuzzy
+msgid "About moving a set"
+msgstr "セットの移動について"
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+#, fuzzy
+msgid "About one piece's box"
+msgstr "1 つのピースのボックスについて"
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+#, fuzzy
+msgid "About proportions"
+msgstr "プロポーションについて"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "About replay tracks"
 msgstr "リプレイのトラックについて"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About roles"
+msgstr "役割について"
+
+#: src/lego/pages/components/ShapeFields.tsx
+#, fuzzy
+msgid "About round shapes"
+msgstr "円形の形状について"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About shooting at each piece"
+msgstr "各ピースへの射撃について"
+
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "About the aim point"
+msgstr "照準点について"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About the collision volume"
+msgstr "当たり判定ボリュームについて"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "About the colour texture"
+msgstr "カラーテクスチャについて"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About the pivot point"
+msgstr "ピボットについて"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "About the shading map"
+msgstr "シェーディングマップについて"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About this scenario"
+msgstr "このシナリオについて"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About unit values"
+msgstr "ユニットの値について"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About using each piece"
+msgstr "各ピースの使用について"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About what it builds with"
+msgstr "建設に使うものについて"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -20547,6 +20657,11 @@ msgstr "{label} をドラッグするか Arrow キーでメニュー内を移動
 msgid "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on."
 msgstr "ドラッグして囲んだものをすべて選択し、Shift クリックで 1 つ追加、何もない地面をクリックで選択を解除します。このモード中は中ボタンドラッグで視点移動します。"
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+#, fuzzy
+msgid "Drag a handle in the view or set a number."
+msgstr "ビューでハンドルをドラッグするか、数値を設定してください。"
+
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on."
@@ -21261,6 +21376,7 @@ msgstr "絵文字"
 msgid "empty"
 msgstr "空"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
 msgid "Empty"
@@ -24433,11 +24549,6 @@ msgstr "形状"
 #, fuzzy
 msgid "Geometry piece"
 msgstr "形状のピース"
-
-#: src/lego/pages/BuilderPage.tsx
-#, fuzzy
-msgid "Geometry."
-msgstr "形状。"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #, fuzzy

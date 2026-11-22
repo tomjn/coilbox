@@ -11,7 +11,7 @@ import {
   AlignVerticalSpaceBetween,
 } from "lucide-react";
 import { type ComponentType, useState } from "react";
-
+import { HelpPopover } from "@/components/HelpPopover";
 import {
   Select,
   SelectContent,
@@ -79,14 +79,25 @@ export function SetPanel({
 
   return (
     <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
-      <p className="text-xs text-muted-foreground">
-        {/* A set is only shown for two or more pieces, so there is no singular. */}
-        <Plural
-          value={selectedCount}
-          one="# piece selected"
-          other="# pieces selected"
-        />
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-xs text-muted-foreground">
+          {/* A set is only shown for two or more pieces, so there is no singular. */}
+          <Plural
+            value={selectedCount}
+            one="# piece selected"
+            other="# pieces selected"
+          />
+        </p>
+        <HelpPopover label={t`About moving a set`}>
+          <p>
+            <Trans>
+              Moving, turning or scaling this set works on each piece about the
+              middle of the set, so it keeps its shape. A piece already carried
+              by another in the set is left to its parent.
+            </Trans>
+          </p>
+        </HelpPopover>
+      </div>
       <ul className="mt-1 flex flex-wrap gap-1">
         {selectedIds.map((pieceId) => {
           const piece = pieceById(project, pieceId);
@@ -206,14 +217,6 @@ export function SetPanel({
           ) : null}
         </div>
       ) : null}
-
-      <p className="mt-2 text-xs text-muted-foreground">
-        <Trans>
-          Moving, turning or scaling this set works on each piece about the
-          middle of the set, so it keeps its shape. A piece already carried by
-          another in the set is left to its parent.
-        </Trans>
-      </p>
     </div>
   );
 }

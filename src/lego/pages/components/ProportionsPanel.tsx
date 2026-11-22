@@ -18,6 +18,7 @@ import { t } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import { HelpPopover } from "@/components/HelpPopover";
 import {
   Popover,
   PopoverContent,
@@ -284,7 +285,7 @@ function PlanProportions({
   onRemove,
   preview,
 }: Omit<Props, "onReset">) {
-  const planLabel = plan.label;
+  const { t } = useLingui();
   const values = planProportions(plan, project.skeleton?.proportions);
   const shownValues =
     preview && preview.id in values
@@ -315,13 +316,22 @@ function PlanProportions({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-      <p className="text-xs text-muted-foreground">
-        {plan.proportions.length > 0 ? (
-          <Trans>{planLabel}. Drag a handle in the view or set a number.</Trans>
-        ) : (
-          plan.label
-        )}
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-xs text-muted-foreground">{plan.label}</p>
+        <HelpPopover label={t`About proportions`}>
+          {plan.proportions.length > 0 ? (
+            <p>
+              <Trans>Drag a handle in the view or set a number.</Trans>
+            </p>
+          ) : null}
+          <p>
+            <Trans>
+              A bone you moved by hand goes back to the plan when a proportion
+              that places it changes.
+            </Trans>
+          </p>
+        </HelpPopover>
+      </div>
       <SizeSection
         plan={plan}
         values={shownValues}
@@ -376,12 +386,6 @@ function PlanProportions({
           </div>
         </div>
       ) : null}
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          A bone you moved by hand goes back to the plan when a proportion that
-          places it changes.
-        </Trans>
-      </p>
       <RemoveSkeleton onRemove={onRemove} />
     </div>
   );

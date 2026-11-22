@@ -226,6 +226,20 @@ describe("a unit with a volume of its own", () => {
   });
 });
 
+describe("the explanations", () => {
+  it("keeps what usepiececollisionvolumes does behind its help icon", () => {
+    show(unit());
+    expect(document.body.textContent).not.toContain("usepiececollisionvolumes");
+    fireEvent.click(
+      screen.getByRole("button", { name: "About shooting at each piece" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "About shooting at each piece" })
+        .textContent,
+    ).toContain("usepiececollisionvolumes");
+  });
+});
+
 describe("what the panel warns about", () => {
   it("says a sphere ignores two of its three sizes", () => {
     show(

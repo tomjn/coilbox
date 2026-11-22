@@ -17,6 +17,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
+import { HelpPopover } from "@/components/HelpPopover";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -91,18 +92,39 @@ export function CollisionPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          The shape the engine hits, clicks and shoots at. Without one it uses a
-          sphere around the whole unit, which is a far bigger click target than
-          a long unit looks.
-        </Trans>
-      </p>
-
       <div>
-        <span className="text-xs text-muted-foreground">
-          <Trans>Shape</Trans>
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">
+            <Trans>Shape</Trans>
+          </span>
+          <HelpPopover label={t`About the collision volume`}>
+            <p>
+              <Trans>
+                The shape the engine hits, clicks and shoots at. Without one it
+                uses a sphere around the whole unit, which is a far bigger click
+                target than a long unit looks.
+              </Trans>
+            </p>
+            <p>
+              <Trans>
+                Size is the volume's full width on each axis, not its radius.
+                The offset is measured from the unit's aim point, which the Aim
+                panel sets and which most units leave on the middle of their
+                bounding box. Move the aim point and these change to keep the
+                volume where it is.
+              </Trans>
+            </p>
+            <p>
+              <Trans>
+                While this panel is open the viewport's handles are on the
+                volume rather than on a piece, so you can drag it to size
+                instead of typing. Move and scale only: a volume has no
+                rotation. Select a piece and they move onto that piece's own box
+                instead, which is the fields at the bottom.
+              </Trans>
+            </p>
+          </HelpPopover>
+        </div>
         <OptionSelect
           className="mt-1"
           size="sm"
@@ -127,25 +149,6 @@ export function CollisionPanel({
         values={volume.offsets}
         onCommit={(axis, value) => setAxis("offsets", axis, value)}
       />
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Size is the volume's full width on each axis, not its radius. The
-          offset is measured from the unit's aim point, which the Aim panel sets
-          and which most units leave on the middle of their bounding box. Move
-          the aim point and these change to keep the volume where it is.
-        </Trans>
-      </p>
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          While this panel is open the viewport's handles are on the volume
-          rather than on a piece, so you can drag it to size instead of typing.
-          Move and scale only: a volume has no rotation. Select a piece and they
-          move onto that piece's own box instead, which is the fields at the
-          bottom.
-        </Trans>
-      </p>
 
       {volume.type === "sphere" ? (
         <p className="text-xs text-muted-foreground">
@@ -187,23 +190,47 @@ export function CollisionPanel({
       )}
 
       <div className="border-t border-border/60 pt-3">
-        <p className="text-xs font-medium">
-          <Trans>Use each piece instead</Trans>
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          <Trans>
-            The engine measures a box around every piece as it loads the model,
-            and can use those boxes rather than the shape above. Shooting and
-            clicking ask for them separately, so these are two switches: a
-            walker can be shot between its legs and still be easy to click on.
-          </Trans>
-        </p>
+        <div className="flex items-center gap-1">
+          <p className="text-xs font-medium">
+            <Trans>Use each piece instead</Trans>
+          </p>
+          <HelpPopover label={t`About using each piece`}>
+            <p>
+              <Trans>
+                The engine measures a box around every piece as it loads the
+                model, and can use those boxes rather than the shape above.
+                Shooting and clicking ask for them separately, so these are two
+                switches: a walker can be shot between its legs and still be
+                easy to click on.
+              </Trans>
+            </p>
+            <p>
+              <Trans>
+                Turn a switch on and the viewport draws the boxes the engine
+                will build. A piece whose box is the wrong answer can be given
+                another one, or taken out of the hit test entirely, below.
+              </Trans>
+            </p>
+          </HelpPopover>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <Label htmlFor="piece-collision" className="text-xs font-medium">
-          <Trans>Shoot at each piece</Trans>
-        </Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor="piece-collision" className="text-xs font-medium">
+            <Trans>Shoot at each piece</Trans>
+          </Label>
+          <HelpPopover label={t`About shooting at each piece`}>
+            <p>
+              <Trans>
+                Writes <code>usepiececollisionvolumes</code>. A shot is then
+                tested against each piece's box, so one can pass between a
+                walker's legs or under a gantry rather than stopping at the
+                shape above.
+              </Trans>
+            </p>
+          </HelpPopover>
+        </div>
         <Switch
           id="piece-collision"
           checked={project.pieceCollision === true}
@@ -211,41 +238,28 @@ export function CollisionPanel({
         />
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Writes <code>usepiececollisionvolumes</code>. A shot is then tested
-          against each piece's box, so one can pass between a walker's legs or
-          under a gantry rather than stopping at the shape above.
-        </Trans>
-      </p>
-
       <div className="flex items-center justify-between gap-3">
-        <Label htmlFor="piece-selection" className="text-xs font-medium">
-          <Trans>Click on each piece</Trans>
-        </Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor="piece-selection" className="text-xs font-medium">
+            <Trans>Click on each piece</Trans>
+          </Label>
+          <HelpPopover label={t`About clicking on each piece`}>
+            <p>
+              <Trans>
+                Writes <code>usepieceselectionvolumes</code>. The click target
+                is then the pieces rather than the shape above, which is what a
+                gantry or a spindly walker wants: it is otherwise selectable
+                from the empty air it encloses.
+              </Trans>
+            </p>
+          </HelpPopover>
+        </div>
         <Switch
           id="piece-selection"
           checked={project.pieceSelection === true}
           onCheckedChange={onPieceSelectionChange}
         />
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Writes <code>usepieceselectionvolumes</code>. The click target is then
-          the pieces rather than the shape above, which is what a gantry or a
-          spindly walker wants: it is otherwise selectable from the empty air it
-          encloses.
-        </Trans>
-      </p>
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Turn a switch on and the viewport draws the boxes the engine will
-          build. A piece whose box is the wrong answer can be given another one,
-          or taken out of the hit test entirely, below.
-        </Trans>
-      </p>
 
       {project.pieceCollision || project.pieceSelection ? (
         <p className="text-xs text-muted-foreground">

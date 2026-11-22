@@ -22,6 +22,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
+import { HelpPopover } from "@/components/HelpPopover";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
   Collapsible,
@@ -184,19 +185,31 @@ export function PieceCollisionFields({
 
   return (
     <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
-      <p className="text-xs font-medium">
-        <Trans>Change one piece's box</Trans>
-      </p>
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Nothing in a model or a unit definition can set these, so coilbox
-          writes them as Lua instead. Exporting the unit puts them in a file of
-          coilbox's own next to the game's scripts, and the unit script pulls
-          that file in with one line. Nothing is written until you export, and
-          the file is rewritten every time, so it keeps up with what you set
-          here even after you have taken the script over.
-        </Trans>
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-xs font-medium">
+          <Trans>Change one piece's box</Trans>
+        </p>
+        <HelpPopover label={t`About one piece's box`}>
+          <p>
+            <Trans>
+              Nothing in a model or a unit definition can set these, so coilbox
+              writes them as Lua instead. Exporting the unit puts them in a file
+              of coilbox's own next to the game's scripts, and the unit script
+              pulls that file in with one line. Nothing is written until you
+              export, and the file is rewritten every time, so it keeps up with
+              what you set here even after you have taken the script over.
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Size is the box's full width, and the offset is measured from the
+              piece's own origin rather than from the unit's aim point, so it
+              turns and moves with the piece. No axis can be under one elmo: the
+              engine clamps them.
+            </Trans>
+          </p>
+        </HelpPopover>
+      </div>
 
       <div>
         <span className="text-xs text-muted-foreground">
@@ -268,15 +281,6 @@ export function PieceCollisionFields({
         values={volume.offsets}
         onCommit={(axis, value) => setAxis("offsets", axis, value)}
       />
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          Size is the box's full width, and the offset is measured from the
-          piece's own origin rather than from the unit's aim point, so it turns
-          and moves with the piece. No axis can be under one elmo: the engine
-          clamps them.
-        </Trans>
-      </p>
 
       {own ? (
         <Button

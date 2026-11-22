@@ -40,6 +40,7 @@ import {
   useState,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
+import { HelpPopover } from "@/components/HelpPopover";
 import { TipButton } from "@/components/TipButton";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -3527,9 +3528,20 @@ function Builder({ id }: { id: string | undefined }) {
                             ) : null}
                             {canMirror(draft, selected.id) ? (
                               <div className="mt-2">
-                                <span className="text-xs text-muted-foreground">
-                                  <Trans>Mirror</Trans>
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground">
+                                    <Trans>Mirror</Trans>
+                                  </span>
+                                  <HelpPopover label={t`About mirroring`}>
+                                    <p>
+                                      <Trans>
+                                        Across the unit's centre line, taking
+                                        everything under this piece with it. A
+                                        copy is how one leg becomes the other.
+                                      </Trans>
+                                    </p>
+                                  </HelpPopover>
+                                </div>
                                 <ButtonGroup className="mt-1 flex w-full">
                                   <Button
                                     size="sm"
@@ -3549,13 +3561,6 @@ function Builder({ id }: { id: string | undefined }) {
                                     <Copy size={14} /> <Trans>As a copy</Trans>
                                   </Button>
                                 </ButtonGroup>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  <Trans>
-                                    Across the unit's centre line, taking
-                                    everything under this piece with it. A copy
-                                    is how one leg becomes the other.
-                                  </Trans>
-                                </p>
                               </div>
                             ) : null}
 
@@ -3565,15 +3570,22 @@ function Builder({ id }: { id: string | undefined }) {
                         honest answer for it. See #2575. */}
                             {imported ? (
                               <div className="mt-2">
-                                <span className="text-xs text-muted-foreground">
-                                  <Trans>Fix UVs and normals</Trans>
-                                </span>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  <Trans>
-                                    For a model imported from somewhere else,
-                                    whose UVs or lighting arrived wrong.
-                                  </Trans>
-                                </p>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground">
+                                    <Trans>Fix UVs and normals</Trans>
+                                  </span>
+                                  <HelpPopover
+                                    label={t`About fixing UVs and normals`}
+                                  >
+                                    <p>
+                                      <Trans>
+                                        For a model imported from somewhere
+                                        else, whose UVs or lighting arrived
+                                        wrong.
+                                      </Trans>
+                                    </p>
+                                  </HelpPopover>
+                                </div>
                                 <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
                                   <span />
                                   <span className="text-center text-[10px] uppercase text-muted-foreground">
@@ -3892,9 +3904,20 @@ function Builder({ id }: { id: string | undefined }) {
 
                             {pivotBox ? (
                               <div className="mt-2">
-                                <span className="text-xs text-muted-foreground">
-                                  <Trans>Turns about</Trans>
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-muted-foreground">
+                                    <Trans>Turns about</Trans>
+                                  </span>
+                                  <HelpPopover label={t`About the pivot point`}>
+                                    <p>
+                                      <Trans>
+                                        The point this piece turns about, and
+                                        that its children hang from. A leg wants
+                                        its top, not its middle.
+                                      </Trans>
+                                    </p>
+                                  </HelpPopover>
+                                </div>
                                 <Select
                                   value={
                                     currentPivot(pivotBox, selected.pivot) ??
@@ -3926,13 +3949,6 @@ function Builder({ id }: { id: string | undefined }) {
                                     ))}
                                   </SelectContent>
                                 </Select>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  <Trans>
-                                    The point this piece turns about, and that
-                                    its children hang from. A leg wants its top,
-                                    not its middle.
-                                  </Trans>
-                                </p>
                               </div>
                             ) : null}
 
@@ -4016,9 +4032,19 @@ function Builder({ id }: { id: string | undefined }) {
                             />
 
                             <div className="mt-2">
-                              <span className="text-xs text-muted-foreground">
-                                <Trans>Role</Trans>
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground">
+                                  <Trans>Role</Trans>
+                                </span>
+                                <HelpPopover label={t`About roles`}>
+                                  <p>
+                                    <Trans>
+                                      What this piece is, so the animation
+                                      presets know what to move.
+                                    </Trans>
+                                  </p>
+                                </HelpPopover>
+                              </div>
                               <Select
                                 value={selected.role ?? NO_ROLE}
                                 onValueChange={(role) =>
@@ -4046,12 +4072,6 @@ function Builder({ id }: { id: string | undefined }) {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                <Trans>
-                                  What this piece is, so the animation presets
-                                  know what to move.
-                                </Trans>
-                              </p>
                               {restAngleWarnings(selected).map((warning) => (
                                 <p
                                   key={warning}
@@ -4062,11 +4082,16 @@ function Builder({ id }: { id: string | undefined }) {
                               ))}
                             </div>
 
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              {pieceKind(selected, raw) === "geometry"
-                                ? t`Geometry.`
-                                : t`Empty, so it carries other pieces and can be an emit point.`}
-                            </p>
+                            {pieceKind(selected, raw) === "geometry" ? null : (
+                              <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                                <span>
+                                  <Trans>Empty</Trans>
+                                </span>
+                                <HelpPopover label={t`About empty pieces`}>
+                                  <p>{t`Empty, so it carries other pieces and can be an emit point.`}</p>
+                                </HelpPopover>
+                              </div>
+                            )}
                           </div>
                         ) : null}
                       </div>

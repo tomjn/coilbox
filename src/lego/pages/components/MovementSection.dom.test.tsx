@@ -382,6 +382,7 @@ describe("MovementSection", () => {
         onMovementChange={onMovementChange}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "About banking" }));
     expect(
       screen.getByText(/engine banks aircraft, not the script/),
     ).toBeTruthy();
@@ -453,7 +454,7 @@ describe("MovementSection", () => {
         onMovementChange={vi.fn()}
       />,
     );
-    expect(screen.queryByText(/banks aircraft/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "About banking" })).toBeNull();
     expect(screen.queryByText("Banking allowed")).toBeNull();
   });
 

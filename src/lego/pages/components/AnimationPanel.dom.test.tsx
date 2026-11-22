@@ -760,7 +760,12 @@ describe("a unit driven along a path", () => {
     const onStandIn = vi.fn();
     show(driver(), { onStandIn });
     await pickDriving();
+    expect(screen.queryByText(/Ground units only, not aircraft/)).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "About this scenario" }),
+    );
     expect(screen.getByText(/Ground units only, not aircraft/)).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(
       screen.getByText(/Speed 60 elmos\/s, from Movement\. Turn rate 600/),
     ).toBeTruthy();

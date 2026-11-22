@@ -4755,10 +4755,6 @@ msgstr "{plan}, with no piece for {missing}."
 msgid "{planLabel}, fitted to this unit's pieces"
 msgstr "{planLabel}, fitted to this unit's pieces"
 
-#: src/lego/pages/components/ProportionsPanel.tsx
-msgid "{planLabel}. Drag a handle in the view or set a number."
-msgstr "{planLabel}. Drag a handle in the view or set a number."
-
 #: src/content/pages/components/MapRecords.tsx
 msgid "{played} played, {decidedCount} with a recorded result."
 msgstr "{played} played, {decidedCount} with a recorded result."
@@ -8018,13 +8014,105 @@ msgstr "About {ms} ms to the relay."
 msgid "About {section}"
 msgstr "About {section}"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "About {subject}"
+msgstr "About {subject}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "About actions"
+msgstr "About actions"
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "About banking"
+msgstr "About banking"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "About calling a function"
+msgstr "About calling a function"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+msgid "About clicking on each piece"
+msgstr "About clicking on each piece"
+
 #: src/general/pages/AboutCoilbox.tsx
 msgid "About Coilbox"
 msgstr "About Coilbox"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "About empty pieces"
+msgstr "About empty pieces"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "About fixing UVs and normals"
+msgstr "About fixing UVs and normals"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "About mirroring"
+msgstr "About mirroring"
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "About moving a set"
+msgstr "About moving a set"
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "About one piece's box"
+msgstr "About one piece's box"
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "About proportions"
+msgstr "About proportions"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "About replay tracks"
 msgstr "About replay tracks"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "About roles"
+msgstr "About roles"
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "About round shapes"
+msgstr "About round shapes"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+msgid "About shooting at each piece"
+msgstr "About shooting at each piece"
+
+#: src/lego/pages/components/AimPointPanel.tsx
+msgid "About the aim point"
+msgstr "About the aim point"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+msgid "About the collision volume"
+msgstr "About the collision volume"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "About the colour texture"
+msgstr "About the colour texture"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "About the pivot point"
+msgstr "About the pivot point"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "About the shading map"
+msgstr "About the shading map"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "About this scenario"
+msgstr "About this scenario"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "About unit values"
+msgstr "About unit values"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+msgid "About using each piece"
+msgstr "About using each piece"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "About what it builds with"
+msgstr "About what it builds with"
 
 #: src/content/unitFieldNotes.ts
 msgid "Above zero, metal this unit reclaims fills the unit instead of the team's pool. Filling it fires an event for the game's own Lua to unload it."
@@ -16867,6 +16955,10 @@ msgstr "Drag {label} to move it along the menu, or use the arrow keys. Home send
 msgid "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on."
 msgstr "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on."
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Drag a handle in the view or set a number."
+msgstr "Drag a handle in the view or set a number."
+
 #: src/scenario/pages/components/modes.tsx
 msgid "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on."
 msgstr "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on."
@@ -17453,6 +17545,7 @@ msgstr "Emoji"
 msgid "empty"
 msgstr "empty"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Empty"
 msgstr "Empty"
@@ -20054,10 +20147,6 @@ msgstr "Geometry"
 #: src/lego/pages/components/PieceTree.tsx
 msgid "Geometry piece"
 msgstr "Geometry piece"
-
-#: src/lego/pages/BuilderPage.tsx
-msgid "Geometry."
-msgstr "Geometry."
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 msgid "Get IP"

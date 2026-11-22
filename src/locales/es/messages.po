@@ -5781,11 +5781,6 @@ msgstr ""
 msgid "{planLabel}, fitted to this unit's pieces"
 msgstr "{planLabel}, ajustado a las partes de esta unidad"
 
-#: src/lego/pages/components/ProportionsPanel.tsx
-#, fuzzy
-msgid "{planLabel}. Drag a handle in the view or set a number."
-msgstr "{planLabel}. Arrastra un tirador en la vista o introduce un número."
-
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "{played} played, {decidedCount} with a recorded result."
@@ -9798,15 +9793,130 @@ msgstr "Unos {ms} ms hasta el relé."
 msgid "About {section}"
 msgstr "Acerca de {section}"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About {subject}"
+msgstr "Acerca de {subject}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About actions"
+msgstr "Acerca de las acciones"
+
+#: src/lego/pages/components/MovementSection.tsx
+#, fuzzy
+msgid "About banking"
+msgstr "Acerca del alabeo"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About calling a function"
+msgstr "Acerca de llamar a una función"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About clicking on each piece"
+msgstr "Acerca de hacer clic en cada parte"
+
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
 msgid "About Coilbox"
 msgstr "Acerca de Coilbox"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About empty pieces"
+msgstr "Acerca de las partes vacías"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About fixing UVs and normals"
+msgstr "Acerca de corregir UV y normales"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About mirroring"
+msgstr "Acerca de reflejar"
+
+#: src/lego/pages/components/SetPanel.tsx
+#, fuzzy
+msgid "About moving a set"
+msgstr "Acerca de mover un conjunto"
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+#, fuzzy
+msgid "About one piece's box"
+msgstr "Acerca de la caja de una parte"
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+#, fuzzy
+msgid "About proportions"
+msgstr "Acerca de las proporciones"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "About replay tracks"
 msgstr "Acerca de las pistas de repetición"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About roles"
+msgstr "Acerca de los papeles"
+
+#: src/lego/pages/components/ShapeFields.tsx
+#, fuzzy
+msgid "About round shapes"
+msgstr "Acerca de las formas redondas"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About shooting at each piece"
+msgstr "Acerca de disparar a cada parte"
+
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "About the aim point"
+msgstr "Acerca del punto de mira"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About the collision volume"
+msgstr "Acerca del volumen de colisión"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "About the colour texture"
+msgstr "Acerca de la textura de color"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About the pivot point"
+msgstr "Acerca del punto de pivote"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "About the shading map"
+msgstr "Acerca del mapa de sombreado"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About this scenario"
+msgstr "Acerca de este escenario"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About unit values"
+msgstr "Acerca de los valores de la unidad"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About using each piece"
+msgstr "Acerca de usar cada parte"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About what it builds with"
+msgstr "Acerca de con qué construye"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -20547,6 +20657,11 @@ msgstr "Arrastra {label} para moverlo por el menú, o usa las flechas. Home lo l
 msgid "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on."
 msgstr "Arrastra un recuadro alrededor de las cosas para seleccionarlas todas, haz Shift+clic para añadir una y haz clic en terreno vacío para soltar. Arrastrar con el botón central desplaza la vista mientras este modo está activo."
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+#, fuzzy
+msgid "Drag a handle in the view or set a number."
+msgstr "Arrastra un tirador en la vista o introduce un número."
+
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on."
@@ -21261,6 +21376,7 @@ msgstr "Emoji"
 msgid "empty"
 msgstr "vacío"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
 msgid "Empty"
@@ -24433,11 +24549,6 @@ msgstr "Geometría"
 #, fuzzy
 msgid "Geometry piece"
 msgstr "Parte con geometría"
-
-#: src/lego/pages/BuilderPage.tsx
-#, fuzzy
-msgid "Geometry."
-msgstr "Geometría."
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #, fuzzy
