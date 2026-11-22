@@ -8786,7 +8786,7 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 msgid "Aim point"
 msgstr ""
@@ -9393,7 +9393,7 @@ msgstr ""
 msgid "Analysis paused"
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Anchors"
 msgstr ""
 
@@ -14749,7 +14749,7 @@ msgstr ""
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Corners"
 msgstr ""
 
@@ -18489,7 +18489,7 @@ msgstr ""
 msgid "Extraction depth"
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Faces"
 msgstr ""
 
@@ -20503,7 +20503,7 @@ msgid "Guard"
 msgstr ""
 
 #: src/lego/pages/components/GuidesPopover.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 msgid "Guides"
 msgstr ""
@@ -30855,7 +30855,7 @@ msgstr ""
 msgid "piece {position}"
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Piece boxes"
 msgstr ""
 
@@ -44086,7 +44086,7 @@ msgstr ""
 msgid "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate."
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Turns here"
 msgstr ""
 
@@ -44480,6 +44480,10 @@ msgstr ""
 msgid "Unit destroyed, {when}"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+msgid "Unit details"
+msgstr ""
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Unit drawing"
 msgstr ""
@@ -44584,7 +44588,7 @@ msgstr ""
 msgid "Unit values"
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Unit volume"
 msgstr ""
 
@@ -45793,7 +45797,7 @@ msgstr ""
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr ""
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 msgid "Weapon {weaponNumber}"
 msgstr ""
 

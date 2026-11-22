@@ -190,10 +190,7 @@ export function ViewportBar({
       : []),
   ];
   return (
-    // In four views the bar has a quadrant to itself and wraps. Each button
-    // then keeps all four of its corners, since a wrapped row has no neighbour
-    // to join to.
-    <ViewControls className="pointer-events-auto shrink-0 group-data-[four-views]/overlay:max-w-full group-data-[four-views]/overlay:flex-wrap group-data-[four-views]/overlay:gap-1 group-data-[four-views]/overlay:self-end group-data-[four-views]/overlay:[&>*]:rounded-md! group-data-[four-views]/overlay:[&>*]:border-l!">
+    <ViewControls className="pointer-events-auto shrink-0">
       {problems}
       <ShowMenu items={items} />
       <ViewButton

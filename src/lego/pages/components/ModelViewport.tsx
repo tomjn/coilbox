@@ -18,7 +18,7 @@
 
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import {
   ArrowDownToLine,
   ClipboardPaste,
@@ -30,7 +30,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -48,7 +48,7 @@ import { useCanvas3D } from "@/lib/useCanvas3D";
 import { attachWheelRelease } from "@/lib/wheelRelease";
 import { useReduceMotion } from "../../../general/display";
 import { attachCameraNavigation } from "../../attachCameraNavigation";
-import { type BalanceResult, balanceSummary } from "../../balance";
+import type { BalanceResult } from "../../balance";
 import type { BodyPlan } from "../../bodyPlans";
 import {
   buildFrontMarker,
@@ -67,7 +67,7 @@ import {
   type GroundChoice,
   type GroundShape,
 } from "../../environment";
-import { type FootprintResult, footprintLines } from "../../footprint";
+import type { FootprintResult } from "../../footprint";
 import { addStandardLights } from "../../geometry";
 import type { PieceTransform } from "../../groupTransform";
 import {
@@ -87,12 +87,17 @@ import {
   pieceById,
 } from "../../model";
 import type { StandardView } from "../../orthoViews";
-import { type OverlapResult, overlapSummary } from "../../overlap";
+import type { OverlapResult } from "../../overlap";
 import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
 import type { PoseOffsets } from "../../pose";
 import type { Problem, ProblemSource } from "../../problems";
-import type { Quadrant } from "../../quadViews";
+import {
+  bandsFrom,
+  NO_BANDS,
+  type Quadrant,
+  type ViewBands,
+} from "../../quadViews";
 import type { RawGeometry } from "../../rawGeometry";
 import {
   buildReferenceUnit,
@@ -160,7 +165,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
-import { FourViewsButton, QuadrantFrames, ViewportOverlay } from "./FourViews";
+import { FourViewsButton, QuadrantFrames } from "./FourViews";
 import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
@@ -171,7 +176,6 @@ import {
   pieceIdOf,
   snapPoseDrag,
 } from "./gizmoCommit";
-import { GUIDE_COLOUR } from "./guideLayer";
 import { clearJoinFaces } from "./joinFaceMarks";
 import { disposeJointLimits } from "./jointLimitsLayer";
 import { DragReadout, LiveMeasureReadout } from "./MeasureReadout";
@@ -238,16 +242,18 @@ import { useProportionHandles } from "./useProportionHandles";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
+import { ViewKey } from "./ViewKey";
 import { ViewportBar } from "./ViewportBar";
 import {
   activeViewBounds,
   attachViewPicking,
   maximiseQuadrant,
   renderQuadrants,
+  setViewBands,
   sizeViews,
   ViewportOrbitControls,
 } from "./viewLayout";
-import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
+import { disposeWeaponReach } from "./weaponReachLayer";
 import { viewportHit } from "./wheelHit";
 
 export type GizmoMode = "translate" | "rotate" | "scale";
@@ -409,8 +415,11 @@ interface Props {
    * to the same box, the chrome, the tool rail and the key below it each
    * assumed the others were far away, and a short view had all three in the
    * same place.
+   *
+   * Told whether four views are on, when the chrome sits in a band along the
+   * top and has less room (#5410).
    */
-  chrome?: ReactNode;
+  chrome?: (fourViews: boolean) => ReactNode;
   /** The game unit picked as the reference figure, or null when none is. */
   onReferenceUnit?: (unit: ReferenceUnit | null) => void;
   /**
@@ -854,6 +863,16 @@ export function ModelViewport({
    *  show beside the perspective one, and null in one view. The scene holds
    *  the layout, and this follows it for the buttons and the borders. */
   const [quadrant, setQuadrant] = useState<Quadrant | null>(null);
+  const fourViews = quadrant !== null;
+  /** What the chrome takes off the canvas's edges in four views (#5410),
+   *  measured from where it is drawn so a wrapping toolbar is allowed for. */
+  const [bands, setBands] = useState<ViewBands>(NO_BANDS);
+  /** The room between the chrome along the top and the bar along the bottom,
+   *  the tool rail, and the block below the view, which the bands are
+   *  measured from. */
+  const viewsRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   // The compass is the button people press when they are lost, so it frames
   // the whole unit rather than dropping the camera on a fixed point that a
@@ -1362,6 +1381,7 @@ export function ModelViewport({
         quad: null,
         onLayoutChange: setQuadrant,
         size: { width: drawn.x, height: drawn.y },
+        bands: NO_BANDS,
         controls,
         gizmo,
         root,
@@ -1949,6 +1969,42 @@ export function ModelViewport({
     toggleFourViews,
   });
 
+  // In four views the chrome keeps bands along the top, the bottom and the
+  // left, and the views share what is left (#5410). The bands are measured
+  // from the chrome as drawn, again whenever any of it changes size, so a
+  // toolbar that wraps grows the top band and the views shrink to suit.
+  useLayoutEffect(() => {
+    if (!fourViews) return;
+    const canvas = containerRef.current;
+    const views = viewsRef.current;
+    const rail = railRef.current;
+    const bottom = bottomRef.current;
+    if (!canvas || !views || !rail || !bottom) return;
+    const measure = () => {
+      const next = bandsFrom(
+        canvas.getBoundingClientRect(),
+        views.getBoundingClientRect(),
+        rail.getBoundingClientRect(),
+      );
+      setBands((was) =>
+        was.top === next.top &&
+        was.bottom === next.bottom &&
+        was.left === next.left
+          ? was
+          : next,
+      );
+      const state = sceneRef.current;
+      if (!state) return;
+      setViewBands(state, next);
+      state.render();
+    };
+    const observer = new ResizeObserver(measure);
+    for (const element of [canvas, views, rail, bottom]) {
+      observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [fourViews]);
+
   const { t } = useLingui();
   // Re-render when a shortcut is rebound, so its tooltip keeps up.
   useShortcutOverrides();
@@ -2009,6 +2065,7 @@ export function ModelViewport({
       {quadrant && (
         <QuadrantFrames
           active={quadrant}
+          bands={bands}
           onMaximise={(id) => {
             const state = sceneRef.current;
             if (!state) return;
@@ -2026,8 +2083,8 @@ export function ModelViewport({
 
           Clicks fall through to the model except on the controls themselves,
           which take `pointer-events-auto` back one at a time. */}
-      <ViewportOverlay fourViews={quadrant !== null}>
-        {chrome}
+      <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
+        {chrome?.(fourViews)}
 
         {/* `m-auto` on the inner column rather than `justify-center` on the
             scrollport: centring a flex container that way clips content off
@@ -2039,9 +2096,16 @@ export function ModelViewport({
             `scrollbar-gutter: stable` reserves nothing for one: the spec only
             has it hold room for a classic scrollbar. Padding is what works on
             both. */}
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {/* Top right, under the unit's chrome and clear of the tool rail. */}
-          <div className="absolute top-0 right-0 z-10 flex items-start gap-2">
+        <div ref={viewsRef} className="relative flex min-h-0 flex-1 flex-col">
+          {/* Top right, under the unit's chrome and clear of the tool rail. In
+              four views, the top right of the perspective view, which starts
+              halfway down the room the bands leave. */}
+          <div
+            className={cn(
+              "absolute right-0 z-10 flex items-start gap-2",
+              fourViews ? "top-1/2 mt-2" : "top-0",
+            )}
+          >
             <FourViewsButton
               on={quadrant !== null}
               onToggle={toggleFourViews}
@@ -2057,7 +2121,10 @@ export function ModelViewport({
             />
           </div>
           <TooltipProvider delayDuration={300}>
-            <div className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2">
+            <div
+              ref={railRef}
+              className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2"
+            >
               <div className="m-auto flex flex-col gap-2">
                 <ButtonGroup orientation="vertical">
                   {MODES.map(({ id, label: modeLabel, key, Icon }) => {
@@ -2212,217 +2279,183 @@ export function ModelViewport({
           </TooltipProvider>
         </div>
 
-        {/* The key on the left, the camera and scene controls on the right,
+        {/* What sits below the view, in one block so four views can tell when
+            the bottom band changes height.
+
+            The key on the left, the camera and scene controls on the right,
             in one row. Side by side rather than each pinned to its own
             corner, so a long key runs out of room before it runs under the
             buttons. Stacked within their group, so the compass keeps the
             corner and the buttons do not push it inward. */}
-        {measure.active || measure.measurements.length > 0 ? (
-          <LiveMeasureReadout
-            store={measure.lines}
-            step={partUnit(pack)}
-            onClear={measure.clear}
-          />
-        ) : null}
-        {measure.moved ? (
-          <DragReadout
-            moved={measure.moved}
-            size={draggedSize}
-            step={partUnit(pack)}
-          />
-        ) : null}
+        <div ref={bottomRef} className="flex flex-col gap-3">
+          {measure.active || measure.measurements.length > 0 ? (
+            <LiveMeasureReadout
+              store={measure.lines}
+              step={partUnit(pack)}
+              onClear={measure.clear}
+            />
+          ) : null}
+          {measure.moved ? (
+            <DragReadout
+              moved={measure.moved}
+              size={draggedSize}
+              step={partUnit(pack)}
+            />
+          ) : null}
 
-        <div className="flex items-end justify-between gap-3 group-data-[four-views]/overlay:flex-col group-data-[four-views]/overlay:items-stretch">
-          {/* One row, wrapping only when the view is too narrow to hold it:
-              each group is a handful of words, and stacking them took a strip
-              off the model for no gain. */}
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {soleSelectedId && !playing ? (
-              <div className="flex gap-3">
-                <Dot colour="#8b5cf6" label={t`Turns here`} />
-                {/* A piece with anchors of its own offers only those, so the box's
-                key would be naming dots that are not drawn. */}
-                {ownAnchors > 0 ? (
-                  <Dot colour="#f472b6" label={t`Anchors`} />
-                ) : (
-                  <>
-                    <Dot colour="#38bdf8" label={t`Faces`} shape="face" />
-                    <Dot colour="#fbbf24" label={t`Corners`} shape="corner" />
-                  </>
-                )}
-              </div>
-            ) : null}
-            {/* Named only while the boxes are drawn, and the piece swatch only
-            while there are piece boxes to name. Two oranges with no key was
-            the thing that made a piece's box hard to place at all. */}
-            {showCollision || editingVolume ? (
-              <div className="flex gap-3">
-                <Dot colour="#f97316" label={t`Unit volume`} />
-                {project.pieceCollision ||
-                project.pieceSelection ||
-                editPieceCollisionId ? (
-                  <Dot colour="#facc15" label={t`Piece boxes`} />
-                ) : null}
-              </div>
-            ) : null}
-            {showAim || showAimPoint ? (
-              <div className="flex gap-3">
-                <Dot colour="#ef4444" label={t`Aim point`} />
-              </div>
-            ) : null}
-            {showGuides &&
-            (symmetryPlane || (project.guides ?? []).some((g) => !g.hidden)) ? (
-              <div className="flex gap-3">
-                <Dot
-                  colour={`#${GUIDE_COLOUR.toString(16)}`}
-                  label={t`Guides`}
+          <div className="flex items-end justify-between gap-3">
+            <ViewKey
+              fourViews={fourViews}
+              pieceDots={
+                soleSelectedId && !playing
+                  ? ownAnchors > 0
+                    ? "anchors"
+                    : "box"
+                  : null
+              }
+              collision={
+                showCollision || editingVolume
+                  ? {
+                      pieceBoxes: Boolean(
+                        project.pieceCollision ||
+                          project.pieceSelection ||
+                          editPieceCollisionId,
+                      ),
+                    }
+                  : null
+              }
+              aimPoint={showAim || showAimPoint}
+              guides={
+                showGuides &&
+                Boolean(
+                  symmetryPlane ||
+                    (project.guides ?? []).some((g) => !g.hidden),
+                )
+              }
+              balance={
+                balance && (showBalance || balance.status === "outside")
+                  ? balance
+                  : null
+              }
+              footprint={
+                footprint?.result &&
+                (showFootprint ||
+                  (footprint.result.status === "ok" &&
+                    (footprint.result.differs ||
+                      footprint.result.overhang.x > 0 ||
+                      footprint.result.overhang.z > 0)))
+                  ? footprint.result
+                  : null
+              }
+              overlap={overlap && showOverlap ? overlap : null}
+              reaches={showReach ? reaches : []}
+              hint={hintText()}
+            />
+
+            <ViewportBar
+              problems={
+                problems ? (
+                  <ProblemsButton
+                    problems={problems.items}
+                    statuses={problems.statuses}
+                    onSelect={(found) => {
+                      problems.onSelect(found.pieceIds);
+                      const state = sceneRef.current;
+                      if (state) focusSelection(state, found.pieceIds);
+                    }}
+                  />
+                ) : null
+              }
+              grid={{ on: showGrid, onChange: setShowGrid }}
+              snapping={{ on: snapEnabled, onChange: setSnapEnabled }}
+              drawMode={drawMode}
+              onNextDrawMode={() => setDrawMode(nextDrawMode)}
+              collision={{ on: showCollision, onChange: setShowCollision }}
+              skeleton={{ on: showSkeleton, onChange: setSkeletonChoice }}
+              balance={{ on: showBalance, onChange: setShowBalance }}
+              overlap={{ on: showOverlap, onChange: setShowOverlap }}
+              footprint={
+                footprint
+                  ? {
+                      on: showFootprint,
+                      onChange: setShowFootprint,
+                      leaveOut: footprint.leaveOut,
+                      onLeaveOutChange: footprint.onLeaveOutChange,
+                    }
+                  : undefined
+              }
+              aim={{ on: showAim, onChange: setShowAim }}
+              reach={
+                reaches.length > 0
+                  ? { on: showReach, onChange: setShowReach }
+                  : undefined
+              }
+              measure={{ on: measure.active, onChange: measure.setActive }}
+              poses={posing?.control}
+              guides={
+                guides ? (
+                  <GuidesPopover
+                    guides={project.guides ?? []}
+                    onEdit={(edit) => {
+                      // A guide added while they are hidden would be invisible.
+                      setShowGuides(true);
+                      guides.onEdit(edit);
+                    }}
+                    picking={pickingGuide}
+                    onPick={setPickingGuide}
+                    symmetryPlane={symmetryPlane}
+                  />
+                ) : null
+              }
+              guideVisibility={
+                guides && ((project.guides ?? []).length > 0 || symmetryPlane)
+                  ? { on: showGuides, onChange: setShowGuides }
+                  : undefined
+              }
+              environment={
+                <EnvironmentPicker
+                  backdrop={backdrop}
+                  onBackdrop={setBackdrop}
+                  ground={ground.choice}
+                  onGround={ground.onChange}
+                  shape={ground.shape}
+                  movement={project.movement}
                 />
-              </div>
-            ) : null}
-            {balance && (showBalance || balance.status === "outside") ? (
-              <span
-                className={
-                  balance.status === "outside" ? "text-orange-400" : undefined
-                }
-              >
-                {balanceSummary(balance)}
-              </span>
-            ) : null}
-            {footprint?.result &&
-            (showFootprint ||
-              (footprint.result.status === "ok" &&
-                (footprint.result.differs ||
-                  footprint.result.overhang.x > 0 ||
-                  footprint.result.overhang.z > 0))) ? (
-              <div className="flex flex-col">
-                {footprintLines(footprint.result).map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </div>
-            ) : null}
-            {overlap && showOverlap ? (
-              <span>{overlapSummary(overlap)}</span>
-            ) : null}
-            {showReach && reaches.length > 0 ? (
-              <div className="flex gap-3">
-                {reaches.map((reach, index) => {
-                  const weaponNumber = reach.number;
-                  return (
-                    <Dot
-                      key={reach.number}
-                      colour={reachColour(index)}
-                      label={t`Weapon ${weaponNumber}`}
-                    />
-                  );
-                })}
-              </div>
-            ) : null}
-            <span>{hintText()}</span>
+              }
+              reference={
+                <ReferencePicker
+                  unit={{ project, pack, raw }}
+                  show={showReference}
+                  onShowChange={setShowReference}
+                  onUnit={onReferenceUnit}
+                  onReference={(choice) => {
+                    setGameReference(choice);
+                    // Picking a unit and having nothing appear reads as a broken
+                    // picker, so choosing one turns the figure on.
+                    if (choice) setShowReference(true);
+                  }}
+                />
+              }
+              standIn={
+                hasStandIn
+                  ? { on: showStandIn, onChange: setShowStandIn }
+                  : undefined
+              }
+              followDrive={
+                standIn.drive
+                  ? { on: followDrive, onChange: setFollowDrive }
+                  : undefined
+              }
+              effects={
+                hasEffects
+                  ? { on: showEffects, onChange: setShowEffects }
+                  : undefined
+              }
+              onShortcuts={() => setShortcutsOpen(true)}
+            />
           </div>
-
-          <ViewportBar
-            problems={
-              problems ? (
-                <ProblemsButton
-                  problems={problems.items}
-                  statuses={problems.statuses}
-                  onSelect={(found) => {
-                    problems.onSelect(found.pieceIds);
-                    const state = sceneRef.current;
-                    if (state) focusSelection(state, found.pieceIds);
-                  }}
-                />
-              ) : null
-            }
-            grid={{ on: showGrid, onChange: setShowGrid }}
-            snapping={{ on: snapEnabled, onChange: setSnapEnabled }}
-            drawMode={drawMode}
-            onNextDrawMode={() => setDrawMode(nextDrawMode)}
-            collision={{ on: showCollision, onChange: setShowCollision }}
-            skeleton={{ on: showSkeleton, onChange: setSkeletonChoice }}
-            balance={{ on: showBalance, onChange: setShowBalance }}
-            overlap={{ on: showOverlap, onChange: setShowOverlap }}
-            footprint={
-              footprint
-                ? {
-                    on: showFootprint,
-                    onChange: setShowFootprint,
-                    leaveOut: footprint.leaveOut,
-                    onLeaveOutChange: footprint.onLeaveOutChange,
-                  }
-                : undefined
-            }
-            aim={{ on: showAim, onChange: setShowAim }}
-            reach={
-              reaches.length > 0
-                ? { on: showReach, onChange: setShowReach }
-                : undefined
-            }
-            measure={{ on: measure.active, onChange: measure.setActive }}
-            poses={posing?.control}
-            guides={
-              guides ? (
-                <GuidesPopover
-                  guides={project.guides ?? []}
-                  onEdit={(edit) => {
-                    // A guide added while they are hidden would be invisible.
-                    setShowGuides(true);
-                    guides.onEdit(edit);
-                  }}
-                  picking={pickingGuide}
-                  onPick={setPickingGuide}
-                  symmetryPlane={symmetryPlane}
-                />
-              ) : null
-            }
-            guideVisibility={
-              guides && ((project.guides ?? []).length > 0 || symmetryPlane)
-                ? { on: showGuides, onChange: setShowGuides }
-                : undefined
-            }
-            environment={
-              <EnvironmentPicker
-                backdrop={backdrop}
-                onBackdrop={setBackdrop}
-                ground={ground.choice}
-                onGround={ground.onChange}
-                shape={ground.shape}
-                movement={project.movement}
-              />
-            }
-            reference={
-              <ReferencePicker
-                unit={{ project, pack, raw }}
-                show={showReference}
-                onShowChange={setShowReference}
-                onUnit={onReferenceUnit}
-                onReference={(choice) => {
-                  setGameReference(choice);
-                  // Picking a unit and having nothing appear reads as a broken
-                  // picker, so choosing one turns the figure on.
-                  if (choice) setShowReference(true);
-                }}
-              />
-            }
-            standIn={
-              hasStandIn
-                ? { on: showStandIn, onChange: setShowStandIn }
-                : undefined
-            }
-            followDrive={
-              standIn.drive
-                ? { on: followDrive, onChange: setFollowDrive }
-                : undefined
-            }
-            effects={
-              hasEffects
-                ? { on: showEffects, onChange: setShowEffects }
-                : undefined
-            }
-            onShortcuts={() => setShortcutsOpen(true)}
-          />
         </div>
-      </ViewportOverlay>
+      </div>
 
       <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
@@ -2491,65 +2524,4 @@ function useEffectsAtlas(
     state.effects.setAtlas(atlas ?? null);
     state.render();
   }, [sceneRef, atlas, reduceMotion]);
-}
-
-/** A key to the dots drawn on the selected piece. */
-function Dot({
-  colour,
-  label,
-  shape = "dot",
-}: {
-  colour: string;
-  label: string;
-  /** What the key draws, matching what the view draws for it: a square lying
-   *  in a face, a cube on a corner, a plain dot for everything else. */
-  shape?: "dot" | "face" | "corner";
-}) {
-  return (
-    <span className="flex items-center gap-1">
-      {shape === "dot" ? (
-        <span
-          className="size-1.5 rounded-full"
-          style={{ backgroundColor: colour }}
-        />
-      ) : (
-        <Iso colour={colour} shape={shape} />
-      )}
-      {label}
-    </span>
-  );
-}
-
-/**
- * The key's own swatch for a face or a corner, drawn at the angle the view
- * shows them from.
- *
- * A flat square and a cube both come out as a circle in plan, so a key of
- * round dots says nothing about which marker it names. Shaded per face rather
- * than outlined, because an outline dark enough to read against the model is
- * invisible against the panel behind the key.
- */
-function Iso({ colour, shape }: { colour: string; shape: "face" | "corner" }) {
-  return (
-    <svg
-      viewBox="0 0 12 12"
-      className="size-3 shrink-0"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {shape === "face" ? (
-        <polygon points="6,2 11,6 6,10 1,6" fill={colour} />
-      ) : (
-        <>
-          <polygon points="6,1 11,3.5 6,6 1,3.5" fill={colour} />
-          <polygon points="1,3.5 6,6 6,11 1,8.5" fill={colour} opacity={0.75} />
-          <polygon
-            points="11,3.5 6,6 6,11 11,8.5"
-            fill={colour}
-            opacity={0.5}
-          />
-        </>
-      )}
-    </svg>
-  );
 }

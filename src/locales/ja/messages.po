@@ -10744,7 +10744,7 @@ msgstr "照準"
 
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
@@ -11490,7 +11490,7 @@ msgstr "分析と記録"
 msgid "Analysis paused"
 msgstr "分析を一時停止中"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Anchors"
 msgstr "アンカー"
@@ -17986,7 +17986,7 @@ msgstr "{name} をコピーしています…"
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
 msgstr "出力をゲームに上書きコピーするだけでは足りません。<2>objectname</2> に拡張子のないユニットについて、エンジンは <1>.s3o</1> より先に <0>.3do</0> を試すため、両方がある間は古いモデルを読み込み続けます。元の <3>.3do</3> ファイルを削除し、<5>objectname</5> に <4>.3do</4> と書いているユニット定義からもそれを取り除く必要があります。"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Corners"
 msgstr "角"
@@ -22528,7 +22528,7 @@ msgstr "展開しています…"
 msgid "Extraction depth"
 msgstr "採掘の深さ"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Faces"
 msgstr "面"
@@ -24986,7 +24986,7 @@ msgid "Guard"
 msgstr "ガード"
 
 #: src/lego/pages/components/GuidesPopover.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
@@ -37616,7 +37616,7 @@ msgstr "ピース"
 msgid "piece {position}"
 msgstr "ピース {position}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Piece boxes"
 msgstr "ピースのボックス"
@@ -53724,7 +53724,7 @@ msgstr "独立した砲塔と砲身を持たないユニット用に、1 つの�
 msgid "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate."
 msgstr "すべての車輪を、ユニットの速度を車輪の半径で割った速さで回転させ、後退時は逆回転させます。測る円形のない車輪は一定の速さで回転します。"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Turns here"
 msgstr "ここで回転"
@@ -54202,6 +54202,11 @@ msgstr "ユニット定義：{defsError}"
 msgid "Unit destroyed, {when}"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Unit details"
+msgstr "ユニットの詳細"
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Unit drawing"
 msgstr ""
@@ -54326,7 +54331,7 @@ msgstr "ユニットタイプ"
 msgid "Unit values"
 msgstr "ユニットの値"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Unit volume"
 msgstr "ユニットの範囲"
@@ -55787,7 +55792,7 @@ msgstr "武器 {slotNumber} がコピーを発射します"
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr "武器 {slotNumber}、{slotName}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Weapon {weaponNumber}"
 msgstr "武器 {weaponNumber}"

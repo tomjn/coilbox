@@ -40,60 +40,68 @@ export interface ViewRect {
 }
 
 /**
- * Where each quadrant sits on a canvas `width` by `height` CSS pixels. The
- * four tile the canvas with no gap and no overlap. An odd size gives the extra
- * pixel to the right column and the bottom row.
+ * The room the unit's chrome keeps along three edges of the canvas in the four
+ * view layout (#5410), in CSS pixels: the toolbar and the unit card along the
+ * top, the bottom bar along the bottom and the tool rail down the left. The
+ * views share what is left, as they do in 3ds Max and Blender, so no control
+ * sits over a view.
+ */
+export interface ViewBands {
+  top: number;
+  bottom: number;
+  left: number;
+}
+
+export const NO_BANDS: ViewBands = { top: 0, bottom: 0, left: 0 };
+
+/**
+ * Where each quadrant sits on a canvas `width` by `height` CSS pixels, once
+ * `bands` are taken off its edges. The four tile what is left with no gap and
+ * no overlap. An odd size gives the extra pixel to the right column and the
+ * bottom row. Bands too big for the canvas leave the views no room rather than
+ * a negative size.
  */
 export function quadrantRects(
   width: number,
   height: number,
+  bands: ViewBands = NO_BANDS,
 ): Record<Quadrant, ViewRect> {
-  const left = Math.floor(width / 2);
-  const upper = Math.floor(height / 2);
-  const right = width - left;
-  const lower = height - upper;
+  const x = Math.min(bands.left, width);
+  const y = Math.min(bands.top, height);
+  const areaWidth = width - x;
+  const areaHeight = Math.max(0, height - y - bands.bottom);
+  const left = Math.floor(areaWidth / 2);
+  const upper = Math.floor(areaHeight / 2);
+  const right = areaWidth - left;
+  const lower = areaHeight - upper;
   return {
-    top: { x: 0, y: 0, width: left, height: upper },
-    front: { x: left, y: 0, width: right, height: upper },
-    side: { x: 0, y: upper, width: left, height: lower },
-    perspective: { x: left, y: upper, width: right, height: lower },
+    top: { x, y, width: left, height: upper },
+    front: { x: x + left, y, width: right, height: upper },
+    side: { x, y: y + upper, width: left, height: lower },
+    perspective: { x: x + left, y: y + upper, width: right, height: lower },
   };
 }
 
-/** How far the unit's overlays sit from each edge of the canvas. */
-export interface OverlayInset {
-  top: string;
-  right: string;
-  bottom: string;
-  left: string;
+/** The part of a box on the page that `bandsFrom` reads. */
+interface Edges {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
-/** The room kept round the overlays. */
-const OVERLAY_GAP = "0.75rem";
-/** The height of a quadrant's name, which the overlays leave clear. */
-const NAME_ROW = "1rem";
-
 /**
- * Where the unit's overlays (the info card, the toolbar, the tool rail, the
- * status text, the grid button, the compass and the bottom bar) are drawn. All
- * of the canvas with one view. With four, the perspective quadrant only, which
- * is its bottom right half in each direction, so the top, front and side views
- * stay uncovered. Below the quadrant's name, which stays where it is.
+ * The bands the chrome takes, measured from where it is drawn: `canvas` is the
+ * canvas, `views` the room the chrome leaves between the top and the bottom
+ * band, and `rail` the tool rail on its left. All three are measured on the
+ * page, as `getBoundingClientRect` gives them. Rounded to whole pixels, since
+ * a view is drawn into whole pixels.
  */
-export function overlayInset(fourViews: boolean): OverlayInset {
-  if (!fourViews) {
-    return {
-      top: OVERLAY_GAP,
-      right: OVERLAY_GAP,
-      bottom: OVERLAY_GAP,
-      left: OVERLAY_GAP,
-    };
-  }
+export function bandsFrom(canvas: Edges, views: Edges, rail: Edges): ViewBands {
   return {
-    top: `calc(50% + ${NAME_ROW} + ${OVERLAY_GAP})`,
-    right: OVERLAY_GAP,
-    bottom: OVERLAY_GAP,
-    left: `calc(50% + ${OVERLAY_GAP})`,
+    top: Math.max(0, Math.round(views.top - canvas.top)),
+    bottom: Math.max(0, Math.round(canvas.bottom - views.bottom)),
+    left: Math.max(0, Math.round(rail.right - canvas.left)),
   };
 }
 

@@ -9,11 +9,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FourViewsButton, QuadrantFrames, ViewportOverlay } from "./FourViews";
+import { FourViewsButton, QuadrantFrames } from "./FourViews";
 import type { SceneState } from "./sceneState";
 import { useModelShortcuts } from "./useModelShortcuts";
 
 afterEach(cleanup);
+
+const BANDS = { top: 60, bottom: 64, left: 56 };
 
 describe("the four views button", () => {
   it("names its shortcut and says whether four views are showing", () => {
@@ -69,7 +71,9 @@ describe("the four views shortcut", () => {
 
 describe("the quadrant frames", () => {
   it("name each quadrant and mark the one that has the controls", () => {
-    render(<QuadrantFrames active="front" onMaximise={vi.fn()} />);
+    render(
+      <QuadrantFrames active="front" bands={BANDS} onMaximise={vi.fn()} />,
+    );
     for (const name of ["Top", "Front", "Side", "Perspective"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
@@ -81,7 +85,13 @@ describe("the quadrant frames", () => {
 
   it("fills the view with a quadrant whose name is double clicked, and not on a single click", () => {
     const onMaximise = vi.fn();
-    render(<QuadrantFrames active="perspective" onMaximise={onMaximise} />);
+    render(
+      <QuadrantFrames
+        active="perspective"
+        bands={BANDS}
+        onMaximise={onMaximise}
+      />,
+    );
     const side = screen.getByRole("button", { name: "Side" });
 
     fireEvent.click(side);
@@ -92,31 +102,30 @@ describe("the quadrant frames", () => {
   });
 });
 
-describe("the viewport overlay", () => {
-  it("takes the perspective quadrant with four views on", () => {
-    render(
-      <ViewportOverlay fourViews>
-        <p>chrome</p>
-      </ViewportOverlay>,
+describe("the chrome's bands (#5410)", () => {
+  it("lay the quadrants out in the room the bands leave, and take the clicks on them", () => {
+    const { container } = render(
+      <QuadrantFrames
+        active="perspective"
+        bands={BANDS}
+        onMaximise={vi.fn()}
+      />,
     );
-    const overlay = screen.getByText("chrome").parentElement as HTMLElement;
-    expect(overlay.style.left).toBe("calc(50% + 0.75rem)");
-    expect(overlay.style.top).toBe("calc(50% + 1rem + 0.75rem)");
-    expect(overlay.style.right).toBe("0.75rem");
-    expect(overlay.style.bottom).toBe("0.75rem");
-    expect(overlay.dataset.fourViews).toBe("true");
-  });
+    const top = screen.getByRole("button", { name: "Top" }).parentElement;
+    const grid = top?.parentElement as HTMLElement;
+    expect(grid.style.top).toBe("60px");
+    expect(grid.style.bottom).toBe("64px");
+    expect(grid.style.left).toBe("56px");
 
-  it("keeps the whole view with one view", () => {
-    render(
-      <ViewportOverlay fourViews={false}>
-        <p>chrome</p>
-      </ViewportOverlay>,
-    );
-    const overlay = screen.getByText("chrome").parentElement as HTMLElement;
-    for (const side of ["top", "right", "bottom", "left"] as const) {
-      expect(overlay.style[side]).toBe("0.75rem");
+    const band = (id: string) =>
+      container.querySelector(`[data-band="${id}"]`) as HTMLElement;
+    expect(band("top").style.height).toBe("60px");
+    expect(band("bottom").style.height).toBe("64px");
+    expect(band("left").style.width).toBe("56px");
+    // Solid, so a click beside a button lands on the band, not on a view.
+    for (const id of ["top", "bottom", "left"]) {
+      expect(band(id).className).not.toContain("pointer-events-none");
+      expect(band(id).className).toContain("bg-background");
     }
-    expect(overlay.dataset.fourViews).toBeUndefined();
   });
 });
