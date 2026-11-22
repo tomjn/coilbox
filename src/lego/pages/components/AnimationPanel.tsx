@@ -24,8 +24,6 @@ import {
   Play,
   Plus,
   Square,
-  StepBack,
-  StepForward,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -153,13 +151,14 @@ import {
   type TargetScale,
   targetTrack,
 } from "../../targetMotion";
+import { actionKeyCount } from "../../timelineModel";
 import { isBuilder } from "../../unitDef";
 import { controlFor } from "../../unitValueControls";
 import { overridesFit, shownParams, withoutFitOverrides } from "../../walkFit";
 import { pickedWeapon } from "../../weaponModule";
 import { unitReaches } from "../../weaponReach";
-import { ActionsDrawer } from "./ActionsDrawer";
 import { BuilderReport } from "./BuilderReport";
+import { FrameScrubber } from "./FrameScrubber";
 import { ScrubberMarks } from "./ScrubberMarks";
 import type { DrivePlacement } from "./standInPlayback";
 import { useWeaponSource } from "./WeaponsSection";
@@ -376,6 +375,11 @@ interface Props {
   /** Edits the unit's actions (#3356). The Actions section is shown only when
    *  this is given. */
   onActionsEdit?: (change: (project: LegoProject) => LegoProject) => void;
+  /** Opens an action in the Timeline tab, where its keys are. */
+  onOpenAction?: (actionId: string) => void;
+  /** Whether the viewport is playing an action the Timeline tab handed it,
+   *  rather than a run of this panel's. Starting a run here replaces it. */
+  timelineRun?: boolean;
   /** Opens the strip on its Script tab, which is where a script is read,
    *  edited, taken over or handed back now. */
   onShowScript: () => void;
@@ -440,10 +444,12 @@ interface Props {
 
 export function AnimationPanel({
   project,
-  playing,
+  playing: viewportPlaying,
   onPlayingChange,
   onChange,
   onActionsEdit,
+  onOpenAction,
+  timelineRun = false,
   onShowScript,
   onBuilderChange,
   onScriptTimeline,
@@ -460,6 +466,9 @@ export function AnimationPanel({
 }: Props) {
   const { t } = useLingui();
   const reduceMotion = useReduceMotion();
+  // A run the Timeline tab started is not this panel's: it shows as nothing
+  // playing, and a click on Play here starts a run that replaces it.
+  const playing = viewportPlaying && !timelineRun;
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
   const [timeline, setTimeline] = useState<ScriptTimeline | null>(null);
   const [running, setRunning] = useState(false);
@@ -572,8 +581,20 @@ export function AnimationPanel({
       : null;
   const soloActionRef = useRef<string | null>(soloAction);
   soloActionRef.current = soloAction;
-  /** The action whose timeline is open. */
-  const [timelineId, setTimelineId] = useState<string | null>(null);
+  // The Timeline tab takes the viewport: what this panel last ran is no longer
+  // on screen, so it lets go of it rather than scrub a run that is not there.
+  useEffect(() => {
+    if (!timelineRun) return;
+    latestRun.current++;
+    soloRef.current = null;
+    setSoloId(null);
+    soloActionRef.current = null;
+    setSoloActionId(null);
+    setRunning(false);
+    setTimeline(null);
+    setFailure(null);
+    setStandInNotes([]);
+  }, [timelineRun]);
   /** The copy of a module picked for each preset in its panel, by preset id.
    *  Absent means all copies, the shared settings. */
   const [picked, setPicked] = useState<Record<string, string>>({});
@@ -1341,59 +1362,33 @@ export function AnimationPanel({
     );
 
     const scrubber = playable(timeline) ? (
-      <div className="flex flex-col gap-1 border-b border-border px-3 py-2">
-        <div className="flex items-start gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={scriptFrame <= 0}
-            onClick={() => step(-1)}
-            title={t`Step back one frame`}
-          >
-            <StepBack size={14} />
-          </Button>
-          <div className="flex flex-1 flex-col gap-1">
-            <Slider
-              min={0}
-              max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
-              step={1}
-              value={[scriptFrame]}
-              onValueChange={([next]) => {
-                onScriptPausedChange(true);
-                onScriptFrameChange(next);
-              }}
-              aria-label={t`Scrub the script preview`}
-              // Match the h-8 step buttons so the row can go items-start:
-              // with marks underneath, the column is taller than the
-              // buttons, and items-center would otherwise centre the
-              // buttons 14px below the thumb.
-              className="h-8"
-            />
-            {timeline?.events.some(isMarked) ? (
-              <ScrubberMarks
-                events={timeline.events}
-                frameCount={timeline.frames.length}
-                onSeek={(frame) => {
-                  onScriptPausedChange(true);
-                  onScriptFrameChange(frame);
-                }}
-              />
-            ) : null}
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
-            onClick={() => step(1)}
-            title={t`Step forward one frame`}
-          >
-            <StepForward size={14} />
-          </Button>
-        </div>
-        <span className="text-right text-xs tabular-nums text-muted-foreground">
-          {scriptFrame + 1}/{timeline?.frames.length}
-        </span>
-      </div>
+      <FrameScrubber
+        className="border-b border-border px-3 py-2"
+        frame={scriptFrame}
+        lastFrame={(timeline?.frames.length ?? 1) - 1}
+        onSeek={(next) => {
+          onScriptPausedChange(true);
+          onScriptFrameChange(next);
+        }}
+        onStep={step}
+        ariaLabel={t`Scrub the script preview`}
+        readout={
+          <>
+            {scriptFrame + 1}/{timeline?.frames.length}
+          </>
+        }
+      >
+        {timeline?.events.some(isMarked) ? (
+          <ScrubberMarks
+            events={timeline.events}
+            frameCount={timeline.frames.length}
+            onSeek={(frame) => {
+              onScriptPausedChange(true);
+              onScriptFrameChange(frame);
+            }}
+          />
+        ) : null}
+      </FrameScrubber>
     ) : null;
 
     const managedSeconds = timeline
@@ -1966,7 +1961,7 @@ export function AnimationPanel({
                   onClick={() => {
                     const id = crypto.randomUUID();
                     onActionsEdit((p) => addAction(p, { id, name: "Action" }));
-                    setTimelineId(id);
+                    onOpenAction?.(id);
                   }}
                 >
                   <Plus size={14} />
@@ -2011,7 +2006,7 @@ export function AnimationPanel({
               {actions.map((action) => {
                 const actionName = action.name;
                 const trigger = action.trigger;
-                const keyCount = action.keys.length;
+                const keyCount = actionKeyCount(action);
                 const shared = new Map<string, string[]>();
                 for (const clash of actionClashes(project)) {
                   if (clash.action.id !== action.id) continue;
@@ -2046,9 +2041,7 @@ export function AnimationPanel({
                             ? "default"
                             : "outline"
                         }
-                        disabled={
-                          reduceMotion || running || action.keys.length === 0
-                        }
+                        disabled={reduceMotion || running || keyCount === 0}
                         aria-pressed={soloAction === action.id && playing}
                         aria-label={t`Preview ${actionName} on its own`}
                         title={t`Play this action on its own, without changing the unit`}
@@ -2060,8 +2053,8 @@ export function AnimationPanel({
                         size="sm"
                         variant="outline"
                         aria-label={t`Edit keys for ${actionName}`}
-                        title={t`Edit the timeline`}
-                        onClick={() => setTimelineId(action.id)}
+                        title={t`Open in the Timeline tab`}
+                        onClick={() => onOpenAction?.(action.id)}
                       >
                         <Pencil size={14} />
                         <Trans>Edit keys</Trans>
@@ -2071,10 +2064,9 @@ export function AnimationPanel({
                         variant="ghost"
                         aria-label={t`Delete ${actionName}`}
                         title={t`Delete`}
-                        onClick={() => {
-                          if (timelineId === action.id) setTimelineId(null);
-                          onActionsEdit((p) => deleteAction(p, action.id));
-                        }}
+                        onClick={() =>
+                          onActionsEdit((p) => deleteAction(p, action.id))
+                        }
                       >
                         <Trash2 size={14} />
                       </Button>
@@ -2160,7 +2152,7 @@ export function AnimationPanel({
                         onActionsEdit((p) =>
                           convertPresetToAction(p, preset.id, base),
                         );
-                        setTimelineId(convertedActionId(base, 1));
+                        onOpenAction?.(convertedActionId(base, 1));
                       }}
                     >
                       <Trans>To action</Trans>
@@ -2306,19 +2298,6 @@ export function AnimationPanel({
             </p>
           ) : null}
         </div>
-        {onActionsEdit && timelineId ? (
-          <ActionsDrawer
-            project={project}
-            actionId={timelineId}
-            onOpenChange={(open) => {
-              if (!open) setTimelineId(null);
-            }}
-            onEdit={onActionsEdit}
-            onPlay={playActionAlone}
-            playing={soloAction === timelineId && playing}
-            playDisabled={reduceMotion || running}
-          />
-        ) : null}
       </div>
     );
   }

@@ -1567,3 +1567,57 @@ describe("the Actions section signposts (#5400)", () => {
     ).toBeNull();
   });
 });
+
+describe("the Actions section hands an action to the Timeline tab (#5396)", () => {
+  const walk = {
+    id: "a",
+    name: "Walk",
+    trigger: "StartMoving",
+    loop: true,
+    keys: [],
+    tracks: [
+      {
+        piece: "p0",
+        kind: "turn" as const,
+        axis: 0 as const,
+        keys: [
+          { frame: 10, value: 1 },
+          { frame: 20, value: 0 },
+        ],
+      },
+    ],
+  };
+
+  it("opens the action in the tab from Edit keys and from a new action", () => {
+    const onOpenAction = vi.fn();
+    show(project({ actions: [walk] }), {
+      onActionsEdit: vi.fn(),
+      onOpenAction,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Edit keys for Walk" }));
+    expect(onOpenAction).toHaveBeenCalledWith("a");
+
+    fireEvent.click(screen.getByRole("button", { name: "New action" }));
+    expect(onOpenAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts the keys of a track action and lets it play", () => {
+    show(project({ actions: [walk] }), { onActionsEdit: vi.fn() });
+    expect(screen.getByText("StartMoving, 2 keys, loops")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Preview Walk on its own" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
+  it("shows nothing playing while the viewport plays an action of the tab's", () => {
+    show(project({ actions: [walk] }), {
+      onActionsEdit: vi.fn(),
+      playing: true,
+      timelineRun: true,
+    });
+    expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+  });
+});

@@ -3747,6 +3747,14 @@ msgstr ""
 msgid "{label} is on the hub"
 msgstr ""
 
+#: src/lego/timelineModel.ts
+msgid "{label} of {piece}, frame {frame}, {degrees} degrees"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "{label} of {piece}, frame {frame}, {elmos} elmos"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 #, fuzzy
 msgid "{label} volume"
@@ -3941,11 +3949,6 @@ msgstr "{lineName} ble ikke skrevet: {problem}"
 #, fuzzy
 msgid "{lineName} written"
 msgstr "{lineName} skrevet"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "{lines, plural, one {# line of Lua} other {# lines of Lua}}"
-msgstr "{lines, plural, one {# linje Lua} other {# linjer Lua}}"
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 #, fuzzy
@@ -8949,7 +8952,7 @@ msgstr "En flat, dempet overflate under markeringene."
 msgid "A folder is read-only"
 msgstr "En mappe er skrivebeskyttet"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "A function of its own"
 msgstr "En egen funksjon"
@@ -9976,6 +9979,10 @@ msgstr "Om dreiepunktet"
 msgid "About the shading map"
 msgstr "Om skyggekartet"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "About the timeline"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "About this scenario"
@@ -10162,20 +10169,20 @@ msgid "Acting as {username} on {serverName}."
 msgstr "Handler som {username} på {serverName}."
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/scenario/validate.ts
 #, fuzzy
 msgid "Action"
 msgstr "Handling"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Action name"
 msgstr "Navn på handling"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Action timeline"
-msgstr "Tidslinje for handling"
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Action settings"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -10359,21 +10366,6 @@ msgstr "Legg til en deltaker under Oppsett, så vises startbetingelsene her."
 #, fuzzy
 msgid "Add a piece to the selection, or take it out"
 msgstr "Legg en del til i utvalget, eller ta den ut"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose"
-msgstr "Legg til en positur"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose as a key"
-msgstr "Legg til en positur som nøkkelbilde"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose below."
-msgstr "Legg til en positur nedenfor."
 
 #: src/multiplayer/NoteButton.tsx
 #, fuzzy
@@ -11239,10 +11231,9 @@ msgstr "Sjekk også Steam-installasjonsmapper for Zero-K under en ny skanning."
 msgid "Also delete its entries from the config files"
 msgstr "Slett også oppføringene i konfigurasjonsfilene"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Also moved by something else: {clashList}."
-msgstr "Flyttes også av noe annet: {clashList}."
+#: src/lego/timelineModel.ts
+msgid "Also moved by {list}."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -13361,6 +13352,10 @@ msgstr "Beste seiersrekke"
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "Etter beste evne ut fra navn — en nedlasting passer kanskje ikke nøyaktig. Se <0>Innstillinger for innholdsmapper</0> for målmappen."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Between two keys a piece moves at a steady speed, as the game moves it."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Between two minutes"
@@ -13386,12 +13381,12 @@ msgstr "svart røyk"
 msgid "Blank"
 msgstr "Tom"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Blend in (s)"
 msgstr "Inntoning (s)"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Blend out (s)"
 msgstr "Uttoning (s)"
@@ -15237,6 +15232,10 @@ msgstr "Kanalemne"
 msgid "Channels"
 msgstr "Kanaler"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Channels of {name}"
+msgstr ""
+
 #: src/multiplayer/admin/ModeratorFeedSection.tsx
 #, fuzzy
 msgid "ChanServ's announcements of what moderators and admins did, from #moderator."
@@ -16087,7 +16086,6 @@ msgstr "Kamuflasjekostnad i bevegelse"
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/hub/upload/UploadToHubButton.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
@@ -19924,11 +19922,6 @@ msgstr "Slettet motor {version}."
 msgid "Deleted objective \"{label}\"."
 msgstr "Slettet målet «{label}»."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Deleted pose"
-msgstr "Slettet positur"
-
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
 msgid "Deleted trigger \"{name}\"."
@@ -21253,6 +21246,10 @@ msgstr "Hver spillers åpning er ordrene samlet i en rekkefølge, med gjentakels
 msgid "Each round must be built up by the player before it can fire. Only the first stockpiled weapon of this type on a unit works correctly."
 msgstr "Hver runde må bygges opp av spilleren før den kan skytes. Bare det første lagrede våpenet av denne typen på en enhet virker riktig."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Each row is a piece the action moves, and each diamond is a frame where it has a key. Open a row to see its turns and moves one by one. Drag the ruler to scrub the motion."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Each set bit lets a shield whose shieldInterceptType has the matching bit hit this weapon."
@@ -21410,11 +21407,6 @@ msgstr "Rediger blåkopien"
 #, fuzzy
 msgid "Edit the blueprint they all use"
 msgstr "Rediger blåkopien alle bruker"
-
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit the timeline"
-msgstr "Rediger tidslinjen"
 
 #: src/lego/pages/components/GameScriptPanel.tsx
 #, fuzzy
@@ -23946,6 +23938,10 @@ msgstr "Frame {current} av {last}"
 msgid "Frame {frame}"
 msgstr "Frame {frame}"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Frame {frame}, {time} s"
+msgstr ""
+
 #: src/lego/pages/components/ScrubberMarks.tsx
 #, fuzzy
 msgid "Frame {frame}: {what}"
@@ -24278,7 +24274,7 @@ msgstr "Fullskjerm, oppløsning og vsync."
 msgid "function name"
 msgstr "funksjonsnavn"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Function name"
 msgstr "Funksjonsnavn"
@@ -25556,6 +25552,10 @@ msgstr "Skjul sidepanelet"
 #, fuzzy
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Skjul sidepanelet og åpne det fra en menyknapp i stedet."
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Hide the timeline"
+msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -27509,6 +27509,18 @@ msgstr "Det skrives til <0>missions/{folder}/</0> inne i <1>{archiveName}</1>."
 msgid "It kept running, because a game is still being played through it. Nobody was cut off. It stops on its own once that game ends, and hosting will work again then."
 msgstr "Den fortsatte å kjøre, fordi et spill fortsatt spilles gjennom den. Ingen ble kuttet av. Den stopper selv når det spillet slutter, og da fungerer det å være vert igjen."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and runs until it is started again."
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and stops on {stopsOn}."
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and stops when {stopFunction} is called."
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "It may change a value typed here too. A mutator archive, an edit-in-place write and the tweak slots each get a value the game turns into the typed one, where loading the game proves it."
@@ -27546,6 +27558,10 @@ msgstr "Den åpnes i importverktøyet, som løser opp manglende innhold før lag
 #, fuzzy
 msgid "It opens in the keybinds editor, unsaved."
 msgstr "Det åpnes i hurtigtastredigereren, ulagret."
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It plays once and holds the last pose."
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -28146,10 +28162,9 @@ msgstr "tastaturoppsett"
 msgid "keymaps"
 msgstr "tastaturoppsett"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Keys"
-msgstr "Nøkkelbilder"
+#: src/lego/timelineModel.ts
+msgid "Keys of {piece} on frame {frame}"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #: src/multiplayer/battle/MemberRow.tsx
@@ -28275,6 +28290,10 @@ msgstr "Språk"
 
 #: src/profile/health.ts
 msgid "Language packs loaded: {loadedList}"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Lap ends"
 msgstr ""
 
 #: src/lego/generate.ts
@@ -29624,14 +29643,10 @@ msgid "Looks as if it would tip: the weight centre is {distance} elmos outside t
 msgstr "Ser ut som den ville velte: tyngdepunktet er {distance} elmo utenfor føttene."
 
 #: src/campaign/pages/components/MediaPlayer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Loop"
 msgstr "Sløyfe"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Loops"
-msgstr "Går i sløyfe"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -31234,29 +31249,9 @@ msgstr "Flytt ned"
 msgid "Move each of the {boxHolders} boxes on to the next ally"
 msgstr "Flytt hver av de {boxHolders} boksene videre til neste allierte"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move earlier"
-msgstr "Flytt tidligere"
-
 #: src/runlite/pages/RunPage.tsx
 msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
 msgstr ""
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move key {keyNumber} earlier"
-msgstr "Flytt nøkkel {keyNumber} tidligere"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move key {keyNumber} later"
-msgstr "Flytt nøkkel {keyNumber} senere"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move later"
-msgstr "Flytt senere"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -31317,6 +31312,18 @@ msgstr "Bytt til {newerName}"
 #, fuzzy
 msgid "Move up"
 msgstr "Flytt opp"
+
+#: src/lego/timelineModel.ts
+msgid "Move x"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Move y"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Move z"
+msgstr ""
 
 #: src/lego/pages/components/MeasureReadout.tsx
 #, fuzzy
@@ -31649,9 +31656,9 @@ msgstr "mysql-binærfil"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/lego/pages/BuilderPage.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -32122,6 +32129,7 @@ msgid "New access level"
 msgstr "Nytt tilgangsnivå"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "New action"
 msgstr "Ny handling"
@@ -34144,11 +34152,6 @@ msgstr "ingen tekst, så radiopanelet åpner med en tom melding"
 #, fuzzy
 msgid "no texture"
 msgstr "ingen tekstur"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "No time yet"
-msgstr "Ingen tid ennå"
 
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
@@ -36440,6 +36443,10 @@ msgstr "Åpne i motoren"
 msgid "Open in the builder"
 msgstr "Åpne i byggeren"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Open in the Timeline tab"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Open it"
@@ -36555,6 +36562,7 @@ msgid "Open the scenario"
 msgstr "Åpne scenarioet"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Åpne Skript-fanen"
@@ -37520,6 +37528,7 @@ msgstr "Patruljer"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Pause"
@@ -38073,8 +38082,8 @@ msgstr ""
 #: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
@@ -38432,11 +38441,6 @@ msgstr "Spilles nøyaktig som i spillet. Skrivebeskyttet, og skrives ikke av eks
 msgid "Plays on Killed, which no action can start from."
 msgstr "Spilles ved Killed, som ingen handling kan starte fra."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Plays once and holds the last pose."
-msgstr "Spilles én gang og holder siste positur."
-
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away."
@@ -38549,11 +38553,6 @@ msgstr "Porter som skal videresendes"
 #, fuzzy
 msgid "Pose name"
 msgstr "Navn på positur"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Pose of key {keyNumber}"
-msgstr "Positur for nøkkel {keyNumber}"
 
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
@@ -40761,7 +40760,6 @@ msgstr "Remikset fra"
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
 #: src/lego/pages/components/BuiltBySection.tsx
@@ -40922,11 +40920,6 @@ msgstr "Fjern fra favoritter"
 #, fuzzy
 msgid "Remove from queue"
 msgstr "Fjern fra køen"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Remove key {keyNumber}"
-msgstr "Fjern nøkkel {keyNumber}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -42416,11 +42409,6 @@ msgstr "Kjøringer"
 msgid "Runs from before records were kept per game, or with no game recorded. What they unlocked is offered in every game."
 msgstr "Tokt fra før resultatene ble lagret per spill, eller uten registrert spill. Det de låste opp, tilbys i alle spill."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Runs until it is started again."
-msgstr "Kjører til den startes igjen."
-
 #: src/lego/index.ts
 #, fuzzy
 msgid "S3O Blender Tools"
@@ -42530,11 +42518,6 @@ msgstr "Lagre en pakke med blåkopier"
 #, fuzzy
 msgid "Save a password first. Coilbox cannot log in at startup without one."
 msgstr "Lagre et passord først. Coilbox kan ikke logge inn ved oppstart uten."
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Save a pose first, from Poses in the view controls."
-msgstr "Lagre en positur først, fra Positurer i visningskontrollene."
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -43243,6 +43226,10 @@ msgstr "Rull til slutten"
 msgid "Scroll to start"
 msgstr "Rull til starten"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Scrub the action"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Scrub the script preview"
@@ -43517,37 +43504,22 @@ msgstr "Sekunder en handling bruker på å gli inn fra der delene er, og på å 
 msgid "seconds between firings"
 msgstr "sekunder mellom hver utløsning"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds from rest, or from the last key when it loops"
-msgstr "Sekunder fra hvile, eller fra siste nøkkel når den går i løkke"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds from the key before"
-msgstr "Sekunder fra forrige nøkkel"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to ease back to rest"
 msgstr "Sekunder for å gli tilbake til hvile"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to ease in from where the pieces are"
 msgstr "Sekunder for å gli inn fra der delene er"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds to reach key {keyNumber}"
-msgstr "Sekunder for å nå nøkkel {keyNumber}"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to reach the first key from wherever the pieces are. Empty uses the unit's time."
 msgstr "Sekunder for å nå første nøkkel fra der delene er. Tomt bruker enhetens tid."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to return to rest when it stops. Empty uses the unit's time."
 msgstr "Sekunder for å gå tilbake til hvile når den stopper. Tomt bruker enhetens tid."
@@ -45207,6 +45179,10 @@ msgstr "Vis skriptet"
 msgid "Show the side panel"
 msgstr "Vis sidepanelet"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Show the timeline"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Show the top, front and side views beside the perspective view, or go back to one view"
@@ -46813,7 +46789,7 @@ msgstr "starter på {value}"
 msgid "Starts cloaked"
 msgstr "Starter usynlig"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Starts on"
 msgstr "Starter ved"
@@ -46914,12 +46890,12 @@ msgstr "Steg"
 msgid "step {number} of the build order"
 msgstr "steg {number} i byggerekkefølgen"
 
-#: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/FrameScrubber.tsx
 #, fuzzy
 msgid "Step back one frame"
 msgstr "Gå én frame tilbake"
 
-#: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/FrameScrubber.tsx
 #, fuzzy
 msgid "Step forward one frame"
 msgstr "Gå én frame fram"
@@ -47098,20 +47074,10 @@ msgstr "Stopper…"
 msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
 msgstr "Stopper bakgrunnsanimasjon – stjerneblink i galaksen, rullende panoramaer, snurrende kartforhåndsvisninger og resultateffekter. «Følg systemet» følger tilgjengelighetsinnstillingen i operativsystemet."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Stops on {stopsOn}."
-msgstr "Stopper ved {stopsOn}."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Stops to shoot"
 msgstr "Stopper for å skyte"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Stops when {stopFunction} is called."
-msgstr "Stopper når {stopFunction} kalles."
 
 #: src/content/index.ts
 #, fuzzy
@@ -53087,6 +53053,10 @@ msgstr "Denne enheten beveger seg, men oppgir ingen bevegelsesklasse, så motore
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "This unit runs its own script."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
@@ -53376,6 +53346,7 @@ msgid "Time: unknown"
 msgstr "Tid: ukjent"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Timeline"
 msgstr "Tidslinje"
@@ -54025,6 +53996,18 @@ msgstr "Drei til"
 #, fuzzy
 msgid "Turn without slowing"
 msgstr "Sving uten å senke farten"
+
+#: src/lego/timelineModel.ts
+msgid "Turn x"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Turn y"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Turn z"
+msgstr ""
 
 #: src/scenario/pages/components/rigidTurn.ts
 #, fuzzy
@@ -57540,11 +57523,6 @@ msgstr "Skriver alle hendelser, uansett hva filtrene viser."
 #, fuzzy
 msgid "Writes every line on the chart. Nothing is hidden."
 msgstr "Skriver hver linje i diagrammet. Ingenting er skjult."
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Writes nothing yet"
-msgstr "Skriver ingenting ennå"
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy

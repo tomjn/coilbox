@@ -3749,6 +3749,14 @@ msgstr ""
 msgid "{label} is on the hub"
 msgstr ""
 
+#: src/lego/timelineModel.ts
+msgid "{label} of {piece}, frame {frame}, {degrees} degrees"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "{label} of {piece}, frame {frame}, {elmos} elmos"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 #, fuzzy
 msgid "{label} volume"
@@ -3943,11 +3951,6 @@ msgstr "Το {lineName} δεν γράφτηκε: {problem}"
 #, fuzzy
 msgid "{lineName} written"
 msgstr "Το {lineName} γράφτηκε"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "{lines, plural, one {# line of Lua} other {# lines of Lua}}"
-msgstr "{lines, plural, one {# γραμμή Lua} other {# γραμμές Lua}}"
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 #, fuzzy
@@ -8952,7 +8955,7 @@ msgstr "Μια επίπεδη, θαμπή επιφάνεια κάτω από τ�
 msgid "A folder is read-only"
 msgstr "Ένας φάκελος είναι μόνο για ανάγνωση"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "A function of its own"
 msgstr "Μια δική της συνάρτηση"
@@ -9979,6 +9982,10 @@ msgstr "Σχετικά με το σημείο περιστροφής"
 msgid "About the shading map"
 msgstr "Σχετικά με τον χάρτη σκίασης"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "About the timeline"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "About this scenario"
@@ -10165,20 +10172,20 @@ msgid "Acting as {username} on {serverName}."
 msgstr "Ενεργείτε ως {username} στο {serverName}."
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/scenario/validate.ts
 #, fuzzy
 msgid "Action"
 msgstr "Δράση"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Action name"
 msgstr "Όνομα δράσης"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Action timeline"
-msgstr "Χρονογραμμή δράσης"
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Action settings"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -10362,21 +10369,6 @@ msgstr "Προσθέστε έναν συμμετέχοντα στη Ρύθμισ
 #, fuzzy
 msgid "Add a piece to the selection, or take it out"
 msgstr "Προσθήκη τμήματος στην επιλογή ή αφαίρεσή του"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose"
-msgstr "Προσθήκη στάσης"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose as a key"
-msgstr "Προσθήκη στάσης ως καρέ-κλειδί"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose below."
-msgstr "Προσθέστε μια στάση παρακάτω."
 
 #: src/multiplayer/NoteButton.tsx
 #, fuzzy
@@ -11242,10 +11234,9 @@ msgstr "Έλεγχος και των θέσεων εγκατάστασης Steam
 msgid "Also delete its entries from the config files"
 msgstr "Διαγραφή και των καταχωρίσεών του από τα αρχεία ρυθμίσεων"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Also moved by something else: {clashList}."
-msgstr "Μετακινείται και από κάτι άλλο: {clashList}."
+#: src/lego/timelineModel.ts
+msgid "Also moved by {list}."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -13364,6 +13355,10 @@ msgstr "Πορεία καλύτερης νίκης"
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "Καλύτερη προσπάθεια κατά όνομα — μια λήψη ίσως δεν ταιριάζει ακριβώς. Δείτε τις <0>ρυθμίσεις Φακέλων περιεχομένου</0> για τον φάκελο προορισμού."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Between two keys a piece moves at a steady speed, as the game moves it."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Between two minutes"
@@ -13389,12 +13384,12 @@ msgstr "μαύρος καπνός"
 msgid "Blank"
 msgstr "Κενό"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Blend in (s)"
 msgstr "Ομαλή είσοδος (δευτ.)"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Blend out (s)"
 msgstr "Ομαλή έξοδος (δευτ.)"
@@ -15240,6 +15235,10 @@ msgstr "Θέμα καναλιού"
 msgid "Channels"
 msgstr "Κανάλια"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Channels of {name}"
+msgstr ""
+
 #: src/multiplayer/admin/ModeratorFeedSection.tsx
 #, fuzzy
 msgid "ChanServ's announcements of what moderators and admins did, from #moderator."
@@ -16090,7 +16089,6 @@ msgstr "Κόστος αορατότητας εν κινήσει"
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/hub/upload/UploadToHubButton.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
@@ -19928,11 +19926,6 @@ msgstr "Διαγράφηκε η μηχανή {version}."
 msgid "Deleted objective \"{label}\"."
 msgstr "Διαγράφηκε ο στόχος «{label}»."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Deleted pose"
-msgstr "Η στάση διαγράφηκε"
-
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
 msgid "Deleted trigger \"{name}\"."
@@ -21257,6 +21250,10 @@ msgstr "Το άνοιγμα κάθε παίκτη είναι οι εντολές
 msgid "Each round must be built up by the player before it can fire. Only the first stockpiled weapon of this type on a unit works correctly."
 msgstr "Κάθε βολή πρέπει να συγκεντρωθεί από τον παίκτη πριν μπορέσει να εκτοξευτεί. Μόνο το πρώτο όπλο αυτού του τύπου με απόθεμα σε μια μονάδα λειτουργεί σωστά."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Each row is a piece the action moves, and each diamond is a frame where it has a key. Open a row to see its turns and moves one by one. Drag the ruler to scrub the motion."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Each set bit lets a shield whose shieldInterceptType has the matching bit hit this weapon."
@@ -21414,11 +21411,6 @@ msgstr "Επεξεργασία του σχεδίου"
 #, fuzzy
 msgid "Edit the blueprint they all use"
 msgstr "Επεξεργασία του σχεδίου που χρησιμοποιούν όλες"
-
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit the timeline"
-msgstr "Επεξεργασία της χρονογραμμής"
 
 #: src/lego/pages/components/GameScriptPanel.tsx
 #, fuzzy
@@ -23956,6 +23948,10 @@ msgstr "Καρέ {current} από {last}"
 msgid "Frame {frame}"
 msgstr "Καρέ {frame}"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Frame {frame}, {time} s"
+msgstr ""
+
 #: src/lego/pages/components/ScrubberMarks.tsx
 #, fuzzy
 msgid "Frame {frame}: {what}"
@@ -24288,7 +24284,7 @@ msgstr "Πλήρης οθόνη, ανάλυση και vsync."
 msgid "function name"
 msgstr "όνομα συνάρτησης"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Function name"
 msgstr "Όνομα συνάρτησης"
@@ -25566,6 +25562,10 @@ msgstr "Απόκρυψη του πλαϊνού πάνελ"
 #, fuzzy
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Απόκρυψη της πλαϊνής στήλης και άνοιγμά της από κουμπί μενού."
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Hide the timeline"
+msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -27519,6 +27519,18 @@ msgstr "Γράφεται στο <0>missions/{folder}/</0> μέσα στο <1>{ar
 msgid "It kept running, because a game is still being played through it. Nobody was cut off. It stops on its own once that game ends, and hosting will work again then."
 msgstr "Συνέχισε να εκτελείται, επειδή παίζεται ακόμη ένα παιχνίδι μέσω αυτού. Κανείς δεν αποσυνδέθηκε. Σταματά μόνο του όταν τελειώσει εκείνο το παιχνίδι, και η φιλοξενία θα λειτουργεί ξανά τότε."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and runs until it is started again."
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and stops on {stopsOn}."
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and stops when {stopFunction} is called."
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "It may change a value typed here too. A mutator archive, an edit-in-place write and the tweak slots each get a value the game turns into the typed one, where loading the game proves it."
@@ -27556,6 +27568,10 @@ msgstr "Ανοίγει στην εισαγωγή, που εντοπίζει όπ
 #, fuzzy
 msgid "It opens in the keybinds editor, unsaved."
 msgstr "Ανοίγει στον επεξεργαστή συντομεύσεων, χωρίς αποθήκευση."
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It plays once and holds the last pose."
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -28156,10 +28172,9 @@ msgstr "διάταξη πλήκτρων"
 msgid "keymaps"
 msgstr "διατάξεις πλήκτρων"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Keys"
-msgstr "Καρέ-κλειδιά"
+#: src/lego/timelineModel.ts
+msgid "Keys of {piece} on frame {frame}"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #: src/multiplayer/battle/MemberRow.tsx
@@ -28287,6 +28302,10 @@ msgstr "Γλώσσα"
 #, fuzzy
 msgid "Language packs loaded: {loadedList}"
 msgstr "Πακέτα γλώσσας που φορτώθηκαν: {loadedList}"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Lap ends"
+msgstr ""
 
 #: src/lego/generate.ts
 msgid "Large"
@@ -29635,14 +29654,10 @@ msgid "Looks as if it would tip: the weight centre is {distance} elmos outside t
 msgstr "Φαίνεται ότι θα ανατραπεί: το κέντρο βάρους είναι {distance} elmo έξω από τα πόδια."
 
 #: src/campaign/pages/components/MediaPlayer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Loop"
 msgstr "Βρόχος"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Loops"
-msgstr "Σε βρόχο"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -31250,29 +31265,9 @@ msgstr "Μετακίνηση κάτω"
 msgid "Move each of the {boxHolders} boxes on to the next ally"
 msgstr "Μετακίνηση καθεμιάς από τις {boxHolders} περιοχές στον επόμενο σύμμαχο"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move earlier"
-msgstr "Μετακίνηση νωρίτερα"
-
 #: src/runlite/pages/RunPage.tsx
 msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
 msgstr ""
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move key {keyNumber} earlier"
-msgstr "Μετακίνηση του καρέ-κλειδιού {keyNumber} νωρίτερα"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move key {keyNumber} later"
-msgstr "Μετακίνηση του καρέ-κλειδιού {keyNumber} αργότερα"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move later"
-msgstr "Μετακίνηση αργότερα"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -31333,6 +31328,18 @@ msgstr "Μετάβαση στο {newerName}"
 #, fuzzy
 msgid "Move up"
 msgstr "Μετακίνηση πάνω"
+
+#: src/lego/timelineModel.ts
+msgid "Move x"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Move y"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Move z"
+msgstr ""
 
 #: src/lego/pages/components/MeasureReadout.tsx
 #, fuzzy
@@ -31665,9 +31672,9 @@ msgstr "εκτελέσιμο mysql"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/lego/pages/BuilderPage.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -32138,6 +32145,7 @@ msgid "New access level"
 msgstr "Νέο επίπεδο πρόσβασης"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "New action"
 msgstr "Νέα δράση"
@@ -34161,11 +34169,6 @@ msgstr "χωρίς κείμενο, οπότε ο πίνακας ασυρμάτο
 #, fuzzy
 msgid "no texture"
 msgstr "χωρίς υφή"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "No time yet"
-msgstr "Καμία χρονική στιγμή ακόμη"
 
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
@@ -36457,6 +36460,10 @@ msgstr "Άνοιγμα στη μηχανή"
 msgid "Open in the builder"
 msgstr "Άνοιγμα στον συναρμολογητή"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Open in the Timeline tab"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Open it"
@@ -36572,6 +36579,7 @@ msgid "Open the scenario"
 msgstr "Άνοιγμα του σεναρίου"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Άνοιγμα της καρτέλας Script"
@@ -37537,6 +37545,7 @@ msgstr "Περιπολία"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Pause"
@@ -38090,8 +38099,8 @@ msgstr ""
 #: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
@@ -38449,11 +38458,6 @@ msgstr "Παίζει ακριβώς όπως στο παιχνίδι. Μόνο �
 msgid "Plays on Killed, which no action can start from."
 msgstr "Παίζει στο Killed, από το οποίο δεν μπορεί να ξεκινήσει καμία δράση."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Plays once and holds the last pose."
-msgstr "Παίζει μία φορά και κρατά την τελευταία στάση."
-
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away."
@@ -38566,11 +38570,6 @@ msgstr "Θύρες για προώθηση"
 #, fuzzy
 msgid "Pose name"
 msgstr "Όνομα στάσης"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Pose of key {keyNumber}"
-msgstr "Στάση του καρέ-κλειδιού {keyNumber}"
 
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
@@ -40778,7 +40777,6 @@ msgstr "Remix από"
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
 #: src/lego/pages/components/BuiltBySection.tsx
@@ -40939,11 +40937,6 @@ msgstr "Αφαίρεση από τα αγαπημένα"
 #, fuzzy
 msgid "Remove from queue"
 msgstr "Αφαίρεση από την ουρά"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Remove key {keyNumber}"
-msgstr "Αφαίρεση του καρέ-κλειδιού {keyNumber}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -42433,11 +42426,6 @@ msgstr "Εκτελέσεις"
 msgid "Runs from before records were kept per game, or with no game recorded. What they unlocked is offered in every game."
 msgstr "Πορείες από πριν αρχίσει η καταγραφή ανά παιχνίδι ή χωρίς καταγεγραμμένο παιχνίδι. Ό,τι ξεκλείδωσαν προσφέρεται σε κάθε παιχνίδι."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Runs until it is started again."
-msgstr "Συνεχίζει μέχρι να ξεκινήσει ξανά."
-
 #: src/lego/index.ts
 #, fuzzy
 msgid "S3O Blender Tools"
@@ -42547,11 +42535,6 @@ msgstr "Αποθήκευση πακέτου σχεδίων"
 #, fuzzy
 msgid "Save a password first. Coilbox cannot log in at startup without one."
 msgstr "Αποθηκεύστε πρώτα έναν κωδικό πρόσβασης. Το Coilbox δεν μπορεί να συνδεθεί κατά την εκκίνηση χωρίς αυτόν."
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Save a pose first, from Poses in the view controls."
-msgstr "Αποθηκεύστε πρώτα μια στάση, από τις Στάσεις στα χειριστήρια προβολής."
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -43260,6 +43243,10 @@ msgstr "Κύλιση στο τέλος"
 msgid "Scroll to start"
 msgstr "Κύλιση στην αρχή"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Scrub the action"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Scrub the script preview"
@@ -43534,37 +43521,22 @@ msgstr "Δευτερόλεπτα που χρειάζεται μια δράση �
 msgid "seconds between firings"
 msgstr "δευτερόλεπτα μεταξύ ενεργοποιήσεων"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds from rest, or from the last key when it loops"
-msgstr "Δευτερόλεπτα από την ηρεμία ή από το τελευταίο καρέ-κλειδί όταν είναι σε βρόχο"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds from the key before"
-msgstr "Δευτερόλεπτα από το προηγούμενο καρέ-κλειδί"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to ease back to rest"
 msgstr "Δευτερόλεπτα για ομαλή επιστροφή σε ηρεμία"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to ease in from where the pieces are"
 msgstr "Δευτερόλεπτα για ομαλή έναρξη από τη θέση των τμημάτων"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds to reach key {keyNumber}"
-msgstr "Δευτερόλεπτα για να φτάσει στο καρέ-κλειδί {keyNumber}"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to reach the first key from wherever the pieces are. Empty uses the unit's time."
 msgstr "Δευτερόλεπτα για να φτάσει στο πρώτο καρέ-κλειδί από όπου βρίσκονται τα τμήματα. Κενό σημαίνει ο χρόνος της μονάδας."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to return to rest when it stops. Empty uses the unit's time."
 msgstr "Δευτερόλεπτα για επιστροφή σε ηρεμία όταν σταματά. Κενό σημαίνει ο χρόνος της μονάδας."
@@ -45224,6 +45196,10 @@ msgstr "Εμφάνιση του script"
 msgid "Show the side panel"
 msgstr "Εμφάνιση του πλαϊνού πλαισίου"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Show the timeline"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Show the top, front and side views beside the perspective view, or go back to one view"
@@ -46830,7 +46806,7 @@ msgstr "ξεκινά από {value}"
 msgid "Starts cloaked"
 msgstr "Ξεκινά αόρατο"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Starts on"
 msgstr "Ξεκινά στο"
@@ -46931,12 +46907,12 @@ msgstr "Βήμα"
 msgid "step {number} of the build order"
 msgstr "βήμα {number} της σειράς κατασκευής"
 
-#: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/FrameScrubber.tsx
 #, fuzzy
 msgid "Step back one frame"
 msgstr "Ένα καρέ πίσω"
 
-#: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/FrameScrubber.tsx
 #, fuzzy
 msgid "Step forward one frame"
 msgstr "Ένα καρέ μπροστά"
@@ -47115,20 +47091,10 @@ msgstr "Διακοπή…"
 msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
 msgstr "Σταματά τις κινήσεις περιβάλλοντος — το τρεμόπαιγμα του γαλαξία, τα πανοράματα που κυλούν, τις περιστρεφόμενες προεπισκοπήσεις χαρτών και τα εφέ αποτελεσμάτων. Το «Ακολούθηση συστήματος» σέβεται την προτίμηση προσβασιμότητας του λειτουργικού σας συστήματος."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Stops on {stopsOn}."
-msgstr "Σταματά στο {stopsOn}."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Stops to shoot"
 msgstr "Σταματά για να βάλλει"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Stops when {stopFunction} is called."
-msgstr "Σταματά όταν καλείται το {stopFunction}."
 
 #: src/content/index.ts
 #, fuzzy
@@ -53104,6 +53070,10 @@ msgstr "Αυτή η μονάδα κινείται αλλά δεν ορίζει �
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "This unit runs its own script."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
@@ -53393,6 +53363,7 @@ msgid "Time: unknown"
 msgstr "Χρόνος: άγνωστος"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Timeline"
 msgstr "Χρονογραμμή"
@@ -54042,6 +54013,18 @@ msgstr "Περιστροφή έως"
 #, fuzzy
 msgid "Turn without slowing"
 msgstr "Στροφή χωρίς επιβράδυνση"
+
+#: src/lego/timelineModel.ts
+msgid "Turn x"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Turn y"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Turn z"
+msgstr ""
 
 #: src/scenario/pages/components/rigidTurn.ts
 #, fuzzy
@@ -57564,11 +57547,6 @@ msgstr "Γράφει κάθε συμβάν, ό,τι κι αν δείχνουν �
 #, fuzzy
 msgid "Writes every line on the chart. Nothing is hidden."
 msgstr "Γράφει κάθε γραμμή του γραφήματος. Τίποτα δεν κρύβεται."
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Writes nothing yet"
-msgstr "Δεν γράφει τίποτα ακόμη"
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy

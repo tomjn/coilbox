@@ -3716,6 +3716,14 @@ msgstr ""
 msgid "{label} is on the hub"
 msgstr ""
 
+#: src/lego/timelineModel.ts
+msgid "{label} of {piece}, frame {frame}, {degrees} degrees"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "{label} of {piece}, frame {frame}, {elmos} elmos"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 #, fuzzy
 msgid "{label} volume"
@@ -3910,11 +3918,6 @@ msgstr "{lineName} не записано: {problem}"
 #, fuzzy
 msgid "{lineName} written"
 msgstr "{lineName} записано"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "{lines, plural, one {# line of Lua} other {# lines of Lua}}"
-msgstr "{lines, plural, one {# рядок Lua} few {# рядки Lua} many {# рядків Lua} other {# рядка Lua}}"
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 #, fuzzy
@@ -8895,7 +8898,7 @@ msgstr "Пласка, приглушена поверхня під познач�
 msgid "A folder is read-only"
 msgstr "Папка лише для читання"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "A function of its own"
 msgstr "Власна функція"
@@ -9911,6 +9914,10 @@ msgstr "Про точку обертання"
 msgid "About the shading map"
 msgstr "Про карту затінення"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "About the timeline"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "About this scenario"
@@ -10097,20 +10104,20 @@ msgid "Acting as {username} on {serverName}."
 msgstr "Ви дієте як {username} на {serverName}."
 
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/scenario/validate.ts
 #, fuzzy
 msgid "Action"
 msgstr "Дія"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Action name"
 msgstr "Назва дії"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Action timeline"
-msgstr "Хронологія дій"
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Action settings"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -10294,21 +10301,6 @@ msgstr "Додайте учасника в розділі «Налаштуван
 #, fuzzy
 msgid "Add a piece to the selection, or take it out"
 msgstr "Додати елемент до виділення або прибрати його"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose"
-msgstr "Додати позу"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose as a key"
-msgstr "Додати позу як ключовий кадр"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Add a pose below."
-msgstr "Додайте позу нижче."
 
 #: src/multiplayer/NoteButton.tsx
 #, fuzzy
@@ -11167,10 +11159,9 @@ msgstr "Під час пересканування також перевірят
 msgid "Also delete its entries from the config files"
 msgstr ""
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Also moved by something else: {clashList}."
-msgstr "Також рухається чимось іншим: {clashList}."
+#: src/lego/timelineModel.ts
+msgid "Also moved by {list}."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -13283,6 +13274,10 @@ msgstr "Найкраща серія перемог"
 msgid "Best-effort by name — a download may not be an exact match. See <0>Content folders settings</0> for the destination folder."
 msgstr "Наскільки можливо, за назвою – завантаження може не точно збігатися. Папку призначення див. у <0>налаштуваннях папок вмісту</0>."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Between two keys a piece moves at a steady speed, as the game moves it."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Between two minutes"
@@ -13308,12 +13303,12 @@ msgstr "чорний дим"
 msgid "Blank"
 msgstr "Порожній"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Blend in (s)"
 msgstr "Наростання (с)"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Blend out (s)"
 msgstr "Згасання (с)"
@@ -15149,6 +15144,10 @@ msgstr "Тема каналу"
 msgid "Channels"
 msgstr "Канали"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Channels of {name}"
+msgstr ""
+
 #: src/multiplayer/admin/ModeratorFeedSection.tsx
 #, fuzzy
 msgid "ChanServ's announcements of what moderators and admins did, from #moderator."
@@ -15990,7 +15989,6 @@ msgstr "Вартість маскування в русі"
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/hub/upload/UploadToHubButton.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/FitPlanDrawer.tsx
@@ -19794,11 +19792,6 @@ msgstr "Видалено рушій {version}."
 msgid "Deleted objective \"{label}\"."
 msgstr "Видалено ціль «{label}»."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Deleted pose"
-msgstr "Позу видалено"
-
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
 msgid "Deleted trigger \"{name}\"."
@@ -21120,6 +21113,10 @@ msgstr "Дебют кожного гравця – це його накази, �
 msgid "Each round must be built up by the player before it can fire. Only the first stockpiled weapon of this type on a unit works correctly."
 msgstr "Кожен заряд гравець має накопичити, перш ніж його можна випустити. Правильно працює лише перша зброя цього типу із запасом боєприпасів на юніті."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Each row is a piece the action moves, and each diamond is a frame where it has a key. Open a row to see its turns and moves one by one. Drag the ruler to scrub the motion."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Each set bit lets a shield whose shieldInterceptType has the matching bit hit this weapon."
@@ -21277,11 +21274,6 @@ msgstr "Редагувати креслення"
 #, fuzzy
 msgid "Edit the blueprint they all use"
 msgstr "Редагувати креслення, яке вони всі використовують"
-
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit the timeline"
-msgstr "Редагувати хронологію"
 
 #: src/lego/pages/components/GameScriptPanel.tsx
 #, fuzzy
@@ -23801,6 +23793,10 @@ msgstr "Кадр {current} з {last}"
 msgid "Frame {frame}"
 msgstr "Кадр {frame}"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Frame {frame}, {time} s"
+msgstr ""
+
 #: src/lego/pages/components/ScrubberMarks.tsx
 #, fuzzy
 msgid "Frame {frame}: {what}"
@@ -24132,7 +24128,7 @@ msgstr "Повноекранний режим, роздільність і ве�
 msgid "function name"
 msgstr "назва функції"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Function name"
 msgstr "Назва функції"
@@ -25405,6 +25401,10 @@ msgstr "Сховати бічну панель"
 #, fuzzy
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Ховати бічну панель і відкривати її кнопкою меню."
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Hide the timeline"
+msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -27347,6 +27347,18 @@ msgstr "Записується в <0>missions/{folder}/</0> всередині <
 msgid "It kept running, because a game is still being played through it. Nobody was cut off. It stops on its own once that game ends, and hosting will work again then."
 msgstr "Він далі працює, бо через нього ще грається гра. Нікого не відключено. Він зупиниться сам, коли гра закінчиться, і тоді створення кімнати знову працюватиме."
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and runs until it is started again."
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and stops on {stopsOn}."
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It loops and stops when {stopFunction} is called."
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "It may change a value typed here too. A mutator archive, an edit-in-place write and the tweak slots each get a value the game turns into the typed one, where loading the game proves it."
@@ -27384,6 +27396,10 @@ msgstr "Відкриється в імпортері, який розв’яже
 #, fuzzy
 msgid "It opens in the keybinds editor, unsaved."
 msgstr "Відкриється в редакторі сполучень клавіш, без збереження."
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "It plays once and holds the last pose."
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -27982,10 +27998,9 @@ msgstr "розкладка клавіш"
 msgid "keymaps"
 msgstr "розкладки клавіш"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Keys"
-msgstr "Клавіші"
+#: src/lego/timelineModel.ts
+msgid "Keys of {piece} on frame {frame}"
+msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #: src/multiplayer/battle/MemberRow.tsx
@@ -28111,6 +28126,10 @@ msgstr "Мова"
 
 #: src/profile/health.ts
 msgid "Language packs loaded: {loadedList}"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Lap ends"
 msgstr ""
 
 #: src/lego/generate.ts
@@ -29448,14 +29467,10 @@ msgid "Looks as if it would tip: the weight centre is {distance} elmos outside t
 msgstr "Схоже, перекинеться: центр ваги на {distance} ельмо за межами ніг."
 
 #: src/campaign/pages/components/MediaPlayer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Loop"
 msgstr "Повторювати"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Loops"
-msgstr "Цикли"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -31054,29 +31069,9 @@ msgstr "Перемістити нижче"
 msgid "Move each of the {boxHolders} boxes on to the next ally"
 msgstr "Передати кожну зону ({boxHolders}) наступному союзнику"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move earlier"
-msgstr "Перемістити раніше"
-
 #: src/runlite/pages/RunPage.tsx
 msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
 msgstr ""
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move key {keyNumber} earlier"
-msgstr "Перемістити ключ {keyNumber} раніше"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move key {keyNumber} later"
-msgstr "Перемістити ключ {keyNumber} пізніше"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Move later"
-msgstr "Перемістити пізніше"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -31137,6 +31132,18 @@ msgstr "Перейти на {newerName}"
 #, fuzzy
 msgid "Move up"
 msgstr "Перемістити вище"
+
+#: src/lego/timelineModel.ts
+msgid "Move x"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Move y"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Move z"
+msgstr ""
 
 #: src/lego/pages/components/MeasureReadout.tsx
 #, fuzzy
@@ -31467,9 +31474,9 @@ msgstr "виконуваний файл mysql"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/lego/pages/BuilderPage.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -31937,6 +31944,7 @@ msgid "New access level"
 msgstr "Новий рівень доступу"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "New action"
 msgstr "Нова дія"
@@ -33952,11 +33960,6 @@ msgstr "немає тексту, тож радіопанель відкрива�
 #, fuzzy
 msgid "no texture"
 msgstr "без текстури"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "No time yet"
-msgstr "Ще немає часу"
 
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
@@ -36223,6 +36226,10 @@ msgstr "Відкрити в рушії"
 msgid "Open in the builder"
 msgstr "Відкрити в конструкторі"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Open in the Timeline tab"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Open it"
@@ -36336,6 +36343,7 @@ msgid "Open the scenario"
 msgstr "Відкрити сценарій"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Відкрити вкладку «Скрипт»"
@@ -37292,6 +37300,7 @@ msgstr "Патрулювати"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Pause"
@@ -37844,8 +37853,8 @@ msgstr ""
 #: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
@@ -38199,11 +38208,6 @@ msgstr "Відтворюється точно як у грі. Лише для ч
 msgid "Plays on Killed, which no action can start from."
 msgstr "Відтворюється на Killed, з якого жодна дія не може початися."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Plays once and holds the last pose."
-msgstr "Відтворюється один раз і утримує останню позу."
-
 #: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away."
@@ -38313,11 +38317,6 @@ msgstr ""
 #, fuzzy
 msgid "Pose name"
 msgstr "Назва пози"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Pose of key {keyNumber}"
-msgstr "Поза ключа {keyNumber}"
 
 #: src/lego/pages/components/PosesPopover.tsx
 #, fuzzy
@@ -40508,7 +40507,6 @@ msgstr "Ремікс із"
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/hub/pages/ItemPage.tsx
-#: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
 #: src/lego/pages/components/BuiltBySection.tsx
@@ -40667,11 +40665,6 @@ msgstr "Прибрати з обраного"
 #, fuzzy
 msgid "Remove from queue"
 msgstr "Прибрати з черги"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Remove key {keyNumber}"
-msgstr "Прибрати ключ {keyNumber}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -42153,11 +42146,6 @@ msgstr "Прогони"
 msgid "Runs from before records were kept per game, or with no game recorded. What they unlocked is offered in every game."
 msgstr "Прогони з часу, коли записи ще не велися окремо для кожної гри, або без записаної гри. Те, що вони відкрили, пропонується в кожній грі."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Runs until it is started again."
-msgstr "Триває, доки його не запустять знову."
-
 #: src/lego/index.ts
 #, fuzzy
 msgid "S3O Blender Tools"
@@ -42266,11 +42254,6 @@ msgstr "Зберегти пакет креслень"
 #, fuzzy
 msgid "Save a password first. Coilbox cannot log in at startup without one."
 msgstr "Спочатку збережіть пароль. Без нього Coilbox не може увійти під час запуску."
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Save a pose first, from Poses in the view controls."
-msgstr "Спочатку збережіть позу в розділі «Пози» елементів керування виглядом."
 
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
@@ -42971,6 +42954,10 @@ msgstr "Прокрутити в кінець"
 msgid "Scroll to start"
 msgstr "Прокрутити на початок"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Scrub the action"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Scrub the script preview"
@@ -43245,37 +43232,22 @@ msgstr "Секунди, за які дія плавно починається �
 msgid "seconds between firings"
 msgstr "секунди між спрацюваннями"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds from rest, or from the last key when it loops"
-msgstr "Секунди від стану спокою або від останнього ключа при повторенні"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds from the key before"
-msgstr "Секунди від попереднього ключа"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to ease back to rest"
 msgstr "Секунди на плавне повернення в стан спокою"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to ease in from where the pieces are"
 msgstr "Секунди на плавний початок із поточного положення елементів"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Seconds to reach key {keyNumber}"
-msgstr "Секунди до ключа {keyNumber}"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to reach the first key from wherever the pieces are. Empty uses the unit's time."
 msgstr "Секунди до першого ключа з будь-якого положення елементів. Порожнє значення використовує час юніта."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Seconds to return to rest when it stops. Empty uses the unit's time."
 msgstr "Секунди на повернення в стан спокою після зупинки. Порожнє значення використовує час юніта."
@@ -44929,6 +44901,10 @@ msgstr "Показати скрипт"
 msgid "Show the side panel"
 msgstr "Показати бічну панель"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Show the timeline"
+msgstr ""
+
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Show the top, front and side views beside the perspective view, or go back to one view"
@@ -46521,7 +46497,7 @@ msgstr "починається з {value}"
 msgid "Starts cloaked"
 msgstr "Починає замаскованим"
 
-#: src/lego/pages/components/ActionsDrawer.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Starts on"
 msgstr "Починається на"
@@ -46621,12 +46597,12 @@ msgstr "Крок"
 msgid "step {number} of the build order"
 msgstr ""
 
-#: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/FrameScrubber.tsx
 #, fuzzy
 msgid "Step back one frame"
 msgstr "Крок на кадр назад"
 
-#: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/FrameScrubber.tsx
 #, fuzzy
 msgid "Step forward one frame"
 msgstr "Крок на кадр уперед"
@@ -46805,20 +46781,10 @@ msgstr "Зупинка…"
 msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
 msgstr "Зупиняє фонову анімацію – мерехтіння галактики, прокручування панорам, обертання переглядів мап і ефекти результатів. «Як у системі» враховує налаштування доступності вашої ОС."
 
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Stops on {stopsOn}."
-msgstr "Зупиняється на {stopsOn}."
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Stops to shoot"
 msgstr "Зупиняється, щоб стріляти"
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Stops when {stopFunction} is called."
-msgstr "Зупиняється, коли викликано {stopFunction}."
 
 #: src/content/index.ts
 #, fuzzy
@@ -52747,6 +52713,10 @@ msgstr "Цей юніт рухається, але не називає клас�
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "This unit runs its own script."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."
@@ -53034,6 +53004,7 @@ msgid "Time: unknown"
 msgstr "Час: невідомо"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Timeline"
 msgstr "Шкала часу"
@@ -53681,6 +53652,18 @@ msgstr "Поворот до"
 #, fuzzy
 msgid "Turn without slowing"
 msgstr "Повертати без сповільнення"
+
+#: src/lego/timelineModel.ts
+msgid "Turn x"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Turn y"
+msgstr ""
+
+#: src/lego/timelineModel.ts
+msgid "Turn z"
+msgstr ""
 
 #: src/scenario/pages/components/rigidTurn.ts
 #, fuzzy
@@ -57182,11 +57165,6 @@ msgstr "Записує кожну подію, хоч би що показува�
 #, fuzzy
 msgid "Writes every line on the chart. Nothing is hidden."
 msgstr "Записує кожну лінію графіка. Нічого не приховано."
-
-#: src/lego/pages/components/ActionsDrawer.tsx
-#, fuzzy
-msgid "Writes nothing yet"
-msgstr "Поки нічого не записує"
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
