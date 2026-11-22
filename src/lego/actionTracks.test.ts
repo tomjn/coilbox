@@ -8,6 +8,9 @@ import {
   piece,
   poseUnits,
   run,
+  track,
+  tracked,
+  trackUnits,
   unit,
 } from "./actionFixtures";
 import goldens from "./actionGoldens.json";
@@ -26,7 +29,6 @@ import {
 import { buildLuaScript } from "./luaScript";
 import {
   type LegoAction,
-  type LegoActionTrack,
   type LegoProject,
   parseLegoProjectData,
 } from "./model";
@@ -51,31 +53,6 @@ function lowered(project: LegoProject): LegoProject {
     ...project,
     actions: project.actions?.map((a) => withTracks(a, project)),
   };
-}
-
-function track(
-  pieceId: string,
-  kind: "turn" | "move",
-  axis: 0 | 1 | 2,
-  keys: [number, number][],
-): LegoActionTrack {
-  return {
-    piece: pieceId,
-    kind,
-    axis,
-    keys: keys.map(([frame, value]) => ({ frame, value })),
-  };
-}
-
-/** An action of tracks. Poses are not needed, so the unit has none. */
-function tracked(
-  tracks: LegoActionTrack[],
-  extra: Partial<LegoAction> = {},
-): LegoProject {
-  return unit({
-    poses: undefined,
-    actions: [action({ keys: [], tracks, ...extra })],
-  });
 }
 
 describe("a pose key action written through tracks (#5394)", () => {
@@ -346,44 +323,7 @@ describe("a plan against the framework under luajit", () => {
     return { timeline, rows };
   }
 
-  const staggered = tracked(
-    [
-      track("arm", "turn", 0, [
-        [10, -0.5],
-        [20, 0],
-      ]),
-      track("hatch", "move", 1, [
-        [15, 3],
-        [30, 0],
-      ]),
-    ],
-    { loop: false, trigger: "Shot1" },
-  );
-  const loopOffsets = tracked([
-    track("arm", "turn", 0, [
-      [10, 1],
-      [40, -1],
-    ]),
-    track("arm", "turn", 2, [
-      [20, 0.5],
-      [50, 0],
-    ]),
-    track("hatch", "move", 1, [
-      [5, 4],
-      [30, 0],
-    ]),
-  ]);
-  const frameZero = tracked([
-    track("arm", "turn", 0, [
-      [0, 1],
-      [30, -0.5],
-      [45, 0.25],
-    ]),
-    track("hatch", "move", 1, [
-      [0, 2],
-      [45, 0],
-    ]),
-  ]);
+  const { staggered, loopOffsets, frameZero } = trackUnits();
 
   it("writes the same script from the normalised tracks", () => {
     for (const project of [staggered, loopOffsets, frameZero]) {
@@ -414,11 +354,7 @@ describe("a plan against the framework under luajit", () => {
   });
 
   it("matches for a one key action", () => {
-    const one = tracked([track("arm", "turn", 0, [[30, 1]])], {
-      loop: false,
-      trigger: "Shot1",
-    });
-    const { timeline } = matches(one, "Shot1");
+    const { timeline } = matches(trackUnits().oneKey, "Shot1");
     expect(timeline.frames).toHaveLength(30);
   });
 
