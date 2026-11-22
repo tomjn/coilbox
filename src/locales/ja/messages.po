@@ -42388,6 +42388,10 @@ msgstr "シングルプレイのプリセットに保存しました"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "後で再プレイできるよう、シングルプレイのプリセットに保存しました。"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "ユニットと一緒に保存されました。エクスポートすると、建設メニューの画像としてゲームに {pictureFile} が書き込まれます。"
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44568,6 +44572,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "すべてのリプレイを再び表示"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "ファイルを表示"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -44897,11 +44905,16 @@ msgstr "建設が止まるとドアを閉じます。1 回だけ再生するア�
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "勢力"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "側面"
 
 #: src/campaign/media.ts
 #, fuzzy

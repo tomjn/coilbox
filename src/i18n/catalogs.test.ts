@@ -42,6 +42,21 @@ const SENTENCE_CASE_NAMES = [
   "Scenario builder",
 ];
 
+/**
+ * "Side" is both a faction and a camera angle. Sharing one message showed the
+ * build picture's side view as 阵营, a faction, in Chinese.
+ */
+describe("camera angle Side", () => {
+  const chinese = catalogs["../locales/zh-Hans/messages.po"].messages;
+
+  it("is its own message, translated as a view", () => {
+    expect(chinese[generateMessageId("Side", "camera angle")]).toEqual([
+      "侧面",
+    ]);
+    expect(chinese[generateMessageId("Side")]).toEqual(["阵营"]);
+  });
+});
+
 describe("English catalog", () => {
   const english = catalogs["../locales/en/messages.po"].messages;
 

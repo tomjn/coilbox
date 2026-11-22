@@ -34790,6 +34790,10 @@ msgstr "Saved to Singleplayer presets"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Saved to your Singleplayer presets to replay later."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr "Saved. The file as it was is at {saved}."
@@ -36574,6 +36578,10 @@ msgstr "Show every lane"
 msgid "Show every replay again"
 msgstr "Show every replay again"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Show file"
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Show frame rate"
 msgstr "Show frame rate"
@@ -36841,8 +36849,12 @@ msgstr "Shuts the doors when the build stops, and an action that plays once neve
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+msgid "Side"
+msgstr "Side"
+
 #: src/content/pages/components/useUnitRenders.ts
 #: src/lego/buildPicture.ts
+msgctxt "camera angle"
 msgid "Side"
 msgstr "Side"
 

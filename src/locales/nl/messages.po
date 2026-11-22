@@ -42675,6 +42675,10 @@ msgstr "Opgeslagen in de Singleplayer-voorinstellingen"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Opgeslagen in je Singleplayer-voorinstellingen om later opnieuw te spelen."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Opgeslagen bij de eenheid. Exporteren schrijft het naar de game als {pictureFile}, de afbeelding in het bouwmenu."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44863,6 +44867,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Alle replays weer tonen"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Bestand tonen"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -45193,11 +45201,16 @@ msgstr "Sluit de deuren als het bouwen stopt, en een actie die één keer speelt
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "Factie"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "Zijkant"
 
 #: src/campaign/media.ts
 #, fuzzy

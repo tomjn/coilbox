@@ -42388,6 +42388,10 @@ msgstr "Guardada en las plantillas de Un jugador"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Guardada en tus plantillas de Un jugador para volver a jugarla más tarde."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Guardada con la unidad. Al exportar se escribe en el juego como {pictureFile}, su imagen del menú de construcción."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44568,6 +44572,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Volver a mostrar todas las repeticiones"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Mostrar archivo"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -44897,11 +44905,16 @@ msgstr "Cierra las puertas cuando se detiene la construcción, y una acción que
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "Facción"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "Lateral"
 
 #: src/campaign/media.ts
 #, fuzzy

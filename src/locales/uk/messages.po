@@ -42388,6 +42388,10 @@ msgstr "Збережено в шаблони одиночної гри"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Збережено у ваші шаблони одиночної гри, щоб зіграти пізніше."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Збережено разом із юнітом. Під час експорту його буде записано в гру як {pictureFile}, зображення в меню будівництва."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44568,6 +44572,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Знову показати всі повтори"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Показати файл"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -44897,11 +44905,16 @@ msgstr "Зачиняє двері, коли будівництво зупиня�
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "Фракція"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "Збоку"
 
 #: src/campaign/media.ts
 #, fuzzy

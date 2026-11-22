@@ -42658,6 +42658,10 @@ msgstr "Salvo nas predefinições de Um jogador"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Salvo nas suas predefinições de Um jogador para jogar de novo depois."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Salva com a unidade. A exportação a grava no jogo como {pictureFile}, a imagem do menu de construção."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44846,6 +44850,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Mostrar todos os replays de novo"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Mostrar arquivo"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -45176,11 +45184,16 @@ msgstr "Fecha as portas quando a construção para, e uma ação que toca uma ve
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "Facção"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "Lateral"
 
 #: src/campaign/media.ts
 #, fuzzy

@@ -51,7 +51,7 @@ export const PICTURE_VIEWS: {
   {
     id: "side",
     get label() {
-      return t`Side`;
+      return t({ message: "Side", context: "camera angle" });
     },
     direction: [viewZ, viewY, 0],
   },

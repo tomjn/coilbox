@@ -42675,6 +42675,10 @@ msgstr "Sparad i förinställningar för enspelarläget"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Sparad i dina förinställningar för enspelarläget så att du kan spela om den senare."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Sparad med enheten. Exporten skriver den till spelet som {pictureFile}, bilden i byggmenyn."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44863,6 +44867,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Visa alla repriser igen"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Visa fil"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -45193,9 +45201,14 @@ msgstr "Stänger dörrarna när bygget slutar, och en åtgärd som spelas en gå
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+#, fuzzy
+msgid "Side"
+msgstr "Sida"
+
 #: src/content/pages/components/useUnitRenders.ts
 #: src/lego/buildPicture.ts
 #, fuzzy
+msgctxt "camera angle"
 msgid "Side"
 msgstr "Sida"
 

@@ -42658,6 +42658,10 @@ msgstr "Lagret i forhåndsinnstillinger for enspiller"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Lagret i forhåndsinnstillingene for enspiller, så du kan spille det igjen senere."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Lagret med enheten. Eksporten skriver det inn i spillet som {pictureFile}, bildet i byggemenyen."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44846,6 +44850,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Vis alle repriser igjen"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Vis fil"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -45176,11 +45184,16 @@ msgstr "Lukker dørene når byggingen stopper, og en handling som spilles én ga
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "Fraksjon"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "Side"
 
 #: src/campaign/media.ts
 #, fuzzy

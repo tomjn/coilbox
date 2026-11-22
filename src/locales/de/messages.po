@@ -42388,6 +42388,10 @@ msgstr "In Einzelspieler-Vorlagen gespeichert"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "In Ihren Einzelspieler-Vorlagen gespeichert, um später erneut zu spielen."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Mit der Einheit gespeichert. Beim Export wird es als {pictureFile} ins Spiel geschrieben, als Bild im Baumenü."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44568,6 +44572,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "Wieder alle Wiederholungen zeigen"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Datei zeigen"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -44897,9 +44905,14 @@ msgstr "Schließt die Tore, wenn das Bauen stoppt, und eine Aktion, die einmal s
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
+#, fuzzy
+msgid "Side"
+msgstr "Seite"
+
 #: src/content/pages/components/useUnitRenders.ts
 #: src/lego/buildPicture.ts
 #, fuzzy
+msgctxt "camera angle"
 msgid "Side"
 msgstr "Seite"
 

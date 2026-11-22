@@ -42388,6 +42388,10 @@ msgstr "已保存到单人游戏预设"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "已保存到你的单人游戏预设，可稍后再玩。"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "已随单位保存。导出时会以 {pictureFile} 写入游戏，作为它在建造菜单中的图片。"
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44568,6 +44572,10 @@ msgstr ""
 msgid "Show every replay again"
 msgstr "重新显示所有回放"
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "显示文件"
+
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Show frame rate"
@@ -44897,11 +44905,16 @@ msgstr "建造停止时关闭舱门，只播放一次的动作不会再回到静
 #: src/conquest/pages/components/RunSetup.tsx
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
-#: src/content/pages/components/useUnitRenders.ts
-#: src/lego/buildPicture.ts
 #, fuzzy
 msgid "Side"
 msgstr "阵营"
+
+#: src/content/pages/components/useUnitRenders.ts
+#: src/lego/buildPicture.ts
+#, fuzzy
+msgctxt "camera angle"
+msgid "Side"
+msgstr "侧面"
 
 #: src/campaign/media.ts
 #, fuzzy
