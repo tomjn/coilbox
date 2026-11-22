@@ -48095,6 +48095,11 @@ msgstr ""
 msgid "The addresses the server gives players for the battles they host."
 msgstr "Adressene serveren gir spillere for kampene de er vert for."
 
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr "Sikktepunktet er ikke stedet skuddene kommer fra. Skuddene går ut fra en våpen sine løp- og snutebluss-deler, som du setter opp i Våpen-delen i Spill-fanen."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
@@ -56692,11 +56697,6 @@ msgstr "Hvilke av spillets bygninger coilbox behandler som hver fraksjons versjo
 #, fuzzy
 msgid "Which part of the unit to edit"
 msgstr "Hvilken del av enheten som skal redigeres"
-
-#: src/lego/pages/components/AimPointPanel.tsx
-#, fuzzy
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
-msgstr "Hvilken del et våpen skyter fra, er noe annet som motoren leser ut av enhetens skript, og byggeren har ingen våpen å skyte med."
 
 #: src/lego/importS3o.ts
 #, fuzzy

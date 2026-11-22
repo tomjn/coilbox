@@ -47786,6 +47786,11 @@ msgstr ""
 msgid "The addresses the server gives players for the battles they host."
 msgstr "プレイヤーがホストする試合に対して、サーバーが渡すアドレス。"
 
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr "照準点は弾が発射される位置ではありません。弾は武器の砲身と発射炎のパーツから発射され、これらはゲームタブの武器セクションで設定します。"
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
@@ -56339,11 +56344,6 @@ msgstr "coilbox が、このゲームの建物のうち各勢力で同じもの�
 #, fuzzy
 msgid "Which part of the unit to edit"
 msgstr "ユニットの編集する部分"
-
-#: src/lego/pages/components/AimPointPanel.tsx
-#, fuzzy
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
-msgstr "武器がどのピースから発射されるかは、エンジンがユニットのスクリプトから読み込む別の情報で、ビルダーには発射する武器がありません。"
 
 #: src/lego/importS3o.ts
 #, fuzzy

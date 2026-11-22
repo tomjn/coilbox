@@ -39230,6 +39230,10 @@ msgstr ""
 msgid "The addresses the server gives players for the battles they host."
 msgstr ""
 
+#: src/lego/pages/components/AimPointPanel.tsx
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
 msgstr ""
@@ -46238,10 +46242,6 @@ msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 msgid "Which part of the unit to edit"
-msgstr ""
-
-#: src/lego/pages/components/AimPointPanel.tsx
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
 msgstr ""
 
 #: src/lego/importS3o.ts
