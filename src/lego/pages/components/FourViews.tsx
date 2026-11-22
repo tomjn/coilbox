@@ -53,6 +53,34 @@ const NAME_CORNER: Record<Quadrant, string> = {
   perspective: "top-1 left-1",
 };
 
+/**
+ * The solid bands the chrome sits in along the top, the bottom and the left of
+ * the canvas. They take their own clicks, so a press beside a button never
+ * reaches a view it is not over. Used in four views, and in one view once the
+ * chrome no longer fits over it (#5414).
+ */
+export function ChromeBands({ bands }: { bands: ViewBands }) {
+  return (
+    <>
+      <div
+        data-band="top"
+        className="absolute inset-x-0 top-0 bg-background"
+        style={{ height: bands.top }}
+      />
+      <div
+        data-band="bottom"
+        className="absolute inset-x-0 bottom-0 bg-background"
+        style={{ height: bands.bottom }}
+      />
+      <div
+        data-band="left"
+        className="absolute left-0 bg-background"
+        style={{ top: bands.top, bottom: bands.bottom, width: bands.left }}
+      />
+    </>
+  );
+}
+
 export function QuadrantFrames({
   active,
   bands,
@@ -75,21 +103,7 @@ export function QuadrantFrames({
   };
   return (
     <>
-      <div
-        data-band="top"
-        className="absolute inset-x-0 top-0 bg-background"
-        style={{ height: bands.top }}
-      />
-      <div
-        data-band="bottom"
-        className="absolute inset-x-0 bottom-0 bg-background"
-        style={{ height: bands.bottom }}
-      />
-      <div
-        data-band="left"
-        className="absolute left-0 bg-background"
-        style={{ top: bands.top, bottom: bands.bottom, width: bands.left }}
-      />
+      <ChromeBands bands={bands} />
       <div
         className="pointer-events-none absolute right-0 grid grid-cols-2 grid-rows-2"
         style={{ top: bands.top, bottom: bands.bottom, left: bands.left }}

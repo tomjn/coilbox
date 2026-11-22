@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FourViewsButton, QuadrantFrames } from "./FourViews";
+import { ChromeBands, FourViewsButton, QuadrantFrames } from "./FourViews";
 import type { SceneState } from "./sceneState";
 import { useModelShortcuts } from "./useModelShortcuts";
 
@@ -127,5 +127,17 @@ describe("the chrome's bands (#5410)", () => {
       expect(band(id).className).not.toContain("pointer-events-none");
       expect(band(id).className).toContain("bg-background");
     }
+  });
+});
+
+describe("the chrome's bands in one view (#5414)", () => {
+  it("are the same solid bands, with no quadrants in them", () => {
+    const { container } = render(<ChromeBands bands={BANDS} />);
+    const band = (id: string) =>
+      container.querySelector(`[data-band="${id}"]`) as HTMLElement;
+    expect(band("top").style.height).toBe("60px");
+    expect(band("bottom").style.height).toBe("64px");
+    expect(band("left").style.width).toBe("56px");
+    expect(container.querySelector("[data-quadrant]")).toBeNull();
   });
 });
