@@ -14318,6 +14318,11 @@ msgstr "Een functie aanroepen"
 msgid "Calls a function the game already has, by name."
 msgstr "Roept een functie aan die het spel al heeft, op naam."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera"
+msgstr "Camera"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "Camera angle"
@@ -14327,6 +14332,11 @@ msgstr "Camerahoek"
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "Cameramodus, schermrandscrollen en de muis."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera navigation"
+msgstr "Camerabesturing"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -16082,6 +16092,7 @@ msgstr "COB-hulpmiddelen"
 msgid "Code"
 msgstr "Code"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -28590,6 +28601,11 @@ msgstr "Achtergebleven toen de naam van {builtByName} werd gewijzigd. De bestand
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "Achtergebleven toen de naam van {projectName} werd gewijzigd. De bestanden staan nog in dit spel, dus het spel heeft twee eenheden. Ruim ze op in de exportlade van de eenhedenbouwer."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Left drag"
+msgstr "Slepen met links"
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Left out of the start positions:"
@@ -30556,6 +30572,11 @@ msgstr ""
 #, fuzzy
 msgid "Middle"
 msgstr "Midden"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Middle drag"
+msgstr "Slepen met midden"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -36616,6 +36637,11 @@ msgstr "Oranje"
 msgid "orange dwarf"
 msgstr "oranje dwerg"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Orbit"
+msgstr "Draaien"
+
 #: src/content/mapAggregate.ts
 #, fuzzy
 msgid "order"
@@ -37015,6 +37041,7 @@ msgstr "Pagina {current} van {lastPage}"
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -41895,6 +41922,11 @@ msgstr "rechts"
 #, fuzzy
 msgid "Right"
 msgstr "Rechts"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Right drag"
+msgstr "Slepen met rechts"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -56318,6 +56350,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "Wat al geschreven was, staat nog in de uitvoermap."
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 #, fuzzy
 msgid "Wheel"
 msgstr "Wiel"
@@ -58229,3 +58262,8 @@ msgstr "Naam van de zone"
 #, fuzzy
 msgid "Zones"
 msgstr "Zones"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Zoom"
+msgstr "Zoomen"

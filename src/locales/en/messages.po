@@ -11642,6 +11642,10 @@ msgstr "Call a function"
 msgid "Calls a function the game already has, by name."
 msgstr "Calls a function the game already has, by name."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Camera"
+msgstr "Camera"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "Camera angle"
 msgstr "Camera angle"
@@ -11649,6 +11653,10 @@ msgstr "Camera angle"
 #: src/content/index.ts
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "Camera mode, edge scrolling and the mouse."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Camera navigation"
+msgstr "Camera navigation"
 
 #: src/content/unitFieldNotes.ts
 msgid "Camera shake strength"
@@ -13095,6 +13103,7 @@ msgstr "COB tools"
 msgid "Code"
 msgstr "Code"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -23305,6 +23314,10 @@ msgstr "Left behind when {builtByName} was renamed. Its files are still in {game
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Left drag"
+msgstr "Left drag"
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Left out of the start positions:"
 msgstr "Left out of the start positions:"
@@ -24914,6 +24927,10 @@ msgstr "Metric in the timeline: {name}"
 #: src/lego/pivot.ts
 msgid "Middle"
 msgstr "Middle"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Middle drag"
+msgstr "Middle drag"
 
 #: src/content/pages/components/AchievementsSection.tsx
 msgid "Milestones"
@@ -29843,6 +29860,10 @@ msgstr "Orange"
 msgid "orange dwarf"
 msgstr "orange dwarf"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Orbit"
+msgstr "Orbit"
+
 #: src/content/mapAggregate.ts
 msgid "order"
 msgstr "order"
@@ -30169,6 +30190,7 @@ msgstr "Page {current} of {lastPage}"
 msgid "Painting the ground…"
 msgstr "Painting the ground…"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 msgid "Pan"
 msgstr "Pan"
@@ -34153,6 +34175,10 @@ msgstr "right"
 #: src/lego/pivot.ts
 msgid "Right"
 msgstr "Right"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Right drag"
+msgstr "Right drag"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -45920,6 +45946,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "Whatever had already been written is still in the output folder."
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 msgid "Wheel"
 msgstr "Wheel"
 
@@ -47468,3 +47495,7 @@ msgstr "Zone name"
 #: src/scenario/pages/components/modes.tsx
 msgid "Zones"
 msgstr "Zones"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Zoom"
+msgstr "Zoom"

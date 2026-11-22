@@ -11641,12 +11641,20 @@ msgstr ""
 msgid "Calls a function the game already has, by name."
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Camera"
+msgstr ""
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "Camera angle"
 msgstr ""
 
 #: src/content/index.ts
 msgid "Camera mode, edge scrolling and the mouse."
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Camera navigation"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -13094,6 +13102,7 @@ msgstr ""
 msgid "Code"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -23304,6 +23313,10 @@ msgstr ""
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Left drag"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Left out of the start positions:"
 msgstr ""
@@ -24912,6 +24925,10 @@ msgstr ""
 
 #: src/lego/pivot.ts
 msgid "Middle"
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Middle drag"
 msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
@@ -29842,6 +29859,10 @@ msgstr ""
 msgid "orange dwarf"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Orbit"
+msgstr ""
+
 #: src/content/mapAggregate.ts
 msgid "order"
 msgstr ""
@@ -30168,6 +30189,7 @@ msgstr ""
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 msgid "Pan"
 msgstr ""
@@ -34151,6 +34173,10 @@ msgstr ""
 
 #: src/lego/pivot.ts
 msgid "Right"
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Right drag"
 msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
@@ -45919,6 +45945,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr ""
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 msgid "Wheel"
 msgstr ""
 
@@ -47466,4 +47493,8 @@ msgstr ""
 #: src/hub/preview.ts
 #: src/scenario/pages/components/modes.tsx
 msgid "Zones"
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Zoom"
 msgstr ""

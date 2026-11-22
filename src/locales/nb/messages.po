@@ -14315,6 +14315,11 @@ msgstr "Kall en funksjon"
 msgid "Calls a function the game already has, by name."
 msgstr "Kaller en funksjon spillet allerede har, etter navn."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera"
+msgstr "Kamera"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "Camera angle"
@@ -14324,6 +14329,11 @@ msgstr "Kameravinkel"
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "Kameramodus, kantrulling og musen."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera navigation"
+msgstr "Kameranavigasjon"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -16079,6 +16089,7 @@ msgstr "COB-verktøy"
 msgid "Code"
 msgstr "Kode"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -28579,6 +28590,11 @@ msgstr "Etterlatt da {builtByName} fikk nytt navn. Filene er fortsatt i {gameLab
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "Etterlatt da {projectName} fikk nytt navn. Filene er fortsatt i dette spillet, så spillet har to enheter. Fjern dem i eksportskuffen i enhetsbyggeren."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Left drag"
+msgstr "Dra med venstre"
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Left out of the start positions:"
@@ -30540,6 +30556,11 @@ msgstr ""
 #, fuzzy
 msgid "Middle"
 msgstr "Midten"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Middle drag"
+msgstr "Dra med midten"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -36599,6 +36620,11 @@ msgstr "Oransje"
 msgid "orange dwarf"
 msgstr "oransje dverg"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Orbit"
+msgstr "Orbit"
+
 #: src/content/mapAggregate.ts
 #, fuzzy
 msgid "order"
@@ -36998,6 +37024,7 @@ msgstr "Side {current} av {lastPage}"
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -41878,6 +41905,11 @@ msgstr "høyre"
 #, fuzzy
 msgid "Right"
 msgstr "Høyre"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Right drag"
+msgstr "Dra med høyre"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -56294,6 +56326,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "Det som allerede var skrevet, ligger fortsatt i utdatamappen."
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 #, fuzzy
 msgid "Wheel"
 msgstr "Hjul"
@@ -58205,3 +58238,8 @@ msgstr "Sonenavn"
 #, fuzzy
 msgid "Zones"
 msgstr "Soner"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Zoom"
+msgstr "Zoom"
