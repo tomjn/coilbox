@@ -282,6 +282,7 @@ import { ExportDrawer } from "./components/ExportDrawer";
 import { FitPlanDrawer } from "./components/FitPlanDrawer";
 import { GamePanel } from "./components/GamePanel";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
+import { createHoverStore } from "./components/hoverStore";
 import { ImportDrawer } from "./components/ImportDrawer";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
@@ -607,7 +608,7 @@ function Builder({ id }: { id: string | undefined }) {
   const [normalsAngle, setNormalsAngle] = useState(DEFAULT_SMOOTHING_ANGLE_DEG);
   /** Shared between the viewport and the tree, so hovering a piece in either
    *  highlights it in the other. */
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [hover] = useState(createHoverStore);
   const [treeScrollRef, treeMoreBelow] = useMoreBelow();
   /** The tree's folded branches. Here rather than in the tree, which unmounts
    *  whenever the sidebar shows another tab. */
@@ -2898,8 +2899,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onSelect: selectPiece,
                   onTransform: transformPiece,
                   onTransformMany: transformPieces,
-                  hoveredId,
-                  onHover: setHoveredId,
+                  hover,
                 }}
                 scriptPlayback={{
                   playing,
@@ -3576,8 +3576,7 @@ function Builder({ id }: { id: string | undefined }) {
                           onToggleHidden={toggleHidden}
                           locks={rerollLocks}
                           onToggleLocked={toggleLocked}
-                          hoveredId={hoveredId}
-                          onHoverChange={setHoveredId}
+                          hover={hover}
                           collapsedIds={collapsedIds}
                           onToggleCollapsed={(pieceId) =>
                             setCollapsedIds((was) => {

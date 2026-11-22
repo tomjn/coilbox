@@ -178,6 +178,7 @@ import {
   pieceIdOf,
   snapPoseDrag,
 } from "./gizmoCommit";
+import type { HoverStore } from "./hoverStore";
 import { clearJoinFaces } from "./joinFaceMarks";
 import { disposeJointLimits } from "./jointLimitsLayer";
 import { DragReadout, LiveMeasureReadout } from "./MeasureReadout";
@@ -497,14 +498,11 @@ interface Props {
      *  group drag is one undo step rather than one per piece. */
     onTransformMany: (changes: Map<string, PieceTransform>) => void;
     /**
-     * The piece to highlight as hovered regardless of where the pointer is,
-     * e.g. because the sidebar's tree row for it is hovered instead of the
-     * canvas.
+     * The hovered piece, shared with the sidebar tree. This view sets it when
+     * the piece under the pointer changes, and highlights whatever it holds,
+     * e.g. because the tree row for a piece is hovered instead of the canvas.
      */
-    hoveredId?: string | null;
-    /** Told whenever the piece under the pointer in this view changes, so the
-     *  sidebar tree can highlight the matching row. */
-    onHover?: (pieceId: string | null) => void;
+    hover?: HoverStore;
   };
   /**
    * Handed a function that draws a frame and returns the canvas, rather than
@@ -739,14 +737,8 @@ export function ModelViewport({
   showFreeFaces = false,
 }: Props) {
   const { pack, raw, project, balance = null, overlap = null } = document;
-  const {
-    selectedIds,
-    onSelect,
-    onTransform,
-    onTransformMany,
-    hoveredId,
-    onHover,
-  } = selection;
+  const { selectedIds, onSelect, onTransform, onTransformMany, hover } =
+    selection;
   const {
     playing = false,
     scriptTimeline = null,
@@ -930,8 +922,8 @@ export function ModelViewport({
   onTransformRef.current = onTransform;
   const onTransformManyRef = useRef(onTransformMany);
   onTransformManyRef.current = onTransformMany;
-  const onHoverRef = useRef(onHover);
-  onHoverRef.current = onHover;
+  const onHoverRef = useRef(hover?.set);
+  onHoverRef.current = hover?.set;
   // F reads this from the keydown listener below, which is registered once
   // and would otherwise only ever see the selection at mount. The hover code
   // reads it too, to skip drawing a hover treatment on a selected piece.
@@ -1876,7 +1868,7 @@ export function ModelViewport({
     };
   }, [dragView]);
 
-  useModelHover(sceneRef, hoveredId, project);
+  useModelHover(sceneRef, hover, project);
 
   useModelAnchors(
     sceneRef,

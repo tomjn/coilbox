@@ -15,6 +15,7 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -24,6 +25,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JoinSummary } from "../../connectors";
 import { type LegoPiece, type LegoProject, newProject } from "../../model";
+import { createHoverStore, type HoverStore } from "./hoverStore";
 import { PieceTree } from "./PieceTree";
 
 function piece(id: string, parentId: string): LegoPiece {
@@ -72,12 +74,14 @@ const handlers = {
   onSelect: vi.fn(),
   onReparent: vi.fn(),
   onToggleHidden: vi.fn(),
-  onHoverChange: vi.fn(),
   onToggleCollapsed: vi.fn(),
 };
 
 /** Nothing folded, which is how the tree opens. */
 const NONE = new Set<string>();
+
+/** The hovered piece the tree shares with the 3D view. A fresh one per test. */
+let hover: HoverStore;
 
 function show(
   project: LegoProject,
@@ -90,6 +94,7 @@ function show(
       joins={joins}
       selectedIds={selectedIds}
       {...handlers}
+      hover={hover}
       collapsedIds={NONE}
     />,
   );
@@ -129,6 +134,7 @@ function drag(from: string, to: string | null) {
 
 beforeEach(() => {
   for (const handler of Object.values(handlers)) handler.mockClear();
+  hover = createHoverStore();
   // happy-dom has no layout, so nothing is ever under a point until a test says
   // so. Pointer capture is the same: the container asks for it mid-drag.
   document.elementFromPoint = () => null;
@@ -369,9 +375,19 @@ describe("hovering a row", () => {
   it("reports the piece under the pointer, and that it has left", () => {
     show(walker());
     fireEvent.mouseEnter(row("turret"));
-    expect(handlers.onHoverChange).toHaveBeenCalledWith("turret");
+    expect(hover.get()).toBe("turret");
     fireEvent.mouseLeave(row("turret"));
-    expect(handlers.onHoverChange).toHaveBeenCalledWith(null);
+    expect(hover.get()).toBeNull();
+  });
+
+  it("highlights the row of a piece hovered in the 3D view", () => {
+    show(walker());
+    act(() => hover.set("barrel"));
+    expect(row("barrel").className).toContain("bg-accent");
+    expect(row("turret").className).not.toContain("bg-accent");
+    act(() => hover.set("turret"));
+    expect(row("barrel").className).not.toContain("bg-accent");
+    expect(row("turret").className).toContain("bg-accent");
   });
 
   /** Mid-drag a row already means a drop target, so a second highlight on it
@@ -381,9 +397,8 @@ describe("hovering a row", () => {
     document.elementFromPoint = () => row("hull");
     fireEvent.pointerDown(row("barrel"), { clientX: 0, clientY: 0 });
     fireEvent.pointerMove(row("barrel"), { clientX: 0, clientY: 40 });
-    handlers.onHoverChange.mockClear();
     fireEvent.mouseEnter(row("skirt"));
-    expect(handlers.onHoverChange).not.toHaveBeenCalled();
+    expect(hover.get()).toBeNull();
   });
 });
 
