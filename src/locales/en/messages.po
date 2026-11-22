@@ -17409,10 +17409,6 @@ msgstr "Edge"
 msgid "Edit"
 msgstr "Edit"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-msgid "Edit {actionName}"
-msgstr "Edit {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 msgid "Edit {label} for {unitName}, now {nowShown}"
 msgstr "Edit {label} for {unitName}, now {nowShown}"
@@ -17432,6 +17428,10 @@ msgstr "Edit in Unit tweaks"
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Edit keys"
 msgstr "Edit keys"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Edit keys for {actionName}"
+msgstr "Edit keys for {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 msgid "Edit mission: {missionTitle}"

@@ -21210,11 +21210,6 @@ msgstr "边缘"
 msgid "Edit"
 msgstr "编辑"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "编辑 {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21239,6 +21234,11 @@ msgstr "在单位调整中编辑"
 #, fuzzy
 msgid "Edit keys"
 msgstr "编辑关键帧"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "编辑 {actionName} 的关键帧"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

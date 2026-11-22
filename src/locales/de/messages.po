@@ -21210,11 +21210,6 @@ msgstr "Rand"
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "{actionName} bearbeiten"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21239,6 +21234,11 @@ msgstr "In Einheiten-Anpassungen bearbeiten"
 #, fuzzy
 msgid "Edit keys"
 msgstr "Tasten bearbeiten"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Tasten für {actionName} bearbeiten"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

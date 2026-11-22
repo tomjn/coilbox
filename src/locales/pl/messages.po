@@ -21210,11 +21210,6 @@ msgstr "Krawędź"
 msgid "Edit"
 msgstr "Edytuj"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Edytuj {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21239,6 +21234,11 @@ msgstr "Edytuj w Poprawkach jednostek"
 #, fuzzy
 msgid "Edit keys"
 msgstr "Edytuj klatki kluczowe"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Edytuj klatki kluczowe: {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

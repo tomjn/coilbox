@@ -2059,7 +2059,7 @@ export function AnimationPanel({
                       <Button
                         size="sm"
                         variant="outline"
-                        aria-label={t`Edit ${actionName}`}
+                        aria-label={t`Edit keys for ${actionName}`}
                         title={t`Edit the timeline`}
                         onClick={() => setTimelineId(action.id)}
                       >

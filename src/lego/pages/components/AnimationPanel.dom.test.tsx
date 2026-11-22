@@ -1557,9 +1557,9 @@ describe("the Actions section signposts (#5400)", () => {
       }),
       { onActionsEdit: vi.fn() },
     );
-    expect(screen.getByRole("button", { name: "Edit Walk" }).textContent).toBe(
-      "Edit keys",
-    );
+    expect(
+      screen.getByRole("button", { name: "Edit keys for Walk" }).textContent,
+    ).toBe("Edit keys");
     expect(
       screen.queryByText(
         "Save poses with the Poses button, then add an action.",

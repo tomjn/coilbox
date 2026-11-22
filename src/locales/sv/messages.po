@@ -21347,11 +21347,6 @@ msgstr "Kant"
 msgid "Edit"
 msgstr "Redigera"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Redigera {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21376,6 +21371,11 @@ msgstr "Redigera i Enhetsjusteringar"
 #, fuzzy
 msgid "Edit keys"
 msgstr "Redigera nycklar"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Redigera nycklar för {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

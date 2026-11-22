@@ -21210,11 +21210,6 @@ msgstr "端"
 msgid "Edit"
 msgstr "編集"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "{actionName} を編集"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21239,6 +21234,11 @@ msgstr "ユニット調整で編集"
 #, fuzzy
 msgid "Edit keys"
 msgstr "キーを編集"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "{actionName} のキーを編集"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

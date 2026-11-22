@@ -21347,11 +21347,6 @@ msgstr "Άκρη"
 msgid "Edit"
 msgstr "Επεξεργασία"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Επεξεργασία {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21376,6 +21371,11 @@ msgstr "Επεξεργασία στις Τροποποιήσεις μονάδω�
 #, fuzzy
 msgid "Edit keys"
 msgstr "Επεξεργασία κλειδιών"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Επεξεργασία κλειδιών για {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

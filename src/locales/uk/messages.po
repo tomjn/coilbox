@@ -21210,11 +21210,6 @@ msgstr "Край"
 msgid "Edit"
 msgstr "Редагувати"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Редагувати {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21239,6 +21234,11 @@ msgstr "Редагувати в «Правки юнітів»"
 #, fuzzy
 msgid "Edit keys"
 msgstr "Редагувати ключі"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Редагувати ключі для {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

@@ -21343,11 +21343,6 @@ msgstr "Borda"
 msgid "Edit"
 msgstr "Editar"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Editar {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21372,6 +21367,11 @@ msgstr "Editar em Ajustes de unidade"
 #, fuzzy
 msgid "Edit keys"
 msgstr "Editar quadros-chave"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Editar quadros-chave de {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy

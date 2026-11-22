@@ -17408,10 +17408,6 @@ msgstr ""
 msgid "Edit"
 msgstr ""
 
-#: src/lego/pages/components/AnimationPanel.tsx
-msgid "Edit {actionName}"
-msgstr ""
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 msgid "Edit {label} for {unitName}, now {nowShown}"
 msgstr ""
@@ -17430,6 +17426,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Edit keys"
+msgstr ""
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Edit keys for {actionName}"
 msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
