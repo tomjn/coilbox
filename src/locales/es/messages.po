@@ -45404,6 +45404,11 @@ msgstr "Ajustado a {elmos} elmos, {units} unidades de rejilla"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Ajustado. Mantén Alt para colocar libremente"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Ajuste"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53417,6 +53422,11 @@ msgstr "Velocidad de giro {turnValue}, de la definición del juego."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Velocidad de giro {turnValue}, sin definir, así que la mínima del motor."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Activar o desactivar el ajuste"
 
 #: src/lego/animPresets.ts
 #, fuzzy

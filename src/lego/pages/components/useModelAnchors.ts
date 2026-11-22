@@ -22,11 +22,18 @@ export function useModelAnchors(
   soleSelectedId: string | null,
   playing: boolean,
   showFreeFaces = false,
+  snapPoints = true,
 ) {
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    showAnchors(state, pack, project, playing ? null : soleSelectedId);
+    showAnchors(
+      state,
+      pack,
+      project,
+      playing ? null : soleSelectedId,
+      snapPoints,
+    );
     showJoinFaces(
       state,
       pack,
@@ -36,5 +43,13 @@ export function useModelAnchors(
     );
     showMountMarks(state, pack, project, playing);
     state.render();
-  }, [sceneRef, pack, project, soleSelectedId, playing, showFreeFaces]);
+  }, [
+    sceneRef,
+    pack,
+    project,
+    soleSelectedId,
+    playing,
+    showFreeFaces,
+    snapPoints,
+  ]);
 }

@@ -203,6 +203,7 @@ import {
 } from "./selectionAndHoverOutlines";
 import { disposeSkeleton, layoutSkeletonLabels } from "./skeletonLayer";
 import { followSlideFrame, settleSlideFrame } from "./slideHandle";
+import { snapAnchorsShown } from "./snapAnchorsShown";
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useBalance } from "./useBalance";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
@@ -773,6 +774,9 @@ export function ModelViewport({
   /** What a pack block face drag says about the size it is on. */
   const [resizeNote, setResizeNote] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  /** A piece is being moved with the gizmo, which is when its snap points show. */
+  const [movingPiece, setMovingPiece] = useState(false);
   const [showReference, setShowReference] = useState(false);
   /** A unit read out of an installed game to stand instead of the built-in
    *  solar collector. Null is the built-in one, which is also the fallback
@@ -1421,6 +1425,7 @@ export function ModelViewport({
         // so their anchors are fixed for the length of it.
         const pieceId = gizmo.object ? pieceIdOf(gizmo.object) : null;
         if (gizmo.getMode() === "translate" && !state.posing) {
+          if (pieceId) setMovingPiece(true);
           showTargetAnchors(
             state,
             packRef.current,
@@ -1432,6 +1437,7 @@ export function ModelViewport({
       gizmo.addEventListener("mouseUp", () => {
         controls.enabled = true;
         state.dragging = false;
+        setMovingPiece(false);
         endDragReadout(state);
         showTargetAnchors(state, packRef.current, projectRef.current, null);
         showSeat(state, null);
@@ -1723,6 +1729,7 @@ export function ModelViewport({
     soleSelectedId,
     playing || posingOn,
     showFreeFaces,
+    snapAnchorsShown(snapEnabled, movingPiece),
   );
 
   useGizmoMode(
@@ -1823,6 +1830,8 @@ export function ModelViewport({
     setShortcutsOpen,
     setDrawMode,
     toggleSkeleton: () => setSkeletonChoice(!showSkeleton),
+    snapEnabled,
+    toggleSnapping: () => setSnapEnabled(!snapEnabled),
   });
 
   const { t } = useLingui();
@@ -2178,6 +2187,7 @@ export function ModelViewport({
               ) : null
             }
             grid={{ on: showGrid, onChange: setShowGrid }}
+            snapping={{ on: snapEnabled, onChange: setSnapEnabled }}
             drawMode={drawMode}
             onNextDrawMode={() => setDrawMode(nextDrawMode)}
             collision={{ on: showCollision, onChange: setShowCollision }}

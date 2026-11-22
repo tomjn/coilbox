@@ -45706,6 +45706,11 @@ msgstr "Προσαρμόστηκε σε {elmos} elmo, {units} μονάδες"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Προσκολλήθηκε. Κρατήστε πατημένο το Alt για ελεύθερη τοποθέτηση"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Προσκόλληση"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53778,6 +53783,11 @@ msgstr "Ρυθμός στροφής {turnValue}, από τον ορισμό το
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Ρυθμός στροφής {turnValue}, δεν έχει οριστεί, οπότε το ελάχιστο της μηχανής."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Ενεργοποίηση ή απενεργοποίηση της προσκόλλησης"
 
 #: src/lego/animPresets.ts
 #, fuzzy

@@ -45404,6 +45404,11 @@ msgstr "Przyciągnięto do {elmos} elmo, jednostek siatki: {units}"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Przyciągnięto. Przytrzymaj Alt, aby umieszczać swobodnie"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Przyciąganie"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53417,6 +53422,11 @@ msgstr "Szybkość skrętu {turnValue}, z definicji gry."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Szybkość skrętu {turnValue}, nieustawiona, więc minimum silnika."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Włącz lub wyłącz przyciąganie"
 
 #: src/lego/animPresets.ts
 #, fuzzy

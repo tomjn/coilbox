@@ -45404,6 +45404,11 @@ msgstr "Aimanté à {elmos} elmos, {units} unités"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Aimanté. Maintenez Alt pour placer librement"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Magnétisme"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53417,6 +53422,11 @@ msgstr "Vitesse de rotation {turnValue}, depuis la définition du jeu."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Vitesse de rotation {turnValue}, non définie, donc le minimum du moteur."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Activer ou désactiver le magnétisme"
 
 #: src/lego/animPresets.ts
 #, fuzzy
