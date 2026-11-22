@@ -49,13 +49,18 @@ import { useReduceMotion } from "../../../general/display";
 import {
   actionHooks,
   actionPoseAt,
+  actionShift,
   addAction,
   bakeAction,
   blendOf,
   type ChannelRef,
+  deleteKeys,
+  earliestMove,
   FPS,
   isHookTrigger,
+  type KeyRef,
   keyFromPose,
+  moveKeys,
   poseChanges,
   renameAction,
   STOP_CALLIN,
@@ -119,6 +124,39 @@ interface Props {
 /** A key picked on a channel's row, by its place on the ruler. */
 interface PickedKey extends ChannelRef {
   frame: number;
+}
+
+const sameKey = (a: KeyRef, b: KeyRef) =>
+  a.piece === b.piece &&
+  a.kind === b.kind &&
+  a.axis === b.axis &&
+  a.frame === b.frame;
+
+/** A diamond on a row: its frame, its name, and the keys it stands for, which
+ *  is one on a channel's row and every channel's on a piece's. */
+interface TrackKey {
+  frame: number;
+  name: string;
+  refs: KeyRef[];
+}
+
+/** A drag in progress: the keys it holds, how many frames it has moved them,
+ *  and whether they could be put there. It lives in the rows, and only an edit
+ *  on release reaches the document. */
+interface Drag {
+  keys: KeyRef[];
+  by: number;
+  blocked: boolean;
+}
+
+/** What moving and deleting a key asks of the tab. `trackId` is the row's. */
+interface KeyEditing {
+  onMove: (trackId: string, key: TrackKey, by: number) => void;
+  onRemove: (trackId: string, key: TrackKey, neighbour?: TrackKey) => void;
+  /** The most negative offset the keys can be moved by. */
+  earliest: (keys: KeyRef[]) => number;
+  /** Whether putting the keys `by` frames on would change nothing. */
+  moveBlocked: (keys: KeyRef[], by: number) => boolean;
 }
 
 export function TimelineTab(props: Props) {
@@ -374,6 +412,60 @@ function ActionTimeline({
     return row && channel && key ? { row, channel, key } : null;
   }, [picked, view]);
 
+  // After a move or a delete the key's button is a new one, so focus is put
+  // back on the key that took its place, which is what lets the arrow keys be
+  // pressed again.
+  const rowsRef = useRef<HTMLDivElement>(null);
+  const refocus = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when an edit has redrawn the keys
+  useEffect(() => {
+    const wanted = refocus.current;
+    refocus.current = null;
+    if (wanted === null) return;
+    for (const button of rowsRef.current?.querySelectorAll<HTMLElement>(
+      "[data-key]",
+    ) ?? []) {
+      if (button.dataset.key === wanted) button.focus();
+    }
+  }, [view]);
+
+  /** How far a change slides the ruler under a blend in, which keys the first
+   *  key's frame, so a key's ruler frame after it is not the one it had. */
+  function slideOf(next: LegoProject): number {
+    const after = next.actions?.find((a) => a.id === action.id);
+    return after ? actionShift(after, next) - actionShift(action, project) : 0;
+  }
+
+  /** Whether a move of these keys would change nothing: it would land on a
+   *  frame the channel already keys, or before frame 0. */
+  const moveBlocked = (keys: KeyRef[], by: number) =>
+    moveKeys(project, action.id, keys, by) === project;
+
+  function moveBy(trackId: string, key: TrackKey, by: number) {
+    const next = moveKeys(project, action.id, key.refs, by);
+    if (next === project) return;
+    const slide = by + slideOf(next);
+    refocus.current = `${trackId}:${key.frame + slide}`;
+    setPicked((now) =>
+      now && key.refs.some((ref) => sameKey(ref, now))
+        ? { ...now, frame: now.frame + slide }
+        : now,
+    );
+    onEdit((p) => moveKeys(p, action.id, key.refs, by));
+  }
+
+  function removeKey(trackId: string, key: TrackKey, neighbour?: TrackKey) {
+    const next = deleteKeys(project, action.id, key.refs);
+    if (next === project) return;
+    refocus.current = neighbour
+      ? `${trackId}:${neighbour.frame + slideOf(next)}`
+      : null;
+    setPicked((now) =>
+      now && key.refs.some((ref) => sameKey(ref, now)) ? null : now,
+    );
+    onEdit((p) => deleteKeys(p, action.id, key.refs));
+  }
+
   return (
     <TooltipProvider>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -470,10 +562,14 @@ function ActionTimeline({
           </HelpPopover>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
+        <div ref={rowsRef} className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
           <Rows
             view={view}
             action={action}
+            earliest={(keys) => earliestMove(action, project, keys)}
+            onMove={moveBy}
+            onRemove={removeKey}
+            moveBlocked={moveBlocked}
             playhead={playhead}
             seconds={seconds}
             onSeek={seek}
@@ -503,7 +599,8 @@ function Rows({
   ariaLabel,
   picked,
   onPick,
-}: {
+  ...editing
+}: KeyEditing & {
   view: TimelineView;
   action: LegoAction;
   playhead: number;
@@ -523,6 +620,7 @@ function Rows({
       return next;
     });
   }, []);
+  const [drag, setDrag] = useState<Drag | null>(null);
   const frameCount = view.end + 1;
   const frame = Math.round(playhead);
 
@@ -546,6 +644,9 @@ function Rows({
             onSeek={onSeek}
             picked={picked}
             onPick={onPick}
+            drag={drag}
+            onDrag={setDrag}
+            {...editing}
           />
           <div
             aria-hidden
@@ -688,32 +789,48 @@ const TrackRows = memo(function TrackRows({
   onSeek,
   picked,
   onPick,
-}: {
+  ...rest
+}: KeyEditing & {
   view: TimelineView;
   open: ReadonlySet<string>;
   frameCount: number;
   onSeek: (frame: number) => void;
   picked: PickedKey | null;
   onPick: (key: PickedKey) => void;
+  drag: Drag | null;
+  onDrag: (drag: Drag | null) => void;
 }) {
   return (
     <>
       {view.rows.map((row) => (
         <div key={row.piece.id} className="flex flex-col">
           <Track
+            id={`piece:${row.piece.id}`}
             frameCount={frameCount}
             onPick={onSeek}
             keys={row.frames.map((frame) => ({
               frame,
               name: pieceKeyName(row, frame),
+              refs: row.channels
+                .filter((channel) =>
+                  channel.keys.some((k) => k.frame === frame),
+                )
+                .map((channel) => ({
+                  piece: row.piece.id,
+                  kind: channel.kind,
+                  axis: channel.axis,
+                  frame,
+                })),
             }))}
             wraps={row.wraps}
             lastKey={view.lap > 0 ? view.lastKey : null}
+            {...rest}
           />
           {open.has(row.piece.id)
             ? row.channels.map((channel) => (
                 <Track
                   key={`${channel.kind}-${channel.axis}`}
+                  id={`${row.piece.id}:${channel.kind}:${channel.axis}`}
                   frameCount={frameCount}
                   onPick={(frame) =>
                     onPick({
@@ -733,9 +850,18 @@ const TrackRows = memo(function TrackRows({
                   keys={channel.keys.map((key) => ({
                     frame: key.frame,
                     name: channelKeyName(row, channel, key),
+                    refs: [
+                      {
+                        piece: row.piece.id,
+                        kind: channel.kind,
+                        axis: channel.axis,
+                        frame: key.frame,
+                      },
+                    ],
                   }))}
                   wraps={[]}
                   lastKey={view.lap > 0 ? view.lastKey : null}
+                  {...rest}
                 />
               ))
             : null}
@@ -745,16 +871,29 @@ const TrackRows = memo(function TrackRows({
   );
 });
 
-/** One row of the timeline: its keys as diamonds that seek to their frame. */
+/**
+ * One row of the timeline: its keys as diamonds. A click seeks to the key's
+ * frame. A drag moves it along the row a whole frame at a time, and lets the
+ * document know once, on release. With a key focused, Left and Right move it a
+ * frame and Delete or Backspace removes it.
+ */
 function Track({
+  id,
   keys,
   wraps,
   lastKey,
   frameCount,
   onPick,
   pickedFrame = null,
-}: {
-  keys: { frame: number; name: string }[];
+  drag,
+  onDrag,
+  onMove,
+  onRemove,
+  earliest,
+  moveBlocked,
+}: KeyEditing & {
+  id: string;
+  keys: TrackKey[];
   /** Where a loop arrives back at the first keys, drawn as an outline. */
   wraps: number[];
   /** Where the lap ends, drawn as a dashed line, when the action loops. */
@@ -764,9 +903,49 @@ function Track({
   onPick: (frame: number) => void;
   /** The frame of the key chosen on this row, which is drawn ringed. */
   pickedFrame?: number | null;
+  drag: Drag | null;
+  onDrag: (drag: Drag | null) => void;
 }) {
+  const rail = useRef<HTMLDivElement>(null);
+  // The pointer's start, and the key it holds, while a button is down.
+  const gesture = useRef<{ x: number; key: TrackKey; by: number } | null>(null);
+  // A drag ends in a click on the same button, which must not seek.
+  const dragged = useRef(false);
+
+  const draggedBy = (key: TrackKey) =>
+    drag && key.refs.every((ref) => drag.keys.some((d) => sameKey(d, ref)))
+      ? drag
+      : null;
+
+  function pointerMove(clientX: number) {
+    const held = gesture.current;
+    const width = rail.current?.getBoundingClientRect().width ?? 0;
+    if (!held || width <= 0) return;
+    // A frame is a gap of `width / (frameCount - 1)`. The pointer is not held
+    // to the row, so a key can be dragged past the end of the ruler.
+    const by = Math.max(
+      Math.round(((clientX - held.x) / width) * (frameCount - 1)),
+      earliest(held.key.refs),
+    );
+    if (by === held.by) return;
+    held.by = by;
+    if (by !== 0) dragged.current = true;
+    onDrag({
+      keys: held.key.refs,
+      by,
+      blocked: by !== 0 && moveBlocked(held.key.refs, by),
+    });
+  }
+
+  function release(commit: boolean) {
+    const held = gesture.current;
+    gesture.current = null;
+    onDrag(null);
+    if (commit && held && held.by !== 0) onMove(id, held.key, held.by);
+  }
+
   return (
-    <div className="relative h-7 border-b border-border/40">
+    <div ref={rail} className="relative h-7 border-b border-border/40">
       {lastKey !== null ? (
         <div
           aria-hidden
@@ -782,27 +961,75 @@ function Track({
           style={{ left: `${markPercent(frame, frameCount)}%` }}
         />
       ))}
-      {keys.map((key) => (
-        <button
-          key={key.frame}
-          type="button"
-          aria-label={key.name}
-          title={key.name}
-          aria-pressed={
-            pickedFrame === null ? undefined : pickedFrame === key.frame
-          }
-          onClick={() => onPick(key.frame)}
-          className="absolute top-0.5 flex size-6 -translate-x-1/2 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          style={{ left: `${markPercent(key.frame, frameCount)}%` }}
-        >
-          <span
-            className={cn(
-              "block size-2.5 rotate-45 bg-primary",
-              pickedFrame === key.frame && "ring-2 ring-foreground",
-            )}
-          />
-        </button>
-      ))}
+      {keys.map((key, index) => {
+        const moving = draggedBy(key);
+        const shown = key.frame + (moving?.by ?? 0);
+        return (
+          <button
+            key={key.frame}
+            type="button"
+            data-key={`${id}:${key.frame}`}
+            aria-label={key.name}
+            title={key.name}
+            aria-pressed={
+              pickedFrame === null ? undefined : pickedFrame === key.frame
+            }
+            onClick={() => {
+              if (dragged.current) {
+                dragged.current = false;
+                return;
+              }
+              onPick(key.frame);
+            }}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              dragged.current = false;
+              gesture.current = { x: event.clientX, key, by: 0 };
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+            }}
+            onPointerMove={(event) => pointerMove(event.clientX)}
+            onPointerUp={() => release(true)}
+            onPointerCancel={() => release(false)}
+            onKeyDown={(event) => {
+              if (event.altKey || event.ctrlKey || event.metaKey) return;
+              if (event.key === "Escape" && gesture.current) {
+                event.preventDefault();
+                event.stopPropagation();
+                release(false);
+                return;
+              }
+              if (event.shiftKey) return;
+              if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                event.preventDefault();
+                event.stopPropagation();
+                onMove(id, key, event.key === "ArrowLeft" ? -1 : 1);
+              } else if (event.key === "Delete" || event.key === "Backspace") {
+                // The builder deletes the selected piece on these keys.
+                event.preventDefault();
+                event.stopPropagation();
+                onRemove(id, key, keys[index + 1] ?? keys[index - 1]);
+              }
+            }}
+            className="absolute top-0.5 flex size-6 -translate-x-1/2 touch-none items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{
+              left: `${markPercent(Math.min(shown, frameCount - 1), frameCount)}%`,
+            }}
+          >
+            <span
+              className={cn(
+                "block size-2.5 rotate-45",
+                moving?.blocked ? "bg-destructive" : "bg-primary",
+                pickedFrame === key.frame && "ring-2 ring-foreground",
+              )}
+            />
+            {moving ? (
+              <span className="pointer-events-none absolute left-full ml-1 text-xs tabular-nums">
+                {shown}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

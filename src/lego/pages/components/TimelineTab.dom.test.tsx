@@ -657,6 +657,257 @@ describe("typing a key's value", () => {
   });
 });
 
+describe("moving and deleting keys (#5398)", () => {
+  const armX = "Turn x of arm, frame 10, -28.6 degrees";
+  const keyNamed = (name: string) => screen.getByRole("button", { name });
+
+  const trackOf = (index: number) => seen.project.actions?.[0].tracks?.[index];
+  const framesOf = (index: number) => trackOf(index)?.keys.map((k) => k.frame);
+
+  /** Drags a diamond `frames` frames along a row `width` pixels wide that is
+   *  `count` frames across, in several moves, and lets go unless told not to. */
+  function drag(
+    button: HTMLElement,
+    frames: number,
+    { release = true, count = 61, width = 1000 } = {},
+  ) {
+    const rail = button.parentElement as HTMLElement;
+    vi.spyOn(rail, "getBoundingClientRect").mockReturnValue({
+      width,
+    } as DOMRect);
+    const dx = (frames * width) / (count - 1);
+    fireEvent.pointerDown(button, { button: 0, pointerId: 1, clientX: 400 });
+    fireEvent.pointerMove(button, {
+      pointerId: 1,
+      clientX: 400 + dx / 2,
+    });
+    fireEvent.pointerMove(button, { pointerId: 1, clientX: 400 + dx });
+    if (release) {
+      fireEvent.pointerUp(button, { pointerId: 1, clientX: 400 + dx });
+    }
+  }
+
+  const openArm = () =>
+    fireEvent.click(screen.getByRole("button", { name: "Channels of arm" }));
+
+  it("names each key by its channel, piece, frame and value", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    expect(names()).toContain(armX);
+    expect(names()).toContain("Turn x of arm, frame 20, 0 degrees");
+    expect(names()).toContain("Keys of arm on frame 10");
+    fireEvent.click(screen.getByRole("button", { name: "Channels of hatch" }));
+    expect(names()).toContain("Move y of hatch, frame 15, 3 elmos");
+  });
+
+  it("moves a key by a drag, and a drag is one edit made on release", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    const before = seen.project;
+    const edits = seen.edits;
+    drag(keyNamed(armX), 4, { release: false });
+    // Held and shown on the way, with nothing in the document yet.
+    expect(seen.edits).toBe(edits);
+    expect(seen.project).toBe(before);
+    expect(within(keyNamed(armX)).getByText("14")).toBeTruthy();
+    fireEvent.pointerUp(keyNamed(armX), { pointerId: 1, clientX: 600 });
+    expect(seen.edits).toBe(edits + 1);
+    expect(framesOf(0)).toEqual([14, 20]);
+    expect(trackOf(0)?.keys[0].value).toBe(-0.5);
+    expect(names()).toContain("Turn x of arm, frame 14, -28.6 degrees");
+  });
+
+  it("does not seek when a drag ends, and seeks on a click", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    drag(keyNamed(armX), 4);
+    fireEvent.click(keyNamed("Turn x of arm, frame 14, -28.6 degrees"));
+    expect(screen.getByText(/^Frame 0,/)).toBeTruthy();
+    fireEvent.click(keyNamed("Turn x of arm, frame 14, -28.6 degrees"));
+    expect(screen.getByText(/^Frame 14,/)).toBeTruthy();
+  });
+
+  it("puts a key back where it was when it is dropped on a frame its channel keys", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    const before = seen.project;
+    const edits = seen.edits;
+    drag(keyNamed(armX), 10, { release: false });
+    // The key is shown as a refusal while it is over the other key.
+    expect(keyNamed(armX).querySelector(".bg-destructive")).not.toBeNull();
+    fireEvent.pointerUp(keyNamed(armX), { pointerId: 1, clientX: 700 });
+    expect(seen.edits).toBe(edits);
+    expect(seen.project).toBe(before);
+    expect(names()).toContain(armX);
+  });
+
+  it("puts a key back where it was when the drag is cancelled", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    const edits = seen.edits;
+    drag(keyNamed(armX), 4, { release: false });
+    fireEvent.keyDown(keyNamed(armX), { key: "Escape" });
+    expect(seen.edits).toBe(edits);
+    expect(names()).toContain(armX);
+  });
+
+  it("stops a key at frame 0 rather than before it", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    drag(keyNamed(armX), -40);
+    expect(framesOf(0)).toEqual([0, 20]);
+  });
+
+  it("extends the ruler when a key is dragged past its end", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    fireEvent.click(screen.getByRole("button", { name: "Channels of hatch" }));
+    const ruler = () =>
+      screen.getByRole("slider").getAttribute("aria-valuemax");
+    expect(ruler()).toBe("60");
+    drag(keyNamed("Move y of hatch, frame 30, 0 elmos"), 45);
+    expect(framesOf(1)).toEqual([15, 75]);
+    expect(ruler()).toBe("105");
+  });
+
+  it("moves every key of a piece on a frame by dragging its diamond", () => {
+    const project = trackUnits().staggered;
+    const arm = project.actions?.[0];
+    if (!arm?.tracks) throw new Error("no tracks");
+    render(
+      <Harness
+        initial={{
+          ...project,
+          actions: [
+            {
+              ...arm,
+              tracks: [
+                ...arm.tracks,
+                {
+                  piece: "arm",
+                  kind: "turn",
+                  axis: 2,
+                  keys: [
+                    { frame: 10, value: 0.5 },
+                    { frame: 40, value: 0 },
+                  ],
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    const edits = seen.edits;
+    drag(keyNamed("Keys of arm on frame 10"), 3, { count: 71 });
+    expect(seen.edits).toBe(edits + 1);
+    expect(framesOf(0)).toEqual([13, 20]);
+    expect(trackOf(2)?.keys.map((k) => k.frame)).toEqual([13, 40]);
+    expect(framesOf(1)).toEqual([15, 30]);
+  });
+
+  it("moves a focused key a frame with the arrow keys, and keeps the focus on it", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    const edits = seen.edits;
+    keyNamed(armX).focus();
+    fireEvent.keyDown(keyNamed(armX), { key: "ArrowRight" });
+    expect(seen.edits).toBe(edits + 1);
+    expect(framesOf(0)).toEqual([11, 20]);
+    const moved = keyNamed("Turn x of arm, frame 11, -28.6 degrees");
+    expect(document.activeElement).toBe(moved);
+    fireEvent.keyDown(moved, { key: "ArrowLeft" });
+    fireEvent.keyDown(keyNamed("Turn x of arm, frame 10, -28.6 degrees"), {
+      key: "ArrowLeft",
+    });
+    expect(framesOf(0)).toEqual([9, 20]);
+    expect(seen.edits).toBe(edits + 3);
+  });
+
+  it("does nothing when an arrow key would put a key on its neighbour", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    for (let step = 0; step < 9; step++) {
+      const at = 10 + step;
+      fireEvent.keyDown(keyNamed(`Turn x of arm, frame ${at}, -28.6 degrees`), {
+        key: "ArrowRight",
+      });
+    }
+    const edits = seen.edits;
+    fireEvent.keyDown(keyNamed("Turn x of arm, frame 19, -28.6 degrees"), {
+      key: "ArrowRight",
+    });
+    expect(seen.edits).toBe(edits);
+    expect(framesOf(0)).toEqual([19, 20]);
+  });
+
+  it("deletes a focused key with Delete or Backspace, and focuses its neighbour", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    const edits = seen.edits;
+    keyNamed(armX).focus();
+    fireEvent.keyDown(keyNamed(armX), { key: "Delete" });
+    expect(seen.edits).toBe(edits + 1);
+    expect(framesOf(0)).toEqual([20]);
+    expect(document.activeElement).toBe(
+      keyNamed("Turn x of arm, frame 20, 0 degrees"),
+    );
+    fireEvent.keyDown(keyNamed("Turn x of arm, frame 20, 0 degrees"), {
+      key: "Backspace",
+    });
+    // The last key of a track takes the track with it.
+    expect(trackOf(0)?.piece).toBe("hatch");
+    expect(seen.project.actions?.[0].tracks).toHaveLength(1);
+  });
+
+  it("deletes every key of a piece on a frame from its diamond, in one edit", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    const edits = seen.edits;
+    fireEvent.keyDown(keyNamed("Keys of hatch on frame 15"), {
+      key: "Delete",
+    });
+    expect(seen.edits).toBe(edits + 1);
+    expect(framesOf(1)).toEqual([30]);
+  });
+
+  it("does not let the builder see the key it used", () => {
+    const seenByWindow = vi.fn();
+    window.addEventListener("keydown", seenByWindow);
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    fireEvent.keyDown(keyNamed(armX), { key: "Delete" });
+    window.removeEventListener("keydown", seenByWindow);
+    expect(seenByWindow).not.toHaveBeenCalled();
+  });
+
+  it("is a step the builder can undo: the document before the edit is untouched", () => {
+    render(<Harness initial={poseUnits().plain} />);
+    const before = seen.project;
+    openArm();
+    fireEvent.keyDown(keyNamed("Turn x of arm, frame 30, 57.3 degrees"), {
+      key: "ArrowRight",
+    });
+    expect(before.actions?.[0].keys.length).toBe(2);
+    expect(before.actions?.[0].tracks).toBeUndefined();
+    expect(seen.project.actions?.[0].keys).toEqual([]);
+    expect(
+      seen.project.actions?.[0].tracks
+        ?.find((t) => t.piece === "arm" && t.axis === 0)
+        ?.keys.map((k) => k.frame),
+    ).toEqual([31, 90]);
+  });
+
+  it("follows a picked key when it moves, so its value stays in the header", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    openArm();
+    fireEvent.click(keyNamed(armX));
+    fireEvent.keyDown(keyNamed(armX), { key: "ArrowRight" });
+    expect(
+      (screen.getByLabelText("Key value in degrees") as HTMLInputElement).value,
+    ).toBe("-28.65");
+    expect(screen.getByText(/of arm, frame 11/)).toBeTruthy();
+  });
+});
+
 describe("the settings", () => {
   function openSettings() {
     fireEvent.click(screen.getByRole("button", { name: "Action settings" }));
