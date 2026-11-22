@@ -1524,6 +1524,10 @@ msgid "{actionName} and {other} both move {pieces}."
 msgstr "{actionName} e {other} muovono entrambe {pieces}."
 
 #: src/lego/actions.ts
+msgid "{actionName}: {pieceName} turns on {axisName} by half a circle or more between frames {from} and {to}, so the engine takes the shorter way round. Add a key between them."
+msgstr ""
+
+#: src/lego/actions.ts
 #, fuzzy
 msgid "{actionName}: a looping action needs two keys to loop."
 msgstr "{actionName}: un’azione in loop richiede due chiavi per ripetersi."
@@ -3359,6 +3363,10 @@ msgstr "Tutto pronto: {gamesText} e {mapsText}."
 #, fuzzy
 msgid "{generated} It is not offered anywhere a game is picked, which is why you will not find it in Singleplayer or in a scenario's setup."
 msgstr "{generated} Non è proposto da nessuna parte in cui si sceglie un gioco, per questo non lo troverai in Giocatore singolo né nella configurazione di uno scenario."
+
+#: src/lego/actions.ts
+msgid "{gone, plural, one {{actionName}: # track names a piece that no longer exists, so it is skipped.} other {{actionName}: # tracks name pieces that no longer exist, so they are skipped.}}"
+msgstr ""
 
 #: src/scenario/pages/components/selection.ts
 #: src/scenario/pages/components/SetupPanel.tsx
