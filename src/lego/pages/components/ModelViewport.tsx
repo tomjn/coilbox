@@ -203,6 +203,7 @@ import {
 } from "./selectionAndHoverOutlines";
 import { disposeSkeleton, layoutSkeletonLabels } from "./skeletonLayer";
 import { followSlideFrame, settleSlideFrame } from "./slideHandle";
+import { snapAnchorsShown } from "./snapAnchorsShown";
 import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useBalance } from "./useBalance";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
@@ -216,7 +217,6 @@ import { useModelEnvironment } from "./useModelEnvironment";
 import { useModelHover } from "./useModelHover";
 import { useModelSceneSync } from "./useModelSceneSync";
 import { useModelSelection } from "./useModelSelection";
-import { snapAnchorsShown } from "./snapAnchorsShown";
 import { useModelShortcuts } from "./useModelShortcuts";
 import { useOverlap } from "./useOverlap";
 import { usePoseMode } from "./usePoseMode";
