@@ -9,9 +9,24 @@ import {
   orthoZoomLimits,
   STANDARD_VIEWS,
   type StandardView,
+  TOP_LEAN,
 } from "./orthoViews";
 
-const VIEWS: StandardView[] = ["front", "side", "top"];
+const VIEWS: StandardView[] = [
+  "front",
+  "back",
+  "side",
+  "otherSide",
+  "top",
+  "bottom",
+];
+
+/** Each view's opposite, which looks from the other end of the same axis. */
+const OPPOSITES: [StandardView, StandardView][] = [
+  ["front", "back"],
+  ["side", "otherSide"],
+  ["top", "bottom"],
+];
 
 describe("STANDARD_VIEWS", () => {
   it.each(
@@ -43,6 +58,24 @@ describe("STANDARD_VIEWS", () => {
     expect(dot([0, 0, 1], STANDARD_VIEWS.side.right)).toBeLessThan(0);
     expect(dot([0, 0, 1], STANDARD_VIEWS.top.up)).toBeLessThan(0);
     expect(dot([1, 0, 0], STANDARD_VIEWS.front.right)).toBeGreaterThan(0);
+  });
+
+  it("puts the front on the right of the other side's view, at the top of the bottom view and on the left of the back view", () => {
+    const dot = (a: number[], b: number[]) =>
+      a.reduce((sum, v, i) => sum + v * b[i], 0);
+    expect(dot([0, 0, 1], STANDARD_VIEWS.otherSide.right)).toBeGreaterThan(0);
+    expect(dot([0, 0, 1], STANDARD_VIEWS.bottom.up)).toBeGreaterThan(0);
+    expect(dot([1, 0, 0], STANDARD_VIEWS.back.right)).toBeLessThan(0);
+  });
+
+  it.each(
+    OPPOSITES,
+  )("looks from opposite ends of one axis in %s and %s", (a, b) => {
+    const [from, to] = [STANDARD_VIEWS[a].toCamera, STANDARD_VIEWS[b].toCamera];
+    // Opposite, to within the lean that gives straight up and down an up.
+    for (let i = 0; i < 3; i++) {
+      expect(Math.abs(from[i] + to[i])).toBeLessThanOrEqual(2 * TOP_LEAN);
+    }
   });
 });
 

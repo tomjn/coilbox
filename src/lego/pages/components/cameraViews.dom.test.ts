@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { describe, expect, it, vi } from "vitest";
-
+import type { StandardView } from "../../orthoViews";
 import { snapReach } from "./anchorsAndSnapping";
 import {
   leaveStandardView,
@@ -83,22 +83,39 @@ describe("showStandardView", () => {
     expect(onViewChange).toHaveBeenLastCalledWith("front");
   });
 
-  it("looks at the box from the front, side and top", () => {
+  it("looks at the box from all six sides", () => {
     const { state } = scene();
-    const look = (id: "front" | "side" | "top") => {
+    const look = (id: StandardView) => {
       showStandardView(state, id, BOX);
       return state.camera.getWorldDirection(new THREE.Vector3());
     };
     // The unit faces +z, so the front camera is on the +z side looking back.
     expect(look("front").z).toBeCloseTo(-1, 3);
+    expect(look("back").z).toBeCloseTo(1, 3);
     expect(look("side").x).toBeCloseTo(-1, 3);
+    expect(look("otherSide").x).toBeCloseTo(1, 3);
     expect(look("top").y).toBeCloseTo(-1, 3);
+    expect(look("bottom").y).toBeCloseTo(1, 3);
+  });
+
+  it("keeps the bottom view below the box rather than pulling it up to the horizon", () => {
+    const { state } = scene();
+    showStandardView(state, "bottom", BOX);
+    expect(state.camera.position.y).toBeLessThan(state.controls.target.y);
+    expect(state.standardView?.id).toBe("bottom");
+    // A later move of the controls does not turn it, which is how a view is
+    // told from one the user has left.
+    state.controls.update();
+    expect(turnedFromStandardView(state)).toBe(false);
   });
 
   it.each([
     "front",
+    "back",
     "side",
+    "otherSide",
     "top",
+    "bottom",
   ] as const)("fits the whole box on screen in the %s view", (id) => {
     const { state } = scene();
     showStandardView(state, id, BOX);
@@ -123,6 +140,22 @@ describe("showStandardView", () => {
       ndc(state, new THREE.Vector3(1, 1, z)).x -
       ndc(state, new THREE.Vector3(0, 1, z)).x;
     expect(width(-10)).toBeCloseTo(width(10), 6);
+  });
+
+  it("puts the front at the top of the bottom view, on the right of the other side view and the left of the back view", () => {
+    const { state } = scene();
+    showStandardView(state, "bottom", BOX);
+    expect(ndc(state, new THREE.Vector3(0, 0, 10)).y).toBeGreaterThan(
+      ndc(state, new THREE.Vector3(0, 0, -10)).y,
+    );
+    showStandardView(state, "otherSide", BOX);
+    expect(ndc(state, new THREE.Vector3(0, 0, 10)).x).toBeGreaterThan(
+      ndc(state, new THREE.Vector3(0, 0, -10)).x,
+    );
+    showStandardView(state, "back", BOX);
+    expect(ndc(state, new THREE.Vector3(10, 0, 0)).x).toBeLessThan(
+      ndc(state, new THREE.Vector3(-10, 0, 0)).x,
+    );
   });
 
   it("puts the front at the bottom of the top view and on the left of the side view", () => {
