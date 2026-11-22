@@ -41258,6 +41258,11 @@ msgstr "Mode redimensionnement, {size}. Les flèches changent sa taille au lieu 
 msgid "Resize sidebar"
 msgstr "Redimensionner la barre latérale"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Redimensionner le panneau de détails"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41267,6 +41272,11 @@ msgstr "Redimensionner la liste des membres"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Redimensionner le tableau des joueurs et la discussion"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Redimensionner le panneau latéral"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

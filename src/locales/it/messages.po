@@ -41534,6 +41534,11 @@ msgstr "Modalità ridimensionamento, {size}. Le frecce cambiano la sua dimension
 msgid "Resize sidebar"
 msgstr "Ridimensiona la barra laterale"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Ridimensiona il pannello dei dettagli"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41543,6 +41548,11 @@ msgstr "Ridimensiona l’elenco dei membri"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Ridimensiona la tabella dei giocatori e la chat"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Ridimensiona il pannello laterale"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

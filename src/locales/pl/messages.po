@@ -41258,6 +41258,11 @@ msgstr "Tryb zmiany rozmiaru, {size}. Strzałki zmieniają rozmiar zamiast pozyc
 msgid "Resize sidebar"
 msgstr "Zmień rozmiar paska bocznego"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Zmień rozmiar panelu szczegółów"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41267,6 +41272,11 @@ msgstr "Zmień rozmiar listy członków"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Zmień rozmiar tabeli graczy i czatu"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Zmień rozmiar panelu bocznego"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

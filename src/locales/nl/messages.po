@@ -41534,6 +41534,11 @@ msgstr "Formaatmodus, {size}. De pijltjes veranderen de grootte in plaats van de
 msgid "Resize sidebar"
 msgstr "Zijbalk van grootte veranderen"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Formaat van het detailpaneel wijzigen"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41543,6 +41548,11 @@ msgstr "De ledenlijst van grootte veranderen"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "De spelerstabel en de chat van grootte veranderen"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Formaat van het zijpaneel wijzigen"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

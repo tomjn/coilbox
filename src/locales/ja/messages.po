@@ -41258,6 +41258,11 @@ msgstr "サイズ変更モード、{size}。Arrow キーで位置ではなくサ
 msgid "Resize sidebar"
 msgstr "サイドバーのサイズを変更"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "詳細パネルのサイズを変更"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41267,6 +41272,11 @@ msgstr "メンバー一覧のサイズを変更"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "プレイヤー表とチャットのサイズを変更"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "サイドパネルのサイズを変更"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

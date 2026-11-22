@@ -41258,6 +41258,11 @@ msgstr "Größenmodus, {size}. Pfeiltasten ändern die Größe statt der Positio
 msgid "Resize sidebar"
 msgstr "Seitenleiste anpassen"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Detailbereich in der Größe ändern"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41267,6 +41272,11 @@ msgstr "Größe der Mitgliederliste ändern"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Größe von Spielertabelle und Chat ändern"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Seitenleiste in der Größe ändern"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

@@ -33857,12 +33857,20 @@ msgstr ""
 msgid "Resize sidebar"
 msgstr ""
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Resize the details panel"
+msgstr ""
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 msgid "Resize the member list"
 msgstr ""
 
 #: src/multiplayer/battle/RoomSplit.tsx
 msgid "Resize the player table and chat"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Resize the side panel"
 msgstr ""
 
 #: src/placement/PlacementSurface.tsx

@@ -33858,6 +33858,10 @@ msgstr "Resize mode, {size}. Arrows change its size instead of its position: nor
 msgid "Resize sidebar"
 msgstr "Resize sidebar"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Resize the details panel"
+msgstr "Resize the details panel"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 msgid "Resize the member list"
 msgstr "Resize the member list"
@@ -33865,6 +33869,10 @@ msgstr "Resize the member list"
 #: src/multiplayer/battle/RoomSplit.tsx
 msgid "Resize the player table and chat"
 msgstr "Resize the player table and chat"
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Resize the side panel"
+msgstr "Resize the side panel"
 
 #: src/placement/PlacementSurface.tsx
 msgid "Resize the working area"

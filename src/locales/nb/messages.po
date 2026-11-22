@@ -41517,6 +41517,11 @@ msgstr "Endre størrelse-modus, {size}. Pilene endrer størrelsen i stedet for p
 msgid "Resize sidebar"
 msgstr "Endre størrelse på sidepanelet"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Endre størrelsen på detaljpanelet"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41526,6 +41531,11 @@ msgstr "Endre størrelse på medlemslisten"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Endre størrelse på spillertabellen og chatten"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Endre størrelsen på sidepanelet"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

@@ -41534,6 +41534,11 @@ msgstr "Λειτουργία αλλαγής μεγέθους, {size}. Τα βε�
 msgid "Resize sidebar"
 msgstr "Αλλαγή μεγέθους πλαϊνής στήλης"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Αλλαγή μεγέθους πάνελ λεπτομερειών"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41543,6 +41548,11 @@ msgstr "Αλλαγή μεγέθους της λίστας μελών"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Αλλαγή μεγέθους του πίνακα παικτών και της συνομιλίας"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Αλλαγή μεγέθους πλευρικού πάνελ"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
