@@ -56,6 +56,7 @@ import { NewUnitPopover } from "./components/NewUnitPopover";
 import { RosterDrawer } from "./components/RosterDrawer";
 import { ScanSkeletons } from "./components/ScanSkeletons";
 import { useTestGame } from "./components/useTestGame";
+import { openNewProject } from "./openNewProject";
 
 /** Radix's select has no empty value, so "No game" needs one of its own. */
 const NO_GAME = "coilbox:no-game";
@@ -252,30 +253,14 @@ export default function ProjectsPage() {
     }
   }
 
-  /**
-   * A unit made somewhere other than New model, saved and opened like a new
-   * one.
-   *
-   * A project rebuilt from an export, a model imported whole, or a generated
-   * candidate. All arrive as an ordinary document, and an imported one already
-   * has its geometry and its textures on disk.
-   */
-  /** Save a newly opened unit and open it. `proposeFrom` is the roles its
-   *  script proposed, when it opens with a skeleton proposed from them. */
+  /** Save a newly opened unit and open it. */
   async function opened(project: LegoProject, proposeFrom?: RoleFindings) {
     setOpening(false);
     setPicking(false);
     setGenerating(false);
     setProblem(null);
     try {
-      await saveProject(project);
-      if (proposeFrom) {
-        navigate(`/lego/${project.id}`, {
-          state: { proposeSkeleton: proposeFrom },
-        });
-      } else {
-        navigate(`/lego/${project.id}`);
-      }
+      await openNewProject(project, navigate, proposeFrom);
     } catch (e) {
       const reason = describeError(e);
       setProblem(t`Could not save the model: ${reason}`);
