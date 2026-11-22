@@ -28,6 +28,7 @@ import {
   clampPanelHeight,
   MIN_PANEL_HEIGHT,
   maxPanelHeight,
+  visibleWidth,
 } from "../../panels";
 
 /** How far one arrow press moves the handle. */
@@ -77,7 +78,13 @@ export function StripResizer({
     if (!column) return;
     // Not `fit`: Biome reads a call to that as a focused test.
     const measure = () => {
-      const space = vertical ? column.clientWidth : column.clientHeight;
+      const space = vertical
+        ? visibleWidth(
+            column.clientWidth,
+            column.getBoundingClientRect().left,
+            window.innerWidth,
+          )
+        : column.clientHeight;
       setAvailable(space);
       if (space === 0) return;
       // A height stored in a taller window, or left behind by this one being
@@ -116,7 +123,7 @@ export function StripResizer({
       tabIndex={0}
       className={
         vertical
-          ? "group absolute inset-y-0 -left-1 z-10 flex w-2.5 cursor-col-resize justify-center focus-visible:outline-none"
+          ? "group absolute inset-y-0 left-0 z-10 flex w-2.5 cursor-col-resize justify-start focus-visible:outline-none"
           : "group absolute inset-x-0 -top-1 z-10 flex h-2.5 cursor-row-resize items-center focus-visible:outline-none"
       }
       onPointerDown={(event) => {

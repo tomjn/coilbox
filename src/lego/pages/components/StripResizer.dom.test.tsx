@@ -33,6 +33,10 @@ import { StripResizer } from "./StripResizer";
 
 afterEach(cleanup);
 
+// happy-dom's window is 1024px wide and its rows sit at the left edge, so the
+// side panel's 1600px row would be cut to the window. Widen the window.
+window.innerWidth = 2000;
+
 const COLUMN = 800;
 
 function Harness({ start = STRIP_HEIGHT }: { start?: number }) {
@@ -208,4 +212,14 @@ it("keeps the tree its minimum on End and the details theirs on Home", () => {
 it("brings details stored in a taller window inside this one", () => {
   render(<DetailsHarness start={5_000} />);
   expect(shown()).toBe(String(COLUMN - MIN_TREE_HEIGHT));
+});
+
+it("clamps the side panel to the window when the row runs past it (#5412)", () => {
+  window.innerWidth = 1300;
+  try {
+    render(<SideHarness start={1000} />);
+    expect(shown()).toBe(String(1300 - KEEP_VIEW_WIDTH));
+  } finally {
+    window.innerWidth = 2000;
+  }
 });

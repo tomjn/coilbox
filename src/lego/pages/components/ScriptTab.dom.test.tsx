@@ -190,6 +190,14 @@ describe("a unit still on the generated script", () => {
 });
 
 describe("a unit that owns its script", () => {
+  it("lets the toolbar wrap rather than hold the drawer wide (#5412)", () => {
+    show(unit({ script: "-- mine\n" }));
+    const button = screen.getByRole("button", { name: "Copy" });
+    const buttons = button.parentElement as HTMLElement;
+    expect(buttons.className).toContain("flex-wrap");
+    expect(buttons.parentElement?.className).toContain("flex-wrap");
+  });
+
   it("edits it in place", () => {
     show(unit({ script: "-- mine\n" }));
     const box = screen.getByRole("textbox");

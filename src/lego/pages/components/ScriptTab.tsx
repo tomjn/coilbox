@@ -404,13 +404,13 @@ export function ScriptTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
         {/* The file this is, rather than the file it would be written to: a
           compiled script is the game's own, at its own path in the archive. */}
-        <span className="truncate text-sm font-medium">
+        <span className="min-w-0 truncate text-sm font-medium">
           {compiled ? compiled.member : `${project.unitName}.lua`}
         </span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {diagnostics.length > 0 && (
             <Button
               size="sm"

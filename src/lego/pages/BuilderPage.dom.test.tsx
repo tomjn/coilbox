@@ -912,3 +912,19 @@ describe("the reroll action for a selected piece", () => {
     expect(screen.queryByRole("button", { name: "Reroll module" })).toBeNull();
   });
 });
+
+describe("the side panel with a wide Script drawer (#5412)", () => {
+  it("lets the view column shrink and keeps the panel inside the row", async () => {
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    const aside = document.getElementById("lego-aside") as HTMLElement;
+    const column = aside.previousElementSibling as HTMLElement;
+    // Without min-w-0 the column holds the row at its content's width and
+    // pushes the panel off the window.
+    expect(column.className).toContain("min-w-0");
+    // The panel's content lays out at the width it gets, not the stored one.
+    expect(aside.className).toContain("min-w-0");
+    expect(aside.className).toContain("max-w-full");
+    expect(aside.className).toContain("overflow-x-clip");
+  });
+});

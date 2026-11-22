@@ -2556,7 +2556,10 @@ function Builder({ id }: { id: string | undefined }) {
         />
 
         <div ref={rowRef} className="flex min-h-0 flex-1">
-          <div ref={columnRef} className="flex min-h-0 flex-1 flex-col">
+          {/* min-w-0: a flex child will not shrink below its content otherwise,
+            and the Script drawer's toolbar would hold this column wide and
+            push the side panel off the window. */}
+          <div ref={columnRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* The unit's chrome floats over the view rather than taking a strip
               off the top of it. The 3D is the point of this screen.
 
@@ -3271,7 +3274,9 @@ function Builder({ id }: { id: string | undefined }) {
           <CollapsibleContent asChild>
             <aside
               id="lego-aside"
-              className="relative flex shrink-0 flex-col border-l border-border"
+              // Never wider than the row and clipped at its own edge, so whatever
+              // is inside follows the width the panel gets, not the stored one.
+              className="relative flex min-w-0 max-w-full shrink-0 flex-col overflow-x-clip border-l border-border"
               style={{ width: asideWidth }}
             >
               <StripResizer

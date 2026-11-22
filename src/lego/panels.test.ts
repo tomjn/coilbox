@@ -15,6 +15,7 @@ import {
   panelHeightFrom,
   panelOpenFrom,
   STRIP_HEIGHT,
+  visibleWidth,
 } from "./panels";
 
 describe("panelOpenFrom", () => {
@@ -97,6 +98,25 @@ describe("clampAsideWidth", () => {
 
   it("rounds, since a drag lands on fractional pixels", () => {
     expect(clampAsideWidth(400.4, 1600)).toBe(400);
+  });
+});
+
+describe("visibleWidth", () => {
+  it("is the row's width when the row fits the window", () => {
+    expect(visibleWidth(1300, 0, 1300)).toBe(1300);
+  });
+
+  it("stops at the window's right edge when the row runs past it", () => {
+    expect(visibleWidth(1424, 100, 1300)).toBe(1200);
+  });
+
+  it("is zero for a row entirely off screen", () => {
+    expect(visibleWidth(500, 2000, 1300)).toBe(0);
+  });
+
+  it("keeps a stored side panel width on screen in a narrow window", () => {
+    const space = visibleWidth(1424, 0, 1300);
+    expect(clampAsideWidth(660, space)).toBe(1300 - KEEP_VIEW_WIDTH);
   });
 });
 
