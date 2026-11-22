@@ -62,6 +62,28 @@ function formatTime(at: number): string {
   });
 }
 
+/** A join or leave line with its time after it, as small as a bubble's time.
+ * A folded run gives the times of its first and last notice. */
+function NoticeLine({
+  from,
+  to,
+  children,
+}: {
+  from: number;
+  to: number;
+  children: ReactNode;
+}) {
+  const start = formatTime(from);
+  const end = formatTime(to);
+  const time = start === end ? start : `${start} - ${end}`;
+  return (
+    <div className="flex items-baseline gap-2 px-1 py-0.5 text-xs text-muted-foreground">
+      <div className="min-w-0 text-left">{children}</div>
+      {time && <span className="shrink-0 select-none text-[10px]">{time}</span>}
+    </div>
+  );
+}
+
 const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
@@ -601,7 +623,10 @@ export function ChatPane({
                     if (run) {
                       const summary = summariseNotices(run);
                       body = (
-                        <div className="px-1 py-0.5 text-left text-xs text-muted-foreground">
+                        <NoticeLine
+                          from={run[0].at}
+                          to={run[run.length - 1].at}
+                        >
                           {noticePart(summary.joined, "joined", t`joined`)}
                           {noticePart(
                             summary.rejoined,
@@ -614,7 +639,7 @@ export function ChatPane({
                             "passedThrough",
                             t`joined and left`,
                           )}
-                        </div>
+                        </NoticeLine>
                       );
                     } else if (isNotice(m.kind)) {
                       const mark = markFor?.(m.from) ?? null;
@@ -624,7 +649,7 @@ export function ChatPane({
                       // than centred, which put a join/leave notice a long way
                       // from the messages around it in a wide chat.
                       body = (
-                        <div className="px-1 py-0.5 text-left text-xs text-muted-foreground">
+                        <NoticeLine from={m.at} to={m.at}>
                           {m.kind === "system" ? (
                             m.text
                           ) : (
@@ -651,7 +676,7 @@ export function ChatPane({
                                   : t`left`}
                             </>
                           )}
-                        </div>
+                        </NoticeLine>
                       );
                     } else if (isAction(m.kind)) {
                       // IRC-style emote: `* alice waves`, full-width and italic,
