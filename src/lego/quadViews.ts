@@ -60,6 +60,43 @@ export function quadrantRects(
   };
 }
 
+/** How far the unit's overlays sit from each edge of the canvas. */
+export interface OverlayInset {
+  top: string;
+  right: string;
+  bottom: string;
+  left: string;
+}
+
+/** The room kept round the overlays. */
+const OVERLAY_GAP = "0.75rem";
+/** The height of a quadrant's name, which the overlays leave clear. */
+const NAME_ROW = "1rem";
+
+/**
+ * Where the unit's overlays (the info card, the toolbar, the tool rail, the
+ * status text, the grid button, the compass and the bottom bar) are drawn. All
+ * of the canvas with one view. With four, the perspective quadrant only, which
+ * is its bottom right half in each direction, so the top, front and side views
+ * stay uncovered. Below the quadrant's name, which stays where it is.
+ */
+export function overlayInset(fourViews: boolean): OverlayInset {
+  if (!fourViews) {
+    return {
+      top: OVERLAY_GAP,
+      right: OVERLAY_GAP,
+      bottom: OVERLAY_GAP,
+      left: OVERLAY_GAP,
+    };
+  }
+  return {
+    top: `calc(50% + ${NAME_ROW} + ${OVERLAY_GAP})`,
+    right: OVERLAY_GAP,
+    bottom: OVERLAY_GAP,
+    left: `calc(50% + ${OVERLAY_GAP})`,
+  };
+}
+
 /** Whether a point on the canvas, in CSS pixels from its top left, is in
  *  `rect`. The left and top edges are inside, the right and bottom are not,
  *  so a point on a shared edge belongs to one quadrant only. */

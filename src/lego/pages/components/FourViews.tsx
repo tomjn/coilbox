@@ -10,7 +10,8 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Grid2x2 } from "lucide-react";
-import { QUADRANTS, type Quadrant } from "../../quadViews";
+import type { ReactNode } from "react";
+import { overlayInset, QUADRANTS, type Quadrant } from "../../quadViews";
 import { useShortcutOverrides } from "../../shortcutOverridesStore";
 import { shortcutLabel } from "../../shortcuts";
 
@@ -39,6 +40,30 @@ export function FourViewsButton({
     >
       <Grid2x2 className="size-4" />
     </Button>
+  );
+}
+
+/**
+ * The box the unit's overlays are laid out in: the whole view, or the
+ * perspective quadrant while four views are on (#5402). Its descendants can
+ * adapt to the smaller box with `group-data-[four-views]/overlay:`.
+ */
+export function ViewportOverlay({
+  fourViews,
+  children,
+}: {
+  fourViews: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-overlay
+      data-four-views={fourViews || undefined}
+      style={overlayInset(fourViews)}
+      className="group/overlay pointer-events-none absolute z-10 flex flex-col gap-3"
+    >
+      {children}
+    </div>
   );
 }
 

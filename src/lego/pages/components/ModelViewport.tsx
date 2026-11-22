@@ -160,7 +160,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
-import { FourViewsButton, QuadrantFrames } from "./FourViews";
+import { FourViewsButton, QuadrantFrames, ViewportOverlay } from "./FourViews";
 import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
@@ -2026,7 +2026,7 @@ export function ModelViewport({
 
           Clicks fall through to the model except on the controls themselves,
           which take `pointer-events-auto` back one at a time. */}
-      <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
+      <ViewportOverlay fourViews={quadrant !== null}>
         {chrome}
 
         {/* `m-auto` on the inner column rather than `justify-center` on the
@@ -2232,7 +2232,7 @@ export function ModelViewport({
           />
         ) : null}
 
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex items-end justify-between gap-3 group-data-[four-views]/overlay:flex-col group-data-[four-views]/overlay:items-stretch">
           {/* One row, wrapping only when the view is too narrow to hold it:
               each group is a handful of words, and stacking them took a strip
               off the model for no gain. */}
@@ -2422,7 +2422,7 @@ export function ModelViewport({
             onShortcuts={() => setShortcutsOpen(true)}
           />
         </div>
-      </div>
+      </ViewportOverlay>
 
       <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
