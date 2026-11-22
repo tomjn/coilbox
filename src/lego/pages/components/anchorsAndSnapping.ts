@@ -40,6 +40,7 @@ import {
 import { placeEnd } from "./measureLayer";
 import type { SceneState } from "./sceneState";
 import { draggedGroup } from "./slideHandle";
+import { activeViewHeight } from "./viewLayout";
 
 /** What the viewport says while the next click puts a connector on the model. */
 export function placeConnectorHint(): string {
@@ -327,7 +328,7 @@ export function forceUniformScale(state: SceneState) {
  * An orthographic one covers the same everywhere, set by how much it shows.
  */
 export function snapReach(state: SceneState, at: THREE.Vector3): number {
-  const viewportHeight = state.renderer.getSize(new THREE.Vector2()).y;
+  const viewportHeight = activeViewHeight(state);
   const { camera } = state;
   if (camera instanceof THREE.OrthographicCamera) {
     return screenPixelsToWorldOrtho(

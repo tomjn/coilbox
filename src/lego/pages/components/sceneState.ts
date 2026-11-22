@@ -31,6 +31,7 @@ import type { StandardView } from "../../orthoViews";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import type { FaceTarget } from "../../placePart";
+import type { Quadrant } from "../../quadViews";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Axis } from "../../resizePackBlock";
 import type { Seat } from "../../seat";
@@ -43,6 +44,7 @@ import type { EffectsLayer } from "./effectsLayer";
 import type { MeasureScene } from "./measureLayer";
 import type { PackFaceDrag } from "./packHandles";
 import type { Placing } from "./placeByFace";
+import type { QuadLayout } from "./viewLayout";
 
 export interface SceneState {
   renderer: THREE.WebGLRenderer;
@@ -58,6 +60,14 @@ export interface SceneState {
   standardView: { id: StandardView; quaternion: THREE.Quaternion } | null;
   /** Told whenever the view changes, so the buttons can show which is on. */
   onViewChange: (view: StandardView | null) => void;
+  /** The four view layout while it is on, and null while one view fills the
+   *  canvas. See `viewLayout.ts`. */
+  quad: QuadLayout | null;
+  /** Told which quadrant has the controls whenever that changes, and null
+   *  when the layout goes back to one view. */
+  onLayoutChange: (active: Quadrant | null) => void;
+  /** The canvas's size in CSS pixels, as it was last resized to. */
+  size: { width: number; height: number };
   controls: OrbitControls;
   gizmo: TransformControls;
   root: THREE.Group;

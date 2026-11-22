@@ -32,7 +32,7 @@ import {
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
@@ -92,6 +92,7 @@ import { type LoadedPack, partUnit } from "../../pack";
 import type { FaceTarget } from "../../placePart";
 import type { PoseOffsets } from "../../pose";
 import type { Problem, ProblemSource } from "../../problems";
+import type { Quadrant } from "../../quadViews";
 import type { RawGeometry } from "../../rawGeometry";
 import {
   buildReferenceUnit,
@@ -128,12 +129,12 @@ import {
   boundsBox,
   focusSelection,
   resetFrame,
+  showFourViews,
   showView,
 } from "./cameraFraming";
 import {
   leaveStandardView,
   ORBIT_MAX_POLAR,
-  sizeCameras,
   syncOrthographicLimits,
   turnedFromStandardView,
 } from "./cameraViews";
@@ -159,6 +160,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
+import { FourViewsButton, QuadrantFrames } from "./FourViews";
 import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
@@ -237,6 +239,14 @@ import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
 import { ViewportBar } from "./ViewportBar";
+import {
+  activeViewBounds,
+  attachViewPicking,
+  maximiseQuadrant,
+  renderQuadrants,
+  sizeViews,
+  ViewportOrbitControls,
+} from "./viewLayout";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
 import { viewportHit } from "./wheelHit";
 
@@ -840,6 +850,10 @@ export function ModelViewport({
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // Which of the front, side and top views is showing, if any.
   const [activeView, setActiveView] = useState<StandardView | null>(null);
+  /** Which quadrant has the controls while the top, front and side views
+   *  show beside the perspective one, and null in one view. The scene holds
+   *  the layout, and this follows it for the buttons and the borders. */
+  const [quadrant, setQuadrant] = useState<Quadrant | null>(null);
 
   // The compass is the button people press when they are lost, so it frames
   // the whole unit rather than dropping the camera on a fixed point that a
@@ -857,6 +871,12 @@ export function ModelViewport({
     const state = sceneRef.current;
     if (!state) return;
     resetFrame(state, boundsBox(unitBounds(project, pack, raw)));
+  }
+
+  function toggleFourViews() {
+    const state = sceneRef.current;
+    if (state)
+      showFourViews(state, state.quad === null, selectedIdsRef.current);
   }
 
   // The scene is built once and never rebuilt on a prop change, because that
@@ -1244,6 +1264,12 @@ export function ModelViewport({
         MIN_FAR,
       );
 
+      // Before the controls and the gizmo exist, so its listeners run first
+      // and both see the camera of the quadrant under the pointer.
+      const detachViewPicking = attachViewPicking(
+        renderer.domElement,
+        () => sceneRef.current,
+      );
       // Before the controls exist, so its pointerdown listener runs first and
       // the buttons are set by the time OrbitControls reads them.
       let navigationControls: OrbitControls | undefined;
@@ -1251,8 +1277,12 @@ export function ModelViewport({
         renderer.domElement,
         () => navigationControls,
         getNavigationPreset,
+        () => {
+          const quad = sceneRef.current?.quad;
+          return !quad || quad.active === "perspective";
+        },
       );
-      const controls = new OrbitControls(camera, renderer.domElement);
+      const controls = new ViewportOrbitControls(camera, renderer.domElement);
       navigationControls = controls;
       controls.maxPolarAngle = ORBIT_MAX_POLAR;
       controls.minDistance = 1;
@@ -1266,12 +1296,20 @@ export function ModelViewport({
 
       const render = () => {
         refreshDrawMode(state.draw, state.groups.values());
-        if (state.skeleton) {
+        // In four views the skeleton's names and the compass follow the
+        // perspective quadrant. The names are laid out so they do not overlap
+        // as that camera sees them, so they are drawn in that quadrant only.
+        const quad = state.quad;
+        const mainCamera = quad ? state.perspectiveCamera : state.camera;
+        const labels = state.skeleton;
+        if (labels) {
           const hovered = state.hoveredId;
           layoutSkeletonLabels(
-            state.skeleton,
-            state.camera,
-            renderer.getSize(new THREE.Vector2()),
+            labels,
+            mainCamera,
+            quad
+              ? quad.rects.perspective
+              : renderer.getSize(new THREE.Vector2()),
             new Set(
               hovered
                 ? [...state.selectedIdsRef.current, hovered]
@@ -1280,9 +1318,24 @@ export function ModelViewport({
           );
         }
         layoutMeasurements(state);
-        renderer.render(scene, state.camera);
+        if (quad) {
+          const named = labels
+            ? labels.children.filter(
+                (child) => child instanceof THREE.Sprite && child.visible,
+              )
+            : [];
+          renderQuadrants(state, (id, rect) => {
+            // The wide line shader works in pixels of the viewport it draws in.
+            pieceEditMaterial.resolution.set(rect.width, rect.height);
+            for (const sprite of named) sprite.visible = id === "perspective";
+          });
+          for (const sprite of named) sprite.visible = true;
+          pieceEditMaterial.resolution.set(state.size.width, state.size.height);
+        } else {
+          renderer.render(scene, state.camera);
+        }
         // After the render, so the camera's inverse matrix is the one just used.
-        if (compassRef.current) paintCompass(compassRef.current, state.camera);
+        if (compassRef.current) paintCompass(compassRef.current, mainCamera);
       };
       // Turning the view is what takes it out of a standard view. Panning and
       // zooming keep its direction, so they stay in it.
@@ -1296,6 +1349,8 @@ export function ModelViewport({
       gizmo.setSpace("local");
       scene.add(gizmo.getHelper());
 
+      // Resized straight after the build, which sets this again.
+      const drawn = renderer.getSize(new THREE.Vector2());
       const state: SceneState = {
         renderer,
         scene,
@@ -1304,6 +1359,9 @@ export function ModelViewport({
         orthographicCamera,
         standardView: null,
         onViewChange: setActiveView,
+        quad: null,
+        onLayoutChange: setQuadrant,
+        size: { width: drawn.x, height: drawn.y },
         controls,
         gizmo,
         root,
@@ -1428,15 +1486,18 @@ export function ModelViewport({
         dragging: false,
       };
       sceneRef.current = state;
+      // A fresh scene opens on one view, whatever the last one showed.
+      setQuadrant(null);
 
       // A wheel past the unit and its ground scrolls the page rather than
       // zooming (issue #2328). `state.camera` is read per event because a
-      // standard view swaps it.
+      // standard view or a quadrant of the four view layout swaps it.
       const detachWheel = attachWheelRelease(
         canvas.host,
         renderer.domElement,
         () => state.camera,
         (ray) => viewportHit(state, ray),
+        () => activeViewBounds(state),
       );
 
       // `mouseDown` and `mouseUp`, not `dragging-changed`: this version of
@@ -1541,7 +1602,7 @@ export function ModelViewport({
       return {
         render,
         resize: (width, height) => {
-          sizeCameras(state, width, height);
+          sizeViews(state, width, height);
           // The wide line shader works in screen space, so it has to be told
           // how big the screen is or the box comes out the wrong width.
           pieceEditMaterial.resolution.set(width, height);
@@ -1551,6 +1612,7 @@ export function ModelViewport({
           detachWheel();
           detachPointerHandlers();
           detachNavigation();
+          detachViewPicking();
           controls.removeEventListener("change", onControlsChange);
           controls.dispose();
           gizmo.detach();
@@ -1884,6 +1946,7 @@ export function ModelViewport({
     toggleSkeleton: () => setSkeletonChoice(!showSkeleton),
     snapEnabled,
     toggleSnapping: () => setSnapEnabled(!snapEnabled),
+    toggleFourViews,
   });
 
   const { t } = useLingui();
@@ -1943,6 +2006,17 @@ export function ModelViewport({
         ref={containerRef}
         className={`h-full w-full ${placingAnchor || placingPart || pickingGuide || measure.active ? "cursor-crosshair" : ""}`}
       />
+      {quadrant && (
+        <QuadrantFrames
+          active={quadrant}
+          onMaximise={(id) => {
+            const state = sceneRef.current;
+            if (!state) return;
+            maximiseQuadrant(state, id);
+            state.render();
+          }}
+        />
+      )}
 
       {/* One column rather than four overlays pinned to the same box. The
           chrome, the rail, the key and the view's own controls share this
@@ -1967,7 +2041,11 @@ export function ModelViewport({
             both. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Top right, under the unit's chrome and clear of the tool rail. */}
-          <div className="absolute top-0 right-0 z-10">
+          <div className="absolute top-0 right-0 z-10 flex items-start gap-2">
+            <FourViewsButton
+              on={quadrant !== null}
+              onToggle={toggleFourViews}
+            />
             <AxisCompass
               compassRef={compassRef}
               view={activeView}

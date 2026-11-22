@@ -18,6 +18,7 @@ import {
   ZOOM_OUT_REACH,
 } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
+import { fitQuadrants, inPerspective, setFourViews } from "./viewLayout";
 
 /**
  * Frame the selection: move the orbit target to the box round everything in
@@ -38,13 +39,19 @@ import type { SceneState } from "./sceneState";
 export function focusSelection(state: SceneState, pieceIds: string[]) {
   const unit = unitBox(state);
   if (!unit) {
-    homeView(state);
+    inPerspective(state, () => homeView(state));
     state.render();
     return;
   }
 
+  // In four views every quadrant frames it.
   const box = selectionBox(state, pieceIds) ?? unit;
-  if (frameBounds(state, box)) state.render();
+  let framed = false;
+  inPerspective(state, () => {
+    framed = frameBounds(state, box);
+  });
+  fitQuadrants(state, box);
+  if (framed) state.render();
 }
 
 /**
@@ -57,15 +64,37 @@ export function showView(
   view: StandardView,
   pieceIds: string[],
 ) {
-  const box =
+  const box = viewBox(state, pieceIds);
+  // A standard view fills the one view layout.
+  setFourViews(state, false, box);
+  showStandardView(state, view, box);
+  state.render();
+}
+
+/**
+ * Switch between one view and four. The top, front and side quadrants open
+ * on the selection, or on the whole unit with nothing selected.
+ */
+export function showFourViews(
+  state: SceneState,
+  on: boolean,
+  pieceIds: string[],
+) {
+  setFourViews(state, on, viewBox(state, pieceIds));
+  state.render();
+}
+
+/** What a standard view frames: the selection, else the whole unit, else a
+ *  small box at the origin for a unit with no geometry. */
+function viewBox(state: SceneState, pieceIds: string[]): THREE.Box3 {
+  return (
     selectionBox(state, pieceIds) ??
     unitBox(state) ??
     new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(),
       new THREE.Vector3(10, 10, 10),
-    );
-  showStandardView(state, view, box);
-  state.render();
+    )
+  );
 }
 
 function unitBox(state: SceneState): THREE.Box3 | null {
@@ -107,7 +136,11 @@ export function frameObject(
   state: SceneState,
   object: THREE.Object3D,
 ): boolean {
-  return frameBounds(state, new THREE.Box3().setFromObject(object));
+  let framed = false;
+  inPerspective(state, () => {
+    framed = frameBounds(state, new THREE.Box3().setFromObject(object));
+  });
+  return framed;
 }
 
 /** The view the builder opens on: the home camera, looking at the origin.
@@ -135,7 +168,10 @@ export function resetFrame(state: SceneState, unit: THREE.Box3 | null) {
     box.union(new THREE.Box3().setFromObject(state.reference));
   }
   // Frames from the home direction, which also leaves a standard view.
-  if (!frameBounds(state, box, HOME_CAMERA)) homeView(state);
+  inPerspective(state, () => {
+    if (!frameBounds(state, box, HOME_CAMERA)) homeView(state);
+  });
+  if (!box.isEmpty()) fitQuadrants(state, box);
   state.render();
 }
 

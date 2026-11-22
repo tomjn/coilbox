@@ -22,6 +22,7 @@ import { handleUnderPointer } from "./proportionHandles";
 import type { SceneState } from "./sceneState";
 import { setHoveredAndNotify } from "./selectionAndHoverOutlines";
 import { grabStandIn, letGoOfStandIn, moveStandIn } from "./standInDrag";
+import { activeViewBounds, aimFromPointer } from "./viewLayout";
 
 /**
  * Wire up the canvas's own pointer handling: sizing a collision face,
@@ -46,14 +47,10 @@ const CLICK_TRAVEL = 4;
 export function attachPointerHandlers(state: SceneState): () => void {
   const { renderer, root } = state;
   const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2();
 
-  const aimAt = (event: PointerEvent) => {
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, state.camera);
-  };
+  // Through the camera of the quadrant the press started in, in four views.
+  const aimAt = (event: { clientX: number; clientY: number }) =>
+    aimFromPointer(state, raycaster, event.clientX, event.clientY);
 
   // Sizing the volume by its faces. Registered before the selection
   // handlers below, so a press that grabbed a plate is already known by the
@@ -133,7 +130,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
   let grab: (MeasureEndRef & { moved: boolean }) | null = null;
 
   const grabMeasureEnd = (event: PointerEvent) => {
-    const rect = renderer.domElement.getBoundingClientRect();
+    const rect = activeViewBounds(state);
     const end = handleUnderPointer(
       endsOnScreen(state.measure.lines.lines),
       state.camera,
@@ -217,10 +214,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
     )
       return;
 
-    const bounds = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
-    pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
-    raycaster.setFromCamera(pointer, state.camera);
+    aimAt(event);
     const hit = raycaster.intersectObject(root, true)[0];
     if (state.measure.active) {
       const at = measureAt(hit);
@@ -262,14 +256,12 @@ export function attachPointerHandlers(state: SceneState): () => void {
   // and asks for a frame. The frame itself does the one raycast that
   // frame gets, and only re-renders if the hovered piece actually changed.
   let hoverFrame = 0;
-  let hoverAt: { x: number; y: number } | null = null;
+  let hoverAt: { clientX: number; clientY: number } | null = null;
 
   const checkHover = () => {
     hoverFrame = 0;
     if (!hoverAt || state.dragging) return;
-    pointer.x = hoverAt.x;
-    pointer.y = hoverAt.y;
-    raycaster.setFromCamera(pointer, state.camera);
+    aimAt(hoverAt);
     if (state.measure.active) {
       state.measure.onHover?.(
         measureAt(raycaster.intersectObject(root, true)[0]),
@@ -312,11 +304,7 @@ export function attachPointerHandlers(state: SceneState): () => void {
       return;
     }
     if (state.dragging) return;
-    const bounds = renderer.domElement.getBoundingClientRect();
-    hoverAt = {
-      x: ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
-      y: -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
-    };
+    hoverAt = { clientX: event.clientX, clientY: event.clientY };
     if (!hoverFrame) hoverFrame = requestAnimationFrame(checkHover);
   };
   const onPointerLeave = () => {

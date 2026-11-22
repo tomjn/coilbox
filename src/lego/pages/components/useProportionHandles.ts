@@ -9,6 +9,7 @@ import {
   valueAfterDrag,
 } from "./proportionHandles";
 import type { SceneState } from "./sceneState";
+import { activeViewBounds, aimFromPointer } from "./viewLayout";
 
 /** The handle dot's width on screen, in pixels. */
 const HANDLE_DOT = 14;
@@ -84,22 +85,14 @@ export function useProportionHandles(
     const raycaster = new THREE.Raycaster();
     let drag: Drag | null = null;
 
-    const rayAt = (event: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      raycaster.setFromCamera(
-        new THREE.Vector2(
-          ((event.clientX - rect.left) / rect.width) * 2 - 1,
-          -((event.clientY - rect.top) / rect.height) * 2 + 1,
-        ),
-        state.camera,
-      );
-    };
+    const rayAt = (event: PointerEvent) =>
+      aimFromPointer(state, raycaster, event.clientX, event.clientY);
     const along = (handle: ProportionHandle) =>
       alongAxis(raycaster.ray, new THREE.Vector3(...handle.at), handle.axis);
 
     const onDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
-      const rect = canvas.getBoundingClientRect();
+      const rect = activeViewBounds(state);
       const handle = handleUnderPointer(
         latest.current.handles,
         state.camera,
