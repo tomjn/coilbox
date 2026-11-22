@@ -273,6 +273,22 @@ describe("a unit built out of parts", () => {
   });
 });
 
+describe("the unit info card (#5403)", () => {
+  it("keeps a width of its own and truncates its info line rather than wrapping words", async () => {
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    const card = screen.getByTestId("unit-card");
+    expect(card.className).toContain("min-w-56");
+    const line = screen.getByLabelText("Export name").parentElement;
+    const text = line?.firstElementChild as HTMLElement;
+    expect(text.textContent).toContain("exports as");
+    expect(text.className).toContain("truncate");
+    expect(text.className).toContain("min-w-0");
+    // The row lets the toolbar drop below the card rather than squeeze it.
+    expect(card.parentElement?.className).toContain("flex-wrap");
+  });
+});
+
 describe("proposing a skeleton (#5185)", () => {
   it("opens the fit drawer proposed for a unit that arrives with roles", async () => {
     doc.current = session(unit({ gameUnitDef: { canmove: false } }));

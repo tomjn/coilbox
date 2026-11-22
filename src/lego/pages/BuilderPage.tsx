@@ -2576,8 +2576,11 @@ function Builder({ id }: { id: string | undefined }) {
                 ground={ground}
                 chrome={
                   <>
-                    <div className="pointer-events-none flex items-start justify-between gap-3">
-                      <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
+                    <div className="pointer-events-none flex flex-wrap items-start justify-between gap-3">
+                      <div
+                        data-testid="unit-card"
+                        className="pointer-events-auto flex max-w-full min-w-56 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur"
+                      >
                         <Blocks
                           size={16}
                           className="shrink-0 text-muted-foreground"
@@ -2590,16 +2593,18 @@ function Builder({ id }: { id: string | undefined }) {
                             className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
                           />
                           <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-                            {plural(pieceCount, {
-                              one: "# piece",
-                              other: "# pieces",
-                            })}{" "}
-                            · <Trans>exports as</Trans>
+                            <span className="min-w-0 truncate">
+                              {plural(pieceCount, {
+                                one: "# piece",
+                                other: "# pieces",
+                              })}{" "}
+                              · <Trans>exports as</Trans>
+                            </span>
                             <NameInput
                               value={draft.unitName}
                               onCommit={renameExport}
                               aria-label={t`Export name`}
-                              className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
+                              className="h-5 w-40 min-w-0 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
                             />
                           </p>
                           {imported ? (
@@ -2631,7 +2636,7 @@ function Builder({ id }: { id: string | undefined }) {
                     chrome as the toolbars in the other corners, rather than a
                     panel of labelled buttons sitting on top of the model. */}
                       <TooltipProvider delayDuration={300}>
-                        <div className="pointer-events-auto flex items-center gap-2">
+                        <div className="pointer-events-auto ml-auto flex items-center gap-2">
                           <ButtonGroup>
                             <Tooltip>
                               <TooltipTrigger asChild>
