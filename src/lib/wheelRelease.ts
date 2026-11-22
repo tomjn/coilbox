@@ -25,6 +25,8 @@ import { releaseWheel } from "@/mapconv/pages/components/wheelGate";
  * @param canvas The element the pointer position is measured against.
  * @param camera The camera to cast from, read per event so a view that swaps
  *   cameras (a perspective and an orthographic one) is always asked right.
+ * @param bounds Where on the page that camera draws, read per event. The
+ *   whole canvas unless the view draws into only part of it.
  * @returns Takes the listener off again.
  */
 export function attachWheelRelease(
@@ -32,11 +34,13 @@ export function attachWheelRelease(
   canvas: HTMLElement,
   camera: () => THREE.Camera,
   isOver: (ray: THREE.Ray) => boolean,
+  bounds: () => Pick<DOMRect, "left" | "top" | "width" | "height"> = () =>
+    canvas.getBoundingClientRect(),
 ): () => void {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const onWheel = (event: WheelEvent) => {
-    const rect = canvas.getBoundingClientRect();
+    const rect = bounds();
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera());

@@ -177,6 +177,14 @@ export const SHORTCUTS: Shortcut[] = [
     combos: [{ key: "3", mod: false, shift: false }],
   },
   {
+    id: "four-views",
+    group: "View",
+    get description() {
+      return t`Show the top, front and side views beside the perspective view, or go back to one view`;
+    },
+    combos: [{ key: "4", mod: false, shift: false }],
+  },
+  {
     id: "draw-mode",
     group: "View",
     get description() {

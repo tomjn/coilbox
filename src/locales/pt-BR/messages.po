@@ -20476,6 +20476,11 @@ msgstr "Porta"
 msgid "Doors"
 msgstr "Portas"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Clique duas vezes para preencher a visualização"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23903,6 +23908,11 @@ msgstr "Fundador (opcional, padrão é você)"
 msgid "Four legs"
 msgstr "Quatro pernas"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Quatro vistas ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24185,6 +24195,12 @@ msgstr "frente"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Frente"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Frente"
 
@@ -37597,6 +37613,12 @@ msgstr "Permissão concedida."
 msgid "Permission not granted."
 msgstr "Permissão não concedida."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Perspectiva"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -45164,6 +45186,11 @@ msgstr "Mostrar o painel lateral"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Mostrar as vistas de cima, de frente e de lado ao lado da vista em perspectiva, ou voltar a uma só vista"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Mostrar esta folha"
 
@@ -45289,6 +45316,12 @@ msgstr "Facção"
 msgctxt "camera angle"
 msgid "Side"
 msgstr "Lateral"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Side"
+msgstr "Lado"
 
 #: src/campaign/media.ts
 #, fuzzy
@@ -53448,6 +53481,12 @@ msgstr "topo"
 #, fuzzy
 msgid "Top"
 msgstr "Topo"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Top"
+msgstr "Cima"
 
 #: src/content/pages/components/useUnitRenders.ts
 #, fuzzy

@@ -20476,6 +20476,11 @@ msgstr "Dør"
 msgid "Doors"
 msgstr "Dører"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Dobbeltklikk for å fylle visningen"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23903,6 +23908,11 @@ msgstr "Grunnlegger (valgfritt, standard er deg)"
 msgid "Four legs"
 msgstr "Fire ben"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Fire visninger ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24185,6 +24195,12 @@ msgstr "foran"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Forfra"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Forfra"
 
@@ -37597,6 +37613,12 @@ msgstr "Tillatelse gitt."
 msgid "Permission not granted."
 msgstr "Tillatelse ikke gitt."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Perspektiv"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -45164,6 +45186,11 @@ msgstr "Vis sidepanelet"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Vis visningene ovenfra, forfra og fra siden ved siden av perspektivvisningen, eller gå tilbake til én visning"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Vis dette arket"
 
@@ -45289,6 +45316,12 @@ msgstr "Fraksjon"
 msgctxt "camera angle"
 msgid "Side"
 msgstr "Side"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Side"
+msgstr "Siden"
 
 #: src/campaign/media.ts
 #, fuzzy
@@ -53448,6 +53481,12 @@ msgstr "topp"
 #, fuzzy
 msgid "Top"
 msgstr "Topp"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Top"
+msgstr "Ovenfra"
 
 #: src/content/pages/components/useUnitRenders.ts
 #, fuzzy

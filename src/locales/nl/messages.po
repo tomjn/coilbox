@@ -20480,6 +20480,11 @@ msgstr "Deur"
 msgid "Doors"
 msgstr "Deuren"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Dubbelklik om de weergave te vullen"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23913,6 +23918,11 @@ msgstr "Oprichter (optioneel, standaard jij)"
 msgid "Four legs"
 msgstr "Vier poten"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Vier weergaven ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24195,6 +24205,12 @@ msgstr "voor"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Voorkant"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Voorkant"
 
@@ -37614,6 +37630,12 @@ msgstr "Toestemming gegeven."
 msgid "Permission not granted."
 msgstr "Geen toestemming gegeven."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Perspectief"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -45181,6 +45203,11 @@ msgstr "Het zijpaneel tonen"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Toon de boven-, voor- en zijweergave naast de perspectiefweergave, of ga terug naar één weergave"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Dit overzicht tonen"
 
@@ -45304,6 +45331,12 @@ msgstr "Factie"
 #: src/lego/buildPicture.ts
 #, fuzzy
 msgctxt "camera angle"
+msgid "Side"
+msgstr "Zijkant"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Side"
 msgstr "Zijkant"
 
@@ -53465,6 +53498,12 @@ msgstr "boven"
 #, fuzzy
 msgid "Top"
 msgstr "Boven"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Top"
+msgstr "Bovenkant"
 
 #: src/content/pages/components/useUnitRenders.ts
 #, fuzzy

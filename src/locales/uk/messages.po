@@ -20345,6 +20345,11 @@ msgstr "Двері"
 msgid "Doors"
 msgstr "Двері"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Двічі клацніть, щоб заповнити вигляд"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23758,6 +23763,11 @@ msgstr "Засновник (необов’язково, типово – ви)"
 msgid "Four legs"
 msgstr "Чотири ноги"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Чотири вигляди ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24039,6 +24049,12 @@ msgstr "спереду"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Спереду"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Спереду"
 
@@ -37369,6 +37385,12 @@ msgstr "Дозвіл надано."
 msgid "Permission not granted."
 msgstr "Дозвіл не надано."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Перспектива"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -44886,6 +44908,11 @@ msgstr "Показати бічну панель"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Показати вигляди згори, спереду і збоку поруч із перспективним виглядом або повернутися до одного вигляду"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Показати цю довідку"
 
@@ -45008,6 +45035,12 @@ msgstr "Фракція"
 #: src/lego/buildPicture.ts
 #, fuzzy
 msgctxt "camera angle"
+msgid "Side"
+msgstr "Збоку"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Side"
 msgstr "Збоку"
 
@@ -53106,6 +53139,12 @@ msgstr "верх"
 #, fuzzy
 msgid "Top"
 msgstr "Верх"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Top"
+msgstr "Згори"
 
 #: src/content/pages/components/useUnitRenders.ts
 #, fuzzy

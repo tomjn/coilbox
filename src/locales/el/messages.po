@@ -20480,6 +20480,11 @@ msgstr "Πόρτα"
 msgid "Doors"
 msgstr "Πόρτες"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Διπλό κλικ για να γεμίσει την προβολή"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23913,6 +23918,11 @@ msgstr "Ιδρυτής (προαιρετικό, προεπιλογή εσείς)
 msgid "Four legs"
 msgstr "Τέσσερα πόδια"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Τέσσερις προβολές ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24197,6 +24207,12 @@ msgstr "εμπρός"
 #, fuzzy
 msgid "Front"
 msgstr "Εμπρός"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Front"
+msgstr "Μπροστά"
 
 #: src/content/replayBuildOrders.ts
 #, fuzzy
@@ -37614,6 +37630,12 @@ msgstr "Η άδεια δόθηκε."
 msgid "Permission not granted."
 msgstr "Η άδεια δεν δόθηκε."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Προοπτική"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -45181,6 +45203,11 @@ msgstr "Εμφάνιση του πλαϊνού πλαισίου"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Εμφάνιση των προβολών από πάνω, μπροστά και πλάι δίπλα στην προοπτική προβολή, ή επιστροφή σε μία προβολή"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Εμφάνιση αυτού του φύλλου"
 
@@ -45306,6 +45333,12 @@ msgstr "Φατρία"
 msgctxt "camera angle"
 msgid "Side"
 msgstr "Πλάγια"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Side"
+msgstr "Πλάι"
 
 #: src/campaign/media.ts
 #, fuzzy
@@ -53463,6 +53496,12 @@ msgstr "πάνω"
 
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Top"
+msgstr "Πάνω"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Top"
 msgstr "Πάνω"
 

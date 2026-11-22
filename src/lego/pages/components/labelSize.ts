@@ -45,14 +45,15 @@ export function labelPixelSize(sprite: THREE.Sprite): {
   };
 }
 
-const SIZE = new THREE.Vector2();
+const VIEWPORT = new THREE.Vector4();
 
 /** Makes `sprite` take its height from the camera and the view each time it
  *  is drawn, keeping the width-to-height ratio it has now. */
 export function keepLabelSize(sprite: THREE.Sprite): void {
   const aspect = sprite.scale.x / sprite.scale.y;
   sprite.onBeforeRender = (renderer, _scene, camera) => {
-    const height = labelHeight(camera, renderer.getSize(SIZE).y || 1);
+    // The viewport, which is one quadrant in four views, not the canvas.
+    const height = labelHeight(camera, renderer.getViewport(VIEWPORT).w || 1);
     sprite.scale.set(height * aspect, height, 1);
     // three reads the world matrix straight after this returns.
     sprite.updateMatrixWorld(true);

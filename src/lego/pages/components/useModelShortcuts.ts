@@ -28,6 +28,8 @@ export interface ModelShortcutsDeps {
   snapEnabled: boolean;
   /** Flips snapping from whatever it is now. */
   toggleSnapping: () => void;
+  /** Switches between one view and four. */
+  toggleFourViews: () => void;
 }
 
 /**
@@ -51,6 +53,7 @@ export function useModelShortcuts(
     toggleSkeleton,
     snapEnabled,
     toggleSnapping,
+    toggleFourViews,
   }: ModelShortcutsDeps,
 ) {
   const altHeld = useRef(false);
@@ -115,6 +118,7 @@ export function useModelShortcuts(
         const state = sceneRef.current;
         if (state) showView(state, view, selectedIdsRef.current);
       }
+      if (isShortcut("four-views", event)) toggleFourViews();
       if (isShortcut("draw-mode", event)) setDrawMode(nextDrawMode);
       if (isShortcut("skeleton", event)) toggleSkeleton();
       if (isShortcut("shortcuts", event)) setShortcutsOpen(true);
@@ -136,5 +140,6 @@ export function useModelShortcuts(
     setDrawMode,
     toggleSkeleton,
     toggleSnapping,
+    toggleFourViews,
   ]);
 }

@@ -14,6 +14,7 @@ import { type DriveFrame, headingRadians } from "../../drive";
 import type { GroundShape } from "../../environment";
 import { onGround } from "../../standIn";
 import type { SceneState } from "./sceneState";
+import { shiftViews } from "./viewLayout";
 
 const UP = new THREE.Vector3(0, 1, 0);
 const NORMAL = new THREE.Vector3();
@@ -98,8 +99,7 @@ export function followCamera(state: SceneState) {
   state.followAt ??= state.followOffset.clone();
   DELTA.subVectors(state.root.position, state.followAt);
   if (DELTA.lengthSq() === 0) return;
-  state.camera.position.add(DELTA);
-  state.controls.target.add(DELTA);
+  shiftViews(state, DELTA);
   state.followOffset.add(DELTA);
   state.followAt.copy(state.root.position);
   state.controls.update();
@@ -109,8 +109,7 @@ export function followCamera(state: SceneState) {
 function returnCamera(state: SceneState) {
   state.followAt = null;
   if (state.followOffset.lengthSq() === 0) return;
-  state.camera.position.sub(state.followOffset);
-  state.controls.target.sub(state.followOffset);
+  shiftViews(state, state.followOffset.negate());
   state.followOffset.set(0, 0, 0);
   state.controls.update();
 }

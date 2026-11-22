@@ -11,7 +11,7 @@ import type { NavigationPreset } from "./cameraNavigation";
 const stateOf = (controls: OrbitControls) =>
   (controls as unknown as { state: number }).state;
 
-function setup(preset: NavigationPreset) {
+function setup(preset: NavigationPreset, canOrbit = true) {
   const element = document.createElement("div");
   element.setPointerCapture = () => {};
   element.releasePointerCapture = () => {};
@@ -21,6 +21,7 @@ function setup(preset: NavigationPreset) {
     element,
     () => controls,
     () => preset,
+    () => canOrbit,
   );
   const made = new OrbitControls(new THREE.PerspectiveCamera(), element);
   controls = made;
@@ -82,5 +83,43 @@ describe("attachCameraNavigation", () => {
     detach();
     fire(element, "pointerdown", 0);
     expect(controls.mouseButtons.LEFT).toBe(MOUSE.ROTATE);
+  });
+});
+
+describe("in a view that cannot orbit", () => {
+  // As the top, front and side views of the four view layout set them up.
+  function flat(preset: NavigationPreset) {
+    const made = setup(preset, false);
+    made.controls.enableRotate = false;
+    return made;
+  }
+
+  it("pans on the drag that would orbit", () => {
+    const { element, controls } = flat("coilbox");
+    fire(element, "pointerdown", 0);
+    expect(stateOf(controls)).toBe(2);
+  });
+
+  it("still pans on the preset's own pan, with or without a modifier", () => {
+    const blender = flat("blender");
+    fire(blender.element, "pointerdown", 1, { shiftKey: true });
+    expect(stateOf(blender.controls)).toBe(2);
+    fire(blender.element, "pointerup", 1);
+
+    const max = flat("3dsmax");
+    fire(max.element, "pointerdown", 1);
+    expect(stateOf(max.controls)).toBe(2);
+  });
+
+  it("pans on Blender's orbit, the plain middle button", () => {
+    const { element, controls } = flat("blender");
+    fire(element, "pointerdown", 1);
+    expect(stateOf(controls)).toBe(2);
+  });
+
+  it("still zooms on the preset's zoom", () => {
+    const { element, controls } = flat("3dsmax");
+    fire(element, "pointerdown", 1, { altKey: true, ctrlKey: true });
+    expect(stateOf(controls)).toBe(1);
   });
 });

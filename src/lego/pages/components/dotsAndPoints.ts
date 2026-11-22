@@ -108,7 +108,7 @@ function markEdges(): THREE.LineBasicMaterial {
 
 const markWorld = new THREE.Vector3();
 const markParentScale = new THREE.Vector3();
-const markViewport = new THREE.Vector2();
+const markViewport = new THREE.Vector4();
 const markLocal = new THREE.Vector3();
 
 /**
@@ -132,7 +132,9 @@ function screenSized(
   place: (half: THREE.Vector3) => void,
 ) {
   mesh.onBeforeRender = (renderer, _scene, camera) => {
-    const height = Math.max(renderer.getSize(markViewport).y, 1);
+    // The viewport rather than the canvas: in four views each quadrant is a
+    // viewport of its own.
+    const height = Math.max(renderer.getViewport(markViewport).w, 1);
     let world: number;
     if (camera instanceof THREE.OrthographicCamera) {
       world = (pixels * (camera.top - camera.bottom)) / camera.zoom / height;

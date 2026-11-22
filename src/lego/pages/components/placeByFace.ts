@@ -26,6 +26,7 @@ import {
 import { pieceIdOf } from "./gizmoCommit";
 import { groundPoint } from "./measureLayer";
 import type { SceneState } from "./sceneState";
+import { aimFromPointer, pickViewAt } from "./viewLayout";
 
 /** A part waiting to be put on a face, and how it will sit when it is. */
 export interface PlacingPart {
@@ -418,19 +419,17 @@ function surfaceDrop(
   };
 }
 
-/** The raycaster for a pointer at window coordinates, or null outside the viewport. */
+/** The raycaster for a pointer at window coordinates, through the quadrant
+ *  under it in four views, or null outside the viewport. */
 function rayAt(state: SceneState, x: number, y: number) {
   const bounds = state.renderer.domElement.getBoundingClientRect();
   if (x < bounds.left || x > bounds.right) return null;
   if (y < bounds.top || y > bounds.bottom) return null;
+  // A drag from the catalogue sends no pointer moves, so the quadrant is
+  // picked here.
+  if (pickViewAt(state, x, y)) state.render();
   const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(
-    new THREE.Vector2(
-      ((x - bounds.left) / bounds.width) * 2 - 1,
-      -((y - bounds.top) / bounds.height) * 2 + 1,
-    ),
-    state.camera,
-  );
+  aimFromPointer(state, raycaster, x, y);
   return raycaster;
 }
 
