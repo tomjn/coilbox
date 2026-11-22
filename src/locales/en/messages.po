@@ -9424,6 +9424,10 @@ msgstr "Angle (°)"
 msgid "Angled"
 msgstr "Angled"
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Animate poses"
+msgstr "Animate poses"
+
 #: src/animation/index.ts
 msgid "animation"
 msgstr "animation"
@@ -17405,10 +17409,6 @@ msgstr "Edge"
 msgid "Edit"
 msgstr "Edit"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-msgid "Edit {actionName}"
-msgstr "Edit {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 msgid "Edit {label} for {unitName}, now {nowShown}"
 msgstr "Edit {label} for {unitName}, now {nowShown}"
@@ -17424,6 +17424,14 @@ msgstr "Edit in place"
 #: src/content/pages/GameUnitPage.tsx
 msgid "Edit in Unit tweaks"
 msgstr "Edit in Unit tweaks"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Edit keys"
+msgstr "Edit keys"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Edit keys for {actionName}"
+msgstr "Edit keys for {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 msgid "Edit mission: {missionTitle}"
@@ -34736,6 +34744,10 @@ msgstr "Save model"
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "Save over {writableName}"
 msgstr "Save over {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Save poses with the Poses button, then add an action."
 
 #: src/play/PresetLibraryToolbar.tsx
 msgid "Save preset"

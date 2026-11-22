@@ -11527,6 +11527,11 @@ msgstr "Kąt (°)"
 msgid "Angled"
 msgstr "Pod kątem"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Animuj pozy"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21205,11 +21210,6 @@ msgstr "Krawędź"
 msgid "Edit"
 msgstr "Edytuj"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Edytuj {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21229,6 +21229,16 @@ msgstr "Edytuj bezpośrednio"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Edytuj w Poprawkach jednostek"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Edytuj klatki kluczowe"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Edytuj klatki kluczowe: {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42329,6 +42339,11 @@ msgstr "Zapisz model"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "Nadpisz {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Zapisz pozy przyciskiem Pozy, a potem dodaj akcję."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

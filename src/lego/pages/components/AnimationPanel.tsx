@@ -169,6 +169,9 @@ import { ProjectWorkshopMarks } from "./WorkshopChangeMarks";
  *  rather than one of the canned scenarios above it. Not a real scenario id:
  *  nothing in `SCENARIOS` uses it, and `scenarioById` finding nothing for it
  *  is how the panel tells the two apart. */
+/** The Actions section's element id, so the poses popover can scroll to it. */
+export const ACTIONS_SECTION_ID = "builder-actions";
+
 const CALL_FUNCTION = "call";
 
 /**
@@ -1937,7 +1940,10 @@ export function AnimationPanel({
           ) : null}
 
           {onActionsEdit ? (
-            <div className="border-b border-border/60 px-3 py-2">
+            <div
+              id={ACTIONS_SECTION_ID}
+              className="border-b border-border/60 px-3 py-2"
+            >
               <div className="flex items-start gap-2">
                 <div className="flex min-w-0 flex-1 items-center gap-1">
                   <p className="text-sm font-medium">
@@ -1964,8 +1970,16 @@ export function AnimationPanel({
                   }}
                 >
                   <Plus size={14} />
+                  <Trans>New action</Trans>
                 </Button>
               </div>
+              {actions.length === 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  <Trans>
+                    Save poses with the Poses button, then add an action.
+                  </Trans>
+                </p>
+              ) : null}
               {actions.length > 0 ? (
                 <div className="mt-2 flex items-center gap-2">
                   <label
@@ -2045,11 +2059,12 @@ export function AnimationPanel({
                       <Button
                         size="sm"
                         variant="outline"
-                        aria-label={t`Edit ${actionName}`}
+                        aria-label={t`Edit keys for ${actionName}`}
                         title={t`Edit the timeline`}
                         onClick={() => setTimelineId(action.id)}
                       >
                         <Pencil size={14} />
+                        <Trans>Edit keys</Trans>
                       </Button>
                       <Button
                         size="sm"

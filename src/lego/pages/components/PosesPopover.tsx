@@ -41,6 +41,8 @@ interface Props {
   onDelete: (id: string) => void;
   /** Put every piece back to rest, as one step that undo takes back. */
   onReset: () => void;
+  /** Open the Animation tab at the Actions section, where poses play in time. */
+  onAnimate: () => void;
 }
 
 export function PosesPopover({
@@ -55,10 +57,12 @@ export function PosesPopover({
   onDuplicate,
   onDelete,
   onReset,
+  onAnimate,
 }: Props) {
   const { t } = useLingui();
   const poses = project.poses ?? [];
   const [name, setName] = useState("");
+  const [open, setOpen] = useState(false);
 
   function save() {
     onSave(name);
@@ -66,16 +70,16 @@ export function PosesPopover({
   }
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          size="icon"
           variant={posing ? "default" : "outline"}
           title={t`Poses`}
           aria-label={t`Poses`}
           aria-pressed={posing}
         >
           <PersonStanding className="size-4" />
+          <Trans>Poses</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent side="top" align="end" className="w-80 space-y-3">
@@ -142,6 +146,20 @@ export function PosesPopover({
               />
             ))}
           </ul>
+        ) : null}
+
+        {poses.length > 0 ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              setOpen(false);
+              onAnimate();
+            }}
+          >
+            <Trans>Animate poses</Trans>
+          </Button>
         ) : null}
       </PopoverContent>
     </Popover>

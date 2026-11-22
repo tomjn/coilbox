@@ -11602,6 +11602,11 @@ msgstr "Γωνία (°)"
 msgid "Angled"
 msgstr "Υπό γωνία"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Κίνηση πόζων"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21342,11 +21347,6 @@ msgstr "Άκρη"
 msgid "Edit"
 msgstr "Επεξεργασία"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Επεξεργασία {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21366,6 +21366,16 @@ msgstr "Επεξεργασία επιτόπου"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Επεξεργασία στις Τροποποιήσεις μονάδων"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Επεξεργασία κλειδιών"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Επεξεργασία κλειδιών για {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42610,6 +42620,11 @@ msgstr "Αποθήκευση μοντέλου"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "Αποθήκευση πάνω στο {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Αποθηκεύστε πόζες με το κουμπί Πόζες και μετά προσθέστε μια ενέργεια."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

@@ -11602,6 +11602,11 @@ msgstr "Vinkel (°)"
 msgid "Angled"
 msgstr "Snett"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Animera poser"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21342,11 +21347,6 @@ msgstr "Kant"
 msgid "Edit"
 msgstr "Redigera"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "Redigera {actionName}"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21366,6 +21366,16 @@ msgstr "Redigera på plats"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Redigera i Enhetsjusteringar"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Redigera nycklar"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Redigera nycklar för {actionName}"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42610,6 +42620,11 @@ msgstr "Spara modell"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "Spara över {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Spara poser med knappen Poser och lägg sedan till en åtgärd."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

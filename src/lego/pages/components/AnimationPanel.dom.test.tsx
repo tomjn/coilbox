@@ -1530,3 +1530,40 @@ describe("converting a preset to an action (#4512)", () => {
     expect(onActionsEdit).not.toHaveBeenCalled();
   });
 });
+
+describe("the Actions section signposts (#5400)", () => {
+  it("says what to do next when the unit has no actions", () => {
+    show(project(), { onActionsEdit: vi.fn() });
+    expect(
+      screen.getByText("Save poses with the Poses button, then add an action."),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "New action" }).textContent).toBe(
+      "New action",
+    );
+  });
+
+  it("labels the timeline button and drops the empty line once there is an action", () => {
+    show(
+      project({
+        actions: [
+          {
+            id: "a",
+            name: "Walk",
+            trigger: "StartMoving",
+            loop: true,
+            keys: [],
+          },
+        ],
+      }),
+      { onActionsEdit: vi.fn() },
+    );
+    expect(
+      screen.getByRole("button", { name: "Edit keys for Walk" }).textContent,
+    ).toBe("Edit keys");
+    expect(
+      screen.queryByText(
+        "Save poses with the Poses button, then add an action.",
+      ),
+    ).toBeNull();
+  });
+});

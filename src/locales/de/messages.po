@@ -11527,6 +11527,11 @@ msgstr "Winkel (°)"
 msgid "Angled"
 msgstr "Schräg"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Posen animieren"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21205,11 +21210,6 @@ msgstr "Rand"
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: src/lego/pages/components/AnimationPanel.tsx
-#, fuzzy
-msgid "Edit {actionName}"
-msgstr "{actionName} bearbeiten"
-
 #: src/workshop/pages/components/ReferenceEditableCell.tsx
 #, fuzzy
 msgid "Edit {label} for {unitName}, now {nowShown}"
@@ -21229,6 +21229,16 @@ msgstr "Direkt bearbeiten"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "In Einheiten-Anpassungen bearbeiten"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Tasten bearbeiten"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys for {actionName}"
+msgstr "Tasten für {actionName} bearbeiten"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42329,6 +42339,11 @@ msgstr "Modell speichern"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "{writableName} überschreiben"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Speichere Posen mit der Schaltfläche „Posen“ und füge dann eine Aktion hinzu."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy
