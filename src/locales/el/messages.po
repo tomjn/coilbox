@@ -42675,6 +42675,10 @@ msgstr "Αποθηκεύτηκε στις προρρυθμίσεις Ένας π
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Αποθηκεύτηκε στις προρρυθμίσεις Ένας παίκτης για να το ξαναπαίξετε αργότερα."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Αποθηκεύτηκε με τη μονάδα. Η εξαγωγή το γράφει στο παιχνίδι ως {pictureFile}, την εικόνα της στο μενού κατασκευής."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44862,6 +44866,10 @@ msgstr ""
 #, fuzzy
 msgid "Show every replay again"
 msgstr "Εμφάνιση όλων των επαναλήψεων ξανά"
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Εμφάνιση αρχείου"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy

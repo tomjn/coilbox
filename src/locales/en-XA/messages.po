@@ -34789,6 +34789,10 @@ msgstr ""
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr ""
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr ""
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -36571,6 +36575,10 @@ msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "Show every replay again"
+msgstr ""
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx

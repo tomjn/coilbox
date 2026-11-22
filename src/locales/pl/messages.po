@@ -42388,6 +42388,10 @@ msgstr "Zapisano w szablonach gry jednoosobowej"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Zapisano w szablonach gry jednoosobowej, aby zagrać później ponownie."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Zapisano z jednostką. Eksport zapisuje go w grze jako {pictureFile}, obraz w menu budowy."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44567,6 +44571,10 @@ msgstr ""
 #, fuzzy
 msgid "Show every replay again"
 msgstr "Pokaż znowu wszystkie powtórki"
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Pokaż plik"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy

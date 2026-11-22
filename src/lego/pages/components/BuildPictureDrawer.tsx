@@ -11,7 +11,8 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
-import { X } from "lucide-react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { FolderSearch, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
 import { Field } from "@/components/Field";
@@ -20,7 +21,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
-import { legoPictureSurvey, type PictureSurvey } from "../../bindings";
+import {
+  legoPicturePath,
+  legoPictureSurvey,
+  type PictureSurvey,
+} from "../../bindings";
 import {
   clampPictureSize,
   DEFAULT_PICTURE_SIZE,
@@ -123,6 +128,27 @@ export function BuildPictureDrawer({
     };
   }, [isOpen, dir]);
 
+  // Where the stored picture is, for "Show file". Asked again after each take,
+  // since the first take is what creates the file.
+  const takenAt = taken?.takenAt;
+  const projectId = project.id;
+  const [storedPath, setStoredPath] = useState<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `takenAt` changes when a take writes the file
+  useEffect(() => {
+    if (!isOpen) return;
+    let live = true;
+    legoPicturePath({ id: projectId })
+      .then((found) => {
+        if (live) setStoredPath(found.path);
+      })
+      .catch(() => {
+        if (live) setStoredPath(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [isOpen, projectId, takenAt]);
+
   async function take() {
     setWorking(true);
     setProblem(null);
@@ -154,6 +180,7 @@ export function BuildPictureDrawer({
     ? formatDateTime(new Date(taken.takenAt))
     : "";
   const takenSize = taken?.size ?? 0;
+  const pictureFile = `unitpics/${project.unitName}.png`;
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={onOpenChange}>
@@ -258,17 +285,38 @@ export function BuildPictureDrawer({
                     : t`Take picture`}
               </Button>
               {taken ? (
-                <p className="text-xs text-muted-foreground">
-                  <Trans>
-                    Taken {takenWhen}, {takenSize} by {takenSize} pixels.
-                  </Trans>
-                  {stale ? (
-                    <>
-                      {" "}
-                      <Trans>The unit has changed since.</Trans>
-                    </>
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    <Trans>
+                      Taken {takenWhen}, {takenSize} by {takenSize} pixels.
+                    </Trans>
+                    {stale ? (
+                      <>
+                        {" "}
+                        <Trans>The unit has changed since.</Trans>
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    <Trans>
+                      Saved with the unit. Exporting writes it into the game
+                      as {pictureFile}, its build menu picture.
+                    </Trans>
+                  </p>
+                  {storedPath ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="self-start gap-1.5"
+                      onClick={() => {
+                        void revealItemInDir(storedPath).catch(() => {});
+                      }}
+                    >
+                      <FolderSearch className="size-3.5" />
+                      <Trans>Show file</Trans>
+                    </Button>
                   ) : null}
-                </p>
+                </>
               ) : (
                 <p className="text-xs text-muted-foreground">
                   <Trans>No picture taken yet.</Trans>

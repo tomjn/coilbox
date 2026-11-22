@@ -34790,6 +34790,10 @@ msgstr "Saved to Singleplayer presets"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Saved to your Singleplayer presets to replay later."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr "Saved. The file as it was is at {saved}."
@@ -36573,6 +36577,10 @@ msgstr "Show every lane"
 #: src/content/pages/ReplaysPage.tsx
 msgid "Show every replay again"
 msgstr "Show every replay again"
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Show file"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Show frame rate"

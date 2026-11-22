@@ -42388,6 +42388,10 @@ msgstr "Enregistré dans les préréglages solo"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Enregistré dans vos préréglages solo pour rejouer plus tard."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Enregistrée avec l’unité. L’export l’écrit dans le jeu sous {pictureFile}, son image du menu de construction."
+
 #: src/widgets/pages/WidgetSettings.tsx
 msgid "Saved. The file as it was is at {saved}."
 msgstr ""
@@ -44567,6 +44571,10 @@ msgstr ""
 #, fuzzy
 msgid "Show every replay again"
 msgstr "Afficher à nouveau toutes les rediffusions"
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Afficher le fichier"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy

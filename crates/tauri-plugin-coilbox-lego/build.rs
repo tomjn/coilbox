@@ -36,6 +36,7 @@ const COMMANDS: &[&str] = &[
     "lego_export_obj",
     "lego_export_stale",
     "lego_picture_save",
+    "lego_picture_path",
     "lego_export_picture",
     "lego_picture_survey",
     "lego_scratch_game",

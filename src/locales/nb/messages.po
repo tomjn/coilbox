@@ -42658,6 +42658,10 @@ msgstr "Lagret i forhåndsinnstillinger for enspiller"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Lagret i forhåndsinnstillingene for enspiller, så du kan spille det igjen senere."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Lagret med enheten. Eksporten skriver det inn i spillet som {pictureFile}, bildet i byggemenyen."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44845,6 +44849,10 @@ msgstr ""
 #, fuzzy
 msgid "Show every replay again"
 msgstr "Vis alle repriser igjen"
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Vis fil"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy

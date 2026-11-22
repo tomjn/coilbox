@@ -18,10 +18,16 @@ import { type LegoProject, newProject } from "../../model";
 import { BuildPictureDrawer } from "./BuildPictureDrawer";
 
 const legoPictureSurvey = vi.fn();
+const legoPicturePath = vi.fn();
+const revealItemInDir = vi.fn();
 const savePicture = vi.fn();
 
 vi.mock("../../bindings", () => ({
   legoPictureSurvey: (args: unknown) => legoPictureSurvey(args),
+  legoPicturePath: (args: unknown) => legoPicturePath(args),
+}));
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  revealItemInDir: (path: string) => revealItemInDir(path),
 }));
 vi.mock("../../projects", () => ({
   savePicture: (id: string, canvas: HTMLCanvasElement) =>
@@ -65,6 +71,10 @@ function show(
 
 beforeEach(() => {
   legoPictureSurvey.mockReset();
+  legoPicturePath.mockReset();
+  legoPicturePath.mockResolvedValue({ path: null });
+  revealItemInDir.mockReset();
+  revealItemInDir.mockResolvedValue(undefined);
   savePicture.mockReset();
   savePicture.mockResolvedValue(undefined);
 });
@@ -137,6 +147,25 @@ describe("the build picture drawer", () => {
     });
     expect(screen.getByRole("button", { name: "Update picture" })).toBeTruthy();
     expect(screen.getByText(/The unit has changed since/)).toBeTruthy();
+  });
+
+  it("says where a taken picture goes and shows its file", async () => {
+    legoPicturePath.mockResolvedValue({ path: "/data/lego/pictures/p.png" });
+    show({
+      ...base,
+      picture: {
+        size: 320,
+        background: null,
+        view: "right",
+        takenAt: "2026-10-16T00:00:00Z",
+        fingerprint: pictureFingerprint(base),
+      },
+    });
+    expect(
+      screen.getByText(/as unitpics\/skyfort\.png, its build menu picture/),
+    ).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Show file" }));
+    expect(revealItemInDir).toHaveBeenCalledWith("/data/lego/pictures/p.png");
   });
 
   it("says when the game's own pictures are another size", async () => {

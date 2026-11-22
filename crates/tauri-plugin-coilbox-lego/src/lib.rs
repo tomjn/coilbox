@@ -3116,6 +3116,21 @@ async fn lego_picture_save<R: Runtime>(app: AppHandle<R>, id: String, png: Vec<u
     }
 }
 
+/// `lego_picture_path` answers where the stored build picture is, so the game
+/// maker can find the file. `path` is null when none has been taken.
+#[tauri::command]
+async fn lego_picture_path<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let file = match lego_dir(&app) {
+        Ok(d) => d.join("pictures").join(format!("{id}.png")),
+        Err(e) => return CliResult::err(e),
+    };
+    let path = file.is_file().then(|| file.to_string_lossy().into_owned());
+    CliResult::ok(json!({ "path": path }))
+}
+
 /// `lego_export_picture` writes the stored build picture into a game folder
 /// under the write once rule in [`place_picture`].
 ///
@@ -3889,6 +3904,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_export_obj,
             lego_export_stale,
             lego_picture_save,
+            lego_picture_path,
             lego_export_picture,
             lego_picture_survey,
             lego_scratch_game,

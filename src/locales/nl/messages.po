@@ -42675,6 +42675,10 @@ msgstr "Opgeslagen in de Singleplayer-voorinstellingen"
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Opgeslagen in je Singleplayer-voorinstellingen om later opnieuw te spelen."
 
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Saved with the unit. Exporting writes it into the game as {pictureFile}, its build menu picture."
+msgstr "Opgeslagen bij de eenheid. Exporteren schrijft het naar de game als {pictureFile}, de afbeelding in het bouwmenu."
+
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Saved. The file as it was is at {saved}."
@@ -44862,6 +44866,10 @@ msgstr ""
 #, fuzzy
 msgid "Show every replay again"
 msgstr "Alle replays weer tonen"
+
+#: src/lego/pages/components/BuildPictureDrawer.tsx
+msgid "Show file"
+msgstr "Bestand tonen"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy

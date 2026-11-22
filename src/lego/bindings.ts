@@ -240,6 +240,12 @@ export const legoPictureSave = defineCommand<
   Record<string, never>
 >("coilbox-lego", "lego_picture_save");
 
+/** Where the stored build picture is on disk, or null before one is taken. */
+export const legoPicturePath = defineCommand<
+  { id: string },
+  { path: string | null }
+>("coilbox-lego", "lego_picture_path");
+
 /**
  * Write the stored build picture to `unitpics/<unit>.png` in a game folder.
  *
