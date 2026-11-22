@@ -285,7 +285,7 @@ import { PosesPopover } from "./components/PosesPopover";
 import { ProblemErrors } from "./components/ProblemErrors";
 import type { CheckStatus } from "./components/ProblemsButton";
 import { ProportionsPanel } from "./components/ProportionsPanel";
-import type { Placing } from "./components/placeByFace";
+import type { DragView, Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type {
   ModuleLabels,
@@ -301,6 +301,7 @@ import { SwapPartDrawer } from "./components/SwapPartDrawer";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
+import type { TileDrag } from "./components/TileGrid";
 import { TransformFields } from "./components/TransformFields";
 import { UnitGamePicker } from "./components/UnitGamePicker";
 import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
@@ -1030,6 +1031,70 @@ function Builder({ id }: { id: string | undefined }) {
     inventoryView.inventory.record({ kind: "part", id: placingPart.part.id });
     setPlacingPart(null);
   }
+
+  /** Put a part on the ground at a place the drag chose, one edit with its twin. */
+  function placeOnGround(part: LegoPartInfo, position: Vec3) {
+    if (!draft) return;
+    const pieceId = crypto.randomUUID();
+    queueTwin(pieceId);
+    place([pieceId], (project) => ({
+      ...project,
+      pieces: [
+        ...project.pieces,
+        {
+          id: pieceId,
+          name: uniquePieceName(
+            part.shape,
+            project.pieces.map((piece) => piece.name),
+          ),
+          parentId: project.rootPieceId,
+          partId: part.id,
+          position,
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        },
+      ],
+    }));
+    inventoryView.inventory.record({ kind: "part", id: part.id });
+    setPlacingPart(null);
+  }
+
+  /**
+   * Dragging a tile into the viewport. The drag is the placing mode with the
+   * pointer choosing the face, so the ghost, the mount rules and the edit are
+   * the click mode's. Shapes and modules that bring meshes with them are not
+   * dragged: they are added by a click.
+   */
+  const dragView = useRef<DragView | null>(null);
+  const tileDrag: TileDrag = {
+    start: (item) => {
+      if (item.kind === "shape") return false;
+      if (item.kind === "module" && holdsMeshes(item.module)) return false;
+      setPlacingAnchor(false);
+      setPlacingPart(
+        item.kind === "part"
+          ? { part: item.part, cycle: 0, twist: 0 }
+          : { module: item.module, cycle: 0, twist: 0 },
+      );
+      return true;
+    },
+    move: (x, y) => dragView.current?.aim(x, y),
+    end: (x, y) => {
+      const drop = dragView.current?.resolve(x, y) ?? null;
+      dragView.current?.clear();
+      if (!drop || !placingPart) {
+        setPlacingPart(null);
+      } else if (drop.kind === "face") {
+        placeOnFace(drop.target);
+      } else if ("part" in placingPart) {
+        placeOnGround(placingPart.part, drop.position);
+      }
+    },
+    cancel: () => {
+      dragView.current?.clear();
+      setPlacingPart(null);
+    },
+  };
 
   // Arming an anchor takes over the click, so a part waiting for a face stops.
   useEffect(() => {
@@ -2759,6 +2824,7 @@ function Builder({ id }: { id: string | undefined }) {
                 partPlacement={{
                   placing: placingPart,
                   onPlace: placeOnFace,
+                  dragView,
                 }}
                 collisionEditing={{
                   // The panel is where a volume is read and changed, so
@@ -3022,6 +3088,7 @@ function Builder({ id }: { id: string | undefined }) {
                           : undefined
                       }
                       onSelectPart={startPlacing}
+                      drag={tileDrag}
                       onSwitchPlacingPart={(part) =>
                         setPlacingPart((was) =>
                           was && "part" in was ? { ...was, part } : was,

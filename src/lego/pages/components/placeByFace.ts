@@ -8,13 +8,16 @@ import {
   pieceById,
 } from "../../model";
 import { placeModule } from "../../moduleMount";
-import { getPartGeometry, type LegoPartInfo } from "../../pack";
+import { getPartGeometry, type LegoPartInfo, partUnit } from "../../pack";
 import { type FaceTarget, faceUnder, placePart } from "../../placePart";
 import { getMeshGeometry } from "../../rawGeometry";
 import { worldMatrix } from "../../reparent";
 import { getShapeGeometry } from "../../shapes";
+import type { Vec3 } from "../../snapping";
 import { hitInPart } from "./anchorsAndSnapping";
+import { chooseDropTarget, type DropTarget, groundSpot } from "./dragToPlace";
 import { pieceIdOf } from "./gizmoCommit";
+import { groundPoint } from "./measureLayer";
 import type { SceneState } from "./sceneState";
 
 /** A part waiting to be put on a face, and how it will sit when it is. */
@@ -226,4 +229,108 @@ export function placeOnClick(
   }
   const target = faceOfHit(state, hit);
   if (target) state.onPlacePartRef.current?.(target);
+}
+
+/** What a drag from the catalogue has over it, and where on the ground that is. */
+export interface DragView {
+  /** The pointer is at these window coordinates: draw the part where it would go. */
+  aim(x: number, y: number): void;
+  /** Where a drop at these window coordinates puts the part, or null for nowhere. */
+  resolve(x: number, y: number): DropTarget | null;
+  /** The drag is over: draw nothing. */
+  clear(): void;
+}
+
+/**
+ * Where a ray puts a part on the ground, in the root piece's axes, with the
+ * step snapping gives it. Null without a ground under the ray or for a module.
+ */
+function groundDrop(
+  state: SceneState,
+  raycaster: THREE.Raycaster,
+  placing: Placing,
+): { position: Vec3; world: THREE.Matrix4 } | null {
+  if ("module" in placing) return null;
+  const at = groundPoint(state, raycaster);
+  const geometry = getPartGeometry(state.packRef.current, placing.part.id);
+  if (!at || !geometry) return null;
+  const project = state.projectRef.current;
+  const parent = state.root.matrixWorld
+    .clone()
+    .multiply(worldMatrix(project, project.rootPieceId));
+  const local = new THREE.Vector3(...at).applyMatrix4(parent.clone().invert());
+  geometry.computeBoundingBox();
+  const lift = -(geometry.boundingBox?.min.y ?? 0);
+  const position = groundSpot(
+    [local.x, local.y, local.z],
+    state.snapping ? partUnit(state.packRef.current) : null,
+    lift,
+  );
+  return { position, world: parent };
+}
+
+/** The raycaster for a pointer at window coordinates, or null outside the viewport. */
+function rayAt(state: SceneState, x: number, y: number) {
+  const bounds = state.renderer.domElement.getBoundingClientRect();
+  if (x < bounds.left || x > bounds.right) return null;
+  if (y < bounds.top || y > bounds.bottom) return null;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(
+    new THREE.Vector2(
+      ((x - bounds.left) / bounds.width) * 2 - 1,
+      -((y - bounds.top) / bounds.height) * 2 + 1,
+    ),
+    state.camera,
+  );
+  return raycaster;
+}
+
+/** What a drop at these window coordinates would do. */
+export function dropAt(
+  state: SceneState,
+  x: number,
+  y: number,
+): DropTarget | null {
+  const placing = state.placingPartRef.current;
+  const raycaster = rayAt(state, x, y);
+  if (!placing || !raycaster) return null;
+  const hit = firstPieceHit(state, raycaster);
+  return chooseDropTarget({
+    hitPiece: hit !== undefined,
+    face: hit ? faceOfHit(state, hit) : null,
+    ground: hit
+      ? null
+      : (groundDrop(state, raycaster, placing)?.position ?? null),
+  });
+}
+
+/** Draw the part where a drop at these window coordinates would put it. */
+export function aimDrag(state: SceneState, x: number, y: number) {
+  const placing = state.placingPartRef.current;
+  const raycaster = rayAt(state, x, y);
+  const drop = dropAt(state, x, y);
+  if (!placing || !raycaster || !drop) {
+    if (state.placeTarget || state.placeGhost.visible) clearPlaceGhost(state);
+    return;
+  }
+  if (drop.kind === "face") {
+    hoverPlaceFace(state, firstPieceHit(state, raycaster));
+    return;
+  }
+  const ground = groundDrop(state, raycaster, placing);
+  const geometry =
+    "part" in placing
+      ? getPartGeometry(state.packRef.current, placing.part.id)
+      : null;
+  if (!ground || !geometry) return;
+  state.placeTarget = null;
+  state.placeMark.visible = false;
+  hideModuleGhost(state);
+  state.placeGhost.geometry = geometry;
+  state.placeGhost.matrix
+    .copy(ground.world)
+    .multiply(new THREE.Matrix4().makeTranslation(...drop.position));
+  state.placeGhost.matrixWorldNeedsUpdate = true;
+  state.placeGhost.visible = true;
+  state.render();
 }

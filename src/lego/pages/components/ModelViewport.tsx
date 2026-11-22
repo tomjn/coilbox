@@ -184,7 +184,14 @@ import { clearMountMarks } from "./mountMarks";
 import { disposeOverlap } from "./overlapLayer";
 import { type CheckStatus, ProblemsButton } from "./ProblemsButton";
 import { buildPackPreview } from "./packHandles";
-import { clearPlaceGhost, type Placing, showPlaceGhost } from "./placeByFace";
+import {
+  aimDrag,
+  clearPlaceGhost,
+  type DragView,
+  dropAt,
+  type Placing,
+  showPlaceGhost,
+} from "./placeByFace";
 import { disposePlanted } from "./plantedLayer";
 import { attachPointerHandlers } from "./pointerHandlers";
 import {
@@ -586,6 +593,9 @@ interface Props {
     placing?: Placing | null;
     /** The face that was clicked, or null for a click that hit nothing. */
     onPlace?: (target: FaceTarget | null) => void;
+    /** Filled with what the builder asks of the viewport while a part is
+     *  dragged in from the catalogue: where it would land, and where it does. */
+    dragView?: { current: DragView | null };
   };
   /** The collision volume, the unit's own or one piece's, while its panel
    *  has the gizmo on it. */
@@ -742,7 +752,11 @@ export function ModelViewport({
     onPlaceAnchor,
     onCancelAnchor,
   } = anchorPlacement;
-  const { placing: placingPart = null, onPlace: onPlacePart } = partPlacement;
+  const {
+    placing: placingPart = null,
+    onPlace: onPlacePart,
+    dragView,
+  } = partPlacement;
   const {
     editCollision = false,
     onCollisionChange,
@@ -1733,6 +1747,29 @@ export function ModelViewport({
     else clearPlaceGhost(state);
     state.render();
   }, [placingPart, project]);
+
+  // The catalogue's drag reads the scene through this, so it is only there
+  // while the scene is.
+  useEffect(() => {
+    if (!dragView) return;
+    dragView.current = {
+      aim: (x, y) => {
+        const state = sceneRef.current;
+        if (state) aimDrag(state, x, y);
+      },
+      resolve: (x, y) => {
+        const state = sceneRef.current;
+        return state ? dropAt(state, x, y) : null;
+      },
+      clear: () => {
+        const state = sceneRef.current;
+        if (state) clearPlaceGhost(state);
+      },
+    };
+    return () => {
+      dragView.current = null;
+    };
+  }, [dragView]);
 
   useModelHover(sceneRef, hoveredId, project);
 

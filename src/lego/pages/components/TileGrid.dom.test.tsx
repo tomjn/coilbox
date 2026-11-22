@@ -70,7 +70,12 @@ vi.mock("../../pack", async (importOriginal) => ({
   getPartGeometry: () => drawn.partGeometry,
 }));
 
-import { type GridItem, type GridSection, TileGrid } from "./TileGrid";
+import {
+  type GridItem,
+  type GridSection,
+  type TileDrag,
+  TileGrid,
+} from "./TileGrid";
 
 const part = (id: string): LegoPartInfo =>
   ({
@@ -320,6 +325,112 @@ describe("picking", () => {
     expect(
       tiles(container).map((tile) => tile.getAttribute("aria-pressed")),
     ).toEqual(["false", "true"]);
+  });
+});
+
+describe("dragging a tile", () => {
+  function dragger(): TileDrag {
+    return {
+      start: vi.fn(() => true),
+      move: vi.fn(),
+      end: vi.fn(),
+      cancel: vi.fn(),
+    };
+  }
+  const press = (tile: HTMLElement) =>
+    fireEvent.pointerDown(tile, { button: 0, clientX: 10, clientY: 10 });
+
+  it("keeps a press and release in place a click that picks the tile", () => {
+    const onPick = vi.fn<(item: GridItem, alt: boolean) => void>();
+    const drag = dragger();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ parts: [part("beam")] })}
+        onPick={onPick}
+        drag={drag}
+      />,
+    );
+    const [tile] = tiles(container);
+    press(tile);
+    fireEvent.pointerUp(window, { clientX: 11, clientY: 10 });
+    fireEvent.click(tile);
+    expect(onPick).toHaveBeenCalledTimes(1);
+    expect(drag.start).not.toHaveBeenCalled();
+  });
+
+  it("still picks with Enter or Space, which press no pointer", () => {
+    const onPick = vi.fn<(item: GridItem, alt: boolean) => void>();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ parts: [part("beam")] })}
+        onPick={onPick}
+        drag={dragger()}
+      />,
+    );
+    fireEvent.click(tiles(container)[0]);
+    expect(onPick).toHaveBeenCalledTimes(1);
+  });
+
+  it("drags once the pointer travels, drops on release and does not pick", () => {
+    const onPick = vi.fn<(item: GridItem, alt: boolean) => void>();
+    const drag = dragger();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ parts: [part("beam")] })}
+        onPick={onPick}
+        drag={drag}
+      />,
+    );
+    const [tile] = tiles(container);
+    press(tile);
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    expect(drag.start).toHaveBeenCalledWith({
+      kind: "part",
+      part: part("beam"),
+    });
+    expect(drag.move).toHaveBeenLastCalledWith(60, 10);
+    expect(document.documentElement.dataset.partDrag).toBe("");
+    fireEvent.pointerUp(window, { clientX: 80, clientY: 20 });
+    expect(drag.end).toHaveBeenCalledWith(80, 20);
+    expect(document.documentElement.dataset.partDrag).toBeUndefined();
+    fireEvent.click(tile);
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it("cancels on Escape and drops nothing on release", () => {
+    const drag = dragger();
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ parts: [part("beam")] })}
+        drag={drag}
+      />,
+    );
+    press(tiles(container)[0]);
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(drag.cancel).toHaveBeenCalledTimes(1);
+    fireEvent.pointerUp(window, { clientX: 80, clientY: 20 });
+    expect(drag.end).not.toHaveBeenCalled();
+  });
+
+  it("leaves a tile the page will not drag as a click", () => {
+    const drag = { ...dragger(), start: vi.fn(() => false) };
+    const { container } = render(
+      <TileGrid
+        pack={pack}
+        sections={sections({ shapes: [cylinder] })}
+        drag={drag}
+      />,
+    );
+    press(tiles(container)[0]);
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10 });
+    fireEvent.pointerUp(window, { clientX: 60, clientY: 10 });
+    expect(drag.move).not.toHaveBeenCalled();
+    expect(drag.end).not.toHaveBeenCalled();
   });
 });
 

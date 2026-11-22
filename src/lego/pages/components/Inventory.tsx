@@ -50,7 +50,12 @@ import { CategoryMenu } from "./CategoryMenu";
 import { DetailPanel } from "./DetailPanel";
 import { useRootHeight } from "./gridScroll";
 import { PackSelect } from "./PartFilters";
-import { type GridItem, type GridSection, TileGrid } from "./TileGrid";
+import {
+  type GridItem,
+  type GridSection,
+  type TileDrag,
+  TileGrid,
+} from "./TileGrid";
 
 const KINDS: { value: InventoryKind; label: MessageDescriptor }[] = [
   { value: "all", label: msg`All` },
@@ -193,6 +198,8 @@ interface GridsProps {
    * placed, which the builder then places instead (#4540).
    */
   onSwitchPlacingPart?: (part: LegoPartInfo) => void;
+  /** Dragging a tile into the builder's viewport. Absent on the Lego parts page. */
+  drag?: TileDrag;
   /** The builder adds the shape. Absent on the Lego parts page. */
   onSelectShape?: (shape: ShapeKind, alt: boolean) => void;
   /** Absent on the Lego parts page, which has no unit to place a module in. */
@@ -240,6 +247,7 @@ export function InventoryGrids({
   selectedPartId,
   onSelectPart,
   onSwitchPlacingPart,
+  drag,
   onSelectShape,
   onInsertModule,
   placingModuleId,
@@ -383,6 +391,7 @@ export function InventoryGrids({
             atlas={atlas}
             selectedKey={selectedKey}
             placesModules={onInsertModule !== undefined}
+            drag={drag}
             onPick={(item, alt) => {
               setSelected(refOf(item));
               if (item.kind === "part") onSelectPart?.(item.part, alt);

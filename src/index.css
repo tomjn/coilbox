@@ -447,3 +447,10 @@ body,
   color: var(--shiki-dark) !important;
   background-color: var(--shiki-dark-bg) !important;
 }
+
+/* A part is being dragged from the unit builder's catalogue. */
+html[data-part-drag],
+html[data-part-drag] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
