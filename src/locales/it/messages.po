@@ -20480,6 +20480,11 @@ msgstr "Porta"
 msgid "Doors"
 msgstr "Porte"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Doppio clic per riempire la vista"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23913,6 +23918,11 @@ msgstr "Fondatore (facoltativo, di default sei tu)"
 msgid "Four legs"
 msgstr "Quattro zampe"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Quattro viste ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24195,6 +24205,12 @@ msgstr "fronte"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Fronte"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Fronte"
 
@@ -37614,6 +37630,12 @@ msgstr "Autorizzazione concessa."
 msgid "Permission not granted."
 msgstr "Autorizzazione non concessa."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Prospettiva"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -45181,6 +45203,11 @@ msgstr "Mostra il pannello laterale"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Mostra le viste dall'alto, frontale e laterale accanto alla vista in prospettiva, o torna a una sola vista"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Mostra questa scheda"
 
@@ -45306,6 +45333,12 @@ msgstr "Fazione"
 msgctxt "camera angle"
 msgid "Side"
 msgstr "Laterale"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Side"
+msgstr "Lato"
 
 #: src/campaign/media.ts
 #, fuzzy
@@ -53463,6 +53496,12 @@ msgstr "alto"
 
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Top"
+msgstr "Alto"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Top"
 msgstr "Alto"
 

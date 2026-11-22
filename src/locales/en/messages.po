@@ -16698,6 +16698,10 @@ msgstr "Door"
 msgid "Doors"
 msgstr "Doors"
 
+#: src/lego/pages/components/FourViews.tsx
+msgid "Double click to fill the view"
+msgstr "Double click to fill the view"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -19493,6 +19497,10 @@ msgstr "Founder (optional, defaults to you)"
 msgid "Four legs"
 msgstr "Four legs"
 
+#: src/lego/pages/components/FourViews.tsx
+msgid "Four views ({key})"
+msgstr "Four views ({key})"
+
 #: src/placement/PlacementSurface.tsx
 msgid "Frame"
 msgstr "Frame"
@@ -19720,6 +19728,11 @@ msgstr "front"
 #: src/content/pages/components/useUnitRenders.ts
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
+msgid "Front"
+msgstr "Front"
+
+#: src/lego/pages/components/FourViews.tsx
+msgctxt "view"
 msgid "Front"
 msgstr "Front"
 
@@ -30656,6 +30669,11 @@ msgstr "Permission granted."
 msgid "Permission not granted."
 msgstr "Permission not granted."
 
+#: src/lego/pages/components/FourViews.tsx
+msgctxt "view"
+msgid "Perspective"
+msgstr "Perspective"
+
 #: src/mapconv/pages/DecompilePage.tsx
 msgid "Pick a .sdd folder…"
 msgstr "Pick a .sdd folder…"
@@ -36833,6 +36851,10 @@ msgid "Show the side panel"
 msgstr "Show the side panel"
 
 #: src/lego/shortcuts.ts
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Show the top, front and side views beside the perspective view, or go back to one view"
+
+#: src/lego/shortcuts.ts
 msgid "Show this sheet"
 msgstr "Show this sheet"
 
@@ -36933,6 +36955,11 @@ msgstr "Side"
 #: src/content/pages/components/useUnitRenders.ts
 #: src/lego/buildPicture.ts
 msgctxt "camera angle"
+msgid "Side"
+msgstr "Side"
+
+#: src/lego/pages/components/FourViews.tsx
+msgctxt "view"
 msgid "Side"
 msgstr "Side"
 
@@ -43584,6 +43611,11 @@ msgid "top"
 msgstr "top"
 
 #: src/lego/pivot.ts
+msgid "Top"
+msgstr "Top"
+
+#: src/lego/pages/components/FourViews.tsx
+msgctxt "view"
 msgid "Top"
 msgstr "Top"
 

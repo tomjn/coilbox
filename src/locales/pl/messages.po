@@ -20345,6 +20345,11 @@ msgstr "Drzwi"
 msgid "Doors"
 msgstr "Drzwi"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Kliknij dwukrotnie, aby wypełnić widok"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23758,6 +23763,11 @@ msgstr "Założyciel (opcjonalnie, domyślnie ty)"
 msgid "Four legs"
 msgstr "Cztery nogi"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Cztery widoki ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24039,6 +24049,12 @@ msgstr "przód"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Przód"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Przód"
 
@@ -37369,6 +37385,12 @@ msgstr "Przyznano uprawnienia."
 msgid "Permission not granted."
 msgstr "Nie przyznano uprawnień."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Perspektywa"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -44886,6 +44908,11 @@ msgstr "Pokaż panel boczny"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Pokaż widoki z góry, z przodu i z boku obok widoku perspektywicznego albo wróć do jednego widoku"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Pokaż tę ściągę"
 
@@ -45008,6 +45035,12 @@ msgstr "Strona"
 #: src/lego/buildPicture.ts
 #, fuzzy
 msgctxt "camera angle"
+msgid "Side"
+msgstr "Bok"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Side"
 msgstr "Bok"
 
@@ -53104,6 +53137,12 @@ msgstr "góra"
 
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Top"
+msgstr "Góra"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Top"
 msgstr "Góra"
 

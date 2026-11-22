@@ -20345,6 +20345,11 @@ msgstr "Tür"
 msgid "Doors"
 msgstr "Türen"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "Doppelklicken, um die Ansicht damit zu füllen"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23758,6 +23763,11 @@ msgstr "Gründer (optional, Standard sind Sie)"
 msgid "Four legs"
 msgstr "Vier Beine"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "Vier Ansichten ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24039,6 +24049,12 @@ msgstr "vorne"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "Vorne"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "Vorne"
 
@@ -37369,6 +37385,12 @@ msgstr "Berechtigung erteilt."
 msgid "Permission not granted."
 msgstr "Berechtigung nicht erteilt."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "Perspektive"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -44886,6 +44908,11 @@ msgstr "Seitenleiste zeigen"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "Die Ansichten von oben, vorne und der Seite neben der perspektivischen Ansicht zeigen, oder zurück zu einer Ansicht"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "Diese Übersicht zeigen"
 
@@ -45008,6 +45035,12 @@ msgstr "Seite"
 #: src/lego/buildPicture.ts
 #, fuzzy
 msgctxt "camera angle"
+msgid "Side"
+msgstr "Seite"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Side"
 msgstr "Seite"
 
@@ -53104,6 +53137,12 @@ msgstr "oben"
 
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Top"
+msgstr "Oben"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Top"
 msgstr "Oben"
 

@@ -20345,6 +20345,11 @@ msgstr "门"
 msgid "Doors"
 msgstr "门"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "双击以填满视图"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23758,6 +23763,11 @@ msgstr "房主（可选，默认为你）"
 msgid "Four legs"
 msgstr "四条腿"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "四视图 ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24041,6 +24051,12 @@ msgstr "前"
 #, fuzzy
 msgid "Front"
 msgstr "正面"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Front"
+msgstr "前视"
 
 #: src/content/replayBuildOrders.ts
 #, fuzzy
@@ -37369,6 +37385,12 @@ msgstr "已授予权限。"
 msgid "Permission not granted."
 msgstr "未授予权限。"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "透视"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -44886,6 +44908,11 @@ msgstr "显示侧面板"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "在透视视图旁显示顶视、前视和侧视视图，或返回单一视图"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "显示此列表"
 
@@ -45010,6 +45037,12 @@ msgstr "阵营"
 msgctxt "camera angle"
 msgid "Side"
 msgstr "侧面"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Side"
+msgstr "侧视"
 
 #: src/campaign/media.ts
 #, fuzzy
@@ -53106,6 +53139,12 @@ msgstr "上"
 #, fuzzy
 msgid "Top"
 msgstr "上"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Top"
+msgstr "顶视"
 
 #: src/content/pages/components/useUnitRenders.ts
 #, fuzzy

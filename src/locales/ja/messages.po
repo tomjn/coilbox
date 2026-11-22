@@ -20345,6 +20345,11 @@ msgstr "ドア"
 msgid "Doors"
 msgstr "ドア"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Double click to fill the view"
+msgstr "ダブルクリックでビュー全体に表示"
+
 #: src/challenge/SubstitutedMapNote.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/content/pages/components/MapNotInstalled.tsx
@@ -23758,6 +23763,11 @@ msgstr "ホスト（任意、デフォルトは自分）"
 msgid "Four legs"
 msgstr "4 本脚"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "Four views ({key})"
+msgstr "4分割ビュー ({key})"
+
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
 msgid "Frame"
@@ -24039,6 +24049,12 @@ msgstr "前"
 #: src/lego/buildPicture.ts
 #: src/lego/pivot.ts
 #, fuzzy
+msgid "Front"
+msgstr "正面"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Front"
 msgstr "正面"
 
@@ -37369,6 +37385,12 @@ msgstr "許可されました。"
 msgid "Permission not granted."
 msgstr "許可されませんでした。"
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Perspective"
+msgstr "透視"
+
 #: src/mapconv/pages/DecompilePage.tsx
 #, fuzzy
 msgid "Pick a .sdd folder…"
@@ -44886,6 +44908,11 @@ msgstr "サイドパネルを表示"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
+msgid "Show the top, front and side views beside the perspective view, or go back to one view"
+msgstr "上面・正面・側面のビューを透視ビューと並べて表示する、または1つのビューに戻す"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
 msgid "Show this sheet"
 msgstr "この一覧を表示"
 
@@ -45008,6 +45035,12 @@ msgstr "勢力"
 #: src/lego/buildPicture.ts
 #, fuzzy
 msgctxt "camera angle"
+msgid "Side"
+msgstr "側面"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
 msgid "Side"
 msgstr "側面"
 
@@ -53106,6 +53139,12 @@ msgstr "上"
 #, fuzzy
 msgid "Top"
 msgstr "上"
+
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgctxt "view"
+msgid "Top"
+msgstr "上面"
 
 #: src/content/pages/components/useUnitRenders.ts
 #, fuzzy
