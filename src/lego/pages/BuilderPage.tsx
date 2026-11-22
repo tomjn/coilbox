@@ -181,7 +181,18 @@ import {
   partUnit,
   projectPackProblems,
 } from "../pack";
-import { usePanelHeight, usePanelOpen } from "../panels";
+import {
+  clampAsideWidth,
+  clampDetailsHeight,
+  DETAILS_HEIGHT,
+  MIN_ASIDE_WIDTH,
+  MIN_DETAILS_HEIGHT,
+  maxAsideWidth,
+  maxDetailsHeight,
+  usePanelHeight,
+  usePanelOpen,
+  usePanelWidth,
+} from "../panels";
 import { attachToBone } from "../partOnBone";
 import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
@@ -452,10 +463,19 @@ function Builder({ id }: { id: string | undefined }) {
   // resizer's own measurement. Whether it was covering the model view does
   // not: see `../panels`.
   const [stripHeight, setStripHeight] = usePanelHeight("strip");
+  const [asideWidth, setAsideWidth] = usePanelWidth("aside");
+  const [detailsHeight, setDetailsHeight] = usePanelHeight(
+    "details",
+    DETAILS_HEIGHT,
+  );
   const [stripFull, setStripFull] = useState(false);
   // The model view and the drawer share this, and it is what a drag is
   // measured against.
   const columnRef = useRef<HTMLDivElement | null>(null);
+  // The row the model view and the side panel share, and the column the piece
+  // tree and the details share: what their handles measure.
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const splitRef = useRef<HTMLDivElement | null>(null);
   // The module is made once, when the step opens, because its pieces get new
   // ids each time and the mount names one of them.
   const liftedRef = useRef<LegoProject | null>(null);
@@ -2318,7 +2338,7 @@ function Builder({ id }: { id: string | undefined }) {
           raw={raw}
         />
 
-        <div className="flex min-h-0 flex-1">
+        <div ref={rowRef} className="flex min-h-0 flex-1">
           <div ref={columnRef} className="flex min-h-0 flex-1 flex-col">
             {/* The unit's chrome floats over the view rather than taking a strip
               off the top of it. The 3D is the point of this screen.
@@ -3009,7 +3029,22 @@ function Builder({ id }: { id: string | undefined }) {
           </div>
 
           <CollapsibleContent asChild>
-            <aside className="flex w-72 shrink-0 flex-col border-l border-border">
+            <aside
+              id="lego-aside"
+              className="relative flex shrink-0 flex-col border-l border-border"
+              style={{ width: asideWidth }}
+            >
+              <StripResizer
+                orientation="vertical"
+                label={t`Resize the side panel`}
+                height={asideWidth}
+                onHeight={setAsideWidth}
+                columnRef={rowRef}
+                controls="lego-aside"
+                min={MIN_ASIDE_WIDTH}
+                max={maxAsideWidth}
+                clamp={clampAsideWidth}
+              />
               <ButtonGroup className="m-2">
                 <Button
                   size="sm"
@@ -3279,696 +3314,730 @@ function Builder({ id }: { id: string | undefined }) {
                     </Button>
                   </div>
 
-                  <div className="relative min-h-32 flex-1">
-                    <div
-                      ref={treeScrollRef}
-                      className="h-full overflow-y-auto py-1"
-                    >
-                      <PieceTree
-                        project={draft}
-                        raw={raw}
-                        selectedIds={selectedIds}
-                        onSelect={selectPiece}
-                        onReparent={reparent}
-                        joins={joins}
-                        onToggleHidden={toggleHidden}
-                        locks={rerollLocks}
-                        onToggleLocked={toggleLocked}
-                        hoveredId={hoveredId}
-                        onHoverChange={setHoveredId}
-                        collapsedIds={collapsedIds}
-                        onToggleCollapsed={(pieceId) =>
-                          setCollapsedIds((was) => {
-                            const next = new Set(was);
-                            if (!next.delete(pieceId)) next.add(pieceId);
-                            return next;
-                          })
-                        }
-                      />
-                    </div>
-                    {/* Fades the last row rather than clipping it mid-line, so a
+                  <div ref={splitRef} className="flex min-h-0 flex-1 flex-col">
+                    <div className="relative min-h-32 flex-1">
+                      <div
+                        ref={treeScrollRef}
+                        className="h-full overflow-y-auto py-1"
+                      >
+                        <PieceTree
+                          project={draft}
+                          raw={raw}
+                          selectedIds={selectedIds}
+                          onSelect={selectPiece}
+                          onReparent={reparent}
+                          joins={joins}
+                          onToggleHidden={toggleHidden}
+                          locks={rerollLocks}
+                          onToggleLocked={toggleLocked}
+                          hoveredId={hoveredId}
+                          onHoverChange={setHoveredId}
+                          collapsedIds={collapsedIds}
+                          onToggleCollapsed={(pieceId) =>
+                            setCollapsedIds((was) => {
+                              const next = new Set(was);
+                              if (!next.delete(pieceId)) next.add(pieceId);
+                              return next;
+                            })
+                          }
+                        />
+                      </div>
+                      {/* Fades the last row rather than clipping it mid-line, so a
                     partly visible row reads as "more below" rather than a
                     rendering fault. Gone at the end of the list, where there
                     is nothing below and it only dimmed the last row. */}
-                    {treeMoreBelow ? (
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
-                      />
-                    ) : null}
-                  </div>
+                      {treeMoreBelow ? (
+                        <div
+                          aria-hidden
+                          className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
+                        />
+                      ) : null}
+                    </div>
 
-                  {selectedIds.length > 1 ? (
-                    <SetPanel
-                      project={draft}
-                      selectedIds={selectedIds}
-                      onSelect={setSelectedId}
-                      onReparent={(parentId, pieceIds) =>
-                        reparentAll(pieceIds, parentId)
-                      }
-                      onAlign={(axis, edge) =>
-                        arrangeSet({ kind: "align", axis, edge })
-                      }
-                      onDistribute={(axis) =>
-                        arrangeSet({ kind: "distribute", axis })
-                      }
-                    />
-                  ) : selected ? (
-                    // Capped and scrollable, and free to shrink further still: the
-                    // 55% cap is against the whole aside, so it can outgrow what
-                    // is actually left once the tree has taken its own minimum.
-                    // Without shrink enabled here, that excess pushed past the
-                    // aside's own box and over whatever sat below it (the parts
-                    // drawer) instead of scrolling.
-                    <div className="flex max-h-[55%] min-h-0 flex-col border-t border-border">
-                      {/* Folds away to give the tree the room, and closes by
+                    {selectedIds.length > 1 ? (
+                      <SetPanel
+                        project={draft}
+                        selectedIds={selectedIds}
+                        onSelect={setSelectedId}
+                        onReparent={(parentId, pieceIds) =>
+                          reparentAll(pieceIds, parentId)
+                        }
+                        onAlign={(axis, edge) =>
+                          arrangeSet({ kind: "align", axis, edge })
+                        }
+                        onDistribute={(axis) =>
+                          arrangeSet({ kind: "distribute", axis })
+                        }
+                      />
+                    ) : selected ? (
+                      // The height is the one dragged to, scrolling inside it, and
+                      // free to shrink so a stored height never pushes past the
+                      // aside's own box over the parts drawer.
+                      <div
+                        id="lego-details"
+                        className="relative flex min-h-0 flex-col border-t border-border"
+                        style={
+                          detailsOpen ? { height: detailsHeight } : undefined
+                        }
+                      >
+                        {detailsOpen ? (
+                          <StripResizer
+                            label={t`Resize the details panel`}
+                            height={detailsHeight}
+                            onHeight={setDetailsHeight}
+                            columnRef={splitRef}
+                            controls="lego-details"
+                            min={MIN_DETAILS_HEIGHT}
+                            max={maxDetailsHeight}
+                            clamp={clampDetailsHeight}
+                          />
+                        ) : null}
+                        {/* Folds away to give the tree the room, and closes by
                         clearing the selection, which is what the panel is
                         about. */}
-                      <div className="flex items-center gap-1 px-1 py-1">
-                        <button
-                          type="button"
-                          onClick={() => setDetailsOpen((open) => !open)}
-                          aria-expanded={detailsOpen}
-                          className="flex min-w-0 flex-1 items-center gap-1 rounded px-2 py-1 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {detailsOpen ? (
-                            <ChevronDown size={14} className="shrink-0" />
-                          ) : (
-                            <ChevronRight size={14} className="shrink-0" />
-                          )}
-                          <span className="truncate">{selected.name}</span>
-                        </button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => setSelectedId(null)}
-                          aria-label={t`Close and deselect`}
-                          title={t`Close and deselect`}
-                        >
-                          <X size={14} />
-                        </Button>
-                      </div>
-                      {detailsOpen ? (
-                        <div className="min-h-0 overflow-y-auto px-3 pb-2">
-                          <label
-                            className="text-xs text-muted-foreground"
-                            htmlFor="lego-piece-name"
+                        <div className="flex items-center gap-1 px-1 py-1">
+                          <button
+                            type="button"
+                            onClick={() => setDetailsOpen((open) => !open)}
+                            aria-expanded={detailsOpen}
+                            className="flex min-w-0 flex-1 items-center gap-1 rounded px-2 py-1 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
-                            <Trans>Name</Trans>
-                          </label>
-                          <NameInput
-                            id="lego-piece-name"
-                            value={selected.name}
-                            onCommit={renameSelected}
-                            className="mt-1"
-                          />
-                          {selected.lifted ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {liftCredit(selected.lifted)}
-                            </p>
-                          ) : null}
-
-                          <TransformFields
-                            piece={selected}
-                            onChange={(change) =>
-                              transformPiece(selected.id, change)
-                            }
-                            uniformScale={uniformScale}
-                            onUniformScaleChange={setUniformScale}
-                          />
-                          <PieceSize
-                            project={draft}
-                            pack={pack}
-                            raw={raw}
-                            pieceId={selected.id}
-                          />
-                          <JointLimitFields
-                            piece={selected}
-                            onChange={(limits) =>
-                              edit((project) =>
-                                withLimits(project, selected.id, limits),
-                              )
-                            }
-                          />
-                          {selected.shape &&
-                          isKnownShapeKind(selected.shape.kind) ? (
-                            <ShapeFields
-                              key={selected.id}
-                              shape={selected.shape}
-                              pack={pack}
-                              onChange={reshapeSelected}
+                            {detailsOpen ? (
+                              <ChevronDown size={14} className="shrink-0" />
+                            ) : (
+                              <ChevronRight size={14} className="shrink-0" />
+                            )}
+                            <span className="truncate">{selected.name}</span>
+                          </button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 shrink-0"
+                            onClick={() => setSelectedId(null)}
+                            aria-label={t`Close and deselect`}
+                            title={t`Close and deselect`}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </div>
+                        {detailsOpen ? (
+                          <div className="min-h-0 overflow-y-auto px-3 pb-2">
+                            <label
+                              className="text-xs text-muted-foreground"
+                              htmlFor="lego-piece-name"
+                            >
+                              <Trans>Name</Trans>
+                            </label>
+                            <NameInput
+                              id="lego-piece-name"
+                              value={selected.name}
+                              onCommit={renameSelected}
+                              className="mt-1"
                             />
-                          ) : null}
-                          {selected.meshBox ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-2 w-full"
-                              onClick={() =>
+                            {selected.lifted ? (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {liftCredit(selected.lifted)}
+                              </p>
+                            ) : null}
+
+                            <TransformFields
+                              piece={selected}
+                              onChange={(change) =>
+                                transformPiece(selected.id, change)
+                              }
+                              uniformScale={uniformScale}
+                              onUniformScaleChange={setUniformScale}
+                            />
+                            <PieceSize
+                              project={draft}
+                              pack={pack}
+                              raw={raw}
+                              pieceId={selected.id}
+                            />
+                            <JointLimitFields
+                              piece={selected}
+                              onChange={(limits) =>
                                 edit((project) =>
-                                  fitToSteps(
-                                    project,
-                                    pack,
-                                    raw,
-                                    selected.id,
-                                    partUnit(pack),
-                                  ),
+                                  withLimits(project, selected.id, limits),
                                 )
                               }
-                            >
-                              <Trans>Fit to steps</Trans>
-                            </Button>
-                          ) : null}
-                          {canMirror(draft, selected.id) ? (
-                            <div className="mt-2">
-                              <span className="text-xs text-muted-foreground">
-                                <Trans>Mirror</Trans>
-                              </span>
-                              <ButtonGroup className="mt-1 flex w-full">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={mirrorSelection}
-                                >
-                                  <FlipHorizontal2 size={14} />{" "}
-                                  <Trans>In place</Trans>
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={mirrorCopyOfSelection}
-                                >
-                                  <Copy size={14} /> <Trans>As a copy</Trans>
-                                </Button>
-                              </ButtonGroup>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                <Trans>
-                                  Across the unit's centre line, taking
-                                  everything under this piece with it. A copy is
-                                  how one leg becomes the other.
-                                </Trans>
-                              </p>
-                            </div>
-                          ) : null}
+                            />
+                            {selected.shape &&
+                            isKnownShapeKind(selected.shape.kind) ? (
+                              <ShapeFields
+                                key={selected.id}
+                                shape={selected.shape}
+                                pack={pack}
+                                onChange={reshapeSelected}
+                              />
+                            ) : null}
+                            {selected.meshBox ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-2 w-full"
+                                onClick={() =>
+                                  edit((project) =>
+                                    fitToSteps(
+                                      project,
+                                      pack,
+                                      raw,
+                                      selected.id,
+                                      partUnit(pack),
+                                    ),
+                                  )
+                                }
+                              >
+                                <Trans>Fit to steps</Trans>
+                              </Button>
+                            ) : null}
+                            {canMirror(draft, selected.id) ? (
+                              <div className="mt-2">
+                                <span className="text-xs text-muted-foreground">
+                                  <Trans>Mirror</Trans>
+                                </span>
+                                <ButtonGroup className="mt-1 flex w-full">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={mirrorSelection}
+                                  >
+                                    <FlipHorizontal2 size={14} />{" "}
+                                    <Trans>In place</Trans>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={mirrorCopyOfSelection}
+                                  >
+                                    <Copy size={14} /> <Trans>As a copy</Trans>
+                                  </Button>
+                                </ButtonGroup>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  <Trans>
+                                    Across the unit's centre line, taking
+                                    everything under this piece with it. A copy
+                                    is how one leg becomes the other.
+                                  </Trans>
+                                </p>
+                              </div>
+                            ) : null}
 
-                          {/* Only for a unit imported whole: a part from the pack
+                            {/* Only for a unit imported whole: a part from the pack
                         arrives mapped, so there is nothing here for it to fix,
                         and this whole section would be a question with no
                         honest answer for it. See #2575. */}
-                          {imported ? (
-                            <div className="mt-2">
-                              <span className="text-xs text-muted-foreground">
-                                <Trans>Fix UVs and normals</Trans>
-                              </span>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                <Trans>
-                                  For a model imported from somewhere else,
-                                  whose UVs or lighting arrived wrong.
-                                </Trans>
-                              </p>
-                              <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
-                                <span />
-                                <span className="text-center text-[10px] uppercase text-muted-foreground">
-                                  <Trans>This piece</Trans>
-                                </span>
-                                <span className="text-center text-[10px] uppercase text-muted-foreground">
-                                  <Trans>Whole model</Trans>
-                                </span>
-
-                                <span className="flex items-center gap-1 text-xs">
-                                  <FlipVertical2 size={12} />{" "}
-                                  <Trans>Flip UVs</Trans>
-                                </span>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canFixMesh(selected)}
-                                  onClick={() => fixSelectedUv("flip", "piece")}
-                                >
-                                  <Trans>Flip</Trans>
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!hasImportedGeometry}
-                                  onClick={() => fixSelectedUv("flip", "model")}
-                                >
-                                  <Trans>Flip</Trans>
-                                </Button>
-
-                                <span className="flex items-center gap-1 text-xs">
-                                  <FlipHorizontal2 size={12} />{" "}
-                                  <Trans>Mirror UVs</Trans>
-                                </span>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canFixMesh(selected)}
-                                  onClick={() =>
-                                    fixSelectedUv("mirror", "piece")
-                                  }
-                                >
-                                  <Trans>Mirror</Trans>
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!hasImportedGeometry}
-                                  onClick={() =>
-                                    fixSelectedUv("mirror", "model")
-                                  }
-                                >
-                                  <Trans>Mirror</Trans>
-                                </Button>
-
-                                <span className="flex items-center gap-1 text-xs">
-                                  <Sparkles size={12} />{" "}
-                                  <Trans>Recalc normals</Trans>
-                                </span>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canFixMesh(selected)}
-                                  onClick={() => recalcSelectedNormals("piece")}
-                                >
-                                  <Trans>Fix</Trans>
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!hasImportedGeometry}
-                                  onClick={() => recalcSelectedNormals("model")}
-                                >
-                                  <Trans>Fix</Trans>
-                                </Button>
-                              </div>
-                              <div className="mt-1.5 flex items-center gap-2">
-                                <label
-                                  htmlFor="lego-normals-angle"
-                                  className="text-xs text-muted-foreground"
-                                >
-                                  <Trans>Smoothing angle</Trans>
-                                </label>
-                                <Input
-                                  id="lego-normals-angle"
-                                  inputMode="decimal"
-                                  value={String(normalsAngle)}
-                                  onChange={(event) => {
-                                    const value = Number(event.target.value);
-                                    if (Number.isFinite(value))
-                                      setNormalsAngle(value);
-                                  }}
-                                  className="h-6 w-16 text-right"
-                                />
+                            {imported ? (
+                              <div className="mt-2">
                                 <span className="text-xs text-muted-foreground">
-                                  <Trans>
-                                    degrees, for the next recalculation
-                                  </Trans>
+                                  <Trans>Fix UVs and normals</Trans>
                                 </span>
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {selected.id === draft.rootPieceId ? null : (
-                            // The same move as dragging a row onto another, for anyone not
-                            // using a pointer.
-                            <div className="mt-2">
-                              <span className="text-xs text-muted-foreground">
-                                <Trans>Hangs off</Trans>
-                              </span>
-                              <Select
-                                value={selected.parentId ?? draft.rootPieceId}
-                                onValueChange={(parentId) =>
-                                  reparent(selected.id, parentId)
-                                }
-                              >
-                                <SelectTrigger
-                                  size="sm"
-                                  className="mt-1 w-full"
-                                  aria-label={t`Parent piece`}
-                                >
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {parentOptions(draft, [selected.id]).map(
-                                    ({ piece, depth }) => (
-                                      <SelectItem
-                                        key={piece.id}
-                                        value={piece.id}
-                                        // Indent on the item, not inside its text: Radix
-                                        // mirrors the text into the trigger, and the
-                                        // padding would come with it.
-                                        style={{ paddingLeft: 8 + depth * 12 }}
-                                      >
-                                        {piece.name}
-                                      </SelectItem>
-                                    ),
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          {selected.id === draft.rootPieceId ? null : (
-                            <JoinedTo
-                              join={joins.get(selected.id) ?? null}
-                              onDetach={() => detach(selected.id)}
-                              onPlace={(change) =>
-                                placeJoin(selected.id, change)
-                              }
-                              onBreak={
-                                (draft.animations ?? []).some(
-                                  (applied) =>
-                                    applied.presetId === BREAK_APART.id,
-                                )
-                                  ? (change) => breakJoin(selected.id, change)
-                                  : undefined
-                              }
-                              notice={
-                                joinNotice?.pieceId === selected.id
-                                  ? joinNotice.text
-                                  : null
-                              }
-                              showFree={showFreeFaces}
-                              onShowFreeChange={setShowFreeFaces}
-                            />
-                          )}
-
-                          {selected.twin && pieceById(draft, selected.twin) ? (
-                            <div className="mt-2 flex items-center gap-2 text-xs">
-                              <span className="text-muted-foreground">
-                                <Trans>Twin</Trans>
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">
-                                {pieceById(draft, selected.twin)?.name}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-xs"
-                                onClick={() =>
-                                  edit((project) =>
-                                    unpairPiece(project, selected.id),
-                                  )
-                                }
-                              >
-                                <Trans>Break</Trans>
-                              </Button>
-                            </div>
-                          ) : null}
-                          {selected.ring &&
-                          ringMembers(draft.pieces, selected.id) ? (
-                            <div className="mt-2 flex items-center gap-2 text-xs">
-                              <span className="text-muted-foreground">
-                                <Trans>Ring</Trans>
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">
-                                {plural(ringCount, {
-                                  one: "# copy",
-                                  other: "# copies",
-                                })}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-xs"
-                                onClick={() =>
-                                  edit((project) =>
-                                    unringPiece(project, selected.id),
-                                  )
-                                }
-                              >
-                                <Trans>Break</Trans>
-                              </Button>
-                            </div>
-                          ) : null}
-
-                          {selectedPart ? (
-                            <div className="mt-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => {
-                                  setSwapNote(null);
-                                  setSwapping(true);
-                                }}
-                              >
-                                <Trans>Change part</Trans>
-                              </Button>
-                              {swapNote ? (
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                  {swapNote}
+                                  <Trans>
+                                    For a model imported from somewhere else,
+                                    whose UVs or lighting arrived wrong.
+                                  </Trans>
                                 </p>
-                              ) : null}
-                            </div>
-                          ) : null}
+                                <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
+                                  <span />
+                                  <span className="text-center text-[10px] uppercase text-muted-foreground">
+                                    <Trans>This piece</Trans>
+                                  </span>
+                                  <span className="text-center text-[10px] uppercase text-muted-foreground">
+                                    <Trans>Whole model</Trans>
+                                  </span>
 
-                          {pack &&
-                          rerollRefusal(draft, pack, selected.id, compounds) ===
-                            null ? (
-                            <div className="mt-2 flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1"
-                                onClick={rerollSelected}
-                                title={
-                                  selected.module
-                                    ? t`Put in another module of the same category`
-                                    : t`Put in another part of the same shape, colour and size`
+                                  <span className="flex items-center gap-1 text-xs">
+                                    <FlipVertical2 size={12} />{" "}
+                                    <Trans>Flip UVs</Trans>
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!canFixMesh(selected)}
+                                    onClick={() =>
+                                      fixSelectedUv("flip", "piece")
+                                    }
+                                  >
+                                    <Trans>Flip</Trans>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!hasImportedGeometry}
+                                    onClick={() =>
+                                      fixSelectedUv("flip", "model")
+                                    }
+                                  >
+                                    <Trans>Flip</Trans>
+                                  </Button>
+
+                                  <span className="flex items-center gap-1 text-xs">
+                                    <FlipHorizontal2 size={12} />{" "}
+                                    <Trans>Mirror UVs</Trans>
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!canFixMesh(selected)}
+                                    onClick={() =>
+                                      fixSelectedUv("mirror", "piece")
+                                    }
+                                  >
+                                    <Trans>Mirror</Trans>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!hasImportedGeometry}
+                                    onClick={() =>
+                                      fixSelectedUv("mirror", "model")
+                                    }
+                                  >
+                                    <Trans>Mirror</Trans>
+                                  </Button>
+
+                                  <span className="flex items-center gap-1 text-xs">
+                                    <Sparkles size={12} />{" "}
+                                    <Trans>Recalc normals</Trans>
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!canFixMesh(selected)}
+                                    onClick={() =>
+                                      recalcSelectedNormals("piece")
+                                    }
+                                  >
+                                    <Trans>Fix</Trans>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!hasImportedGeometry}
+                                    onClick={() =>
+                                      recalcSelectedNormals("model")
+                                    }
+                                  >
+                                    <Trans>Fix</Trans>
+                                  </Button>
+                                </div>
+                                <div className="mt-1.5 flex items-center gap-2">
+                                  <label
+                                    htmlFor="lego-normals-angle"
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    <Trans>Smoothing angle</Trans>
+                                  </label>
+                                  <Input
+                                    id="lego-normals-angle"
+                                    inputMode="decimal"
+                                    value={String(normalsAngle)}
+                                    onChange={(event) => {
+                                      const value = Number(event.target.value);
+                                      if (Number.isFinite(value))
+                                        setNormalsAngle(value);
+                                    }}
+                                    className="h-6 w-16 text-right"
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    <Trans>
+                                      degrees, for the next recalculation
+                                    </Trans>
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {selected.id === draft.rootPieceId ? null : (
+                              // The same move as dragging a row onto another, for anyone not
+                              // using a pointer.
+                              <div className="mt-2">
+                                <span className="text-xs text-muted-foreground">
+                                  <Trans>Hangs off</Trans>
+                                </span>
+                                <Select
+                                  value={selected.parentId ?? draft.rootPieceId}
+                                  onValueChange={(parentId) =>
+                                    reparent(selected.id, parentId)
+                                  }
+                                >
+                                  <SelectTrigger
+                                    size="sm"
+                                    className="mt-1 w-full"
+                                    aria-label={t`Parent piece`}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {parentOptions(draft, [selected.id]).map(
+                                      ({ piece, depth }) => (
+                                        <SelectItem
+                                          key={piece.id}
+                                          value={piece.id}
+                                          // Indent on the item, not inside its text: Radix
+                                          // mirrors the text into the trigger, and the
+                                          // padding would come with it.
+                                          style={{
+                                            paddingLeft: 8 + depth * 12,
+                                          }}
+                                        >
+                                          {piece.name}
+                                        </SelectItem>
+                                      ),
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
+                            {selected.id === draft.rootPieceId ? null : (
+                              <JoinedTo
+                                join={joins.get(selected.id) ?? null}
+                                onDetach={() => detach(selected.id)}
+                                onPlace={(change) =>
+                                  placeJoin(selected.id, change)
                                 }
-                              >
-                                <Dices size={14} />
-                                {selected.module ? (
-                                  <Trans>Reroll module</Trans>
-                                ) : (
-                                  <Trans>Reroll part</Trans>
-                                )}
-                              </Button>
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                className="h-8 w-28 text-xs"
-                                aria-label={t`Seed`}
-                                placeholder={t`Seed`}
-                                value={
-                                  seedEntry?.id === selected.id
-                                    ? seedEntry.text
-                                    : (
-                                        rerolledSeed(draft, selected.id) ?? ""
-                                      ).toString()
+                                onBreak={
+                                  (draft.animations ?? []).some(
+                                    (applied) =>
+                                      applied.presetId === BREAK_APART.id,
+                                  )
+                                    ? (change) => breakJoin(selected.id, change)
+                                    : undefined
                                 }
-                                onChange={(event) =>
-                                  setSeedEntry({
-                                    id: selected.id,
-                                    text: event.target.value,
-                                  })
+                                notice={
+                                  joinNotice?.pieceId === selected.id
+                                    ? joinNotice.text
+                                    : null
                                 }
+                                showFree={showFreeFaces}
+                                onShowFreeChange={setShowFreeFaces}
                               />
-                            </div>
-                          ) : null}
+                            )}
 
-                          {selected.module ? (
-                            <div className="mt-2">
-                              {missingModuleIds.has(selected.module.id) ? (
-                                <p className="mb-1 text-xs text-muted-foreground">
-                                  <Trans>Module missing</Trans>
+                            {selected.twin &&
+                            pieceById(draft, selected.twin) ? (
+                              <div className="mt-2 flex items-center gap-2 text-xs">
+                                <span className="text-muted-foreground">
+                                  <Trans>Twin</Trans>
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">
+                                  {pieceById(draft, selected.twin)?.name}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() =>
+                                    edit((project) =>
+                                      unpairPiece(project, selected.id),
+                                    )
+                                  }
+                                >
+                                  <Trans>Break</Trans>
+                                </Button>
+                              </div>
+                            ) : null}
+                            {selected.ring &&
+                            ringMembers(draft.pieces, selected.id) ? (
+                              <div className="mt-2 flex items-center gap-2 text-xs">
+                                <span className="text-muted-foreground">
+                                  <Trans>Ring</Trans>
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">
+                                  {plural(ringCount, {
+                                    one: "# copy",
+                                    other: "# copies",
+                                  })}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() =>
+                                    edit((project) =>
+                                      unringPiece(project, selected.id),
+                                    )
+                                  }
+                                >
+                                  <Trans>Break</Trans>
+                                </Button>
+                              </div>
+                            ) : null}
+
+                            {selectedPart ? (
+                              <div className="mt-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => {
+                                    setSwapNote(null);
+                                    setSwapping(true);
+                                  }}
+                                >
+                                  <Trans>Change part</Trans>
+                                </Button>
+                                {swapNote ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {swapNote}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            {pack &&
+                            rerollRefusal(
+                              draft,
+                              pack,
+                              selected.id,
+                              compounds,
+                            ) === null ? (
+                              <div className="mt-2 flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={rerollSelected}
+                                  title={
+                                    selected.module
+                                      ? t`Put in another module of the same category`
+                                      : t`Put in another part of the same shape, colour and size`
+                                  }
+                                >
+                                  <Dices size={14} />
+                                  {selected.module ? (
+                                    <Trans>Reroll module</Trans>
+                                  ) : (
+                                    <Trans>Reroll part</Trans>
+                                  )}
+                                </Button>
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  className="h-8 w-28 text-xs"
+                                  aria-label={t`Seed`}
+                                  placeholder={t`Seed`}
+                                  value={
+                                    seedEntry?.id === selected.id
+                                      ? seedEntry.text
+                                      : (
+                                          rerolledSeed(draft, selected.id) ?? ""
+                                        ).toString()
+                                  }
+                                  onChange={(event) =>
+                                    setSeedEntry({
+                                      id: selected.id,
+                                      text: event.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : null}
+
+                            {selected.module ? (
+                              <div className="mt-2">
+                                {missingModuleIds.has(selected.module.id) ? (
+                                  <p className="mb-1 text-xs text-muted-foreground">
+                                    <Trans>Module missing</Trans>
+                                  </p>
+                                ) : null}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => setSwappingModule(true)}
+                                >
+                                  <Trans>Swap module</Trans>
+                                </Button>
+                              </div>
+                            ) : null}
+
+                            {pivotBox ? (
+                              <div className="mt-2">
+                                <span className="text-xs text-muted-foreground">
+                                  <Trans>Turns about</Trans>
+                                </span>
+                                <Select
+                                  value={
+                                    currentPivot(pivotBox, selected.pivot) ??
+                                    "middle"
+                                  }
+                                  onValueChange={(id) => {
+                                    const choice = pivotChoices(pivotBox).find(
+                                      (option) => option.id === id,
+                                    );
+                                    if (choice)
+                                      movePivot(selected.id, choice.position);
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    size="sm"
+                                    className="mt-1 w-full"
+                                    aria-label={t`Pivot point`}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {pivotChoices(pivotBox).map((choice) => (
+                                      <SelectItem
+                                        key={choice.id}
+                                        value={choice.id}
+                                      >
+                                        {choice.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  <Trans>
+                                    The point this piece turns about, and that
+                                    its children hang from. A leg wants its top,
+                                    not its middle.
+                                  </Trans>
                                 </p>
-                              ) : null}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => setSwappingModule(true)}
-                              >
-                                <Trans>Swap module</Trans>
-                              </Button>
-                            </div>
-                          ) : null}
+                              </div>
+                            ) : null}
 
-                          {pivotBox ? (
+                            <AnchorList
+                              piece={selected}
+                              connectors={
+                                pack ? pieceConnectors(pack, selected) : []
+                              }
+                              placing={placingAnchor}
+                              onPlacingChange={setPlacingAnchor}
+                              onAddAtOrigin={() =>
+                                edit((project) =>
+                                  addAnchor(
+                                    project,
+                                    selected.id,
+                                    selected.pivot ?? [0, 0, 0],
+                                    crypto.randomUUID(),
+                                  ),
+                                )
+                              }
+                              onChange={(anchorId, change) =>
+                                edit((project) =>
+                                  updateAnchor(
+                                    project,
+                                    selected.id,
+                                    anchorId,
+                                    change,
+                                  ),
+                                )
+                              }
+                              onRemove={(anchorId) =>
+                                edit((project) =>
+                                  removeAnchor(project, selected.id, anchorId),
+                                )
+                              }
+                            />
+
+                            <MountPointList
+                              piece={selected}
+                              project={draft}
+                              connectors={
+                                pack
+                                  ? pieceConnectors(pack, selected).map(
+                                      (c) => ({
+                                        id: c.id,
+                                        label: faceName(pack, selected, c.id),
+                                      }),
+                                    )
+                                  : []
+                              }
+                              onMark={(connector) =>
+                                pack &&
+                                edit((project) =>
+                                  markMountPoint(
+                                    project,
+                                    pack,
+                                    selected.id,
+                                    connector,
+                                  ),
+                                )
+                              }
+                              onChange={(connector, change) =>
+                                edit((project) =>
+                                  updateMountPoint(
+                                    project,
+                                    selected.id,
+                                    connector,
+                                    change,
+                                  ),
+                                )
+                              }
+                              onRemove={(connector) =>
+                                edit((project) =>
+                                  unmarkMountPoint(
+                                    project,
+                                    selected.id,
+                                    connector,
+                                  ),
+                                )
+                              }
+                            />
+
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
-                                <Trans>Turns about</Trans>
+                                <Trans>Role</Trans>
                               </span>
                               <Select
-                                value={
-                                  currentPivot(pivotBox, selected.pivot) ??
-                                  "middle"
+                                value={selected.role ?? NO_ROLE}
+                                onValueChange={(role) =>
+                                  setRole(
+                                    selected.id,
+                                    role === NO_ROLE ? undefined : role,
+                                  )
                                 }
-                                onValueChange={(id) => {
-                                  const choice = pivotChoices(pivotBox).find(
-                                    (option) => option.id === id,
-                                  );
-                                  if (choice)
-                                    movePivot(selected.id, choice.position);
-                                }}
                               >
                                 <SelectTrigger
                                   size="sm"
                                   className="mt-1 w-full"
-                                  aria-label={t`Pivot point`}
+                                  aria-label={t`Animation role`}
                                 >
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {pivotChoices(pivotBox).map((choice) => (
-                                    <SelectItem
-                                      key={choice.id}
-                                      value={choice.id}
-                                    >
-                                      {choice.label}
+                                  <SelectItem
+                                    value={NO_ROLE}
+                                  >{t`None`}</SelectItem>
+                                  {pickerRoles(draft.pieces).map((role) => (
+                                    <SelectItem key={role.id} value={role.id}>
+                                      {role.label}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 <Trans>
-                                  The point this piece turns about, and that its
-                                  children hang from. A leg wants its top, not
-                                  its middle.
+                                  What this piece is, so the animation presets
+                                  know what to move.
                                 </Trans>
                               </p>
+                              {restAngleWarnings(selected).map((warning) => (
+                                <p
+                                  key={warning}
+                                  className="mt-1 text-xs text-amber-500"
+                                >
+                                  {warning}
+                                </p>
+                              ))}
                             </div>
-                          ) : null}
 
-                          <AnchorList
-                            piece={selected}
-                            connectors={
-                              pack ? pieceConnectors(pack, selected) : []
-                            }
-                            placing={placingAnchor}
-                            onPlacingChange={setPlacingAnchor}
-                            onAddAtOrigin={() =>
-                              edit((project) =>
-                                addAnchor(
-                                  project,
-                                  selected.id,
-                                  selected.pivot ?? [0, 0, 0],
-                                  crypto.randomUUID(),
-                                ),
-                              )
-                            }
-                            onChange={(anchorId, change) =>
-                              edit((project) =>
-                                updateAnchor(
-                                  project,
-                                  selected.id,
-                                  anchorId,
-                                  change,
-                                ),
-                              )
-                            }
-                            onRemove={(anchorId) =>
-                              edit((project) =>
-                                removeAnchor(project, selected.id, anchorId),
-                              )
-                            }
-                          />
-
-                          <MountPointList
-                            piece={selected}
-                            project={draft}
-                            connectors={
-                              pack
-                                ? pieceConnectors(pack, selected).map((c) => ({
-                                    id: c.id,
-                                    label: faceName(pack, selected, c.id),
-                                  }))
-                                : []
-                            }
-                            onMark={(connector) =>
-                              pack &&
-                              edit((project) =>
-                                markMountPoint(
-                                  project,
-                                  pack,
-                                  selected.id,
-                                  connector,
-                                ),
-                              )
-                            }
-                            onChange={(connector, change) =>
-                              edit((project) =>
-                                updateMountPoint(
-                                  project,
-                                  selected.id,
-                                  connector,
-                                  change,
-                                ),
-                              )
-                            }
-                            onRemove={(connector) =>
-                              edit((project) =>
-                                unmarkMountPoint(
-                                  project,
-                                  selected.id,
-                                  connector,
-                                ),
-                              )
-                            }
-                          />
-
-                          <div className="mt-2">
-                            <span className="text-xs text-muted-foreground">
-                              <Trans>Role</Trans>
-                            </span>
-                            <Select
-                              value={selected.role ?? NO_ROLE}
-                              onValueChange={(role) =>
-                                setRole(
-                                  selected.id,
-                                  role === NO_ROLE ? undefined : role,
-                                )
-                              }
-                            >
-                              <SelectTrigger
-                                size="sm"
-                                className="mt-1 w-full"
-                                aria-label={t`Animation role`}
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem
-                                  value={NO_ROLE}
-                                >{t`None`}</SelectItem>
-                                {pickerRoles(draft.pieces).map((role) => (
-                                  <SelectItem key={role.id} value={role.id}>
-                                    {role.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              <Trans>
-                                What this piece is, so the animation presets
-                                know what to move.
-                              </Trans>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {pieceKind(selected, raw) === "geometry"
+                                ? t`Geometry.`
+                                : t`Empty, so it carries other pieces and can be an emit point.`}
                             </p>
-                            {restAngleWarnings(selected).map((warning) => (
-                              <p
-                                key={warning}
-                                className="mt-1 text-xs text-amber-500"
-                              >
-                                {warning}
-                              </p>
-                            ))}
                           </div>
-
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            {pieceKind(selected, raw) === "geometry"
-                              ? t`Geometry.`
-                              : t`Empty, so it carries other pieces and can be an emit point.`}
-                          </p>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </>
               )}
             </aside>

@@ -41286,6 +41286,11 @@ msgstr "Режим зміни розміру, {size}. Стрілки зміню�
 msgid "Resize sidebar"
 msgstr "Змінити ширину бічної панелі"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Змінити розмір панелі відомостей"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41295,6 +41300,11 @@ msgstr "Змінити розмір списку учасників"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Змінити розмір таблиці гравців і чату"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Змінити розмір бічної панелі"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

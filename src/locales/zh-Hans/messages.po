@@ -41286,6 +41286,11 @@ msgstr "调整大小模式，{size}。Arrow 键改变其大小而不是位置：
 msgid "Resize sidebar"
 msgstr "调整侧边栏大小"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "调整详细信息面板大小"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41295,6 +41300,11 @@ msgstr "调整成员列表大小"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "调整玩家表格和聊天的大小"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "调整侧边栏大小"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy

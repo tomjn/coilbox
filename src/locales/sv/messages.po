@@ -41562,6 +41562,11 @@ msgstr "Storleksläge, {size}. Pilarna ändrar storleken i stället för positio
 msgid "Resize sidebar"
 msgstr "Ändra storlek på sidofältet"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the details panel"
+msgstr "Ändra storlek på detaljpanelen"
+
 #: src/multiplayer/chat/MemberListResizer.tsx
 #, fuzzy
 msgid "Resize the member list"
@@ -41571,6 +41576,11 @@ msgstr "Ändra storlek på medlemslistan"
 #, fuzzy
 msgid "Resize the player table and chat"
 msgstr "Ändra storlek på spelartabellen och chatten"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Resize the side panel"
+msgstr "Ändra storlek på sidopanelen"
 
 #: src/placement/PlacementSurface.tsx
 #, fuzzy
