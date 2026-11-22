@@ -14,6 +14,7 @@ import { Button, Input } from "@picoframe/frame";
 import { useEffect, useId, useState } from "react";
 
 import { CheckField } from "@/components/Field";
+import { HelpPopover } from "@/components/HelpPopover";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { useColourwayColours } from "../../colourwayColours";
 import { colourwayLabel, type LoadedPack } from "../../pack";
@@ -271,9 +272,16 @@ function RoundFields({ shape, onChange }: Props) {
   return (
     <div className="mt-2 flex flex-col gap-2">
       <div>
-        <span className="text-xs text-muted-foreground">
-          <Trans>Axis</Trans>
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">
+            <Trans>Axis</Trans>
+          </span>
+          <HelpPopover label={t`About round shapes`}>
+            <p>
+              <Trans>Dragging a round side sets the radius.</Trans>
+            </p>
+          </HelpPopover>
+        </div>
         <ButtonGroup className="mt-1 flex w-full" aria-label={t`Axis`}>
           {AXES.map((axis, index) => (
             <Button
@@ -309,9 +317,6 @@ function RoundFields({ shape, onChange }: Props) {
           }}
         />
       ) : null}
-      <p className="text-xs text-muted-foreground">
-        <Trans>Dragging a round side sets the radius.</Trans>
-      </p>
       {problem ? (
         <p role="alert" className="text-xs text-destructive">
           {problem}

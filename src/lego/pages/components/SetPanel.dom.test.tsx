@@ -148,8 +148,12 @@ describe("what the panel says is selected", () => {
     expect(onSelect).toHaveBeenCalledWith("arm");
   });
 
-  it("says how a set is moved", () => {
+  it("says how a set is moved behind its help icon", () => {
     show(["hull", "arm"]);
+    expect(document.body.textContent).not.toContain("keeps its shape");
+    fireEvent.click(
+      document.querySelector('[aria-label="About moving a set"]') as Element,
+    );
     expect(document.body.textContent).toContain("keeps its shape");
   });
 });
