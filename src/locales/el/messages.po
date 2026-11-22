@@ -5827,11 +5827,6 @@ msgstr ""
 msgid "{planLabel}, fitted to this unit's pieces"
 msgstr "{planLabel}, προσαρμοσμένο στα τμήματα αυτής της μονάδας"
 
-#: src/lego/pages/components/ProportionsPanel.tsx
-#, fuzzy
-msgid "{planLabel}. Drag a handle in the view or set a number."
-msgstr "{planLabel}. Σύρετε μια λαβή στην προβολή ή ορίστε έναν αριθμό."
-
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "{played} played, {decidedCount} with a recorded result."
@@ -9866,15 +9861,130 @@ msgstr "Περίπου {ms} ms ως την αναμετάδοση."
 msgid "About {section}"
 msgstr "Σχετικά με: {section}"
 
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About {subject}"
+msgstr "Σχετικά με: {subject}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About actions"
+msgstr "Σχετικά με τις ενέργειες"
+
+#: src/lego/pages/components/MovementSection.tsx
+#, fuzzy
+msgid "About banking"
+msgstr "Σχετικά με την κλίση"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About calling a function"
+msgstr "Σχετικά με την κλήση συνάρτησης"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About clicking on each piece"
+msgstr "Σχετικά με το κλικ σε κάθε τμήμα"
+
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
 msgid "About Coilbox"
 msgstr "Σχετικά με το Coilbox"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About empty pieces"
+msgstr "Σχετικά με τα κενά τμήματα"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About fixing UVs and normals"
+msgstr "Σχετικά με τη διόρθωση UV και κανονικών"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About mirroring"
+msgstr "Σχετικά με τον κατοπτρισμό"
+
+#: src/lego/pages/components/SetPanel.tsx
+#, fuzzy
+msgid "About moving a set"
+msgstr "Σχετικά με τη μετακίνηση ομάδας"
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+#, fuzzy
+msgid "About one piece's box"
+msgstr "Σχετικά με το κουτί ενός τμήματος"
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+#, fuzzy
+msgid "About proportions"
+msgstr "Σχετικά με τις αναλογίες"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "About replay tracks"
 msgstr "Σχετικά με τα ίχνη επαναλήψεων"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About roles"
+msgstr "Σχετικά με τους ρόλους"
+
+#: src/lego/pages/components/ShapeFields.tsx
+#, fuzzy
+msgid "About round shapes"
+msgstr "Σχετικά με τα στρογγυλά σχήματα"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About shooting at each piece"
+msgstr "Σχετικά με τη βολή σε κάθε τμήμα"
+
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "About the aim point"
+msgstr "Σχετικά με το σημείο σκόπευσης"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About the collision volume"
+msgstr "Σχετικά με τον όγκο σύγκρουσης"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "About the colour texture"
+msgstr "Σχετικά με την υφή χρώματος"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "About the pivot point"
+msgstr "Σχετικά με το σημείο περιστροφής"
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "About the shading map"
+msgstr "Σχετικά με τον χάρτη σκίασης"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About this scenario"
+msgstr "Σχετικά με αυτό το σενάριο"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About unit values"
+msgstr "Σχετικά με τις τιμές μονάδας"
+
+#: src/lego/pages/components/CollisionPanel.tsx
+#, fuzzy
+msgid "About using each piece"
+msgstr "Σχετικά με τη χρήση κάθε τμήματος"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "About what it builds with"
+msgstr "Σχετικά με το με τι κατασκευάζει"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -20683,6 +20793,11 @@ msgstr "Σύρετε το {label} για να το μετακινήσετε στ
 msgid "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on."
 msgstr "Σύρετε ένα πλαίσιο γύρω από αντικείμενα για να τα επιλέξετε όλα, Shift-κλικ για να προσθέσετε ένα, και κλικ σε γυμνό έδαφος για αποεπιλογή. Η μετατόπιση γίνεται με το μεσαίο κουμπί όσο είναι ενεργή αυτή η λειτουργία."
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+#, fuzzy
+msgid "Drag a handle in the view or set a number."
+msgstr "Σύρετε μια λαβή στην προβολή ή ορίστε έναν αριθμό."
+
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on."
@@ -21398,6 +21513,7 @@ msgstr "Emoji"
 msgid "empty"
 msgstr "κενό"
 
+#: src/lego/pages/BuilderPage.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #, fuzzy
 msgid "Empty"
@@ -24596,11 +24712,6 @@ msgstr "Γεωμετρία"
 #, fuzzy
 msgid "Geometry piece"
 msgstr "Τμήμα γεωμετρίας"
-
-#: src/lego/pages/BuilderPage.tsx
-#, fuzzy
-msgid "Geometry."
-msgstr "Γεωμετρία."
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #, fuzzy
