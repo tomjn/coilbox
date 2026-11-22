@@ -23,6 +23,7 @@ import type { Axis, Edge } from "../../align";
 import { transformRoots } from "../../groupTransform";
 import { type LegoProject, pieceById } from "../../model";
 import { parentOptions } from "../../reparent";
+import { useScrollTopOnChange } from "./useScrollTopOnChange";
 
 const AXES: Axis[] = ["x", "y", "z"];
 const EDGES: Edge[] = ["low", "middle", "high"];
@@ -69,6 +70,7 @@ export function SetPanel({
   );
   const selectedCount = selectedIds.length;
   const selection = selectedIds.join(",");
+  const scrollRef = useScrollTopOnChange<HTMLDivElement>(selection);
   const say = (names: string[]) => setFreed({ names, of: selection });
   const roots = transformRoots(project, selectedIds);
   const parents = new Set(
@@ -78,7 +80,10 @@ export function SetPanel({
   const shared = parents.size === 1 ? [...parents][0] : MIXED_PARENT;
 
   return (
-    <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
+    <div
+      ref={scrollRef}
+      className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2"
+    >
       <div className="flex items-center gap-1">
         <p className="text-xs text-muted-foreground">
           {/* A set is only shown for two or more pieces, so there is no singular. */}

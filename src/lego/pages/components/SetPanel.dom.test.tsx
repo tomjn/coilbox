@@ -283,4 +283,22 @@ describe("align and distribute", () => {
       "Detached: arm",
     );
   });
+
+  it("goes back to its top when the selection changes, so the first line is not half under the edge (#5404)", () => {
+    const project = walker();
+    const view = show(["hull", "arm"], project);
+    const scroller = document.querySelector(".overflow-y-auto") as HTMLElement;
+    scroller.scrollTop = 40;
+    view.rerender(
+      <SetPanel
+        project={project}
+        selectedIds={["thigh", "arm"]}
+        onSelect={onSelect}
+        onReparent={onReparent}
+        onAlign={onAlign}
+        onDistribute={onDistribute}
+      />,
+    );
+    expect(scroller.scrollTop).toBe(0);
+  });
 });
