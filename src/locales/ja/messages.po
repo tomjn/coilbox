@@ -14343,6 +14343,11 @@ msgstr "関数を呼び出す"
 msgid "Calls a function the game already has, by name."
 msgstr "ゲームにすでにある関数を名前で呼び出します。"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera"
+msgstr "カメラ"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "Camera angle"
@@ -14352,6 +14357,11 @@ msgstr "カメラの角度"
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "カメラモード、画面端スクロール、マウス。"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera navigation"
+msgstr "カメラ操作"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -16091,6 +16101,7 @@ msgstr "COB ツール"
 msgid "Code"
 msgstr "コード"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -28525,6 +28536,11 @@ msgstr "{builtByName} の名前を変更したときに残ったものです。�
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "{projectName} の名前を変更したときに残ったものです。ファイルはまだこのゲームにあるため、ゲームには 2 つのユニットがあります。ユニットビルダーのエクスポートドロワーで削除してください。"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Left drag"
+msgstr "左ドラッグ"
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Left out of the start positions:"
@@ -30473,6 +30489,11 @@ msgstr ""
 #, fuzzy
 msgid "Middle"
 msgstr "中央"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Middle drag"
+msgstr "中ボタンドラッグ"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -36486,6 +36507,11 @@ msgstr "オレンジ"
 msgid "orange dwarf"
 msgstr "オレンジ矮星"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Orbit"
+msgstr "オービット"
+
 #: src/content/mapAggregate.ts
 #, fuzzy
 msgid "order"
@@ -36882,6 +36908,7 @@ msgstr "{current} / {lastPage} ページ"
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -41727,6 +41754,11 @@ msgstr "右"
 #, fuzzy
 msgid "Right"
 msgstr "右"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Right drag"
+msgstr "右ドラッグ"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -56054,6 +56086,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "すでに書き込まれたものは出力フォルダーに残っています。"
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 #, fuzzy
 msgid "Wheel"
 msgstr "車輪"
@@ -57942,3 +57975,8 @@ msgstr "ゾーン名"
 #, fuzzy
 msgid "Zones"
 msgstr "ゾーン"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Zoom"
+msgstr "ズーム"

@@ -14428,6 +14428,11 @@ msgstr "Κλήση συνάρτησης"
 msgid "Calls a function the game already has, by name."
 msgstr "Καλεί μια συνάρτηση που έχει ήδη το παιχνίδι, με το όνομά της."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera"
+msgstr "Κάμερα"
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
 msgid "Camera angle"
@@ -14437,6 +14442,11 @@ msgstr "Γωνία κάμερας"
 #, fuzzy
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr "Λειτουργία κάμερας, κύλιση στα άκρα και ποντίκι."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Camera navigation"
+msgstr "Πλοήγηση κάμερας"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -16192,6 +16202,7 @@ msgstr "Εργαλεία COB"
 msgid "Code"
 msgstr "Κωδικός"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
@@ -28701,6 +28712,11 @@ msgstr "Απέμεινε όταν μετονομάστηκε το {builtByName}.
 msgid "Left behind when {projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer."
 msgstr "Απέμεινε όταν μετονομάστηκε το {projectName}. Τα αρχεία του βρίσκονται ακόμη σε αυτό το παιχνίδι, οπότε το παιχνίδι έχει δύο μονάδες. Καθαρίστε τα στο συρτάρι εξαγωγής του συναρμολογητή μονάδων."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Left drag"
+msgstr "Σύρσιμο με αριστερό"
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "Left out of the start positions:"
@@ -30667,6 +30683,11 @@ msgstr ""
 #, fuzzy
 msgid "Middle"
 msgstr "Μέση"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Middle drag"
+msgstr "Σύρσιμο με μεσαίο"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -36727,6 +36748,11 @@ msgstr "Πορτοκαλί"
 msgid "orange dwarf"
 msgstr "πορτοκαλί νάνος"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Orbit"
+msgstr "Περιστροφή"
+
 #: src/content/mapAggregate.ts
 #, fuzzy
 msgid "order"
@@ -37126,6 +37152,7 @@ msgstr "Σελίδα {current} από {lastPage}"
 msgid "Painting the ground…"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
 msgid "Pan"
@@ -42006,6 +42033,11 @@ msgstr "δεξιά"
 #, fuzzy
 msgid "Right"
 msgstr "Δεξιά"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Right drag"
+msgstr "Σύρσιμο με δεξί"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
@@ -56429,6 +56461,7 @@ msgid "Whatever had already been written is still in the output folder."
 msgstr "Ό,τι είχε ήδη γραφτεί βρίσκεται ακόμη στον φάκελο εξόδου."
 
 #: src/lego/animPresets.ts
+#: src/lego/pages/components/ShortcutSheet.tsx
 #, fuzzy
 msgid "Wheel"
 msgstr "Τροχός"
@@ -58340,3 +58373,8 @@ msgstr "Όνομα ζώνης"
 #, fuzzy
 msgid "Zones"
 msgstr "Ζώνες"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Zoom"
+msgstr "Ζουμ"
