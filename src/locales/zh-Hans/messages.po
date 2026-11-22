@@ -10630,6 +10630,7 @@ msgstr "瞄准"
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
 msgstr "瞄准点"
@@ -12591,6 +12592,11 @@ msgstr "图片损坏"
 #, fuzzy
 msgid "Balance"
 msgstr "平衡"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Balance check"
+msgstr "平衡检查"
 
 #: src/lego/balance.ts
 #, fuzzy
@@ -16755,6 +16761,11 @@ msgstr "碰撞伤害阈值"
 msgid "Collision size"
 msgstr "碰撞尺寸"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Collision volume"
+msgstr "碰撞体积"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Collision volume axis"
@@ -18429,11 +18440,6 @@ msgstr "无法保存预设"
 #, fuzzy
 msgid "Count"
 msgstr "数量"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
-msgstr "在底座占地中计入炮管、枪口闪光、瞄准点和建造喷嘴"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -23340,8 +23346,8 @@ msgstr "跟随系统"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
-msgid "Follow the driving unit with the camera"
-msgstr "相机跟随行进中的单位"
+msgid "Follow the driving unit"
+msgstr "跟随行驶中的单位"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -23420,6 +23426,11 @@ msgstr "占地宽度"
 #, fuzzy
 msgid "Footprint and placement"
 msgstr "占地与放置"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Footprint check"
+msgstr "占地检查"
 
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #, fuzzy
@@ -24695,6 +24706,11 @@ msgstr "绿色"
 msgid "Grew {step}, now {size}."
 msgstr "已增大 {step}，当前 {size}。"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Grid"
+msgstr "网格"
+
 #: src/lego/environment.ts
 #, fuzzy
 msgid "Grid only"
@@ -24810,6 +24826,7 @@ msgstr "保护"
 
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
 msgstr "参考线"
@@ -25180,11 +25197,6 @@ msgstr "隐藏距离你的领土超过两次跃迁的地点。"
 msgid "Hide model"
 msgstr "隐藏模型"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide script effects"
-msgstr "隐藏脚本效果"
-
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Hide sidebar when collapsed"
@@ -25200,40 +25212,10 @@ msgstr "隐藏 {label} 模型"
 msgid "Hide the {unplaceable} this game cannot place at all"
 msgstr "隐藏此游戏完全无法放置的 {unplaceable}"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the aim point"
-msgstr "隐藏瞄准点"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the balance check"
-msgstr "隐藏平衡检查"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the collision volume"
-msgstr "隐藏碰撞体积"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the footprint check"
-msgstr "隐藏占地检查"
-
 #: src/components/ViewControls.tsx
 #, fuzzy
 msgid "Hide the ground grid"
 msgstr "隐藏地面网格"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the guides"
-msgstr "隐藏参考线"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the overlap check"
-msgstr "隐藏重叠检查"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -25255,25 +25237,10 @@ msgstr "隐藏侧面板"
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "隐藏侧边栏，改为从菜单按钮打开。"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the skeleton ({skeletonKey})"
-msgstr "隐藏骨架（{skeletonKey}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide the stand-in unit"
-msgstr "隐藏替身单位"
-
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Hide this map"
 msgstr "隐藏此地图"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Hide weapon ranges"
-msgstr "隐藏武器射程"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -27685,11 +27652,6 @@ msgstr "保留此预设未设置的选项"
 msgid "Keep playing"
 msgstr "继续游玩"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Keep the camera still while the unit drives"
-msgstr "单位行驶时保持镜头不动"
-
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
 #, fuzzy
@@ -28348,8 +28310,8 @@ msgstr "退出姿势编辑"
 
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
-msgid "Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
-msgstr "基础占地不计入炮管、枪口闪光、瞄准点和建造喷嘴"
+msgid "Leave the barrel and similar out of the footprint"
+msgstr "占地中不计炮管等部件"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 #, fuzzy
@@ -36707,6 +36669,11 @@ msgstr "超频反应堆"
 msgid "Overlap"
 msgstr "重叠"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Overlap check"
+msgstr "重叠检查"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
 msgid "overlapping another building, in red"
@@ -42762,6 +42729,11 @@ msgstr "脚本"
 msgid "Script"
 msgstr "脚本"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Script effects"
+msgstr "脚本特效"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "Script imported"
@@ -44494,6 +44466,7 @@ msgstr "每轮连发发数"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/ProblemsButton.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Show"
 msgstr "显示"
@@ -44562,11 +44535,6 @@ msgstr "显示封禁"
 #, fuzzy
 msgid "Show build orders"
 msgstr "显示建造顺序"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show each weapon's stated range and firing arc"
-msgstr "显示每件武器标定的射程和射击弧度"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Show every lane"
@@ -44679,11 +44647,6 @@ msgstr "显示或隐藏骨架"
 msgid "Show replays under a minute long"
 msgstr "显示不足一分钟的回放"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show script effects, such as nano spray, from the unit's own script"
-msgstr "显示单位自身脚本中的脚本效果，例如纳米喷流"
-
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "Show server IP"
@@ -44699,20 +44662,10 @@ msgstr "显示你连接之前的运营团队操作，除非协管员已开启 <0
 msgid "Show the {label} model"
 msgstr "显示 {label} 模型"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the aim point, the one point another unit shoots at"
-msgstr "显示瞄准点，即其他单位射击的那一点"
-
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "在顶栏中显示后退和前进导航按钮。"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
-msgstr "显示平衡检查：重心看起来所在的位置，与脚或轮子覆盖的地面对照。这是按单一密度根据部件体积做的估算，并不是质量。引擎不会模拟平衡"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
@@ -44724,11 +44677,6 @@ msgstr "Coilbox 启动时显示品牌启动画面。点击它或按 Escape 可�
 msgid "Show the build grid the blueprint stands on"
 msgstr "显示蓝图所在的建造网格"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the collision volume, the shape the engine hits and clicks"
-msgstr "显示碰撞体积，即引擎判定命中和点击的形状"
-
 #: src/content/pages/components/BindingList.tsx
 #, fuzzy
 msgid "Show the file this would write"
@@ -44739,30 +44687,10 @@ msgstr "显示此操作将写入的文件"
 msgid "Show the file this writes"
 msgstr "显示此操作写入的文件"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
-msgstr "显示占地检查：导出时写入的占地，画在单位下方的地面上"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the ground grid, marked in footprint steps and plate sizes"
-msgstr "显示地面网格，按占地步长和底板尺寸标记"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the guides"
-msgstr "显示参考线"
-
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Show the nanoframe"
 msgstr "显示纳米框架"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
-msgstr "显示重叠检查：勾勒出完全埋在其他部件内部的部件，模型仍会绘制它们，导出也仍会写出它们"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -44783,16 +44711,6 @@ msgstr "显示脚本"
 #, fuzzy
 msgid "Show the side panel"
 msgstr "显示侧面板"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the skeleton: a line from each bone to its parent, a dot on each joint and its role ({skeletonKey})"
-msgstr "显示骨架：从每根骨骼到其父级的连线、每个关节上的点及其作用（{skeletonKey}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Show the stand-in unit, the thing a scenario aims at, builds or carries"
-msgstr "显示替身单位，即场景中瞄准、建造或运输的对象"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -45236,6 +45154,7 @@ msgid "Sizing the caches..."
 msgstr "正在统计缓存大小…"
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #: src/lego/problems.ts
 #: src/widgets/pages/CoilboxWidgets.tsx
 #, fuzzy
@@ -45945,6 +45864,11 @@ msgstr "撤销首领"
 #, fuzzy
 msgid "Stand it beside the build"
 msgstr "放在所建单位旁边"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Stand-in unit"
+msgstr "替身单位"
 
 #: src/scenario/pages/ScenariosPage.tsx
 #, fuzzy
@@ -55651,6 +55575,11 @@ msgstr "已排除的武器：{line}"
 #, fuzzy
 msgid "Weapon name"
 msgstr "武器名称"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Weapon ranges"
+msgstr "武器射程"
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
