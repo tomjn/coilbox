@@ -20,7 +20,9 @@ const BASE: LegoProject = {
   poses: [{ id: "a", name: "Raised", pieces: { gone: { turn: [1, 0, 0] } } }],
 };
 
-function open(options: { posing?: boolean; changed?: boolean } = {}) {
+function open(
+  options: { posing?: boolean; changed?: boolean; project?: LegoProject } = {},
+) {
   const handlers = {
     onPosingChange: vi.fn(),
     onSave: vi.fn(),
@@ -30,10 +32,11 @@ function open(options: { posing?: boolean; changed?: boolean } = {}) {
     onDuplicate: vi.fn(),
     onDelete: vi.fn(),
     onReset: vi.fn(),
+    onAnimate: vi.fn(),
   };
   render(
     <PosesPopover
-      project={BASE}
+      project={options.project ?? BASE}
       posing={options.posing ?? false}
       changed={options.changed ?? false}
       {...handlers}
@@ -44,6 +47,25 @@ function open(options: { posing?: boolean; changed?: boolean } = {}) {
 }
 
 describe("PosesPopover", () => {
+  it("shows its name beside the icon", () => {
+    open();
+    expect(screen.getByRole("button", { name: "Poses" }).textContent).toBe(
+      "Poses",
+    );
+  });
+
+  it("offers Animate poses once a pose is saved, and closes on use", () => {
+    const { onAnimate } = open();
+    fireEvent.click(screen.getByRole("button", { name: "Animate poses" }));
+    expect(onAnimate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Animate poses" })).toBeNull();
+  });
+
+  it("does not offer Animate poses with no saved pose", () => {
+    open({ project: { ...BASE, poses: [] } });
+    expect(screen.queryByRole("button", { name: "Animate poses" })).toBeNull();
+  });
+
   it("switches the posing mode on and off", () => {
     const { onPosingChange } = open();
     fireEvent.click(screen.getByRole("button", { name: "Pose the unit" }));

@@ -267,7 +267,10 @@ import { addWeaponModule, pickWeaponParts } from "../weaponModule";
 import { setPieceRole, setPieceShape, wheelAxleProblems } from "../wheelAxle";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
-import { AnimationPanel } from "./components/AnimationPanel";
+import {
+  ACTIONS_SECTION_ID,
+  AnimationPanel,
+} from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
 import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
@@ -505,6 +508,14 @@ function Builder({ id }: { id: string | undefined }) {
     | "texture"
     | "skeleton"
   >("pieces");
+  const [scrollToActions, setScrollToActions] = useState(false);
+  useEffect(() => {
+    if (!scrollToActions || aside !== "animation" || !asideOpen) return;
+    document
+      .getElementById(ACTIONS_SECTION_ID)
+      ?.scrollIntoView({ block: "start" });
+    setScrollToActions(false);
+  }, [scrollToActions, aside, asideOpen]);
   /** The game unit standing beside the build, which the stats compare with. */
   const [referenceUnit, setReferenceUnit] = useState<ReferenceUnit | null>(
     null,
@@ -3038,6 +3049,11 @@ function Builder({ id }: { id: string | undefined }) {
                       onReset={() =>
                         dispatchPose({ type: "load", offsets: {} })
                       }
+                      onAnimate={() => {
+                        setAside("animation");
+                        setAsideOpen(true);
+                        setScrollToActions(true);
+                      }}
                     />
                   ),
                 }}
