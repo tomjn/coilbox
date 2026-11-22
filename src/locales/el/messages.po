@@ -26429,6 +26429,11 @@ msgstr "Εισαγωγή σχεδίου"
 msgid "Import a clip"
 msgstr "Εισαγωγή αποσπάσματος"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Import a model file"
+msgstr "Εισαγωγή αρχείου μοντέλου"
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Import a run report"

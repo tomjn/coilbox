@@ -26263,6 +26263,11 @@ msgstr "Імпортувати креслення"
 msgid "Import a clip"
 msgstr "Імпортувати кліп"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Import a model file"
+msgstr "Імпортувати файл моделі"
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Import a run report"

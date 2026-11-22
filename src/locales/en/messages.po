@@ -21544,6 +21544,10 @@ msgstr "Import a blueprint"
 msgid "Import a clip"
 msgstr "Import a clip"
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Import a model file"
+msgstr "Import a model file"
+
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Import a run report"
 msgstr "Import a run report"

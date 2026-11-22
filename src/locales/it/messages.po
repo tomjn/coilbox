@@ -26429,6 +26429,11 @@ msgstr "Importa uno schema"
 msgid "Import a clip"
 msgstr "Importa una clip"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Import a model file"
+msgstr "Importa un file di modello"
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Import a run report"

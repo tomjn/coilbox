@@ -26419,6 +26419,11 @@ msgstr "Importer en blåkopi"
 msgid "Import a clip"
 msgstr "Importer et klipp"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Import a model file"
+msgstr "Importer en modellfil"
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Import a run report"

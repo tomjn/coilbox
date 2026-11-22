@@ -10,6 +10,7 @@ import {
   Copy,
   Crosshair,
   Dices,
+  FileUp,
   FlipHorizontal2,
   FlipVertical2,
   ImageIcon,
@@ -256,6 +257,7 @@ import { ExportDrawer } from "./components/ExportDrawer";
 import { FitPlanDrawer } from "./components/FitPlanDrawer";
 import { GamePanel } from "./components/GamePanel";
 import { GameUnitBrowser } from "./components/GameUnitBrowser";
+import { ImportDrawer } from "./components/ImportDrawer";
 import { InventoryFilters, InventoryGrids } from "./components/Inventory";
 import { JoinedTo } from "./components/JoinedTo";
 import { JointLimitFields } from "./components/JointLimitFields";
@@ -293,6 +295,7 @@ import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
 import { useMoreBelow } from "./components/useMoreBelow";
 import { VariantMenu } from "./components/VariantMenu";
+import { openNewProject } from "./openNewProject";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
@@ -474,6 +477,7 @@ function Builder({ id }: { id: string | undefined }) {
     null,
   );
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [picturing, setPicturing] = useState(false);
   /** Whether the drawer that fits a body plan to the unit's pieces is open. */
@@ -2258,6 +2262,21 @@ function Builder({ id }: { id: string | undefined }) {
           }
         />
 
+        <ImportDrawer
+          open={importing}
+          onOpenChange={setImporting}
+          onOpened={(project) => {
+            setImporting(false);
+            openNewProject(project, navigate).catch((error) =>
+              notify({
+                title: t`Import a model file`,
+                body: describeError(error),
+                level: "error",
+              }),
+            );
+          }}
+        />
+
         <BuildPictureDrawer
           open={picturing}
           onOpenChange={setPicturing}
@@ -2464,6 +2483,21 @@ function Builder({ id }: { id: string | undefined }) {
                                   : doc.dirty
                                     ? t`Unsaved changes - save now`
                                     : t`Saved`}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => setImporting(true)}
+                                  aria-label={t`Import a model file`}
+                                >
+                                  <FileUp size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <Trans>Import a model file</Trans>
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>

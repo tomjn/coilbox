@@ -26429,6 +26429,11 @@ msgstr "Importera en ritning"
 msgid "Import a clip"
 msgstr "Importera ett klipp"
 
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Import a model file"
+msgstr "Importera en modellfil"
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "Import a run report"
