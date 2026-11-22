@@ -14,7 +14,8 @@ function runHook(
   viewportHeight: number,
 ): void {
   const renderer = {
-    getSize: (target: THREE.Vector2) => target.set(900, viewportHeight),
+    getViewport: (target: THREE.Vector4) =>
+      target.set(0, 0, 900, viewportHeight),
   } as THREE.WebGLRenderer;
   sprite.onBeforeRender(
     renderer,
