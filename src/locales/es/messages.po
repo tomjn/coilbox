@@ -23115,11 +23115,6 @@ msgstr "Posiciones fijas del mapa"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Posiciones iniciales fijas: el equipo N aparece en la posición inicial N del mapa."
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Fixed views"
-msgstr "Vistas fijas"
-
 #: src/multiplayer/pages/HighlightsSettings.tsx
 #, fuzzy
 msgid "Flag messages that mention your logged-in username."
@@ -28318,11 +28313,6 @@ msgstr "Dejar fuera de la huella el cañón y similares"
 msgid "Leave the depot"
 msgstr "Salir del depósito"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the front view ({key})"
-msgstr "Salir de la vista frontal ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Leave the measure tool"
@@ -28332,16 +28322,6 @@ msgstr "Salir de la herramienta de medir"
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "Salir de la herramienta de medir ({measureKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the side view ({key})"
-msgstr "Salir de la vista lateral ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the top view ({key})"
-msgstr "Salir de la vista superior ({key})"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
@@ -29210,21 +29190,6 @@ msgstr "larga"
 #, fuzzy
 msgid "Longest"
 msgstr "Más largas"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the front with no perspective ({key})"
-msgstr "Mirar el frente sin perspectiva ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the side with no perspective ({key})"
-msgstr "Mirar el lateral sin perspectiva ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the top with no perspective ({key})"
-msgstr "Mirar desde arriba sin perspectiva ({key})"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -30478,6 +30443,21 @@ msgstr "Daño mínimo según el alcance"
 #, fuzzy
 msgid "Minimum water depth"
 msgstr "Profundidad mínima del agua"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus X: look at the other side with no perspective"
+msgstr "Menos X: mirar el otro lado sin perspectiva"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Y: look at the bottom with no perspective"
+msgstr "Menos Y: mirar desde abajo sin perspectiva"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Z: look at the back with no perspective"
+msgstr "Menos Z: mirar la parte trasera sin perspectiva"
 
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -41213,7 +41193,7 @@ msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "Restablecer la clase de blindaje a {inherited}, la del juego"
 
 #: src/components/ViewControls.tsx
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/AxisCompass.tsx
 #, fuzzy
 msgid "Reset the view"
 msgstr "Restablecer la vista"
@@ -55112,6 +55092,11 @@ msgstr "Ver"
 msgid "View available units"
 msgstr "Ver unidades disponibles"
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "View axes"
+msgstr "Ejes de la vista"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/ArchiveRow.tsx
 #, fuzzy
@@ -57085,6 +57070,11 @@ msgstr "X en elmos"
 msgid "X-Ray Unit Silhouettes"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "X: look at the side with no perspective ({side})"
+msgstr "X: mirar el lateral sin perspectiva ({side})"
+
 #: src/content/aiRecord.ts
 #, fuzzy
 msgid "x{income} income"
@@ -57094,6 +57084,11 @@ msgstr "ingresos x{income}"
 #, fuzzy
 msgid "Y axis"
 msgstr "Eje Y"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Y: look at the top with no perspective ({top})"
+msgstr "Y: mirar desde arriba sin perspectiva ({top})"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -57759,6 +57754,11 @@ msgstr "z"
 #, fuzzy
 msgid "Z in elmos"
 msgstr "Z en elmos"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Z: look at the front with no perspective ({front})"
+msgstr "Z: mirar el frente sin perspectiva ({front})"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
