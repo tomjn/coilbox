@@ -66,6 +66,7 @@ import {
   type RawGeometry,
 } from "../../rawGeometry";
 import { getShapeGeometry, type ShapeKind } from "../../shapes";
+import { startsDrag } from "./dragToPlace";
 import { type GridWindow, gridScroll, useRootHeight } from "./gridScroll";
 import {
   type GridMetrics,
@@ -141,6 +142,21 @@ function itemName(item: GridItem, pack: LoadedPack): string {
   }
 }
 
+/**
+ * What a tile dragged out of the grid tells its page. The page decides what can
+ * be dragged and what a drop does.
+ */
+export interface TileDrag {
+  /** The pointer has moved far enough to drag this tile. False leaves it a click. */
+  start: (item: GridItem) => boolean;
+  /** The pointer is at these window coordinates. */
+  move: (x: number, y: number) => void;
+  /** The button was let go at these window coordinates. */
+  end: (x: number, y: number) => void;
+  /** Escape, or the system took the pointer. Nothing is dropped. */
+  cancel: () => void;
+}
+
 interface Props {
   pack: LoadedPack;
   sections: GridSection[];
@@ -150,6 +166,8 @@ interface Props {
   /** The `itemKey` of the tile drawn as chosen. */
   selectedKey?: string;
   onPick?: (item: GridItem, alt: boolean) => void;
+  /** Absent, a tile cannot be dragged. */
+  drag?: TileDrag;
   /** Whether picking a module places it in a unit, which its title says. */
   placesModules?: boolean;
   /** `itemKey`s of the favourites. With `onFavourite`, each tile gets a star. */
@@ -173,6 +191,7 @@ export function TileGrid({
   atlas,
   selectedKey,
   onPick,
+  drag,
   placesModules = false,
   favourites,
   onFavourite,
@@ -195,6 +214,71 @@ export function TileGrid({
   );
   const asked = useRef(new Set<string>());
   const reduceMotion = useReduceMotion();
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  /** True from a drag until the click it would end in has passed. */
+  const afterDrag = useRef(false);
+  const endPress = useRef<(() => void) | null>(null);
+  useEffect(() => () => endPress.current?.(), []);
+
+  // A press on a tile is a click until the pointer travels, then a drag. The
+  // moves and the release are read from the window, since the pointer leaves
+  // the tile at once and is let go over the viewport.
+  const pressTile = (event: React.PointerEvent, item: GridItem) => {
+    afterDrag.current = false;
+    if (!dragRef.current || event.button !== 0) return;
+    const from = { x: event.clientX, y: event.clientY };
+    let dragging = false;
+    let cancelled = false;
+    const root = document.documentElement;
+    const stop = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("keydown", onKey, true);
+      delete root.dataset.partDrag;
+      endPress.current = null;
+    };
+    const onMove = (move: PointerEvent) => {
+      const at = dragRef.current;
+      if (cancelled || !at) return;
+      if (!dragging) {
+        if (!startsDrag(from, { x: move.clientX, y: move.clientY })) return;
+        if (!at.start(item)) {
+          stop();
+          return;
+        }
+        dragging = true;
+        afterDrag.current = true;
+        root.dataset.partDrag = "";
+      }
+      at.move(move.clientX, move.clientY);
+    };
+    const onUp = (up: PointerEvent) => {
+      stop();
+      if (dragging && !cancelled) dragRef.current?.end(up.clientX, up.clientY);
+      // The click that follows a release over this tile is not a pick.
+      if (dragging) setTimeout(() => (afterDrag.current = false), 0);
+    };
+    const onCancel = () => {
+      stop();
+      if (dragging && !cancelled) dragRef.current?.cancel();
+      if (dragging) setTimeout(() => (afterDrag.current = false), 0);
+    };
+    const onKey = (key: KeyboardEvent) => {
+      if (key.key !== "Escape" || !dragging || cancelled) return;
+      key.preventDefault();
+      key.stopPropagation();
+      cancelled = true;
+      delete root.dataset.partDrag;
+      dragRef.current?.cancel();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("keydown", onKey, true);
+    endPress.current = stop;
+  };
 
   const shown = useMemo(
     () => sections.filter((section) => section.items.length > 0),
@@ -487,7 +571,14 @@ export function TileGrid({
               }
               onKeyDown(event);
             }}
-            onClick={(event) => onPick?.(item, event.altKey)}
+            onPointerDown={(event) => pressTile(event, item)}
+            onClick={(event) => {
+              if (afterDrag.current) {
+                afterDrag.current = false;
+                return;
+              }
+              onPick?.(item, event.altKey);
+            }}
             className="peer absolute inset-0 flex flex-col justify-end rounded-md focus-visible:outline-none"
           >
             <span className="block truncate px-0.5 text-center text-[11px] leading-[14px]">
