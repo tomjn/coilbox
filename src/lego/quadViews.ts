@@ -105,6 +105,22 @@ export function bandsFrom(canvas: Edges, views: Edges, rail: Edges): ViewBands {
   };
 }
 
+/**
+ * Whether the chrome fits over one view (#5414): the tool rail, which gets
+ * what the top chrome and the bottom block leave, shows every tool without
+ * scrolling. When it does not, the views lose too much to the controls laid
+ * over them, and the chrome takes bands as it does in four views. Read from
+ * the rail itself rather than from a window size, so it follows the side panel,
+ * the Script drawer and the text size alike.
+ */
+export function chromeFits(rail: {
+  scrollHeight: number;
+  clientHeight: number;
+}): boolean {
+  // A pixel of slack, since a zoomed page rounds the two differently.
+  return rail.scrollHeight <= rail.clientHeight + 1;
+}
+
 /** Whether a point on the canvas, in CSS pixels from its top left, is in
  *  `rect`. The left and top edges are inside, the right and bottom are not,
  *  so a point on a shared edge belongs to one quadrant only. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   bandsFrom,
+  chromeFits,
   fromBottomLeft,
   pointInView,
   QUADRANTS,
@@ -141,5 +142,21 @@ describe("bandsFrom", () => {
       bottom: 64,
       left: 56,
     });
+  });
+});
+
+describe("chromeFits (#5414)", () => {
+  it("fits while the tool rail shows all of its tools", () => {
+    expect(chromeFits({ scrollHeight: 340, clientHeight: 340 })).toBe(true);
+    expect(chromeFits({ scrollHeight: 340, clientHeight: 520 })).toBe(true);
+  });
+
+  it("does not fit once the rail has to scroll", () => {
+    expect(chromeFits({ scrollHeight: 340, clientHeight: 180 })).toBe(false);
+  });
+
+  it("lets a pixel of rounding through", () => {
+    expect(chromeFits({ scrollHeight: 341, clientHeight: 340 })).toBe(true);
+    expect(chromeFits({ scrollHeight: 342, clientHeight: 340 })).toBe(false);
   });
 });

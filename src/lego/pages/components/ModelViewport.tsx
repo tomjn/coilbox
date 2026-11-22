@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import * as THREE from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -94,6 +95,7 @@ import type { PoseOffsets } from "../../pose";
 import type { Problem, ProblemSource } from "../../problems";
 import {
   bandsFrom,
+  chromeFits,
   NO_BANDS,
   type Quadrant,
   type ViewBands,
@@ -165,7 +167,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
-import { FourViewsButton, QuadrantFrames } from "./FourViews";
+import { ChromeBands, FourViewsButton, QuadrantFrames } from "./FourViews";
 import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
@@ -416,10 +418,11 @@ interface Props {
    * assumed the others were far away, and a short view had all three in the
    * same place.
    *
-   * Told whether four views are on, when the chrome sits in a band along the
-   * top and has less room (#5410).
+   * Told whether the chrome sits in bands round the views rather than over
+   * them, which it does in four views (#5410) and in one view that is too
+   * small to hold it (#5414). It has less room then, along the top.
    */
-  chrome?: (fourViews: boolean) => ReactNode;
+  chrome?: (banded: boolean) => ReactNode;
   /** The game unit picked as the reference figure, or null when none is. */
   onReferenceUnit?: (unit: ReferenceUnit | null) => void;
   /**
@@ -867,6 +870,21 @@ export function ModelViewport({
   /** What the chrome takes off the canvas's edges in four views (#5410),
    *  measured from where it is drawn so a wrapping toolbar is allowed for. */
   const [bands, setBands] = useState<ViewBands>(NO_BANDS);
+  /** Whether the chrome is too big to sit over one view (#5414): the tool
+   *  rail has to scroll. One view then takes the bands four views do. */
+  const [crowded, setCrowded] = useState(false);
+  /** Whether the tool rail has tools below what it shows, for the fade that
+   *  says so. */
+  const [railMore, setRailMore] = useState(false);
+  /** In bands round the views rather than over them. */
+  const banded = fourViews || crowded;
+  /** What was drawn last, for the measure below, which runs from observers
+   *  and would otherwise read the render it was set up in. */
+  const crowdedRef = useRef(crowded);
+  crowdedRef.current = crowded;
+  /** The whole viewport, which the bands are measured against. In one view
+   *  the canvas shrinks to what they leave, so it cannot be the reference. */
+  const wrapperRef = useRef<HTMLDivElement>(null);
   /** The room between the chrome along the top and the bar along the bottom,
    *  the tool rail, and the block below the view, which the bands are
    *  measured from. */
@@ -1973,16 +1991,35 @@ export function ModelViewport({
   // left, and the views share what is left (#5410). The bands are measured
   // from the chrome as drawn, again whenever any of it changes size, so a
   // toolbar that wraps grows the top band and the views shrink to suit.
+  //
+  // One view takes the same bands once the chrome no longer fits over it
+  // (#5414), which the tool rail says: it gets what the chrome above and below
+  // leave, and scrolls when that is not enough.
+  //
+  // In bands the unit card is one line, so the chrome is shorter and the rail
+  // has more room than it would over the view. Reading the rail there would
+  // say it fits, which takes the bands away, which says it does not. So while
+  // in bands this lays the chrome out over the view first, reads the rail
+  // there, and lays out the answer. Both layouts are made before the browser
+  // paints, so only the answer is seen.
   useLayoutEffect(() => {
-    if (!fourViews) return;
-    const canvas = containerRef.current;
+    const wrapper = wrapperRef.current;
     const views = viewsRef.current;
     const rail = railRef.current;
     const bottom = bottomRef.current;
-    if (!canvas || !views || !rail || !bottom) return;
+    if (!wrapper || !views || !rail || !bottom) return;
+    const checkRail = () =>
+      // A pixel of slack, as `chromeFits` allows.
+      setRailMore(rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1);
     const measure = () => {
+      // Four views are banded whatever the rail says, and the chrome is in
+      // bands when it is measured, so there is nothing to ask of it.
+      if (!fourViews) {
+        if (crowdedRef.current) flushSync(() => setCrowded(false));
+        if (!chromeFits(rail)) flushSync(() => setCrowded(true));
+      }
       const next = bandsFrom(
-        canvas.getBoundingClientRect(),
+        wrapper.getBoundingClientRect(),
         views.getBoundingClientRect(),
         rail.getBoundingClientRect(),
       );
@@ -1993,16 +2030,22 @@ export function ModelViewport({
           ? was
           : next,
       );
+      checkRail();
       const state = sceneRef.current;
-      if (!state) return;
+      if (!state || !fourViews) return;
       setViewBands(state, next);
       state.render();
     };
     const observer = new ResizeObserver(measure);
-    for (const element of [canvas, views, rail, bottom]) {
-      observer.observe(element);
+    const content = rail.firstElementChild;
+    for (const element of [wrapper, views, rail, bottom, content]) {
+      if (element) observer.observe(element);
     }
-    return () => observer.disconnect();
+    rail.addEventListener("scroll", checkRail, { passive: true });
+    return () => {
+      observer.disconnect();
+      rail.removeEventListener("scroll", checkRail);
+    };
   }, [fourViews]);
 
   const { t } = useLingui();
@@ -2057,10 +2100,17 @@ export function ModelViewport({
     // Darker than the page behind it, so the unit reads as being in its own
     // space and pale parts have something to sit against. A translucent tint
     // rather than a fixed colour, so it deepens whatever the theme is.
-    <div className="relative h-full w-full bg-black/30">
+    <div ref={wrapperRef} className="relative h-full w-full bg-black/30">
+      {/* The whole viewport, except in one view that the chrome is too big to
+          sit over (#5414): that view is drawn in what the bands leave. */}
       <div
         ref={containerRef}
-        className={`h-full w-full ${placingAnchor || placingPart || pickingGuide || measure.active ? "cursor-crosshair" : ""}`}
+        className={`absolute inset-0 ${placingAnchor || placingPart || pickingGuide || measure.active ? "cursor-crosshair" : ""}`}
+        style={
+          crowded && !fourViews
+            ? { top: bands.top, bottom: bands.bottom, left: bands.left }
+            : undefined
+        }
       />
       {quadrant && (
         <QuadrantFrames
@@ -2074,17 +2124,19 @@ export function ModelViewport({
           }}
         />
       )}
+      {crowded && !fourViews ? <ChromeBands bands={bands} /> : null}
 
       {/* One column rather than four overlays pinned to the same box. The
           chrome, the rail, the key and the view's own controls share this
-          height instead of each assuming the others are elsewhere, so a view
-          too short to hold them all crowds nobody: the rail scrolls, and that
-          is the whole of it.
+          height instead of each assuming the others are elsewhere. A view too
+          short to hold them all takes bands for them rather than have them
+          cover the model (#5414), and the rail scrolls for as long as it is
+          still too tall.
 
           Clicks fall through to the model except on the controls themselves,
           which take `pointer-events-auto` back one at a time. */}
       <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
-        {chrome?.(fourViews)}
+        {chrome?.(banded)}
 
         {/* `m-auto` on the inner column rather than `justify-center` on the
             scrollport: centring a flex container that way clips content off
@@ -2123,7 +2175,11 @@ export function ModelViewport({
           <TooltipProvider delayDuration={300}>
             <div
               ref={railRef}
-              className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2"
+              // Fades out at the foot while there are tools below, since a
+              // macOS scrollbar stays hidden until it is used and a rail that
+              // just stops looks like all there is (#5414).
+              data-more-below={railMore || undefined}
+              className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2 data-more-below:[mask-image:linear-gradient(to_bottom,#000_calc(100%-2.5rem),transparent)]"
             >
               <div className="m-auto flex flex-col gap-2">
                 <ButtonGroup orientation="vertical">
@@ -2303,7 +2359,15 @@ export function ModelViewport({
             />
           ) : null}
 
-          <div className="flex items-end justify-between gap-3">
+          {/* In one view in bands the buttons drop to a row of their own when
+              the key would otherwise be squeezed into a narrow column
+              (#5414). Over the view they stay beside it, as they were. */}
+          <div
+            className={cn(
+              "flex items-end justify-between gap-3",
+              crowded && !fourViews && "flex-wrap [&>:last-child]:ml-auto",
+            )}
+          >
             <ViewKey
               fourViews={fourViews}
               pieceDots={

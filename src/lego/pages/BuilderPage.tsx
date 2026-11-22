@@ -2577,13 +2577,14 @@ function Builder({ id }: { id: string | undefined }) {
                 showFreeFaces={showFreeFaces}
                 onReferenceUnit={setReferenceUnit}
                 ground={ground}
-                chrome={(fourViews) => (
+                chrome={(banded) => (
                   <>
                     <div className="pointer-events-none flex flex-wrap items-start justify-between gap-3">
-                      {/* In four views the card is one line in the band along
-                          the top (#5410): the unit's name, with the rest of the
-                          card a click away. */}
-                      <UnitCard compact={fourViews} name={draft.name}>
+                      {/* In bands, in four views (#5410) or a one view too small
+                          to hold the chrome (#5414), the card is one line in
+                          the band along the top: the unit's name, with the rest
+                          of the card a click away. */}
+                      <UnitCard compact={banded} name={draft.name}>
                         <div className="min-w-0">
                           <Input
                             value={draft.name}
