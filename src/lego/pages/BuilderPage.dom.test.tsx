@@ -190,6 +190,13 @@ vi.mock("../generatorStyles", () => ({
   useGeneratorStyles: () => ({ copy: copyStyle }),
 }));
 const notice = vi.fn();
+// The import drawer goes straight to the file picker when it opens.
+const pickFile = vi.fn(async () => new Promise<string | null>(() => {}));
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: (...args: unknown[]) =>
+    (pickFile as (...a: unknown[]) => unknown)(...args),
+}));
+
 vi.mock("@/notify/notify", () => ({ notify: (n: unknown) => notice(n) }));
 
 import BuilderPage from "./BuilderPage";
@@ -745,6 +752,18 @@ describe("the build picture action", () => {
     expect(
       document.querySelector("button[aria-label='Build picture'] span"),
     ).toBeTruthy();
+  });
+});
+
+describe("the import a model file action (#5375)", () => {
+  it("is in the toolbar and opens the file picker of the import drawer", async () => {
+    pickFile.mockClear();
+    show(unit());
+    expect(pickFile).not.toHaveBeenCalled();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Import a model file" }),
+    );
+    expect(pickFile).toHaveBeenCalledTimes(1);
   });
 });
 

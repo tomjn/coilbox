@@ -21543,6 +21543,10 @@ msgstr ""
 msgid "Import a clip"
 msgstr ""
 
+#: src/lego/pages/BuilderPage.tsx
+msgid "Import a model file"
+msgstr ""
+
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Import a run report"
 msgstr ""
