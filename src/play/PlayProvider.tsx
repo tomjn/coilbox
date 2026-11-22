@@ -153,8 +153,9 @@ interface PlayContextValue {
    * Force-quit the running game or abandon a launch still getting ready, and
    * immediately clear run state, regardless of whether the engine cooperates or
    * the launch promise ever settles. The escape hatch for a stuck badge (#925).
+   * Resolves once the engine process is gone.
    */
-  cancel: () => void;
+  cancel: () => Promise<void>;
 }
 
 const PlayContext = createContext<PlayContextValue | null>(null);
@@ -519,13 +520,17 @@ export function PlayProvider({ children }: { children: ReactNode }) {
 
   const cancel = useCallback(() => {
     const runId = activeRunIdRef.current;
-    if (!runId) return;
+    if (!runId) return Promise.resolve();
     // Clear synchronously so the badge and the single-run guard free up right
-    // away. Don't wait on play_cancel, or on the still-pending launch promise
-    // (the start finally-block now no-ops for it via the run id check). A stuck
-    // launch is exactly the case this exists for.
+    // away. Don't wait on the still-pending launch promise (the start
+    // finally-block now no-ops for it via the run id check). A stuck launch is
+    // exactly the case this exists for. play_cancel kills the engine and waits
+    // for it to exit, so a caller about to launch another can await it.
     clearRun();
-    void playCancel({ runId }).catch(() => {});
+    return playCancel({ runId }).then(
+      () => {},
+      () => {},
+    );
   }, [clearRun]);
 
   return (

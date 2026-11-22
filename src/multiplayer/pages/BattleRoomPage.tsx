@@ -413,14 +413,22 @@ function BattleRoomPage() {
   // host is still in-game we have dropped out of a running match, which is what
   // the header's Rejoin offers to undo (issue #453).
   const [launching, setLaunching] = useState(false);
-  const runLaunch = useCallback(async () => {
-    setLaunching(true);
-    try {
-      await doLaunch();
-    } finally {
-      setLaunching(false);
-    }
-  }, [doLaunch]);
+  // A launch that replaced another must not be marked over when the one it
+  // replaced ends.
+  const launchSeqRef = useRef(0);
+  const launchWith = useCallback(
+    async (replace: boolean) => {
+      const mine = ++launchSeqRef.current;
+      setLaunching(true);
+      try {
+        await doLaunch({ replace });
+      } finally {
+        if (launchSeqRef.current === mine) setLaunching(false);
+      }
+    },
+    [doLaunch],
+  );
+  const runLaunch = useCallback(() => launchWith(false), [launchWith]);
   useEffect(() => {
     if (!room.hostIngame) launchedRef.current = false;
     const go = launchesOnItsOwn({
@@ -480,8 +488,10 @@ function BattleRoomPage() {
       return;
     }
     startedRef.current = battleStartSeq;
-    void runLaunch();
-  }, [battleStartSeq, blockReason, canRun, runLaunch, t]);
+    // The server only sends this for a new match, so an engine still up from
+    // the last one, even one still loading it, gives way.
+    void launchWith(true);
+  }, [battleStartSeq, blockReason, canRun, launchWith, t]);
 
   // What the header's main button does. Getting into a running match is never
   // automatic past the first launch: an engine that exited may have exited on
