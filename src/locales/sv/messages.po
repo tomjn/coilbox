@@ -10815,7 +10815,7 @@ msgstr "Sikta"
 
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
@@ -11565,7 +11565,7 @@ msgstr "Analys och inspelning"
 msgid "Analysis paused"
 msgstr "Analysen pausad"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Anchors"
 msgstr "Ankare"
@@ -18108,7 +18108,7 @@ msgstr "Kopierar {name}…"
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
 msgstr "Att kopiera utdata över spelet räcker inte i sig: motorn provar <0>.3do</0> före <1>.s3o</1> för en enhet vars <2>objectname</2> saknar filändelse, så den fortsätter att läsa in de gamla modellerna så länge båda finns. De ursprungliga <3>.3do</3>-filerna måste bort, och varje enhetsdefinition som skriver <4>.3do</4> i sitt <5>objectname</5> måste också bli av med den."
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Corners"
 msgstr "Hörn"
@@ -22677,7 +22677,7 @@ msgstr "Packar upp…"
 msgid "Extraction depth"
 msgstr "Utvinningsdjup"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Faces"
 msgstr "Ytor"
@@ -25146,7 +25146,7 @@ msgid "Guard"
 msgstr "Vakta"
 
 #: src/lego/pages/components/GuidesPopover.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
@@ -37861,7 +37861,7 @@ msgstr "Del"
 msgid "piece {position}"
 msgstr "del {position}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Piece boxes"
 msgstr "Dellådor"
@@ -54085,7 +54085,7 @@ msgstr "Vrider och lyfter en enda del mot ett mål, för en enhet utan separat t
 msgid "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate."
 msgstr "Vrider varje hjul med enhetens hastighet genom hjulets radie, bakåt när den backar. Ett hjul utan rund form att mäta vrider sig i jämn takt."
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Turns here"
 msgstr "Vrids här"
@@ -54564,6 +54564,11 @@ msgstr "Enhetsdefinitioner: {defsError}"
 msgid "Unit destroyed, {when}"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Unit details"
+msgstr "Enhetsdetaljer"
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Unit drawing"
 msgstr ""
@@ -54688,7 +54693,7 @@ msgstr "enhetstyper"
 msgid "Unit values"
 msgstr "Enhetsvärden"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Unit volume"
 msgstr "Enhetsvolym"
@@ -56161,7 +56166,7 @@ msgstr "vapen {slotNumber} avfyrar kopian"
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr "Vapen {slotNumber}, {slotName}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Weapon {weaponNumber}"
 msgstr "Vapen {weaponNumber}"

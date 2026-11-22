@@ -10744,7 +10744,7 @@ msgstr "Apuntar"
 
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
@@ -11490,7 +11490,7 @@ msgstr "Análisis y grabación"
 msgid "Analysis paused"
 msgstr "Análisis en pausa"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Anchors"
 msgstr "Anclajes"
@@ -17986,7 +17986,7 @@ msgstr "Copiando {name}…"
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
 msgstr "Copiar la salida sobre el juego no basta por sí solo: el motor prueba <0>.3do</0> antes que <1>.s3o</1> para una unidad cuyo <2>objectname</2> no tiene extensión, así que sigue cargando los modelos antiguos mientras estén los dos. Hay que quitar los archivos <3>.3do</3> originales, y cualquier definición de unidad que escriba <4>.3do</4> en su <5>objectname</5> también tiene que quitarlo."
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Corners"
 msgstr "Esquinas"
@@ -22528,7 +22528,7 @@ msgstr "Extrayendo…"
 msgid "Extraction depth"
 msgstr "Profundidad de extracción"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Faces"
 msgstr "Caras"
@@ -24986,7 +24986,7 @@ msgid "Guard"
 msgstr "Proteger"
 
 #: src/lego/pages/components/GuidesPopover.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
@@ -37616,7 +37616,7 @@ msgstr "Parte"
 msgid "piece {position}"
 msgstr "parte {position}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Piece boxes"
 msgstr "Cajas de las partes"
@@ -53724,7 +53724,7 @@ msgstr "Gira y levanta una sola parte para encarar un objetivo, para una unidad 
 msgid "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate."
 msgstr "Gira cada rueda según la velocidad de la unidad dividida entre el radio de la rueda, hacia atrás cuando va marcha atrás. Una rueda sin forma redonda que medir gira a un ritmo constante."
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Turns here"
 msgstr "Gira aquí"
@@ -54202,6 +54202,11 @@ msgstr "Definiciones de unidades: {defsError}"
 msgid "Unit destroyed, {when}"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Unit details"
+msgstr "Detalles de la unidad"
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Unit drawing"
 msgstr ""
@@ -54326,7 +54331,7 @@ msgstr "tipos de unidad"
 msgid "Unit values"
 msgstr "Valores de la unidad"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Unit volume"
 msgstr "Volumen de la unidad"
@@ -55787,7 +55792,7 @@ msgstr "el arma {slotNumber} dispara la copia"
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr "Arma {slotNumber}, {slotName}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Weapon {weaponNumber}"
 msgstr "Arma {weaponNumber}"

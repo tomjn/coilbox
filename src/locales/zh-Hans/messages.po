@@ -10744,7 +10744,7 @@ msgstr "瞄准"
 
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
@@ -11490,7 +11490,7 @@ msgstr "分析与录制"
 msgid "Analysis paused"
 msgstr "分析已暂停"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Anchors"
 msgstr "锚点"
@@ -17986,7 +17986,7 @@ msgstr "正在复制 {name}…"
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
 msgstr "仅将输出复制到游戏上还不够：对于 <2>objectname</2> 没有扩展名的单位，引擎会先尝试 <0>.3do</0> 再尝试 <1>.s3o</1>，因此两者都存在时它仍会加载旧模型。必须删除原始的 <3>.3do</3> 文件，并且所有在 <5>objectname</5> 中写有 <4>.3do</4> 的单位定义也要去掉它。"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Corners"
 msgstr "角"
@@ -22528,7 +22528,7 @@ msgstr "正在解压…"
 msgid "Extraction depth"
 msgstr "开采深度"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Faces"
 msgstr "面"
@@ -24986,7 +24986,7 @@ msgid "Guard"
 msgstr "保护"
 
 #: src/lego/pages/components/GuidesPopover.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
@@ -37616,7 +37616,7 @@ msgstr "部件"
 msgid "piece {position}"
 msgstr "部件 {position}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Piece boxes"
 msgstr "部件碰撞盒"
@@ -53724,7 +53724,7 @@ msgstr "转动并抬起单个部件以对准目标，用于没有独立炮塔和
 msgid "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate."
 msgstr "按单位速度除以轮子半径转动每个轮子，倒车时反向转动。没有圆形可测量的轮子会以恒定速度转动。"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Turns here"
 msgstr "在此旋转"
@@ -54202,6 +54202,11 @@ msgstr "单位定义：{defsError}"
 msgid "Unit destroyed, {when}"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Unit details"
+msgstr "单位详情"
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Unit drawing"
 msgstr ""
@@ -54326,7 +54331,7 @@ msgstr "单位类型"
 msgid "Unit values"
 msgstr "单位数值"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Unit volume"
 msgstr "单位体积"
@@ -55787,7 +55792,7 @@ msgstr "武器 {slotNumber} 发射该副本"
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr "武器 {slotNumber}，{slotName}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Weapon {weaponNumber}"
 msgstr "武器 {weaponNumber}"
