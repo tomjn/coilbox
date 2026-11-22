@@ -18173,6 +18173,10 @@ msgstr "Every unit in this project, to compare side by side and change many at o
 msgid "Every unit matching this rule belongs too, kept up to date as values change, on top of anything ticked below."
 msgstr "Every unit matching this rule belongs too, kept up to date as values change, on top of anything ticked below."
 
+#: src/scenario/triggerTypes.ts
+msgid "every unit of the group"
+msgstr "every unit of the group"
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Every unit that was destroyed counts, whatever destroyed it."
 msgstr "Every unit that was destroyed counts, whatever destroyed it."
@@ -21024,6 +21028,10 @@ msgstr "Holds once a team has finished building enough of a unit type."
 #: src/scenario/triggerTypes.ts
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
+msgstr "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
 
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Holds position until woken"
@@ -26168,6 +26176,10 @@ msgstr "Needs attention"
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "Needs cob_vars.lua"
 msgstr "Needs cob_vars.lua"
+
+#: src/scenario/validate.ts
+msgid "needs one of {list}"
+msgstr "needs one of {list}"
 
 #: src/scenario/capabilities.ts
 msgid "Needs runtime {version}"

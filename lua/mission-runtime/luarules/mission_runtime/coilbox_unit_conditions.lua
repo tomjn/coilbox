@@ -113,12 +113,55 @@ function M.register(engine, state)
 		return count
 	end
 
+	--- How many of a group's living units match the condition (issue #5292).
+	-- `team`, when given, keeps the units that team owns now, so a group the
+	-- mission handed the player can be counted from either side. Read through
+	-- `state` because groups are registered after this module.
+	local function groupCount(params, team)
+		local living = state.groups and state.groups.living(params.group, team)
+		if not living then
+			return nil
+		end
+
+		local wanted
+		if params.unitDefs and #params.unitDefs > 0 then
+			wanted = {}
+			for _, name in ipairs(params.unitDefs) do
+				wanted[name] = true
+			end
+		end
+
+		local count = 0
+		for _, unitID in ipairs(living) do
+			local def = UnitDefs[Spring.GetUnitDefID(unitID)]
+			if not wanted or (def and wanted[def.name]) then
+				count = count + 1
+			end
+		end
+		return count
+	end
+
 	-- Polled: a team's holdings change with every death and every build, and an
 	-- aggregate nobody can see change is not worth a callin per unit.
+	--
+	-- With a `group` it counts that group's living units instead of a team's, and
+	-- `team` becomes optional: absent, the group is counted whoever owns it now.
 	engine:addCondition("unit_count", {
 		test = function(params)
 			local team = engineTeam[params.team]
+			if params.group ~= nil then
+				if params.team ~= nil and not team then
+					return false
+				end
+				local count = groupCount(params, team)
+				return count ~= nil and within(count, tonumber(params.min), tonumber(params.max))
+			end
+
 			if not team then
+				if params.team == nil then
+					engine:report("unit-count-team", "warning",
+						"unit_count names neither a team nor a group, treating it as empty")
+				end
 				return false
 			end
 

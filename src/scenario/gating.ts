@@ -30,11 +30,13 @@ import {
   holdsAtStart,
   SCENARIO_RUNTIME_VERSION,
   type Scenario,
+  type TriggerStep,
   usesDifficulty,
 } from "./model";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
+  PARAM_RUNTIME_VERSION,
   type TypeSpec,
   typeRuntimeVersion,
 } from "./triggerTypes";
@@ -215,6 +217,24 @@ function huntsAParticipant(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime a step needs for the parameters it sets on a type that shipped
+ * without them, from `PARAM_RUNTIME_VERSION`. A parameter written `false` asks
+ * for nothing, because every runtime has always answered that question.
+ */
+function paramVersion(step: TriggerStep): number {
+  let version = 1;
+  for (const [name, since] of Object.entries(
+    PARAM_RUNTIME_VERSION[step.type] ?? {},
+  )) {
+    const value = step.params[name];
+    if (value !== undefined && value !== false) {
+      version = Math.max(version, since);
+    }
+  }
+  return version;
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -268,10 +288,10 @@ export function requiredRuntimeVersion(
   let version = SCENARIO_RUNTIME_VERSION;
   for (const trigger of scenario.triggers) {
     for (const step of trigger.conditions.conditions) {
-      version = Math.max(version, since(step.type));
+      version = Math.max(version, since(step.type), paramVersion(step));
     }
     for (const step of trigger.actions) {
-      version = Math.max(version, since(step.type));
+      version = Math.max(version, since(step.type), paramVersion(step));
     }
   }
   if (namesBaseBuilding(scenario)) {

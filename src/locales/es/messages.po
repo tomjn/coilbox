@@ -22130,6 +22130,10 @@ msgstr "Todas las unidades de este proyecto, para compararlas lado a lado y camb
 msgid "Every unit matching this rule belongs too, kept up to date as values change, on top of anything ticked below."
 msgstr "También pertenece toda unidad que cumpla esta regla, actualizada cuando cambian los valores, además de lo que marques abajo."
 
+#: src/scenario/triggerTypes.ts
+msgid "every unit of the group"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Every unit that was destroyed counts, whatever destroyed it."
@@ -25609,6 +25613,10 @@ msgstr "Se cumple cuando un equipo ha terminado de construir suficientes unidade
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Se cumple cuando un equipo ha mantenido una zona durante el tiempo que fijes, opcionalmente solo mientras nadie la disputa."
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Holds position until woken"
@@ -31867,6 +31875,10 @@ msgstr "Por revisar"
 #, fuzzy
 msgid "Needs cob_vars.lua"
 msgstr "Necesita cob_vars.lua"
+
+#: src/scenario/validate.ts
+msgid "needs one of {list}"
+msgstr ""
 
 #: src/scenario/capabilities.ts
 #, fuzzy

@@ -81,8 +81,17 @@ function M.register(engine, state, hooks)
 	local groups = {}
 	-- Group id -> its units that are alive, in the order they were spawned.
 	local members = {}
-	-- unitID -> the group it belongs to.
+	-- unitID -> the group it belongs to, for as long as it is alive. Unlike
+	-- `members`, a release does not clear it.
 	local groupOf = {}
+	-- Group id -> its units that are alive, whoever commands them now. A gift moves
+	-- the units to another team and a release stops the mission ordering them,
+	-- and neither stops them being that group's for the conditions that ask about
+	-- it (issue #5292). Only a death takes a unit out.
+	local roster = {}
+	-- Group id -> true once the group has had units on the map, so a group that has
+	-- not been spawned yet can be told from one that has been wiped.
+	local onMap = {}
 	-- unitID -> the move state it had before it was put to sleep. Kept rather
 	-- than assumed, because it is the game's own default for that unit type and
 	-- waking has to give it back rather than guess at it.
@@ -110,6 +119,7 @@ function M.register(engine, state, hooks)
 	for _, group in ipairs((state.mission or {}).groups or {}) do
 		groups[group.id] = group
 		members[group.id] = {}
+		roster[group.id] = {}
 		if gate and not gate(group.difficulty) then
 			excluded[group.id] = true
 		end
@@ -330,9 +340,12 @@ function M.register(engine, state, hooks)
 		end
 
 		local living = members[group.id]
+		local all = roster[group.id]
 		for _, unitID in ipairs(hooks.spawn(group, team)) do
 			living[#living + 1] = unitID
+			all[#all + 1] = unitID
 			groupOf[unitID] = group.id
+			onMap[group.id] = true
 		end
 	end
 
@@ -365,6 +378,34 @@ function M.register(engine, state, hooks)
 	-- is the runtime's own, so read it and do not keep it.
 	function handle.units(id)
 		return members[id] or {}
+	end
+
+	--- The living units of a group a condition is asking about, or nil when the
+	-- scenario has no such group (said once, as an error, because a condition on
+	-- a group that does not exist can never hold).
+	--
+	-- A group's units stay its own through a gift and a release: only a death takes
+	-- one out. `allegiance`, when given, keeps the units that team owns now, which
+	-- is how a condition asks about the part of a group a player has been handed.
+	-- The list is a copy, so it is the caller's to keep.
+	function handle.living(id, allegiance)
+		if not groups[id] then
+			groupOfName(id)
+			return nil
+		end
+		local out = {}
+		for _, unitID in ipairs(roster[id]) do
+			if allegiance == nil or Spring.GetUnitTeam(unitID) == allegiance then
+				out[#out + 1] = unitID
+			end
+		end
+		return out
+	end
+
+	--- Whether a group has ever had units on the map. A group waiting for its
+	-- spawn has not, and is not dead for it.
+	function handle.hasBeenPlaced(id)
+		return onMap[id] == true
 	end
 
 	--- Whether a group is running its orders rather than holding.
@@ -458,8 +499,9 @@ function M.register(engine, state, hooks)
 
 	--- Let go of a group. This is `release_group`.
 	--
-	-- The mission stops ordering the units and stops counting them as the group's,
-	-- so a squad it handed the player is the player's to command (issue #812).
+	-- The mission stops ordering the units, so a squad it handed the player is the
+	-- player's to command (issue #812). They are still the group's to the
+	-- conditions that ask about it, which is `handle.living`'s (issue #5292).
 	-- Nothing is done to the units themselves: this is the mission letting go, and
 	-- `gift_units` is what changes who owns them. So the two are separate actions,
 	-- and a mission that lends an escort gifts it now and releases it when the
@@ -481,7 +523,6 @@ function M.register(engine, state, hooks)
 		hunting[group.id] = nil
 		local living = members[group.id]
 		for index = #living, 1, -1 do
-			groupOf[living[index]] = nil
 			living[index] = nil
 		end
 	end
@@ -587,11 +628,13 @@ function M.register(engine, state, hooks)
 		end
 		groupOf[unitID] = nil
 
-		local living = members[id]
-		for index, member in ipairs(living) do
-			if member == unitID then
-				table.remove(living, index)
-				return
+		-- A released unit is in the roster and no longer in the members.
+		for _, list in ipairs({ members[id], roster[id] }) do
+			for index, member in ipairs(list) do
+				if member == unitID then
+					table.remove(list, index)
+					break
+				end
 			end
 		end
 	end
@@ -614,6 +657,21 @@ function M.register(engine, state, hooks)
 		end
 		return spawned
 	end
+
+	-- Event driven: a group only gets deader on a death, and `handle.removed` runs
+	-- ahead of the event, so the roll a trigger reads is the one this death wrote.
+	--
+	-- A group that has not been on the map is not dead. Dead means it was there
+	-- and every unit in it has since died, so a wave waiting for its spawn does
+	-- not trip "the raiders are dead" on the first frame. A group wiped and then
+	-- spawned again is alive again.
+	engine:addCondition("group_dead", {
+		events = { "unit_destroyed" },
+		test = function(params)
+			local living = handle.living(params.group)
+			return living ~= nil and onMap[params.group] == true and #living == 0
+		end,
+	})
 
 	engine:addAction("spawn_group", function(params)
 		handle.spawn(params.group)

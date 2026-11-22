@@ -22130,6 +22130,10 @@ msgstr "Кожен юніт у цьому проєкті – щоб порівн
 msgid "Every unit matching this rule belongs too, kept up to date as values change, on top of anything ticked below."
 msgstr "Сюди також належить кожен юніт, що відповідає цьому правилу, з оновленням у міру зміни значень, на додачу до всього позначеного нижче."
 
+#: src/scenario/triggerTypes.ts
+msgid "every unit of the group"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Every unit that was destroyed counts, whatever destroyed it."
@@ -25609,6 +25613,10 @@ msgstr "Виконується, щойно команда завершила б�
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Виконується, щойно команда утримала зону заданий час, за бажанням лише тоді, коли її ніхто не оскаржує."
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Holds position until woken"
@@ -31867,6 +31875,10 @@ msgstr "Потребує уваги"
 #, fuzzy
 msgid "Needs cob_vars.lua"
 msgstr "Потрібен cob_vars.lua"
+
+#: src/scenario/validate.ts
+msgid "needs one of {list}"
+msgstr ""
 
 #: src/scenario/capabilities.ts
 #, fuzzy

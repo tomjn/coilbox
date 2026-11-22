@@ -144,6 +144,16 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   units_in_zone: {
     zone: { kind: "zoneId" },
     team: { kind: "teamId", optional: true },
+    /** Count only this group's living units, whoever owns them now (issue #5292). */
+    group: { kind: "groupId", optional: true },
+    /** With a group: hold only while every living unit of it is in the zone. */
+    all: {
+      kind: "boolean",
+      optional: true,
+      get label() {
+        return t`every unit of the group`;
+      },
+    },
     unitDefs: {
       kind: "strings",
       optional: true,
@@ -167,7 +177,10 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
     },
   },
   unit_count: {
-    team: { kind: "teamId" },
+    /** Required unless a group is given, which `REQUIRES_ONE_OF` says. */
+    team: { kind: "teamId", optional: true },
+    /** Count only this group's living units, whoever owns them now (issue #5292). */
+    group: { kind: "groupId", optional: true },
     unitDefs: {
       kind: "strings",
       optional: true,
@@ -192,6 +205,13 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   },
   unit_dead: {
     actor: { kind: "actorId" },
+  },
+  /**
+   * Holds once every unit in a group has died. False until the group has been on
+   * the map, so a wave waiting for its spawn is not dead (issue #5292).
+   */
+  group_dead: {
+    group: { kind: "groupId" },
   },
   unit_health_below: {
     actor: { kind: "actorId" },
@@ -563,6 +583,7 @@ const TYPE_DESCRIPTION_MESSAGES: Record<string, MessageDescriptor> = {
   units_in_zone: msg`Watches how many units are standing in a zone against the count you set.`,
   unit_count: msg`Counts a team's units anywhere on the map, not just inside a zone.`,
   unit_dead: msg`Becomes true the moment a named actor is destroyed.`,
+  group_dead: msg`Holds once every unit in a group has died. A group that has not been placed yet is not dead.`,
   unit_health_below: msg`Trips once an actor's health drops below the fraction you set.`,
   unit_built: msg`Holds once a team has finished building enough of a unit type.`,
   unit_captured: msg`True once an actor changes hands, whether captured or gifted away.`,
@@ -650,6 +671,7 @@ export const TYPE_GROUPS: Record<string, string> = {
   units_in_zone: "Units",
   unit_count: "Units",
   unit_dead: "Units",
+  group_dead: "Units",
   unit_health_below: "Units",
   unit_built: "Units",
   unit_captured: "Units",
@@ -748,6 +770,36 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   /** Issue #4799. A runtime behind 10 has no implementation, and has already
    *  placed the base at the start, without its terrain changes. */
   spawn_base: 10,
+  /** Issue #5292. A runtime behind 14 has no implementation, so the condition
+   *  reports itself once and never holds. */
+  group_dead: 14,
+};
+
+/**
+ * The runtime version that first read one parameter of a type that shipped
+ * earlier, keyed by type and then parameter (issue #5292).
+ *
+ * A runtime behind it reads past the parameter and answers the question without
+ * it, which is a different question: `units_in_zone` with a `group` counts every
+ * unit in the zone. So a scenario that sets one asks for the version. A boolean
+ * written `false` is the question every runtime has always answered and asks for
+ * nothing.
+ *
+ * Add a parameter here in the same change that adds it to the type's table and
+ * bumps `missions/runtime.lua`.
+ */
+export const PARAM_RUNTIME_VERSION: Record<string, Record<string, number>> = {
+  units_in_zone: { group: 14, all: 14 },
+  unit_count: { group: 14 },
+};
+
+/**
+ * The parameter sets a type needs at least one of, which the table cannot say
+ * because each is optional on its own. `unit_count` counts a team's units or a
+ * group's, and a step naming neither counts nothing.
+ */
+export const REQUIRES_ONE_OF: Record<string, readonly (readonly string[])[]> = {
+  unit_count: [["team", "group"]],
 };
 
 /**

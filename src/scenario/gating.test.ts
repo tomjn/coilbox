@@ -436,6 +436,64 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #5292. A runtime behind 14 has no `group_dead`, and reads past a
+   * `group` or `all` on a count and answers for every unit instead.
+   */
+  describe("a condition about a group", () => {
+    const only = (type: string, params: TriggerStep["params"]): Scenario => {
+      const scenario = withTrigger([], []);
+      return {
+        ...scenario,
+        triggers: [
+          {
+            ...scenario.triggers[0],
+            conditions: { op: "all", conditions: [{ type, params }] },
+          },
+        ],
+      };
+    };
+
+    it("asks for 14 when group_dead is used", () => {
+      expect(requiredRuntimeVersion(withTrigger(["group_dead"], []))).toBe(14);
+    });
+
+    it("asks for 14 when a zone or count names a group", () => {
+      expect(
+        requiredRuntimeVersion(
+          only("units_in_zone", { zone: "gate", group: "convoy" }),
+        ),
+      ).toBe(14);
+      expect(
+        requiredRuntimeVersion(only("unit_count", { group: "convoy" })),
+      ).toBe(14);
+    });
+
+    it("asks for 14 when a zone wants all, but not for all set to false", () => {
+      expect(
+        requiredRuntimeVersion(
+          only("units_in_zone", { zone: "gate", group: "convoy", all: true }),
+        ),
+      ).toBe(14);
+      expect(
+        requiredRuntimeVersion(
+          only("units_in_zone", { zone: "gate", all: false }),
+        ),
+      ).toBe(1);
+    });
+
+    it("asks for nothing from the same conditions without the group", () => {
+      expect(
+        requiredRuntimeVersion(
+          only("units_in_zone", { zone: "gate", team: "player" }),
+        ),
+      ).toBe(1);
+      expect(
+        requiredRuntimeVersion(only("unit_count", { team: "player" })),
+      ).toBe(1);
+    });
+  });
+
+  /**
    * Issue #5252. A runtime behind 13 finds no engine team number on the neutral
    * team and drops it with everything placed for it.
    */

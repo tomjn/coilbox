@@ -160,6 +160,42 @@ function M.register(engine, state)
 		return zone
 	end
 
+	--- How many of a group's living units are in a zone, and whether that is every
+	-- one of them (issue #5292).
+	--
+	-- Membership is the same engine query a zone without a group uses, so a unit is
+	-- in a zone here exactly when it would be counted there. `allegiance` narrows
+	-- the group to the units that team owns now, and `defs` to the types named.
+	-- `all` asks for every one of those to be inside, which is false for a group
+	-- with nothing living: "the convoy arrived" must not hold because the convoy
+	-- was wiped, or has not been spawned.
+	local function groupInZone(zone, params, allegiance, defs, min, max)
+		local living = state.groups and state.groups.living(params.group, allegiance)
+		if not living then
+			return false
+		end
+
+		local inside = {}
+		for _, unitID in ipairs(unitsIn(zone, nil)) do
+			inside[unitID] = true
+		end
+
+		local total, count = 0, 0
+		for _, unitID in ipairs(living) do
+			if counted(unitID, defs) then
+				total = total + 1
+				if inside[unitID] then
+					count = count + 1
+				end
+			end
+		end
+
+		if params.all == true and (total == 0 or count < total) then
+			return false
+		end
+		return within(count, min, max)
+	end
+
 	-- Polled: occupancy changes with every step a unit takes, and the engine has
 	-- no callin for crossing a line on the ground.
 	--
@@ -167,6 +203,10 @@ function M.register(engine, state)
 	-- because "units in the zone" with no number is asking whether anything is
 	-- there. Stating only a maximum keeps its own meaning, so `max = 0` is how a
 	-- mission asks whether a zone is clear.
+	--
+	-- With a `group`, only that group's living units are counted, wherever they
+	-- are owned now. `all` is a question about a group, and without one it is
+	-- reported and ignored.
 	engine:addCondition("units_in_zone", {
 		test = function(params)
 			local zone = zoneOf(params)
@@ -188,7 +228,16 @@ function M.register(engine, state)
 			if not min and not max then
 				min = 1
 			end
-			return within(countIn(zone, allegiance, defSet(params.unitDefs), placed), min, max)
+			local defs = defSet(params.unitDefs)
+			if params.group ~= nil then
+				return groupInZone(zone, params, allegiance, defs, min, max)
+			end
+			if params.all == true then
+				report("zone-all:" .. tostring(params.zone), "warning",
+					"units_in_zone on zone " .. tostring(params.zone)
+						.. " asks for all with no group, ignoring it")
+			end
+			return within(countIn(zone, allegiance, defs, placed), min, max)
 		end,
 	})
 
