@@ -243,6 +243,8 @@ export type PoseDraftAction =
   | { type: "set"; pieceId: string; offset: LegoPoseOffset }
   /** Start from these offsets, as one step that undo can step back over. */
   | { type: "load"; offsets: PoseOffsets }
+  /** Hold these offsets with no history, so undo has only what is done after. */
+  | { type: "hold"; offsets: PoseOffsets }
   | { type: "undo" }
   | { type: "redo" }
   /** Leave posing: the draft and its history go. */
@@ -263,6 +265,8 @@ export function reduceDraft(
       );
     case "load":
       return step(state, copyOffsets(action.offsets));
+    case "hold":
+      return { offsets: copyOffsets(action.offsets), past: [], future: [] };
     case "undo": {
       const previous = state.past.at(-1);
       if (!previous) return state;

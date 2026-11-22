@@ -177,6 +177,16 @@ describe("the pose being held", () => {
     expect(reduceDraft(loaded, { type: "load", offsets: RAISED })).toBe(loaded);
   });
 
+  it("holds offsets with no history, so undo only steps what is done after", () => {
+    const held = reduceDraft(
+      reduceDraft(emptyDraft, { type: "load", offsets: RAISED }),
+      { type: "hold", offsets: RAISED },
+    );
+    expect(held.offsets).toEqual(RAISED);
+    expect(held.past).toEqual([]);
+    expect(held.future).toEqual([]);
+  });
+
   it("forgets everything when posing is left", () => {
     const loaded = reduceDraft(emptyDraft, { type: "load", offsets: RAISED });
     expect(reduceDraft(loaded, { type: "clear" })).toEqual(emptyDraft);
