@@ -1988,6 +1988,10 @@ msgstr "{buildings, plural, other {# 個の建物}}のうち {changed} 個を {t
 msgid "{changes}, so nothing in it can be placed"
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "{channel} of {piece}, frame {frame}"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "{cheapest} salvage"
@@ -19420,6 +19424,10 @@ msgstr "地形の高さを定義します。<0>白が最も高く、黒が最も
 msgid "Defs this shape"
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "degrees"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "degrees, for the next recalculation"
@@ -21349,6 +21357,7 @@ msgstr "楕円体"
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "elmos"
 msgstr "elmo"
@@ -27957,6 +27966,10 @@ msgstr "既存の .cob を残し、上書きしませんでした。"
 msgid "Kept, because they were changed after the last export:"
 msgstr "前回のエクスポート後に変更されたため、残しました："
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key"
+msgstr ""
+
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
 msgid "key (optional)"
@@ -27966,6 +27979,18 @@ msgstr "キー（任意）"
 #, fuzzy
 msgid "Key {key}"
 msgstr "キー {key}"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key the pieces you changed on this frame"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in degrees"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in elmos"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -53049,6 +53074,10 @@ msgstr "アクションへ"
 #, fuzzy
 msgid "to allies"
 msgstr "味方宛て"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "To make a key, pause on a frame, move a piece with the gizmo, and press Key. Every turn and move you changed gets a key on that frame. Moving the ruler drops a change you have not keyed. Pick a key on a turn or move row to type its value."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy

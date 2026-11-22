@@ -1660,6 +1660,10 @@ msgstr "{changed} of {buildings, plural, one {# building} other {# buildings}} s
 msgid "{changes}, so nothing in it can be placed"
 msgstr "{changes}, so nothing in it can be placed"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "{channel} of {piece}, frame {frame}"
+msgstr "{channel} of {piece}, frame {frame}"
+
 #: src/runlite/pages/RunPage.tsx
 msgid "{cheapest} salvage"
 msgstr "{cheapest} salvage"
@@ -15942,6 +15946,10 @@ msgstr "Defines the terrain elevation. A grayscale image where <0>white is the h
 msgid "Defs this shape"
 msgstr "Defs this shape"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "degrees"
+msgstr "degrees"
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "degrees, for the next recalculation"
 msgstr "degrees, for the next recalculation"
@@ -17531,6 +17539,7 @@ msgstr "Ellipsoid"
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 msgid "elmos"
 msgstr "elmos"
 
@@ -22944,6 +22953,10 @@ msgstr "Kept the existing .cob, not overwritten."
 msgid "Kept, because they were changed after the last export:"
 msgstr "Kept, because they were changed after the last export:"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key"
+msgstr "Key"
+
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 msgid "key (optional)"
 msgstr "key (optional)"
@@ -22951,6 +22964,18 @@ msgstr "key (optional)"
 #: src/scenario/pages/components/ScenarioMapSceneChrome.tsx
 msgid "Key {key}"
 msgstr "Key {key}"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key the pieces you changed on this frame"
+msgstr "Key the pieces you changed on this frame"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in degrees"
+msgstr "Key value in degrees"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in elmos"
+msgstr "Key value in elmos"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "keybinds"
@@ -43561,6 +43586,10 @@ msgstr "To action"
 #: src/content/replayEventList.ts
 msgid "to allies"
 msgstr "to allies"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "To make a key, pause on a frame, move a piece with the gizmo, and press Key. Every turn and move you changed gets a key on that frame. Moving the ruler drops a change you have not keyed. Pick a key on a turn or move row to type its value."
+msgstr "To make a key, pause on a frame, move a piece with the gizmo, and press Key. Every turn and move you changed gets a key on that frame. Moving the ruler drops a change you have not keyed. Pick a key on a turn or move row to type its value."
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "To minute"

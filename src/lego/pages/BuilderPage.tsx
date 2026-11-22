@@ -209,6 +209,7 @@ import {
   emptyDraft,
   offsetsOf,
   overwritePose,
+  type PoseOffsets,
   reduceDraft,
   renamePose,
   savePose,
@@ -2054,6 +2055,21 @@ function Builder({ id }: { id: string | undefined }) {
     dispatchPose({ type: "clear" });
     if (on) setPlaying(false);
   }
+  /**
+   * The Timeline tab holds the action's pose on the playhead for the gizmo to
+   * change while it is paused, and lets it go when something plays (#5397). The
+   * pose is the draft's start, so pose mode's undo only steps what the gizmo
+   * does after it.
+   */
+  function holdPose(offsets: PoseOffsets | null) {
+    if (offsets === null) {
+      setPosing(false);
+      dispatchPose({ type: "clear" });
+      return;
+    }
+    setPosing(true);
+    dispatchPose({ type: "hold", offsets });
+  }
   // Playing the preview shows the unit moving by its script, which a held pose
   // would only fight, so starting it leaves the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only starting to play matters
@@ -3270,6 +3286,7 @@ function Builder({ id }: { id: string | undefined }) {
                         setStrip("script");
                         setStripOpen(true);
                       }}
+                      pose={{ offsets: poseDraft.offsets, onHold: holdPose }}
                     />
                   ) : pack ? (
                     <InventoryGrids

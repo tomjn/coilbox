@@ -21,6 +21,7 @@ import type {
   LegoPose,
   LegoProject,
 } from "./model";
+import { type PoseOffsets, withPieceOffset } from "./pose";
 import { type Problem, problem } from "./problems";
 import type { ScriptTimeline } from "./scriptPlayback";
 import { luaString } from "./unitDef";
@@ -667,6 +668,19 @@ export function planAction(
   };
 }
 
+/** Where a call's channel is in a baked frame: six numbers a piece, the move
+ *  on x, y, z and then the turn on x, y, z. */
+function slotIndex(
+  project: LegoProject,
+  call: { piece: string; kind: "turn" | "move"; axis: 0 | 1 | 2 },
+): number {
+  return (
+    project.pieces.findIndex((piece) => piece.id === call.piece) * 6 +
+    (call.kind === "turn" ? 3 : 0) +
+    call.axis
+  );
+}
+
 /**
  * An action played frame by frame, as the engine plays the script `emitActions`
  * writes for it: each piece goes to its destination at a constant speed, and a
@@ -705,10 +719,7 @@ export function bakeAction(
   // A lap goes on from where the lead ended, and a one shot action holds.
   timeline.end = plan.looping ? { loopFrom: plan.leadFrames } : "hold";
 
-  const slotOf = (call: PlanCall) =>
-    project.pieces.findIndex((piece) => piece.id === call.piece) * 6 +
-    (call.kind === "turn" ? 3 : 0) +
-    call.axis;
+  const slotOf = (call: PlanCall) => slotIndex(project, call);
   const calls = new Map<number, PlanCall[]>();
   const queue = (call: PlanCall, frame: number) =>
     calls.set(frame, [...(calls.get(frame) ?? []), call]);
@@ -1487,5 +1498,212 @@ export function setKeySeconds(
   return mapAction(project, id, (a) => ({
     ...a,
     keys: a.keys.map((key, at) => (at === index ? { ...key, seconds } : key)),
+  }));
+}
+
+// --- Keying on the timeline (#5397) ------------------------------------------
+//
+// Positions here are ruler frames, the frames of `bakeAction`'s preview, which
+// are the action's own frames plus the frames a blend in takes before the first
+// key (`actionShift`). A key is stored on the action's own frame.
+
+/** One channel of a piece: what a track is for. */
+export interface ChannelRef {
+  piece: string;
+  kind: "turn" | "move";
+  axis: 0 | 1 | 2;
+}
+
+/** A channel and the value to key on it, in radians or elmos. */
+export interface ChannelValue extends ChannelRef {
+  value: number;
+}
+
+/** How far a blend in moves the keys on the ruler: a key on action frame `n` is
+ *  on ruler frame `n + shift`, because the blend takes the place of the time
+ *  before the first key. Zero when there is no blend in. */
+export function actionShift(action: LegoAction, project: LegoProject): number {
+  const plan = planAction(action, project);
+  if (!plan) return 0;
+  const frames = channelsOf(action, project).flatMap((channel) =>
+    channel.keys.map((key) => key.frame),
+  );
+  return plan.leadFrames - Math.max(...frames);
+}
+
+/** The first ruler frame a key can be written on. A blend in takes the frames
+ *  before the first key, and the pieces are mid blend on them, so nothing there
+ *  has a value to key. Without a blend in, every frame can be keyed. */
+function keyableFrom(action: LegoAction, project: LegoProject): number {
+  if (blendOf(action, project).blendIn <= 0) return 0;
+  const frames = channelsOf(action, project).flatMap((channel) =>
+    channel.keys.map((key) => key.frame),
+  );
+  return frames.length === 0
+    ? 0
+    : Math.min(...frames) + actionShift(action, project);
+}
+
+/**
+ * The pose the action has on a ruler frame, as the offsets pose mode holds: what
+ * the unit looks like after that many frames of the action. A key is on its own
+ * frame with its own value, so a diamond and the pose under it agree. Frame 0 is
+ * the rest pose with any key that jumps on that frame applied.
+ *
+ * Past the end of the preview, and for a one shot action once everything has
+ * stopped, it is the last pose. An action that moves nothing is at rest.
+ *
+ * Pass the action's `bakeAction` timeline when there is one, to not bake it
+ * again.
+ */
+export function actionPoseAt(
+  action: LegoAction,
+  project: LegoProject,
+  frame: number,
+  baked: ScriptTimeline = bakeAction(action, project),
+): PoseOffsets {
+  const { frames } = baked;
+  if (frames.length === 0) return {};
+  let values: number[];
+  if (frame <= 0) {
+    values = new Array<number>(project.pieces.length * 6).fill(0);
+    for (const call of planAction(action, project)?.lead ?? []) {
+      if (call.frame !== 0) continue;
+      if (call.speed !== undefined || call.blend !== undefined) continue;
+      values[slotIndex(project, call)] = call.dest;
+    }
+  } else {
+    values = frames[Math.min(frame, frames.length) - 1];
+  }
+  let offsets: PoseOffsets = {};
+  project.pieces.forEach((piece, index) => {
+    const v = values.slice(index * 6, index * 6 + 6).map(round4);
+    offsets = withPieceOffset(offsets, piece.id, {
+      move: [v[0], v[1], v[2]],
+      turn: [v[3], v[4], v[5]],
+    });
+  });
+  return offsets;
+}
+
+/**
+ * The channels whose value in `held` differs from the action's own on a ruler
+ * frame, with the held value. Empty while a blend in is under way, which has
+ * no key to write.
+ */
+export function poseChanges(
+  action: LegoAction,
+  project: LegoProject,
+  frame: number,
+  held: PoseOffsets,
+  baked?: ScriptTimeline,
+): ChannelValue[] {
+  if (frame < keyableFrom(action, project)) return [];
+  const base = actionPoseAt(action, project, frame, baked);
+  const changes: ChannelValue[] = [];
+  for (const piece of project.pieces) {
+    for (const kind of KINDS as ("turn" | "move")[]) {
+      for (const axis of [0, 1, 2] as const) {
+        const was = base[piece.id]?.[kind]?.[axis] ?? 0;
+        const now = held[piece.id]?.[kind]?.[axis] ?? 0;
+        if (round4(now) !== round4(was)) {
+          changes.push({ piece: piece.id, kind, axis, value: round4(now) });
+        }
+      }
+    }
+  }
+  return changes;
+}
+
+const sameChannel = (a: ChannelRef, b: ChannelRef) =>
+  a.piece === b.piece && a.kind === b.kind && a.axis === b.axis;
+
+/** An action's tracks with a key set on one channel's track, which is made if the
+ *  action has none for it. A key already on the frame is replaced. */
+function withKey(
+  tracks: LegoActionTrack[],
+  channel: ChannelValue,
+  frame: number,
+): LegoActionTrack[] {
+  const key = { frame, value: channel.value };
+  const place = (keys: LegoActionTrack["keys"]) =>
+    [...keys.filter((k) => k.frame !== frame), key].sort(
+      (a, b) => a.frame - b.frame,
+    );
+  if (!tracks.some((track) => sameChannel(track, channel))) {
+    return [
+      ...tracks,
+      {
+        piece: channel.piece,
+        kind: channel.kind,
+        axis: channel.axis,
+        keys: [key],
+      },
+    ];
+  }
+  return tracks.map((track) =>
+    sameChannel(track, channel) ? { ...track, keys: place(track.keys) } : track,
+  );
+}
+
+/** Lower an action's pose keys to tracks, in one edit. An action that has tracks
+ *  is left as it is. */
+export function convertToTracks(project: LegoProject, id: string): LegoProject {
+  const action = project.actions?.find((a) => a.id === id);
+  if (!action || action.tracks) return project;
+  return mapAction(project, id, (a) => withTracks(a, project));
+}
+
+/**
+ * Key every channel whose held value differs from the action's on a ruler frame.
+ * A key already on the frame is replaced, and a channel with no track gets one.
+ * An action of pose keys becomes tracks in the same edit, so one undo puts the
+ * pose keys back. Nothing changes when no channel differs.
+ */
+export function keyFromPose(
+  project: LegoProject,
+  id: string,
+  frame: number,
+  held: PoseOffsets,
+): LegoProject {
+  const action = project.actions?.find((a) => a.id === id);
+  if (!action) return project;
+  const changes = poseChanges(action, project, frame, held);
+  if (changes.length === 0) return project;
+  const at = frame - actionShift(action, project);
+  return mapAction(project, id, (a) => {
+    const lowered = withTracks(a, project);
+    const tracks = changes.reduce(
+      (all, change) => withKey(all, change, at),
+      lowered.tracks ?? [],
+    );
+    return { ...lowered, tracks };
+  });
+}
+
+/**
+ * Set the value of the key a channel has on a ruler frame, in radians for a turn
+ * and elmos for a move. One edit, which converts an action of pose keys to
+ * tracks first. Nothing changes when there is no such key, or its value is that
+ * already.
+ */
+export function setKeyValue(
+  project: LegoProject,
+  id: string,
+  channel: ChannelRef,
+  frame: number,
+  value: number,
+): LegoProject {
+  const action = project.actions?.find((a) => a.id === id);
+  if (!action || !Number.isFinite(value)) return project;
+  const at = frame - actionShift(action, project);
+  const lowered = withTracks(action, project);
+  const key = lowered.tracks
+    ?.find((track) => sameChannel(track, channel))
+    ?.keys.find((k) => k.frame === at);
+  if (!key || round4(key.value) === round4(value)) return project;
+  return mapAction(project, id, () => ({
+    ...lowered,
+    tracks: withKey(lowered.tracks ?? [], { ...channel, value }, at),
   }));
 }

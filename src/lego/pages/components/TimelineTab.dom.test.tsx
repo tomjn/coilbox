@@ -7,6 +7,7 @@
  */
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -14,12 +15,13 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { action, poseUnits, trackUnits, unit } from "../../actionFixtures";
-import type { LegoProject } from "../../model";
+import type { LegoPoseOffset, LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
+import { emptyDraft, type PoseOffsets, reduceDraft } from "../../pose";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import { AnimationPanel } from "./AnimationPanel";
 import { TimelineTab } from "./TimelineTab";
@@ -91,6 +93,13 @@ interface Seen {
   paused: boolean;
   frame: number;
   shownScript: number;
+  /** Whether the unit is held in a pose, and what the gizmo holds. */
+  posing: boolean;
+  offsets: PoseOffsets;
+  /** What the gizmo does: sets one piece's offset in the held pose. */
+  pose: (pieceId: string, offset: LegoPoseOffset) => void;
+  /** Edits of the document the tab has made. */
+  edits: number;
 }
 
 const seen: Seen = {
@@ -100,6 +109,10 @@ const seen: Seen = {
   paused: false,
   frame: 0,
   shownScript: 0,
+  posing: false,
+  offsets: {},
+  pose: () => {},
+  edits: 0,
 };
 
 /**
@@ -110,10 +123,13 @@ function Harness({
   initial,
   panel = false,
   open = true,
+  onHold,
 }: {
   initial: LegoProject;
   panel?: boolean;
   open?: boolean;
+  /** Told what the tab asks to be held, as well as the harness holding it. */
+  onHold?: (offsets: PoseOffsets | null) => void;
 }) {
   const [project, setProject] = useState(initial);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -122,7 +138,20 @@ function Harness({
   const [timeline, setTimeline] = useState<ScriptTimeline | null>(null);
   const [paused, setPaused] = useState(false);
   const [frame, setFrame] = useState(0);
-  Object.assign(seen, { project, playing, timeline, paused, frame });
+  // What the builder page holds for the pose the tab asks to be held.
+  const [posing, setPosing] = useState(false);
+  const [draft, dispatchPose] = useReducer(reduceDraft, emptyDraft);
+  Object.assign(seen, {
+    project,
+    playing,
+    timeline,
+    paused,
+    frame,
+    posing,
+    offsets: draft.offsets,
+    pose: (pieceId: string, offset: LegoPoseOffset) =>
+      act(() => dispatchPose({ type: "set", pieceId, offset })),
+  });
 
   return (
     <>
@@ -156,7 +185,10 @@ function Harness({
           project={project}
           actionId={actionId}
           onActionChange={setActionId}
-          onEdit={(change) => setProject(change)}
+          onEdit={(change) => {
+            seen.edits++;
+            setProject(change);
+          }}
           playing={playing}
           onPlayingChange={setPlaying}
           scriptTimeline={timeline}
@@ -168,6 +200,18 @@ function Harness({
           onRunReplaced={vi.fn()}
           onShowScript={() => {
             seen.shownScript++;
+          }}
+          pose={{
+            offsets: draft.offsets,
+            onHold: (offsets) => {
+              onHold?.(offsets);
+              setPosing(offsets !== null);
+              dispatchPose(
+                offsets === null
+                  ? { type: "clear" }
+                  : { type: "hold", offsets },
+              );
+            },
           }}
         />
       ) : null}
@@ -227,6 +271,26 @@ describe("opening an action from the Animation panel", () => {
     // The panel's own button no longer says Pause, and the tab's does.
     expect(screen.getAllByRole("button", { name: "Pause" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Play" })).toHaveLength(1);
+  });
+
+  it("makes the panel let go of its run when the tab holds the viewport, so an edit does not start it again", async () => {
+    runLua.mockReset();
+    runLua.mockResolvedValue(PANEL_RUN);
+    render(<Harness initial={poseUnits().plain} panel />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Play" })[0]);
+    await waitFor(() => expect(seen.timeline).toBe(PANEL_RUN));
+    expect(runLua).toHaveBeenCalledTimes(1);
+
+    // A key on the tab stops the panel's run and holds the pose.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Keys of arm on frame 30" }),
+    );
+    expect(seen.playing).toBe(false);
+    fireEvent.click(screen.getAllByRole("switch", { name: "Loop" }).at(-1)!);
+    // The panel would run the edited script again once its edits settled.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(runLua).toHaveBeenCalledTimes(1);
+    expect(seen.playing).toBe(false);
   });
 
   it("is replaced by a run of the panel's", async () => {
@@ -337,9 +401,14 @@ describe("playing and scrubbing", () => {
     expect(seen.timeline?.action).toBe("act");
     expect(seen.timeline?.frames.length).toBeGreaterThan(0);
 
+    // Pausing stops the run and holds the unit in the pose it was paused on.
+    // The tab's timeline stays the viewport's, so the panel lets go of its own.
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-    expect(seen.paused).toBe(true);
+    expect(seen.playing).toBe(false);
+    expect(seen.timeline?.action).toBe("act");
+    expect(seen.posing).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    expect(seen.playing).toBe(true);
     expect(seen.paused).toBe(false);
   });
 
@@ -356,37 +425,32 @@ describe("playing and scrubbing", () => {
     expect(seen.timeline?.end).toBe("hold");
   });
 
-  it("goes on playing the changed action after an edit, from the frame it was on", () => {
+  it("goes on playing the changed action after an edit", () => {
     render(<Harness initial={poseUnits().plain} />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Keys of arm on frame 30" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
     const before = seen.timeline;
-    expect(seen.frame).toBe(30);
     fireEvent.click(screen.getByRole("switch", { name: "Loop" }));
     expect(seen.project.actions?.[0].loop).toBe(false);
     expect(seen.timeline).not.toBe(before);
     expect(seen.timeline?.end).toBe("hold");
     expect(seen.playing).toBe(true);
-    expect(seen.frame).toBe(30);
   });
 
-  it("pauses and seeks when the ruler is dragged, starting the run if there is none", () => {
+  it("seeks when the ruler is dragged, and holds the pose there rather than playing", () => {
     render(<Harness initial={poseUnits().plain} />);
     expect(seen.timeline).toBeNull();
     nudgeRuler("ArrowRight");
-    expect(seen.playing).toBe(true);
-    expect(seen.paused).toBe(true);
-    expect(seen.frame).toBe(1);
-    expect(seen.timeline?.action).toBe("act");
+    expect(screen.getByText(/^Frame 1,/)).toBeTruthy();
+    expect(seen.playing).toBe(false);
+    expect(seen.posing).toBe(true);
 
     nudgeRuler("ArrowRight");
-    expect(seen.frame).toBe(2);
+    expect(screen.getByText(/^Frame 2,/)).toBeTruthy();
     nudgeRuler("Home");
-    expect(seen.frame).toBe(0);
+    expect(screen.getByText(/^Frame 0,/)).toBeTruthy();
     // The ruler runs a second past the last key, which is frame 90.
     nudgeRuler("End");
-    expect(seen.frame).toBe(120);
+    expect(screen.getByText(/^Frame 120,/)).toBeTruthy();
   });
 
   it("steps a frame at a time and seeks to a key's frame", () => {
@@ -394,21 +458,19 @@ describe("playing and scrubbing", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Keys of arm on frame 30" }),
     );
-    expect(seen.paused).toBe(true);
-    expect(seen.frame).toBe(30);
     expect(screen.getByText("Frame 30, 1 s")).toBeTruthy();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Step forward one frame" }),
     );
-    expect(seen.frame).toBe(31);
+    expect(screen.getByText(/^Frame 31,/)).toBeTruthy();
     fireEvent.click(
       screen.getByRole("button", { name: "Step back one frame" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Step back one frame" }),
     );
-    expect(seen.frame).toBe(29);
+    expect(screen.getByText(/^Frame 29,/)).toBeTruthy();
   });
 
   it("stops playing an action that is deleted", () => {
@@ -418,6 +480,180 @@ describe("playing and scrubbing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete Plant" }));
     expect(seen.playing).toBe(false);
     expect(seen.timeline).toBeNull();
+  });
+});
+
+describe("keying from the pose", () => {
+  const keyButton = () => screen.getByRole("button", { name: "Key" });
+  const isDisabled = (button: HTMLElement) => button.hasAttribute("disabled");
+  const diamond = (name: string) =>
+    fireEvent.click(screen.getByRole("button", { name }));
+
+  it("holds the pose the action has on the playhead while paused, and lets it go while playing", () => {
+    render(<Harness initial={poseUnits().plain} />);
+    expect(seen.posing).toBe(true);
+    diamond("Keys of arm on frame 30");
+    expect(seen.offsets.arm?.turn).toEqual([1, 0, 0]);
+    expect(seen.offsets.hatch?.move).toEqual([0, 4, 0]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    expect(seen.posing).toBe(false);
+    expect(seen.offsets).toEqual({});
+  });
+
+  it("disables Key until the pose changes, then keys what changed in one edit", () => {
+    render(<Harness initial={poseUnits().plain} />);
+    diamond("Keys of arm on frame 30");
+    expect(isDisabled(keyButton())).toBe(true);
+
+    seen.pose("arm", { turn: [1, 0, 0.5] });
+    expect(isDisabled(keyButton())).toBe(false);
+
+    const edits = seen.edits;
+    fireEvent.click(keyButton());
+    expect(seen.edits).toBe(edits + 1);
+    // The first edit of a pose key action turns it into tracks.
+    const keyed = seen.project.actions?.[0];
+    expect(keyed?.keys).toEqual([]);
+    expect(keyed?.tracks).toContainEqual({
+      piece: "arm",
+      kind: "turn",
+      axis: 2,
+      keys: [
+        { frame: 30, value: 0.5 },
+        { frame: 90, value: 0.8 },
+      ],
+    });
+    // What was keyed is the action's pose now, so there is nothing left to key.
+    expect(isDisabled(keyButton())).toBe(true);
+    expect(seen.offsets.arm?.turn).toEqual([1, 0, 0.5]);
+  });
+
+  it("keys a channel the action has no track for", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    diamond("Keys of arm on frame 20");
+    seen.pose("arm", { move: [2, 0, 0] });
+    fireEvent.click(keyButton());
+    expect(seen.project.actions?.[0].tracks).toContainEqual({
+      piece: "arm",
+      kind: "move",
+      axis: 0,
+      keys: [{ frame: 20, value: 2 }],
+    });
+  });
+
+  it("drops a change that was not keyed when the playhead moves", () => {
+    render(<Harness initial={poseUnits().plain} />);
+    diamond("Keys of arm on frame 30");
+    seen.pose("arm", { turn: [1, 0, 0.5] });
+    expect(isDisabled(keyButton())).toBe(false);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Step forward one frame" }),
+    );
+    expect(isDisabled(keyButton())).toBe(true);
+    expect(seen.offsets.arm?.turn?.[2] ?? 0).not.toBe(0.5);
+    expect(seen.project.actions?.[0].tracks).toBeUndefined();
+  });
+
+  it("drops a change that was not keyed when something plays", () => {
+    render(<Harness initial={poseUnits().plain} />);
+    seen.pose("arm", { turn: [0, 0, 0.5] });
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(seen.offsets.arm).toBeUndefined();
+    expect(isDisabled(keyButton())).toBe(true);
+  });
+
+  it("lets the pose go when the tab goes", () => {
+    const onHold = vi.fn();
+    const { unmount } = render(
+      <Harness initial={poseUnits().plain} onHold={onHold} />,
+    );
+    expect(onHold).toHaveBeenLastCalledWith({});
+    unmount();
+    expect(onHold).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe("typing a key's value", () => {
+  const valueField = () =>
+    screen.getByLabelText("Key value in degrees") as HTMLInputElement;
+
+  it("shows the value of the key picked, in degrees for a turn", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    fireEvent.click(screen.getByRole("button", { name: "Channels of arm" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Turn x of arm, frame 10, -28.6 degrees",
+      }),
+    );
+    expect(valueField().value).toBe("-28.65");
+    expect(screen.getByText(/^Frame 10,/)).toBeTruthy();
+  });
+
+  it("shows a move in elmos", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    fireEvent.click(screen.getByRole("button", { name: "Channels of hatch" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Move y of hatch, frame 15, 3 elmos",
+      }),
+    );
+    expect(
+      (screen.getByLabelText("Key value in elmos") as HTMLInputElement).value,
+    ).toBe("3");
+  });
+
+  it("makes typing a value one edit, turning degrees into radians", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    fireEvent.click(screen.getByRole("button", { name: "Channels of arm" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Turn x of arm, frame 10, -28.6 degrees",
+      }),
+    );
+    const edits = seen.edits;
+    fireEvent.change(valueField(), { target: { value: "45" } });
+    fireEvent.blur(valueField());
+    expect(seen.edits).toBe(edits + 1);
+    const keys = seen.project.actions?.[0].tracks?.[0].keys;
+    expect(keys?.[0].frame).toBe(10);
+    expect(keys?.[0].value).toBeCloseTo(Math.PI / 4, 8);
+  });
+
+  it("changes nothing for text that is not a number, and puts the old value back", () => {
+    render(<Harness initial={trackUnits().staggered} />);
+    fireEvent.click(screen.getByRole("button", { name: "Channels of arm" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Turn x of arm, frame 10, -28.6 degrees",
+      }),
+    );
+    const edits = seen.edits;
+    fireEvent.change(valueField(), { target: { value: "" } });
+    fireEvent.blur(valueField());
+    expect(seen.edits).toBe(edits);
+    expect(valueField().value).toBe("-28.65");
+  });
+
+  it("turns a pose key action into tracks on its first edit", () => {
+    render(<Harness initial={poseUnits().plain} />);
+    fireEvent.click(screen.getByRole("button", { name: "Channels of arm" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Turn x of arm, frame 30, 57.3 degrees",
+      }),
+    );
+    const edits = seen.edits;
+    fireEvent.change(valueField(), { target: { value: "90" } });
+    fireEvent.blur(valueField());
+    expect(seen.edits).toBe(edits + 1);
+    expect(seen.project.actions?.[0].keys).toEqual([]);
+    expect(seen.project.actions?.[0].tracks?.[0].keys[0].value).toBeCloseTo(
+      Math.PI / 2,
+      8,
+    );
   });
 });
 

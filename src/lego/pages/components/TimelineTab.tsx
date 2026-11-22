@@ -17,6 +17,7 @@ import { Button, Input } from "@picoframe/frame";
 import {
   ChevronDown,
   ChevronRight,
+  Diamond,
   FileCode,
   Pause,
   Play,
@@ -47,19 +48,25 @@ import { cn } from "@/lib/utils";
 import { useReduceMotion } from "../../../general/display";
 import {
   actionHooks,
+  actionPoseAt,
   addAction,
   bakeAction,
   blendOf,
+  type ChannelRef,
   FPS,
   isHookTrigger,
+  keyFromPose,
+  poseChanges,
   renameAction,
   STOP_CALLIN,
   setActionBlend,
   setActionLoop,
   setActionTrigger,
+  setKeyValue,
   triggerProblem,
 } from "../../actions";
 import type { LegoAction, LegoProject } from "../../model";
+import type { PoseOffsets } from "../../pose";
 import { markPercent } from "../../scriptMarks";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import {
@@ -97,6 +104,21 @@ interface Props {
   onRunReplaced: () => void;
   /** Opens the Script tab. */
   onShowScript: () => void;
+  /**
+   * The pose the gizmo holds while the tab is paused (#5397). The tab asks for
+   * the action's pose on the playhead's frame to be held, or for none (null)
+   * when something plays. `offsets` is what is held now, with the gizmo's
+   * changes in it.
+   */
+  pose: {
+    offsets: PoseOffsets;
+    onHold: (offsets: PoseOffsets | null) => void;
+  };
+}
+
+/** A key picked on a channel's row, by its place on the ruler. */
+interface PickedKey extends ChannelRef {
+  frame: number;
 }
 
 export function TimelineTab(props: Props) {
@@ -173,6 +195,7 @@ function ActionTimeline({
   scriptFrame,
   onScriptFrameChange,
   onRunReplaced,
+  pose,
 }: Props & { action: LegoAction }) {
   const { t } = useLingui();
   const reduceMotion = useReduceMotion();
@@ -185,13 +208,50 @@ function ActionTimeline({
   const oneShot = baked.end === "hold";
   const last = baked.frames.length - 1;
   const atEnd = active && oneShot && scriptFrame >= last;
-  const playhead = active ? rulerFrame(view, scriptFrame) : 0;
+
+  // While nothing plays the tab is paused on `heldFrame`, and the unit is held
+  // in the action's pose there for the gizmo to change (#5397).
+  const [heldFrame, setHeldFrame] = useState(0);
+  const [picked, setPicked] = useState<PickedKey | null>(null);
+  const held = !playing;
+  const playhead = active
+    ? rulerFrame(view, scriptFrame)
+    : Math.min(heldFrame, view.end);
+
+  const baseline = useMemo(
+    () => (held ? actionPoseAt(action, project, playhead, baked) : null),
+    [held, action, project, playhead, baked],
+  );
+  const changes = useMemo(
+    () =>
+      held ? poseChanges(action, project, playhead, pose.offsets, baked) : [],
+    [held, action, project, playhead, pose.offsets, baked],
+  );
+
+  // Holding is asking pose mode for the baseline again, which drops a change
+  // that was not keyed. It happens when the playhead moves, when something
+  // plays and stops, and when an edit changes the pose under the playhead.
+  const holdRef = useRef(pose.onHold);
+  holdRef.current = pose.onHold;
+  const baselineKey = baseline ? `${playhead}:${JSON.stringify(baseline)}` : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key stands for the baseline
+  useEffect(() => {
+    holdRef.current(baseline);
+  }, [baselineKey]);
+  useEffect(() => () => holdRef.current(null), []);
 
   // Held in refs so the effects below read the latest without running again.
   const activeRef = useRef(active);
   activeRef.current = active;
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const frameRequest = useRef(0);
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      cancelAnimationFrame(frameRequest.current);
+    },
+    [],
+  );
 
   const stop = useCallback(() => {
     onScriptTimeline(null);
@@ -199,6 +259,23 @@ function ActionTimeline({
     onScriptPausedChange(false);
     onScriptFrameChange(0);
   }, [
+    onScriptTimeline,
+    onPlayingChange,
+    onScriptPausedChange,
+    onScriptFrameChange,
+  ]);
+
+  // Stops what plays and holds the pose instead. The tab's own timeline stays
+  // the viewport's, which is how the Animation panel knows the tab has the
+  // viewport and lets go of the run it made, so that an edit made here does not
+  // start that run again.
+  const settle = useCallback(() => {
+    onScriptTimeline(baked);
+    onPlayingChange(false);
+    onScriptPausedChange(false);
+    onScriptFrameChange(0);
+  }, [
+    baked,
     onScriptTimeline,
     onPlayingChange,
     onScriptPausedChange,
@@ -216,21 +293,38 @@ function ActionTimeline({
     else onScriptTimeline(baked);
   }, [baked, stop, onScriptTimeline]);
 
+  // A one shot action that has played to its end stays on its last pose, which
+  // is held now, so that it can be keyed.
+  useEffect(() => {
+    if (!atEnd) return;
+    setHeldFrame(Math.min(baked.frames.length, view.end));
+    settle();
+  }, [atEnd, baked, view, settle]);
+
   /**
-   * Starts the run at `frame`, paused or not. A viewport already playing
-   * something else, or this action again from its start, is stopped for a
-   * tick first, because its clock only starts again from nothing.
+   * Plays the action from `from`. A viewport playing something else is stopped
+   * for a tick first, because its clock only starts again from nothing. The
+   * clock starts a run from the frame it is paused on, so a run that starts
+   * part way in is paused on that frame and let go once the viewport has
+   * drawn it.
    */
-  function run(paused: boolean, frame: number, restart = false) {
+  function play(from: number) {
     clearTimeout(timer.current);
+    cancelAnimationFrame(frameRequest.current);
     const start = () => {
       onScriptTimeline(baked);
-      onScriptPausedChange(paused);
-      onScriptFrameChange(frame);
+      onScriptPausedChange(from > 0);
+      onScriptFrameChange(from);
       onPlayingChange(true);
+      if (from <= 0) return;
+      frameRequest.current = requestAnimationFrame(() => {
+        frameRequest.current = requestAnimationFrame(() =>
+          onScriptPausedChange(false),
+        );
+      });
     };
     if (!active) onRunReplaced();
-    if (playing && (!active || restart)) {
+    if (playing) {
       onPlayingChange(false);
       timer.current = setTimeout(start, 0);
     } else {
@@ -238,24 +332,47 @@ function ActionTimeline({
     }
   }
 
+  /** Pauses where the run has got to, with the unit held in the pose there. */
+  function pause() {
+    cancelAnimationFrame(frameRequest.current);
+    setHeldFrame(rulerFrame(view, scriptFrame));
+    settle();
+  }
+
   function seek(frame: number) {
     const to = Math.min(Math.max(frame, 0), view.end);
-    if (active) {
-      onScriptPausedChange(true);
-      onScriptFrameChange(to);
-    } else {
-      run(true, to);
+    clearTimeout(timer.current);
+    cancelAnimationFrame(frameRequest.current);
+    setHeldFrame(to);
+    if (playing) {
+      if (!active) onRunReplaced();
+      settle();
     }
   }
 
+  const running = active && !scriptPaused && !atEnd;
+
   function togglePlay() {
-    if (atEnd) run(false, 0, true);
-    else if (!active) run(false, 0);
-    else onScriptPausedChange(!scriptPaused);
+    if (running) {
+      pause();
+      return;
+    }
+    // From the end of a one shot action, play it again from the start.
+    play(oneShot && playhead >= baked.frames.length ? 0 : playhead);
   }
 
-  const showsPlaying = active && !scriptPaused && !atEnd;
+  const showsPlaying = running;
   const seconds = playhead / FPS;
+
+  const pickedKey = useMemo(() => {
+    if (!picked) return null;
+    const row = view.rows.find((r) => r.piece.id === picked.piece);
+    const channel = row?.channels.find(
+      (c) => c.kind === picked.kind && c.axis === picked.axis,
+    );
+    const key = channel?.keys.find((k) => k.frame === picked.frame);
+    return row && channel && key ? { row, channel, key } : null;
+  }, [picked, view]);
 
   return (
     <TooltipProvider>
@@ -310,6 +427,43 @@ function ActionTimeline({
               }
             />
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={changes.length === 0}
+            title={t`Key the pieces you changed on this frame`}
+            onClick={() =>
+              onEdit((p) => keyFromPose(p, action.id, playhead, pose.offsets))
+            }
+          >
+            <Diamond size={14} />
+            <Trans>Key</Trans>
+          </Button>
+          {pickedKey ? (
+            <KeyValueField
+              key={`${pickedKey.row.piece.id}-${pickedKey.channel.label}-${pickedKey.key.frame}`}
+              channel={pickedKey.channel.label}
+              piece={pickedKey.row.piece.name}
+              frame={pickedKey.key.frame}
+              turn={pickedKey.channel.kind === "turn"}
+              value={pickedKey.key.value}
+              onCommit={(value) =>
+                onEdit((p) =>
+                  setKeyValue(
+                    p,
+                    action.id,
+                    {
+                      piece: pickedKey.row.piece.id,
+                      kind: pickedKey.channel.kind,
+                      axis: pickedKey.channel.axis,
+                    },
+                    pickedKey.key.frame,
+                    value,
+                  ),
+                )
+              }
+            />
+          ) : null}
           <SettingsPopover project={project} action={action} onEdit={onEdit} />
           <HelpPopover label={t`About the timeline`}>
             <TimelineHelp project={project} action={action} />
@@ -325,6 +479,11 @@ function ActionTimeline({
             onSeek={seek}
             onStep={(delta) => seek(playhead + delta)}
             ariaLabel={t`Scrub the action`}
+            picked={pickedKey ? picked : null}
+            onPick={(key) => {
+              setPicked(key);
+              seek(key.frame);
+            }}
           />
         </div>
       </div>
@@ -342,6 +501,8 @@ function Rows({
   onSeek,
   onStep,
   ariaLabel,
+  picked,
+  onPick,
 }: {
   view: TimelineView;
   action: LegoAction;
@@ -350,6 +511,9 @@ function Rows({
   onSeek: (frame: number) => void;
   onStep: (delta: number) => void;
   ariaLabel: string;
+  picked: PickedKey | null;
+  /** A key on a channel's row was chosen: the playhead goes to it. */
+  onPick: (key: PickedKey) => void;
 }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const toggle = useCallback((id: string) => {
@@ -380,6 +544,8 @@ function Rows({
             open={open}
             frameCount={frameCount}
             onSeek={onSeek}
+            picked={picked}
+            onPick={onPick}
           />
           <div
             aria-hidden
@@ -520,11 +686,15 @@ const TrackRows = memo(function TrackRows({
   open,
   frameCount,
   onSeek,
+  picked,
+  onPick,
 }: {
   view: TimelineView;
   open: ReadonlySet<string>;
   frameCount: number;
   onSeek: (frame: number) => void;
+  picked: PickedKey | null;
+  onPick: (key: PickedKey) => void;
 }) {
   return (
     <>
@@ -532,7 +702,7 @@ const TrackRows = memo(function TrackRows({
         <div key={row.piece.id} className="flex flex-col">
           <Track
             frameCount={frameCount}
-            onSeek={onSeek}
+            onPick={onSeek}
             keys={row.frames.map((frame) => ({
               frame,
               name: pieceKeyName(row, frame),
@@ -545,7 +715,21 @@ const TrackRows = memo(function TrackRows({
                 <Track
                   key={`${channel.kind}-${channel.axis}`}
                   frameCount={frameCount}
-                  onSeek={onSeek}
+                  onPick={(frame) =>
+                    onPick({
+                      piece: row.piece.id,
+                      kind: channel.kind,
+                      axis: channel.axis,
+                      frame,
+                    })
+                  }
+                  pickedFrame={
+                    picked?.piece === row.piece.id &&
+                    picked.kind === channel.kind &&
+                    picked.axis === channel.axis
+                      ? picked.frame
+                      : null
+                  }
                   keys={channel.keys.map((key) => ({
                     frame: key.frame,
                     name: channelKeyName(row, channel, key),
@@ -567,7 +751,8 @@ function Track({
   wraps,
   lastKey,
   frameCount,
-  onSeek,
+  onPick,
+  pickedFrame = null,
 }: {
   keys: { frame: number; name: string }[];
   /** Where a loop arrives back at the first keys, drawn as an outline. */
@@ -575,7 +760,10 @@ function Track({
   /** Where the lap ends, drawn as a dashed line, when the action loops. */
   lastKey: number | null;
   frameCount: number;
-  onSeek: (frame: number) => void;
+  /** A key was clicked. The playhead goes to it. */
+  onPick: (frame: number) => void;
+  /** The frame of the key chosen on this row, which is drawn ringed. */
+  pickedFrame?: number | null;
 }) {
   return (
     <div className="relative h-7 border-b border-border/40">
@@ -600,13 +788,85 @@ function Track({
           type="button"
           aria-label={key.name}
           title={key.name}
-          onClick={() => onSeek(key.frame)}
+          aria-pressed={
+            pickedFrame === null ? undefined : pickedFrame === key.frame
+          }
+          onClick={() => onPick(key.frame)}
           className="absolute top-0.5 flex size-6 -translate-x-1/2 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           style={{ left: `${markPercent(key.frame, frameCount)}%` }}
         >
-          <span className="block size-2.5 rotate-45 bg-primary" />
+          <span
+            className={cn(
+              "block size-2.5 rotate-45 bg-primary",
+              pickedFrame === key.frame && "ring-2 ring-foreground",
+            )}
+          />
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The value of the key picked on a channel's row: degrees for a turn, elmos for
+ * a move. Typing one and leaving the field, or pressing Enter, is one edit.
+ */
+function KeyValueField({
+  channel,
+  piece,
+  frame,
+  turn,
+  value,
+  onCommit,
+}: {
+  channel: string;
+  piece: string;
+  frame: number;
+  turn: boolean;
+  /** Radians for a turn, elmos for a move. */
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const { t } = useLingui();
+  const shown = String(
+    Math.round((turn ? (value * 180) / Math.PI : value) * 100) / 100,
+  );
+  const [text, setText] = useState(shown);
+  useEffect(() => setText(shown), [shown]);
+
+  function commit() {
+    const typed = Number(text);
+    if (text.trim() === "" || !Number.isFinite(typed)) {
+      setText(shown);
+      return;
+    }
+    if (String(typed) === shown) return;
+    onCommit(turn ? (typed * Math.PI) / 180 : typed);
+  }
+
+  return (
+    <div className="flex items-center gap-1 text-xs">
+      <span className="text-muted-foreground">
+        <Trans>
+          {channel} of {piece}, frame {frame}
+        </Trans>
+      </span>
+      <Input
+        type="number"
+        step={turn ? 1 : 0.1}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") setText(shown);
+        }}
+        aria-label={turn ? t`Key value in degrees` : t`Key value in elmos`}
+        className="h-7 w-20 text-xs"
+      />
+      <span className="text-muted-foreground">
+        {turn ? t`degrees` : t`elmos`}
+      </span>
     </div>
   );
 }
@@ -781,6 +1041,14 @@ function TimelineHelp({
           Each row is a piece the action moves, and each diamond is a frame
           where it has a key. Open a row to see its turns and moves one by one.
           Drag the ruler to scrub the motion.
+        </Trans>
+      </p>
+      <p>
+        <Trans>
+          To make a key, pause on a frame, move a piece with the gizmo, and
+          press Key. Every turn and move you changed gets a key on that frame.
+          Moving the ruler drops a change you have not keyed. Pick a key on a
+          turn or move row to type its value.
         </Trans>
       </p>
       <p>

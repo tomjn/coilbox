@@ -2011,6 +2011,10 @@ msgstr "{changed} από {buildings, plural, one {# κτίριο} other {# κτ�
 msgid "{changes}, so nothing in it can be placed"
 msgstr "{changes}, οπότε τίποτα σε αυτό δεν μπορεί να τοποθετηθεί"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "{channel} of {piece}, frame {frame}"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "{cheapest} salvage"
@@ -19554,6 +19558,10 @@ msgstr "Ορίζει το υψόμετρο του εδάφους. Μια εικ�
 msgid "Defs this shape"
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "degrees"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "degrees, for the next recalculation"
@@ -21486,6 +21494,7 @@ msgstr "Ελλειψοειδές"
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "elmos"
 msgstr "elmos"
@@ -28131,6 +28140,10 @@ msgstr "Διατηρήθηκε το υπάρχον .cob, δεν αντικατα
 msgid "Kept, because they were changed after the last export:"
 msgstr "Διατηρήθηκαν, επειδή άλλαξαν μετά την τελευταία εξαγωγή:"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key"
+msgstr ""
+
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
 msgid "key (optional)"
@@ -28140,6 +28153,18 @@ msgstr "κλειδί (προαιρετικό)"
 #, fuzzy
 msgid "Key {key}"
 msgstr "Πλήκτρο {key}"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key the pieces you changed on this frame"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in degrees"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in elmos"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -53408,6 +53433,10 @@ msgstr "Στη δράση"
 #, fuzzy
 msgid "to allies"
 msgstr "προς συμμάχους"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "To make a key, pause on a frame, move a piece with the gizmo, and press Key. Every turn and move you changed gets a key on that frame. Moving the ruler drops a change you have not keyed. Pick a key on a turn or move row to type its value."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
