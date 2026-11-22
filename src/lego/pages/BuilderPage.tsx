@@ -2,7 +2,6 @@ import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input, useHideSidebar } from "@picoframe/frame";
 import {
-  Blocks,
   Bone,
   ChevronDown,
   ChevronRight,
@@ -317,6 +316,7 @@ import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import type { TileDrag } from "./components/TileGrid";
 import { TransformFields } from "./components/TransformFields";
+import { UnitCard } from "./components/UnitCard";
 import { UnitGamePicker } from "./components/UnitGamePicker";
 import { useBuiltUnitDef } from "./components/useBuiltUnitDef";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
@@ -2574,17 +2574,13 @@ function Builder({ id }: { id: string | undefined }) {
                 showFreeFaces={showFreeFaces}
                 onReferenceUnit={setReferenceUnit}
                 ground={ground}
-                chrome={
+                chrome={(fourViews) => (
                   <>
-                    <div className="pointer-events-none flex flex-wrap items-start justify-between gap-3 group-data-[four-views]/overlay:flex-col">
-                      <div
-                        data-testid="unit-card"
-                        className="pointer-events-auto flex max-w-full min-w-56 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur"
-                      >
-                        <Blocks
-                          size={16}
-                          className="shrink-0 text-muted-foreground"
-                        />
+                    <div className="pointer-events-none flex flex-wrap items-start justify-between gap-3">
+                      {/* In four views the card is one line in the band along
+                          the top (#5410): the unit's name, with the rest of the
+                          card a click away. */}
+                      <UnitCard compact={fourViews} name={draft.name}>
                         <div className="min-w-0">
                           <Input
                             value={draft.name}
@@ -2630,13 +2626,13 @@ function Builder({ id }: { id: string | undefined }) {
                             moduleNames={moduleNames}
                           />
                         </div>
-                      </div>
+                      </UnitCard>
 
                       {/* Icons only, and no card behind them: the same viewport
                     chrome as the toolbars in the other corners, rather than a
                     panel of labelled buttons sitting on top of the model. */}
                       <TooltipProvider delayDuration={300}>
-                        <div className="pointer-events-auto ml-auto flex items-center gap-2 group-data-[four-views]/overlay:ml-0 group-data-[four-views]/overlay:flex-wrap">
+                        <div className="pointer-events-auto ml-auto flex items-center gap-2">
                           <ButtonGroup>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -2875,7 +2871,7 @@ function Builder({ id }: { id: string | undefined }) {
 
                     <ProblemErrors problems={problems} />
                   </>
-                }
+                )}
                 document={{
                   pack,
                   raw,

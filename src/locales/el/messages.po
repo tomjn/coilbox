@@ -10815,7 +10815,7 @@ msgstr "Σκόπευση"
 
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/AimPointPanel.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Aim point"
@@ -11565,7 +11565,7 @@ msgstr "Ανάλυση και εγγραφή"
 msgid "Analysis paused"
 msgstr "Η ανάλυση σε παύση"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Anchors"
 msgstr "Άγκυρες"
@@ -18108,7 +18108,7 @@ msgstr "Αντιγραφή {name}…"
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
 msgstr "Η αντιγραφή της εξόδου πάνω στο παιχνίδι δεν αρκεί από μόνη της: η μηχανή δοκιμάζει το <0>.3do</0> πριν από το <1>.s3o</1> για μονάδα της οποίας το <2>objectname</2> δεν έχει επέκταση, οπότε συνεχίζει να φορτώνει τα παλιά μοντέλα όσο υπάρχουν και τα δύο. Τα αρχικά αρχεία <3>.3do</3> πρέπει να αφαιρεθούν, και κάθε ορισμός μονάδας που γράφει <4>.3do</4> στο <5>objectname</5> του πρέπει επίσης να το αφαιρέσει."
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Corners"
 msgstr "Γωνίες"
@@ -22677,7 +22677,7 @@ msgstr "Αποσυμπίεση…"
 msgid "Extraction depth"
 msgstr "Βάθος εξόρυξης"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Faces"
 msgstr "Όψεις"
@@ -25146,7 +25146,7 @@ msgid "Guard"
 msgstr "Φύλαξη"
 
 #: src/lego/pages/components/GuidesPopover.tsx
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Guides"
@@ -37861,7 +37861,7 @@ msgstr "Τμήμα"
 msgid "piece {position}"
 msgstr "τμήμα {position}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Piece boxes"
 msgstr "Πλαίσια τμημάτων"
@@ -54085,7 +54085,7 @@ msgstr "Περιστρέφει και ανυψώνει ένα μόνο τμήμ�
 msgid "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate."
 msgstr "Περιστρέφει κάθε τροχό με την ταχύτητα της μονάδας διά την ακτίνα του τροχού, ανάποδα όταν κάνει όπισθεν. Ένας τροχός χωρίς στρογγυλό σχήμα για μέτρηση περιστρέφεται με σταθερό ρυθμό."
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Turns here"
 msgstr "Περιστρέφεται εδώ"
@@ -54564,6 +54564,11 @@ msgstr "Ορισμοί μονάδων: {defsError}"
 msgid "Unit destroyed, {when}"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Unit details"
+msgstr "Λεπτομέρειες μονάδας"
+
 #: src/content/pages/components/ReplayMapUnits.tsx
 msgid "Unit drawing"
 msgstr ""
@@ -54688,7 +54693,7 @@ msgstr "τύποι μονάδων"
 msgid "Unit values"
 msgstr "Τιμές μονάδας"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Unit volume"
 msgstr "Όγκος μονάδας"
@@ -56161,7 +56166,7 @@ msgstr "το όπλο {slotNumber} βάλλει με το αντίγραφο"
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr "Όπλο {slotNumber}, {slotName}"
 
-#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/ViewKey.tsx
 #, fuzzy
 msgid "Weapon {weaponNumber}"
 msgstr "Όπλο {weaponNumber}"

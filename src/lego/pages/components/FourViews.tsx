@@ -4,14 +4,15 @@
  * with its name.
  *
  * The scene draws the quadrants. This only marks them out, so the frames let
- * every click through to the canvas except on the names.
+ * every click through to the canvas except on the names. The bands the chrome
+ * sits in round them are solid and take their own clicks, so a press beside a
+ * button never reaches a view it is not over (#5410).
  */
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Grid2x2 } from "lucide-react";
-import type { ReactNode } from "react";
-import { overlayInset, QUADRANTS, type Quadrant } from "../../quadViews";
+import { QUADRANTS, type Quadrant, type ViewBands } from "../../quadViews";
 import { useShortcutOverrides } from "../../shortcutOverridesStore";
 import { shortcutLabel } from "../../shortcuts";
 
@@ -43,30 +44,6 @@ export function FourViewsButton({
   );
 }
 
-/**
- * The box the unit's overlays are laid out in: the whole view, or the
- * perspective quadrant while four views are on (#5402). Its descendants can
- * adapt to the smaller box with `group-data-[four-views]/overlay:`.
- */
-export function ViewportOverlay({
-  fourViews,
-  children,
-}: {
-  fourViews: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      data-overlay
-      data-four-views={fourViews || undefined}
-      style={overlayInset(fourViews)}
-      className="group/overlay pointer-events-none absolute z-10 flex flex-col gap-3"
-    >
-      {children}
-    </div>
-  );
-}
-
 /** Where each quadrant's name sits: in the corner nearest the middle of the
  *  canvas, clear of the chrome round its edges. */
 const NAME_CORNER: Record<Quadrant, string> = {
@@ -78,10 +55,14 @@ const NAME_CORNER: Record<Quadrant, string> = {
 
 export function QuadrantFrames({
   active,
+  bands,
   onMaximise,
 }: {
   /** The quadrant that has the controls. */
   active: Quadrant;
+  /** What the chrome takes off the canvas's edges. The quadrants fill the
+   *  rest. */
+  bands: ViewBands;
   onMaximise: (id: Quadrant) => void;
 }) {
   const { t } = useLingui();
@@ -93,34 +74,54 @@ export function QuadrantFrames({
     perspective: t({ message: "Perspective", context: "view" }),
   };
   return (
-    <div className="pointer-events-none absolute inset-0 grid grid-cols-2 grid-rows-2">
-      {QUADRANTS.map((id) => (
-        <div
-          key={id}
-          data-quadrant={id}
-          data-active={id === active || undefined}
-          className={cn(
-            "relative border",
-            id === active ? "border-primary" : "border-border/60",
-          )}
-        >
-          <button
-            type="button"
-            title={t`Double click to fill the view`}
-            onDoubleClick={() => onMaximise(id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") onMaximise(id);
-            }}
+    <>
+      <div
+        data-band="top"
+        className="absolute inset-x-0 top-0 bg-background"
+        style={{ height: bands.top }}
+      />
+      <div
+        data-band="bottom"
+        className="absolute inset-x-0 bottom-0 bg-background"
+        style={{ height: bands.bottom }}
+      />
+      <div
+        data-band="left"
+        className="absolute left-0 bg-background"
+        style={{ top: bands.top, bottom: bands.bottom, width: bands.left }}
+      />
+      <div
+        className="pointer-events-none absolute right-0 grid grid-cols-2 grid-rows-2"
+        style={{ top: bands.top, bottom: bands.bottom, left: bands.left }}
+      >
+        {QUADRANTS.map((id) => (
+          <div
+            key={id}
+            data-quadrant={id}
+            data-active={id === active || undefined}
             className={cn(
-              "pointer-events-auto absolute rounded bg-background/70 px-1.5 py-0.5 text-xs backdrop-blur focus-visible:outline-2 focus-visible:outline-ring",
-              NAME_CORNER[id],
-              id === active && "text-primary",
+              "relative border",
+              id === active ? "border-primary" : "border-border/60",
             )}
           >
-            {names[id]}
-          </button>
-        </div>
-      ))}
-    </div>
+            <button
+              type="button"
+              title={t`Double click to fill the view`}
+              onDoubleClick={() => onMaximise(id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") onMaximise(id);
+              }}
+              className={cn(
+                "pointer-events-auto absolute rounded bg-background/70 px-1.5 py-0.5 text-xs backdrop-blur focus-visible:outline-2 focus-visible:outline-ring",
+                NAME_CORNER[id],
+                id === active && "text-primary",
+              )}
+            >
+              {names[id]}
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

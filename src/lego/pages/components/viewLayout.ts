@@ -20,6 +20,7 @@ import {
   type Quadrant,
   quadrantAt,
   quadrantRects,
+  type ViewBands,
   type ViewRect,
 } from "../../quadViews";
 import {
@@ -46,6 +47,10 @@ export interface QuadLayout {
   rects: Record<Quadrant, ViewRect>;
   /** The quadrant that has the controls and the gizmo. */
   active: Quadrant;
+  /** What the top, front and side views framed when the layout opened, to
+   *  frame again once the chrome's bands are measured, since the views were
+   *  first shaped by the whole canvas. Null once that is done. */
+  refit: THREE.Box3 | null;
 }
 
 /**
@@ -198,7 +203,7 @@ function sizeQuadrants(state: SceneState) {
   if (!quad) return;
   // Kept, since handing the controls back below reads it.
   quad.views[quad.active].target.copy(state.controls.target);
-  quad.rects = quadrantRects(state.size.width, state.size.height);
+  quad.rects = quadrantRects(state.size.width, state.size.height, state.bands);
   for (const id of QUADRANTS) {
     const rect = quad.rects[id];
     const aspect = rect.width / Math.max(rect.height, 1);
@@ -219,6 +224,22 @@ export function sizeViews(state: SceneState, width: number, height: number) {
   state.size = { width, height };
   if (state.quad) sizeQuadrants(state);
   else sizeCameras(state, width, height);
+}
+
+/**
+ * The chrome round the four view layout takes `bands` off the canvas's edges,
+ * so size every quadrant to what is left. The first measure after the layout
+ * opens frames the top, front and side views again, in their final shape.
+ */
+export function setViewBands(state: SceneState, bands: ViewBands) {
+  state.bands = bands;
+  const quad = state.quad;
+  if (!quad) return;
+  sizeQuadrants(state);
+  if (quad.refit) {
+    fitQuadrants(state, quad.refit);
+    quad.refit = null;
+  }
 }
 
 /**
@@ -254,8 +275,9 @@ export function setFourViews(state: SceneState, on: boolean, box: THREE.Box3) {
         target: state.controls.target.clone(),
       },
     },
-    rects: quadrantRects(state.size.width, state.size.height),
+    rects: quadrantRects(state.size.width, state.size.height, state.bands),
     active: "perspective",
+    refit: box.clone(),
   };
   sizeQuadrants(state);
   syncOrthographicLimits(state);

@@ -91,9 +91,15 @@ vi.mock("../useRawGeometry", () => ({
   }),
 }));
 
-// Draws its `chrome`, which is the toolbar over the view.
+// Draws its `chrome`, which is the toolbar over the view, in one view or in
+// four as a test sets.
+const layout = { fourViews: false };
 vi.mock("./components/ModelViewport", () => ({
-  ModelViewport: ({ chrome }: { chrome?: React.ReactNode }) => chrome,
+  ModelViewport: ({
+    chrome,
+  }: {
+    chrome?: (fourViews: boolean) => React.ReactNode;
+  }) => chrome?.(layout.fourViews),
 }));
 
 // Reads the app's own settings store for its target engine, which nothing
@@ -254,6 +260,7 @@ function show(project: LegoProject, selectedId?: string) {
 }
 
 beforeEach(() => {
+  layout.fourViews = false;
   localStorage.clear();
   packLoad = loadedPack();
   loadedRaw = null;
@@ -286,6 +293,24 @@ describe("the unit info card (#5403)", () => {
     expect(text.className).toContain("min-w-0");
     // The row lets the toolbar drop below the card rather than squeeze it.
     expect(card.parentElement?.className).toContain("flex-wrap");
+  });
+});
+
+describe("the unit info card in four views (#5410)", () => {
+  it("is one line with the unit's name, and opens the rest of the card from it", async () => {
+    layout.fourViews = true;
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    const card = screen.getByTestId("unit-card");
+    expect(card.textContent).toBe("walker");
+    expect(screen.queryByLabelText("Export name")).toBeNull();
+    expect(screen.queryByLabelText("Unit name")).toBeNull();
+
+    fireEvent.click(card);
+    expect(await screen.findByLabelText("Export name")).toBeTruthy();
+    expect((screen.getByLabelText("Unit name") as HTMLInputElement).value).toBe(
+      "walker",
+    );
   });
 });
 
