@@ -1988,6 +1988,10 @@ msgstr "{changed} z {buildings, plural, one {# budynku} few {# budynków} many {
 msgid "{changes}, so nothing in it can be placed"
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "{channel} of {piece}, frame {frame}"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "{cheapest} salvage"
@@ -19420,6 +19424,10 @@ msgstr "Określa wysokość terenu. Obraz w skali szarości, w którym <0>biały
 msgid "Defs this shape"
 msgstr ""
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "degrees"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "degrees, for the next recalculation"
@@ -21349,6 +21357,7 @@ msgstr "Elipsoida"
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
+#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "elmos"
 msgstr "elmo"
@@ -27957,6 +27966,10 @@ msgstr "Zachowano istniejący plik .cob, bez nadpisywania."
 msgid "Kept, because they were changed after the last export:"
 msgstr "Zachowano, bo zostały zmienione po ostatnim eksporcie:"
 
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key"
+msgstr ""
+
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
 msgid "key (optional)"
@@ -27966,6 +27979,18 @@ msgstr "klucz (opcjonalnie)"
 #, fuzzy
 msgid "Key {key}"
 msgstr "Klawisz {key}"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key the pieces you changed on this frame"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in degrees"
+msgstr ""
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "Key value in elmos"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -53049,6 +53074,10 @@ msgstr "Do akcji"
 #, fuzzy
 msgid "to allies"
 msgstr "do sojuszników"
+
+#: src/lego/pages/components/TimelineTab.tsx
+msgid "To make a key, pause on a frame, move a piece with the gizmo, and press Key. Every turn and move you changed gets a key on that frame. Moving the ruler drops a change you have not keyed. Pick a key on a turn or move row to type its value."
+msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
