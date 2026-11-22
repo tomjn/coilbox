@@ -45394,6 +45394,11 @@ msgstr "Auf {elmos} Elmos eingerastet, {units} Rastereinheiten"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Eingerastet. Alt halten für freie Platzierung"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "Einrasten"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53407,6 +53412,11 @@ msgstr "Drehrate {turnValue}, aus der Definition des Spiels."
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Drehrate {turnValue}, keine gesetzt, also das Minimum der Engine."
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "Einrasten ein- oder ausschalten"
 
 #: src/lego/animPresets.ts
 #, fuzzy

@@ -37256,6 +37256,10 @@ msgstr "Snapped to {elmos} elmos, {units} units"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "Snapped. Hold Alt to place freely"
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Snapping"
+msgstr "Snapping"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "snapshot"
 msgstr "snapshot"
@@ -43831,6 +43835,10 @@ msgstr "Turn rate {turnValue}, from the game's definition."
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "Turn rate {turnValue}, none set, so the engine's least."
+
+#: src/lego/shortcuts.ts
+msgid "Turn snapping on or off"
+msgstr "Turn snapping on or off"
 
 #: src/lego/animPresets.ts
 msgid "Turn speed"

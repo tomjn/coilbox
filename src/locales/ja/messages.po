@@ -45394,6 +45394,11 @@ msgstr "{elmos} elmo、{units} グリッド単位にスナップしました"
 msgid "Snapped. Hold Alt to place freely"
 msgstr "スナップしました。Alt を押しながらで自由に配置"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "Snapping"
+msgstr "スナップ"
+
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
 msgid "snapshot"
@@ -53407,6 +53412,11 @@ msgstr "旋回速度 {turnValue}（ゲームの定義から）。"
 #, fuzzy
 msgid "Turn rate {turnValue}, none set, so the engine's least."
 msgstr "旋回速度 {turnValue}。未設定のため、エンジンの最小値です。"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Turn snapping on or off"
+msgstr "スナップのオンとオフを切り替える"
 
 #: src/lego/animPresets.ts
 #, fuzzy
