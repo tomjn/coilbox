@@ -9,6 +9,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { getLocale } from "@/i18n";
 import { CheckField, Field } from "../../../components/Field";
+import { HelpPopover } from "../../../components/HelpPopover";
 import { OptionSelect } from "../../../components/OptionSelect";
 import { useUnitDefs } from "../../../workshop/config";
 import { bankingKeys, withEngineBanking } from "../../banking";
@@ -229,9 +230,21 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
   const gameNameShown = game?.name ?? "";
   return (
     <div className="flex flex-col gap-2 border-b border-border/60 px-3 py-2">
-      <p className="text-sm font-medium">
-        <Trans>Movement</Trans>
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="text-sm font-medium">
+          <Trans>Movement</Trans>
+        </p>
+        {movement?.flies ? (
+          <HelpPopover label={t`About banking`}>
+            <p>
+              <Trans>
+                The engine banks aircraft, not the script. The preview's roll
+                illustrates these keys.
+              </Trans>
+            </p>
+          </HelpPopover>
+        ) : null}
+      </div>
       {state.state === "no-game" ? (
         <p className="text-xs text-muted-foreground">{state.reason}</p>
       ) : state.state === "loading" ? (
@@ -424,12 +437,6 @@ export function MovementSection({ project, bounds, onMovementChange }: Props) {
           </Field>
           {movement.flies ? (
             <>
-              <p className="text-xs text-muted-foreground">
-                <Trans>
-                  The engine banks aircraft, not the script. The preview's roll
-                  illustrates these keys.
-                </Trans>
-              </p>
               {bankingKeys(movement.flies).map((entry) => {
                 const { key } = entry;
                 const engineDefault = entry.engineDefault;
