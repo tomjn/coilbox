@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clampAsideWidth,
+  clampDetailsHeight,
   clampPanelHeight,
   KEEP_VIEW,
+  KEEP_VIEW_WIDTH,
+  MIN_ASIDE_WIDTH,
+  MIN_DETAILS_HEIGHT,
   MIN_PANEL_HEIGHT,
+  MIN_TREE_HEIGHT,
+  maxAsideWidth,
+  maxDetailsHeight,
   panelHeightFrom,
   panelOpenFrom,
   STRIP_HEIGHT,
@@ -64,5 +72,53 @@ describe("clampPanelHeight", () => {
 
   it("rounds, since a drag lands on fractional pixels", () => {
     expect(clampPanelHeight(300.6, 800)).toBe(301);
+  });
+});
+
+describe("clampAsideWidth", () => {
+  it("leaves a width the window can show alone", () => {
+    expect(clampAsideWidth(400, 1600)).toBe(400);
+  });
+
+  it("never goes narrower than the panel was before it could be dragged", () => {
+    expect(clampAsideWidth(100, 1600)).toBe(MIN_ASIDE_WIDTH);
+    expect(clampAsideWidth(-5, 1600)).toBe(MIN_ASIDE_WIDTH);
+  });
+
+  it("leaves the model view its width at the far end of a drag", () => {
+    expect(clampAsideWidth(10_000, 1600)).toBe(1600 - KEEP_VIEW_WIDTH);
+    expect(maxAsideWidth(1600)).toBe(1600 - KEEP_VIEW_WIDTH);
+  });
+
+  it("gives the panel its floor in a window too narrow for both", () => {
+    expect(clampAsideWidth(500, 700)).toBe(MIN_ASIDE_WIDTH);
+    expect(maxAsideWidth(0)).toBe(MIN_ASIDE_WIDTH);
+  });
+
+  it("rounds, since a drag lands on fractional pixels", () => {
+    expect(clampAsideWidth(400.4, 1600)).toBe(400);
+  });
+});
+
+describe("clampDetailsHeight", () => {
+  it("leaves a height the column can show alone", () => {
+    expect(clampDetailsHeight(300, 800)).toBe(300);
+  });
+
+  it("stops short of details with only their header", () => {
+    expect(clampDetailsHeight(0, 800)).toBe(MIN_DETAILS_HEIGHT);
+  });
+
+  it("leaves the tree its minimum at the far end of a drag", () => {
+    expect(clampDetailsHeight(10_000, 800)).toBe(800 - MIN_TREE_HEIGHT);
+    expect(maxDetailsHeight(800)).toBe(800 - MIN_TREE_HEIGHT);
+  });
+
+  it("gives the details their floor in a column too short for both", () => {
+    expect(clampDetailsHeight(400, 200)).toBe(MIN_DETAILS_HEIGHT);
+  });
+
+  it("rounds, since a drag lands on fractional pixels", () => {
+    expect(clampDetailsHeight(300.6, 800)).toBe(301);
   });
 });
