@@ -299,8 +299,8 @@ export function BuildPictureDrawer({
                   </p>
                   <p className="text-xs text-muted-foreground">
                     <Trans>
-                      Saved with the unit. Exporting writes it into the game
-                      as {pictureFile}, its build menu picture.
+                      Saved with the unit. Exporting writes it into the game as{" "}
+                      {pictureFile}, its build menu picture.
                     </Trans>
                   </p>
                   {storedPath ? (
