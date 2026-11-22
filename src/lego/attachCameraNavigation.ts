@@ -1,3 +1,4 @@
+import { MOUSE } from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { mouseButtonsFor, type NavigationPreset } from "./cameraNavigation";
@@ -17,24 +18,38 @@ const NO_KEYS = {
  *
  * Call it before the `OrbitControls` is made, so this listener runs first on
  * the same element. `getControls` is read on each press, so it can return
- * nothing until the controls exist. Returns a function that removes the
- * listeners.
+ * nothing until the controls exist. `canOrbit` is read on each press too, and
+ * where it says no, the orbit button pans instead: the top, front and side
+ * views of the four view layout pan and zoom but never turn. Returns a
+ * function that removes the listeners.
  */
 export function attachCameraNavigation(
   element: HTMLElement,
   getControls: () => Pick<OrbitControls, "mouseButtons"> | undefined,
   getPreset: () => NavigationPreset,
+  canOrbit: () => boolean = () => true,
 ): () => void {
   const onDown = (event: PointerEvent) => {
     const controls = getControls();
     if (!controls || event.pointerType === "touch") return;
-    controls.mouseButtons = mouseButtonsFor(getPreset(), {
+    const buttons = mouseButtonsFor(getPreset(), {
       button: event.button,
       ctrl: event.ctrlKey,
       shift: event.shiftKey,
       alt: event.altKey,
       meta: event.metaKey,
     });
+    if (!canOrbit()) {
+      // OrbitControls swaps rotate and pan while Ctrl, Command or Shift is
+      // held, so which entry means "orbit" depends on them.
+      const swapped = event.ctrlKey || event.metaKey || event.shiftKey;
+      const orbit = swapped ? MOUSE.PAN : MOUSE.ROTATE;
+      const pan = swapped ? MOUSE.ROTATE : MOUSE.PAN;
+      for (const key of ["LEFT", "MIDDLE", "RIGHT"] as const) {
+        if (buttons[key] === orbit) buttons[key] = pan;
+      }
+    }
+    controls.mouseButtons = buttons;
   };
   const onEnd = () => {
     const controls = getControls();
