@@ -7,12 +7,20 @@
 
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  type CameraMove,
+  type NavigationControl,
+  type NavigationPreset,
+  navigationControls,
+} from "../../cameraNavigation";
+import { useNavigationPreset } from "../../cameraNavigationStore";
 import {
   comboLabel,
   isMac,
@@ -29,6 +37,40 @@ function groupLabel(group: ShortcutGroup): string {
   return t`Help`;
 }
 
+function moveLabel(move: CameraMove): string {
+  if (move === "orbit") return t`Orbit`;
+  if (move === "pan") return t`Pan`;
+  return t`Zoom`;
+}
+
+function buttonLabel(button: NavigationControl["button"]): string {
+  if (button === "left") return t`Left drag`;
+  if (button === "middle") return t`Middle drag`;
+  if (button === "right") return t`Right drag`;
+  return t`Wheel`;
+}
+
+function keyLabel(key: "ctrl" | "shift" | "alt"): string {
+  if (key === "ctrl") return "Ctrl";
+  if (key === "shift") return "Shift";
+  return "Alt";
+}
+
+/** What to press for a mouse control, e.g. "Shift + Middle drag". */
+export function navigationLabel(control: NavigationControl): string {
+  return [...control.keys.map(keyLabel), buttonLabel(control.button)].join(
+    " + ",
+  );
+}
+
+function presetLabel(preset: NavigationPreset): string {
+  if (preset === "blender") return "Blender";
+  if (preset === "3dsmax") return "3ds Max";
+  return t`Coilbox`;
+}
+
+const PRESETS: NavigationPreset[] = ["coilbox", "blender", "3dsmax"];
+
 export function ShortcutSheet({
   open,
   onOpenChange,
@@ -37,6 +79,7 @@ export function ShortcutSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const mac = isMac();
+  const [preset, setPreset] = useNavigationPreset();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,6 +119,43 @@ export function ShortcutSheet({
               </ul>
             </div>
           ))}
+          <div>
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Trans>Camera</Trans>
+            </h3>
+            <div className="mt-1 flex items-center justify-between gap-4 text-sm">
+              <span>
+                <Trans>Camera navigation</Trans>
+              </span>
+              <OptionSelect
+                className="w-40"
+                size="sm"
+                ariaLabel={t`Camera navigation`}
+                value={preset}
+                onValueChange={(value) => {
+                  const next = PRESETS.find((p) => p === value);
+                  if (next) setPreset(next);
+                }}
+                options={PRESETS.map((p) => ({
+                  value: p,
+                  label: presetLabel(p),
+                }))}
+              />
+            </div>
+            <ul className="mt-2 flex flex-col gap-1">
+              {navigationControls(preset).map((control) => (
+                <li
+                  key={navigationLabel(control)}
+                  className="flex items-center justify-between gap-4 text-sm"
+                >
+                  <span>{moveLabel(control.move)}</span>
+                  <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    {navigationLabel(control)}
+                  </kbd>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
