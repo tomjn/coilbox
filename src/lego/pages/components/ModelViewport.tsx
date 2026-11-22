@@ -47,8 +47,11 @@ import {
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { attachWheelRelease } from "@/lib/wheelRelease";
 import { useReduceMotion } from "../../../general/display";
+import { attachCameraNavigation } from "../../attachCameraNavigation";
 import { type BalanceResult, balanceSummary } from "../../balance";
 import type { BodyPlan } from "../../bodyPlans";
+import { mouseButtonsFor } from "../../cameraNavigation";
+import { getNavigationPreset } from "../../cameraNavigationStore";
 import {
   buildFrontMarker,
   buildGround,
@@ -1226,7 +1229,16 @@ export function ModelViewport({
         MIN_FAR,
       );
 
+      // Before the controls exist, so its pointerdown listener runs first and
+      // the buttons are set by the time OrbitControls reads them.
+      let navigationControls: OrbitControls | undefined;
+      const detachNavigation = attachCameraNavigation(
+        renderer.domElement,
+        () => navigationControls,
+        getNavigationPreset,
+      );
       const controls = new OrbitControls(camera, renderer.domElement);
+      navigationControls = controls;
       controls.maxPolarAngle = ORBIT_MAX_POLAR;
       controls.minDistance = 1;
       controls.maxDistance = MIN_MAX_DISTANCE;
@@ -1523,6 +1535,7 @@ export function ModelViewport({
           cancelAnimationFrame(frame);
           detachWheel();
           detachPointerHandlers();
+          detachNavigation();
           controls.removeEventListener("change", onControlsChange);
           controls.dispose();
           gizmo.detach();
