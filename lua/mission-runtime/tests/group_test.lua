@@ -676,6 +676,189 @@ check("a released group is not ordered", select(2, lastOrder(kept)) == afterRele
 pursuit.env.Spring.DestroyUnit(replacement)
 
 --------------------------------------------------------------------------------
+-- Conditions about a group: group_dead, and the `group` and `all` parameters of
+-- units_in_zone and unit_count (issue #5292).
+--
+-- Every trigger repeats, so each reading says which conditions hold right then.
+-- group_dead is event driven and the other two poll, so a death is read from the
+-- events it raised and a position from the polled tick.
+--------------------------------------------------------------------------------
+
+do
+	local function watching(id, kind, params)
+		return {
+			id = id,
+			enabled = true,
+			["repeat"] = true,
+			conditions = { op = "all", conditions = { { type = kind, params = params } } },
+			actions = { { type = "probe", params = { mark = id } } },
+		}
+	end
+
+	local watched = compiled({
+		teams = { player = { team = 0 }, enemy = { team = 1 } },
+		zones = {
+			{ id = "pad", name = "Pad", shape = "box", min = { x = 0, z = 0 }, max = { x = 200, z = 200 } },
+		},
+		groups = {
+			{
+				id = "convoy",
+				team = "enemy",
+				pos = { x = 100, z = 100 },
+				units = { { def = "armpw", count = 2 }, { def = "armrock", count = 1 } },
+				orders = {},
+				dormant = false,
+			},
+			{
+				id = "raiders",
+				team = "enemy",
+				pos = { x = 700, z = 700 },
+				units = { { def = "armpw", count = 2 } },
+				orders = {},
+				dormant = true,
+			},
+		},
+		triggers = {
+			watching("convoy-dead", "group_dead", { group = "convoy" }),
+			watching("raiders-dead", "group_dead", { group = "raiders" }),
+			watching("phantom-dead", "group_dead", { group = "phantom" }),
+			watching("convoy-any-in", "units_in_zone", { zone = "pad", group = "convoy" }),
+			watching("convoy-all-in", "units_in_zone", { zone = "pad", group = "convoy", all = true }),
+			watching("raiders-all-in", "units_in_zone", { zone = "pad", group = "raiders", all = true }),
+			watching("rocks-all-in", "units_in_zone",
+				{ zone = "pad", group = "convoy", all = true, unitDefs = { "armrock" } }),
+			watching("anyone-all-in", "units_in_zone", { zone = "pad", all = true }),
+			watching("convoy-two", "unit_count", { group = "convoy", min = 2 }),
+			watching("convoy-rock", "unit_count", { group = "convoy", unitDefs = { "armrock" }, min = 1 }),
+			watching("convoy-player", "unit_count", { group = "convoy", team = "player", min = 1 }),
+			watching("convoy-enemy-gone", "unit_count", { group = "convoy", team = "enemy", max = 0 }),
+			watching("count-of-nothing", "unit_count", {}),
+		},
+	})
+
+	local gc = load({ coilbox_mission = "demo" }, missionFiles(watched), {
+		defs = { armpw = true, armrock = true },
+	})
+	gc.env:Initialize()
+	gc.env:GameStart()
+
+	local fired = {}
+	gc.GG.CoilboxMission.triggers:addAction("probe", function(params)
+		fired[#fired + 1] = params.mark
+	end)
+	gc.env:GameFrame(1)
+
+	local gstate = gc.GG.CoilboxMission
+	local function reset()
+		for index = #fired, 1, -1 do
+			fired[index] = nil
+		end
+	end
+	--- What fired on the polled tick at `frame`.
+	local function tick(frame)
+		reset()
+		gc.env:GameFrame(frame)
+		return "," .. table.concat(fired, ",") .. ","
+	end
+	--- What fired on the events one death raised.
+	local function kill(unitID)
+		reset()
+		gc.env.Spring.DestroyUnit(unitID)
+		return "," .. table.concat(fired, ",") .. ","
+	end
+	local function has(readout, id)
+		return readout:find("," .. id .. ",", 1, true) ~= nil
+	end
+
+	local convoy = gstate.groups.units("convoy")
+	local pw1, pw2, rock = convoy[1], convoy[2], convoy[3]
+	gc.move(pw1, 50, 50)
+	gc.move(pw2, 60, 60)
+	gc.move(rock, 500, 500)
+
+	local read = tick(15)
+	check("units_in_zone with a group holds while any of that group is in the zone",
+		has(read, "convoy-any-in"), read)
+	check("all does not hold while one of the group is outside",
+		not has(read, "convoy-all-in"), read)
+	check("a unit that is not the group's is not counted, however many are in the zone",
+		not has(tick(30), "raiders-all-in"))
+
+	gc.move(rock, 70, 70)
+	read = tick(45)
+	check("all holds once every living unit of the group is inside", has(read, "convoy-all-in"), read)
+	check("all with unit types asks only about those types", has(read, "rocks-all-in"), read)
+
+	gc.move(rock, 500, 500)
+	read = tick(60)
+	check("all with unit types fails when one of those types is outside", not has(read, "rocks-all-in"), read)
+
+	read = tick(75)
+	check("all on a group that has not been spawned does not hold", not has(read, "raiders-all-in"), read)
+	check("all with no group is ignored and says so",
+		logged(gc, "warning: units_in_zone on zone pad asks for all with no group"))
+
+	read = tick(90)
+	check("unit_count with a group counts that group and no team", has(read, "convoy-two"), read)
+	check("and can be narrowed to a unit type", has(read, "convoy-rock"), read)
+	check("a unit_count naming neither a team nor a group never holds and says so",
+		not has(read, "count-of-nothing")
+		and logged(gc, "warning: unit_count names neither a team nor a group"))
+
+	-- group_dead before anything has died, and for a group that has not been on
+	-- the map.
+	--- Raise a death that is nobody's in the mission, which wakes every event
+	-- driven trigger and changes nothing the groups hold.
+	local function bystanderDies()
+		return kill(gc.spawn("armpw", 0))
+	end
+	read = bystanderDies()
+	check("a group that has not been spawned is not dead", not has(read, "raiders-dead"), read)
+	check("a group with all its units standing is not dead", not has(read, "convoy-dead"), read)
+	check("a group the scenario does not have is reported and never dead",
+		not has(read, "phantom-dead") and logged(gc, "error: no group named phantom"))
+
+	-- A death is read by the trigger the same frame, and a unit inside the zone
+	-- that dies leaves the others to answer "all".
+	gc.move(rock, 80, 80)
+	check("a living unit's death leaves the rest of the group alive", not has(kill(pw1), "convoy-dead"))
+	read = tick(105)
+	check("all is every unit still living, however many have died", has(read, "convoy-all-in"), read)
+	check("and the count follows the deaths", has(read, "convoy-two"), read)
+
+	-- A gift and a release leave the units the group's.
+	gstate.groups.gift("convoy", "player")
+	read = tick(120)
+	check("a gifted group is still counted as that group", has(read, "convoy-two"), read)
+	check("team narrows a group to the units that team owns now",
+		has(read, "convoy-player") and has(read, "convoy-enemy-gone"), read)
+	check("and the group is not dead for having changed hands", not has(kill(pw2), "convoy-dead"))
+
+	gstate.groups.release("convoy")
+	read = tick(135)
+	check("a released group is still counted as that group", has(read, "convoy-rock"), read)
+	check("the last unit of a released group is its death", has(kill(rock), "convoy-dead"))
+
+	-- Wiped, then sent again: alive again until it is wiped again.
+	gstate.groups.spawn("raiders")
+	-- A copy, because the runtime's own list shrinks as its units die.
+	local raiders = {}
+	for _, unitID in ipairs(gstate.groups.units("raiders")) do
+		raiders[#raiders + 1] = unitID
+	end
+	check("a spawned group is not dead for having been placed", #raiders == 2 and not has(bystanderDies(), "raiders-dead"))
+	check("it is dead once every one of its units is", not has(kill(raiders[1]), "raiders-dead")
+		and has(kill(raiders[2]), "raiders-dead"))
+
+	gstate.groups.spawn("raiders")
+	local second = gstate.groups.units("raiders")
+	check("a group spawned again after a wipe is alive again", #second == 2)
+	reset()
+	gc.env:GameFrame(150)
+	check("and is not read as dead", not has("," .. table.concat(fired, ",") .. ",", "raiders-dead"))
+end
+
+--------------------------------------------------------------------------------
 -- Groups are synced only.
 --------------------------------------------------------------------------------
 

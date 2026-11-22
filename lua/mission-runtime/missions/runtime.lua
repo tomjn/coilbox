@@ -144,8 +144,23 @@
 -- A runtime behind 13 finds no engine team number on it and drops the team, and
 -- everything placed for it with it. So a scenario with a neutral team asks for 13.
 
+-- 14 lets a condition ask about a group (issue #5292). One condition and two
+-- format features:
+--
+--   * group_dead holds once every unit in a group has died, and is false until
+--     the group has been on the map
+--   * units_in_zone and unit_count may carry `group`, and then count only that
+--     group's living units. `team` is optional on unit_count when a group is given
+--   * units_in_zone may carry `all` with a group, and then holds only while every
+--     living unit of the group is in the zone
+--
+-- A runtime behind 14 has no implementation for group_dead, so it reports itself
+-- once and never holds. It reads past `group` and `all` and counts every unit
+-- the zone or team holds, so "the convoy arrived" holds when anything at all is
+-- in the zone. So a scenario using any of them asks for 14.
+
 return {
-	version = 13,
+	version = 14,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
@@ -154,6 +169,7 @@ return {
 		"units_in_zone",
 		"unit_count",
 		"unit_dead",
+		"group_dead",
 		"unit_health_below",
 		"unit_built",
 		"unit_captured",
