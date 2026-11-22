@@ -14,8 +14,15 @@
 import { plural, t } from "@lingui/core/macro";
 import type { LuaHook } from "./animPresets";
 import { PRESETS } from "./animPresets";
-import type { LegoAction, LegoPiece, LegoPose, LegoProject } from "./model";
+import type {
+  LegoAction,
+  LegoActionTrack,
+  LegoPiece,
+  LegoPose,
+  LegoProject,
+} from "./model";
 import { type Problem, problem } from "./problems";
+import type { ScriptTimeline } from "./scriptPlayback";
 import { luaString } from "./unitDef";
 import { scriptWeapons } from "./weaponModule";
 
@@ -160,14 +167,18 @@ export function liveSteps(action: LegoAction, project: LegoProject): Step[] {
   return steps;
 }
 
-/** The pieces the action moves, in document order: those some live key's pose
- *  names that the unit still has. */
+/** The pieces the action moves, in document order: those its tracks, or the
+ *  poses of its live keys, name that the unit still has. */
 export function actionPieces(
   action: LegoAction,
   project: LegoProject,
 ): LegoPiece[] {
   const named = new Set(
-    liveSteps(action, project).flatMap((step) => Object.keys(step.pose.pieces)),
+    action.tracks
+      ? action.tracks.map((track) => track.piece)
+      : liveSteps(action, project).flatMap((step) =>
+          Object.keys(step.pose.pieces),
+        ),
   );
   return project.pieces.filter((piece) => named.has(piece.id));
 }
@@ -196,51 +207,547 @@ function callName(kind: "turn" | "move", tracked: boolean): string {
   return tracked ? "ActMove" : "Move";
 }
 
+const KINDS = ["turn", "move"];
+
+// --- Tracks ------------------------------------------------------------------
+
 /**
- * The calls that take every target from `from` to `to` in `seconds`, then the
- * sleep that waits for them. Per axis, so one axis that has to travel further
- * goes faster than another that has a short way to go and both arrive together.
- * An axis that does not change writes nothing.
+ * Pose keys as tracks. Each channel any live pose moves gets a key at every
+ * key's frame, 0 where that pose leaves it alone. A frame is the running sum of
+ * each key's seconds rounded to whole frames (`framesOf`). A track has one key
+ * to a frame, so a key with no time of its own after a key that has been
+ * reached goes one frame after it, and the keys after it keep their own sums.
+ * Keys with no time on frame 0 are one pose, the last, because nothing has been
+ * reached before them.
+ *
+ * A channel no pose moves has no track, because it never writes a call. Pieces
+ * the poses name that the unit no longer has are kept, so lowering an action
+ * loses nothing.
  */
-function stepLines(
-  targets: Target[],
-  from: Map<string, Values>,
-  to: Map<string, Values>,
-  seconds: number,
-  indent: string,
-  moved: Moved,
-  sleep: boolean,
-  tracked: boolean,
-): { lines: string[]; frames: number } {
-  const frames = framesOf(seconds);
-  const lines: string[] = [];
-  for (const { piece, name } of targets) {
-    const before = from.get(piece.id) ?? REST;
-    const after = to.get(piece.id) ?? REST;
-    for (const kind of ["turn", "move"] as const) {
-      const call = callName(kind, tracked);
-      for (let axis = 0; axis < 3; axis++) {
-        const was = before[kind][axis];
-        const now = after[kind][axis];
-        if (was === now) continue;
-        const set = moved[kind].get(piece.id) ?? new Set<number>();
-        set.add(axis);
-        moved[kind].set(piece.id, set);
-        if (frames === 0) {
-          lines.push(`${indent}${call}(${name}, ${AXES[axis]}, ${lua(now)})`);
-          continue;
-        }
-        const speed = Math.abs(now - was) / (frames / FPS);
-        lines.push(
-          `${indent}${call}(${name}, ${AXES[axis]}, ${lua(now)}, ${lua(speed)})`,
+export function actionTracks(
+  action: LegoAction,
+  project: LegoProject,
+): LegoActionTrack[] {
+  const steps = liveSteps(action, project);
+  const frames: number[] = [];
+  let at = 0;
+  for (const step of steps) {
+    at += framesOf(step.seconds);
+    const last = frames[frames.length - 1];
+    frames.push(last !== undefined && last > 0 && at <= last ? last + 1 : at);
+  }
+
+  const named = new Set(steps.flatMap((step) => Object.keys(step.pose.pieces)));
+  const ids = [
+    ...project.pieces.filter((piece) => named.has(piece.id)).map((p) => p.id),
+    ...[...named].filter((id) => !project.pieces.some((p) => p.id === id)),
+  ];
+
+  const tracks: LegoActionTrack[] = [];
+  for (const piece of ids) {
+    for (const kind of KINDS as ("turn" | "move")[]) {
+      for (const axis of [0, 1, 2] as const) {
+        const values = steps.map(
+          (step) => valuesOf(step.pose, piece)[kind][axis],
         );
+        if (values.every((value) => value === 0)) continue;
+        const keys: LegoActionTrack["keys"] = [];
+        values.forEach((value, index) => {
+          const last = keys[keys.length - 1];
+          if (last && last.frame === frames[index]) last.value = value;
+          else keys.push({ frame: frames[index], value });
+        });
+        tracks.push({ piece, kind, axis, keys });
       }
     }
   }
-  if (sleep && frames > 0) {
-    lines.push(`${indent}Sleep(${frames * SLEEP_FRAME_MS})`);
+  return tracks;
+}
+
+/** The action with its pose keys lowered to tracks. An action that has tracks
+ *  is returned as it is. */
+export function withTracks(
+  action: LegoAction,
+  project: LegoProject,
+): LegoAction {
+  if (action.tracks) return action;
+  return { ...action, keys: [], tracks: actionTracks(action, project) };
+}
+
+/**
+ * The tracks without the keys that start no change and end no change: one that
+ * repeats the value before it (the rest position before a channel's first key)
+ * and is followed by a key with the same value, or by nothing. The script does
+ * not write them, so a reader cannot bring them back. A track left with no keys
+ * goes.
+ *
+ * A key on the action's first frame stays, because a blend in goes to the
+ * values there. A looping action's lap is as long as its last key frame, so a
+ * key on that frame stays too. Pass `loop` for a looping action.
+ */
+export function normaliseTracks(
+  tracks: LegoActionTrack[],
+  loop = false,
+): LegoActionTrack[] {
+  const frames = tracks.flatMap((track) => track.keys.map((k) => k.frame));
+  const kept = new Set([
+    Math.min(...frames),
+    ...(loop ? [Math.max(...frames)] : []),
+  ]);
+  const out: LegoActionTrack[] = [];
+  for (const track of tracks) {
+    const value = (index: number) => round4(track.keys[index].value);
+    const keys = track.keys.filter((key, i) => {
+      if (kept.has(key.frame)) return true;
+      const ends = value(i) !== (i === 0 ? 0 : value(i - 1));
+      const next =
+        i === track.keys.length - 1 ? (loop ? value(0) : null) : value(i + 1);
+      const starts = next !== null && next !== value(i);
+      return ends || starts;
+    });
+    if (keys.length > 0) out.push({ ...track, keys });
   }
-  return { lines, frames };
+  return out;
+}
+
+/** One channel of an action on a piece the unit has, its keys rounded as the
+ *  script is written and in frame order. */
+interface Channel {
+  piece: LegoPiece;
+  /** The piece's place in the unit, which is the order calls are written in. */
+  order: number;
+  kind: "turn" | "move";
+  axis: 0 | 1 | 2;
+  keys: { frame: number; value: number }[];
+}
+
+/** The channels the action writes: its tracks, or its pose keys lowered to
+ *  tracks, without those of pieces the unit no longer has. */
+function channelsOf(action: LegoAction, project: LegoProject): Channel[] {
+  const tracks = action.tracks ?? actionTracks(action, project);
+  const channels: Channel[] = [];
+  for (const track of tracks) {
+    const order = project.pieces.findIndex((p) => p.id === track.piece);
+    if (order < 0) continue;
+    const taken = channels.some(
+      (c) =>
+        c.order === order && c.kind === track.kind && c.axis === track.axis,
+    );
+    if (taken) continue;
+    const byFrame = new Map<number, number>();
+    for (const key of track.keys) {
+      if (!Number.isFinite(key.frame) || !Number.isFinite(key.value)) continue;
+      byFrame.set(Math.max(0, Math.round(key.frame)), round4(key.value));
+    }
+    if (byFrame.size === 0) continue;
+    channels.push({
+      piece: project.pieces[order],
+      order,
+      kind: track.kind,
+      axis: track.axis,
+      keys: [...byFrame]
+        .sort((a, b) => a[0] - b[0])
+        .map(([frame, value]) => ({ frame, value })),
+    });
+  }
+  return channels.sort(
+    (a, b) =>
+      a.order - b.order ||
+      KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) ||
+      a.axis - b.axis,
+  );
+}
+
+/** How many of the action's tracks name a piece the unit no longer has. */
+function deletedTracks(action: LegoAction, project: LegoProject): number {
+  return (action.tracks ?? []).filter(
+    (track) => !project.pieces.some((piece) => piece.id === track.piece),
+  ).length;
+}
+
+// --- The plan ----------------------------------------------------------------
+
+/** One `Turn` or `Move` the action's thread makes. */
+export interface PlanCall {
+  /** The frame it is made on, counted from the frame the thread starts, or for
+   *  a call in `lap` from the start of the lap. */
+  frame: number;
+  /** A piece id. */
+  piece: string;
+  kind: "turn" | "move";
+  axis: 0 | 1 | 2;
+  dest: number;
+  /** Radians or elmos a second. Absent puts the piece there at once. */
+  speed?: number;
+  /** Set on the call that blends in: the seconds to take from wherever the
+   *  piece is, so its speed is not known until it plays. */
+  blend?: number;
+}
+
+/**
+ * What an action's thread does, decided once. `emitActions` prints it as Lua
+ * and `bakeAction` plays it.
+ *
+ * The thread makes the `lead` calls, and a looping action then repeats `lap`.
+ * `leadFrames` is the frame the lead waits until, which is where the lap starts,
+ * and a lap is `lapFrames` long. A one shot action's thread ends after its last
+ * call.
+ */
+export interface ActionPlan {
+  /** The pieces the action moves, in the unit's order. */
+  pieces: LegoPiece[];
+  lead: PlanCall[];
+  leadFrames: number;
+  lap: PlanCall[];
+  lapFrames: number;
+  looping: boolean;
+  /** Frames to play the lead until everything has stopped moving, or for a
+   *  looping action the lead and one lap. */
+  frames: number;
+  /** The channels that make a call, in the order they are first called, with
+   *  no blend. A blend out sends these home. */
+  moved: { piece: string; kind: "turn" | "move"; axis: 0 | 1 | 2 }[];
+}
+
+/** A stretch of one channel from one value to another. */
+interface Segment {
+  channel: Channel;
+  start: number;
+  arrive: number;
+  from: number;
+  dest: number;
+}
+
+/**
+ * The segments of one channel: the first key reached from rest starting on
+ * frame 0, then key to key, and for a looping action the wrap from the last key
+ * to the first, which arrives `length` frames after the first key's frame, where
+ * the next lap has it.
+ */
+function segmentsOf(
+  channel: Channel,
+  loop: boolean,
+  length: number,
+): { first: Segment; between: Segment[]; wrap: Segment | null } {
+  const keys = channel.keys;
+  const segment = (
+    a: { frame: number; value: number } | null,
+    b: { frame: number; value: number },
+    arrive = b.frame,
+  ): Segment => ({
+    channel,
+    start: a?.frame ?? 0,
+    arrive,
+    from: a?.value ?? 0,
+    dest: b.value,
+  });
+  return {
+    first: segment(null, keys[0]),
+    between: keys.slice(1).map((key, i) => segment(keys[i], key)),
+    wrap: loop
+      ? segment(keys[keys.length - 1], keys[0], length + keys[0].frame)
+      : null,
+  };
+}
+
+/** How far a turn of `delta` goes, as the engine takes it: the shorter way
+ *  round, `fmod(delta + 3π, 2π) - π` (`UnitScript.cpp:142`). Exactly half a
+ *  circle is the negative way. */
+export function shortestTurn(delta: number): number {
+  const tau = 2 * Math.PI;
+  return ((((delta + 3 * Math.PI) % tau) + tau) % tau) - Math.PI;
+}
+
+/** The call a segment makes, or null when its value does not change. */
+function callOf(segment: Segment, frame: number): PlanCall | null {
+  if (segment.dest === segment.from) return null;
+  const frames = segment.arrive - segment.start;
+  const { channel } = segment;
+  return {
+    frame,
+    piece: channel.piece.id,
+    kind: channel.kind,
+    axis: channel.axis,
+    dest: segment.dest,
+    ...(frames > 0
+      ? { speed: Math.abs(segment.dest - segment.from) / (frames / FPS) }
+      : {}),
+  };
+}
+
+/** A call with what is needed to order it. */
+interface Placed {
+  call: PlanCall;
+  channel: Channel;
+  /** The frame its motion ends on. */
+  arrive: number;
+}
+
+/** Calls in the order they are written: by frame, then the calls that put a
+ *  piece there before those that set it moving, then piece, turn before move,
+ *  x, y, z. The calls of a blend go turns first, as they always have. */
+function ordered(placed: Placed[]): Placed[] {
+  const rank = (p: Placed) => [
+    p.call.speed === undefined && p.call.blend === undefined ? 0 : 1,
+    p.call.blend !== undefined ? KINDS.indexOf(p.call.kind) : p.channel.order,
+    p.call.blend !== undefined ? p.channel.order : KINDS.indexOf(p.call.kind),
+    p.call.axis,
+    p.arrive,
+  ];
+  return placed
+    .map((p, index) => ({ p, index }))
+    .sort((a, b) => {
+      if (a.p.call.frame !== b.p.call.frame) {
+        return a.p.call.frame - b.p.call.frame;
+      }
+      const ra = rank(a.p);
+      const rb = rank(b.p);
+      for (let i = 0; i < ra.length; i++) {
+        if (ra[i] !== rb[i]) return ra[i] - rb[i];
+      }
+      return a.index - b.index;
+    })
+    .map(({ p }) => p);
+}
+
+/**
+ * The thread an action writes, from its tracks. An action of pose keys is
+ * lowered to tracks first, so one set of rules covers both. Null when it moves
+ * no piece the unit has.
+ *
+ * - A channel with a segment that starts on a frame gets one call there, to its
+ *   next key's value at the speed that arrives on that key's frame. A channel
+ *   whose value does not change gets no call.
+ * - A channel's first key is reached from rest, starting on frame 0.
+ * - Calls on one frame are in piece order, then turn before move, then x, y, z.
+ *   One `Sleep` waits for the next frame that has calls.
+ * - A looping action's length is its last key frame over every channel. Each
+ *   channel wraps from its last key to its first. The lead covers frames 0 to
+ *   the length and the lap one lap after it.
+ * - A one shot action ends after its last calls, with no `Sleep`.
+ * - With a blend in, every channel that moves blends to its value on the first
+ *   key frame over the blend time, and the lead goes on from there. A channel
+ *   keyed later than that is part way along its way from rest, so it blends to
+ *   where that is and goes on to its first key from there.
+ */
+export function planAction(
+  action: LegoAction,
+  project: LegoProject,
+): ActionPlan | null {
+  const channels = channelsOf(action, project);
+  if (channels.length === 0) return null;
+
+  const keyFrames = new Set(
+    channels.flatMap((channel) => channel.keys.map((key) => key.frame)),
+  );
+  const length = Math.max(...keyFrames);
+  const first = Math.min(...keyFrames);
+  // A loop that never moves on from one frame has no lap.
+  const looping = action.loop && keyFrames.size > 1;
+
+  /** The lead and the lap. `blend` is the frames the blend in takes, if any. */
+  const build = (blendFrames: number | null) => {
+    const shift = blendFrames === null ? 0 : blendFrames - first;
+    const lead: Placed[] = [];
+    const lap: Placed[] = [];
+    const add = (
+      into: Placed[],
+      segment: Segment,
+      frame: number,
+      moveBy = 0,
+    ) => {
+      const call = callOf(segment, frame + moveBy);
+      if (call) {
+        into.push({
+          call,
+          channel: segment.channel,
+          arrive: segment.arrive + moveBy,
+        });
+      }
+    };
+    for (const channel of channels) {
+      const parts = segmentsOf(channel, looping, length);
+      const head = channel.keys[0];
+      if (blendFrames === null) {
+        add(lead, parts.first, 0);
+      } else if (head.frame > first) {
+        const reached = round4((head.value * first) / head.frame);
+        add(
+          lead,
+          { ...parts.first, start: first, from: reached },
+          first,
+          shift,
+        );
+      }
+      for (const segment of parts.between) {
+        add(lead, segment, segment.start, shift);
+        if (looping) add(lap, segment, segment.start);
+      }
+      const { wrap } = parts;
+      if (wrap) {
+        if (wrap.start < length) add(lead, wrap, wrap.start, shift);
+        add(lap, wrap, wrap.start % length || 0);
+      }
+    }
+    return { lead: ordered(lead), lap: ordered(lap), shift };
+  };
+
+  const plain = build(null);
+  const moved: ActionPlan["moved"] = [];
+  for (const { call } of [...plain.lead, ...plain.lap]) {
+    const known = moved.some(
+      (m) =>
+        m.piece === call.piece && m.kind === call.kind && m.axis === call.axis,
+    );
+    if (!known)
+      moved.push({ piece: call.piece, kind: call.kind, axis: call.axis });
+  }
+
+  const { blendIn } = blendOf(action, project);
+  let { lead, lap } = plain;
+  let leadFrames = length;
+  if (blendIn > 0) {
+    const blendFrames = framesOf(blendIn);
+    const built = build(blendFrames);
+    const blends: Placed[] = [];
+    for (const channel of channels) {
+      const goes = moved.some(
+        (m) =>
+          m.piece === channel.piece.id &&
+          m.kind === channel.kind &&
+          m.axis === channel.axis,
+      );
+      if (!goes) continue;
+      const head = channel.keys[0];
+      blends.push({
+        call: {
+          frame: 0,
+          piece: channel.piece.id,
+          kind: channel.kind,
+          axis: channel.axis,
+          dest:
+            head.frame === first
+              ? head.value
+              : round4((head.value * first) / head.frame),
+          blend: blendIn,
+        },
+        channel,
+        arrive: blendFrames,
+      });
+    }
+    lead = [...ordered(blends), ...built.lead];
+    lap = built.lap;
+    leadFrames = length + built.shift;
+  }
+
+  const pieces = project.pieces.filter((piece) =>
+    channels.some((channel) => channel.piece.id === piece.id),
+  );
+  const calls = (placed: Placed[]) => placed.map(({ call }) => call);
+  const all = lead.map((p) => p);
+  // Frames until nothing is moving: a call with a speed ends where its segment
+  // does, and one that puts a piece there ends on its own frame.
+  const settled = Math.max(
+    1,
+    ...all.map((p) =>
+      p.call.speed !== undefined || p.call.blend !== undefined
+        ? p.arrive
+        : p.call.frame + 1,
+    ),
+  );
+  return {
+    pieces,
+    lead: calls(lead),
+    leadFrames,
+    lap: calls(lap),
+    lapFrames: looping ? length : 0,
+    looping,
+    frames: looping ? leadFrames + length : settled,
+    moved,
+  };
+}
+
+/**
+ * An action played frame by frame, as the engine plays the script `emitActions`
+ * writes for it: each piece goes to its destination at a constant speed, and a
+ * turn takes the shorter way round (`shortestTurn`). A looping action plays its
+ * lead and one lap, a one shot action its lead until everything has stopped.
+ * It plays from rest, by itself, from the frame it starts.
+ *
+ * Frame `n` holds the pieces after the thread has made its calls on frame `n`
+ * and the engine has moved every piece once. An angle is the number the script
+ * wrote, not wrapped into one turn.
+ *
+ * The timeline has the unit's pieces in order and no frames when the action
+ * moves none that the unit has.
+ */
+export function bakeAction(
+  action: LegoAction,
+  project: LegoProject,
+): ScriptTimeline {
+  const timeline: ScriptTimeline = {
+    fps: FPS,
+    pieces: project.pieces.map((piece) => piece.name),
+    frames: [],
+    hidden: [],
+    error: null,
+    warnings: [],
+    asked: [],
+    functions: [],
+    linesRun: [],
+    offsetsRun: [],
+    events: [],
+  };
+  const plan = planAction(action, project);
+  if (!plan) return timeline;
+
+  const slotOf = (call: PlanCall) =>
+    project.pieces.findIndex((piece) => piece.id === call.piece) * 6 +
+    (call.kind === "turn" ? 3 : 0) +
+    call.axis;
+  const calls = new Map<number, PlanCall[]>();
+  const queue = (call: PlanCall, frame: number) =>
+    calls.set(frame, [...(calls.get(frame) ?? []), call]);
+  for (const call of plan.lead) queue(call, call.frame);
+  if (plan.looping) {
+    for (const call of plan.lap) queue(call, plan.leadFrames + call.frame);
+  }
+
+  const values = new Array<number>(project.pieces.length * 6).fill(0);
+  const moving = new Map<number, { dest: number; speed: number }>();
+  for (let frame = 0; frame < plan.frames; frame++) {
+    for (const call of calls.get(frame) ?? []) {
+      const slot = slotOf(call);
+      const turns = call.kind === "turn";
+      let speed = call.speed;
+      if (call.blend !== undefined) {
+        // A blend goes from where the piece is, by the way the engine will go.
+        const way = turns
+          ? shortestTurn(call.dest - values[slot])
+          : call.dest - values[slot];
+        speed = Math.abs(way) < 0.0001 ? undefined : Math.abs(way) / call.blend;
+      }
+      if (speed === undefined) {
+        values[slot] = call.dest;
+        moving.delete(slot);
+      } else {
+        moving.set(slot, { dest: call.dest, speed });
+      }
+    }
+    for (const [slot, { dest, speed }] of moving) {
+      const step = speed / FPS;
+      const way =
+        slot % 6 >= 3 ? shortestTurn(dest - values[slot]) : dest - values[slot];
+      if (Math.abs(way) <= step) {
+        values[slot] = dest;
+        moving.delete(slot);
+      } else {
+        values[slot] += Math.sign(way) * step;
+      }
+    }
+    timeline.frames.push(values.slice());
+  }
+  return timeline;
 }
 
 /** What emitting the actions of a unit adds to its script. */
@@ -260,9 +767,46 @@ function slug(name: string): string {
 }
 
 /**
+ * The lines that make `calls`, with a `Sleep` before each frame that has calls
+ * to wait for it. `end` is the frame to wait until after the last call, which
+ * is how long a lap lasts, and null for a thread that stops there.
+ */
+function planLines(
+  calls: PlanCall[],
+  end: number | null,
+  indent: string,
+  nameOf: (id: string) => string,
+  tracked: boolean,
+): string[] {
+  const lines: string[] = [];
+  let at = 0;
+  for (const call of calls) {
+    if (call.frame > at) {
+      lines.push(`${indent}Sleep(${(call.frame - at) * SLEEP_FRAME_MS})`);
+      at = call.frame;
+    }
+    const target = `${nameOf(call.piece)}, ${AXES[call.axis]}, ${lua(call.dest)}`;
+    if (call.blend !== undefined) {
+      const blend = call.kind === "turn" ? "BlendTurn" : "BlendMove";
+      lines.push(`${indent}${blend}(${target}, ${lua(call.blend)})`);
+    } else if (call.speed === undefined) {
+      lines.push(`${indent}${callName(call.kind, tracked)}(${target})`);
+    } else {
+      lines.push(
+        `${indent}${callName(call.kind, tracked)}(${target}, ${lua(call.speed)})`,
+      );
+    }
+  }
+  if (end !== null && end > at) {
+    lines.push(`${indent}Sleep(${(end - at) * SLEEP_FRAME_MS})`);
+  }
+  return lines;
+}
+
+/**
  * The Lua for every action of the unit. `use` names a piece in the script, and
- * marks it so the script declares it. An action with no live key, or one that
- * moves no piece the unit has, writes nothing.
+ * marks it so the script declares it. An action that moves no piece the unit
+ * has writes nothing. Each action is written from its plan (`planAction`).
  *
  * A looping action first goes from rest to its first key, then loops from the
  * second key round to the first again, so every lap after the first is from
@@ -280,12 +824,11 @@ export function emitActions(
     out.hooks[hook] = [...(out.hooks[hook] ?? []), ...lines];
   };
 
-  const plans: Plan[] = [];
+  const plans: Entry[] = [];
   for (const action of project.actions ?? []) {
     if (triggerProblem(project, action.trigger)) continue;
-    const steps = liveSteps(action, project);
-    const pieces = actionPieces(action, project);
-    if (steps.length === 0 || pieces.length === 0) continue;
+    const plan = planAction(action, project);
+    if (!plan) continue;
 
     let base = slug(action.name) || "action";
     for (let n = 2; taken.has(base.toLowerCase()); n++) {
@@ -294,8 +837,8 @@ export function emitActions(
     taken.add(base.toLowerCase());
     plans.push({
       action,
-      steps,
-      pieces,
+      plan,
+      pieces: plan.pieces,
       thread: `action_${base}`,
       signal: `SIG_ACTION_${base.toUpperCase()}`,
       ...blendOf(action, project),
@@ -308,96 +851,39 @@ export function emitActions(
   const blending = unitBlends(project);
   if (blending) out.functions.push(...BLEND_HELPERS, "");
 
-  for (const plan of plans) {
-    const { action, steps, pieces, thread, signal, blendIn, blendOut } = plan;
+  for (const entry of plans) {
+    const { action, plan, pieces, thread, signal, blendOut } = entry;
     const targets = pieces.map((piece) => ({ piece, name: use(piece) }));
-    const keyed = steps.map(
-      (step) =>
-        new Map(
-          pieces.map((piece) => [piece.id, valuesOf(step.pose, piece.id)]),
-        ),
-    );
+    const nameOf = (id: string) =>
+      targets.find((t) => t.piece.id === id)?.name as string;
+
     const moved: Moved = {
       turn: new Map<string, Set<number>>(),
       move: new Map<string, Set<number>>(),
     };
-    const rest = new Map<string, Values>();
-
-    const leadParts: string[][] = [];
-    let previous = rest;
-    steps.forEach((step, index) => {
-      const last = !action.loop && index === steps.length - 1;
-      leadParts.push(
-        stepLines(
-          targets,
-          previous,
-          keyed[index],
-          step.seconds,
-          "  ",
-          moved,
-          !last,
-          blending,
-        ).lines,
-      );
-      previous = keyed[index];
-    });
-
-    // The laps after the first. The first lap has run every key, so a lap
-    // starts by going back from the last key to the first and then through the
-    // rest. A loop whose steps take no time at all would never sleep and so
-    // never let the engine run, so it does not loop.
-    const loop: string[] = [];
-    let loopFrames = 0;
-    if (action.loop && steps.length > 1) {
-      const lap = [
-        stepLines(
-          targets,
-          keyed[steps.length - 1],
-          keyed[0],
-          steps[0].seconds,
-          "    ",
-          moved,
-          true,
-          blending,
-        ),
-        ...steps
-          .slice(1)
-          .map((step, index) =>
-            stepLines(
-              targets,
-              keyed[index],
-              keyed[index + 1],
-              step.seconds,
-              "    ",
-              moved,
-              true,
-              blending,
-            ),
-          ),
-      ];
-      for (const made of lap) {
-        loop.push(...made.lines);
-        loopFrames += made.frames;
-      }
+    for (const m of plan.moved) {
+      const set = moved[m.kind].get(m.piece) ?? new Set<number>();
+      set.add(m.axis);
+      moved[m.kind].set(m.piece, set);
     }
-    const looping = loop.length > 0 && loopFrames > 0;
 
-    // With a blend in, the first key is reached over that time from wherever
-    // the pieces are, on every axis the action ever moves, because the action
-    // that held them left them anywhere.
-    if (blendIn > 0) {
-      const last = !action.loop && steps.length === 1;
-      const lines = blendLines(targets, moved, keyed[0], blendIn, "  ");
-      if (!last) lines.push(`  Sleep(${framesOf(blendIn) * SLEEP_FRAME_MS})`);
-      leadParts[0] = lines;
-    }
-    const lead = leadParts.flat();
+    const lead = planLines(
+      plan.lead,
+      action.loop ? plan.leadFrames : null,
+      "  ",
+      nameOf,
+      blending,
+    );
+    const loop = plan.looping
+      ? planLines(plan.lap, plan.lapFrames, "    ", nameOf, blending)
+      : [];
+    const looping = plan.looping;
 
     // The pieces another action also moves. Whichever starts last takes them,
     // and the one it took them from no longer sends them home.
     const sharedWith = plans.filter(
       (other) =>
-        other !== plan &&
+        other !== entry &&
         other.pieces.some((p) => pieces.some((mine) => mine.id === p.id)),
     );
     const sharedIds = new Set(
@@ -479,9 +965,9 @@ export function emitActions(
 }
 
 /** An action with the things emitting it needs settled first. */
-interface Plan {
+interface Entry {
   action: LegoAction;
-  steps: Step[];
+  plan: ActionPlan;
   pieces: LegoPiece[];
   thread: string;
   signal: string;
@@ -499,34 +985,6 @@ export function blendOf(
     blendIn: action.blendIn ?? fallback,
     blendOut: action.blendOut ?? fallback,
   };
-}
-
-/**
- * The calls that take every axis the action moves to its first key over
- * `seconds`, each at the speed that covers what is left to go by then.
- */
-function blendLines(
-  targets: Target[],
-  moved: Moved,
-  first: Map<string, Values>,
-  seconds: number,
-  indent: string,
-): string[] {
-  const lines: string[] = [];
-  for (const kind of ["turn", "move"] as const) {
-    const call = kind === "turn" ? "BlendTurn" : "BlendMove";
-    for (const { piece, name } of targets) {
-      const axes = moved[kind].get(piece.id);
-      if (!axes) continue;
-      const to = first.get(piece.id) ?? REST;
-      for (const axis of [...axes].sort()) {
-        lines.push(
-          `${indent}${call}(${name}, ${AXES[axis]}, ${lua(to[kind][axis])}, ${lua(seconds)})`,
-        );
-      }
-    }
-  }
-  return lines;
 }
 
 /**
@@ -723,11 +1181,46 @@ export function sharedOutcome(project: LegoProject): string {
 export function unitBlends(project: LegoProject): boolean {
   return (project.actions ?? []).some((action) => {
     if (triggerProblem(project, action.trigger)) return false;
-    if (liveSteps(action, project).length === 0) return false;
-    if (actionPieces(action, project).length === 0) return false;
+    if (channelsOf(action, project).length === 0) return false;
     const { blendIn, blendOut } = blendOf(action, project);
     return blendIn > 0 || blendOut > 0;
   });
+}
+
+/** The turns of an action that go half a circle or more between two keys. The
+ *  engine takes the shorter way round, which is not the way the keys say, so the
+ *  game maker is asked to add a key between them. The script is still written
+ *  as the engine will play it. */
+function turnProblems(
+  action: LegoAction,
+  channels: Channel[],
+  keyFrames: Set<number>,
+): Problem[] {
+  const found: Problem[] = [];
+  const looping = action.loop && keyFrames.size > 1;
+  const length = Math.max(0, ...keyFrames);
+  const actionName = action.name;
+  for (const channel of channels) {
+    if (channel.kind !== "turn") continue;
+    const parts = segmentsOf(channel, looping, length);
+    const segments = [parts.first, ...parts.between, parts.wrap];
+    for (const segment of segments) {
+      if (!segment || Math.abs(segment.dest - segment.from) < Math.PI) continue;
+      const pieceName = channel.piece.name;
+      const axisName = ["x", "y", "z"][channel.axis];
+      const from = segment.start;
+      const to = segment.arrive;
+      found.push(
+        problem(
+          "actions",
+          "warning",
+          t`${actionName}: ${pieceName} turns on ${axisName} by half a circle or more between frames ${from} and ${to}, so the engine takes the shorter way round. Add a key between them.`,
+          [channel.piece.id],
+        ),
+      );
+    }
+  }
+  return found;
 }
 
 /** What is wrong with each action, for the problems list. */
@@ -755,7 +1248,27 @@ export function actionProblems(project: LegoProject): Problem[] {
         ),
       );
     }
-    if (action.loop && liveSteps(action, project).length < 2) {
+    const gone = deletedTracks(action, project);
+    if (gone > 0) {
+      found.push(
+        problem(
+          "actions",
+          "warning",
+          plural(gone, {
+            one: `${actionName}: # track names a piece that no longer exists, so it is skipped.`,
+            other: `${actionName}: # tracks name pieces that no longer exist, so they are skipped.`,
+          }),
+        ),
+      );
+    }
+    const channels = channelsOf(action, project);
+    const keyFrames = new Set(
+      channels.flatMap((channel) => channel.keys.map((key) => key.frame)),
+    );
+    const keyCount = action.tracks
+      ? keyFrames.size
+      : liveSteps(action, project).length;
+    if (action.loop && keyCount < 2) {
       found.push(
         problem(
           "actions",
@@ -764,6 +1277,7 @@ export function actionProblems(project: LegoProject): Problem[] {
         ),
       );
     }
+    found.push(...turnProblems(action, channels, keyFrames));
   }
   // Two actions that share a piece are one finding, told from the one listed
   // first.

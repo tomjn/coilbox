@@ -196,3 +196,66 @@ export const HATCH_Y: Watch = { piece: "hatch", kind: "move", axis: "y_axis" };
 export function allowance(speed: number): number {
   return speed / FPS + 1e-3;
 }
+
+export const POSE_C = {
+  id: "pose-c",
+  name: "Aimed",
+  pieces: { arm: { turn: [2, 0, 0] as [number, number, number] } },
+};
+
+/** The units the action tests write scripts for, made of pose keys. The
+ *  goldens in `actionGoldens.json` are what `main` wrote for each before
+ *  actions kept tracks (#5394). */
+export function poseUnits(): Record<string, LegoProject> {
+  const aim = action({
+    id: "aim",
+    name: "Aim",
+    trigger: "Shot1",
+    loop: false,
+    keys: [{ pose: "pose-c", seconds: 5 }],
+  });
+  const threePoses = { poses: [POSE_A, POSE_B, POSE_C] };
+  return {
+    plain: unit(),
+    oneShot: unit({ actions: [action({ trigger: "Shot1", loop: false })] }),
+    ownFunction: unit({ actions: [action({ trigger: "OpenHatch" })] }),
+    deletedKey: unit({
+      actions: [
+        action({
+          loop: false,
+          keys: [
+            { pose: "pose-a", seconds: 1 },
+            { pose: "deleted", seconds: 1 },
+            { pose: "pose-b", seconds: 1 },
+          ],
+        }),
+      ],
+    }),
+    keyOnFrameZero: unit({
+      actions: [
+        action({
+          keys: [
+            { pose: "pose-a", seconds: 0 },
+            { pose: "pose-b", seconds: 2 },
+          ],
+        }),
+      ],
+    }),
+    oneKeyLoop: unit({
+      actions: [action({ keys: [{ pose: "pose-a", seconds: 1 }] })],
+    }),
+    twoActions: unit({
+      ...threePoses,
+      actions: [action(), { ...aim, loop: true }],
+    }),
+    blended: unit({
+      ...threePoses,
+      actions: [action({ blendOut: 1 }), { ...aim, blendIn: 0.5 }],
+    }),
+    blendedIn: unit({ actions: [action({ blendIn: 0.5, blendOut: 0 })] }),
+    blendedOneShot: unit({
+      actions: [action({ loop: false, trigger: "Shot1", blendIn: 0.5 })],
+    }),
+    defaultBlend: unit({ actionBlend: 0.4 }),
+  };
+}

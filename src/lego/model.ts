@@ -1036,8 +1036,28 @@ export interface LegoActionKey {
 }
 
 /**
+ * One channel of an action over time: a piece, `turn` or `move`, and one axis,
+ * with its value on the frames it is keyed. Values are radians for a turn and
+ * elmos for a move, the numbers `Turn` and `Move` take. There is no easing,
+ * because the engine moves a piece at a constant speed between two calls
+ * (`rts/Sim/Units/Scripts/UnitScript.cpp:117-150`).
+ */
+export interface LegoActionTrack {
+  /** Piece id, as poses use, so a rename keeps the track. */
+  piece: string;
+  kind: "turn" | "move";
+  axis: 0 | 1 | 2;
+  /** Frame ascending, one key per frame. Frames are whole sim frames from the
+   *  action's start, because `Sleep` and the engine both count frames. */
+  keys: { frame: number; value: number }[];
+}
+
+/**
  * A named motion: its keys in order, what starts it and whether it repeats.
  * Written as a thread of `Turn` and `Move` calls (`actions.ts`).
+ *
+ * It holds pose `keys` or `tracks`, not both. An action with tracks has
+ * `keys: []`.
  */
 export interface LegoAction {
   id: string;
@@ -1049,6 +1069,8 @@ export interface LegoAction {
    *  repeats until the unit is told to start it again. */
   loop: boolean;
   keys: LegoActionKey[];
+  /** Keys per piece and axis. Absent on an action made of pose keys. */
+  tracks?: LegoActionTrack[];
   /** Seconds to reach the first key from wherever the pieces are, when this
    *  action starts over another. Absent uses the project's `actionBlend`. */
   blendIn?: number;
@@ -1275,6 +1297,55 @@ function parseSeconds(value: unknown): number | null {
     : null;
 }
 
+/**
+ * The tracks that can be read. A key with a frame that is not a whole number of
+ * 0 or more, a value that is not finite, or a frame an earlier key has is
+ * dropped. A track with no keys left, or without a piece, kind and axis, is
+ * dropped. Keys are put in frame order.
+ */
+function parseTracks(value: unknown): LegoActionTrack[] {
+  if (!Array.isArray(value)) return [];
+  const tracks: LegoActionTrack[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const t = entry as Record<string, unknown>;
+    if (typeof t.piece !== "string" || t.piece === "") continue;
+    if (t.kind !== "turn" && t.kind !== "move") continue;
+    if (t.axis !== 0 && t.axis !== 1 && t.axis !== 2) continue;
+    if (!Array.isArray(t.keys)) continue;
+    if (
+      tracks.some(
+        (have) =>
+          have.piece === t.piece &&
+          have.kind === t.kind &&
+          have.axis === t.axis,
+      )
+    ) {
+      continue;
+    }
+    const keys: { frame: number; value: number }[] = [];
+    for (const raw of t.keys) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const k = raw as Record<string, unknown>;
+      if (
+        typeof k.frame !== "number" ||
+        !Number.isInteger(k.frame) ||
+        k.frame < 0 ||
+        typeof k.value !== "number" ||
+        !Number.isFinite(k.value) ||
+        keys.some((key) => key.frame === k.frame)
+      ) {
+        continue;
+      }
+      keys.push({ frame: k.frame, value: k.value });
+    }
+    if (keys.length === 0) continue;
+    keys.sort((a, b) => a.frame - b.frame);
+    tracks.push({ piece: t.piece, kind: t.kind, axis: t.axis, keys });
+  }
+  return tracks;
+}
+
 /** The actions that can be read, or null when there are none. */
 function parseActions(value: unknown): LegoAction[] | null {
   if (!Array.isArray(value)) return null;
@@ -1304,12 +1375,16 @@ function parseActions(value: unknown): LegoAction[] | null {
     }
     const blendIn = parseSeconds(e.blendIn);
     const blendOut = parseSeconds(e.blendOut);
+    // An action holds pose keys or tracks. Tracks win, as they are what a
+    // later edit writes.
+    const tracks = parseTracks(e.tracks);
     actions.push({
       id: e.id,
       name: e.name.trim(),
       trigger: e.trigger,
       loop: e.loop === true,
-      keys,
+      keys: tracks.length > 0 ? [] : keys,
+      ...(tracks.length > 0 ? { tracks } : {}),
       ...(blendIn !== null ? { blendIn } : {}),
       ...(blendOut !== null ? { blendOut } : {}),
     });
