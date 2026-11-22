@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FourViewsButton, QuadrantFrames } from "./FourViews";
+import { FourViewsButton, QuadrantFrames, ViewportOverlay } from "./FourViews";
 import type { SceneState } from "./sceneState";
 import { useModelShortcuts } from "./useModelShortcuts";
 
@@ -89,5 +89,34 @@ describe("the quadrant frames", () => {
 
     fireEvent.doubleClick(side);
     expect(onMaximise).toHaveBeenCalledWith("side");
+  });
+});
+
+describe("the viewport overlay", () => {
+  it("takes the perspective quadrant with four views on", () => {
+    render(
+      <ViewportOverlay fourViews>
+        <p>chrome</p>
+      </ViewportOverlay>,
+    );
+    const overlay = screen.getByText("chrome").parentElement as HTMLElement;
+    expect(overlay.style.left).toBe("calc(50% + 0.75rem)");
+    expect(overlay.style.top).toBe("calc(50% + 1rem + 0.75rem)");
+    expect(overlay.style.right).toBe("0.75rem");
+    expect(overlay.style.bottom).toBe("0.75rem");
+    expect(overlay.dataset.fourViews).toBe("true");
+  });
+
+  it("keeps the whole view with one view", () => {
+    render(
+      <ViewportOverlay fourViews={false}>
+        <p>chrome</p>
+      </ViewportOverlay>,
+    );
+    const overlay = screen.getByText("chrome").parentElement as HTMLElement;
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      expect(overlay.style[side]).toBe("0.75rem");
+    }
+    expect(overlay.dataset.fourViews).toBeUndefined();
   });
 });

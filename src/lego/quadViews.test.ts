@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   fromBottomLeft,
+  overlayInset,
   pointInView,
   QUADRANTS,
   quadrantAt,
@@ -80,5 +81,24 @@ describe("fromBottomLeft", () => {
       height: 300,
     });
     expect(fromBottomLeft(rects.perspective, 600).y).toBe(0);
+  });
+});
+
+describe("overlayInset", () => {
+  it("keeps the same margin on every side with one view", () => {
+    expect(overlayInset(false)).toEqual({
+      top: "0.75rem",
+      right: "0.75rem",
+      bottom: "0.75rem",
+      left: "0.75rem",
+    });
+  });
+
+  it("starts at the middle of the canvas, below the perspective name, with four views", () => {
+    const inset = overlayInset(true);
+    expect(inset.left).toBe("calc(50% + 0.75rem)");
+    expect(inset.top).toBe("calc(50% + 1rem + 0.75rem)");
+    expect(inset.right).toBe("0.75rem");
+    expect(inset.bottom).toBe("0.75rem");
   });
 });

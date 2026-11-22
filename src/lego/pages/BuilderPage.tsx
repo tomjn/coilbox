@@ -2576,7 +2576,7 @@ function Builder({ id }: { id: string | undefined }) {
                 ground={ground}
                 chrome={
                   <>
-                    <div className="pointer-events-none flex items-start justify-between gap-3">
+                    <div className="pointer-events-none flex items-start justify-between gap-3 group-data-[four-views]/overlay:flex-col">
                       <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-2 py-1.5 backdrop-blur">
                         <Blocks
                           size={16}
@@ -2631,7 +2631,7 @@ function Builder({ id }: { id: string | undefined }) {
                     chrome as the toolbars in the other corners, rather than a
                     panel of labelled buttons sitting on top of the model. */}
                       <TooltipProvider delayDuration={300}>
-                        <div className="pointer-events-auto flex items-center gap-2">
+                        <div className="pointer-events-auto flex items-center gap-2 group-data-[four-views]/overlay:flex-wrap">
                           <ButtonGroup>
                             <Tooltip>
                               <TooltipTrigger asChild>
