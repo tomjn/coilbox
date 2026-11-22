@@ -64,7 +64,7 @@ import {
 import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { actionProblems } from "../actions";
-import { addShape } from "../addShape";
+import { addShape, newShape } from "../addShape";
 import { aimPoint } from "../aimPoint";
 import { type ArrangeAction, arrange } from "../align";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
@@ -159,7 +159,12 @@ import {
   uniquePieceName,
 } from "../model";
 import { swapCandidates, withLabels } from "../moduleFilter";
-import { defaultMount, moduleConnectors, placeModule } from "../moduleMount";
+import {
+  defaultMount,
+  moduleConnectors,
+  placeModule,
+  placeModuleAt,
+} from "../moduleMount";
 import {
   type ModuleUpdate,
   markModuleCurrent,
@@ -285,7 +290,12 @@ import { PosesPopover } from "./components/PosesPopover";
 import { ProblemErrors } from "./components/ProblemErrors";
 import type { CheckStatus } from "./components/ProblemsButton";
 import { ProportionsPanel } from "./components/ProportionsPanel";
-import type { DragView, Placing } from "./components/placeByFace";
+import {
+  type DropTarget,
+  groundParentId,
+  placingAfterDrag,
+} from "./components/dragToPlace";
+import type { DragSubject, DragView, Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type {
   ModuleLabels,
@@ -857,19 +867,26 @@ function Builder({ id }: { id: string | undefined }) {
    * Choosing a shape adds it where `addPart` adds a part: a new piece hanging
    * off the selection, at its origin, at the kind's default size (#3337), and
    * selects it. The placing-by-face and bone rules are for pack parts and do
-   * not apply yet. A pack that lists no swatches offers no shapes.
+   * not apply yet. A pack that lists no swatches offers no shapes. A drop from
+   * the catalogue gives the parent and the position the pointer chose.
    */
-  function addStripShape(info: ShapeKind) {
-    if (!draft || !pack) return;
+  function addStripShape(
+    info: ShapeKind,
+    at?: { parentId: string; position: Vec3 },
+  ): boolean {
+    if (!draft || !pack) return false;
     const pieceId = crypto.randomUUID();
-    const parentId = selectedId ?? draft.rootPieceId;
-    if (!addShape(draft, info, pack, parentId, pieceId)) return;
+    const parentId = at?.parentId ?? selectedId ?? draft.rootPieceId;
+    const position = at?.position;
+    if (!addShape(draft, info, pack, parentId, pieceId, position)) return false;
     inventoryView.inventory.record({ kind: "shape", id: info.id });
     edit(
-      (project) => addShape(project, info, pack, parentId, pieceId) ?? project,
+      (project) =>
+        addShape(project, info, pack, parentId, pieceId, position) ?? project,
     );
     queueTwin(pieceId);
     setSelectedId(pieceId);
+    return true;
   }
 
   /** Resize the selected cylinder or tube from the piece panel. */
@@ -970,71 +987,65 @@ function Builder({ id }: { id: string | undefined }) {
    * selected piece's origin, but only in a unit with no part yet, where there
    * is no face to click.
    */
-  function placeOnFace(target: FaceTarget | null) {
-    if (!placingPart || !draft || !pack) return;
-    if ("module" in placingPart) {
-      if (!target) return;
-      const { module } = placingPart;
-      const refused = mountRefusal(draft, target.parentId, target.to, module);
+  function placeOnFace(
+    target: FaceTarget | null,
+    waiting: Placing | null = placingPart,
+    base: LegoProject | null = draft,
+  ): boolean {
+    if (!waiting || !base || !pack) return false;
+    if ("module" in waiting) {
+      if (!target) return false;
+      const { module } = waiting;
+      const refused = mountRefusal(base, target.parentId, target.to, module);
       if (refused) {
         void notify({ title: t`Mount point`, body: refused, level: "warning" });
-        return;
+        return false;
       }
-      const inserted = placeModule(
-        draft,
-        module,
-        pack,
-        target,
-        placingPart,
-        () => crypto.randomUUID(),
+      const inserted = placeModule(base, module, pack, target, waiting, () =>
+        crypto.randomUUID(),
       );
-      if (!inserted) return;
+      if (!inserted) return false;
       edit(() => inserted.project);
       doc.selectMany(inserted.rootPieceIds);
       for (const pieceId of inserted.rootPieceIds)
         queueTwin(pieceId, inserted.presets.held);
       inventoryView.inventory.record({ kind: "module", id: module.id });
       setPlacingPart(null);
-      return;
+      return true;
     }
     if (!target) {
-      if (draft.pieces.some((piece) => piece.partId || piece.shape)) return;
-      addPart(placingPart.part);
+      if (base.pieces.some((piece) => piece.partId || piece.shape))
+        return false;
+      addPart(waiting.part);
       setPlacingPart(null);
-      return;
+      return true;
     }
     const pieceId = crypto.randomUUID();
-    const partRefused = mountPartRefusal(draft, target.parentId, target.to);
+    const partRefused = mountPartRefusal(base, target.parentId, target.to);
     if (partRefused) {
       void notify({
         title: t`Mount point`,
         body: partRefused,
         level: "warning",
       });
-      return;
+      return false;
     }
-    if (!placePart(draft, pack, placingPart.part, target, placingPart, pieceId))
-      return;
+    if (!placePart(base, pack, waiting.part, target, waiting, pieceId))
+      return false;
     queueTwin(pieceId);
     place([pieceId], (project) => {
       return (
-        placePart(
-          project,
-          pack,
-          placingPart.part,
-          target,
-          placingPart,
-          pieceId,
-        ) ?? project
+        placePart(project, pack, waiting.part, target, waiting, pieceId) ??
+        project
       );
     });
-    inventoryView.inventory.record({ kind: "part", id: placingPart.part.id });
+    inventoryView.inventory.record({ kind: "part", id: waiting.part.id });
     setPlacingPart(null);
+    return true;
   }
 
   /** Put a part on the ground at a place the drag chose, one edit with its twin. */
-  function placeOnGround(part: LegoPartInfo, position: Vec3) {
-    if (!draft) return;
+  function placeOnGround(part: LegoPartInfo, parentId: string, position: Vec3) {
     const pieceId = crypto.randomUUID();
     queueTwin(pieceId);
     place([pieceId], (project) => ({
@@ -1047,7 +1058,7 @@ function Builder({ id }: { id: string | undefined }) {
             part.shape,
             project.pieces.map((piece) => piece.name),
           ),
-          parentId: project.rootPieceId,
+          parentId,
           partId: part.id,
           position,
           rotation: [0, 0, 0],
@@ -1059,40 +1070,142 @@ function Builder({ id }: { id: string | undefined }) {
     setPlacingPart(null);
   }
 
+  /** Put a module on the ground at a place the drag chose, as one edit. */
+  function placeModuleOnGround(
+    module: LegoProject,
+    parentId: string,
+    position: Vec3,
+    base: LegoProject,
+  ): boolean {
+    const inserted = placeModuleAt(base, module, parentId, position, () =>
+      crypto.randomUUID(),
+    );
+    if (!inserted) return false;
+    edit(() => inserted.project);
+    doc.selectMany(inserted.rootPieceIds);
+    for (const pieceId of inserted.rootPieceIds)
+      queueTwin(pieceId, inserted.presets.held);
+    inventoryView.inventory.record({ kind: "module", id: module.id });
+    setPlacingPart(null);
+    return true;
+  }
+
   /**
-   * Dragging a tile into the viewport. The drag is the placing mode with the
-   * pointer choosing the face, so the ghost, the mount rules and the edit are
-   * the click mode's. Shapes and modules that bring meshes with them are not
-   * dragged: they are added by a click.
+   * Dragging a tile into the viewport. A part or a module is the placing mode
+   * with the pointer choosing the face, so the ghost, the mount rules and the
+   * edit are the click mode's. A shape has no placing mode, so the drag holds it
+   * and the drop adds it as a click does, at the place the pointer chose. A
+   * module that brings meshes is copied into the unit first, which a click waits
+   * for too, so a drop let go before that finishes waits for it. Whatever click
+   * placing was on before the drag comes back unless the drop placed something.
    */
   const dragView = useRef<DragView | null>(null);
+  const dragging = useRef<{
+    before: Placing | null;
+    subject: DragSubject | null;
+    lifting: Promise<LegoProject | null> | null;
+    over: boolean;
+  } | null>(null);
+  const dragAim = () => ({
+    subject: dragging.current?.subject ?? null,
+    parentId: draft ? groundParentId(draft, selectedId) : "",
+  });
+  /** Place what the drag carried where it was let go, true when it was placed. */
+  function dropTile(
+    subject: DragSubject,
+    drop: DropTarget,
+    base: LegoProject,
+  ): boolean {
+    if (drop.kind === "face") {
+      return "shape" in subject
+        ? false
+        : placeOnFace(drop.target, subject, base);
+    }
+    if ("shape" in subject) return addStripShape(subject.shape, drop);
+    if ("module" in subject)
+      return placeModuleOnGround(
+        subject.module,
+        drop.parentId,
+        drop.position,
+        base,
+      );
+    placeOnGround(subject.part, drop.parentId, drop.position);
+    return true;
+  }
   const tileDrag: TileDrag = {
     start: (item) => {
-      if (item.kind === "shape") return false;
-      if (item.kind === "module" && holdsMeshes(item.module)) return false;
+      if (!draft || !pack) return false;
+      // A refused module is left to the click that follows, which says why.
+      if (item.kind === "module" && liftedModuleRefusal(draft, item.module))
+        return false;
+      if (item.kind === "shape" && !newShape(draft, item.shape, pack))
+        return false;
       setPlacingAnchor(false);
-      setPlacingPart(
-        item.kind === "part"
-          ? { part: item.part, cycle: 0, twist: 0 }
-          : { module: item.module, cycle: 0, twist: 0 },
-      );
+      const session: NonNullable<typeof dragging.current> = {
+        before: placingPart,
+        subject: null,
+        lifting: null,
+        over: false,
+      };
+      dragging.current = session;
+      if (item.kind === "shape") {
+        session.subject = { shape: item.shape };
+        setPlacingPart(null);
+      } else if (item.kind === "part") {
+        session.subject = { part: item.part, cycle: 0, twist: 0 };
+        setPlacingPart(session.subject);
+      } else if (holdsMeshes(item.module)) {
+        setPlacingPart(null);
+        session.lifting = takeInLifted(item.module, t`Add module`).then(
+          (placed) => {
+            if (placed && !session.over) {
+              session.subject = { module: placed, cycle: 0, twist: 0 };
+              setPlacingPart(session.subject);
+            }
+            return placed;
+          },
+        );
+      } else {
+        session.subject = { module: item.module, cycle: 0, twist: 0 };
+        setPlacingPart(session.subject);
+      }
       return true;
     },
-    move: (x, y) => dragView.current?.aim(x, y),
+    move: (x, y) => dragView.current?.aim(x, y, dragAim()),
     end: (x, y) => {
-      const drop = dragView.current?.resolve(x, y) ?? null;
-      dragView.current?.clear();
-      if (!drop || !placingPart) {
-        setPlacingPart(null);
-      } else if (drop.kind === "face") {
-        placeOnFace(drop.target);
-      } else if ("part" in placingPart) {
-        placeOnGround(placingPart.part, drop.position);
+      const session = dragging.current;
+      dragging.current = null;
+      if (!session) return;
+      session.over = true;
+      const finish = (
+        subject: DragSubject | null,
+        base: LegoProject | null,
+      ) => {
+        const drop =
+          subject && dragView.current?.resolve(x, y, { ...dragAim(), subject });
+        dragView.current?.clear();
+        const placed =
+          !!subject && !!drop && !!base && dropTile(subject, drop, base);
+        setPlacingPart(placingAfterDrag(session.before, placed));
+      };
+      if (session.subject || !session.lifting) {
+        finish(session.subject, draft);
+        return;
       }
+      // Read off the document, because the copy of the meshes finishes later.
+      void session.lifting.then((placed) => {
+        finish(
+          placed && { module: placed, cycle: 0, twist: 0 },
+          docRef.current.project,
+        );
+      });
     },
     cancel: () => {
+      const session = dragging.current;
+      dragging.current = null;
+      if (session) session.over = true;
       dragView.current?.clear();
-      setPlacingPart(null);
+      setPlacingPart(placingAfterDrag(session?.before ?? null, false));
     },
   };
 
@@ -3094,7 +3207,7 @@ function Builder({ id }: { id: string | undefined }) {
                           was && "part" in was ? { ...was, part } : was,
                         )
                       }
-                      onSelectShape={addStripShape}
+                      onSelectShape={(info) => addStripShape(info)}
                       onInsertModule={startPlacingModule}
                       placingModuleId={
                         placingPart && "module" in placingPart

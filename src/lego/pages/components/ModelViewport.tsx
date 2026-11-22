@@ -1753,13 +1753,13 @@ export function ModelViewport({
   useEffect(() => {
     if (!dragView) return;
     dragView.current = {
-      aim: (x, y) => {
+      aim: (x, y, drag) => {
         const state = sceneRef.current;
-        if (state) aimDrag(state, x, y);
+        if (state) aimDrag(state, x, y, drag);
       },
-      resolve: (x, y) => {
+      resolve: (x, y, drag) => {
         const state = sceneRef.current;
-        return state ? dropAt(state, x, y) : null;
+        return state ? dropAt(state, x, y, drag) : null;
       },
       clear: () => {
         const state = sceneRef.current;
