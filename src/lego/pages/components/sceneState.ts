@@ -31,7 +31,7 @@ import type { StandardView } from "../../orthoViews";
 import { getPartGeometry, type LoadedPack } from "../../pack";
 import { seatPieceMesh } from "../../pivot";
 import type { FaceTarget } from "../../placePart";
-import type { Quadrant } from "../../quadViews";
+import type { Quadrant, ViewBands } from "../../quadViews";
 import { getFixedPieceGeometry, type RawGeometry } from "../../rawGeometry";
 import type { Axis } from "../../resizePackBlock";
 import type { Seat } from "../../seat";
@@ -68,6 +68,9 @@ export interface SceneState {
   onLayoutChange: (active: Quadrant | null) => void;
   /** The canvas's size in CSS pixels, as it was last resized to. */
   size: { width: number; height: number };
+  /** What the chrome takes off the canvas's edges in the four view layout,
+   *  measured by the viewport and kept for the next time the layout opens. */
+  bands: ViewBands;
   controls: OrbitControls;
   gizmo: TransformControls;
   root: THREE.Group;

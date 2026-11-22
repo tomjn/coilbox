@@ -8,6 +8,7 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { describe, expect, it, vi } from "vitest";
+import { NO_BANDS } from "../../quadViews";
 import {
   ORBIT_MAX_POLAR,
   sizeCameras,
@@ -19,6 +20,7 @@ import {
   maximiseQuadrant,
   pickViewAt,
   setFourViews,
+  setViewBands,
   sizeViews,
   ViewportOrbitControls,
 } from "./viewLayout";
@@ -55,6 +57,7 @@ function scene() {
     quad: null,
     onLayoutChange,
     size: { width: CANVAS.width, height: CANVAS.height },
+    bands: NO_BANDS,
     controls,
     gizmo,
     dragging: false,
@@ -177,6 +180,56 @@ describe("picking the quadrant under the pointer", () => {
     const { state } = scene();
     expect(pickViewAt(state, 100, 100)).toBe(false);
     expect(state.camera).toBe(state.perspectiveCamera);
+  });
+});
+
+describe("the chrome's bands (#5410)", () => {
+  const BANDS = { top: 60, bottom: 40, left: 50 };
+
+  it("puts the gizmo, the pointer and each camera's shape in the room the bands leave", () => {
+    const { state } = scene();
+    setFourViews(state, true, BOX);
+    setViewBands(state, BANDS);
+
+    // 750 by 500 left, so each view is 375 by 250.
+    expect(state.quad?.rects.perspective).toEqual({
+      x: 425,
+      y: 310,
+      width: 375,
+      height: 250,
+    });
+    expect(state.gizmo.viewport?.toArray()).toEqual([425, 40, 375, 250]);
+    expect(state.perspectiveCamera.aspect).toBeCloseTo(375 / 250, 6);
+    // A press on the toolbar's band picks no view.
+    expect(pickViewAt(state, 100, 30)).toBe(false);
+    expect(pickViewAt(state, 100, 100)).toBe(true);
+    expect(state.gizmo.viewport?.toArray()).toEqual([50, 290, 375, 250]);
+  });
+
+  it("frames the box again in the views' final shape, once", () => {
+    const { state } = scene();
+    setFourViews(state, true, BOX);
+    const top = state.quad?.views.top.camera as THREE.OrthographicCamera;
+    setViewBands(state, BANDS);
+    const framed = top.zoom;
+    expect(state.quad?.refit).toBeNull();
+
+    top.zoom = framed * 2;
+    setViewBands(state, { ...BANDS, top: 100 });
+    expect(top.zoom).toBe(framed * 2);
+  });
+
+  it("keeps the bands for the next time four views open", () => {
+    const { state } = scene();
+    setViewBands(state, BANDS);
+    expect(state.quad).toBeNull();
+    setFourViews(state, true, BOX);
+    expect(state.quad?.rects.top).toEqual({
+      x: 50,
+      y: 60,
+      width: 375,
+      height: 250,
+    });
   });
 });
 

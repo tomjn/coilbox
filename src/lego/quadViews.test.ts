@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bandsFrom,
   fromBottomLeft,
-  overlayInset,
   pointInView,
   QUADRANTS,
   quadrantAt,
@@ -84,21 +84,62 @@ describe("fromBottomLeft", () => {
   });
 });
 
-describe("overlayInset", () => {
-  it("keeps the same margin on every side with one view", () => {
-    expect(overlayInset(false)).toEqual({
-      top: "0.75rem",
-      right: "0.75rem",
-      bottom: "0.75rem",
-      left: "0.75rem",
+describe("quadrantRects with the chrome's bands taken off (#5410)", () => {
+  // The narrowest view the side panel leaves, with a toolbar on one row.
+  const bands = { top: 60, bottom: 64, left: 56 };
+
+  it("splits only the room the bands leave", () => {
+    const rects = quadrantRects(640, 600, bands);
+    expect(rects.top).toEqual({ x: 56, y: 60, width: 292, height: 238 });
+    expect(rects.front).toEqual({ x: 348, y: 60, width: 292, height: 238 });
+    expect(rects.side).toEqual({ x: 56, y: 298, width: 292, height: 238 });
+    expect(rects.perspective).toEqual({
+      x: 348,
+      y: 298,
+      width: 292,
+      height: 238,
     });
+    // Down to the bottom band and out to the right edge, with no gap.
+    expect(rects.perspective.y + rects.perspective.height).toBe(600 - 64);
+    expect(rects.front.x + rects.front.width).toBe(640);
   });
 
-  it("starts at the middle of the canvas, below the perspective name, with four views", () => {
-    const inset = overlayInset(true);
-    expect(inset.left).toBe("calc(50% + 0.75rem)");
-    expect(inset.top).toBe("calc(50% + 1rem + 0.75rem)");
-    expect(inset.right).toBe("0.75rem");
-    expect(inset.bottom).toBe("0.75rem");
+  it("shrinks the views when the toolbar wraps and the top band grows", () => {
+    const one = quadrantRects(640, 600, bands);
+    const two = quadrantRects(640, 600, { ...bands, top: 108 });
+    expect(two.top.y).toBe(108);
+    expect(two.top.height + two.side.height).toBe(600 - 108 - 64);
+    expect(two.perspective.height).toBeLessThan(one.perspective.height);
+    expect(two.perspective.width).toBe(one.perspective.width);
+  });
+
+  it("finds no view under the bands", () => {
+    const rects = quadrantRects(640, 600, bands);
+    expect(quadrantAt(rects, 300, 30)).toBeNull();
+    expect(quadrantAt(rects, 20, 300)).toBeNull();
+    expect(quadrantAt(rects, 600, 580)).toBeNull();
+    expect(quadrantAt(rects, 56, 60)).toBe("top");
+    expect(quadrantAt(rects, 639, 535)).toBe("perspective");
+  });
+
+  it("leaves the views no room, never a negative size, when the bands fill the canvas", () => {
+    const rects = quadrantRects(640, 100, { top: 80, bottom: 80, left: 700 });
+    for (const id of QUADRANTS) {
+      expect(rects[id].width).toBe(0);
+      expect(rects[id].height).toBe(0);
+    }
+  });
+});
+
+describe("bandsFrom", () => {
+  it("measures each band from the canvas edge to where the chrome stops", () => {
+    const canvas = { left: 100, top: 50, right: 740, bottom: 650 };
+    const views = { left: 112, top: 110.4, right: 728, bottom: 586 };
+    const rail = { left: 112, top: 200, right: 155.6, bottom: 500 };
+    expect(bandsFrom(canvas, views, rail)).toEqual({
+      top: 60,
+      bottom: 64,
+      left: 56,
+    });
   });
 });
