@@ -180,7 +180,8 @@ describe("the Show menu", () => {
       "Script effects",
     ]);
     expect(items[0].getAttribute("aria-checked")).toBe("true");
-    expect(items[1].getAttribute("aria-checked")).toBe("false");
+    expect(items[1].getAttribute("aria-checked")).toBe("true");
+    expect(items[2].getAttribute("aria-checked")).toBe("false");
   });
 
   it("leaves out what the page does not offer", () => {
