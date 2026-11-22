@@ -270,6 +270,11 @@ import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
 import { BuildPictureDrawer } from "./components/BuildPictureDrawer";
 import { CollisionPanel } from "./components/CollisionPanel";
+import {
+  type DropTarget,
+  groundParentId,
+  placingAfterDrag,
+} from "./components/dragToPlace";
 import { ExportDrawer } from "./components/ExportDrawer";
 import { FitPlanDrawer } from "./components/FitPlanDrawer";
 import { GamePanel } from "./components/GamePanel";
@@ -290,11 +295,6 @@ import { PosesPopover } from "./components/PosesPopover";
 import { ProblemErrors } from "./components/ProblemErrors";
 import type { CheckStatus } from "./components/ProblemsButton";
 import { ProportionsPanel } from "./components/ProportionsPanel";
-import {
-  type DropTarget,
-  groundParentId,
-  placingAfterDrag,
-} from "./components/dragToPlace";
 import type { DragSubject, DragView, Placing } from "./components/placeByFace";
 import type { ReferenceUnit } from "./components/ReferencePicker";
 import type {

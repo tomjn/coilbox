@@ -1,5 +1,5 @@
 import * as THREE from "three";
-
+import { newShape } from "../../addShape";
 import { pieceConnectors } from "../../connectors";
 import {
   isEffectivelyHidden,
@@ -10,7 +10,6 @@ import {
 } from "../../model";
 import { placeModule, placeModuleAt } from "../../moduleMount";
 import { getPartGeometry, type LegoPartInfo, partUnit } from "../../pack";
-import { newShape } from "../../addShape";
 import { type FaceTarget, faceUnder, placePart } from "../../placePart";
 import { getMeshGeometry } from "../../rawGeometry";
 import { worldMatrix } from "../../reparent";
