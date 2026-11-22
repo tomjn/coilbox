@@ -48127,6 +48127,11 @@ msgstr ""
 msgid "The addresses the server gives players for the battles they host."
 msgstr "Os endereços que o servidor dá aos jogadores para as salas que eles hospedam."
 
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr "O ponto de mira não é de onde saem os tiros. Os tiros saem das peças de cano e clarão de disparo de uma arma, que você configura na seção Armas da aba Jogo."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
@@ -56725,11 +56730,6 @@ msgstr "Quais construções deste jogo o coilbox trata como a versão de cada fa
 #, fuzzy
 msgid "Which part of the unit to edit"
 msgstr "Qual parte da unidade editar"
-
-#: src/lego/pages/components/AimPointPanel.tsx
-#, fuzzy
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
-msgstr "De qual parte uma arma dispara é outra coisa, que a engine lê do script da unidade, e o construtor não tem armas para disparar."
 
 #: src/lego/importS3o.ts
 #, fuzzy

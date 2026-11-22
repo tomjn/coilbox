@@ -94,9 +94,9 @@ export function AimPointPanel({ project, pack, raw, onChange }: Props) {
             </p>
             <p>
               <Trans>
-                Which piece a weapon fires from is a separate thing the engine
-                reads out of the unit's script, and the builder has no weapons
-                to fire.
+                The aim point is not where shots come from. Shots leave from a
+                weapon's barrel and muzzle flare pieces, which you set up in the
+                Weapons section of the Game tab.
               </Trans>
             </p>
           </HelpPopover>

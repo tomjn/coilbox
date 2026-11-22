@@ -48144,6 +48144,11 @@ msgstr ""
 msgid "The addresses the server gives players for the battles they host."
 msgstr "Οι διευθύνσεις που δίνει ο διακομιστής στους παίκτες για τις μάχες που φιλοξενούν."
 
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr "Το σημείο στόχευσης δεν είναι το σημείο από το οποίο εκτοξεύονται τα βλήματα. Οι βολές ξεκινούν από τα κομμάτια κάννης και λάμψης στομίου ενός όπλου, τα οποία ορίζετε στην ενότητα «Όπλα» της καρτέλας «Παιχνίδι»."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
@@ -56749,11 +56754,6 @@ msgstr "Ποια κτίρια αυτού του παιχνιδιού θεωρε�
 #, fuzzy
 msgid "Which part of the unit to edit"
 msgstr "Ποιο μέρος της μονάδας να επεξεργαστείτε"
-
-#: src/lego/pages/components/AimPointPanel.tsx
-#, fuzzy
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
-msgstr "Από ποιο τμήμα βάλλει ένα όπλο είναι ξεχωριστό θέμα που η μηχανή διαβάζει από το script της μονάδας, και ο συναρμολογητής δεν έχει όπλα για βολή."
 
 #: src/lego/importS3o.ts
 #, fuzzy

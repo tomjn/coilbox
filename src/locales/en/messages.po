@@ -39257,6 +39257,10 @@ msgstr "the 3D map"
 msgid "The addresses the server gives players for the battles they host."
 msgstr "The addresses the server gives players for the battles they host."
 
+#: src/lego/pages/components/AimPointPanel.tsx
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
 msgstr "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
@@ -46267,10 +46271,6 @@ msgstr "Which of this game's buildings coilbox treats as each side's version of 
 #: src/workshop/pages/UnitPage.tsx
 msgid "Which part of the unit to edit"
 msgstr "Which part of the unit to edit"
-
-#: src/lego/pages/components/AimPointPanel.tsx
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
-msgstr "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
 
 #: src/lego/importS3o.ts
 msgid "Which pieces were dropped in as a module. A module is copied into the unit when it is used, so the copy is all there ever was in the model."

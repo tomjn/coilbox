@@ -47818,6 +47818,11 @@ msgstr ""
 msgid "The addresses the server gives players for the battles they host."
 msgstr "Адреси, які сервер видає гравцям для матчів, які вони хостять."
 
+#: src/lego/pages/components/AimPointPanel.tsx
+#, fuzzy
+msgid "The aim point is not where shots come from. Shots leave from a weapon's barrel and muzzle flare pieces, which you set up in the Weapons section of the Game tab."
+msgstr "Точка прицілювання — це не місце, звідки вилітають постріли. Постріли виходять із деталей ствола та дульного спалаху зброї, які налаштовуються в розділі «Зброя» на вкладці «Гра»."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
@@ -56372,11 +56377,6 @@ msgstr "Які будівлі цієї гри coilbox вважає версія�
 #, fuzzy
 msgid "Which part of the unit to edit"
 msgstr "Яку частину юніта редагувати"
-
-#: src/lego/pages/components/AimPointPanel.tsx
-#, fuzzy
-msgid "Which piece a weapon fires from is a separate thing the engine reads out of the unit's script, and the builder has no weapons to fire."
-msgstr "З якого елемента стріляє зброя – окреме питання, яке рушій читає зі скрипту юніта, а в конструкторі немає зброї для стрільби."
 
 #: src/lego/importS3o.ts
 #, fuzzy
