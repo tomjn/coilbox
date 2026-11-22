@@ -21,7 +21,7 @@
 --   header               format, game, gameVersion, gameShortName, map,
 --                        engine, mapSizeX, mapSizeZ, gaiaTeam, positionFrames,
 --                        unitDefs, damageFrames, gridWidth, gridHeight
---   unit_def             id, name, humanName, metalCost, energyCost, mobile,
+--   unit_def             id, name, humanName, iconType, metalCost, energyCost, mobile,
 --                        builder, builds, armed, and the numbers under
 --                        DEF_NUMBERS
 --   game_start           frame
@@ -83,7 +83,10 @@
 -- It is the engine's own list for this match, with the match's mod options and
 -- map applied. The unsynced half writes it, from a table that only reads.
 -- "name" is the definition's key. "humanName" is left out when the definition
--- gives none. "mobile", "builder", "builds" (it has a build menu) and "armed"
+-- gives none. "iconType" is the name of the map icon the engine draws the unit
+-- with in this match, which a mod option or a game's tweak can change from what
+-- the game's own files say. The engine gives "default" to a unit that names no
+-- type. "mobile", "builder", "builds" (it has a build menu) and "armed"
 -- (it has a weapon) are left out when false, and a number other than a cost is
 -- left out when zero.
 --
@@ -904,6 +907,11 @@ else
 		local human = def.humanName
 		if type(human) == "string" and human ~= "" and human ~= def.name then
 			parts[#parts + 1] = '"humanName":' .. quote(human)
+		end
+		-- Only the unsynced half is told a definition's icon type, and the engine
+		-- gives "default" to one that names none, so every unit in a real run has one.
+		if type(def.iconType) == "string" and def.iconType ~= "" then
+			parts[#parts + 1] = '"iconType":' .. quote(def.iconType)
 		end
 		parts[#parts + 1] = '"metalCost":' .. stat(def.metalCost)
 		parts[#parts + 1] = '"energyCost":' .. stat(def.energyCost)

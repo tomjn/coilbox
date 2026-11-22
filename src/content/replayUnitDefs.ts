@@ -96,7 +96,19 @@ export function storedToUnit(def: StoredUnitDef): UnitDatasetEntry {
     buildOptions: def.builds ? [""] : [],
     mobile: def.mobile === true,
     stats,
+    ...(def.iconType ? { iconType: def.iconType } : {}),
   } as UnitDatasetEntry;
+}
+
+/** The icon type of each unit in a list that names one, by lowercase name. */
+export function iconTypesByName(
+  units: readonly UnitDatasetEntry[] | undefined,
+): Map<string, string> {
+  const types = new Map<string, string>();
+  for (const unit of units ?? []) {
+    if (unit.iconType) types.set(unit.name.toLowerCase(), unit.iconType);
+  }
+  return types;
 }
 
 /** A stored list a replay can be read against, with where it came from. */

@@ -530,13 +530,13 @@ end
 -- present, zero where the definition said nothing.
 local UNIT_DEFS = {
 	{
-		name = "tgcom", humanName = "Commander", metalCost = 2500, energyCost = 25000.5, speed = 37.5,
+		name = "tgcom", humanName = "Commander", iconType = "commander", metalCost = 2500, energyCost = 25000.5, speed = 37.5,
 		isBuilder = true, buildOptions = { 2, 3 }, weapons = { {} },
 		transportCapacity = 0, metalMake = 1.5, energyMake = 25, metalStorage = 500, energyStorage = 0,
 		radarDistance = 700,
 	},
 	{
-		name = "tgmex", humanName = "Metal Extractor", metalCost = 50, energyCost = 500, speed = 0,
+		name = "tgmex", humanName = "Metal Extractor", iconType = "default", metalCost = 50, energyCost = 500, speed = 0,
 		isBuilder = false, buildOptions = {}, weapons = {},
 		extractsMetal = 0.0010000000474974513, energyUpkeep = 3,
 	},
@@ -546,7 +546,7 @@ local UNIT_DEFS = {
 		windGenerator = 25, energyUpkeep = -0.00001,
 	},
 	{
-		name = 'tg"odd', humanName = 'tg"odd', metalCost = 0, energyCost = 0, speed = 90,
+		name = 'tg"odd', humanName = 'tg"odd', iconType = 'tg"icon', metalCost = 0, energyCost = 0, speed = 90,
 		isBuilder = false, buildOptions = {}, weapons = { {}, {} }, transportCapacity = 8,
 	},
 }
@@ -574,6 +574,10 @@ do
 		defs[1].metalMake == 1.5 and defs[1].energyMake == 25 and defs[1].metalStorage == 500
 			and defs[1].radarDistance == 700 and defs[2].energyUpkeep == 3 and defs[3].windGenerator == 25
 			and defs[4].transportCapacity == 8)
+	check("a definition carries the icon type the engine draws it with, the default one included",
+		defs[1].iconType == "commander" and defs[2].iconType == "default")
+	check("an icon type with a quote in it survives", defs[4].iconType == 'tg"icon')
+	check("a definition the engine gave no icon type is left without one", defs[3].iconType == nil)
 	check("a number that is zero is left out", defs[1].energyStorage == nil and defs[1].transportCapacity == nil)
 	check("a cost of nothing is still written, because free is a price",
 		defs[4].metalCost == 0 and defs[4].energyCost == 0)
@@ -945,11 +949,11 @@ do
 
 	local function playFixture(fixture, files, teamUnits)
 		local defs = {
-			[1] = { name = "odd", isBuilding = true, xsize = 6, zsize = 6, speed = 0 },
-			[2] = { name = "even", isBuilding = true, xsize = 4, zsize = 4, speed = 0 },
-			[3] = { name = "plane", xsize = 2, zsize = 2, speed = 5, canFly = true },
-			[4] = { name = "walker", xsize = 2, zsize = 2, speed = 1 },
-			[5] = { name = "runner", xsize = 2, zsize = 2, speed = 2 },
+			[1] = { name = "odd", iconType = "default", isBuilding = true, xsize = 6, zsize = 6, speed = 0 },
+			[2] = { name = "even", iconType = "default", isBuilding = true, xsize = 4, zsize = 4, speed = 0 },
+			[3] = { name = "plane", iconType = "default", xsize = 2, zsize = 2, speed = 5, canFly = true },
+			[4] = { name = "walker", iconType = "default", xsize = 2, zsize = 2, speed = 1 },
+			[5] = { name = "runner", iconType = "default", xsize = 2, zsize = 2, speed = 2 },
 		}
 		local byName = {}
 		for id, def in pairs(defs) do

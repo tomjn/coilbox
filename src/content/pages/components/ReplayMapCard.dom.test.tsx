@@ -27,6 +27,7 @@ import type {
   GameItem,
   ReplayTrackFault,
   ReplayTrackHeader,
+  ReplayUnitDefSets,
   StartBoxConfig,
   StoredReplayAnalysis,
   StoredReplayTrack,
@@ -56,6 +57,7 @@ import {
 import type { EmphasisStore } from "../../seriesEmphasis";
 import { resetUnitDrawingForTests } from "../../unitMapDrawing";
 import { resetExplosionsForTests } from "../../unitMapExplosions";
+import { resetKeptUnitListsForTests } from "../../useReplayUnits";
 import { resetUnitMapIconsForTests } from "../../useUnitMapIcons";
 
 const ID = "00112233445566778899aabbccddeeff";
@@ -147,6 +149,8 @@ const startBoxesAsked = vi.fn();
 
 /** What unitsync says about the game's icons, or null for a failed read. */
 let ICONS: UnitIconsResult | null = null;
+/** What the unit definition store holds for the replay, or null for none. */
+let UNIT_SETS: ReplayUnitDefSets | null = null;
 
 /** What the replay file holds, and what the analysis logged. */
 let CHAT: {
@@ -179,6 +183,10 @@ vi.mock("../../bindings", async () => {
     unitsyncUnitIcons: async () => {
       if (ICONS === null) throw new Error("no icons");
       return ICONS;
+    },
+    contentUnitDefSet: async () => {
+      if (UNIT_SETS === null) throw new Error("no unit lists");
+      return UNIT_SETS;
     },
     contentDemoChat: async () => CHAT,
     contentDemoBuildOrders: async () => ORDERS,
@@ -2731,6 +2739,7 @@ describe("units as their game icons (#5316)", () => {
     loaded.length = 0;
     resetUnitDrawingForTests();
     resetUnitMapIconsForTests();
+    resetKeptUnitListsForTests();
     localStorage.removeItem("coilbox.replayMap.unitDrawing");
     ICONS = ICON_TYPES;
     GAMES = [
@@ -2768,7 +2777,31 @@ describe("units as their game icons (#5316)", () => {
     localStorage.removeItem("coilbox.replayMap.unitDrawing");
     resetUnitDrawingForTests();
     ICONS = null;
+    UNIT_SETS = null;
   });
+
+  /** The engine's list from the analysis, which names each unit the track holds
+   *  and says the icon type the match drew it with. */
+  const analysed = (units: Record<string, string | undefined>) => {
+    const digest = `sha256:${"c".repeat(64)}`;
+    const link = {
+      digest,
+      origin: "engine" as const,
+      game: "Some Game 1.0",
+      takenAtMs: 1,
+    };
+    UNIT_SETS = {
+      links: [link],
+      stream: null,
+      events: link,
+      sets: {
+        [digest]: Object.entries(units).map(([name, iconType]) => ({
+          name,
+          ...(iconType ? { iconType } : {}),
+        })),
+      },
+    };
+  };
 
   const drawn = () =>
     ctx.calls.slice(ctx.calls.map((c) => c.op).lastIndexOf("clearRect"));
@@ -2784,6 +2817,44 @@ describe("units as their game icons (#5316)", () => {
     expect(picture.filter((c) => c.op === "closePath")).toHaveLength(1);
     expect(loaded).toHaveLength(1);
     expect(loaded[0]).toContain("commander.png");
+  });
+
+  it("draws a unit with the icon type the analysis recorded for the match, over the game's", async () => {
+    // The game gives armpw a type with no picture. The match drew it as a commander.
+    analysed({ armcom: "commander", armpw: "commander" });
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(2);
+    expect(drawn().filter((c) => c.op === "closePath")).toHaveLength(0);
+  });
+
+  it("draws a unit as a rectangle when the match gave it a type with no picture", async () => {
+    analysed({ armcom: "sub", armpw: "sub" });
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(0);
+    expect(drawn().filter((c) => c.op === "closePath")).toHaveLength(2);
+  });
+
+  it("draws a type the game does not define as the game's default type", async () => {
+    ICONS = {
+      ...ICON_TYPES,
+      types: { ...ICON_TYPES.types, default: { file: "default.png", size: 1 } },
+    };
+    analysed({ armcom: "commander", armpw: "tweaked" });
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(2);
+    expect(loaded.some((url) => url.includes("default.png"))).toBe(true);
+  });
+
+  it("falls back to the game's types for an analysis that recorded none", async () => {
+    // Written before the logger wrote icon types.
+    analysed({ armcom: undefined, armpw: undefined });
+    await show("current", "/replay?frame=30");
+    await settle();
+    expect(drawn().filter((c) => c.op === "drawImage")).toHaveLength(1);
+    expect(drawn().filter((c) => c.op === "closePath")).toHaveLength(1);
   });
 
   it("draws every unit as a rectangle when the game's icons cannot be read", async () => {
