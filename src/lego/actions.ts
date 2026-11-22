@@ -1707,3 +1707,114 @@ export function setKeyValue(
     tracks: withKey(lowered.tracks ?? [], { ...channel, value }, at),
   }));
 }
+
+// --- Moving and deleting keys (#5398) ------------------------------------------
+
+/** A key on a channel, by its ruler frame. */
+export interface KeyRef extends ChannelRef {
+  frame: number;
+}
+
+/**
+ * The earliest offset a move of these keys can have: the one that puts the
+ * first of them on frame 0, the action's first instant. A key cannot go before
+ * it, because a `Sleep` cannot wait a negative time. Zero for no keys.
+ */
+export function earliestMove(
+  action: LegoAction,
+  project: LegoProject,
+  keys: KeyRef[],
+): number {
+  if (keys.length === 0) return 0;
+  const shift = actionShift(action, project);
+  return -Math.min(...keys.map((key) => key.frame - shift));
+}
+
+/**
+ * Move keys by a whole number of frames, in one edit. Each key goes with its own
+ * value, on its own channel. An action of pose keys becomes tracks in the same
+ * edit.
+ *
+ * Nothing changes when a key would land before frame 0, or on a frame its
+ * channel already keys, which is the same as the key going back where it was.
+ * The whole move is refused, so a piece's keys never part. With a blend in the
+ * keys are named by ruler frame and the offset is in the action's own frames,
+ * which are the same distance.
+ */
+export function moveKeys(
+  project: LegoProject,
+  id: string,
+  keys: KeyRef[],
+  by: number,
+): LegoProject {
+  const action = project.actions?.find((a) => a.id === id);
+  if (!action || !Number.isInteger(by) || by === 0) return project;
+  const shift = actionShift(action, project);
+  const lowered = withTracks(action, project);
+  const tracks = lowered.tracks ?? [];
+
+  // The action frames to move, on each track that has keys there.
+  const moving = new Map<LegoActionTrack, Set<number>>();
+  for (const ref of keys) {
+    const at = ref.frame - shift;
+    const track = tracks.find((t) => sameChannel(t, ref));
+    if (!track?.keys.some((k) => k.frame === at)) continue;
+    moving.set(track, (moving.get(track) ?? new Set<number>()).add(at));
+  }
+  if (moving.size === 0) return project;
+
+  for (const [track, frames] of moving) {
+    for (const at of frames) {
+      const to = at + by;
+      if (to < 0) return project;
+      if (!frames.has(to) && track.keys.some((k) => k.frame === to)) {
+        return project;
+      }
+    }
+  }
+
+  return mapAction(project, id, () => ({
+    ...lowered,
+    tracks: tracks.map((track) => {
+      const frames = moving.get(track);
+      if (!frames) return track;
+      return {
+        ...track,
+        keys: track.keys
+          .map((k) => (frames.has(k.frame) ? { ...k, frame: k.frame + by } : k))
+          .sort((a, b) => a.frame - b.frame),
+      };
+    }),
+  }));
+}
+
+/**
+ * Delete keys by ruler frame, in one edit. A track left with no keys goes, and
+ * an action of pose keys becomes tracks in the same edit. Nothing changes when
+ * none of the keys exist.
+ */
+export function deleteKeys(
+  project: LegoProject,
+  id: string,
+  keys: KeyRef[],
+): LegoProject {
+  const action = project.actions?.find((a) => a.id === id);
+  if (!action) return project;
+  const shift = actionShift(action, project);
+  const lowered = withTracks(action, project);
+  let removed = false;
+  const tracks: LegoActionTrack[] = [];
+  for (const track of lowered.tracks ?? []) {
+    const kept = track.keys.filter((k) => {
+      const gone = keys.some(
+        (ref) => sameChannel(ref, track) && ref.frame - shift === k.frame,
+      );
+      removed ||= gone;
+      return !gone;
+    });
+    if (kept.length === track.keys.length) tracks.push(track);
+    else if (kept.length > 0) tracks.push({ ...track, keys: kept });
+  }
+  if (!removed) return project;
+  return mapAction(project, id, () => ({ ...lowered, tracks }));
+}
