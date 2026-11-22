@@ -21,6 +21,29 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+describe("the sheet's layout (#5405)", () => {
+  it("scrolls its body below a header that stays put, within the window", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    const dialog = screen.getByRole("dialog");
+    const body = screen.getByTestId("shortcut-body");
+    const title = screen.getByText("Keyboard shortcuts");
+    expect(dialog.className).toContain("max-h-[calc(100dvh-2rem)]");
+    expect(body.className).toContain("overflow-y-auto");
+    expect(body.className).toContain("min-h-0");
+    expect(body.contains(title)).toBe(false);
+    expect(dialog.contains(body)).toBe(true);
+  });
+
+  it("puts Camera first in the body, ahead of Transform", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    const headings = [
+      ...screen.getByTestId("shortcut-body").querySelectorAll("h3"),
+    ].map((heading) => heading.textContent);
+    expect(headings[0]).toBe("Camera");
+    expect(headings[1]).toBe("Transform");
+  });
+});
+
 describe("the camera navigation setting", () => {
   it("defaults to Coilbox and lists its mouse controls", () => {
     render(<ShortcutSheet open onOpenChange={() => {}} />);
