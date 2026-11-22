@@ -11527,6 +11527,11 @@ msgstr "角度（°）"
 msgid "Angled"
 msgstr "斜角"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "为姿势制作动画"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21229,6 +21234,11 @@ msgstr "直接写入"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "在单位调整中编辑"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "编辑关键帧"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42329,6 +42339,11 @@ msgstr "保存模型"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "覆盖保存 {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "用“姿势”按钮保存姿势，然后添加动作。"
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

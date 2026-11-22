@@ -11527,6 +11527,11 @@ msgstr "角度（°）"
 msgid "Angled"
 msgstr "斜め"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "ポーズをアニメーションにする"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21229,6 +21234,11 @@ msgstr "直接編集"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "ユニット調整で編集"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "キーを編集"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42329,6 +42339,11 @@ msgstr "モデルを保存"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "{writableName} に上書き保存"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "ポーズボタンでポーズを保存してから、アクションを追加します。"
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

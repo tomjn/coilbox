@@ -11527,6 +11527,11 @@ msgstr "Кут (°)"
 msgid "Angled"
 msgstr "Під кутом"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Анімувати пози"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21229,6 +21234,11 @@ msgstr "Редагувати безпосередньо"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Редагувати в «Правки юнітів»"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Редагувати ключі"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42329,6 +42339,11 @@ msgstr "Зберегти модель"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "Зберегти поверх {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Збережіть пози кнопкою «Пози», а потім додайте дію."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

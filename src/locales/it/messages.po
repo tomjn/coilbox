@@ -11602,6 +11602,11 @@ msgstr "Angolo (°)"
 msgid "Angled"
 msgstr "Angolato"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Anima le pose"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21366,6 +21371,11 @@ msgstr "Modifica direttamente"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Modifica in Ritocchi unità"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Modifica i fotogrammi chiave"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42610,6 +42620,11 @@ msgstr "Salva il modello"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "Sovrascrivi {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Salva le pose con il pulsante Pose, poi aggiungi un'azione."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

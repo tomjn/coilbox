@@ -11602,6 +11602,11 @@ msgstr "Hoek (°)"
 msgid "Angled"
 msgstr "Schuin"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Poses animeren"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21366,6 +21371,11 @@ msgstr "Rechtstreeks bewerken"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Bewerken in Eenheidsaanpassingen"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Sleutels bewerken"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42610,6 +42620,11 @@ msgstr "Model opslaan"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "{writableName} overschrijven"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Sla poses op met de knop Poses en voeg dan een actie toe."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

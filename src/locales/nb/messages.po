@@ -11599,6 +11599,11 @@ msgstr "Vinkel (°)"
 msgid "Angled"
 msgstr "Skrå"
 
+#: src/lego/pages/components/PosesPopover.tsx
+#, fuzzy
+msgid "Animate poses"
+msgstr "Animer positurer"
+
 #: src/animation/index.ts
 #, fuzzy
 msgid "animation"
@@ -21362,6 +21367,11 @@ msgstr "Rediger direkte"
 #, fuzzy
 msgid "Edit in Unit tweaks"
 msgstr "Rediger i Enhetsjusteringer"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Edit keys"
+msgstr "Rediger nøkler"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -42593,6 +42603,11 @@ msgstr "Lagre modell"
 #, fuzzy
 msgid "Save over {writableName}"
 msgstr "Lagre over {writableName}"
+
+#: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
+msgid "Save poses with the Poses button, then add an action."
+msgstr "Lagre positurer med Positurer-knappen, og legg så til en handling."
 
 #: src/play/PresetLibraryToolbar.tsx
 #, fuzzy

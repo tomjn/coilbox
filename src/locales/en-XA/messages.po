@@ -9423,6 +9423,10 @@ msgstr ""
 msgid "Angled"
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Animate poses"
+msgstr ""
+
 #: src/animation/index.ts
 msgid "animation"
 msgstr ""
@@ -17422,6 +17426,10 @@ msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 msgid "Edit in Unit tweaks"
+msgstr ""
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Edit keys"
 msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
@@ -34734,6 +34742,10 @@ msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "Save over {writableName}"
+msgstr ""
+
+#: src/lego/pages/components/AnimationPanel.tsx
+msgid "Save poses with the Poses button, then add an action."
 msgstr ""
 
 #: src/play/PresetLibraryToolbar.tsx
