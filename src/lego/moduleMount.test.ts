@@ -14,6 +14,7 @@ import {
   insertModule,
   moduleConnectors,
   placeModule,
+  placeModuleAt,
 } from "./moduleMount";
 import type { LegoPartInfo, LoadedPack } from "./pack";
 import { worldMatrix } from "./reparent";
@@ -520,5 +521,25 @@ describe("a lifted module (#3269)", () => {
         counter("n"),
       ),
     ).toBeNull();
+  });
+});
+
+describe("placeModuleAt", () => {
+  it("moves every root of the module by the spot, under the parent, joined to nothing", () => {
+    const out = placeModuleAt(UNIT, MODULE, "hull", [3, 0.5, -2], counter("n"));
+    const leg = out?.project.pieces.find((p) => p.id === out.idMap.get("leg"));
+    const pod = out?.project.pieces.find((p) => p.id === out.idMap.get("pod"));
+    expect(out?.rootPieceIds).toEqual([leg?.id]);
+    expect(leg).toMatchObject({ parentId: "hull", position: [3, 0.5, -2] });
+    expect(leg?.connection).toBeUndefined();
+    // The rest of the module stays where it was relative to its root.
+    expect(pod).toMatchObject({ parentId: leg?.id, position: [0, 1.5, 0] });
+  });
+
+  it("is the same module a face would place, so it is recorded as a module", () => {
+    const out = placeModuleAt(UNIT, MODULE, "root", [0, 0, 0], counter("n"));
+    expect(
+      out?.project.pieces.find((p) => p.id === out.idMap.get("leg"))?.module,
+    ).toMatchObject({ id: "module" });
   });
 });
