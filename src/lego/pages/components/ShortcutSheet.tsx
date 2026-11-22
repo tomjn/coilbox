@@ -148,13 +148,56 @@ export function ShortcutSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg" closeLabel={t`Close`}>
-        <DialogHeader>
+      <DialogContent
+        className="flex max-h-[calc(100dvh-2rem)] flex-col sm:max-w-lg"
+        closeLabel={t`Close`}
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             <Trans>Keyboard shortcuts</Trans>
           </DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-4">
+        <div
+          data-testid="shortcut-body"
+          className="flex min-h-0 flex-col gap-4 overflow-y-auto"
+        >
+          <div>
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Trans>Camera</Trans>
+            </h3>
+            <div className="mt-1 flex items-center justify-between gap-4 text-sm">
+              <span>
+                <Trans>Camera navigation</Trans>
+              </span>
+              <OptionSelect
+                className="w-40"
+                size="sm"
+                ariaLabel={t`Camera navigation`}
+                value={preset}
+                onValueChange={(value) => {
+                  const next = PRESETS.find((p) => p === value);
+                  if (next) setPreset(next);
+                }}
+                options={PRESETS.map((p) => ({
+                  value: p,
+                  label: presetLabel(p),
+                }))}
+              />
+            </div>
+            <ul className="mt-2 flex flex-col gap-1">
+              {navigationControls(preset).map((control) => (
+                <li
+                  key={navigationLabel(control)}
+                  className="flex items-center justify-between gap-4 text-sm"
+                >
+                  <span>{moveLabel(control.move)}</span>
+                  <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    {navigationLabel(control)}
+                  </kbd>
+                </li>
+              ))}
+            </ul>
+          </div>
           {GROUP_ORDER.map((group) => (
             <div key={group}>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -246,43 +289,6 @@ export function ShortcutSheet({
             >
               <Trans>Reset all shortcuts</Trans>
             </Button>
-          </div>
-          <div>
-            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Trans>Camera</Trans>
-            </h3>
-            <div className="mt-1 flex items-center justify-between gap-4 text-sm">
-              <span>
-                <Trans>Camera navigation</Trans>
-              </span>
-              <OptionSelect
-                className="w-40"
-                size="sm"
-                ariaLabel={t`Camera navigation`}
-                value={preset}
-                onValueChange={(value) => {
-                  const next = PRESETS.find((p) => p === value);
-                  if (next) setPreset(next);
-                }}
-                options={PRESETS.map((p) => ({
-                  value: p,
-                  label: presetLabel(p),
-                }))}
-              />
-            </div>
-            <ul className="mt-2 flex flex-col gap-1">
-              {navigationControls(preset).map((control) => (
-                <li
-                  key={navigationLabel(control)}
-                  className="flex items-center justify-between gap-4 text-sm"
-                >
-                  <span>{moveLabel(control.move)}</span>
-                  <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
-                    {navigationLabel(control)}
-                  </kbd>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </DialogContent>
