@@ -6223,6 +6223,10 @@ msgstr ""
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "{used} is already used to: {name}"
+msgstr ""
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "{usedSize} used of {limitSize}"
 msgstr ""
@@ -11925,6 +11929,7 @@ msgstr ""
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -11963,6 +11968,10 @@ msgstr ""
 
 #: src/content/AnalysisQueueBadge.tsx
 msgid "Cancel all"
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Cancel changing {description}"
 msgstr ""
 
 #: src/downloads/DownloadQueueBadge.tsx
@@ -12154,8 +12163,13 @@ msgstr ""
 msgid "Chance of setting static map features alight on impact."
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "Change"
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Change {description}"
 msgstr ""
 
 #: src/multiplayer/admin/StaffSection.tsx
@@ -19055,6 +19069,7 @@ msgstr ""
 msgid "fixed"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 msgid "Fixed"
 msgstr ""
@@ -31511,6 +31526,10 @@ msgstr ""
 msgid "Press a key"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Press a key together with the modifier"
+msgstr ""
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 msgid "Press it again later to carry on."
@@ -31530,6 +31549,10 @@ msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Press the new keys"
 msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
@@ -33853,9 +33876,14 @@ msgstr ""
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 msgid "Reset"
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Reset {description}"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -33885,6 +33913,10 @@ msgstr ""
 
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Reset all shortcuts"
 msgstr ""
 
 #: src/uberstress/pages/SettingsSection.tsx

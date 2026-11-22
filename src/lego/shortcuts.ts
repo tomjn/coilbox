@@ -1,4 +1,6 @@
 import { t } from "@lingui/core/macro";
+import { applyOverrides } from "./shortcutOverrides";
+import { getShortcutOverrides } from "./shortcutOverridesStore";
 /**
  * The single source of truth for every keyboard shortcut in the unit
  * builder.
@@ -64,9 +66,14 @@ export function shortcutMatches(
   return shortcut.combos.some((combo) => comboMatches(combo, event));
 }
 
+/** The shortcuts as the player has them, with their rebinding applied. */
+export function effectiveShortcuts(): Shortcut[] {
+  return applyOverrides(SHORTCUTS, getShortcutOverrides());
+}
+
 /** Look up a shortcut by id and test it in one call, for use in a handler. */
 export function isShortcut(id: string, event: KeyboardEvent): boolean {
-  const shortcut = SHORTCUTS.find((s) => s.id === id);
+  const shortcut = effectiveShortcuts().find((s) => s.id === id);
   if (!shortcut) throw new Error(`Unknown shortcut id: ${id}`);
   return shortcutMatches(shortcut, event);
 }
@@ -315,7 +322,7 @@ export function comboLabel(combo: KeyCombo, mac: boolean): string {
  * tooltip cannot go on promising a key the handler stopped listening for.
  */
 export function shortcutLabel(id: string): string {
-  const shortcut = SHORTCUTS.find((s) => s.id === id);
+  const shortcut = effectiveShortcuts().find((s) => s.id === id);
   const combo = shortcut?.combos[0];
   if (!combo) throw new Error(`Unknown shortcut id: ${id}`);
   return comboLabel(combo, isMac());

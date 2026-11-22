@@ -6224,6 +6224,10 @@ msgstr "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in 
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "{used} is already used to: {name}"
+msgstr "{used} is already used to: {name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "{usedSize} used of {limitSize}"
 msgstr "{usedSize} used of {limitSize}"
@@ -11926,6 +11930,7 @@ msgstr "Can't damage its own unit"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -11965,6 +11970,10 @@ msgstr "Cancel {0}"
 #: src/content/AnalysisQueueBadge.tsx
 msgid "Cancel all"
 msgstr "Cancel all"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Cancel changing {description}"
+msgstr "Cancel changing {description}"
 
 #: src/downloads/DownloadQueueBadge.tsx
 msgid "Cancel downloading {label}"
@@ -12155,9 +12164,14 @@ msgstr "Challenges"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Chance of setting static map features alight on impact."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "Change"
 msgstr "Change"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Change {description}"
+msgstr "Change {description}"
 
 #: src/multiplayer/admin/StaffSection.tsx
 msgid "Change {username}'s access?"
@@ -19056,6 +19070,7 @@ msgstr "Fix UVs and normals"
 msgid "fixed"
 msgstr "fixed"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 msgid "Fixed"
 msgstr "Fixed"
@@ -31512,6 +31527,10 @@ msgstr "Presets do not cover this. Take the script over and write {callinNames}.
 msgid "Press a key"
 msgstr "Press a key"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Press a key together with the modifier"
+msgstr "Press a key together with the modifier"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 msgid "Press it again later to carry on."
@@ -31532,6 +31551,10 @@ msgstr "Press Register to create the account."
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Press the keys you want. Escape binds Escape, so use Cancel to back out."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Press the new keys"
+msgstr "Press the new keys"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -33854,10 +33877,15 @@ msgstr "Resend verification email"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 msgid "Reset"
 msgstr "Reset"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Reset {description}"
+msgstr "Reset {description}"
 
 #: src/sound/SoundSettings.tsx
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
@@ -33887,6 +33915,10 @@ msgstr "Reset {rowLabel} to the inherited value"
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "Reset again to send the ones that did not land. Options already at their default are skipped."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Reset all shortcuts"
+msgstr "Reset all shortcuts"
 
 #: src/uberstress/pages/SettingsSection.tsx
 msgid "Reset database before each bench run"

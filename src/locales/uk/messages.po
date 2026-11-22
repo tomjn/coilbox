@@ -7600,6 +7600,11 @@ msgstr "{upgraded, plural, one {# покращення в цьому промі�
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, one {# покращення.} few {# покращення.} many {# покращень.} other {# покращення.}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "{used} is already used to: {name}"
+msgstr "{used} вже використовується для: {name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "{usedSize} used of {limitSize}"
@@ -14578,6 +14583,7 @@ msgstr "Не може пошкодити власний юніт"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -14619,6 +14625,11 @@ msgstr "Скасувати: {0}"
 #, fuzzy
 msgid "Cancel all"
 msgstr "Скасувати все"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Cancel changing {description}"
+msgstr "Скасувати зміну: {description}"
 
 #: src/downloads/DownloadQueueBadge.tsx
 #, fuzzy
@@ -14853,10 +14864,16 @@ msgstr "Виклики"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Імовірність підпалити статичні об’єкти мапи під час влучання."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Change"
 msgstr "Змінити"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Change {description}"
+msgstr "Змінити: {description}"
 
 #: src/multiplayer/admin/StaffSection.tsx
 #, fuzzy
@@ -23222,6 +23239,7 @@ msgstr "Виправити UV і нормалі"
 msgid "fixed"
 msgstr "фіксоване"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Fixed"
@@ -38407,6 +38425,11 @@ msgstr "Готові анімації цього не покривають. Ві
 msgid "Press a key"
 msgstr "Натисніть клавішу"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press a key together with the modifier"
+msgstr "Натисніть клавішу разом із модифікатором"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -38431,6 +38454,11 @@ msgstr "Натисніть «Зареєструвати», щоб створит
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Натисніть потрібні клавіші. Escape призначає Escape, тож для виходу використовуйте «Скасувати»."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press the new keys"
+msgstr "Натисніть нові клавіші"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -41254,11 +41282,17 @@ msgstr "Надіслати лист підтвердження ще раз"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Скинути"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset {description}"
+msgstr "Скинути: {description}"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -41294,6 +41328,11 @@ msgstr "Скинути {rowLabel} до успадкованого значенн
 #, fuzzy
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "Скиньте ще раз, щоб надіслати ті, що не дійшли. Параметри, які вже мають значення за замовчуванням, пропускаються."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset all shortcuts"
+msgstr "Скинути всі скорочення"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy

@@ -7655,6 +7655,11 @@ msgstr "{upgraded, plural, one {# upgrade in dit tijdvak.} other {# upgrades in 
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "{used} is already used to: {name}"
+msgstr "{used} wordt al gebruikt voor: {name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "{usedSize} used of {limitSize}"
@@ -14663,6 +14668,7 @@ msgstr "Kan eigen eenheid niet beschadigen"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -14705,6 +14711,11 @@ msgstr "{0} annuleren"
 #, fuzzy
 msgid "Cancel all"
 msgstr "Alles annuleren"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Cancel changing {description}"
+msgstr "Wijzigen van {description} annuleren"
 
 #: src/downloads/DownloadQueueBadge.tsx
 #, fuzzy
@@ -14941,10 +14952,16 @@ msgstr "Uitdagingen"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Kans dat vaste kaartobjecten bij inslag in brand vliegen."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Change"
 msgstr "Wijzigen"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Change {description}"
+msgstr "{description} wijzigen"
 
 #: src/multiplayer/admin/StaffSection.tsx
 #, fuzzy
@@ -23375,6 +23392,7 @@ msgstr "UV’s en normalen herstellen"
 msgid "fixed"
 msgstr "vast"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Fixed"
@@ -38663,6 +38681,11 @@ msgstr "Voorinstellingen dekken dit niet. Neem het script over en schrijf {calli
 msgid "Press a key"
 msgstr "Druk op een toets"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press a key together with the modifier"
+msgstr "Druk op een toets samen met de modifier"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -38688,6 +38711,11 @@ msgstr "Druk op Account aanmaken om het account aan te maken."
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Druk op de toetsen die je wilt. Escape wijst Escape toe, dus gebruik Annuleren om terug te gaan."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press the new keys"
+msgstr "Druk op de nieuwe toetsen"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -41529,11 +41557,17 @@ msgstr "Verificatiemail opnieuw versturen"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Resetten"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset {description}"
+msgstr "{description} resetten"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -41570,6 +41604,11 @@ msgstr "{rowLabel} resetten naar de overgenomen waarde"
 #, fuzzy
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "Reset nog eens om de opties te versturen die niet zijn aangekomen. Opties die al op hun standaard staan, worden overgeslagen."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset all shortcuts"
+msgstr "Alle sneltoetsen resetten"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy

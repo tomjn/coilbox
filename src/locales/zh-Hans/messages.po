@@ -7600,6 +7600,11 @@ msgstr "{upgraded, plural, other {此时间段内有 # 次升级。}}"
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, other {# 次升级。}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "{used} is already used to: {name}"
+msgstr "{used} 已用于：{name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "{usedSize} used of {limitSize}"
@@ -14578,6 +14583,7 @@ msgstr "不会伤害自己的单位"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -14619,6 +14625,11 @@ msgstr "取消 {0}"
 #, fuzzy
 msgid "Cancel all"
 msgstr "全部取消"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Cancel changing {description}"
+msgstr "取消更改 {description}"
 
 #: src/downloads/DownloadQueueBadge.tsx
 #, fuzzy
@@ -14853,10 +14864,16 @@ msgstr "挑战"
 msgid "Chance of setting static map features alight on impact."
 msgstr "命中时点燃地图上静态物体的几率。"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Change"
 msgstr "更改"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Change {description}"
+msgstr "更改 {description}"
 
 #: src/multiplayer/admin/StaffSection.tsx
 #, fuzzy
@@ -23222,6 +23239,7 @@ msgstr "修复 UV 和法线"
 msgid "fixed"
 msgstr "固定"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Fixed"
@@ -38407,6 +38425,11 @@ msgstr "预设不涵盖此情况。请接管脚本并编写 {callinNames}。"
 msgid "Press a key"
 msgstr "请按一个键"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press a key together with the modifier"
+msgstr "请在修饰键之外再按一个键"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -38431,6 +38454,11 @@ msgstr "按“注册”以创建账号。"
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "按下你想要的按键。Escape 会绑定 Escape，所以请使用“取消”退出。"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press the new keys"
+msgstr "请按下新的按键"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -41254,11 +41282,17 @@ msgstr "重新发送验证邮件"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "重置"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset {description}"
+msgstr "重置 {description}"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -41294,6 +41328,11 @@ msgstr "将 {rowLabel} 重置为继承的值"
 #, fuzzy
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "再次重置以发送未生效的选项。已是默认值的选项会被跳过。"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset all shortcuts"
+msgstr "重置所有快捷键"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy

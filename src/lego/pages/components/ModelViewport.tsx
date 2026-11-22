@@ -101,6 +101,7 @@ import type { Axis } from "../../resizePackBlock";
 import { unitBounds } from "../../s3oBuild";
 import type { ScriptTimeline } from "../../scriptPlayback";
 import type { Seat } from "../../seat";
+import { useShortcutOverrides } from "../../shortcutOverridesStore";
 import { shortcutLabel } from "../../shortcuts";
 import { proportionHandles as proportionHandlesOf } from "../../skeletonEdit";
 import type { Vec3 } from "../../snapping";
@@ -1886,6 +1887,8 @@ export function ModelViewport({
   });
 
   const { t } = useLingui();
+  // Re-render when a shortcut is rebound, so its tooltip keeps up.
+  useShortcutOverrides();
 
   // What the line at the foot of the view says about the gesture in progress.
   function hintText(): string {

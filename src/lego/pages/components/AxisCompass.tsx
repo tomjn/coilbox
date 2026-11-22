@@ -17,6 +17,7 @@ import { Button, cn } from "@picoframe/frame";
 import type { RefObject } from "react";
 import * as THREE from "three";
 import type { StandardView } from "../../orthoViews";
+import { useShortcutOverrides } from "../../shortcutOverridesStore";
 import { shortcutLabel } from "../../shortcuts";
 import {
   AXES,
@@ -85,6 +86,8 @@ export function AxisCompass({
   onResetView,
 }: AxisCompassProps) {
   const { t } = useLingui();
+  // Re-render when a shortcut is rebound, so its tooltip keeps up.
+  useShortcutOverrides();
   const front = shortcutLabel("view-front");
   const side = shortcutLabel("view-side");
   const top = shortcutLabel("view-top");

@@ -7655,6 +7655,11 @@ msgstr "{upgraded, plural, one {# uppgradering i det här tidsfönstret.} other 
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, one {# uppgradering.} other {# uppgraderingar.}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "{used} is already used to: {name}"
+msgstr "{used} används redan för: {name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "{usedSize} used of {limitSize}"
@@ -14663,6 +14668,7 @@ msgstr "Kan inte skada sin egen enhet"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -14705,6 +14711,11 @@ msgstr "Avbryt {0}"
 #, fuzzy
 msgid "Cancel all"
 msgstr "Avbryt alla"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Cancel changing {description}"
+msgstr "Avbryt ändring av {description}"
 
 #: src/downloads/DownloadQueueBadge.tsx
 #, fuzzy
@@ -14941,10 +14952,16 @@ msgstr "Utmaningar"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Chans att sätta eld på statiska kartobjekt vid träff."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Change"
 msgstr "Ändra"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Change {description}"
+msgstr "Ändra {description}"
 
 #: src/multiplayer/admin/StaffSection.tsx
 #, fuzzy
@@ -23375,6 +23392,7 @@ msgstr "Åtgärda UV och normaler"
 msgid "fixed"
 msgstr "fast"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Fixed"
@@ -38663,6 +38681,11 @@ msgstr "Förinställningarna täcker inte det här. Ta över skriptet och skriv 
 msgid "Press a key"
 msgstr "Tryck på en tangent"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press a key together with the modifier"
+msgstr "Tryck på en tangent tillsammans med modifieraren"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -38688,6 +38711,11 @@ msgstr "Tryck på Registrera för att skapa kontot."
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Tryck på tangenterna du vill ha. Escape kopplar Escape, så använd Avbryt för att backa."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press the new keys"
+msgstr "Tryck på de nya tangenterna"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -41529,11 +41557,17 @@ msgstr "Skicka verifieringsmejlet igen"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Återställ"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset {description}"
+msgstr "Återställ {description}"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -41570,6 +41604,11 @@ msgstr "Återställ {rowLabel} till det ärvda värdet"
 #, fuzzy
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "Återställ igen för att skicka de som inte gick fram. Alternativ som redan har sitt standardvärde hoppas över."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset all shortcuts"
+msgstr "Återställ alla kortkommandon"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy

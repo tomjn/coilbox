@@ -7655,6 +7655,11 @@ msgstr "{upgraded, plural, one {# αναβάθμιση σε αυτό το χρο
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, one {# αναβάθμιση.} other {# αναβαθμίσεις.}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "{used} is already used to: {name}"
+msgstr "Το {used} χρησιμοποιείται ήδη για: {name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "{usedSize} used of {limitSize}"
@@ -14663,6 +14668,7 @@ msgstr "Δεν μπορεί να βλάψει τη δική του μονάδα"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -14705,6 +14711,11 @@ msgstr "Ακύρωση {0}"
 #, fuzzy
 msgid "Cancel all"
 msgstr "Ακύρωση όλων"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Cancel changing {description}"
+msgstr "Ακύρωση αλλαγής: {description}"
 
 #: src/downloads/DownloadQueueBadge.tsx
 #, fuzzy
@@ -14941,10 +14952,16 @@ msgstr "Προκλήσεις"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Πιθανότητα να πάρουν φωτιά τα στατικά αντικείμενα χάρτη κατά την πρόσκρουση."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Change"
 msgstr "Αλλαγή"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Change {description}"
+msgstr "Αλλαγή: {description}"
 
 #: src/multiplayer/admin/StaffSection.tsx
 #, fuzzy
@@ -23375,6 +23392,7 @@ msgstr "Διόρθωση UV και κανονικών"
 msgid "fixed"
 msgstr "σταθερό"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Fixed"
@@ -38663,6 +38681,11 @@ msgstr "Οι προρρυθμίσεις δεν καλύπτουν αυτό. Αν
 msgid "Press a key"
 msgstr "Πατήστε ένα πλήκτρο"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press a key together with the modifier"
+msgstr "Πατήστε ένα πλήκτρο μαζί με το πλήκτρο τροποποίησης"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -38688,6 +38711,11 @@ msgstr "Πατήστε Δημιουργία λογαριασμού για να �
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Πατήστε τα πλήκτρα που θέλετε. Το Escape αντιστοιχίζει το Escape, οπότε χρησιμοποιήστε την Ακύρωση για να βγείτε."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press the new keys"
+msgstr "Πατήστε τα νέα πλήκτρα"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -41529,11 +41557,17 @@ msgstr "Επαναποστολή email επαλήθευσης"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Επαναφορά"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset {description}"
+msgstr "Επαναφορά: {description}"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -41570,6 +41604,11 @@ msgstr "Επαναφορά του {rowLabel} στην κληρονομημένη
 #, fuzzy
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "Κάντε ξανά επαναφορά για να σταλούν όσες δεν έφτασαν. Οι επιλογές που είναι ήδη στην προεπιλογή τους παραλείπονται."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset all shortcuts"
+msgstr "Επαναφορά όλων των συντομεύσεων"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy

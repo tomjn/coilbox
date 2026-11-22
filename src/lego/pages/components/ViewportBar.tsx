@@ -36,6 +36,7 @@ import {
   ViewControls,
   ViewToggle,
 } from "@/components/ViewControls";
+import { useShortcutOverrides } from "../../shortcutOverridesStore";
 import { shortcutLabel } from "../../shortcuts";
 import type { DrawMode } from "./drawMode";
 
@@ -126,6 +127,8 @@ export function ViewportBar({
   onShortcuts,
 }: ViewportBarProps) {
   const { t } = useLingui();
+  // Re-render when a shortcut is rebound, so its tooltip keeps up.
+  useShortcutOverrides();
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
   const measureKey = shortcutLabel("measure");
   const skeletonKey = shortcutLabel("skeleton");

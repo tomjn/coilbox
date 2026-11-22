@@ -7653,6 +7653,11 @@ msgstr "{upgraded, plural, one {# melhoria neste intervalo.} other {# melhorias 
 msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
 msgstr "{upgraded, plural, one {# melhoria.} other {# melhorias.}}"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "{used} is already used to: {name}"
+msgstr "{used} já é usado para: {name}"
+
 #: src/content/pages/components/ReplayTracksStorage.tsx
 #, fuzzy
 msgid "{usedSize} used of {limitSize}"
@@ -14660,6 +14665,7 @@ msgstr "Não causa dano à própria unidade"
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/lobby-servers/RegisterForm.tsx
@@ -14702,6 +14708,11 @@ msgstr "Cancelar {0}"
 #, fuzzy
 msgid "Cancel all"
 msgstr "Cancelar tudo"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Cancel changing {description}"
+msgstr "Cancelar a alteração de {description}"
 
 #: src/downloads/DownloadQueueBadge.tsx
 #, fuzzy
@@ -14938,10 +14949,16 @@ msgstr "Desafios"
 msgid "Chance of setting static map features alight on impact."
 msgstr "Chance de incendiar objetos estáticos do mapa no impacto."
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Change"
 msgstr "Trocar"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Change {description}"
+msgstr "Alterar {description}"
 
 #: src/multiplayer/admin/StaffSection.tsx
 #, fuzzy
@@ -23365,6 +23382,7 @@ msgstr "Corrigir UVs e normais"
 msgid "fixed"
 msgstr "fixo"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/startbox/mode.ts
 #, fuzzy
 msgid "Fixed"
@@ -38646,6 +38664,11 @@ msgstr "As predefinições não cobrem isto. Assuma o script e escreva {callinNa
 msgid "Press a key"
 msgstr "Pressione uma tecla"
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press a key together with the modifier"
+msgstr "Pressione uma tecla junto com o modificador"
+
 #: src/hub/assets/pictureSweep.ts
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -38671,6 +38694,11 @@ msgstr "Pressione Criar conta para criar a conta."
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Pressione as teclas que quiser. Escape atribui Escape, então use Cancelar para desistir."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Press the new keys"
+msgstr "Pressione as novas teclas"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/conquest/pages/ConquestListPage.tsx
@@ -41512,11 +41540,17 @@ msgstr "Reenviar e-mail de verificação"
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Redefinir"
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset {description}"
+msgstr "Redefinir {description}"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -41553,6 +41587,11 @@ msgstr "Redefinir {rowLabel} para o valor herdado"
 #, fuzzy
 msgid "Reset again to send the ones that did not land. Options already at their default are skipped."
 msgstr "Redefina de novo para enviar as que não chegaram. As opções que já estão no padrão são puladas."
+
+#: src/lego/pages/components/ShortcutSheet.tsx
+#, fuzzy
+msgid "Reset all shortcuts"
+msgstr "Redefinir todos os atalhos"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy

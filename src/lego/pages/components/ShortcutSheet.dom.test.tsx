@@ -1,17 +1,23 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getNavigationPreset,
   resetNavigationPresetCache,
   setNavigationPreset,
 } from "../../cameraNavigationStore";
+import {
+  getShortcutOverrides,
+  resetShortcutOverridesCache,
+} from "../../shortcutOverridesStore";
+import { isShortcut } from "../../shortcuts";
 import { ShortcutSheet } from "./ShortcutSheet";
 
 beforeEach(() => {
   localStorage.clear();
   resetNavigationPresetCache();
+  resetShortcutOverridesCache();
 });
 afterEach(cleanup);
 
@@ -42,5 +48,102 @@ describe("the camera navigation setting", () => {
     );
     expect(screen.getByText("Shift + Middle drag")).toBeTruthy();
     setNavigationPreset("coilbox");
+  });
+});
+
+function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  return new KeyboardEvent("keydown", { key, ...init });
+}
+
+describe("rebinding a shortcut", () => {
+  function startChanging(description: string) {
+    fireEvent.click(
+      screen.getByRole("button", { name: `Change ${description}` }),
+    );
+  }
+
+  it("saves the keys pressed after choosing a row", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    startChanging("Move the selection");
+    fireEvent.keyDown(document.body, { key: "q" });
+    expect(getShortcutOverrides().translate).toEqual({
+      key: "q",
+      mod: false,
+      shift: false,
+    });
+    expect(localStorage.getItem("coilbox.lego.shortcutOverrides")).toContain(
+      "translate",
+    );
+    expect(isShortcut("translate", press("q"))).toBe(true);
+    expect(isShortcut("translate", press("g"))).toBe(false);
+    expect(screen.getByText("Q")).toBeTruthy();
+  });
+
+  it("takes modifiers into the combo", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    startChanging("Move the selection");
+    fireEvent.keyDown(document.body, { key: "q", ctrlKey: true });
+    expect(getShortcutOverrides().translate).toEqual({
+      key: "q",
+      mod: true,
+      shift: false,
+    });
+  });
+
+  it("cancels on Escape without changing anything", () => {
+    const onOpenChange = vi.fn();
+    render(<ShortcutSheet open onOpenChange={onOpenChange} />);
+    startChanging("Move the selection");
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(getShortcutOverrides()).toEqual({});
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.queryByText("Press the new keys")).toBeNull();
+  });
+
+  it("refuses a combo another shortcut uses and names that shortcut", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    startChanging("Move the selection");
+    fireEvent.keyDown(document.body, { key: "r" });
+    expect(getShortcutOverrides()).toEqual({});
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Turn the selection");
+    expect(screen.getByText("Press the new keys")).toBeTruthy();
+  });
+
+  it("refuses a bare modifier", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    startChanging("Move the selection");
+    fireEvent.keyDown(document.body, { key: "Shift", shiftKey: true });
+    expect(getShortcutOverrides()).toEqual({});
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+
+  it("offers no way to change the Alt hold or the modified click", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    expect(screen.getAllByText("Fixed").length).toBe(2);
+  });
+
+  it("resets one shortcut, then all of them", () => {
+    render(<ShortcutSheet open onOpenChange={() => {}} />);
+    startChanging("Move the selection");
+    fireEvent.keyDown(document.body, { key: "q" });
+    startChanging("Turn the selection");
+    fireEvent.keyDown(document.body, { key: "x" });
+    expect(Object.keys(getShortcutOverrides()).sort()).toEqual([
+      "rotate",
+      "translate",
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset Move the selection" }),
+    );
+    expect(Object.keys(getShortcutOverrides())).toEqual(["rotate"]);
+    expect(screen.getByText("G")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset all shortcuts" }),
+    );
+    expect(getShortcutOverrides()).toEqual({});
+    expect(localStorage.getItem("coilbox.lego.shortcutOverrides")).toBeNull();
   });
 });

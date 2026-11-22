@@ -241,6 +241,7 @@ import type {
 } from "../scriptPlayback";
 import { dragPiece, freeMoved, type Seat, typedJoinedTransform } from "../seat";
 import { isKnownShapeKind, type LegoShape, type ShapeKind } from "../shapes";
+import { useShortcutOverrides } from "../shortcutOverridesStore";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { skeletonProblems } from "../skeletonChecks";
 import { applyProportions, resetToPlan } from "../skeletonEdit";
@@ -2234,6 +2235,9 @@ function Builder({ id }: { id: string | undefined }) {
       return rest;
     });
   }
+
+  // Re-render when a shortcut is rebound, so its tooltip keeps up.
+  useShortcutOverrides();
 
   if (doc.loading || !draft || !pack) {
     // A document that finished loading with nothing to show did not load, and
