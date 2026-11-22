@@ -1,6 +1,6 @@
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { type NavigationPreset, mouseButtonsFor } from "./cameraNavigation";
+import { mouseButtonsFor, type NavigationPreset } from "./cameraNavigation";
 
 const NO_KEYS = {
   button: 0,

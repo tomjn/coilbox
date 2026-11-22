@@ -2,8 +2,8 @@ import { MOUSE } from "three";
 import { describe, expect, it } from "vitest";
 
 import {
-  moveFor,
   mouseButtonsFor,
+  moveFor,
   navigationControls,
   type PointerModifiers,
   presetFromStored,

@@ -50,8 +50,6 @@ import { useReduceMotion } from "../../../general/display";
 import { attachCameraNavigation } from "../../attachCameraNavigation";
 import { type BalanceResult, balanceSummary } from "../../balance";
 import type { BodyPlan } from "../../bodyPlans";
-import { mouseButtonsFor } from "../../cameraNavigation";
-import { getNavigationPreset } from "../../cameraNavigationStore";
 import {
   buildFrontMarker,
   buildGround,
@@ -60,6 +58,8 @@ import {
   groundSteps,
   REFERENCE_PARK_X,
 } from "../../buildPlate";
+import { mouseButtonsFor } from "../../cameraNavigation";
+import { getNavigationPreset } from "../../cameraNavigationStore";
 import { driveReach as driveReachOf } from "../../drive";
 import {
   type BackdropId,
