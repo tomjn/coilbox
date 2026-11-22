@@ -87,7 +87,9 @@ export function showStandardView(
   // user turning away from the view.
   state.standardView = null;
   use(state, ortho);
-  controls.maxPolarAngle = Math.PI / 2;
+  // The bottom view is below the horizon, which the orbit would otherwise
+  // pull the camera back up from.
+  controls.maxPolarAngle = id === "bottom" ? Math.PI : Math.PI / 2;
 
   const target = box.getCenter(new THREE.Vector3());
   const distance = Math.max(controls.maxDistance / 2, controls.minDistance);
@@ -110,6 +112,8 @@ export function showStandardView(
 /**
  * Go back to the perspective camera, looking the way the orthographic one was
  * and showing the target at about the size it was. A no-op in perspective.
+ * Leaving the bottom view lands the perspective camera at the lowest angle its
+ * orbit allows, as it has no view from underneath.
  */
 export function leaveStandardView(state: SceneState) {
   if (state.camera !== state.orthographicCamera) return;

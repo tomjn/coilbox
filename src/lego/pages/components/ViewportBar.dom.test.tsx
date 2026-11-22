@@ -12,7 +12,6 @@
  */
 
 import {
-  act,
   cleanup,
   fireEvent,
   render,
@@ -79,8 +78,6 @@ function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
     overlap: toggle(),
     footprint: { ...toggle(), leaveOut: true, onLeaveOutChange: vi.fn() },
     aim: toggle(),
-    view: null,
-    onView: vi.fn(),
     measure: toggle(),
     guides: (
       <GuidesPopover
@@ -109,8 +106,6 @@ function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
       />
     ),
     onShortcuts: vi.fn(),
-    compassRef: { current: null },
-    onResetView: vi.fn(),
     ...overrides,
   };
 }
@@ -131,19 +126,8 @@ function bar() {
   return screen.getAllByRole("group")[0];
 }
 
-/** The buttons in the bar itself, not the ones in a flyout or a popover. */
 function barButtons() {
-  return within(bar())
-    .getAllByRole("button")
-    .filter((button) => !button.closest("[data-views-flyout]"));
-}
-
-function resetButton() {
-  return screen.getByRole("button", { name: "Reset the view" });
-}
-
-function focused() {
-  return document.activeElement as HTMLElement;
+  return within(bar()).getAllByRole("button");
 }
 
 function lucideName(svg: Element) {
@@ -258,13 +242,11 @@ describe("icons", () => {
     "both",
   ] as const)("gives no two buttons the same icon, drawing %s", (drawMode) => {
     render(<ViewportBar {...props({ ...everything(), drawMode })} />);
-    // Open the flyout so its view buttons are counted too.
-    fireEvent.mouseOver(resetButton());
     const names = within(bar())
       .getAllByRole("button")
       .map((button) => {
         const svg = button.querySelector("svg.lucide");
-        return svg ? lucideName(svg) : "compass";
+        return svg ? lucideName(svg) : "none";
       });
     expect(names).not.toContain(undefined);
     expect(new Set(names).size).toBe(names.length);
@@ -287,99 +269,14 @@ describe("icons", () => {
   });
 });
 
-describe("the fixed views", () => {
-  it("keeps them out of the bar, which is shorter for it", () => {
+describe("the axis compass", () => {
+  it("is not in the bar, and neither is the views flyout", () => {
     render(<ViewportBar {...props()} />);
-    // The screenshot's bar held 17 buttons, three of them the views. The
-    // overlay toggles have since moved into the Show menu.
-    expect(barButtons()).toHaveLength(8);
-    expect(screen.queryByRole("button", { name: /front/ })).toBeNull();
-  });
-
-  it("opens them above the reset button on hover", () => {
-    render(<ViewportBar {...props()} />);
-    fireEvent.mouseOver(resetButton());
-    const flyout = screen.getByRole("group", { name: "Fixed views" });
-    const names = within(flyout)
-      .getAllByRole("button")
-      .map((button) => button.getAttribute("aria-label"));
-    expect(names).toEqual([
-      "Look at the front with no perspective (1)",
-      "Look at the side with no perspective (2)",
-      "Look at the top with no perspective (3)",
-    ]);
-    expect(flyout.parentElement?.className).toContain("bottom-full");
-
-    fireEvent.mouseOut(resetButton());
+    expect(screen.queryByRole("button", { name: "Reset the view" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Fixed views" })).toBeNull();
-  });
-
-  it("opens them when the reset button takes focus, after it in tab order", () => {
-    render(<ViewportBar {...props()} />);
-    act(() => resetButton().focus());
-    const flyout = screen.getByRole("group", { name: "Fixed views" });
-    const first = within(flyout).getAllByRole("button")[0];
-    expect(
-      resetButton().compareDocumentPosition(first) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("moves through them with the arrow keys and closes on Escape", () => {
-    render(<ViewportBar {...props()} />);
-    act(() => resetButton().focus());
-    // Up from the reset button reaches the nearest view, the bottom one.
-    fireEvent.keyDown(resetButton(), { key: "ArrowUp" });
-    expect(document.activeElement?.getAttribute("aria-label")).toBe(
-      "Look at the top with no perspective (3)",
-    );
-    fireEvent.keyDown(focused(), { key: "ArrowUp" });
-    expect(document.activeElement?.getAttribute("aria-label")).toBe(
-      "Look at the side with no perspective (2)",
-    );
-    fireEvent.keyDown(focused(), { key: "ArrowDown" });
-    fireEvent.keyDown(focused(), { key: "ArrowDown" });
-    expect(document.activeElement).toBe(resetButton());
-
-    fireEvent.keyDown(resetButton(), { key: "ArrowUp" });
-    fireEvent.keyDown(focused(), { key: "Escape" });
-    expect(screen.queryByRole("group", { name: "Fixed views" })).toBeNull();
-    expect(document.activeElement).toBe(resetButton());
-  });
-
-  it("keeps Escape inside the flyout from reaching the viewport's own keys", () => {
-    const onWindowKey = vi.fn();
-    window.addEventListener("keydown", onWindowKey);
-    render(<ViewportBar {...props()} />);
-    act(() => resetButton().focus());
-    fireEvent.keyDown(resetButton(), { key: "Escape" });
-    window.removeEventListener("keydown", onWindowKey);
-    expect(onWindowKey).not.toHaveBeenCalled();
-  });
-
-  it("shows which view is on, and turns it off from the same button", () => {
-    const onView = vi.fn();
-    render(<ViewportBar {...props({ view: "side", onView })} />);
-    fireEvent.mouseOver(resetButton());
-    const side = screen.getByRole("button", {
-      name: "Leave the side view (2)",
-    });
-    expect(side.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(side);
-    expect(onView).toHaveBeenCalledWith("side", false);
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Look at the top with no perspective (3)",
-      }),
-    );
-    expect(onView).toHaveBeenCalledWith("top", true);
-  });
-
-  it("still resets the view when the reset button is clicked", () => {
-    const onResetView = vi.fn();
-    render(<ViewportBar {...props({ onResetView })} />);
-    fireEvent.click(resetButton());
-    expect(onResetView).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: /perspective/ })).toBeNull();
+    // The Show menu, the draw mode, the measure tool, the pickers and the
+    // keyboard sheet are what is left.
+    expect(barButtons()).toHaveLength(7);
   });
 });

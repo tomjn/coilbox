@@ -18969,10 +18969,6 @@ msgstr ""
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Fixed views"
-msgstr ""
-
 #: src/multiplayer/pages/HighlightsSettings.tsx
 msgid "Flag messages that mention your logged-in username."
 msgstr ""
@@ -23227,24 +23223,12 @@ msgstr ""
 msgid "Leave the depot"
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Leave the front view ({key})"
-msgstr ""
-
 #: src/lego/shortcuts.ts
 msgid "Leave the measure tool"
 msgstr ""
 
 #: src/lego/pages/components/ViewportBar.tsx
 msgid "Leave the measure tool ({measureKey})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Leave the side view ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Leave the top view ({key})"
 msgstr ""
 
 #: src/hub/pages/components/AssetUploadControl.tsx
@@ -23960,18 +23944,6 @@ msgstr ""
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/ReplaysPage.tsx
 msgid "Longest"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Look at the front with no perspective ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Look at the side with no perspective ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Look at the top with no perspective ({key})"
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -25007,6 +24979,18 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Minimum water depth"
+msgstr ""
+
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Minus X: look at the other side with no perspective"
+msgstr ""
+
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Minus Y: look at the bottom with no perspective"
+msgstr ""
+
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Minus Z: look at the back with no perspective"
 msgstr ""
 
 #: src/content/mapAggregate.ts
@@ -33821,7 +33805,7 @@ msgid "Reset the armour class to {inherited}, the game's own"
 msgstr ""
 
 #: src/components/ViewControls.tsx
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/AxisCompass.tsx
 msgid "Reset the view"
 msgstr ""
 
@@ -45249,6 +45233,10 @@ msgstr ""
 msgid "View available units"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "View axes"
+msgstr ""
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/ArchiveRow.tsx
 msgid "View game"
@@ -46861,12 +46849,20 @@ msgstr ""
 msgid "X-Ray Unit Silhouettes"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "X: look at the side with no perspective ({side})"
+msgstr ""
+
 #: src/content/aiRecord.ts
 msgid "x{income} income"
 msgstr ""
 
 #: src/workshop/pages/components/UnitScatterPlot.tsx
 msgid "Y axis"
+msgstr ""
+
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Y: look at the top with no perspective ({top})"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -47412,6 +47408,10 @@ msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "Z in elmos"
+msgstr ""
+
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Z: look at the front with no perspective ({front})"
 msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx

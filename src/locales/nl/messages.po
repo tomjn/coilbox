@@ -23268,11 +23268,6 @@ msgstr "Vaste kaartposities"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Vaste startposities: team N spawnt op startpositie N van de kaart."
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Fixed views"
-msgstr "Vaste weergaven"
-
 #: src/multiplayer/pages/HighlightsSettings.tsx
 #, fuzzy
 msgid "Flag messages that mention your logged-in username."
@@ -28494,11 +28489,6 @@ msgstr "Loop en dergelijke buiten de voetafdruk laten"
 msgid "Leave the depot"
 msgstr "Het depot verlaten"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the front view ({key})"
-msgstr "Het vooraanzicht verlaten ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Leave the measure tool"
@@ -28508,16 +28498,6 @@ msgstr "Het meetgereedschap verlaten"
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "Het meetgereedschap verlaten ({measureKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the side view ({key})"
-msgstr "Het zijaanzicht verlaten ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the top view ({key})"
-msgstr "Het bovenaanzicht verlaten ({key})"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
@@ -29397,21 +29377,6 @@ msgstr "lang"
 #, fuzzy
 msgid "Longest"
 msgstr "Langste"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the front with no perspective ({key})"
-msgstr "Vooraanzicht zonder perspectief ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the side with no perspective ({key})"
-msgstr "Zijaanzicht zonder perspectief ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the top with no perspective ({key})"
-msgstr "Bovenaanzicht zonder perspectief ({key})"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -30672,6 +30637,21 @@ msgstr "Minimale schade over afstand"
 #, fuzzy
 msgid "Minimum water depth"
 msgstr "Minimale waterdiepte"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus X: look at the other side with no perspective"
+msgstr "Min X: kijk naar de andere zijkant zonder perspectief"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Y: look at the bottom with no perspective"
+msgstr "Min Y: kijk van onderen zonder perspectief"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Z: look at the back with no perspective"
+msgstr "Min Z: kijk naar de achterkant zonder perspectief"
 
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -41489,7 +41469,7 @@ msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "De pantserklasse resetten naar {inherited}, die van het spel zelf"
 
 #: src/components/ViewControls.tsx
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/AxisCompass.tsx
 #, fuzzy
 msgid "Reset the view"
 msgstr "De weergave resetten"
@@ -55494,6 +55474,11 @@ msgstr "Weergave"
 msgid "View available units"
 msgstr "Beschikbare eenheden bekijken"
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "View axes"
+msgstr "Aanzichtassen"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/ArchiveRow.tsx
 #, fuzzy
@@ -57478,6 +57463,11 @@ msgstr "X in elmo"
 msgid "X-Ray Unit Silhouettes"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "X: look at the side with no perspective ({side})"
+msgstr "X: kijk naar de zijkant zonder perspectief ({side})"
+
 #: src/content/aiRecord.ts
 #, fuzzy
 msgid "x{income} income"
@@ -57487,6 +57477,11 @@ msgstr "x{income} inkomen"
 #, fuzzy
 msgid "Y axis"
 msgstr "Y-as"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Y: look at the top with no perspective ({top})"
+msgstr "Y: kijk van boven zonder perspectief ({top})"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -58162,6 +58157,11 @@ msgstr "z"
 #, fuzzy
 msgid "Z in elmos"
 msgstr "Z in elmo"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Z: look at the front with no perspective ({front})"
+msgstr "Z: kijk naar de voorkant zonder perspectief ({front})"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy

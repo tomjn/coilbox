@@ -23268,11 +23268,6 @@ msgstr "Σταθερές θέσεις χάρτη"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "Σταθερές θέσεις εκκίνησης: η ομάδα N εμφανίζεται στη θέση εκκίνησης N του χάρτη."
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Fixed views"
-msgstr "Σταθερές προβολές"
-
 #: src/multiplayer/pages/HighlightsSettings.tsx
 #, fuzzy
 msgid "Flag messages that mention your logged-in username."
@@ -28494,11 +28489,6 @@ msgstr "Εξαίρεση της κάννης και παρόμοιων από τ
 msgid "Leave the depot"
 msgstr "Αποχώρηση από την αποθήκη"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the front view ({key})"
-msgstr "Έξοδος από την πρόσοψη ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Leave the measure tool"
@@ -28508,16 +28498,6 @@ msgstr "Έξοδος από το εργαλείο μέτρησης"
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "Έξοδος από το εργαλείο μέτρησης ({measureKey})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the side view ({key})"
-msgstr "Έξοδος από την πλάγια όψη ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the top view ({key})"
-msgstr "Έξοδος από την κάτοψη ({key})"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
@@ -29397,21 +29377,6 @@ msgstr "μακρύ"
 #, fuzzy
 msgid "Longest"
 msgstr "Μεγαλύτεροι"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the front with no perspective ({key})"
-msgstr "Πρόσοψη χωρίς προοπτική ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the side with no perspective ({key})"
-msgstr "Πλάγια όψη χωρίς προοπτική ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the top with no perspective ({key})"
-msgstr "Κάτοψη χωρίς προοπτική ({key})"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -30672,6 +30637,21 @@ msgstr "Ελάχιστη ζημιά κλιμακούμενη με την εμβ�
 #, fuzzy
 msgid "Minimum water depth"
 msgstr "Ελάχιστο βάθος νερού"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus X: look at the other side with no perspective"
+msgstr "Μείον X: κοίτα την άλλη πλευρά χωρίς προοπτική"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Y: look at the bottom with no perspective"
+msgstr "Μείον Y: κοίτα το κάτω μέρος χωρίς προοπτική"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Z: look at the back with no perspective"
+msgstr "Μείον Z: κοίτα το πίσω μέρος χωρίς προοπτική"
 
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -41489,7 +41469,7 @@ msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "Επαναφορά της κατηγορίας θωράκισης σε {inherited}, αυτή του παιχνιδιού"
 
 #: src/components/ViewControls.tsx
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/AxisCompass.tsx
 #, fuzzy
 msgid "Reset the view"
 msgstr "Επαναφορά της προβολής"
@@ -55494,6 +55474,11 @@ msgstr "Προβολή"
 msgid "View available units"
 msgstr "Προβολή διαθέσιμων μονάδων"
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "View axes"
+msgstr "Άξονες προβολής"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/ArchiveRow.tsx
 #, fuzzy
@@ -57478,6 +57463,11 @@ msgstr "X σε elmo"
 msgid "X-Ray Unit Silhouettes"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "X: look at the side with no perspective ({side})"
+msgstr "X: κοίτα την πλευρά χωρίς προοπτική ({side})"
+
 #: src/content/aiRecord.ts
 #, fuzzy
 msgid "x{income} income"
@@ -57487,6 +57477,11 @@ msgstr "x{income} εισόδημα"
 #, fuzzy
 msgid "Y axis"
 msgstr "Άξονας Y"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Y: look at the top with no perspective ({top})"
+msgstr "Y: κοίτα από πάνω χωρίς προοπτική ({top})"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -58162,6 +58157,11 @@ msgstr "z"
 #, fuzzy
 msgid "Z in elmos"
 msgstr "Z σε elmo"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Z: look at the front with no perspective ({front})"
+msgstr "Z: κοίτα το μπροστινό μέρος χωρίς προοπτική ({front})"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy

@@ -23115,11 +23115,6 @@ msgstr "マップの固定位置"
 msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr "固定の開始位置：チーム N はマップの開始位置 N に出現します。"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Fixed views"
-msgstr "固定ビュー"
-
 #: src/multiplayer/pages/HighlightsSettings.tsx
 #, fuzzy
 msgid "Flag messages that mention your logged-in username."
@@ -28318,11 +28313,6 @@ msgstr "砲身などをフットプリントから除く"
 msgid "Leave the depot"
 msgstr "倉庫を出る"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the front view ({key})"
-msgstr "正面ビューを終了（{key}）"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Leave the measure tool"
@@ -28332,16 +28322,6 @@ msgstr "計測ツールを終了"
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "計測ツールを終了（{measureKey}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the side view ({key})"
-msgstr "側面ビューを終了（{key}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Leave the top view ({key})"
-msgstr "上面ビューを終了（{key}）"
 
 #: src/hub/pages/components/AssetUploadControl.tsx
 #, fuzzy
@@ -29210,21 +29190,6 @@ msgstr "長い"
 #, fuzzy
 msgid "Longest"
 msgstr "長い順"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the front with no perspective ({key})"
-msgstr "正面を平行投影で表示（{key}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the side with no perspective ({key})"
-msgstr "側面を平行投影で表示（{key}）"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Look at the top with no perspective ({key})"
-msgstr "上面を平行投影で表示（{key}）"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -30478,6 +30443,21 @@ msgstr "射程による最小ダメージ"
 #, fuzzy
 msgid "Minimum water depth"
 msgstr "最小水深"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus X: look at the other side with no perspective"
+msgstr "マイナスX: 遠近感なしで反対側を見る"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Y: look at the bottom with no perspective"
+msgstr "マイナスY: 遠近感なしで下から見る"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Minus Z: look at the back with no perspective"
+msgstr "マイナスZ: 遠近感なしで背面を見る"
 
 #: src/content/mapAggregate.ts
 #, fuzzy
@@ -41213,7 +41193,7 @@ msgid "Reset the armour class to {inherited}, the game's own"
 msgstr "装甲クラスをゲーム自体の {inherited} にリセット"
 
 #: src/components/ViewControls.tsx
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/AxisCompass.tsx
 #, fuzzy
 msgid "Reset the view"
 msgstr "ビューをリセット"
@@ -55122,6 +55102,11 @@ msgstr "表示"
 msgid "View available units"
 msgstr "使用可能なユニットを表示"
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "View axes"
+msgstr "表示の軸"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/ArchiveRow.tsx
 #, fuzzy
@@ -57095,6 +57080,11 @@ msgstr "X（elmo）"
 msgid "X-Ray Unit Silhouettes"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "X: look at the side with no perspective ({side})"
+msgstr "X: 遠近感なしで側面を見る ({side})"
+
 #: src/content/aiRecord.ts
 #, fuzzy
 msgid "x{income} income"
@@ -57104,6 +57094,11 @@ msgstr "収入 x{income}"
 #, fuzzy
 msgid "Y axis"
 msgstr "Y 軸"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Y: look at the top with no perspective ({top})"
+msgstr "Y: 遠近感なしで上から見る ({top})"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -57769,6 +57764,11 @@ msgstr "z"
 #, fuzzy
 msgid "Z in elmos"
 msgstr "Z（elmo）"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Z: look at the front with no perspective ({front})"
+msgstr "Z: 遠近感なしで正面を見る ({front})"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."

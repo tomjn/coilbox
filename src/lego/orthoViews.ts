@@ -1,5 +1,5 @@
 /**
- * The front, side and top views: which way each camera looks and how much of
+ * The six standard views, a pair for each axis: which way each camera looks and how much of
  * the scene an orthographic camera shows.
  *
  * Pure for the same reason as framing.ts. The viewport owns the cameras and
@@ -13,7 +13,13 @@
 import { type Box3, FRAME_PADDING } from "./framing";
 import type { Vec3 } from "./snapping";
 
-export type StandardView = "front" | "side" | "top";
+export type StandardView =
+  | "front"
+  | "back"
+  | "side"
+  | "otherSide"
+  | "top"
+  | "bottom";
 
 export interface ViewAxes {
   /** The direction from the orbit target to the camera. */
@@ -26,7 +32,8 @@ export interface ViewAxes {
 /**
  * Straight down has no "up" for the camera to use, so the top view leans this
  * far (in the ratio of z to y) towards the front. That fixes which way is up on
- * screen. The lean is not visible: it is a hundredth of a degree.
+ * screen. The bottom view leans the same way, from below. The lean is not
+ * visible: it is a hundredth of a degree.
  */
 export const TOP_LEAN = 0.0001;
 
@@ -35,11 +42,19 @@ export const TOP_LEAN = 0.0001;
  * view looks from +z with +x to the right. The side view looks from the unit's
  * left, +x, so the front is on the left of the screen. The top view looks down
  * with the front at the bottom of the screen.
+ *
+ * The back, the other side and the bottom are the opposite ends of those three
+ * axes. The back looks from -z with +x on the left. The other side looks from
+ * the unit's right, -x, so the front is on the right of the screen. The bottom
+ * looks up with +x still to the right, so the front is at the top of the screen.
  */
 export const STANDARD_VIEWS: Record<StandardView, ViewAxes> = {
   front: { toCamera: [0, 0, 1], right: [1, 0, 0], up: [0, 1, 0] },
+  back: { toCamera: [0, 0, -1], right: [-1, 0, 0], up: [0, 1, 0] },
   side: { toCamera: [1, 0, 0], right: [0, 0, -1], up: [0, 1, 0] },
+  otherSide: { toCamera: [-1, 0, 0], right: [0, 0, 1], up: [0, 1, 0] },
   top: { toCamera: [0, 1, TOP_LEAN], right: [1, 0, 0], up: [0, 0, -1] },
+  bottom: { toCamera: [0, -1, TOP_LEAN], right: [1, 0, 0], up: [0, 0, 1] },
 };
 
 /** The height an orthographic camera shows at zoom 1, in world units. */

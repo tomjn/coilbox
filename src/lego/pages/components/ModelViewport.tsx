@@ -109,6 +109,7 @@ import {
 } from "../../thumbnail";
 import { ELMOS_PER_FOOTPRINT } from "../../unitDef";
 import type { SymmetryMode } from "../../useSymmetry";
+import { AxisCompass, paintCompass } from "./AxisCompass";
 import {
   applySnap,
   clearAnchors,
@@ -224,7 +225,7 @@ import { useProportionHandles } from "./useProportionHandles";
 import { useScriptFrameStepping } from "./useScriptFrameStepping";
 import { useSkeleton } from "./useSkeleton";
 import { useWeaponReach } from "./useWeaponReach";
-import { paintCompass, ViewportBar } from "./ViewportBar";
+import { ViewportBar } from "./ViewportBar";
 import { disposeWeaponReach, reachColour } from "./weaponReachLayer";
 import { viewportHit } from "./wheelHit";
 
@@ -762,7 +763,7 @@ export function ModelViewport({
   const editingVolume = editCollision || editPieceCollisionId !== null;
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
-  const compassRef = useRef<SVGSVGElement>(null);
+  const compassRef = useRef<HTMLFieldSetElement>(null);
   const reduceMotion = useReduceMotion();
   const [mode, setMode] = useState<GizmoMode>("translate");
   const [snapped, setSnapped] = useState(false);
@@ -1911,158 +1912,174 @@ export function ModelViewport({
             `scrollbar-gutter: stable` reserves nothing for one: the spec only
             has it hold room for a classic scrollbar. Padding is what works on
             both. */}
-        <TooltipProvider delayDuration={300}>
-          <div className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2">
-            <div className="m-auto flex flex-col gap-2">
-              <ButtonGroup orientation="vertical">
-                {MODES.map(({ id, label: modeLabel, key, Icon }) => {
-                  const label = modeLabel();
-                  // A collision volume is measured along the model's own axes and
-                  // has nothing to turn, so the handles for it are move and scale.
-                  // The aim point is a point: move is all it has.
-                  const off = showAimPoint
-                    ? id !== "translate"
-                    : editingVolume && id === "rotate";
-                  return (
-                    <Tooltip key={id}>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {/* Top right, under the unit's chrome and clear of the tool rail. */}
+          <div className="absolute top-0 right-0 z-10">
+            <AxisCompass
+              compassRef={compassRef}
+              view={activeView}
+              onView={(id) => {
+                const state = sceneRef.current;
+                if (state) showView(state, id, selectedIdsRef.current);
+              }}
+              onResetView={resetView}
+            />
+          </div>
+          <TooltipProvider delayDuration={300}>
+            <div className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2">
+              <div className="m-auto flex flex-col gap-2">
+                <ButtonGroup orientation="vertical">
+                  {MODES.map(({ id, label: modeLabel, key, Icon }) => {
+                    const label = modeLabel();
+                    // A collision volume is measured along the model's own axes and
+                    // has nothing to turn, so the handles for it are move and scale.
+                    // The aim point is a point: move is all it has.
+                    const off = showAimPoint
+                      ? id !== "translate"
+                      : editingVolume && id === "rotate";
+                    return (
+                      <Tooltip key={id}>
+                        <TooltipTrigger asChild>
+                          <TipButton
+                            size="icon"
+                            variant={
+                              mode === id && !off ? "default" : "outline"
+                            }
+                            onClick={() => setMode(id)}
+                            disabled={off}
+                            aria-label={label}
+                            aria-pressed={mode === id && !off}
+                          >
+                            <Icon className="size-4" />
+                          </TipButton>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          {!off
+                            ? t`${label} (${key})`
+                            : showAimPoint
+                              ? t`An aim point is one point, so it only moves`
+                              : t`A collision volume has no rotation`}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </ButtonGroup>
+
+                {/* A group of its own. The three above are a mode you are in, this
+              is a thing you do once. */}
+                {onGround ? (
+                  <ButtonGroup orientation="vertical">
+                    <Tooltip>
                       <TooltipTrigger asChild>
                         <TipButton
                           size="icon"
-                          variant={mode === id && !off ? "default" : "outline"}
-                          onClick={() => setMode(id)}
-                          disabled={off}
-                          aria-label={label}
-                          aria-pressed={mode === id && !off}
+                          variant="outline"
+                          onClick={onGround}
+                          disabled={!canGround}
+                          aria-label={t`Sit the unit on the ground`}
                         >
-                          <Icon className="size-4" />
+                          <ArrowDownToLine className="size-4" />
                         </TipButton>
                       </TooltipTrigger>
                       <TooltipContent side="right">
-                        {!off
-                          ? t`${label} (${key})`
-                          : showAimPoint
-                            ? t`An aim point is one point, so it only moves`
-                            : t`A collision volume has no rotation`}
+                        {canGround
+                          ? t`Sit on the ground`
+                          : t`Sit on the ground: the unit is already on it`}
                       </TooltipContent>
                     </Tooltip>
-                  );
-                })}
-              </ButtonGroup>
+                  </ButtonGroup>
+                ) : null}
 
-              {/* A group of its own. The three above are a mode you are in, this
-              is a thing you do once. */}
-              {onGround ? (
+                {/* A third group: what you do to the selected piece, rather than a
+              mode or a one-off on the whole unit. */}
                 <ButtonGroup orientation="vertical">
+                  {/* Held on rather than pressed once, so it reads as a state the
+                  builder is in: everything placed while it is lit comes in
+                  pairs. */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant={symmetryOn ? "default" : "outline"}
+                        onClick={() => onSymmetryChange(!symmetryOn)}
+                        aria-pressed={symmetryOn}
+                        aria-label={t`Symmetry`}
+                      >
+                        <FlipHorizontal2 className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <Trans>
+                        Symmetry: a new piece gets a twin or a ring of copies,
+                        which follow it (M)
+                      </Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                  <SymmetryPopover
+                    mode={symmetryMode}
+                    onModeChange={onSymmetryModeChange}
+                    count={symmetryCount}
+                    onCountChange={onSymmetryCountChange}
+                  />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <TipButton
                         size="icon"
                         variant="outline"
-                        onClick={onGround}
-                        disabled={!canGround}
-                        aria-label={t`Sit the unit on the ground`}
+                        onClick={onDuplicate}
+                        disabled={!canDuplicate}
+                        aria-label={t`Duplicate the selection`}
                       >
-                        <ArrowDownToLine className="size-4" />
+                        <Copy className="size-4" />
                       </TipButton>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      {canGround
-                        ? t`Sit on the ground`
-                        : t`Sit on the ground: the unit is already on it`}
+                      <Trans>Duplicate (Cmd D)</Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={onPaste}
+                        aria-label={t`Paste`}
+                      >
+                        <ClipboardPaste className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <Trans>Paste (Cmd V)</Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                  {onSaveAsCompound ? (
+                    <SaveCompoundPopover
+                      disabled={!canSaveAsCompound}
+                      options={compoundMounts ?? (() => null)}
+                      onSave={onSaveAsCompound}
+                    />
+                  ) : null}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TipButton
+                        size="icon"
+                        variant="outline"
+                        onClick={onDelete}
+                        disabled={!canDelete}
+                        aria-label={t`Delete the selection`}
+                      >
+                        <Trash2 className="size-4" />
+                      </TipButton>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <Trans>Delete (Backspace)</Trans>
                     </TooltipContent>
                   </Tooltip>
                 </ButtonGroup>
-              ) : null}
-
-              {/* A third group: what you do to the selected piece, rather than a
-              mode or a one-off on the whole unit. */}
-              <ButtonGroup orientation="vertical">
-                {/* Held on rather than pressed once, so it reads as a state the
-                  builder is in: everything placed while it is lit comes in
-                  pairs. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant={symmetryOn ? "default" : "outline"}
-                      onClick={() => onSymmetryChange(!symmetryOn)}
-                      aria-pressed={symmetryOn}
-                      aria-label={t`Symmetry`}
-                    >
-                      <FlipHorizontal2 className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <Trans>
-                      Symmetry: a new piece gets a twin or a ring of copies,
-                      which follow it (M)
-                    </Trans>
-                  </TooltipContent>
-                </Tooltip>
-                <SymmetryPopover
-                  mode={symmetryMode}
-                  onModeChange={onSymmetryModeChange}
-                  count={symmetryCount}
-                  onCountChange={onSymmetryCountChange}
-                />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <TipButton
-                      size="icon"
-                      variant="outline"
-                      onClick={onDuplicate}
-                      disabled={!canDuplicate}
-                      aria-label={t`Duplicate the selection`}
-                    >
-                      <Copy className="size-4" />
-                    </TipButton>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <Trans>Duplicate (Cmd D)</Trans>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={onPaste}
-                      aria-label={t`Paste`}
-                    >
-                      <ClipboardPaste className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <Trans>Paste (Cmd V)</Trans>
-                  </TooltipContent>
-                </Tooltip>
-                {onSaveAsCompound ? (
-                  <SaveCompoundPopover
-                    disabled={!canSaveAsCompound}
-                    options={compoundMounts ?? (() => null)}
-                    onSave={onSaveAsCompound}
-                  />
-                ) : null}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <TipButton
-                      size="icon"
-                      variant="outline"
-                      onClick={onDelete}
-                      disabled={!canDelete}
-                      aria-label={t`Delete the selection`}
-                    >
-                      <Trash2 className="size-4" />
-                    </TipButton>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <Trans>Delete (Backspace)</Trans>
-                  </TooltipContent>
-                </Tooltip>
-              </ButtonGroup>
+              </div>
             </div>
-          </div>
-        </TooltipProvider>
+          </TooltipProvider>
+        </div>
 
         {/* The key on the left, the camera and scene controls on the right,
             in one row. Side by side rather than each pinned to its own
@@ -2210,16 +2227,6 @@ export function ModelViewport({
                 ? { on: showReach, onChange: setShowReach }
                 : undefined
             }
-            view={activeView}
-            onView={(id, on) => {
-              const state = sceneRef.current;
-              if (!state) return;
-              if (on) showView(state, id, selectedIdsRef.current);
-              else {
-                leaveStandardView(state);
-                state.render();
-              }
-            }}
             measure={{ on: measure.active, onChange: measure.setActive }}
             poses={posing?.control}
             guides={
@@ -2282,8 +2289,6 @@ export function ModelViewport({
                 : undefined
             }
             onShortcuts={() => setShortcutsOpen(true)}
-            compassRef={compassRef}
-            onResetView={resetView}
           />
         </div>
       </div>
