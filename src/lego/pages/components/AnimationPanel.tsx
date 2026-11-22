@@ -29,6 +29,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HelpPopover } from "@/components/HelpPopover";
 import { TipButton } from "@/components/TipButton";
 import {
   Collapsible,
@@ -1448,9 +1449,25 @@ export function AnimationPanel({
     const body = (
       <>
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium">
-            <Trans>What happens to the unit</Trans>
-          </span>
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-medium">
+              <Trans>What happens to the unit</Trans>
+            </span>
+            {isCallMode ? (
+              <HelpPopover label={t`About calling a function`}>
+                <p>
+                  <Trans>
+                    Numbers, comma separated. Call-ins that aim take radians, as
+                    the engine hands them.
+                  </Trans>
+                </p>
+              </HelpPopover>
+            ) : scenario?.description ? (
+              <HelpPopover label={t`About this scenario`}>
+                <p>{scenario.description}</p>
+              </HelpPopover>
+            ) : null}
+          </div>
           <Select
             value={scenarioId}
             onValueChange={(next) => {
@@ -1524,21 +1541,12 @@ export function AnimationPanel({
                 placeholder="0.8, 0.15"
                 onChange={(e) => onArgsTextChange(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                <Trans>
-                  Numbers, comma separated. Call-ins that aim take radians, as
-                  the engine hands them.
-                </Trans>
-              </p>
               {callArgsError ? (
                 <p className="text-xs text-destructive">{callArgsError}</p>
               ) : null}
             </>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                {scenario?.description}
-              </p>
               {marks.has(scenarioId) ? (
                 <p className="text-xs text-muted-foreground">
                   {marks.get(scenarioId)}
@@ -1641,15 +1649,19 @@ export function AnimationPanel({
 
         {timeline && timeline.asked.length > 0 ? (
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium">
-              <Trans>Unit values</Trans>
-            </span>
-            <p className="text-xs text-muted-foreground">
-              <Trans>
-                What the script reads about its unit. Change one and the preview
-                runs again with it.
-              </Trans>
-            </p>
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-medium">
+                <Trans>Unit values</Trans>
+              </span>
+              <HelpPopover label={t`About unit values`}>
+                <p>
+                  <Trans>
+                    What the script reads about its unit. Change one and the
+                    preview runs again with it.
+                  </Trans>
+                </p>
+              </HelpPopover>
+            </div>
             {timeline.asked
               .filter(
                 (asked) => !(scenario?.drive && DRIVEN_VALUES.has(asked.id)),
@@ -1831,51 +1843,63 @@ export function AnimationPanel({
             what say this unit builds. */}
           {isBuilder(project) ? (
             <div className="border-b border-border/60 px-3 py-2">
-              <p className="text-sm font-medium">
-                <Trans>What it builds with</Trans>
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                <Trans>
-                  This unit has a build arm, so its definition is written as a
-                  builder. All three go together: the engine reads a builder
-                  with no work rate as not a builder at all.
-                </Trans>
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-medium">
+                  <Trans>What it builds with</Trans>
+                </p>
+                <HelpPopover label={t`About what it builds with`}>
+                  <p>
+                    <Trans>
+                      This unit has a build arm, so its definition is written as
+                      a builder. All three go together: the engine reads a
+                      builder with no work rate as not a builder at all.
+                    </Trans>
+                  </p>
+                </HelpPopover>
+              </div>
               <BuilderReport project={project} />
 
-              {builderFields().map((field) => (
-                <div key={field.id} className="mt-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5">
-                      {field.label}
-                      <ProjectWorkshopMarks
-                        project={project}
-                        paths={[field.id]}
-                      />
-                    </span>
-                    <span className="text-muted-foreground">
-                      {project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id]}
-                      {field.suffix}
-                    </span>
+              {builderFields().map((field) => {
+                const subject = field.label;
+                return (
+                  <div key={field.id} className="mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5">
+                        {field.label}
+                        <HelpPopover label={t`About ${subject}`}>
+                          <p>{field.note}</p>
+                        </HelpPopover>
+                        <ProjectWorkshopMarks
+                          project={project}
+                          paths={[field.id]}
+                        />
+                      </span>
+                      <span className="text-muted-foreground">
+                        {project.builder?.[field.id] ??
+                          DEFAULT_BUILDER[field.id]}
+                        {field.suffix}
+                      </span>
+                    </div>
+                    <Slider
+                      className="mt-1"
+                      min={field.min}
+                      max={field.max}
+                      step={field.step}
+                      value={[
+                        project.builder?.[field.id] ??
+                          DEFAULT_BUILDER[field.id],
+                      ]}
+                      onValueChange={([next]) =>
+                        onBuilderChange({
+                          ...project.builder,
+                          [field.id]: next,
+                        })
+                      }
+                      aria-label={field.label}
+                    />
                   </div>
-                  <Slider
-                    className="mt-1"
-                    min={field.min}
-                    max={field.max}
-                    step={field.step}
-                    value={[
-                      project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id],
-                    ]}
-                    onValueChange={([next]) =>
-                      onBuilderChange({ ...project.builder, [field.id]: next })
-                    }
-                    aria-label={field.label}
-                  />
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {field.note}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
 
               {movesInGame(project.movement) ? null : (
                 <div className="mt-3 flex items-center justify-between gap-3">
@@ -1915,16 +1939,18 @@ export function AnimationPanel({
           {onActionsEdit ? (
             <div className="border-b border-border/60 px-3 py-2">
               <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 items-center gap-1">
                   <p className="text-sm font-medium">
                     <Trans>Actions</Trans>
                   </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    <Trans>
-                      Saved poses in time, written into the script beside the
-                      presets.
-                    </Trans>
-                  </p>
+                  <HelpPopover label={t`About actions`}>
+                    <p>
+                      <Trans>
+                        Saved poses in time, written into the script beside the
+                        presets.
+                      </Trans>
+                    </p>
+                  </HelpPopover>
                 </div>
                 <Button
                   size="sm"
@@ -2067,6 +2093,7 @@ export function AnimationPanel({
               ? (conversionProblems.get(preset.id) ?? null)
               : null;
             const presetLabel = preset.label;
+            const subject = preset.label;
             const copyCount = preset.copies?.count(copies) ?? "";
             const missingRoles = missing
               .map((role) => roleLabel(role))
@@ -2078,15 +2105,15 @@ export function AnimationPanel({
                 className="border-b border-border/60 px-3 py-2"
               >
                 <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
                     <p className="text-sm font-medium">
                       {copies > 1 && preset.copies
                         ? t`${presetLabel}, ${copyCount}`
                         : presetLabel}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {preset.description}
-                    </p>
+                    <HelpPopover label={t`About ${subject}`}>
+                      <p>{preset.description}</p>
+                    </HelpPopover>
                   </div>
                   {entry && !playsOwnScript ? (
                     <Button
