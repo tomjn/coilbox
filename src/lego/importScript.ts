@@ -11,7 +11,7 @@
  *
  * A simple script is read back as actions (`actions.ts`), so the builder can
  * edit it: poses when every piece arrives as the next `Sleep` ends, tracks when
- * pieces arrive on different frames. Anything else becomes the unit's own
+ * pieces arrive on different frames or the unit blends. Anything else becomes the unit's own
  * script, exactly as imported apart from the case renames. Reading back is all
  * or nothing: if any part of the script is outside what {@link readActions}
  * recognises, none of it is taken apart.
@@ -20,10 +20,13 @@
 import { plural, t } from "@lingui/core/macro";
 import {
   actionHooks,
+  BLEND_HELPERS,
+  framesOf,
   type PlanCall,
   planAction,
   STOP_CALLIN,
   triggerProblem,
+  unitBlends,
 } from "./actions";
 import { pieceNameLiterals, renameScriptPieces } from "./luaPieces";
 import { buildLuaScript } from "./luaScript";
@@ -92,8 +95,17 @@ export function matchScriptPieces(
 
 const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
 const NAME = String.raw`[A-Za-z_]\w*`;
+/** `Turn` or `Move`, or `ActTurn` or `ActMove`, which a unit that blends writes
+ *  instead. */
 const MOVE_LINE = new RegExp(
-  String.raw`^(Turn|Move)\(\s*(${NAME})\s*,\s*([xyz]_axis)\s*,\s*(${NUMBER})\s*(?:,\s*(${NUMBER})\s*)?\)$`,
+  String.raw`^(Act)?(Turn|Move)\(\s*(${NAME})\s*,\s*([xyz]_axis)\s*,\s*(${NUMBER})\s*(?:,\s*(${NUMBER})\s*)?\)$`,
+);
+const BLEND_LINE = new RegExp(
+  String.raw`^Blend(Turn|Move)\(\s*(${NAME})\s*,\s*([xyz]_axis)\s*,\s*(${NUMBER})\s*,\s*(${NUMBER})\s*\)$`,
+);
+/** A rest call a unit that blends guards, for a piece two actions share. */
+const OWNER_LINE = new RegExp(
+  String.raw`^if\s+ACT_OWNER\[\s*${NAME}\s*\]\s*==\s*${NAME}\s+then\s+(.+?)\s+end$`,
 );
 const SLEEP_LINE = /^Sleep\(\s*(\d+)\s*\)$/;
 const MASK_LINE = new RegExp(String.raw`^SetSignalMask\(\s*(${NAME})\s*\)$`);
@@ -130,13 +142,45 @@ interface Block {
   body: string[];
 }
 
-/** One `Turn` or `Move` call. */
+/** One `Turn` or `Move` call, or a `BlendTurn` or `BlendMove`. */
 interface MoveCall {
   kind: "turn" | "move";
   piece: string;
   axis: number;
   value: number;
   speed: number | null;
+  /** The seconds a blend takes, which is also what makes the call one. */
+  blend: number | null;
+}
+
+/**
+ * The call a line makes, or null for any other line. A unit that blends writes
+ * every call through the helpers, and one that does not has none of them, so a
+ * line of the wrong kind is no call: that script is not what the builder wrote.
+ */
+function readCall(line: string, blending: boolean): MoveCall | null {
+  const move = MOVE_LINE.exec(line);
+  if (move) {
+    if ((move[1] !== undefined) !== blending) return null;
+    return {
+      kind: move[2] === "Turn" ? "turn" : "move",
+      piece: move[3],
+      axis: AXES.indexOf(move[4]),
+      value: Number(move[5]),
+      speed: move[6] === undefined ? null : Number(move[6]),
+      blend: null,
+    };
+  }
+  const blend = blending ? BLEND_LINE.exec(line) : null;
+  if (!blend) return null;
+  return {
+    kind: blend[1] === "Turn" ? "turn" : "move",
+    piece: blend[2],
+    axis: AXES.indexOf(blend[3]),
+    value: Number(blend[4]),
+    speed: null,
+    blend: Number(blend[5]),
+  };
 }
 
 /** The calls up to and including one `Sleep`, or the calls after the last. */
@@ -152,7 +196,7 @@ interface Thread {
 }
 
 /** A thread's body as segments, or null when it holds anything else. */
-function readThread(block: Block): Thread | null {
+function readThread(block: Block, blending: boolean): Thread | null {
   const lead: Segment[] = [];
   const loop: Segment[] = [];
   let into = lead;
@@ -163,15 +207,9 @@ function readThread(block: Block): Thread | null {
   if (lines.length > 0 && MASK_LINE.test(lines[0])) lines = lines.slice(1);
   for (const line of lines) {
     if (loopClosed) return null;
-    const move = MOVE_LINE.exec(line);
+    const move = readCall(line, blending);
     if (move) {
-      current.push({
-        kind: move[1] === "Turn" ? "turn" : "move",
-        piece: move[2],
-        axis: AXES.indexOf(move[3]),
-        value: Number(move[4]),
-        speed: move[5] === undefined ? null : Number(move[5]),
-      });
+      current.push(move);
       continue;
     }
     const sleep = SLEEP_LINE.exec(line);
@@ -200,21 +238,55 @@ function readThread(block: Block): Thread | null {
   return { name: block.name, lead, loop };
 }
 
-/** A stop function: a `Signal` and pieces sent back to rest, nothing else. */
-function isStopFunction(block: Block): boolean {
-  if (block.body.length === 0 || !SIGNAL_LINE.test(block.body[0])) return false;
-  return block.body.slice(1).every((line) => {
-    const move = MOVE_LINE.exec(line);
-    return move !== null && Number(move[4]) === 0;
-  });
+/** The calls a stop function makes, or null when it is not a stop function: a
+ *  `Signal` and pieces sent back to rest, nothing else. A unit that blends may
+ *  guard a rest call with the piece's owner. */
+function restCalls(block: Block, blending: boolean): MoveCall[] | null {
+  if (block.body.length === 0 || !SIGNAL_LINE.test(block.body[0])) return null;
+  const calls: MoveCall[] = [];
+  for (const line of block.body.slice(1)) {
+    const guarded = blending ? OWNER_LINE.exec(line) : null;
+    const call = readCall(guarded ? guarded[1] : line, blending);
+    if (!call || call.value !== 0) return null;
+    calls.push(call);
+  }
+  return calls;
+}
+
+/** The seconds a stop function blends out over, or 0 when it does not. */
+function blendOutOf(calls: MoveCall[]): number {
+  return calls.find((call) => call.blend !== null)?.blend ?? 0;
+}
+
+/** The lines of the helpers a unit that blends carries, as this reader sees
+ *  them: no comments and no blank lines. */
+const HELPER_LINES = BLEND_HELPERS.map((line) => codeOf(line) ?? "").filter(
+  (line) => line !== "",
+);
+
+/** Where the builder's blend helpers start in `lines`, or -1. All of them have
+ *  to be there, as written: a script with some of them, or a changed one, has
+ *  lines this reader does not take. */
+function helpersAt(lines: string[]): number {
+  const [first] = HELPER_LINES;
+  for (
+    let at = lines.indexOf(first);
+    at >= 0;
+    at = lines.indexOf(first, at + 1)
+  ) {
+    if (HELPER_LINES.every((line, i) => lines[at + i] === line)) return at;
+  }
+  return -1;
 }
 
 /** A file's top level, split into the parts this reader takes. Null for any
- *  line it does not. */
+ *  line it does not. `blending` is whether it carries the helpers a unit that
+ *  blends has, which are taken out and are not read as functions. */
 function readTopLevel(lua: string): {
   pieces: Map<string, string>;
   locals: Block[];
   callins: Block[];
+  blending: boolean;
 } | null {
   const pieces = new Map<string, string>();
   const locals: Block[] = [];
@@ -225,6 +297,9 @@ function readTopLevel(lua: string): {
     if (code === null) return null;
     if (code !== "") lines.push(code);
   }
+  const helpers = helpersAt(lines);
+  const blending = helpers >= 0;
+  if (blending) lines.splice(helpers, HELPER_LINES.length);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const decl = PIECE_DECL.exec(line);
@@ -258,7 +333,7 @@ function readTopLevel(lua: string): {
     const name = (local ?? callin)?.[1] ?? "";
     (local ? locals : callins).push({ name, body });
   }
-  return { pieces, locals, callins };
+  return { pieces, locals, callins, blending };
 }
 
 function round4(n: number): number {
@@ -420,6 +495,8 @@ interface Made {
   axis: number;
   dest: number;
   speed: number | null;
+  /** The seconds of a blend in, on the call that makes it. */
+  blend: number | null;
 }
 
 /** A channel's keys so far: one piece, `turn` or `move`, and an axis. */
@@ -467,6 +544,24 @@ function framesTaken(distance: number, speed: number): number | null {
  *   channel's last key gets a key at its end that holds the value of the first
  *   channel that ends where it began.
  *
+ * A thread that blends in starts with a `BlendTurn` or `BlendMove` for every
+ * channel that moves, on frame 0, and goes on from the frame the blend ends on.
+ * The script does not say which frame the first key was on, only the frames it
+ * is played on, so the first key frame is chosen:
+ *
+ * - A looping action's lead in is as long as its lap and the frames the blend
+ *   replaces, because the lap starts where the action's last key is. The
+ *   frames the blend replaces put the first key on `blend frames - (lead in -
+ *   lap)`.
+ * - Any other action has the first key on the frame the blend ends on. Two
+ *   actions with different first key frames and the same blend time write the
+ *   same script, so this is as good as any, and it does not change the script.
+ *
+ * Every channel that blends has a key on that frame, holding the value the
+ * blend goes to. A channel that was part way from rest when the blend ended,
+ * which only a loop can show, is the key it goes on to instead, where the lap
+ * goes back to that and not to the blend's value.
+ *
  * The keys are then written again with `planAction` and the calls compared
  * with the script's, which is what makes all of the above all or nothing.
  */
@@ -490,8 +585,35 @@ function tracksOf(
       axis: move.axis,
       dest: round4(move.value),
       speed: move.speed === null ? null : round4(move.speed),
+      blend: move.blend === null ? null : round4(move.blend),
     };
   };
+
+  // The blend in is the calls that blend, all in the first run of calls.
+  const blendCalls = [...thread.lead, ...thread.loop]
+    .flatMap((segment) => segment.moves)
+    .filter((move) => move.blend !== null);
+  const firstRun = thread.lead[0]?.moves.filter((move) => move.blend !== null);
+  if (blendCalls.length !== (firstRun?.length ?? 0)) return null;
+  const blendTimes = new Set(blendCalls.map((move) => round4(move.blend ?? 0)));
+  if (blendTimes.size > 1 || blendTimes.has(0)) return null;
+  const blendIn = [...blendTimes][0] ?? 0;
+  const blendFrames = framesOf(blendIn);
+
+  const span = (segments: Segment[]) =>
+    segments.reduce<number | null>((sum, segment) => {
+      if (sum === null || segment.sleepMs === null) return sum;
+      const frames = sleepFrames(segment.sleepMs);
+      return frames === 0 ? null : sum + frames;
+    }, 0);
+  const leadSpan = span(thread.lead);
+  const lapSpan = span(thread.loop);
+  if (leadSpan === null || lapSpan === null) return null;
+  const looping = thread.loop.length > 0;
+  // How far the blend moves the action's frames on, as `planAction` has it.
+  const shift = blendIn > 0 && looping ? leadSpan - lapSpan : 0;
+  const firstFrame = blendFrames - shift;
+  if (blendIn > 0 && firstFrame < 0) return null;
 
   const play = (segments: Segment[], into: Made[], keyed: boolean) => {
     let at = 0;
@@ -500,7 +622,14 @@ function tracksOf(
         const made = place(move, at);
         if (!made) return null;
         into.push(made);
-        if (keyed && !keyCall(channels, made)) return null;
+        if (!keyed) continue;
+        if (made.blend !== null) {
+          if (!keyBlend(channels, made, firstFrame)) return null;
+        } else if (blendIn > 0 && at < blendFrames) {
+          return null;
+        } else if (!keyCall(channels, made, shift)) {
+          return null;
+        }
       }
       if (segment.sleepMs !== null) {
         const frames = sleepFrames(segment.sleepMs);
@@ -513,9 +642,9 @@ function tracksOf(
 
   const leadFrames = play(thread.lead, lead, true);
   if (leadFrames === null) return null;
-  const looping = thread.loop.length > 0;
   const lapFrames = looping ? play(thread.loop, lap, false) : 0;
-  if (lapFrames === null || (looping && leadFrames !== lapFrames)) return null;
+  if (lapFrames === null) return null;
+  if (looping && leadFrames !== lapFrames + shift) return null;
   if (channels.size === 0) return null;
 
   const order = (channel: Channel) =>
@@ -530,10 +659,28 @@ function tracksOf(
 
   if (looping) {
     for (const channel of sorted) {
+      const last = lastOf(channel);
+      const wrapped = last.frame > lapFrames;
+      const [head, next] = wrapped ? channel.keys.slice(0, -1) : channel.keys;
+      if (blendIn > 0 && next) {
+        // A channel that was part way from rest when the blend ended starts
+        // with the key the blend goes to, which is not one of its own: the lap
+        // goes back to the key after it. The wrap is in the lead unless the
+        // channel ends on the lap's last frame, and the lap always has it.
+        const wrap = lap.find(
+          (call) =>
+            channelId(call) === channelId(channel) &&
+            call.frame === last.frame % lapFrames,
+        );
+        const goesTo = wrapped ? last.value : (wrap?.dest ?? last.value);
+        if (goesTo !== head.value && goesTo === next.value) {
+          channel.keys.shift();
+        }
+      }
+      if (!wrapped) continue;
       const [first] = channel.keys;
-      if (lastOf(channel).frame <= lapFrames) continue;
-      if (lastOf(channel).frame !== lapFrames + first.frame) return null;
-      if (lastOf(channel).value !== first.value) return null;
+      if (last.frame !== lapFrames + first.frame) return null;
+      if (last.value !== first.value) return null;
       channel.keys.pop();
     }
     if (
@@ -560,6 +707,7 @@ function tracksOf(
     loop: looping,
     keys: [],
     tracks,
+    ...(blendIn > 0 ? { blendIn } : {}),
   };
 
   const plan = planAction(action, { ...project, actionBlend: 0 });
@@ -575,33 +723,61 @@ function tracksOf(
   return action;
 }
 
-/** Add the keys a call makes. False when the call does not fit. */
-function keyCall(channels: Map<string, Channel>, call: Made): boolean {
-  const id = `${call.piece}:${call.kind}:${call.axis}`;
+/** A channel's id in the map of channels. */
+function channelId(of: { piece: string; kind: string; axis: number }): string {
+  return `${of.piece}:${of.kind}:${of.axis}`;
+}
+
+/** Add the key a blend in makes: the value it goes to, on the frame it ends on.
+ *  False when the channel already has keys. */
+function keyBlend(
+  channels: Map<string, Channel>,
+  call: Made,
+  frame: number,
+): boolean {
+  const id = channelId(call);
+  if (channels.has(id)) return false;
+  channels.set(id, {
+    piece: call.piece,
+    kind: call.kind,
+    axis: call.axis as 0 | 1 | 2,
+    keys: [{ frame, value: call.dest }],
+  });
+  return true;
+}
+
+/** Add the keys a call makes, on the action's frames, which are the frames the
+ *  call is on less `shift`. False when the call does not fit. */
+function keyCall(
+  channels: Map<string, Channel>,
+  call: Made,
+  shift: number,
+): boolean {
+  const id = channelId(call);
   const channel = channels.get(id) ?? {
     piece: call.piece,
     kind: call.kind,
     axis: call.axis as 0 | 1 | 2,
     keys: [],
   };
+  const at = call.frame - shift;
   const last = channel.keys[channel.keys.length - 1];
   const was = last?.value ?? 0;
   if (call.dest === was) return false;
-  if (last && last.frame > call.frame) return false;
+  if (last && last.frame > at) return false;
   const { speed } = call;
   if (speed === null) {
-    if (last || call.frame !== 0) return false;
+    if (last || at !== 0) return false;
     channel.keys.push({ frame: 0, value: call.dest });
   } else {
     if (speed <= 0) return false;
     const frames = framesTaken(Math.abs(call.dest - was), speed);
     if (frames === null) return false;
-    if (!last && call.frame > 0)
-      channel.keys.push({ frame: call.frame, value: 0 });
-    else if (last && last.frame < call.frame) {
-      channel.keys.push({ frame: call.frame, value: was });
+    if (!last && at > 0) channel.keys.push({ frame: at, value: 0 });
+    else if (last && last.frame < at) {
+      channel.keys.push({ frame: at, value: was });
     }
-    channel.keys.push({ frame: call.frame + frames, value: call.dest });
+    channel.keys.push({ frame: at + frames, value: call.dest });
   }
   channels.set(id, channel);
   return true;
@@ -617,10 +793,11 @@ function sameCalls(made: Made[], planned: PlanCall[]): boolean {
     axis: number;
     dest: number;
     speed?: number | null;
+    blend?: number | null;
   }) =>
     `${c.frame}|${c.piece}|${c.kind}|${c.axis}|${round4(c.dest)}|${
       c.speed == null ? "-" : round4(c.speed)
-    }`;
+    }|${c.blend == null ? "-" : round4(c.blend)}`;
   const a = made.map(text).sort();
   const b = planned.map(text).sort();
   return a.length === b.length && a.every((line, at) => line === b[at]);
@@ -652,14 +829,16 @@ export function readActions(
     pieceIds.set(variable, piece.id);
   }
 
+  const { blending } = top;
   const threads: Thread[] = [];
-  const stops = new Set<string>();
+  const stops = new Map<string, MoveCall[]>();
   for (const block of top.locals) {
-    if (isStopFunction(block)) {
-      stops.add(block.name);
+    const rest = restCalls(block, blending);
+    if (rest) {
+      stops.set(block.name, rest);
       continue;
     }
-    const thread = readThread(block);
+    const thread = readThread(block, blending);
     if (!thread) return null;
     threads.push(thread);
   }
@@ -695,7 +874,9 @@ export function readActions(
     if (triggers.length !== 1) return null;
     const trigger = triggers[0];
     if (triggerProblem(project, trigger)) return null;
-    const keys = keysOf(thread);
+    // A unit that blends has no actions of poses to read: the blend takes the
+    // place of the first key's time, so each is read as tracks.
+    const keys = blending ? null : keysOf(thread);
     const wide = keys ? null : tracksOf(thread, pieceIds, project, trigger);
     if (!keys && !wide) return null;
     const looping = keys?.loop ?? wide?.loop ?? false;
@@ -705,6 +886,17 @@ export function readActions(
     if (looping && (STOP_CALLIN[trigger] || custom) && !hasStop) return null;
     if (!looping && hasStop) return null;
 
+    // The times the script blends over. A time that is the unit's default is
+    // left to follow it, and any other is the action's own, including none on a
+    // unit that has a default. A blend out is only in the stop function of a
+    // looping action, so any other action takes the default, which is nothing
+    // the script shows.
+    const fallback = project.actionBlend ?? 0;
+    const blendIn = wide?.blendIn ?? 0;
+    let blendOut: number | null = blending ? null : 0;
+    const rest = looping ? stops.get(`${thread.name}Stop`) : undefined;
+    if (blending && rest) blendOut = blendOutOf(rest);
+
     const name = thread.name.replace(/^action_/, "") || thread.name;
     const action: LegoAction = {
       id: newId(),
@@ -713,6 +905,8 @@ export function readActions(
       loop: looping,
       keys: [],
       ...(wide ? { tracks: wide.tracks } : {}),
+      ...(blendIn !== fallback ? { blendIn } : {}),
+      ...(blendOut !== null && blendOut !== fallback ? { blendOut } : {}),
     };
     keys?.poses.forEach((state, at) => {
       const pieces: LegoPose["pieces"] = {};
@@ -747,10 +941,24 @@ export function readActions(
 
   // Whatever else the call-ins do has to be what the builder writes anyway,
   // or nothing, so a call-in left empty takes the builder's default.
-  const rebuilt = readTopLevel(
-    buildLuaScript({ ...project, poses: named.poses, actions }),
-  );
+  const built = { ...project, poses: named.poses, actions };
+  const rebuilt = readTopLevel(buildLuaScript(built));
   if (!rebuilt) return null;
+  if (blending) {
+    // The helpers are only there when an action blends, and the stop functions
+    // have to be written as they are, because only their blend time is read.
+    if (!unitBlends(built)) return null;
+    const stopsOf = (blocks: Block[]) =>
+      blocks
+        .filter((block) => restCalls(block, true))
+        .map((block) => `${block.name}\n${block.body.join("\n")}`)
+        .sort();
+    const mine = stopsOf(top.locals);
+    const theirs = stopsOf(rebuilt.locals);
+    if (mine.join("\n\n") !== theirs.join("\n\n")) return null;
+  } else if (unitBlends(built)) {
+    return null;
+  }
   const written = new Map(rebuilt.callins.map((c) => [c.name, c.body]));
   for (const callin of top.callins) {
     const own = callin.body.filter(

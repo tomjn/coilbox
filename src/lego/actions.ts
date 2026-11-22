@@ -186,7 +186,7 @@ export function actionPieces(
 
 /** Frames a step lasts: whole frames, because `Sleep` waits whole frames and
  *  the engine moves a piece once a frame. Zero for a key with no time. */
-function framesOf(seconds: number): number {
+export function framesOf(seconds: number): number {
   return seconds <= 0 ? 0 : Math.max(1, Math.round(seconds * FPS));
 }
 
@@ -1013,7 +1013,7 @@ export function blendOf(
  * call, and a script that used it would not play there. `Spring.GetGameFrame`
  * is in both.
  */
-const BLEND_HELPERS = [
+export const BLEND_HELPERS = [
   "-- Where the actions have left each piece, so a blend can start from there.",
   "local ACT_AT = {}",
   "local ACT_OWNER = {}",

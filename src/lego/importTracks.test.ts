@@ -303,19 +303,6 @@ describe("a script that does not fit stays the unit's own", () => {
     expect(readActions(lua, bare(unit()), ids())).toBeNull();
   });
 
-  it("keeps a script the builder wrote for an action that blends in", () => {
-    const blended = tracked(
-      (FIXTURES.staggered.actions?.[0] as LegoAction).tracks ?? [],
-      { loop: false, trigger: "Shot1", blendIn: 0.5 },
-    );
-    const lua = buildLuaScript(blended);
-
-    const result = importScript(bare(blended), lua, { newId: ids() });
-
-    expect(result.as).toBe("script");
-    expect(result.project.script).toBe(lua);
-  });
-
   it("still writes a blended action the same from its normalised tracks", () => {
     const tracks = (FIXTURES.staggered.actions?.[0] as LegoAction).tracks ?? [];
     const options = { loop: false, trigger: "Shot1", blendIn: 0.5 };
