@@ -376,6 +376,38 @@ describe("validateMission", () => {
     expect(issues).toEqual([]);
   });
 
+  describe("a condition about a group (issue #5292)", () => {
+    const issuesFor = (type: string, params: Record<string, unknown>) =>
+      validateMission(withStep({ type, params }, "conditions"));
+
+    it("passes a group that exists, on all three", () => {
+      expect(issuesFor("group_dead", { group: "wave1" })).toEqual([]);
+      expect(
+        issuesFor("units_in_zone", { zone: "gate", group: "wave1", all: true }),
+      ).toEqual([]);
+      expect(issuesFor("unit_count", { group: "wave1", min: 2 })).toEqual([]);
+    });
+
+    it("reports a group that does not exist", () => {
+      for (const [type, params] of [
+        ["group_dead", { group: "wave2" }],
+        ["units_in_zone", { zone: "gate", group: "wave2" }],
+        ["unit_count", { group: "wave2" }],
+      ] as const) {
+        const issues = issuesFor(type, params);
+        expect(issues, type).toHaveLength(1);
+        expect(issues[0].message).toMatch(/^no group called /);
+      }
+    });
+
+    it("lets unit_count name a team or a group, and needs one", () => {
+      expect(issuesFor("unit_count", { team: "player" })).toEqual([]);
+      const issues = issuesFor("unit_count", { min: 1 });
+      expect(issues).toHaveLength(1);
+      expect(issues[0].message).toBe("needs one of team, group");
+    });
+  });
+
   it("resolves an order target against actors and groups alike", () => {
     const issues = validateMission(
       mission({

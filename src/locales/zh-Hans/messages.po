@@ -22130,6 +22130,10 @@ msgstr "此项目中的所有单位，可并排比较并一次更改多个"
 msgid "Every unit matching this rule belongs too, kept up to date as values change, on top of anything ticked below."
 msgstr "符合此规则的所有单位也属于其中，会随数值变化自动更新，此外还包括下方勾选的内容。"
 
+#: src/scenario/triggerTypes.ts
+msgid "every unit of the group"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Every unit that was destroyed counts, whatever destroyed it."
@@ -25609,6 +25613,10 @@ msgstr "当某支队伍建造完足够数量的某种单位后成立。"
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "当某支队伍守住一个区域达到你设定的时间后成立，可选仅在无人争夺时计时。"
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Holds position until woken"
@@ -31867,6 +31875,10 @@ msgstr "需要处理"
 #, fuzzy
 msgid "Needs cob_vars.lua"
 msgstr "需要 cob_vars.lua"
+
+#: src/scenario/validate.ts
+msgid "needs one of {list}"
+msgstr ""
 
 #: src/scenario/capabilities.ts
 #, fuzzy

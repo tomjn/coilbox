@@ -22274,6 +22274,10 @@ msgstr "Κάθε μονάδα σε αυτό το έργο, για σύγκρισ
 msgid "Every unit matching this rule belongs too, kept up to date as values change, on top of anything ticked below."
 msgstr "Κάθε μονάδα που ταιριάζει με αυτόν τον κανόνα ανήκει επίσης, με ενημέρωση καθώς αλλάζουν οι τιμές, επιπλέον όσων είναι επιλεγμένα παρακάτω."
 
+#: src/scenario/triggerTypes.ts
+msgid "every unit of the group"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "Every unit that was destroyed counts, whatever destroyed it."
@@ -25771,6 +25775,10 @@ msgstr "Ισχύει μόλις μια ομάδα ολοκληρώσει αρκ�
 #, fuzzy
 msgid "Holds once a team has kept a zone for the time you set, optionally only while uncontested."
 msgstr "Ισχύει μόλις μια ομάδα κρατήσει μια ζώνη για τον χρόνο που ορίζετε, προαιρετικά μόνο χωρίς αντίπαλο."
+
+#: src/scenario/triggerTypes.ts
+msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 #, fuzzy
@@ -32068,6 +32076,10 @@ msgstr "Χρειάζεται προσοχή"
 #, fuzzy
 msgid "Needs cob_vars.lua"
 msgstr "Απαιτεί cob_vars.lua"
+
+#: src/scenario/validate.ts
+msgid "needs one of {list}"
+msgstr ""
 
 #: src/scenario/capabilities.ts
 #, fuzzy

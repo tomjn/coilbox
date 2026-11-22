@@ -14,6 +14,7 @@ import {
   CONDITION_TYPES,
   isUnitDefParam,
   type ParamKind,
+  REQUIRES_ONE_OF,
   type TypeSpec,
 } from "./triggerTypes";
 
@@ -275,6 +276,16 @@ function checkStep(
     // An absent optional parameter is the runtime applying its default.
     if (value === undefined && param.optional) continue;
     resolve(param.kind, value, where, known, issues);
+  }
+
+  for (const names of REQUIRES_ONE_OF[type] ?? []) {
+    if (names.every((name) => params[name] === undefined)) {
+      const list = names.join(", ");
+      issues.push({
+        path: `${path}.params`,
+        message: t`needs one of ${list}`,
+      });
+    }
   }
 }
 
