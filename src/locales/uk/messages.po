@@ -17364,11 +17364,6 @@ msgstr "Утримані команди"
 msgid "Common"
 msgstr "Звичайний"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Спільнота"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26525,6 +26520,7 @@ msgid "HTML page"
 msgstr "HTML-сторінка"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Хаб"
@@ -45894,11 +45890,6 @@ msgstr "Увійдіть, щоб публікувати звідси. Або с�
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Увійти в хаб"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Увійдіть на хаб, щоб завантажити {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"

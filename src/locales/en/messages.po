@@ -14039,10 +14039,6 @@ msgstr "Commands withheld"
 msgid "Common"
 msgstr "Common"
 
-#: src/hub/index.tsx
-msgid "Community"
-msgstr "Community"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 msgid "Compare"
 msgstr "Compare"
@@ -21470,6 +21466,7 @@ msgid "HTML page"
 msgstr "HTML page"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 msgid "Hub"
 msgstr "Hub"
 
@@ -37155,10 +37152,6 @@ msgstr "Sign in to publish from here. Or copy the code and finish on the hub's o
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Sign in to the hub"
-
-#: src/hub/upload/UploadToHubButton.tsx
-msgid "Sign in to the hub to upload {label}."
-msgstr "Sign in to the hub to upload {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"

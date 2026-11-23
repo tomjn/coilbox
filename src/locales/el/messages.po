@@ -17368,11 +17368,6 @@ msgstr "Αποκλεισμένες εντολές"
 msgid "Common"
 msgstr "Κοινό"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Κοινότητα"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26533,6 +26528,7 @@ msgid "HTML page"
 msgstr "Σελίδα HTML"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hub"
@@ -45919,11 +45915,6 @@ msgstr "Συνδεθείτε για να δημοσιεύσετε από εδώ.
 #, fuzzy
 msgid "Sign in to the hub"
 msgstr "Σύνδεση στο hub"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Συνδεθείτε στο hub για να ανεβάσετε το {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy

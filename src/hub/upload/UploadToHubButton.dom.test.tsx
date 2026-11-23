@@ -199,14 +199,10 @@ describe("the upload to hub button", () => {
     expect(started).not.toHaveBeenCalled();
   });
 
-  it("offers the sign in first to somebody signed out", async () => {
+  it("shows nothing to somebody signed out", () => {
     account = { ...signedIn(), signedIn: false };
-    render(<UploadToHubButton {...MAP} />);
-    fireEvent.click(screen.getByRole("button", { name: /Upload to hub/ }));
-    expect(
-      await screen.findByRole("button", { name: "Sign in with Discord" }),
-    ).toBeTruthy();
-    expect(screen.queryByText(/will be public/)).toBeNull();
+    const { container } = render(<UploadToHubButton {...MAP} />);
+    expect(container.innerHTML).toBe("");
   });
 
   it("starts the upload under a grant for this map, then closes the grant", async () => {

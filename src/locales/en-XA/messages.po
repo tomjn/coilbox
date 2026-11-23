@@ -14038,10 +14038,6 @@ msgstr ""
 msgid "Common"
 msgstr ""
 
-#: src/hub/index.tsx
-msgid "Community"
-msgstr ""
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 msgid "Compare"
 msgstr ""
@@ -21469,6 +21465,7 @@ msgid "HTML page"
 msgstr ""
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 msgid "Hub"
 msgstr ""
 
@@ -37153,10 +37150,6 @@ msgstr ""
 
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
-msgstr ""
-
-#: src/hub/upload/UploadToHubButton.tsx
-msgid "Sign in to the hub to upload {label}."
 msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx

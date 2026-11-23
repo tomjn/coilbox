@@ -17364,11 +17364,6 @@ msgstr "保留中のコマンド"
 msgid "Common"
 msgstr "一般"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "コミュニティ"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26525,6 +26520,7 @@ msgid "HTML page"
 msgstr "HTML ページ"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "ハブ"
@@ -45894,11 +45890,6 @@ msgstr "ここから公開するにはログインしてください。または
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "ハブにログイン"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "{label} をアップロードするには、ハブにサインインしてください。"
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"

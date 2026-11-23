@@ -17364,11 +17364,6 @@ msgstr "已暂扣的命令"
 msgid "Common"
 msgstr "普通"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "社区"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26525,6 +26520,7 @@ msgid "HTML page"
 msgstr "HTML 页面"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "中心"
@@ -45894,11 +45890,6 @@ msgstr "登录后即可从这里发布。或者复制代码，在中心的页面
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "登录中心"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "请登录中心以上传 {label}。"
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"
