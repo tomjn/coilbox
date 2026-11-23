@@ -53,7 +53,7 @@ function Action({
   status: RowStatus;
   canInstall: boolean;
   onInstall: (row: GameVersionRow) => void;
-  onRemoved: () => void;
+  onRemoved: (row: GameVersionRow) => void;
 }) {
   const path = row.installedItem?.primaryArchive.path;
   if (row.installed) {
@@ -61,7 +61,7 @@ function Action({
       <DeleteArchiveButton
         path={path}
         name={row.installedItem?.primaryArchive.name ?? row.pkg}
-        onDeleted={onRemoved}
+        onDeleted={() => onRemoved(row)}
       />
     ) : null;
   }
@@ -113,7 +113,8 @@ export function GameVersionsTab({
   canInstall: boolean;
   statusOf: (row: GameVersionRow) => RowStatus;
   onInstall: (row: GameVersionRow) => void;
-  onRemoved: () => void;
+  /** A version's archive was deleted from disk. */
+  onRemoved: (row: GameVersionRow) => void;
 }) {
   const { t } = useLingui();
   const [showSnapshots, setShowSnapshots] = useState(false);
