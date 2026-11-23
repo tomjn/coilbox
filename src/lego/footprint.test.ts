@@ -186,9 +186,12 @@ describe("checkFootprint", () => {
 
     expect(result.overhang.x).toBe(0);
     expect(result.overhang.z).toBeCloseTo(8, 9);
-    expect(footprintProblems(result)).toHaveLength(1);
-    expect(footprintProblems(result)[0].message).toContain("8 elmos");
-    expect(footprintProblems(result)[0].message).toContain("z");
+    const warnings = footprintProblems(result).filter(
+      (p) => p.severity === "warning",
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("8 elmos");
+    expect(warnings[0].message).toContain("z");
   });
 
   it("reports no problem for a unit inside its footprint", () => {
@@ -215,10 +218,14 @@ describe("checkFootprint", () => {
     expect(result.differs).toBe(true);
     // Judged against the written 3 step footprint, which covers -24 to 24.
     expect(result.overhang.z).toBeCloseTo(16, 9);
-    const lines = footprintLines(result).join(" ");
-    expect(lines).toContain("2x3");
-    expect(lines).toContain("2x4");
-    expect(lines).toContain("not updated");
+    const differs = footprintProblems(result).find((p) =>
+      p.message.includes("not updated"),
+    );
+    expect(differs?.severity).toBe("warning");
+    expect(differs?.message).toContain("2x3");
+    expect(differs?.message).toContain("2x4");
+    // Said once, in the problems list, not again over the view.
+    expect(footprintLines(result).join(" ")).not.toContain("not updated");
   });
 
   it("does not say it differs when the export matches", () => {
@@ -237,7 +244,9 @@ describe("checkFootprint", () => {
     if (result.status !== "ok") throw new Error("expected a result");
 
     expect(result.differs).toBe(false);
-    expect(footprintLines(result).join(" ")).not.toContain("not updated");
+    expect(problemTexts(footprintProblems(result)).join(" ")).not.toContain(
+      "not updated",
+    );
   });
 
   it("reads a game unit's own footprint when it was never exported", () => {
@@ -257,10 +266,12 @@ describe("checkFootprint", () => {
     if (result.status !== "ok") throw new Error("expected a result");
 
     expect(result.wasted).toEqual({ x: 0, z: 2 });
-    expect(footprintLines(result).join(" ")).toContain("2 steps");
-    expect(problemTexts(footprintProblems(result)).join(" ")).not.toContain(
-      "steps bigger",
+    const wasted = footprintProblems(result).filter((p) =>
+      p.message.includes("steps bigger"),
     );
+    expect(wasted.map((p) => p.severity)).toEqual(["note"]);
+    expect(wasted[0].message).toContain("2 steps");
+    expect(footprintLines(result).join(" ")).not.toContain("steps bigger");
   });
 
   it("notes no waste when nothing is left out", () => {

@@ -842,7 +842,8 @@ function Builder({ id }: { id: string | undefined }) {
   );
 
   // Whether the base footprint leaves out a barrel, flare, aim point and build
-  // nozzle. The problems below do not depend on it: they judge the whole unit.
+  // nozzle. Of the problems below, only the note on steps spent on those
+  // pieces depends on it. The rest judge the whole unit.
   const [footprintLeaveOut, setFootprintLeaveOut] = useState(true);
   const footprint = useMemo(
     () =>

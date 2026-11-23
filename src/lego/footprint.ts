@@ -193,7 +193,9 @@ export function checkFootprint(
   };
 }
 
-/** What the viewport says about a result, one line each. */
+/** What the viewport says about the footprint it draws, one line each. Anything
+ *  to act on is in `footprintProblems`, so the problems list is the one place
+ *  that says it. */
 export function footprintLines(result: FootprintResult): string[] {
   if (result.status === "notApplicable") {
     return [t`Footprint not checked. The unit has no geometry.`];
@@ -212,38 +214,19 @@ export function footprintLines(result: FootprintResult): string[] {
     const baseZ = base.z;
     lines.push(t`Without ${names}: ${baseX}x${baseZ}.`);
   }
-  if (result.differs && result.written) {
-    const writtenX = result.written.x;
-    const writtenZ = result.written.z;
-    lines.push(
-      result.written.source === "game"
-        ? t`The game has ${writtenX}x${writtenZ}, now ${nowX}x${nowZ}. The exported definition is not updated by a re-export.`
-        : t`Exported ${writtenX}x${writtenZ}, now ${nowX}x${nowZ}. The exported definition is not updated by a re-export.`,
-    );
-  }
-  const { wasted } = result;
-  for (const axis of ["x", "z"] as const) {
-    const steps = wasted[axis];
-    if (steps > 0) {
-      lines.push(
-        plural(steps, {
-          one: `Footprint is # step bigger than the base on ${axis}.`,
-          other: `Footprint is # steps bigger than the base on ${axis}.`,
-        }),
-      );
-    }
-  }
   return lines;
 }
 
-/** The lines for the problems list: only a unit sticking out of its footprint. */
+/** The footprint's entries in the problems list: a unit sticking out of its
+ *  footprint, a footprint that no longer matches the one the game has, and
+ *  steps spent only on outlying pieces. */
 export function footprintProblems(result: FootprintResult): Problem[] {
   if (result.status !== "ok") return [];
-  const { overhang, written, now } = result;
+  const { overhang, written, now, wasted } = result;
   const inForce = written ?? now;
   const forceX = inForce.x;
   const forceZ = inForce.z;
-  return (["x", "z"] as const)
+  const problems = (["x", "z"] as const)
     .filter((axis) => overhang[axis] > 0)
     .map((axis) => {
       const by = formatNumber(overhang[axis], { maximumFractionDigits: 2 });
@@ -253,4 +236,35 @@ export function footprintProblems(result: FootprintResult): Problem[] {
         t`Sticks out of its ${forceX}x${forceZ} footprint by ${by} elmos on ${axis}.`,
       );
     });
+  if (result.differs && written) {
+    const writtenX = written.x;
+    const writtenZ = written.z;
+    const nowX = now.x;
+    const nowZ = now.z;
+    problems.push(
+      problem(
+        "footprint",
+        "warning",
+        written.source === "game"
+          ? t`The game has ${writtenX}x${writtenZ}, now ${nowX}x${nowZ}. The exported definition is not updated by a re-export.`
+          : t`Exported ${writtenX}x${writtenZ}, now ${nowX}x${nowZ}. The exported definition is not updated by a re-export.`,
+      ),
+    );
+  }
+  for (const axis of ["x", "z"] as const) {
+    const steps = wasted[axis];
+    if (steps > 0) {
+      problems.push(
+        problem(
+          "footprint",
+          "note",
+          plural(steps, {
+            one: `Footprint is # step bigger than the base on ${axis}.`,
+            other: `Footprint is # steps bigger than the base on ${axis}.`,
+          }),
+        ),
+      );
+    }
+  }
+  return problems;
 }
