@@ -3401,7 +3401,14 @@ function Builder({ id }: { id: string | undefined }) {
                 max={maxAsideWidth}
                 clamp={clampAsideWidth}
               />
-              <ButtonGroup className="m-2">
+              {/* Separate buttons that wrap, not one joined group: up to seven
+                  tabs do not fit a panel of an ordinary width, and a joined
+                  group can only run off its edge. */}
+              <div
+                role="group"
+                aria-label={t`Side panel`}
+                className="m-2 flex flex-wrap gap-1"
+              >
                 <Button
                   size="sm"
                   variant={aside === "pieces" ? "default" : "outline"}
@@ -3465,7 +3472,7 @@ function Builder({ id }: { id: string | undefined }) {
                     <Trans>Texture</Trans>
                   </Button>
                 ) : null}
-              </ButtonGroup>
+              </div>
 
               {aside === "texture" && imported ? (
                 <TextureBuilderPanel
