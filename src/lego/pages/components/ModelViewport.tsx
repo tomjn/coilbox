@@ -136,6 +136,7 @@ import { disposeBalance } from "./balanceLayer";
 import {
   boundsBox,
   focusSelection,
+  orbitBy,
   resetFrame,
   showFourViews,
   showView,
@@ -153,6 +154,7 @@ import {
   handleBox,
 } from "./collisionHandles";
 import { disposePieceCollision } from "./collisionVolumes";
+import { COMPASS_SIZE } from "./compassLayout";
 import { dotMaterial, points } from "./dotsAndPoints";
 import {
   type DrawMode,
@@ -426,8 +428,13 @@ interface Props {
    * Told whether the chrome sits in bands round the views rather than over
    * them, which it does in four views (#5410) and in one view that is too
    * small to hold it (#5414). It has less room then, along the top.
+   *
+   * `corner` is the four views button and the axis compass, for the chrome to
+   * put under its top right toolbar. Over the view the chrome's row is as tall
+   * as the unit card, and below that row the compass hung a card's height
+   * under a toolbar a third of it. Null in bands, where they stay in the view.
    */
-  chrome?: (banded: boolean) => ReactNode;
+  chrome?: (banded: boolean, corner: ReactNode) => ReactNode;
   /** The game unit picked as the reference figure, or null when none is. */
   onReferenceUnit?: (unit: ReferenceUnit | null) => void;
   /**
@@ -2050,6 +2057,29 @@ export function ModelViewport({
   useShortcutOverrides();
   const measureKey = shortcutLabel("measure");
 
+  // Top right, under the unit's chrome toolbar when the chrome is over the
+  // view. In bands it stays in the view: in four views, the top right of the
+  // perspective view, which starts halfway down the room the bands leave.
+  const cornerInChrome = Boolean(chrome) && !banded;
+  const corner = (
+    <div className="flex items-start gap-2">
+      <FourViewsButton on={quadrant !== null} onToggle={toggleFourViews} />
+      <AxisCompass
+        compassRef={compassRef}
+        view={activeView}
+        onView={(id) => {
+          const state = sceneRef.current;
+          if (state) showView(state, id, selectedIdsRef.current);
+        }}
+        onResetView={resetView}
+        onOrbit={(dx, dy) => {
+          const state = sceneRef.current;
+          if (state) orbitBy(state, dx, dy, COMPASS_SIZE);
+        }}
+      />
+    </div>
+  );
+
   // What the line at the foot of the view says about the gesture in progress.
   function hintText(): string {
     if (measure.active) {
@@ -2134,7 +2164,7 @@ export function ModelViewport({
           Clicks fall through to the model except on the controls themselves,
           which take `pointer-events-auto` back one at a time. */}
       <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
-        {chrome?.(banded)}
+        {chrome?.(banded, cornerInChrome ? corner : null)}
 
         {/* `m-auto` on the inner column rather than `justify-center` on the
             scrollport: centring a flex container that way clips content off
@@ -2147,29 +2177,17 @@ export function ModelViewport({
             has it hold room for a classic scrollbar. Padding is what works on
             both. */}
         <div ref={viewsRef} className="relative flex min-h-0 flex-1 flex-col">
-          {/* Top right, under the unit's chrome and clear of the tool rail. In
-              four views, the top right of the perspective view, which starts
-              halfway down the room the bands leave. */}
-          <div
-            className={cn(
-              "absolute right-0 z-10 flex items-start gap-2",
-              fourViews ? "top-1/2 mt-2" : "top-0",
-            )}
-          >
-            <FourViewsButton
-              on={quadrant !== null}
-              onToggle={toggleFourViews}
-            />
-            <AxisCompass
-              compassRef={compassRef}
-              view={activeView}
-              onView={(id) => {
-                const state = sceneRef.current;
-                if (state) showView(state, id, selectedIdsRef.current);
-              }}
-              onResetView={resetView}
-            />
-          </div>
+          {/* In bands only: over the view it is in the chrome. */}
+          {cornerInChrome ? null : (
+            <div
+              className={cn(
+                "absolute right-0 z-10",
+                fourViews ? "top-1/2 mt-2" : "top-0",
+              )}
+            >
+              {corner}
+            </div>
+          )}
           <TooltipProvider delayDuration={300}>
             <div
               ref={railRef}

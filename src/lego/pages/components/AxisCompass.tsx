@@ -5,6 +5,8 @@
  * end of each axis is a button that turns the camera to look from that end:
  * the +x end to the side, +y to the top and +z to the front, with -x, -y and -z
  * to the other side, the bottom and the back. The middle button resets the view.
+ * A drag anywhere on it turns the camera, as the view navigation gizmos of
+ * other 3D tools do.
  *
  * The ends are HTML buttons rather than parts of the drawing, so each has a
  * name, takes Tab and shows a focus ring. They move every frame while the
@@ -14,7 +16,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
-import type { RefObject } from "react";
+import { type RefObject, useRef } from "react";
 import * as THREE from "three";
 import type { StandardView } from "../../orthoViews";
 import { useShortcutOverrides } from "../../shortcutOverridesStore";
@@ -37,7 +39,13 @@ export interface AxisCompassProps {
   /** Asked for when an axis end is pressed. */
   onView: (view: StandardView) => void;
   onResetView: () => void;
+  /** A drag across the compass, in pixels since the last call. */
+  onOrbit: (dx: number, dy: number) => void;
 }
+
+/** How far a press moves before it is a drag rather than a click, as the
+ *  piece tree has it. */
+const DRAG_THRESHOLD = 4;
 
 /**
  * Move the compass's ends and lines to match where the camera is looking.
@@ -84,8 +92,22 @@ export function AxisCompass({
   view,
   onView,
   onResetView,
+  onOrbit,
 }: AxisCompassProps) {
   const { t } = useLingui();
+  // A press anywhere on the compass, the ends included, turns the camera once
+  // it moves past the threshold. Until then it may still be a click on an end,
+  // so the pointer is only captured once it is a drag: captured from the
+  // start, the click would land on the compass and never reach the end.
+  const press = useRef<{
+    id: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    dragging: boolean;
+  } | null>(null);
+  const dragged = useRef(false);
   // Re-render when a shortcut is rebound, so its tooltip keeps up.
   useShortcutOverrides();
   const front = shortcutLabel("view-front");
@@ -104,8 +126,51 @@ export function AxisCompass({
     <fieldset
       ref={compassRef}
       aria-label={t`View axes`}
-      className="pointer-events-auto relative m-0 min-w-0 shrink-0 rounded-full border-0 bg-background/60 p-0 backdrop-blur"
+      title={t`Drag to turn the view`}
+      className="pointer-events-auto relative m-0 min-w-0 shrink-0 cursor-grab touch-none rounded-full border-0 bg-background/60 p-0 backdrop-blur active:cursor-grabbing"
       style={{ width: COMPASS_SIZE, height: COMPASS_SIZE }}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        dragged.current = false;
+        press.current = {
+          id: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          x: event.clientX,
+          y: event.clientY,
+          dragging: false,
+        };
+      }}
+      onPointerMove={(event) => {
+        const held = press.current;
+        if (!held || held.id !== event.pointerId) return;
+        if (!held.dragging) {
+          const moved = Math.hypot(
+            event.clientX - held.startX,
+            event.clientY - held.startY,
+          );
+          if (moved < DRAG_THRESHOLD) return;
+          held.dragging = true;
+          dragged.current = true;
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }
+        onOrbit(event.clientX - held.x, event.clientY - held.y);
+        held.x = event.clientX;
+        held.y = event.clientY;
+      }}
+      onPointerUp={() => {
+        press.current = null;
+      }}
+      onPointerCancel={() => {
+        press.current = null;
+      }}
+      // A drag that started on an end is not a press of that end.
+      onClickCapture={(event) => {
+        if (!dragged.current) return;
+        dragged.current = false;
+        event.stopPropagation();
+        event.preventDefault();
+      }}
     >
       <svg
         viewBox={`0 0 ${COMPASS_SIZE} ${COMPASS_SIZE}`}

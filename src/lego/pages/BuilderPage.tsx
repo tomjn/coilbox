@@ -2646,7 +2646,7 @@ function Builder({ id }: { id: string | undefined }) {
                 showFreeFaces={showFreeFaces}
                 onReferenceUnit={setReferenceUnit}
                 ground={ground}
-                chrome={(banded) => (
+                chrome={(banded, corner) => (
                   <>
                     <div className="pointer-events-none flex flex-wrap items-start justify-between gap-3">
                       {/* In bands, in four views (#5410) or a one view too small
@@ -2703,230 +2703,234 @@ function Builder({ id }: { id: string | undefined }) {
 
                       {/* Icons only, and no card behind them: the same viewport
                     chrome as the toolbars in the other corners, rather than a
-                    panel of labelled buttons sitting on top of the model. */}
-                      <TooltipProvider delayDuration={300}>
-                        <div className="pointer-events-auto ml-auto flex items-center gap-2">
-                          <ButtonGroup>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <TipButton
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={undo}
-                                  disabled={!canUndo}
-                                  aria-label={t`Undo`}
-                                >
-                                  <Undo size={14} />
-                                </TipButton>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <Trans>Undo ({undoShortcut})</Trans>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <TipButton
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={redo}
-                                  disabled={!canRedo}
-                                  aria-label={t`Redo`}
-                                >
-                                  <Redo size={14} />
-                                </TipButton>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <Trans>Redo ({redoShortcut})</Trans>
-                              </TooltipContent>
-                            </Tooltip>
-                          </ButtonGroup>
-                          <ButtonGroup>
-                            {/* The save status was a word beside this button and is
+                    panel of labelled buttons sitting on top of the model.
+                    The view's corner controls hang just under it. */}
+                      <div className="ml-auto flex flex-col items-end gap-3">
+                        <TooltipProvider delayDuration={300}>
+                          <div className="pointer-events-auto ml-auto flex items-center gap-2">
+                            <ButtonGroup>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <TipButton
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={undo}
+                                    disabled={!canUndo}
+                                    aria-label={t`Undo`}
+                                  >
+                                    <Undo size={14} />
+                                  </TipButton>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <Trans>Undo ({undoShortcut})</Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <TipButton
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={redo}
+                                    disabled={!canRedo}
+                                    aria-label={t`Redo`}
+                                  >
+                                    <Redo size={14} />
+                                  </TipButton>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <Trans>Redo ({redoShortcut})</Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                            </ButtonGroup>
+                            <ButtonGroup>
+                              {/* The save status was a word beside this button and is
                           now a dot on it: a mark while there is work not yet on
                           disk, gone once there isn't. The word itself survives
                           in the tooltip, which is where the difference between
                           saving and saved belongs. */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <TipButton
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => doc.save()}
-                                  disabled={doc.saving}
-                                  className="relative"
-                                  aria-label={t`Save`}
-                                >
-                                  <Save size={14} />
-                                  {doc.dirty || doc.saving ? (
-                                    <span
-                                      aria-hidden
-                                      className={cn(
-                                        "absolute right-1 top-1 size-2 rounded-full bg-amber-500",
-                                        doc.saving &&
-                                          "motion-safe:animate-pulse",
-                                      )}
-                                    />
-                                  ) : null}
-                                </TipButton>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                {doc.saving
-                                  ? t`Saving`
-                                  : doc.dirty
-                                    ? t`Unsaved changes - save now`
-                                    : t`Saved`}
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => setImporting(true)}
-                                  aria-label={t`Import a model file`}
-                                >
-                                  <FileUp size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <Trans>Import a model file</Trans>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => setTesting(true)}
-                                  aria-label={t`Test in game`}
-                                >
-                                  <Rocket size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <Trans>Test in game</Trans>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => {
-                                    // A selection made after this picks a
-                                    // piece, so none is left over from before.
-                                    setSelectedId(null);
-                                    setProposal(null);
-                                    setFitting(true);
-                                  }}
-                                  aria-label={t`Fit a body plan`}
-                                >
-                                  <Bone size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                <Trans>Fit a body plan</Trans>
-                              </TooltipContent>
-                            </Tooltip>
-                            {draft.script ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <TipButton
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={() => doc.save()}
+                                    disabled={doc.saving}
+                                    className="relative"
+                                    aria-label={t`Save`}
+                                  >
+                                    <Save size={14} />
+                                    {doc.dirty || doc.saving ? (
+                                      <span
+                                        aria-hidden
+                                        className={cn(
+                                          "absolute right-1 top-1 size-2 rounded-full bg-amber-500",
+                                          doc.saving &&
+                                            "motion-safe:animate-pulse",
+                                        )}
+                                      />
+                                    ) : null}
+                                  </TipButton>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  {doc.saving
+                                    ? t`Saving`
+                                    : doc.dirty
+                                      ? t`Unsaved changes - save now`
+                                      : t`Saved`}
+                                </TooltipContent>
+                              </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     size="icon"
                                     variant="outline"
-                                    disabled={proposing}
-                                    onClick={() => void proposeSkeleton()}
-                                    aria-label={t`Propose a skeleton`}
+                                    onClick={() => setImporting(true)}
+                                    aria-label={t`Import a model file`}
                                   >
-                                    <PersonStanding size={14} />
+                                    <FileUp size={14} />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom">
-                                  <Trans>Propose a skeleton</Trans>
+                                  <Trans>Import a model file</Trans>
                                 </TooltipContent>
                               </Tooltip>
-                            ) : null}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="relative"
-                                  onClick={() => setPicturing(true)}
-                                  aria-label={t`Build picture`}
-                                >
-                                  <ImageIcon size={14} />
-                                  {pictureIsStale(draft) ? (
-                                    <span
-                                      aria-hidden="true"
-                                      className="absolute top-1 right-1 size-2 rounded-full bg-primary"
-                                    />
-                                  ) : null}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom">
-                                {pictureIsStale(draft)
-                                  ? t`Build picture - the unit has changed since it was taken`
-                                  : t`Build picture`}
-                              </TooltipContent>
-                            </Tooltip>
-                            {/* Only a unit that came from a file has a model to save
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={() => setTesting(true)}
+                                    aria-label={t`Test in game`}
+                                  >
+                                    <Rocket size={14} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <Trans>Test in game</Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={() => {
+                                      // A selection made after this picks a
+                                      // piece, so none is left over from before.
+                                      setSelectedId(null);
+                                      setProposal(null);
+                                      setFitting(true);
+                                    }}
+                                    aria-label={t`Fit a body plan`}
+                                  >
+                                    <Bone size={14} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <Trans>Fit a body plan</Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                              {draft.script ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="outline"
+                                      disabled={proposing}
+                                      onClick={() => void proposeSkeleton()}
+                                      aria-label={t`Propose a skeleton`}
+                                    >
+                                      <PersonStanding size={14} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">
+                                    <Trans>Propose a skeleton</Trans>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : null}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="relative"
+                                    onClick={() => setPicturing(true)}
+                                    aria-label={t`Build picture`}
+                                  >
+                                    <ImageIcon size={14} />
+                                    {pictureIsStale(draft) ? (
+                                      <span
+                                        aria-hidden="true"
+                                        className="absolute top-1 right-1 size-2 rounded-full bg-primary"
+                                      />
+                                    ) : null}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  {pictureIsStale(draft)
+                                    ? t`Build picture - the unit has changed since it was taken`
+                                    : t`Build picture`}
+                                </TooltipContent>
+                              </Tooltip>
+                              {/* Only a unit that came from a file has a model to save
                           back to. One built out of parts has no such file, and
                           Export is the only way it ever leaves the builder. */}
-                            {imported ? (
-                              <SaveModelPopover
-                                project={draft}
-                                imported={imported}
-                                pack={pack}
-                                raw={raw}
-                              />
-                            ) : null}
-                            {/* The one filled button here, as it was the one filled
+                              {imported ? (
+                                <SaveModelPopover
+                                  project={draft}
+                                  imported={imported}
+                                  pack={pack}
+                                  raw={raw}
+                                />
+                              ) : null}
+                              {/* The one filled button here, as it was the one filled
                           button before: without its label, colour is what still
                           says this is the thing you are working towards. */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    onClick={() => setExporting(true)}
+                                    aria-label={t`Export`}
+                                  >
+                                    <Upload size={14} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  <Trans>Export</Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                            </ButtonGroup>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  onClick={() => setExporting(true)}
-                                  aria-label={t`Export`}
-                                >
-                                  <Upload size={14} />
-                                </Button>
+                                <CollapsibleTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    aria-label={
+                                      asideOpen
+                                        ? t`Hide the side panel`
+                                        : t`Show the side panel`
+                                    }
+                                  >
+                                    {asideOpen ? (
+                                      <PanelRightClose size={16} />
+                                    ) : (
+                                      <PanelRightOpen size={16} />
+                                    )}
+                                  </Button>
+                                </CollapsibleTrigger>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                <Trans>Export</Trans>
+                                {asideOpen
+                                  ? t`Hide the side panel`
+                                  : t`Show the side panel`}
                               </TooltipContent>
                             </Tooltip>
-                          </ButtonGroup>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <CollapsibleTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  aria-label={
-                                    asideOpen
-                                      ? t`Hide the side panel`
-                                      : t`Show the side panel`
-                                  }
-                                >
-                                  {asideOpen ? (
-                                    <PanelRightClose size={16} />
-                                  ) : (
-                                    <PanelRightOpen size={16} />
-                                  )}
-                                </Button>
-                              </CollapsibleTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              {asideOpen
-                                ? t`Hide the side panel`
-                                : t`Show the side panel`}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TooltipProvider>
+                          </div>
+                        </TooltipProvider>
+                        {corner}
+                      </div>
                     </div>
 
                     {moduleOffers &&
@@ -3405,6 +3409,7 @@ function Builder({ id }: { id: string | undefined }) {
               {/* Separate buttons that wrap, not one joined group: up to seven
                   tabs do not fit a panel of an ordinary width, and a joined
                   group can only run off its edge. */}
+              {/* biome-ignore lint/a11y/useSemanticElements: a group of buttons that switch the panel, as ButtonGroup is, not a form fieldset */}
               <div
                 role="group"
                 aria-label={t`Side panel`}

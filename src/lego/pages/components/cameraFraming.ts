@@ -72,6 +72,26 @@ export function showView(
 }
 
 /**
+ * Turn the camera round its target by a drag on the axis compass, `dx` and
+ * `dy` in pixels of a compass `size` across. A drag across the whole compass
+ * is half a turn, which keeps a small compass from spinning the view too far.
+ * In four views it turns the perspective quadrant, the one the compass
+ * follows. Out of a standard view it leaves it, as a drag on the view does.
+ */
+export function orbitBy(
+  state: SceneState,
+  dx: number,
+  dy: number,
+  size: number,
+) {
+  inPerspective(state, () => {
+    state.controls.rotateLeft((Math.PI * dx) / size);
+    state.controls.rotateUp((Math.PI * dy) / size);
+  });
+  state.render();
+}
+
+/**
  * Switch between one view and four. The top, front and side quadrants open
  * on the selection, or on the whole unit with nothing selected.
  */
