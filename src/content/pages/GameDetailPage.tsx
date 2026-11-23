@@ -37,6 +37,7 @@ import {
 } from "../config";
 import { isDeletableArchive, isSdd } from "../format";
 import { missingDependencyNotes } from "../gameDependencies";
+import { afterVersionRemoved } from "../gameVersionRows";
 import { mutatorsOf } from "../libraryGames";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
@@ -400,7 +401,14 @@ export default function GameDetailPage() {
             canInstall={!!lib.writePath}
             statusOf={lib.statusOf}
             onInstall={lib.install}
-            onRemoved={() => navigate("/library/games")}
+            onRemoved={(row) => {
+              const to = afterVersionRemoved(
+                row,
+                game.name,
+                lib.record?.installed ?? [],
+              );
+              if (to) navigate(to, { replace: true });
+            }}
           />
         </TabsContent>
         <TabsContent value="sources">

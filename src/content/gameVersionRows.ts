@@ -71,6 +71,25 @@ function versionOf(name: string): string {
 }
 
 /**
+ * Where the game page goes after the Versions tab deletes `row`, or null to
+ * stay. Deleting another version keeps the page, so several old versions can
+ * be cleared in a row. Deleting the version the page shows moves to another
+ * installed version, and to the catalogue only when none is left.
+ */
+export function afterVersionRemoved(
+  row: GameVersionRow,
+  current: string,
+  installed: readonly GameItem[],
+): string | null {
+  const removed = row.installedItem?.name;
+  if (removed && removed !== current) return null;
+  const next = installed.find((g) => g.name !== current);
+  return next
+    ? `/library/games/${encodeURIComponent(next.name)}`
+    : "/library/games";
+}
+
+/**
  * Every version the game's sources list: a row per named rapid tag, with the
  * commit snapshots set apart, then a row per GitHub release archive. A rapid row
  * is installed when the pool holds its package, and a GitHub row when its
