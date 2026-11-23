@@ -526,11 +526,18 @@ function Builder({ id }: { id: string | undefined }) {
   // it has no parts to build with. Script is the tab that still applies, since
   // an imported unit is usually the one carrying its game's own script, and
   // Timeline stays for the same reason: its actions came from that script.
+  //
+  // A unit that runs its own script, written or compiled, has no actions for
+  // the Timeline to show, so the tab is off and Script shows in its place.
+  const timelineOff = Boolean(
+    draft && (draft.script !== undefined || draft.compiledScript !== undefined),
+  );
+  const shownStrip = strip === "timeline" && timelineOff ? "script" : strip;
   const effectiveStrip = imported
-    ? strip === "timeline"
+    ? shownStrip === "timeline"
       ? "timeline"
       : "script"
-    : strip;
+    : shownStrip;
   // Open or closed is remembered between runs. Which tab is showing is not, so
   // the side panel always comes back on Pieces. See `../panels`.
   const [stripOpen, setStripOpen] = usePanelOpen("strip");
@@ -3241,19 +3248,36 @@ function Builder({ id }: { id: string | undefined }) {
                   >
                     <Trans>Script</Trans>
                   </Button>
-                  <Button
-                    size="sm"
-                    variant={
-                      effectiveStrip === "timeline" ? "default" : "outline"
-                    }
-                    onClick={() => {
-                      setStrip("timeline");
-                      setStripOpen(true);
-                    }}
-                    aria-pressed={effectiveStrip === "timeline"}
-                  >
-                    <Trans>Timeline</Trans>
-                  </Button>
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <TipButton
+                          size="sm"
+                          variant={
+                            effectiveStrip === "timeline"
+                              ? "default"
+                              : "outline"
+                          }
+                          disabled={timelineOff}
+                          onClick={() => {
+                            setStrip("timeline");
+                            setStripOpen(true);
+                          }}
+                          aria-pressed={effectiveStrip === "timeline"}
+                        >
+                          <Trans>Timeline</Trans>
+                        </TipButton>
+                      </TooltipTrigger>
+                      {timelineOff ? (
+                        <TooltipContent side="top">
+                          <Trans>
+                            This unit runs its own script, so it has no actions
+                            to show. Its motion is in the Script tab.
+                          </Trans>
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </TooltipProvider>
                 </ButtonGroup>
 
                 {stripOpen && effectiveStrip === "inventory" && pack ? (
@@ -3322,10 +3346,6 @@ function Builder({ id }: { id: string | undefined }) {
                         // describes a run that is no longer on screen.
                         setLastScriptRun(null);
                         setStandIn({ track: null, attachPieces: new Map() });
-                      }}
-                      onShowScript={() => {
-                        setStrip("script");
-                        setStripOpen(true);
                       }}
                       pose={{ offsets: poseDraft.offsets, onHold: holdPose }}
                     />

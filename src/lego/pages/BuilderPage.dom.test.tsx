@@ -687,6 +687,22 @@ describe("the create a style button (#3238)", () => {
   });
 });
 
+describe("the Timeline tab", () => {
+  it("is off for a unit that runs its own script", async () => {
+    show(unit({ script: "function Create() end" }));
+    const timeline = await screen.findByRole("button", { name: "Timeline" });
+    expect(timeline.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(timeline);
+    expect(timeline.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("is on for a unit whose script coilbox writes", async () => {
+    show(unit());
+    const timeline = await screen.findByRole("button", { name: "Timeline" });
+    expect(timeline.getAttribute("aria-disabled")).toBeNull();
+  });
+});
+
 describe("a unit imported whole", () => {
   it("offers only Script, not the Inventory", async () => {
     show(unit({ imported: { source: "/tmp/unit.s3o" } }));

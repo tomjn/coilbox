@@ -18,7 +18,6 @@ import {
   ChevronDown,
   ChevronRight,
   Diamond,
-  FileCode,
   Pause,
   Play,
   Plus,
@@ -115,8 +114,6 @@ interface Props {
   /** Called when the tab takes the viewport from a run of the Animation
    *  panel's, so what that run put beside the unit goes. */
   onRunReplaced: () => void;
-  /** Opens the Script tab. */
-  onShowScript: () => void;
   /**
    * The pose the gizmo holds while the tab is paused (#5397). The tab asks for
    * the action's pose on the playhead's frame to be held, or for none (null)
@@ -193,18 +190,9 @@ export function TimelineTab(props: Props) {
     onPlayingChange,
   ]);
 
-  if (owned || compiled) {
-    return (
-      <div className="flex flex-1 flex-col items-start gap-3 p-4 text-sm">
-        <p>
-          <Trans>This unit runs its own script.</Trans>
-        </p>
-        <Button size="sm" variant="outline" onClick={props.onShowScript}>
-          <FileCode size={14} /> <Trans>Open the Script tab</Trans>
-        </Button>
-      </div>
-    );
-  }
+  // The builder turns the tab off for a unit that runs its own script: it has
+  // no actions to show.
+  if (owned || compiled) return null;
 
   if (!action) {
     return (

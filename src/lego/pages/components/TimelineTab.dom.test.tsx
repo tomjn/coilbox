@@ -92,7 +92,6 @@ interface Seen {
   timeline: ScriptTimeline | null;
   paused: boolean;
   frame: number;
-  shownScript: number;
   /** Whether the unit is held in a pose, and what the gizmo holds. */
   posing: boolean;
   offsets: PoseOffsets;
@@ -108,7 +107,6 @@ const seen: Seen = {
   timeline: null,
   paused: false,
   frame: 0,
-  shownScript: 0,
   posing: false,
   offsets: {},
   pose: () => {},
@@ -198,9 +196,6 @@ function Harness({
           scriptFrame={frame}
           onScriptFrameChange={setFrame}
           onRunReplaced={vi.fn()}
-          onShowScript={() => {
-            seen.shownScript++;
-          }}
           pose={{
             offsets: draft.offsets,
             onHold: (offsets) => {
@@ -363,22 +358,19 @@ describe("the rows", () => {
 });
 
 describe("a script that is not the generated one", () => {
-  it("says the unit runs its own script, and opens the Script tab", () => {
-    seen.shownScript = 0;
+  // The builder turns the tab off for these (BuilderPage.dom.test.tsx), so
+  // the tab draws nothing rather than actions the unit does not run.
+  it("draws nothing for a unit with its own script", () => {
     render(
       <Harness
         initial={{ ...poseUnits().plain, script: "function Create() end" }}
       />,
     );
-    expect(screen.getByText("This unit runs its own script.")).toBeTruthy();
     expect(screen.queryByLabelText("Scrub the action")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open the Script tab" }),
-    );
-    expect(seen.shownScript).toBe(1);
+    expect(screen.queryByRole("button", { name: /New action/ })).toBeNull();
   });
 
-  it("says the same for a compiled script", () => {
+  it("draws nothing for a compiled script", () => {
     render(
       <Harness
         initial={{
@@ -387,8 +379,8 @@ describe("a script that is not the generated one", () => {
         }}
       />,
     );
-    expect(screen.getByText("This unit runs its own script.")).toBeTruthy();
     expect(screen.queryByRole("slider")).toBeNull();
+    expect(screen.queryByRole("button", { name: /New action/ })).toBeNull();
   });
 });
 
