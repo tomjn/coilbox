@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The row that scrubs a preview: a step back button, a slider over the frames,
- * a step forward button and what frame it is on. The Animation panel scrubs a
+ * a step forward button and what frame it is on, beside them. The Animation panel scrubs a
  * script run with it, and the Timeline tab uses it as its ruler.
  *
  * `frame` and `lastFrame` are the slider's own value and last position, from
@@ -49,7 +49,10 @@ export function FrameScrubber({
   return (
     <div
       className={cn(
-        "grid grid-cols-[auto_1fr_auto] items-start gap-x-2 gap-y-1",
+        "grid items-start gap-x-2 gap-y-1",
+        readout
+          ? "grid-cols-[auto_1fr_auto_auto]"
+          : "grid-cols-[auto_1fr_auto]",
         className,
       )}
     >
@@ -91,17 +94,25 @@ export function FrameScrubber({
       >
         <StepForward size={14} />
       </Button>
+      {/* Beside the step buttons, where the eye already is while scrubbing,
+          rather than under every row of the tab. */}
+      {readout ? (
+        <span
+          className={cn(
+            "flex h-8 items-center rounded-md border border-border px-2 text-sm font-medium tabular-nums",
+            ruler,
+          )}
+        >
+          {readout}
+        </span>
+      ) : null}
       {rows !== undefined ? (
         <>
           <div className="flex min-w-0 flex-col">{labels}</div>
           <div className="flex min-w-0 flex-col">{rows}</div>
           <div />
+          {readout ? <div /> : null}
         </>
-      ) : null}
-      {readout ? (
-        <span className="col-span-3 text-right text-xs tabular-nums text-muted-foreground">
-          {readout}
-        </span>
       ) : null}
     </div>
   );

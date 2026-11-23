@@ -23962,7 +23962,7 @@ msgid "Frame {frame}"
 msgstr "Frame {frame}"
 
 #: src/lego/pages/components/TimelineTab.tsx
-msgid "Frame {frame}, {time} s"
+msgid "Frame {frame} / {last}, {time} s"
 msgstr ""
 
 #: src/lego/pages/components/ScrubberMarks.tsx
