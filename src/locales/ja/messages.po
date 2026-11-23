@@ -7724,6 +7724,11 @@ msgstr "{updateName} は古い {updateModule} を使っています。"
 msgid "{updateName} via {updateVia}"
 msgstr "{updateVia} 経由の {updateName}"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
+msgid "{updates, plural, one {# update} other {# updates}}"
+msgstr "{updates, plural, other {# 件の更新}}"
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
 msgid "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in this window.}}"
@@ -9085,8 +9090,8 @@ msgstr "ゲームが実行中です。これらの設定を変更するには閉
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
-msgid "A game is running. Close it to remove widgets."
-msgstr "ゲームが実行中です。ウィジェットを削除するには閉じてください。"
+msgid "A game is running. Close it to delete widgets."
+msgstr "ゲームが実行中です。ウィジェットを削除するにはゲームを閉じてください。"
 
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
@@ -11098,6 +11103,11 @@ msgstr "すべての装備構成"
 #, fuzzy
 msgid "all Map options"
 msgstr "すべてのマップオプション"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "All of its files are deleted. You can install it again from Coilbox widgets."
+msgstr "すべてのファイルが削除されます。Coilbox ウィジェットから再インストールできます。"
 
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
@@ -19755,6 +19765,7 @@ msgstr "バースト内の射撃間隔"
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/components/TriggerPanel.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -19824,9 +19835,15 @@ msgstr "{loadoutName} を削除"
 
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Delete {name}"
 msgstr "{name} を削除"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Delete {name} for all games?"
+msgstr "すべてのゲームから {name} を削除しますか？"
 
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -20058,6 +20075,7 @@ msgid "Deleted {name}, freeing {freed}."
 msgstr "{name} を削除し、{freed} を解放しました。"
 
 #: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Deleted {name}."
 msgstr "{name} を削除しました。"
@@ -27702,6 +27720,12 @@ msgstr "この coilbox が今ホストしている試合を中継しています
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "ゲームの BOS から再変換されます。その後の編集は失われます。"
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "It is deleted from every game that loads it: {0}"
+msgstr "読み込むすべてのゲームから削除されます: {0}"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "It is in the style list under Generate on the Models page."
@@ -27721,12 +27745,6 @@ msgstr "オブジェクトではありません"
 #, fuzzy
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "{atLeast} 以上 {atMost} 以下という、該当する難易度のない範囲にしか存在しないため、表示されることはありません"
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "It is removed from every game that loads it: {0}"
-msgstr "それを読み込むすべてのゲームから削除されます：{0}"
 
 #: src/deeplink/actions.ts
 #, fuzzy
@@ -34783,6 +34801,12 @@ msgstr "見つかりません"
 msgid "None named, so it opens untextured"
 msgstr "指定がないため、テクスチャなしで開きます"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of {0}'s widgets match \"{query}\"."
+msgstr "{0} のウィジェットで \"{query}\" に一致するものはありません。"
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "None of it has an attacker, so it came from nowhere on the map."
@@ -34832,6 +34856,11 @@ msgstr "これらは回転しません。グループのユニットはすべて
 #, fuzzy
 msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
 msgstr "このゲームのどの勢力もユニット一覧の開始ユニットに解決できないため、以下の建設ツリーはすべて空です。「すべてのユニット」には引き続き全ユニットが表示されます。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of your widgets match \"{query}\"."
+msgstr "\"{query}\" に一致するウィジェットはありません。"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -36520,6 +36549,11 @@ msgstr "選択したユニット間で異なるフィールドのみ。"
 #, fuzzy
 msgid "Only the fields you change are recorded, so the rest still follow the game when it updates."
 msgstr "変更したフィールドだけが記録されるため、それ以外はゲームのアップデートに追従します。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Only the files listed below are deleted. Files the widget includes from elsewhere stay, because other widgets may share them."
+msgstr "削除されるのは以下のファイルだけです。ウィジェットが他の場所から読み込むファイルは、他のウィジェットと共有されている可能性があるため残ります。"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -41143,7 +41177,6 @@ msgstr "リミックス元"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -41213,7 +41246,6 @@ msgstr "{mapTitle} を削除しますか？"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "{name} を外す"
@@ -41237,11 +41269,6 @@ msgstr "{name} をプロジェクトから外す"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "{name} を比較から外す"
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Remove {name}?"
-msgstr "{name} を削除しますか？"
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -41428,11 +41455,6 @@ msgstr "Chobby から「{name}」を削除しました"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "{missionName} をゲームから削除しました。"
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Removed {name}."
-msgstr "{name} を削除しました。"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -43862,6 +43884,16 @@ msgstr "動画ファイルを検索…"
 #, fuzzy
 msgid "Search weapons…"
 msgstr "武器を検索…"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets"
+msgstr "ウィジェットを検索"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets…"
+msgstr "ウィジェットを検索…"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -54444,6 +54476,11 @@ msgstr "すべて回転"
 #, fuzzy
 msgid "Turn all {count}"
 msgstr "{count} 個すべてを回転"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Turn all off"
+msgstr "すべてオフ"
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy

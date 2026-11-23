@@ -7724,6 +7724,11 @@ msgstr "{updateName} używa starszej wersji: {updateModule}."
 msgid "{updateName} via {updateVia}"
 msgstr "{updateName} przez {updateVia}"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
+msgid "{updates, plural, one {# update} other {# updates}}"
+msgstr "{updates, plural, one {# aktualizacja} few {# aktualizacje} many {# aktualizacji} other {# aktualizacji}}"
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
 msgid "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in this window.}}"
@@ -9085,8 +9090,8 @@ msgstr "Gra jest uruchomiona. Zamknij ją, aby zmienić te ustawienia."
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
-msgid "A game is running. Close it to remove widgets."
-msgstr "Gra jest uruchomiona. Zamknij ją, aby usunąć widżety."
+msgid "A game is running. Close it to delete widgets."
+msgstr "Gra jest uruchomiona. Zamknij ją, aby usuwać widżety."
 
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
@@ -11098,6 +11103,11 @@ msgstr "Wszystkie wyposażenia"
 #, fuzzy
 msgid "all Map options"
 msgstr "wszystkie opcje mapy"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "All of its files are deleted. You can install it again from Coilbox widgets."
+msgstr "Wszystkie jego pliki zostaną usunięte. Możesz zainstalować go ponownie w sekcji Widżety Coilbox."
 
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
@@ -19755,6 +19765,7 @@ msgstr "Opóźnienie między strzałami w serii"
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/components/TriggerPanel.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -19824,9 +19835,15 @@ msgstr "Usuń {loadoutName}"
 
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Delete {name}"
 msgstr "Usuń {name}"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Delete {name} for all games?"
+msgstr "Usunąć {name} ze wszystkich gier?"
 
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -20058,6 +20075,7 @@ msgid "Deleted {name}, freeing {freed}."
 msgstr "Usunięto {name}, zwolniono {freed}."
 
 #: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Deleted {name}."
 msgstr "Usunięto {name}."
@@ -27702,6 +27720,12 @@ msgstr "Obsługuje mecz, który ten coilbox teraz hostuje. Opuść ten mecz prze
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "Zostanie ponownie przekonwertowany z BOS gry. Zmiany wprowadzone od tego czasu przepadną."
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "It is deleted from every game that loads it: {0}"
+msgstr "Zostanie usunięty z każdej gry, która go wczytuje: {0}"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "It is in the style list under Generate on the Models page."
@@ -27721,12 +27745,6 @@ msgstr "nie jest obiektem"
 #, fuzzy
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "występuje tylko od {atLeast} wzwyż i tylko do {atMost}, czyli przy żadnym poziomie trudności, więc nigdy się nie pojawia"
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "It is removed from every game that loads it: {0}"
-msgstr "Zostaje usunięty z każdej gry, która go wczytuje: {0}"
 
 #: src/deeplink/actions.ts
 #, fuzzy
@@ -34783,6 +34801,12 @@ msgstr "nie znaleziono"
 msgid "None named, so it opens untextured"
 msgstr "Brak nazwy, więc otwiera się bez tekstury"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of {0}'s widgets match \"{query}\"."
+msgstr "Żaden widżet gry {0} nie pasuje do \"{query}\"."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "None of it has an attacker, so it came from nowhere on the map."
@@ -34832,6 +34856,11 @@ msgstr "Żadne z nich się nie obraca. Jednostki grupy są zwrócone na południ
 #, fuzzy
 msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
 msgstr "Żadna z frakcji tej gry nie prowadzi do jednostki startowej z jej listy, więc każde drzewo budowy poniżej jest puste. Wszystkie jednostki nadal pokazuje pełną listę."
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of your widgets match \"{query}\"."
+msgstr "Żaden z twoich widżetów nie pasuje do \"{query}\"."
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -36520,6 +36549,11 @@ msgstr "Tylko pola, którymi zaznaczone jednostki się różnią."
 #, fuzzy
 msgid "Only the fields you change are recorded, so the rest still follow the game when it updates."
 msgstr "Zapisywane są tylko pola, które zmienisz, więc reszta nadal podąża za grą, gdy ta się aktualizuje."
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Only the files listed below are deleted. Files the widget includes from elsewhere stay, because other widgets may share them."
+msgstr "Usuwane są tylko pliki wymienione poniżej. Pliki, które widżet wczytuje z innych miejsc, zostają, bo mogą z nich korzystać inne widżety."
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -41143,7 +41177,6 @@ msgstr "Remiks z"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -41213,7 +41246,6 @@ msgstr "Usunąć {mapTitle}?"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "Usuń {name}"
@@ -41237,11 +41269,6 @@ msgstr "Usuń {name} z projektów"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "Usuń {name} z porównania"
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Remove {name}?"
-msgstr "Usunąć {name}?"
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -41428,11 +41455,6 @@ msgstr "Usunięto „{name}” z Chobby"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "Usunięto {missionName} z gry."
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Removed {name}."
-msgstr "Usunięto {name}."
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -43862,6 +43884,16 @@ msgstr "Szukaj plików wideo…"
 #, fuzzy
 msgid "Search weapons…"
 msgstr "Szukaj broni…"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets"
+msgstr "Szukaj widżetów"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets…"
+msgstr "Szukaj widżetów…"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -54444,6 +54476,11 @@ msgstr "Obróć wszystkie"
 #, fuzzy
 msgid "Turn all {count}"
 msgstr "Obróć wszystkie ({count})"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Turn all off"
+msgstr "Wyłącz wszystkie"
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy

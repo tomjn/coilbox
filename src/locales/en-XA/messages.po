@@ -6231,6 +6231,10 @@ msgstr ""
 msgid "{updateName} via {updateVia}"
 msgstr ""
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+msgid "{updates, plural, one {# update} other {# updates}}"
+msgstr ""
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in this window.}}"
 msgstr ""
@@ -7323,7 +7327,7 @@ msgid "A game is running. Close it to change these settings."
 msgstr ""
 
 #: src/widgets/pages/RemoveWidget.tsx
-msgid "A game is running. Close it to remove widgets."
+msgid "A game is running. Close it to delete widgets."
 msgstr ""
 
 #: src/blueprint/pages/components/LeavingPack.tsx
@@ -8946,6 +8950,10 @@ msgstr ""
 
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "all Map options"
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "All of its files are deleted. You can install it again from Coilbox widgets."
 msgstr ""
 
 #: src/scenario/pages/components/TriggerPanel.tsx
@@ -15980,6 +15988,7 @@ msgstr ""
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/components/TriggerPanel.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -16036,7 +16045,12 @@ msgstr ""
 
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Delete {name}"
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Delete {name} for all games?"
 msgstr ""
 
 #: src/workshop/pages/components/CloneActions.tsx
@@ -16224,6 +16238,7 @@ msgid "Deleted {name}, freeing {freed}."
 msgstr ""
 
 #: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Deleted {name}."
 msgstr ""
 
@@ -22425,6 +22440,11 @@ msgstr ""
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr ""
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "It is deleted from every game that loads it: {0}"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "It is in the style list under Generate on the Models page."
 msgstr ""
@@ -22439,11 +22459,6 @@ msgstr ""
 
 #: src/scenario/validate.ts
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
-msgstr ""
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-msgid "It is removed from every game that loads it: {0}"
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -28150,6 +28165,11 @@ msgstr ""
 msgid "None named, so it opens untextured"
 msgstr ""
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "None of {0}'s widgets match \"{query}\"."
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "None of it has an attacker, so it came from nowhere on the map."
 msgstr ""
@@ -28188,6 +28208,10 @@ msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "None of your widgets match \"{query}\"."
 msgstr ""
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
@@ -29548,6 +29572,10 @@ msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 msgid "Only the fields you change are recorded, so the rest still follow the game when it updates."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Only the files listed below are deleted. Files the widget includes from elsewhere stay, because other widgets may share them."
 msgstr ""
 
 #: src/hub/pages/BrowsePage.tsx
@@ -33303,7 +33331,6 @@ msgstr ""
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Remove"
@@ -33360,7 +33387,6 @@ msgstr ""
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 msgid "Remove {name}"
 msgstr ""
 
@@ -33378,10 +33404,6 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 msgid "Remove {name} from the comparison"
-msgstr ""
-
-#: src/widgets/pages/RemoveWidget.tsx
-msgid "Remove {name}?"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -33531,10 +33553,6 @@ msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Removed {missionName} from the game."
-msgstr ""
-
-#: src/widgets/pages/RemoveWidget.tsx
-msgid "Removed {name}."
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -35507,6 +35525,14 @@ msgstr ""
 
 #: src/lego/pages/components/WeaponsSection.tsx
 msgid "Search weapons…"
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Search widgets"
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Search widgets…"
 msgstr ""
 
 #: src/hub/pages/BrowsePage.tsx
@@ -44039,6 +44065,10 @@ msgstr ""
 
 #: src/placement/SurfaceBars.tsx
 msgid "Turn all {count}"
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Turn all off"
 msgstr ""
 
 #: src/multiplayer/MatchFoundPanel.tsx

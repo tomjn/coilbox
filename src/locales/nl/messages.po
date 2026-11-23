@@ -7725,6 +7725,11 @@ msgstr "{updateName} gebruikt een oude versie van {updateModule}."
 msgid "{updateName} via {updateVia}"
 msgstr "{updateName} via {updateVia}"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
+msgid "{updates, plural, one {# update} other {# updates}}"
+msgstr "{updates, plural, one {# update} other {# updates}}"
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
 msgid "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in this window.}}"
@@ -9086,7 +9091,7 @@ msgstr "Er draait een spel. Sluit het om deze instellingen te wijzigen."
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
-msgid "A game is running. Close it to remove widgets."
+msgid "A game is running. Close it to delete widgets."
 msgstr "Er draait een spel. Sluit het om widgets te verwijderen."
 
 #: src/blueprint/pages/components/LeavingPack.tsx
@@ -11099,6 +11104,11 @@ msgstr "Alle uitrustingen"
 #, fuzzy
 msgid "all Map options"
 msgstr "alle kaartopties"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "All of its files are deleted. You can install it again from Coilbox widgets."
+msgstr "Al zijn bestanden worden verwijderd. Je kunt hem opnieuw installeren via Coilbox-widgets."
 
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
@@ -19759,6 +19769,7 @@ msgstr "Vertraging tussen schoten in een salvo"
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/components/TriggerPanel.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -19828,9 +19839,15 @@ msgstr "{loadoutName} verwijderen"
 
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Delete {name}"
 msgstr "{name} verwijderen"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Delete {name} for all games?"
+msgstr "{name} voor alle spellen verwijderen?"
 
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -20062,6 +20079,7 @@ msgid "Deleted {name}, freeing {freed}."
 msgstr "{name} verwijderd, {freed} vrijgemaakt."
 
 #: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Deleted {name}."
 msgstr "{name} verwijderd."
@@ -27711,6 +27729,12 @@ msgstr "Hij draagt een gevecht dat deze coilbox nu host. Verlaat dat gevecht voo
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "Het wordt opnieuw omgezet uit de BOS van het spel. Wijzigingen die je sindsdien hebt gemaakt, gaan verloren."
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "It is deleted from every game that loads it: {0}"
+msgstr "Hij wordt verwijderd uit elk spel dat hem laadt: {0}"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "It is in the style list under Generate on the Models page."
@@ -27730,12 +27754,6 @@ msgstr "het is geen object"
 #, fuzzy
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "het is er alleen vanaf {atLeast} en maar tot {atMost}, en dat is helemaal geen moeilijkheidsgraad, dus het verschijnt nooit"
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "It is removed from every game that loads it: {0}"
-msgstr "Het wordt verwijderd uit elk spel dat het laadt: {0}"
 
 #: src/deeplink/actions.ts
 #, fuzzy
@@ -34795,6 +34813,12 @@ msgstr "niets gevonden"
 msgid "None named, so it opens untextured"
 msgstr "Geen genoemd, dus het opent zonder textuur"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of {0}'s widgets match \"{query}\"."
+msgstr "Geen van de widgets van {0} komt overeen met \"{query}\"."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "None of it has an attacker, so it came from nowhere on the map."
@@ -34844,6 +34868,11 @@ msgstr "Geen van deze draait. De eenheden van een groep kijken allemaal naar het
 #, fuzzy
 msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
 msgstr "Geen van de facties van dit spel leidt naar een starteenheid in de selectie, dus elke bouwboom hieronder is leeg. Alle eenheden toont nog steeds de volledige selectie."
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of your widgets match \"{query}\"."
+msgstr "Geen van je widgets komt overeen met \"{query}\"."
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -36534,6 +36563,11 @@ msgstr "Alleen de velden waarin de geselecteerde eenheden verschillen."
 #, fuzzy
 msgid "Only the fields you change are recorded, so the rest still follow the game when it updates."
 msgstr "Alleen de velden die je wijzigt, worden vastgelegd, dus de rest volgt nog steeds het spel als het bijgewerkt wordt."
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Only the files listed below are deleted. Files the widget includes from elsewhere stay, because other widgets may share them."
+msgstr "Alleen de bestanden hieronder worden verwijderd. Bestanden die de widget van elders laadt blijven staan, omdat andere widgets ze kunnen delen."
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -41162,7 +41196,6 @@ msgstr "Geremixt van"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -41232,7 +41265,6 @@ msgstr "{mapTitle} verwijderen?"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "{name} verwijderen"
@@ -41256,11 +41288,6 @@ msgstr "{name} uit projecten verwijderen"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "{name} uit de vergelijking verwijderen"
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Remove {name}?"
-msgstr "{name} verwijderen?"
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -41447,11 +41474,6 @@ msgstr "\"{name}\" uit Chobby verwijderd"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "{missionName} uit het spel verwijderd."
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Removed {name}."
-msgstr "{name} verwijderd."
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -43884,6 +43906,16 @@ msgstr "Videobestanden zoeken…"
 #, fuzzy
 msgid "Search weapons…"
 msgstr "Wapens zoeken…"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets"
+msgstr "Widgets zoeken"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets…"
+msgstr "Widgets zoeken…"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -54475,6 +54507,11 @@ msgstr "Alles draaien"
 #, fuzzy
 msgid "Turn all {count}"
 msgstr "Alle {count} draaien"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Turn all off"
+msgstr "Alles uitzetten"
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy
