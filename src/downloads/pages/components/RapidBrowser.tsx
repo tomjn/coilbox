@@ -139,24 +139,36 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     return () => observer.disconnect();
   }, [scroller]);
 
+  // Each load bumps its counter, and a reply whose number is no longer the
+  // latest is dropped, so a slow answer for an earlier click never replaces
+  // what the user has picked since.
+  const reposRequest = useRef(0);
+  const versionsRequest = useRef(0);
+
   const loadRepos = useCallback(async (url: string, refresh = false) => {
+    const request = ++reposRequest.current;
+    versionsRequest.current++;
     setReposLoading(true);
     setReposError(null);
     setSelected(null);
     setVersions(null);
+    setVersionsLoading(false);
+    setVersionsError(null);
     try {
       const { repos, ageSecs } = await dlRepos({
         masterUrl: url.trim() || DEFAULT_MASTER,
         refresh,
       });
+      if (request !== reposRequest.current) return;
       setRepos(repos);
       setReposAge(ageSecs);
     } catch (e) {
+      if (request !== reposRequest.current) return;
       setRepos(null);
       setReposAge(null);
       setReposError(errorText(e));
     } finally {
-      setReposLoading(false);
+      if (request === reposRequest.current) setReposLoading(false);
     }
   }, []);
 
@@ -169,6 +181,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   }, [cfg.rapidRepos, masterUrl, loadRepos]);
 
   async function selectRepo(repo: Repo, refresh = false) {
+    const request = ++versionsRequest.current;
     setSelected(repo);
     setVersions(null);
     setVersionsAge(null);
@@ -181,12 +194,14 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
         dataDir: writePath,
         refresh,
       });
+      if (request !== versionsRequest.current) return;
       setVersions(orderRapidVersions(versions));
       setVersionsAge(ageSecs);
     } catch (e) {
+      if (request !== versionsRequest.current) return;
       setVersionsError(errorText(e));
     } finally {
-      setVersionsLoading(false);
+      if (request === versionsRequest.current) setVersionsLoading(false);
     }
   }
 
