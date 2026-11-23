@@ -293,7 +293,10 @@ describe("the unit info card (#5403)", () => {
     expect(text.className).toContain("truncate");
     expect(text.className).toContain("min-w-0");
     // The row lets the toolbar drop below the card rather than squeeze it.
-    expect(card.parentElement?.className).toContain("flex-wrap");
+    expect(card.parentElement?.parentElement?.className).toContain("flex-wrap");
+    // Open, it hangs out of a slot the closed card's height, so the row
+    // under it, and the tool rail, do not move.
+    expect(card.parentElement?.className).toContain("h-[38px]");
   });
 });
 
