@@ -23910,6 +23910,7 @@ msgstr "Nourriture"
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/generateChecked.ts
+#: src/lego/pages/components/GamePanel.tsx
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 #, fuzzy
