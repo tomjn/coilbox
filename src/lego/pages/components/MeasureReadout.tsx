@@ -152,17 +152,23 @@ export function DragReadout({
   step: number | null;
 }) {
   return (
-    <div className={card}>
+    // Each label beside its figures rather than above them, so the card stays
+    // short enough not to cover the piece being dragged in a small view.
+    <div className={`${card} grid grid-cols-[auto_auto] gap-x-2 gap-y-1`}>
       <div className="font-medium">
         <Trans>Moved</Trans>
       </div>
-      <AxisFigures values={moved} step={step} />
+      <div>
+        <AxisFigures values={moved} step={step} />
+      </div>
       {size ? (
         <>
-          <div className="mt-1 font-medium">
+          <div className="font-medium">
             <Trans>Size</Trans>
           </div>
-          <AxisFigures values={size} step={step} />
+          <div>
+            <AxisFigures values={size} step={step} />
+          </div>
         </>
       ) : null}
     </div>

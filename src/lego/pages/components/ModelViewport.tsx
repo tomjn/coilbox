@@ -2339,21 +2339,26 @@ export function ModelViewport({
             corner, so a long key runs out of room before it runs under the
             buttons. Stacked within their group, so the compass keeps the
             corner and the buttons do not push it inward. */}
-        <div ref={bottomRef} className="flex flex-col gap-3">
-          {measure.active || measure.measurements.length > 0 ? (
-            <LiveMeasureReadout
-              store={measure.lines}
-              step={partUnit(pack)}
-              onClear={measure.clear}
-            />
-          ) : null}
-          {measure.moved ? (
-            <DragReadout
-              moved={measure.moved}
-              size={draggedSize}
-              step={partUnit(pack)}
-            />
-          ) : null}
+        <div ref={bottomRef} className="relative flex flex-col gap-3">
+          {/* Over the view, just above this block, rather than in it. In four
+              views this block's height is the bottom band, so a readout in it
+              shrank all four views for as long as a drag lasted. */}
+          <div className="absolute bottom-full left-0 mb-3 flex flex-col items-start gap-2">
+            {measure.active || measure.measurements.length > 0 ? (
+              <LiveMeasureReadout
+                store={measure.lines}
+                step={partUnit(pack)}
+                onClear={measure.clear}
+              />
+            ) : null}
+            {measure.moved ? (
+              <DragReadout
+                moved={measure.moved}
+                size={draggedSize}
+                step={partUnit(pack)}
+              />
+            ) : null}
+          </div>
 
           {/* In one view in bands the buttons drop to a row of their own when
               the key would otherwise be squeezed into a narrow column
