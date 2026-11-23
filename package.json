@@ -58,7 +58,7 @@
     "emojibase-data": "^17.0.0",
     "fflate": "^0.8.3",
     "flag-icons": "^7.5.0",
-    "lucide-react": "^1.53.0",
+    "lucide-react": "^1.78.0",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
