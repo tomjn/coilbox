@@ -2831,7 +2831,7 @@ function Builder({ id }: { id: string | undefined }) {
                                     }}
                                     aria-label={t`Fit a body plan`}
                                   >
-                                    <Bone size={14} />
+                                    <PersonStanding size={14} />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom">
@@ -2848,7 +2848,7 @@ function Builder({ id }: { id: string | undefined }) {
                                       onClick={() => void proposeSkeleton()}
                                       aria-label={t`Propose a skeleton`}
                                     >
-                                      <PersonStanding size={14} />
+                                      <Bone size={14} />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom">

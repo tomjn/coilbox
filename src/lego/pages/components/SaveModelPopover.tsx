@@ -16,7 +16,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
-import { FileDown } from "lucide-react";
+import { FileBox } from "lucide-react";
 import { useState } from "react";
 import {
   Popover,
@@ -103,7 +103,7 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
             <Button size="icon" variant="outline" aria-label={t`Save model`}>
-              <FileDown size={14} />
+              <FileBox size={14} />
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
