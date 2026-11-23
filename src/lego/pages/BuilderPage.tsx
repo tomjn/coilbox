@@ -3499,6 +3499,7 @@ function Builder({ id }: { id: string | undefined }) {
                   pack={loaded}
                   raw={raw}
                   referenceUnit={referenceUnit}
+                  footprint={footprint}
                   onMovementChange={(movement) =>
                     edit(({ movement: _old, ...project }) =>
                       movement ? { ...project, movement } : project,

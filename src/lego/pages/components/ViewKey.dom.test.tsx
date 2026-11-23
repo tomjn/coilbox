@@ -8,16 +8,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { FootprintResult } from "../../footprint";
-import { footprintLines } from "../../footprint";
 import { ViewKey } from "./ViewKey";
 
 afterEach(cleanup);
-
-const FOOTPRINT: FootprintResult = {
-  status: "notApplicable",
-  reason: "no geometry",
-};
 
 function key(fourViews: boolean) {
   return render(
@@ -28,7 +21,6 @@ function key(fourViews: boolean) {
       aimPoint={false}
       guides={false}
       balance={null}
-      footprint={FOOTPRINT}
       overlap={null}
       reaches={[]}
       hint="Hold Alt to place freely"
@@ -37,18 +29,21 @@ function key(fourViews: boolean) {
 }
 
 describe("the view's key", () => {
-  it("has the footprint and the hint in one view", () => {
+  it("has the hint in one view", () => {
     key(false);
     expect(screen.getByText("Hold Alt to place freely")).toBeTruthy();
-    expect(screen.getByText(footprintLines(FOOTPRINT)[0])).toBeTruthy();
     expect(screen.getByText("Turns here")).toBeTruthy();
   });
 
-  it("leaves the footprint and the hint out in four views, and keeps the key", () => {
+  it("leaves the hint out in four views, and keeps the key", () => {
     key(true);
     expect(screen.queryByText("Hold Alt to place freely")).toBeNull();
-    expect(screen.queryByText(footprintLines(FOOTPRINT)[0])).toBeNull();
     expect(screen.getByText("Turns here")).toBeTruthy();
     expect(screen.getByText("Faces")).toBeTruthy();
+  });
+
+  it("does not say the footprint, which the Game tab does", () => {
+    key(false);
+    expect(screen.queryByText(/^Footprint/)).toBeNull();
   });
 });

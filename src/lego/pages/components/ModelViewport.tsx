@@ -2449,16 +2449,6 @@ export function ModelViewport({
                   ? balance
                   : null
               }
-              footprint={
-                footprint?.result &&
-                (showFootprint ||
-                  (footprint.result.status === "ok" &&
-                    (footprint.result.differs ||
-                      footprint.result.overhang.x > 0 ||
-                      footprint.result.overhang.z > 0)))
-                  ? footprint.result
-                  : null
-              }
               overlap={overlap && showOverlap ? overlap : null}
               reaches={showReach ? reaches : []}
               hint={hintText()}

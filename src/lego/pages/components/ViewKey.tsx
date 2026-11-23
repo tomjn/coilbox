@@ -7,7 +7,6 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { type BalanceResult, balanceSummary } from "../../balance";
-import { type FootprintResult, footprintLines } from "../../footprint";
 import { type OverlapResult, overlapSummary } from "../../overlap";
 import { GUIDE_COLOUR } from "./guideLayer";
 import { reachColour } from "./weaponReachLayer";
@@ -19,14 +18,12 @@ export function ViewKey({
   aimPoint,
   guides,
   balance,
-  footprint,
   overlap,
   reaches,
   hint,
 }: {
-  /** The four view layout, where the footprint and the hint are left out
-   *  (#5410). Both are about the one view's ground, and the bottom band has
-   *  no room for them. */
+  /** The four view layout, where the hint is left out (#5410). It is about
+   *  the one view. The footprint is in the Game tab. */
   fourViews: boolean;
   /** The dots drawn on the selected piece: its own anchors, the faces and
    *  corners of its box, or none. */
@@ -37,7 +34,6 @@ export function ViewKey({
   aimPoint: boolean;
   guides: boolean;
   balance: BalanceResult | null;
-  footprint: FootprintResult | null;
   overlap: OverlapResult | null;
   reaches: readonly { number: number }[];
   hint: string;
@@ -92,13 +88,6 @@ export function ViewKey({
         >
           {balanceSummary(balance)}
         </span>
-      ) : null}
-      {footprint && !fourViews ? (
-        <div className="flex flex-col">
-          {footprintLines(footprint).map((line) => (
-            <span key={line}>{line}</span>
-          ))}
-        </div>
       ) : null}
       {overlap ? <span>{overlapSummary(overlap)}</span> : null}
       {reaches.length > 0 ? (
