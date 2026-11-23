@@ -143,6 +143,23 @@ describe("oneEntryPerGame", () => {
     handler: WidgetHandler | null = lower,
   ): InstalledGame => ({ game, title, version, shortName, handler });
 
+  it("marks an entry a mutator only when every version it stands for is one", () => {
+    const entries = oneEntryPerGame([
+      install("Zero-K v1.12", "Zero-K", "v1.12", "ZK"),
+      { ...install("ZK Chaos 2", "ZK Chaos", "2", "ZKC"), mutator: true },
+      { ...install("ZK Chaos 3", "ZK Chaos", "3", "ZKC"), mutator: true },
+      { ...install("Zero-K test", "Zero-K", "test", "ZK"), mutator: true },
+      { ...install("uAI_6.2", "uAI_6.2", "", undefined), mutator: true },
+    ]);
+    expect(
+      entries.map((e) => ({ game: e.game, mutator: e.mutator ?? false })),
+    ).toEqual([
+      { game: "uAI_6.2", mutator: true },
+      { game: "Zero-K", mutator: false },
+      { game: "ZK Chaos", mutator: true },
+    ]);
+  });
+
   it("makes one entry of the versions of a game, named without a version", () => {
     const entries = oneEntryPerGame([
       install("Splinter Faction 0.1.93", "Splinter Faction", "0.1.93", "SF"),

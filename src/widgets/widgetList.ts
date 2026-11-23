@@ -24,6 +24,10 @@ export interface GameHandler {
    *  share their widgets: the full name of each, newest first. `game` is then
    *  the name without a version. */
   versions?: readonly string[];
+  /** Every version it stands for depends on another installed game, so it is a
+   *  mutator. The game picker leaves it out, and it uses the widgets for all
+   *  games unless it shares a short name with its base game. */
+  mutator?: boolean;
 }
 
 /** One installed version of a game, before versions are grouped. */
@@ -57,6 +61,7 @@ export function oneEntryPerGame(
   }
   const taken = new Set(entries.map((e) => e.game));
   for (const [shortName, members] of byShortName) {
+    const mutator = members.every((m) => m.mutator);
     members.sort((a, b) => compareGameVersions(b.version, a.version));
     const newest = members[0];
     // Two games can share a name without a version, such as a test branch.
@@ -70,6 +75,7 @@ export function oneEntryPerGame(
       shortName,
       handler: newest.handler,
       versions: members.map((m) => m.game),
+      ...(mutator && { mutator }),
     });
   }
   return entries.sort((a, b) => a.game.localeCompare(b.game));

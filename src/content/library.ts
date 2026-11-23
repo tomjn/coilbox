@@ -460,7 +460,7 @@ function buildGames(
  * mutator, since the engine has no mutator type. A dependency names a game by
  * its name or its archive name, which are the two forms the scan reports.
  */
-function mutatorNames(scanned: readonly GameItem[]): Set<string> {
+export function mutatorNames(scanned: readonly GameItem[]): Set<string> {
   const owner = ownersOf(scanned);
   return new Set(
     scanned
