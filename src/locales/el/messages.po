@@ -36934,7 +36934,6 @@ msgid "Open the scenario"
 msgstr "Άνοιγμα του σεναρίου"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Άνοιγμα της καρτέλας Script"
@@ -53591,10 +53590,10 @@ msgstr "Αυτή η μονάδα κινείται αλλά δεν ορίζει �
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr "Αυτή η μονάδα δεν έχει πια τον σκελετό πάνω στον οποίο δημιουργήθηκε, οπότε δεν μπορεί να δημιουργηθεί ξανά."
 
-#: src/lego/pages/components/TimelineTab.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
-msgid "This unit runs its own script."
-msgstr "Αυτή η μονάδα εκτελεί το δικό της script."
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
+msgstr "Αυτή η μονάδα εκτελεί το δικό της script, οπότε δεν έχει ενέργειες να δείξει. Η κίνησή της βρίσκεται στην καρτέλα Script."
 
 #: src/lego/pack.ts
 #, fuzzy

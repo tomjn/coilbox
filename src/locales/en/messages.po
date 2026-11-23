@@ -29874,7 +29874,6 @@ msgid "Open the scenario"
 msgstr "Open the scenario"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 msgid "Open the Script tab"
 msgstr "Open the Script tab"
 
@@ -43328,9 +43327,9 @@ msgstr "This unit moves but names no movement class, so the engine drops it at l
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 
-#: src/lego/pages/components/TimelineTab.tsx
-msgid "This unit runs its own script."
-msgstr "This unit runs its own script."
+#: src/lego/pages/BuilderPage.tsx
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
+msgstr "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
 
 #: src/lego/pack.ts
 msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is not installed."

@@ -36919,7 +36919,6 @@ msgid "Open the scenario"
 msgstr "Otwórz scenariusz"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Otwórz kartę Skrypt"
@@ -53560,10 +53559,10 @@ msgstr "Ta jednostka się porusza, ale nie wskazuje klasy ruchu, więc silnik po
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr "Ta jednostka nie ma już szkieletu, na którym została wygenerowana, więc nie można jej ponownie wylosować."
 
-#: src/lego/pages/components/TimelineTab.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
-msgid "This unit runs its own script."
-msgstr "Ta jednostka uruchamia własny skrypt."
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
+msgstr "Ta jednostka uruchamia własny skrypt, więc nie ma akcji do pokazania. Jej ruch jest na karcie Skrypt."
 
 #: src/lego/pack.ts
 #, fuzzy

@@ -29873,7 +29873,6 @@ msgid "Open the scenario"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 msgid "Open the Script tab"
 msgstr ""
 
@@ -43327,8 +43326,8 @@ msgstr ""
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr ""
 
-#: src/lego/pages/components/TimelineTab.tsx
-msgid "This unit runs its own script."
+#: src/lego/pages/BuilderPage.tsx
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
 msgstr ""
 
 #: src/lego/pack.ts

@@ -36919,7 +36919,6 @@ msgid "Open the scenario"
 msgstr "Відкрити сценарій"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Відкрити вкладку «Скрипт»"
@@ -53560,10 +53559,10 @@ msgstr "Цей юніт рухається, але не називає клас�
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr "У цього юніта більше немає скелета, на якому його згенеровано, тому його не можна перегенерувати."
 
-#: src/lego/pages/components/TimelineTab.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
-msgid "This unit runs its own script."
-msgstr "Цей юніт виконує власний скрипт."
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
+msgstr "Цей юніт виконує власний скрипт, тож не має дій для показу. Його рух на вкладці «Скрипт»."
 
 #: src/lego/pack.ts
 #, fuzzy

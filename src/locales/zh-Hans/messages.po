@@ -36919,7 +36919,6 @@ msgid "Open the scenario"
 msgstr "打开场景"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "打开脚本标签页"
@@ -53560,10 +53559,10 @@ msgstr "此单位会移动但没有指定移动类型，所以引擎会在加载
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr "此单位已不再有生成它时所用的骨架，因此无法重新随机。"
 
-#: src/lego/pages/components/TimelineTab.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
-msgid "This unit runs its own script."
-msgstr "此单位运行自己的脚本。"
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
+msgstr "此单位运行自己的脚本，因此没有可显示的动作。它的动作在“脚本”标签页中。"
 
 #: src/lego/pack.ts
 #, fuzzy

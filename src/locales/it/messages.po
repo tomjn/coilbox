@@ -36934,7 +36934,6 @@ msgid "Open the scenario"
 msgstr "Apri lo scenario"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 #, fuzzy
 msgid "Open the Script tab"
 msgstr "Apri la scheda Script"
@@ -53591,10 +53590,10 @@ msgstr "Questa unità si muove ma non nomina una classe di movimento, quindi il 
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr "Questa unità non ha più lo scheletro su cui è stata generata, quindi non si può fare il reroll."
 
-#: src/lego/pages/components/TimelineTab.tsx
+#: src/lego/pages/BuilderPage.tsx
 #, fuzzy
-msgid "This unit runs its own script."
-msgstr "Questa unità esegue un proprio script."
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
+msgstr "Questa unità esegue il proprio script, quindi non ha azioni da mostrare. Il suo movimento è nella scheda Script."
 
 #: src/lego/pack.ts
 #, fuzzy
