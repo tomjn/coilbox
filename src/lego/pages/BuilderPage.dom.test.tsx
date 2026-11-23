@@ -93,13 +93,13 @@ vi.mock("../useRawGeometry", () => ({
 
 // Draws its `chrome`, which is the toolbar over the view, in one view or in
 // four as a test sets.
-const layout = { fourViews: false };
+const layout = { banded: false };
 vi.mock("./components/ModelViewport", () => ({
   ModelViewport: ({
     chrome,
   }: {
-    chrome?: (fourViews: boolean) => React.ReactNode;
-  }) => chrome?.(layout.fourViews),
+    chrome?: (banded: boolean, corner: React.ReactNode) => React.ReactNode;
+  }) => chrome?.(layout.banded, null),
 }));
 
 // Reads the app's own settings store for its target engine, which nothing
@@ -260,7 +260,7 @@ function show(project: LegoProject, selectedId?: string) {
 }
 
 beforeEach(() => {
-  layout.fourViews = false;
+  layout.banded = false;
   localStorage.clear();
   packLoad = loadedPack();
   loadedRaw = null;
@@ -314,9 +314,9 @@ describe("the unit info card over one view", () => {
   });
 });
 
-describe("the unit info card in four views (#5410)", () => {
+describe("the unit info card in bands (#5414)", () => {
   it("is one line with the unit's name, and opens the rest of the card from it", async () => {
-    layout.fourViews = true;
+    layout.banded = true;
     show(unit());
     await screen.findByRole("button", { name: "Script" });
     const card = screen.getByTestId("unit-card");

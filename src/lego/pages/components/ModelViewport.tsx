@@ -874,13 +874,15 @@ export function ModelViewport({
    *  measured from where it is drawn so a wrapping toolbar is allowed for. */
   const [bands, setBands] = useState<ViewBands>(NO_BANDS);
   /** Whether the chrome is too big to sit over one view (#5414): the tool
-   *  rail has to scroll. One view then takes the bands four views do. */
+   *  rail has to scroll. One view then takes bands round it. */
   const [crowded, setCrowded] = useState(false);
   /** Whether the tool rail has tools below what it shows, for the fade that
    *  says so. */
   const [railMore, setRailMore] = useState(false);
-  /** In bands round the views rather than over them. */
-  const banded = fourViews || crowded;
+  /** In bands round the view rather than over it. Four views never are: the
+   *  chrome floats over them as it does over one view, since the bands left
+   *  a margin of empty space round all four and made each of them smaller. */
+  const banded = crowded && !fourViews;
   /** What was drawn last, for the measure below, which runs from observers
    *  and would otherwise read the render it was set up in. */
   const crowdedRef = useRef(crowded);
@@ -1991,14 +1993,14 @@ export function ModelViewport({
     toggleFourViews,
   });
 
-  // In four views the chrome keeps bands along the top, the bottom and the
-  // left, and the views share what is left (#5410). The bands are measured
-  // from the chrome as drawn, again whenever any of it changes size, so a
-  // toolbar that wraps grows the top band and the views shrink to suit.
+  // One view takes bands along the top, the bottom and the left once the
+  // chrome no longer fits over it (#5414), which the tool rail says: it gets
+  // what the chrome above and below leave, and scrolls when that is not
+  // enough. The bands are measured from the chrome as drawn, again whenever
+  // any of it changes size, so a toolbar that wraps grows the top band.
   //
-  // One view takes the same bands once the chrome no longer fits over it
-  // (#5414), which the tool rail says: it gets what the chrome above and below
-  // leave, and scrolls when that is not enough.
+  // Four views took the same bands once (#5410). They fill the viewport now,
+  // with the chrome over them, so their quadrants are told there are none.
   //
   // In bands the unit card is one line, so the chrome is shorter and the rail
   // has more room than it would over the view. Reading the rail there would
@@ -2016,17 +2018,19 @@ export function ModelViewport({
       // A pixel of slack, as `chromeFits` allows.
       setRailMore(rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1);
     const measure = () => {
-      // Four views are banded whatever the rail says, and the chrome is in
-      // bands when it is measured, so there is nothing to ask of it.
+      // Four views are never banded, so there is nothing to ask of the rail:
+      // it scrolls when it does not fit.
       if (!fourViews) {
         if (crowdedRef.current) flushSync(() => setCrowded(false));
         if (!chromeFits(rail)) flushSync(() => setCrowded(true));
       }
-      const next = bandsFrom(
-        wrapper.getBoundingClientRect(),
-        views.getBoundingClientRect(),
-        rail.getBoundingClientRect(),
-      );
+      const next = fourViews
+        ? NO_BANDS
+        : bandsFrom(
+            wrapper.getBoundingClientRect(),
+            views.getBoundingClientRect(),
+            rail.getBoundingClientRect(),
+          );
       setBands((was) =>
         was.top === next.top &&
         was.bottom === next.bottom &&
@@ -2057,10 +2061,10 @@ export function ModelViewport({
   useShortcutOverrides();
   const measureKey = shortcutLabel("measure");
 
-  // Top right, under the unit's chrome toolbar when the chrome is over the
-  // view. In bands it stays in the view: in four views, the top right of the
-  // perspective view, which starts halfway down the room the bands leave.
-  const cornerInChrome = Boolean(chrome) && !banded;
+  // Top right, under the unit's chrome toolbar when the chrome is over one
+  // view. In bands, or with no chrome, it is the top right of the view, and in
+  // four views the top right of the perspective quadrant.
+  const cornerInChrome = Boolean(chrome) && !banded && !fourViews;
   const corner = (
     <div className="flex items-start gap-2">
       <FourViewsButton on={quadrant !== null} onToggle={toggleFourViews} />
@@ -2165,6 +2169,12 @@ export function ModelViewport({
           which take `pointer-events-auto` back one at a time. */}
       <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
         {chrome?.(banded, cornerInChrome ? corner : null)}
+        {/* In four views, the top right of the perspective quadrant, the
+            view the compass turns. The quadrants fill the viewport, so that
+            is halfway down it. */}
+        {fourViews ? (
+          <div className="absolute top-1/2 right-0 z-10 mt-3">{corner}</div>
+        ) : null}
 
         {/* `m-auto` on the inner column rather than `justify-center` on the
             scrollport: centring a flex container that way clips content off
@@ -2177,17 +2187,11 @@ export function ModelViewport({
             has it hold room for a classic scrollbar. Padding is what works on
             both. */}
         <div ref={viewsRef} className="relative flex min-h-0 flex-1 flex-col">
-          {/* In bands only: over the view it is in the chrome. */}
-          {cornerInChrome ? null : (
-            <div
-              className={cn(
-                "absolute right-0 z-10",
-                fourViews ? "top-1/2 mt-2" : "top-0",
-              )}
-            >
-              {corner}
-            </div>
-          )}
+          {/* One view in bands or with no chrome. Otherwise it is in the
+              chrome, or in four views in the perspective quadrant. */}
+          {!cornerInChrome && !fourViews ? (
+            <div className="absolute top-0 right-0 z-10">{corner}</div>
+          ) : null}
           <TooltipProvider delayDuration={300}>
             <div
               ref={railRef}
