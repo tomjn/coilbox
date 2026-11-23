@@ -13564,10 +13564,6 @@ msgstr ""
 msgid "Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How {gameName} reads a tweakdefs slot is unverified, so check the changes in game."
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "Coilbox has its own copy and there is no file behind it to re-read, which is what a model out of a packed game or map leaves you with. Choose one, and refresh picks up edits to it after that."
-msgstr ""
-
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
 msgstr ""
@@ -17043,6 +17039,10 @@ msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
 msgid "Drag to turn"
+msgstr ""
+
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Drag to turn the view"
 msgstr ""
 
 #: src/lego/pages/components/ShapeFields.tsx
@@ -20874,6 +20874,10 @@ msgstr ""
 msgid "Hide this map"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+msgid "Hide unit details"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "hideSettings id ''{id}'' matches nothing"
 msgstr ""
@@ -23430,7 +23434,7 @@ msgstr ""
 msgid "Leave the measure tool"
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Leave the measure tool ({measureKey})"
 msgstr ""
 
@@ -24924,6 +24928,7 @@ msgid "Maximum water depth"
 msgstr ""
 
 #: src/lego/pages/components/MeasureReadout.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Measure"
 msgstr ""
 
@@ -24931,7 +24936,7 @@ msgstr ""
 msgid "Measure between two points"
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Measure between two points ({measureKey})"
 msgstr ""
 
@@ -26916,6 +26921,10 @@ msgstr ""
 msgid "No file in this game names this parameter."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "No file to re-read"
+msgstr ""
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "No file to save over"
 msgstr ""
@@ -27908,10 +27917,6 @@ msgstr ""
 
 #: src/scenario/validate.ts
 msgid "no text, so the radio panel opens on an empty message"
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "no texture"
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -32288,10 +32293,6 @@ msgstr ""
 msgid "Raw text"
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "Re-read the texture file, to pick up an edit made elsewhere"
-msgstr ""
-
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Re-run"
@@ -33050,16 +33051,16 @@ msgstr ""
 msgid "Refresh {repoName} versions"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Refresh re-reads the file the texture came from, to pick up an edit made elsewhere. A model out of a packed game or map has no such file until you choose one."
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Refresh server IP"
 msgstr ""
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Refresh the address (admins only)"
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "Refresh the texture"
 msgstr ""
 
 #: src/lib/relativeTime.ts
@@ -34824,6 +34825,10 @@ msgstr ""
 msgid "Save the model"
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Save the model file on its own"
+msgstr ""
+
 #: src/lego/moduleFileIo.ts
 msgid "Save the module"
 msgstr ""
@@ -36386,7 +36391,6 @@ msgid "Shaders compiled"
 msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
-#: src/lego/pages/components/TexturePicker.tsx
 msgid "Shading map"
 msgstr ""
 
@@ -36913,6 +36917,10 @@ msgstr ""
 msgid "Show this sheet"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+msgid "Show unit details"
+msgstr ""
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "Show updates"
 msgstr ""
@@ -37032,6 +37040,10 @@ msgstr ""
 
 #: src/campaign/pages/components/missionEditorGroups.ts
 msgid "side graphic video"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Side panel"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -39069,10 +39081,6 @@ msgstr ""
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "texture"
-msgstr ""
-
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
@@ -40855,7 +40863,7 @@ msgstr ""
 msgid "The model names none."
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
 msgstr ""
 
@@ -43382,10 +43390,6 @@ msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 msgid "This unit's script is your own and does not pull the file in, so nothing set here reaches a game. Add <0>{includeLine}</0> near the top of it. A script generated after these were set carries that line already."
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "This unit's team-colour mask is missing"
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -46154,7 +46158,7 @@ msgstr ""
 msgid "What this project is called, and what it is for."
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
 msgstr ""
 

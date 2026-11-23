@@ -16776,11 +16776,6 @@ msgstr "Coilbox は {shortname} のこの 1 時間の画像をすでに送信し
 msgid "Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How {gameName} reads a tweakdefs slot is unverified, so check the changes in game."
 msgstr "Coilbox はこの経路を Beyond All Reason と Zero-K 自身のコードでしか確認していません。{gameName} が tweakdefs スロットをどう読むかは未検証なので、ゲーム内で変更を確認してください。"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Coilbox has its own copy and there is no file behind it to re-read, which is what a model out of a packed game or map leaves you with. Choose one, and refresh picks up edits to it after that."
-msgstr "Coilbox は独自のコピーを持っていますが、読み直す元のファイルがありません。パッケージ化されたゲームやマップのモデルではこうなります。ファイルを選択すると、その後の編集を更新で取り込めます。"
-
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
@@ -21060,6 +21055,11 @@ msgstr "ドラッグで並べ替え"
 #, fuzzy
 msgid "Drag to turn"
 msgstr "ドラッグで回転"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Drag to turn the view"
+msgstr "ドラッグしてビューを回転"
 
 #: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
@@ -25785,6 +25785,11 @@ msgstr "タイムラインを隠す"
 msgid "Hide this map"
 msgstr "このマップを非表示"
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Hide unit details"
+msgstr "ユニットの詳細を隠す"
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "hideSettings id ''{id}'' matches nothing"
@@ -28949,7 +28954,7 @@ msgstr "倉庫を出る"
 msgid "Leave the measure tool"
 msgstr "計測ツールを終了"
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "計測ツールを終了（{measureKey}）"
@@ -30790,6 +30795,7 @@ msgid "Maximum water depth"
 msgstr "最大水深"
 
 #: src/lego/pages/components/MeasureReadout.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Measure"
 msgstr "計測"
@@ -30799,7 +30805,7 @@ msgstr "計測"
 msgid "Measure between two points"
 msgstr "2 点間を計測"
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Measure between two points ({measureKey})"
 msgstr "2 点間を計測（{measureKey}）"
@@ -33252,6 +33258,11 @@ msgstr "coilbox が把握しているフィールドではこれを指定して�
 msgid "No file in this game names this parameter."
 msgstr "このゲームでこのパラメーターを指定するファイルはありません。"
 
+#: src/lego/pages/components/TexturePicker.tsx
+#, fuzzy
+msgid "No file to re-read"
+msgstr "再読み込みするファイルがありません"
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
 msgid "No file to save over"
@@ -34487,11 +34498,6 @@ msgstr "テキストがないため、目標パネルに空の行が表示され
 #, fuzzy
 msgid "no text, so the radio panel opens on an empty message"
 msgstr "テキストがないため、無線パネルが空のメッセージで開きます"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "no texture"
-msgstr "テクスチャなし"
 
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
@@ -39899,11 +39905,6 @@ msgstr "レーティング"
 msgid "Raw text"
 msgstr "生のテキスト"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Re-read the texture file, to pick up an edit made elsewhere"
-msgstr "別の場所で行った編集を反映するため、テクスチャファイルを再読み込み"
-
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
@@ -40836,6 +40837,11 @@ msgstr "更新"
 msgid "Refresh {repoName} versions"
 msgstr "{repoName} のバージョンを更新"
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "Refresh re-reads the file the texture came from, to pick up an edit made elsewhere. A model out of a packed game or map has no such file until you choose one."
+msgstr "更新すると、テクスチャの元のファイルを読み直し、他のアプリで行った編集を反映します。パッケージ化されたゲームやマップから取り込んだモデルには、ファイルを選ぶまでそのようなファイルはありません。"
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "Refresh server IP"
@@ -40845,11 +40851,6 @@ msgstr "サーバー IP を更新"
 #, fuzzy
 msgid "Refresh the address (admins only)"
 msgstr "アドレスを更新（管理者のみ）"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Refresh the texture"
-msgstr "テクスチャを更新"
 
 #: src/lib/relativeTime.ts
 #, fuzzy
@@ -43021,6 +43022,11 @@ msgstr "描画された位置を保存"
 msgid "Save the model"
 msgstr "モデルを保存"
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+#, fuzzy
+msgid "Save the model file on its own"
+msgstr "モデルファイルだけを保存"
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Save the module"
@@ -44946,7 +44952,6 @@ msgid "Shaders compiled"
 msgstr "シェーダーをコンパイルしました"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
-#: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Shading map"
 msgstr "シェーディングマップ"
@@ -45597,6 +45602,11 @@ msgstr "上面・正面・側面のビューを透視ビューと並べて表示
 msgid "Show this sheet"
 msgstr "この一覧を表示"
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Show unit details"
+msgstr "ユニットの詳細を表示"
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 #, fuzzy
 msgid "Show updates"
@@ -45746,6 +45756,11 @@ msgstr "サイド画像（画像）"
 #, fuzzy
 msgid "side graphic video"
 msgstr "サイド画像（動画）"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Side panel"
+msgstr "サイドパネル"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -48258,11 +48273,6 @@ msgstr "テキスト"
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
 msgstr "テキストファイル。1 行に 1 つのオブジェクト：[tdfname] [x] [y] [z] [rotation]"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "texture"
-msgstr "テクスチャ"
-
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
@@ -50480,7 +50490,7 @@ msgstr "モデルは <0>{texture}</0> を指定しています。"
 msgid "The model names none."
 msgstr "モデルは何も指定していません。"
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
 msgstr "モデルの 2 枚目のテクスチャ。エンジンは画像としてではなく、赤を発光、緑を光沢として読み込みます。ユニットと一緒に保持され、エクスポートで書き出されますが、ここでは描画されません。"
@@ -53630,11 +53640,6 @@ msgstr "このユニットのスクリプトは、共有される COB のユニ�
 #, fuzzy
 msgid "This unit's script is your own and does not pull the file in, so nothing set here reaches a game. Add <0>{includeLine}</0> near the top of it. A script generated after these were set carries that line already."
 msgstr "このユニットのスクリプトは自分のもので、ファイルを読み込んでいないため、ここでの設定はゲームに反映されません。先頭付近に <0>{includeLine}</0> を追加してください。これらを設定した後に生成されたスクリプトには、すでにその行があります。"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "This unit's team-colour mask is missing"
-msgstr "このユニットのチームカラーのマスクがありません"
 
 #: src/deeplink/build.ts
 #, fuzzy
@@ -57054,7 +57059,7 @@ msgstr "このピースが何かを示し、アニメーションプリセット
 msgid "What this project is called, and what it is for."
 msgstr "このプロジェクトの名前と用途。"
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
 msgstr "このユニットの塗装に使う画像。UV マップがこの画像を指すため、別の画像にすると貼り直しではなく見た目そのものが変わります。"

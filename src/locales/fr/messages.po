@@ -16776,11 +16776,6 @@ msgstr "Coilbox a déjà envoyé les images de cette heure pour {shortname}."
 msgid "Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How {gameName} reads a tweakdefs slot is unverified, so check the changes in game."
 msgstr "Coilbox n’a vérifié cette voie qu’avec le code de Beyond All Reason et de Zero-K. La façon dont {gameName} lit un emplacement tweakdefs n’est pas vérifiée, contrôlez donc les modifications en jeu."
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Coilbox has its own copy and there is no file behind it to re-read, which is what a model out of a packed game or map leaves you with. Choose one, and refresh picks up edits to it after that."
-msgstr "Coilbox a sa propre copie et aucun fichier derrière à relire, ce que laisse un modèle tiré d’un jeu ou d’une carte compressé. Choisissez-en un, et l’actualisation reprendra ensuite ses modifications."
-
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
@@ -21060,6 +21055,11 @@ msgstr "Glisser pour réordonner"
 #, fuzzy
 msgid "Drag to turn"
 msgstr "Glisser pour tourner"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Drag to turn the view"
+msgstr "Faire glisser pour tourner la vue"
 
 #: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
@@ -25785,6 +25785,11 @@ msgstr "Masquer la chronologie"
 msgid "Hide this map"
 msgstr "Masquer cette carte"
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Hide unit details"
+msgstr "Masquer les détails de l’unité"
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "hideSettings id ''{id}'' matches nothing"
@@ -28949,7 +28954,7 @@ msgstr "Quitter le dépôt"
 msgid "Leave the measure tool"
 msgstr "Quitter l’outil de mesure"
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "Quitter l’outil de mesure ({measureKey})"
@@ -30790,6 +30795,7 @@ msgid "Maximum water depth"
 msgstr "Profondeur d’eau maximale"
 
 #: src/lego/pages/components/MeasureReadout.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Measure"
 msgstr "Mesurer"
@@ -30799,7 +30805,7 @@ msgstr "Mesurer"
 msgid "Measure between two points"
 msgstr "Mesurer entre deux points"
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Measure between two points ({measureKey})"
 msgstr "Mesurer entre deux points ({measureKey})"
@@ -33252,6 +33258,11 @@ msgstr "Aucun champ connu de coilbox ne le cite, donc le Lua du jeu l’utilise 
 msgid "No file in this game names this parameter."
 msgstr "Aucun fichier de ce jeu ne cite ce paramètre."
 
+#: src/lego/pages/components/TexturePicker.tsx
+#, fuzzy
+msgid "No file to re-read"
+msgstr "Aucun fichier à relire"
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
 msgid "No file to save over"
@@ -34487,11 +34498,6 @@ msgstr "aucun texte, le panneau des objectifs affiche donc une ligne vide"
 #, fuzzy
 msgid "no text, so the radio panel opens on an empty message"
 msgstr "aucun texte, le panneau radio s’ouvre donc sur un message vide"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "no texture"
-msgstr "aucune texture"
 
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
@@ -39899,11 +39905,6 @@ msgstr "Classement"
 msgid "Raw text"
 msgstr "Texte brut"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Re-read the texture file, to pick up an edit made elsewhere"
-msgstr "Relire le fichier de texture, pour prendre en compte une modification faite ailleurs"
-
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
@@ -40836,6 +40837,11 @@ msgstr "Actualiser"
 msgid "Refresh {repoName} versions"
 msgstr "Actualiser les versions de {repoName}"
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "Refresh re-reads the file the texture came from, to pick up an edit made elsewhere. A model out of a packed game or map has no such file until you choose one."
+msgstr "Actualiser relit le fichier d’où vient la texture, pour prendre en compte une modification faite ailleurs. Un modèle issu d’un jeu ou d’une carte empaquetés n’a pas de tel fichier tant que vous n’en choisissez pas un."
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "Refresh server IP"
@@ -40845,11 +40851,6 @@ msgstr "Actualiser l’IP du serveur"
 #, fuzzy
 msgid "Refresh the address (admins only)"
 msgstr "Actualiser l’adresse (admins uniquement)"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Refresh the texture"
-msgstr "Actualiser la texture"
 
 #: src/lib/relativeTime.ts
 #, fuzzy
@@ -43021,6 +43022,11 @@ msgstr "Enregistrer les positions dessinées"
 msgid "Save the model"
 msgstr "Enregistrer le modèle"
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+#, fuzzy
+msgid "Save the model file on its own"
+msgstr "Enregistrer seulement le fichier du modèle"
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Save the module"
@@ -44946,7 +44952,6 @@ msgid "Shaders compiled"
 msgstr "Shaders compilés"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
-#: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Shading map"
 msgstr "Carte d’ombrage"
@@ -45597,6 +45602,11 @@ msgstr "Afficher les vues de dessus, de face et de côté à côté de la vue en
 msgid "Show this sheet"
 msgstr "Afficher cette fiche"
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Show unit details"
+msgstr "Afficher les détails de l’unité"
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 #, fuzzy
 msgid "Show updates"
@@ -45746,6 +45756,11 @@ msgstr "image latérale fixe"
 #, fuzzy
 msgid "side graphic video"
 msgstr "vidéo latérale"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Side panel"
+msgstr "Panneau latéral"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -48258,11 +48273,6 @@ msgstr "texte"
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
 msgstr "fichier texte, un élément par ligne : [tdfname] [x] [y] [z] [rotation]"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "texture"
-msgstr "texture"
-
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
@@ -50480,7 +50490,7 @@ msgstr "Le modèle cite <0>{texture}</0>."
 msgid "The model names none."
 msgstr "Le modèle n’en cite aucune."
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
 msgstr "La seconde texture du modèle, que le moteur lit comme lueur dans le rouge et brillance dans le vert plutôt que comme une image. Conservée avec l’unité et réécrite par l’export, mais rien ici ne l’affiche."
@@ -53630,11 +53640,6 @@ msgstr "Le script de cette unité peut conserver les valeurs d’unité COB part
 #, fuzzy
 msgid "This unit's script is your own and does not pull the file in, so nothing set here reaches a game. Add <0>{includeLine}</0> near the top of it. A script generated after these were set carries that line already."
 msgstr "Le script de cette unité est le vôtre et n’inclut pas le fichier, donc rien de ce qui est défini ici n’atteint un jeu. Ajoutez <0>{includeLine}</0> près du début. Un script généré après ces réglages contient déjà cette ligne."
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "This unit's team-colour mask is missing"
-msgstr "Le masque de couleur d’équipe de cette unité est manquant"
 
 #: src/deeplink/build.ts
 #, fuzzy
@@ -57054,7 +57059,7 @@ msgstr "Ce qu’est cette pièce, pour que les animations prédéfinies sachent 
 msgid "What this project is called, and what it is for."
 msgstr "Le nom de ce projet, et à quoi il sert."
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
 msgstr "La peinture de cette unité. Sa carte UV pointe sur cette image, donc en changer donne un autre aspect et non un autre mappage."

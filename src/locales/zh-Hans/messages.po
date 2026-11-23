@@ -16776,11 +16776,6 @@ msgstr "Coilbox 本小时已发送过 {shortname} 的图片。"
 msgid "Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How {gameName} reads a tweakdefs slot is unverified, so check the changes in game."
 msgstr "Coilbox 仅对照 Beyond All Reason 和 Zero-K 自己的代码检查过此路径。{gameName} 如何读取 tweakdefs 槽位尚未验证，因此请在游戏中检查更改。"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Coilbox has its own copy and there is no file behind it to re-read, which is what a model out of a packed game or map leaves you with. Choose one, and refresh picks up edits to it after that."
-msgstr "Coilbox 有自己的副本，背后没有可重新读取的文件，从打包的游戏或地图中取出的模型就是这种情况。选择一个文件后，刷新即可读取之后对它的编辑。"
-
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
@@ -21060,6 +21055,11 @@ msgstr "拖动以重新排序"
 #, fuzzy
 msgid "Drag to turn"
 msgstr "拖动以旋转"
+
+#: src/lego/pages/components/AxisCompass.tsx
+#, fuzzy
+msgid "Drag to turn the view"
+msgstr "拖动以旋转视图"
 
 #: src/lego/pages/components/ShapeFields.tsx
 #, fuzzy
@@ -25785,6 +25785,11 @@ msgstr "隐藏时间轴"
 msgid "Hide this map"
 msgstr "隐藏此地图"
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Hide unit details"
+msgstr "隐藏单位详情"
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "hideSettings id ''{id}'' matches nothing"
@@ -28949,7 +28954,7 @@ msgstr "离开仓库"
 msgid "Leave the measure tool"
 msgstr "退出测量工具"
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Leave the measure tool ({measureKey})"
 msgstr "退出测量工具（{measureKey}）"
@@ -30790,6 +30795,7 @@ msgid "Maximum water depth"
 msgstr "最大水深"
 
 #: src/lego/pages/components/MeasureReadout.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Measure"
 msgstr "测量"
@@ -30799,7 +30805,7 @@ msgstr "测量"
 msgid "Measure between two points"
 msgstr "测量两点之间的距离"
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #, fuzzy
 msgid "Measure between two points ({measureKey})"
 msgstr "测量两点之间的距离（{measureKey}）"
@@ -33252,6 +33258,11 @@ msgstr "coilbox 已知的字段都没有引用它，所以游戏自身的 Lua �
 msgid "No file in this game names this parameter."
 msgstr "此游戏中没有文件引用此参数。"
 
+#: src/lego/pages/components/TexturePicker.tsx
+#, fuzzy
+msgid "No file to re-read"
+msgstr "没有可重新读取的文件"
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
 msgid "No file to save over"
@@ -34487,11 +34498,6 @@ msgstr "没有文本，所以目标面板会显示一行空白"
 #, fuzzy
 msgid "no text, so the radio panel opens on an empty message"
 msgstr "没有文本，所以无线电面板打开时是一条空消息"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "no texture"
-msgstr "无纹理"
 
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
@@ -39899,11 +39905,6 @@ msgstr "评分"
 msgid "Raw text"
 msgstr "原始文本"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Re-read the texture file, to pick up an edit made elsewhere"
-msgstr "重新读取纹理文件，以获取在其他地方做的编辑"
-
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
@@ -40836,6 +40837,11 @@ msgstr "刷新"
 msgid "Refresh {repoName} versions"
 msgstr "刷新 {repoName} 版本"
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#, fuzzy
+msgid "Refresh re-reads the file the texture came from, to pick up an edit made elsewhere. A model out of a packed game or map has no such file until you choose one."
+msgstr "刷新会重新读取纹理的来源文件，以载入在别处做的修改。来自打包游戏或地图的模型在你选择文件之前没有这样的文件。"
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
 msgid "Refresh server IP"
@@ -40845,11 +40851,6 @@ msgstr "刷新服务器 IP"
 #, fuzzy
 msgid "Refresh the address (admins only)"
 msgstr "刷新地址（仅限管理员）"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "Refresh the texture"
-msgstr "刷新纹理"
 
 #: src/lib/relativeTime.ts
 #, fuzzy
@@ -43021,6 +43022,11 @@ msgstr "保存绘制的位置"
 msgid "Save the model"
 msgstr "保存模型"
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+#, fuzzy
+msgid "Save the model file on its own"
+msgstr "仅保存模型文件"
+
 #: src/lego/moduleFileIo.ts
 #, fuzzy
 msgid "Save the module"
@@ -44946,7 +44952,6 @@ msgid "Shaders compiled"
 msgstr "着色器已编译"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
-#: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Shading map"
 msgstr "着色贴图"
@@ -45597,6 +45602,11 @@ msgstr "在透视视图旁显示顶视、前视和侧视视图，或返回单一
 msgid "Show this sheet"
 msgstr "显示此列表"
 
+#: src/lego/pages/components/UnitCard.tsx
+#, fuzzy
+msgid "Show unit details"
+msgstr "显示单位详情"
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 #, fuzzy
 msgid "Show updates"
@@ -45746,6 +45756,11 @@ msgstr "侧边图像（图片）"
 #, fuzzy
 msgid "side graphic video"
 msgstr "侧边图像（视频）"
+
+#: src/lego/pages/BuilderPage.tsx
+#, fuzzy
+msgid "Side panel"
+msgstr "侧面板"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -48258,11 +48273,6 @@ msgstr "文本"
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
 msgstr "文本文件，每行一个物体：[tdfname] [x] [y] [z] [rotation]"
 
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "texture"
-msgstr "纹理"
-
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
@@ -50480,7 +50490,7 @@ msgstr "模型指定了 <0>{texture}</0>。"
 msgid "The model names none."
 msgstr "模型没有指定任何纹理。"
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
 msgstr "模型的第二张纹理，引擎将其红色通道读作发光、绿色通道读作高光，而不是当作图片。它随单位保存并由导出写回，但这里不会绘制它。"
@@ -53630,11 +53640,6 @@ msgstr "此单位的脚本可以将共享的 COB 单位数值保存为 rules par
 #, fuzzy
 msgid "This unit's script is your own and does not pull the file in, so nothing set here reaches a game. Add <0>{includeLine}</0> near the top of it. A script generated after these were set carries that line already."
 msgstr "此单位的脚本是你自己的，没有引入该文件，所以这里的设置都不会进入游戏。请在脚本顶部附近添加 <0>{includeLine}</0>。在这些设置之后生成的脚本已经带有这一行。"
-
-#: src/lego/pages/components/TexturePicker.tsx
-#, fuzzy
-msgid "This unit's team-colour mask is missing"
-msgstr "此单位缺少队伍颜色遮罩"
 
 #: src/deeplink/build.ts
 #, fuzzy
@@ -57054,7 +57059,7 @@ msgstr "此部件是什么，以便动画预设知道要移动什么。"
 msgid "What this project is called, and what it is for."
 msgstr "此项目的名称和用途。"
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
 msgid "What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
 msgstr "此单位的涂装。其 UV 映射指向这张图片，所以换一张就是换一种外观，而不是重新映射。"
