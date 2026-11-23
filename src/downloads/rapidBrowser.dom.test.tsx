@@ -175,13 +175,18 @@ async function openWithSlowSa() {
       { name: "byar", url: "https://master.test/byar" },
     ],
     ageSecs: 0,
+    stale: false,
   });
   let releaseSa = () => {};
   vi.mocked(dlVersions).mockImplementationOnce(
     () =>
       new Promise((resolve) => {
         releaseSa = () =>
-          resolve({ versions: [version("sa:test", "ccc")], ageSecs: 0 });
+          resolve({
+            versions: [version("sa:test", "ccc")],
+            ageSecs: 0,
+            stale: false,
+          });
       }),
   );
   render(
@@ -221,6 +226,7 @@ it("ignores a repository list that a newer load has overtaken", async () => {
             resolve({
               repos: [{ name: "sa", url: "https://master.test/sa" }],
               ageSecs: 0,
+              stale: false,
             });
         }),
     )
@@ -243,6 +249,47 @@ it("ignores a repository list that a newer load has overtaken", async () => {
   await act(async () => releaseOld());
 
   expect(screen.queryByRole("button", { name: "sa" })).toBeNull();
+});
+
+it("shows a stale disk copy, then swaps in the copy fetched this launch", async () => {
+  const { dlVersions } = await import("./bindings");
+  let releaseFresh = () => {};
+  vi.mocked(dlVersions)
+    .mockResolvedValueOnce({
+      versions: [version("byar:stable", "aaa")],
+      ageSecs: 34 * 24 * 3600,
+      stale: true,
+    })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFresh = () =>
+            resolve({
+              versions: [
+                version("byar:stable", "aaa"),
+                version("byar:test", "ddd"),
+              ],
+              ageSecs: 0,
+              stale: false,
+            });
+        }),
+    );
+  await openByar();
+
+  await screen.findByRole("button", { name: "Download byar:stable" });
+  expect(screen.queryByText("byar:test")).toBeNull();
+  await waitFor(() =>
+    expect(dlVersions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ revalidate: true }),
+    ),
+  );
+
+  await act(async () => releaseFresh());
+
+  expect(
+    screen.getByRole("button", { name: "Download byar:test" }),
+  ).toBeTruthy();
+  expect(screen.getAllByText("refreshed just now")).toHaveLength(2);
 });
 
 it("keeps a downloaded version installed after the queue forgets it", async () => {

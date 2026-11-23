@@ -460,21 +460,65 @@ fn dl_cancel(op_id: String) -> CliResult {
     CliResult::ok(json!({}))
 }
 
-/// A rapid index body and how many seconds ago it was fetched. Reads the disk
-/// copy unless `refresh` is set or there is none, and stores what it fetches.
-async fn rapid_index(url: String, refresh: bool) -> Result<(String, u64), String> {
-    if !refresh {
-        let key = url.clone();
-        let stored = tauri::async_runtime::spawn_blocking(move || rapid_cache::read_blocking(&key))
-            .await
-            .ok()
-            .flatten();
-        if let Some(entry) = stored {
-            let age = entry.age_secs(rapid_cache::now_secs());
-            return Ok((entry.body, age));
+/// How a rapid index command may use the disk copy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IndexMode {
+    /// Answer from the disk copy when there is one.
+    Cached,
+    /// Fetch unless this run already has, and fall back to the disk copy when
+    /// the fetch fails.
+    Revalidate,
+    /// Always fetch.
+    Refresh,
+}
+
+impl IndexMode {
+    fn of(refresh: Option<bool>, revalidate: Option<bool>) -> Self {
+        if refresh.unwrap_or(false) {
+            Self::Refresh
+        } else if revalidate.unwrap_or(false) {
+            Self::Revalidate
+        } else {
+            Self::Cached
         }
     }
-    let body = fetch_gz(url.clone()).await?;
+}
+
+/// A rapid index body, how many seconds ago it was fetched, and whether it is
+/// a disk copy this run has not fetched again.
+struct RapidIndex {
+    body: String,
+    age: u64,
+    stale: bool,
+}
+
+/// Reads a rapid index as `mode` allows, and stores what it fetches.
+async fn rapid_index(url: String, mode: IndexMode) -> Result<RapidIndex, String> {
+    let stored = if mode == IndexMode::Refresh {
+        None
+    } else {
+        let key = url.clone();
+        tauri::async_runtime::spawn_blocking(move || rapid_cache::read_blocking(&key))
+            .await
+            .ok()
+            .flatten()
+    };
+    let fetched = rapid_cache::fetched_this_run(&url);
+    let from_disk = |entry: rapid_cache::Entry, stale: bool| RapidIndex {
+        age: entry.age_secs(rapid_cache::now_secs()),
+        body: entry.body,
+        stale,
+    };
+    if mode == IndexMode::Cached || fetched {
+        if let Some(entry) = stored.clone() {
+            return Ok(from_disk(entry, !fetched));
+        }
+    }
+    let body = match fetch_gz(url.clone()).await {
+        Ok(body) => body,
+        Err(e) => return stored.map(|entry| from_disk(entry, true)).ok_or(e),
+    };
+    rapid_cache::mark_fetched(&url);
     let entry = rapid_cache::Entry {
         url,
         fetched_at: rapid_cache::now_secs(),
@@ -486,22 +530,32 @@ async fn rapid_index(url: String, refresh: bool) -> Result<(String, u64), String
     })
     .await
     .map_err(|e| e.to_string())?;
-    Ok((entry.body, 0))
+    Ok(RapidIndex {
+        body: entry.body,
+        age: 0,
+        stale: false,
+    })
 }
 
 /// `dl_repos` — list rapid repositories from a master index (default springrts).
-/// Answers from the disk copy when there is one, unless `refresh` is set, and
-/// returns `ageSecs`, the time since the index was fetched.
+/// Answers from the disk copy when there is one, unless `refresh` or
+/// `revalidate` is set, and returns `ageSecs`, the time since the index was
+/// fetched, and `stale`, set on a disk copy this run has not fetched again.
 #[tauri::command]
-async fn dl_repos(master_url: Option<String>, refresh: Option<bool>) -> CliResult {
+async fn dl_repos(
+    master_url: Option<String>,
+    refresh: Option<bool>,
+    revalidate: Option<bool>,
+) -> CliResult {
     let base = master_url
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| DEFAULT_MASTER.into());
     let url = format!("{}/repos.gz", base.trim_end_matches('/'));
-    match rapid_index(url, refresh.unwrap_or(false)).await {
-        Ok((body, age)) => CliResult::ok(json!({
-            "repos": rapid::parse_repos(&body),
-            "ageSecs": age,
+    match rapid_index(url, IndexMode::of(refresh, revalidate)).await {
+        Ok(index) => CliResult::ok(json!({
+            "repos": rapid::parse_repos(&index.body),
+            "ageSecs": index.age,
+            "stale": index.stale,
         })),
         Err(e) => CliResult::err(format!("failed to fetch rapid repos: {e}")),
     }
@@ -515,14 +569,15 @@ async fn dl_versions(
     repo_url: String,
     data_dir: Option<String>,
     refresh: Option<bool>,
+    revalidate: Option<bool>,
 ) -> CliResult {
     if repo_url.trim().is_empty() {
         return CliResult::err("repo_url is required");
     }
     let url = format!("{}/versions.gz", repo_url.trim_end_matches('/'));
-    match rapid_index(url, refresh.unwrap_or(false)).await {
-        Ok((body, age)) => {
-            let mut versions = rapid::parse_versions(&body);
+    match rapid_index(url, IndexMode::of(refresh, revalidate)).await {
+        Ok(index) => {
+            let mut versions = rapid::parse_versions(&index.body);
             if let Some(dir) = data_dir.filter(|d| !d.trim().is_empty()) {
                 let pool = tauri::async_runtime::spawn_blocking(move || {
                     rapid::pool_md5s(std::path::Path::new(&dir))
@@ -531,7 +586,11 @@ async fn dl_versions(
                 .unwrap_or_default();
                 rapid::mark_installed(&mut versions, &pool);
             }
-            CliResult::ok(json!({ "versions": versions, "ageSecs": age }))
+            CliResult::ok(json!({
+                "versions": versions,
+                "ageSecs": index.age,
+                "stale": index.stale,
+            }))
         }
         Err(e) => CliResult::err(format!("failed to fetch rapid versions: {e}")),
     }

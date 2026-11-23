@@ -29,8 +29,8 @@ export function rapidReposOf(
 
 /**
  * Every version in the game's rapid repositories, read from the index copies on
- * disk. Neither command is asked to refresh, so this is the copy the Browse
- * Rapid page reads, and a missing copy is fetched once as that page would.
+ * disk, which the Browse Rapid page reads too. A missing copy is fetched, and
+ * a copy not fetched since the app started is shown and then fetched again.
  */
 export function useGameRapidVersions(repos: readonly string[]): {
   repos: RapidRepoVersions[];
@@ -55,23 +55,32 @@ export function useGameRapidVersions(repos: readonly string[]): {
     }
     let live = true;
     setState((s) => ({ ...s, loading: true }));
-    (async () => {
+    const read = async (revalidate: boolean) => {
       const out: RapidRepoVersions[] = [];
       const errors: string[] = [];
+      let stale = false;
       const left = new Set(names);
       for (const masterUrl of masters.split("\n")) {
         if (left.size === 0) break;
         try {
-          const { repos: listed } = await dlRepos({ masterUrl });
-          for (const r of listed) {
+          const listed = await dlRepos({ masterUrl, revalidate });
+          stale ||= listed.stale;
+          for (const r of listed.repos) {
             if (!left.has(r.name)) continue;
             left.delete(r.name);
             try {
-              const { versions, ageSecs } = await dlVersions({
+              const index = await dlVersions({
                 repoUrl: r.url,
                 dataDir: writePath,
+                revalidate,
               });
-              out.push({ repo: r.name, masterUrl, versions, ageSecs });
+              stale ||= index.stale;
+              out.push({
+                repo: r.name,
+                masterUrl,
+                versions: index.versions,
+                ageSecs: index.ageSecs,
+              });
             } catch (e) {
               errors.push(`${r.name}: ${errorText(e)}`);
             }
@@ -80,7 +89,16 @@ export function useGameRapidVersions(repos: readonly string[]): {
           errors.push(`${masterUrl}: ${errorText(e)}`);
         }
       }
-      if (live) setState({ repos: out, loading: false, errors });
+      return { state: { repos: out, loading: false, errors }, stale };
+    };
+    (async () => {
+      const first = await read(false);
+      if (!live) return;
+      setState(first.state);
+      // The disk copies show at once, then are fetched once this launch.
+      if (!first.stale) return;
+      const fresh = await read(true);
+      if (live) setState(fresh.state);
     })();
     return () => {
       live = false;

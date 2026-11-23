@@ -154,14 +154,19 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     setVersions(null);
     setVersionsLoading(false);
     setVersionsError(null);
+    const masterUrl = url.trim() || DEFAULT_MASTER;
     try {
-      const { repos, ageSecs } = await dlRepos({
-        masterUrl: url.trim() || DEFAULT_MASTER,
-        refresh,
-      });
+      const { repos, ageSecs, stale } = await dlRepos({ masterUrl, refresh });
       if (request !== reposRequest.current) return;
       setRepos(repos);
       setReposAge(ageSecs);
+      setReposLoading(false);
+      if (!stale) return;
+      // Show the disk copy, then fetch it once this launch and swap it in.
+      const fresh = await dlRepos({ masterUrl, revalidate: true });
+      if (request !== reposRequest.current) return;
+      setRepos(fresh.repos);
+      setReposAge(fresh.ageSecs);
     } catch (e) {
       if (request !== reposRequest.current) return;
       setRepos(null);
@@ -188,15 +193,21 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     setVersionsError(null);
     setVersionsLoading(true);
     if (!refresh) setVersionFilter("");
+    const args = { repoUrl: repo.url, dataDir: writePath };
     try {
-      const { versions, ageSecs } = await dlVersions({
-        repoUrl: repo.url,
-        dataDir: writePath,
+      const { versions, ageSecs, stale } = await dlVersions({
+        ...args,
         refresh,
       });
       if (request !== versionsRequest.current) return;
       setVersions(orderRapidVersions(versions));
       setVersionsAge(ageSecs);
+      setVersionsLoading(false);
+      if (!stale) return;
+      const fresh = await dlVersions({ ...args, revalidate: true });
+      if (request !== versionsRequest.current) return;
+      setVersions(orderRapidVersions(fresh.versions));
+      setVersionsAge(fresh.ageSecs);
     } catch (e) {
       if (request !== versionsRequest.current) return;
       setVersionsError(errorText(e));
