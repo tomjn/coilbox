@@ -12,7 +12,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
-import { Blocks, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, VectorPolygon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
   Collapsible,
@@ -64,7 +64,10 @@ export function UnitCard({
           >
             {open ? (
               <div className="flex h-7 min-w-0 items-center gap-2 pl-2">
-                <Blocks size={16} className="shrink-0 text-muted-foreground" />
+                <VectorPolygon
+                  size={16}
+                  className="shrink-0 text-muted-foreground"
+                />
                 <div className="min-w-0 flex-1">{nameField}</div>
                 <CollapsibleTrigger asChild>
                   <Button
@@ -87,7 +90,7 @@ export function UnitCard({
                   className="h-7 min-w-0 justify-start gap-2 pr-1.5 pl-2"
                   title={t`Show unit details`}
                 >
-                  <Blocks
+                  <VectorPolygon
                     size={16}
                     className="shrink-0 text-muted-foreground"
                   />
@@ -122,7 +125,7 @@ export function UnitCard({
           title={t`Unit details`}
           className="pointer-events-auto max-w-full min-w-0 gap-2 bg-background/80 px-2 backdrop-blur"
         >
-          <Blocks size={16} className="shrink-0 text-muted-foreground" />
+          <VectorPolygon size={16} className="shrink-0 text-muted-foreground" />
           <span className="min-w-0 truncate font-semibold">{name}</span>
           <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
         </Button>
