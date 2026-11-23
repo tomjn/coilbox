@@ -284,6 +284,7 @@ describe("the unit info card (#5403)", () => {
   it("keeps a width of its own and truncates its info line rather than wrapping words", async () => {
     show(unit());
     await screen.findByRole("button", { name: "Script" });
+    fireEvent.click(screen.getByRole("button", { name: "walker" }));
     const card = screen.getByTestId("unit-card");
     expect(card.className).toContain("min-w-56");
     const line = screen.getByLabelText("Export name").parentElement;
@@ -293,6 +294,23 @@ describe("the unit info card (#5403)", () => {
     expect(text.className).toContain("min-w-0");
     // The row lets the toolbar drop below the card rather than squeeze it.
     expect(card.parentElement?.className).toContain("flex-wrap");
+  });
+});
+
+describe("the unit info card over one view", () => {
+  it("starts closed on the unit's name, opens in place and closes again", async () => {
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    expect(screen.queryByLabelText("Export name")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "walker" }));
+    expect(screen.getByLabelText("Export name")).toBeTruthy();
+    expect((screen.getByLabelText("Unit name") as HTMLInputElement).value).toBe(
+      "walker",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide unit details" }));
+    expect(screen.queryByLabelText("Export name")).toBeNull();
   });
 });
 
