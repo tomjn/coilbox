@@ -62,16 +62,24 @@ export const dlCancel = defineCommand<{ opId: string }, Record<string, never>>(
 
 /**
  * Both rapid index commands answer from a disk copy when one exists and report
- * `ageSecs`, the time since it was fetched. `refresh` forces a fetch.
+ * `ageSecs`, the time since it was fetched. `stale` marks a disk copy that has
+ * not been fetched since the app started, which the caller shows and then asks
+ * for again with `revalidate`. That fetches once per launch and falls back to
+ * the disk copy when offline. `refresh` always fetches.
  */
 export const dlRepos = defineCommand<
-  { masterUrl?: string; refresh?: boolean },
-  { repos: Repo[]; ageSecs: number }
+  { masterUrl?: string; refresh?: boolean; revalidate?: boolean },
+  { repos: Repo[]; ageSecs: number; stale: boolean }
 >("coilbox-downloads", "dl_repos");
 
 export const dlVersions = defineCommand<
-  { repoUrl: string; dataDir?: string; refresh?: boolean },
-  { versions: Version[]; ageSecs: number }
+  {
+    repoUrl: string;
+    dataDir?: string;
+    refresh?: boolean;
+    revalidate?: boolean;
+  },
+  { versions: Version[]; ageSecs: number; stale: boolean }
 >("coilbox-downloads", "dl_versions");
 
 /**

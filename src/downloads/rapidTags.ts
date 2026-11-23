@@ -7,24 +7,28 @@ export interface RapidTag {
 }
 
 /**
- * The current package of each rapid tag, read from the rapid indexes. Neither
- * command is asked to refresh, so each answers from the copy on disk when there
- * is one, which is the copy the Browse Rapid page reads. A tag's repository is
- * the part before the colon. A tag that no master lists, or whose index cannot
- * be read, is left out.
+ * The current package of each rapid tag, read from the rapid indexes. Each
+ * answers from the copy on disk when there is one, which is the copy the Browse
+ * Rapid page reads. `stale` is set when any copy has not been fetched since the
+ * app started, and a second call with `revalidate` fetches those. A tag's
+ * repository is the part before the colon. A tag that no master lists, or
+ * whose index cannot be read, is left out.
  */
 export async function loadRapidTags(
   tags: readonly string[],
   masterUrls: readonly string[],
   dataDir: string | undefined,
-): Promise<Record<string, RapidTag>> {
+  revalidate = false,
+): Promise<{ tags: Record<string, RapidTag>; stale: boolean }> {
   const wanted = [...new Set(tags)];
-  if (wanted.length === 0) return {};
+  if (wanted.length === 0) return { tags: {}, stale: false };
+  let stale = false;
   const repoUrls = new Map<string, string>();
   for (const masterUrl of masterUrls) {
     try {
-      const { repos } = await dlRepos({ masterUrl });
-      for (const r of repos)
+      const listed = await dlRepos({ masterUrl, revalidate });
+      stale ||= listed.stale;
+      for (const r of listed.repos)
         if (!repoUrls.has(r.name)) repoUrls.set(r.name, r.url);
     } catch {
       // A master that cannot be read cannot vouch for any tag.
@@ -38,7 +42,8 @@ export async function loadRapidTags(
     try {
       let read = versions.get(repoUrl);
       if (!read) {
-        read = await dlVersions({ repoUrl, dataDir });
+        read = await dlVersions({ repoUrl, dataDir, revalidate });
+        stale ||= read.stale;
         versions.set(repoUrl, read);
       }
       const v = read.versions.find((x) => x.tag === tag);
@@ -47,5 +52,5 @@ export async function loadRapidTags(
       // Leave the tag out. The game page reports an unreadable index.
     }
   }
-  return out;
+  return { tags: out, stale };
 }

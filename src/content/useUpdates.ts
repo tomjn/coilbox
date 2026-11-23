@@ -151,9 +151,16 @@ export function useUpdateSources(
   );
   useEffect(() => {
     let live = true;
-    loadRapidTags(tags, masters ? masters.split("\n") : [], writePath).then(
-      (r) => live && setRapidVersions(r),
-    );
+    const urls = masters ? masters.split("\n") : [];
+    (async () => {
+      const first = await loadRapidTags(tags, urls, writePath);
+      if (!live) return;
+      setRapidVersions(first.tags);
+      // The disk copies answer at once, then are fetched once this launch.
+      if (!first.stale) return;
+      const fresh = await loadRapidTags(tags, urls, writePath, true);
+      if (live) setRapidVersions(fresh.tags);
+    })();
     return () => {
       live = false;
     };

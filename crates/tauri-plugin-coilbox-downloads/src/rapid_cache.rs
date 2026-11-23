@@ -1,13 +1,15 @@
 //! A disk copy of each rapid index (`repos.gz`, `versions.gz`) with the time it
 //! was fetched, so Browse Rapid can open without a request and say how old the
-//! data is. Entries are keyed by URL and never expire. The caller refetches
-//! when the user asks.
+//! data is. Entries are keyed by URL and never expire on disk. A copy that has
+//! not been fetched since the app started counts as stale, so callers can show
+//! it at once and fetch a new one behind it once per launch.
 
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Subdirectory of the app cache dir that holds the entries.
@@ -23,6 +25,25 @@ pub fn set_dir(cache_dir: Option<PathBuf>) {
 
 fn dir() -> Option<&'static Path> {
     DIR.get().and_then(|d| d.as_deref())
+}
+
+/// URLs fetched since the app started.
+static FETCHED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+
+/// Record that `url` was fetched in this run.
+pub fn mark_fetched(url: &str) {
+    if let Ok(mut set) = FETCHED.lock() {
+        set.get_or_insert_with(HashSet::new).insert(url.to_owned());
+    }
+}
+
+/// Whether `url` has been fetched in this run. A disk copy of a URL that has
+/// not is stale.
+pub fn fetched_this_run(url: &str) -> bool {
+    FETCHED
+        .lock()
+        .map(|set| set.as_ref().is_some_and(|s| s.contains(url)))
+        .unwrap_or(false)
 }
 
 /// One stored index. `body` is the inflated text.
@@ -109,6 +130,15 @@ mod tests {
         assert_eq!(read_in(tmp.path(), "https://example.test/other.gz"), None);
         std::fs::write(file_for(tmp.path(), &e.url), b"not json").unwrap();
         assert_eq!(read_in(tmp.path(), &e.url), None);
+    }
+
+    #[test]
+    fn a_url_counts_as_fetched_only_after_it_is_marked() {
+        let url = "https://example.test/marked/versions.gz";
+        assert!(!fetched_this_run(url));
+        mark_fetched(url);
+        assert!(fetched_this_run(url));
+        assert!(!fetched_this_run("https://example.test/other/versions.gz"));
     }
 
     #[test]

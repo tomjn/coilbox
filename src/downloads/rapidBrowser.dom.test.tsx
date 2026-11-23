@@ -67,7 +67,10 @@ vi.mock("./config", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./config")>()),
   useDownloadsConfig: () => [
     {
-      rapidRepos: [{ name: "Master", url: "https://master.test" }],
+      rapidRepos: [
+        { name: "Master", url: "https://master.test" },
+        { name: "Other", url: "https://other.test" },
+      ],
     },
     vi.fn(),
   ],
@@ -160,6 +163,133 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   finishDownload.current = null;
   deletedPaths.length = 0;
+});
+
+/** Lists `sa` and `byar`, and holds `sa`'s versions until the test releases
+ *  them, so a later click can overtake the request. */
+async function openWithSlowSa() {
+  const { dlRepos, dlVersions } = await import("./bindings");
+  vi.mocked(dlRepos).mockResolvedValueOnce({
+    repos: [
+      { name: "sa", url: "https://master.test/sa" },
+      { name: "byar", url: "https://master.test/byar" },
+    ],
+    ageSecs: 0,
+    stale: false,
+  });
+  let releaseSa = () => {};
+  vi.mocked(dlVersions).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        releaseSa = () =>
+          resolve({
+            versions: [version("sa:test", "ccc")],
+            ageSecs: 0,
+            stale: false,
+          });
+      }),
+  );
+  render(
+    <I18nProvider i18n={i18n}>
+      <MemoryRouter>
+        <DownloadQueueProvider>
+          <RapidBrowser />
+        </DownloadQueueProvider>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "sa" }));
+  return () => act(async () => releaseSa());
+}
+
+it("ignores versions for a repository that is no longer selected", async () => {
+  const releaseSa = await openWithSlowSa();
+  fireEvent.click(screen.getByRole("button", { name: "byar" }));
+  await screen.findByRole("button", { name: "Download byar:stable" });
+
+  await releaseSa();
+
+  expect(screen.queryByText("sa:test")).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Download byar:stable" }),
+  ).toBeTruthy();
+});
+
+it("ignores a repository list that a newer load has overtaken", async () => {
+  const { dlRepos } = await import("./bindings");
+  let releaseOld = () => {};
+  vi.mocked(dlRepos)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseOld = () =>
+            resolve({
+              repos: [{ name: "sa", url: "https://master.test/sa" }],
+              ageSecs: 0,
+              stale: false,
+            });
+        }),
+    )
+    .mockImplementationOnce(() => new Promise(() => {}));
+  render(
+    <I18nProvider i18n={i18n}>
+      <MemoryRouter>
+        <DownloadQueueProvider>
+          <RapidBrowser />
+        </DownloadQueueProvider>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  // The mount load is still out when the user picks another master.
+  await waitFor(() => expect(dlRepos).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole("combobox"));
+  fireEvent.click(screen.getByRole("option", { name: "Other" }));
+  await waitFor(() => expect(dlRepos).toHaveBeenCalledTimes(2));
+
+  await act(async () => releaseOld());
+
+  expect(screen.queryByRole("button", { name: "sa" })).toBeNull();
+});
+
+it("shows a stale disk copy, then swaps in the copy fetched this launch", async () => {
+  const { dlVersions } = await import("./bindings");
+  let releaseFresh = () => {};
+  vi.mocked(dlVersions)
+    .mockResolvedValueOnce({
+      versions: [version("byar:stable", "aaa")],
+      ageSecs: 34 * 24 * 3600,
+      stale: true,
+    })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFresh = () =>
+            resolve({
+              versions: [
+                version("byar:stable", "aaa"),
+                version("byar:test", "ddd"),
+              ],
+              ageSecs: 0,
+              stale: false,
+            });
+        }),
+    );
+  await openByar();
+
+  await screen.findByRole("button", { name: "Download byar:stable" });
+  expect(screen.queryByText("byar:test")).toBeNull();
+  await waitFor(() =>
+    expect(dlVersions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ revalidate: true }),
+    ),
+  );
+
+  await act(async () => releaseFresh());
+
+  expect(
+    screen.getByRole("button", { name: "Download byar:test" }),
+  ).toBeTruthy();
+  expect(screen.getAllByText("refreshed just now")).toHaveLength(2);
 });
 
 it("keeps a downloaded version installed after the queue forgets it", async () => {
