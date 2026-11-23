@@ -4,7 +4,6 @@ import { Button, Input } from "@picoframe/frame";
 import { ask } from "@tauri-apps/plugin-dialog";
 import {
   Blocks,
-  Boxes,
   ChevronDown,
   ChevronRight,
   Dices,
@@ -16,6 +15,7 @@ import {
   Rows3,
   Search,
   Trash2,
+  VectorPolygon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -455,7 +455,7 @@ export default function ProjectsPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <Boxes size={18} /> <Trans>Models</Trans>
+            <VectorPolygon size={18} /> <Trans>Models</Trans>
           </>
         }
         actions={

@@ -91,7 +91,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "rotate",
     group: "Transform",
     get description() {
-      return t`Turn the selection`;
+      return t`Rotate the selection`;
     },
     combos: [{ key: "r", shift: false }],
   },

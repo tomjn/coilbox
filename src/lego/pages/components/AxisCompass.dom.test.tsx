@@ -26,6 +26,7 @@ function compass(overrides: Partial<Parameters<typeof AxisCompass>[0]> = {}) {
     view: null,
     onView: vi.fn(),
     onResetView: vi.fn(),
+    onOrbit: vi.fn(),
     ...overrides,
   };
   render(<AxisCompass {...props} />);
@@ -90,6 +91,64 @@ describe("the middle", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset the view" }));
     expect(onResetView).toHaveBeenCalledOnce();
     expect(onView).not.toHaveBeenCalled();
+  });
+});
+
+describe("dragging", () => {
+  function fieldset() {
+    return screen.getByRole("group", { name: "View axes" });
+  }
+
+  it("turns the view by how far the pointer moved, once past the threshold", () => {
+    const props = compass();
+    const xEnd = ends()[0];
+    fireEvent.pointerDown(xEnd, {
+      button: 0,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(xEnd, { pointerId: 1, clientX: 12, clientY: 10 });
+    expect(props.onOrbit).not.toHaveBeenCalled();
+
+    fireEvent.pointerMove(xEnd, { pointerId: 1, clientX: 20, clientY: 13 });
+    fireEvent.pointerMove(fieldset(), {
+      pointerId: 1,
+      clientX: 25,
+      clientY: 13,
+    });
+    expect(props.onOrbit).toHaveBeenNthCalledWith(1, 10, 3);
+    expect(props.onOrbit).toHaveBeenNthCalledWith(2, 5, 0);
+  });
+
+  it("does not take a drag that began on an end as a press of that end", () => {
+    const props = compass();
+    const xEnd = ends()[0];
+    fireEvent.pointerDown(xEnd, {
+      button: 0,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(xEnd, { pointerId: 1, clientX: 30, clientY: 10 });
+    fireEvent.pointerUp(xEnd, { pointerId: 1 });
+    fireEvent.click(xEnd);
+    expect(props.onView).not.toHaveBeenCalled();
+  });
+
+  it("still takes a press that does not move as a click", () => {
+    const props = compass();
+    const xEnd = ends()[0];
+    fireEvent.pointerDown(xEnd, {
+      button: 0,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    fireEvent.pointerUp(xEnd, { pointerId: 1 });
+    fireEvent.click(xEnd);
+    expect(props.onView).toHaveBeenCalledWith("side");
+    expect(props.onOrbit).not.toHaveBeenCalled();
   });
 });
 

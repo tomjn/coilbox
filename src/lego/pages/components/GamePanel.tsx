@@ -5,7 +5,9 @@
  * Animation panel, among the walk cycles and poses.
  */
 
+import { Trans } from "@lingui/react/macro";
 import { useMemo } from "react";
+import { type FootprintResult, footprintLines } from "../../footprint";
 import type { LegoMovement, LegoPieceWeapon, LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
@@ -38,6 +40,9 @@ interface Props {
   onBuiltByChange?: (builtBy: string[]) => void;
   /** The game unit picked beside the build, for the stats to compare with. */
   referenceUnit?: ReferenceUnit | null;
+  /** The footprint the view draws, its size given here rather than over the
+   *  view. What to do about it is in the problems list. */
+  footprint?: FootprintResult | null;
 }
 
 export function GamePanel({
@@ -50,6 +55,7 @@ export function GamePanel({
   onWeaponChange,
   onBuiltByChange,
   referenceUnit,
+  footprint,
 }: Props) {
   const bounds = useMemo(
     () => unitBounds(project, pack, raw),
@@ -85,6 +91,19 @@ export function GamePanel({
         reference={referenceUnit ?? null}
         onBudgetChange={onBudgetChange}
       />
+
+      {footprint ? (
+        <div className="flex flex-col gap-1.5 border-b border-border/60 px-3 py-2">
+          <p className="text-sm font-medium">
+            <Trans>Footprint</Trans>
+          </p>
+          {footprintLines(footprint).map((line) => (
+            <p key={line} className="text-xs">
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
       <GameFitSection project={project} bounds={bounds} />
     </div>

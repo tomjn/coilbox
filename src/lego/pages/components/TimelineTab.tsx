@@ -18,14 +18,21 @@ import {
   ChevronDown,
   ChevronRight,
   Diamond,
-  FileCode,
   Pause,
   Play,
   Plus,
   Settings2,
   TriangleAlert,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { Field } from "@/components/Field";
 import { HelpPopover } from "@/components/HelpPopover";
@@ -107,8 +114,6 @@ interface Props {
   /** Called when the tab takes the viewport from a run of the Animation
    *  panel's, so what that run put beside the unit goes. */
   onRunReplaced: () => void;
-  /** Opens the Script tab. */
-  onShowScript: () => void;
   /**
    * The pose the gizmo holds while the tab is paused (#5397). The tab asks for
    * the action's pose on the playhead's frame to be held, or for none (null)
@@ -185,18 +190,9 @@ export function TimelineTab(props: Props) {
     onPlayingChange,
   ]);
 
-  if (owned || compiled) {
-    return (
-      <div className="flex flex-1 flex-col items-start gap-3 p-4 text-sm">
-        <p>
-          <Trans>This unit runs its own script.</Trans>
-        </p>
-        <Button size="sm" variant="outline" onClick={props.onShowScript}>
-          <FileCode size={14} /> <Trans>Open the Script tab</Trans>
-        </Button>
-      </div>
-    );
-  }
+  // The builder turns the tab off for a unit that runs its own script: it has
+  // no actions to show.
+  if (owned || compiled) return null;
 
   if (!action) {
     return (
@@ -633,7 +629,7 @@ function Rows({
       onSeek={onSeek}
       onStep={onStep}
       ariaLabel={ariaLabel}
-      readout={<ReadoutText frame={frame} seconds={seconds} />}
+      readout={<ReadoutText frame={frame} last={view.end} seconds={seconds} />}
       labels={<Labels view={view} open={open} onToggle={toggle} />}
       rows={
         <div className="relative mx-2">
@@ -661,16 +657,28 @@ function Rows({
   );
 }
 
-function ReadoutText({ frame, seconds }: { frame: number; seconds: number }) {
+function ReadoutText({
+  frame,
+  last,
+  seconds,
+}: {
+  frame: number;
+  last: number;
+  seconds: number;
+}) {
   const time = formatNumber(seconds, { maximumFractionDigits: 2 });
   return (
     <Trans>
-      Frame {frame}, {time} s
+      Frame {frame} / {last}, {time} s
     </Trans>
   );
 }
 
-/** Seconds under the ruler, and where a loop's lap ends. */
+/** Numbered strides between frame labels, so labels land on round frames. */
+const LABEL_STRIDES = [1, 2, 5, 10, 15, 30, 60, 150, 300, 600, 1500, 3000];
+
+/** Frames under the ruler, a mark on each and a number on every few, and
+ *  where a loop's lap ends. */
 function Ticks({
   view,
   frameCount,
@@ -681,25 +689,46 @@ function Ticks({
   loop: boolean;
 }) {
   const { t } = useLingui();
-  const total = Math.floor(view.end / FPS);
-  // Every second until they would crowd, then every few.
-  const stride = Math.max(1, Math.ceil(total / 12));
-  const labels: number[] = [];
-  for (let second = 0; second <= total; second += stride) labels.push(second);
+  // A number every few frames until they would crowd past a dozen, then a
+  // wider stride.
+  const stride =
+    LABEL_STRIDES.find((s) => view.end / s <= 12) ??
+    Math.ceil(view.end / 12 / FPS) * FPS;
+  // A short mark between the numbers: every frame while the numbers are close,
+  // a fifth or a half of the stride once they are not.
+  const minor =
+    stride % 5 === 0 ? stride / 5 : stride % 2 === 0 ? stride / 2 : 1;
+  const marks: number[] = [];
+  for (let frame = 0; frame <= view.end; frame += minor) marks.push(frame);
   return (
-    <div className="relative mx-2 h-4 text-xs text-muted-foreground">
-      {labels.map((second) => (
-        <span
-          key={second}
-          className="absolute -translate-x-1/2 tabular-nums"
-          style={{ left: `${markPercent(second * FPS, frameCount)}%` }}
-        >
-          {second}
-        </span>
-      ))}
+    <div className="relative mx-2 h-6 text-xs text-muted-foreground">
+      {marks.map((frame) => {
+        const major = frame % stride === 0;
+        const left = `${markPercent(frame, frameCount)}%`;
+        return (
+          <Fragment key={frame}>
+            <span
+              aria-hidden
+              className={cn(
+                "absolute top-0 w-px bg-muted-foreground/60",
+                major ? "h-2" : "h-1",
+              )}
+              style={{ left }}
+            />
+            {major ? (
+              <span
+                className="absolute top-2 -translate-x-1/2 tabular-nums"
+                style={{ left }}
+              >
+                {frame}
+              </span>
+            ) : null}
+          </Fragment>
+        );
+      })}
       {loop && view.lap > 0 ? (
         <span
-          className="absolute top-0 h-4 border-l border-dashed border-foreground/60 pl-1"
+          className="absolute top-0 h-6 border-l border-dashed border-foreground/60 pl-1"
           style={{ left: `${markPercent(view.lastKey, frameCount)}%` }}
         >
           {t`Lap ends`}

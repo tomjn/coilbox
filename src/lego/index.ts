@@ -1,6 +1,6 @@
 import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Boxes, Code2, ToyBrick } from "lucide-react";
+import { Code2, ToyBrick, VectorPolygon } from "lucide-react";
 import CoilMark from "../general/CoilMark";
 import { featureVisible, gateFeature } from "../general/features";
 import { insideSection } from "../general/nav";
@@ -32,7 +32,7 @@ const legoPlugin: FramePlugin = {
           end: true,
           activeWhen: insideSection("/lego", ["/lego/parts"]),
           order: 0,
-          icon: Boxes,
+          icon: VectorPolygon,
           useVisible: featureVisible("units"),
         },
         {

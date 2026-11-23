@@ -92,7 +92,6 @@ interface Seen {
   timeline: ScriptTimeline | null;
   paused: boolean;
   frame: number;
-  shownScript: number;
   /** Whether the unit is held in a pose, and what the gizmo holds. */
   posing: boolean;
   offsets: PoseOffsets;
@@ -108,7 +107,6 @@ const seen: Seen = {
   timeline: null,
   paused: false,
   frame: 0,
-  shownScript: 0,
   posing: false,
   offsets: {},
   pose: () => {},
@@ -198,9 +196,6 @@ function Harness({
           scriptFrame={frame}
           onScriptFrameChange={setFrame}
           onRunReplaced={vi.fn()}
-          onShowScript={() => {
-            seen.shownScript++;
-          }}
           pose={{
             offsets: draft.offsets,
             onHold: (offsets) => {
@@ -363,22 +358,19 @@ describe("the rows", () => {
 });
 
 describe("a script that is not the generated one", () => {
-  it("says the unit runs its own script, and opens the Script tab", () => {
-    seen.shownScript = 0;
+  // The builder turns the tab off for these (BuilderPage.dom.test.tsx), so
+  // the tab draws nothing rather than actions the unit does not run.
+  it("draws nothing for a unit with its own script", () => {
     render(
       <Harness
         initial={{ ...poseUnits().plain, script: "function Create() end" }}
       />,
     );
-    expect(screen.getByText("This unit runs its own script.")).toBeTruthy();
     expect(screen.queryByLabelText("Scrub the action")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open the Script tab" }),
-    );
-    expect(seen.shownScript).toBe(1);
+    expect(screen.queryByRole("button", { name: /New action/ })).toBeNull();
   });
 
-  it("says the same for a compiled script", () => {
+  it("draws nothing for a compiled script", () => {
     render(
       <Harness
         initial={{
@@ -387,8 +379,8 @@ describe("a script that is not the generated one", () => {
         }}
       />,
     );
-    expect(screen.getByText("This unit runs its own script.")).toBeTruthy();
     expect(screen.queryByRole("slider")).toBeNull();
+    expect(screen.queryByRole("button", { name: /New action/ })).toBeNull();
   });
 });
 
@@ -440,17 +432,17 @@ describe("playing and scrubbing", () => {
     render(<Harness initial={poseUnits().plain} />);
     expect(seen.timeline).toBeNull();
     nudgeRuler("ArrowRight");
-    expect(screen.getByText(/^Frame 1,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 1 \//)).toBeTruthy();
     expect(seen.playing).toBe(false);
     expect(seen.posing).toBe(true);
 
     nudgeRuler("ArrowRight");
-    expect(screen.getByText(/^Frame 2,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 2 \//)).toBeTruthy();
     nudgeRuler("Home");
-    expect(screen.getByText(/^Frame 0,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 0 \//)).toBeTruthy();
     // The ruler runs a second past the last key, which is frame 90.
     nudgeRuler("End");
-    expect(screen.getByText(/^Frame 120,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 120 \//)).toBeTruthy();
   });
 
   it("steps a frame at a time and seeks to a key's frame", () => {
@@ -458,19 +450,19 @@ describe("playing and scrubbing", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Keys of arm on frame 30" }),
     );
-    expect(screen.getByText("Frame 30, 1 s")).toBeTruthy();
+    expect(screen.getByText(/^Frame 30 \/ \d+, 1 s$/)).toBeTruthy();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Step forward one frame" }),
     );
-    expect(screen.getByText(/^Frame 31,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 31 \//)).toBeTruthy();
     fireEvent.click(
       screen.getByRole("button", { name: "Step back one frame" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Step back one frame" }),
     );
-    expect(screen.getByText(/^Frame 29,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 29 \//)).toBeTruthy();
   });
 
   it("stops playing an action that is deleted", () => {
@@ -589,7 +581,7 @@ describe("typing a key's value", () => {
       }),
     );
     expect(valueField().value).toBe("-28.65");
-    expect(screen.getByText(/^Frame 10,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 10 \//)).toBeTruthy();
   });
 
   it("shows a move in elmos", () => {
@@ -722,9 +714,9 @@ describe("moving and deleting keys (#5398)", () => {
     openArm();
     drag(keyNamed(armX), 4);
     fireEvent.click(keyNamed("Turn x of arm, frame 14, -28.6 degrees"));
-    expect(screen.getByText(/^Frame 0,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 0 \//)).toBeTruthy();
     fireEvent.click(keyNamed("Turn x of arm, frame 14, -28.6 degrees"));
-    expect(screen.getByText(/^Frame 14,/)).toBeTruthy();
+    expect(screen.getByText(/^Frame 14 \//)).toBeTruthy();
   });
 
   it("puts a key back where it was when it is dropped on a frame its channel keys", () => {

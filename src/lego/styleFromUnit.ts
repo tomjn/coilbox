@@ -61,6 +61,15 @@ export function refusalMessage(reason: StyleRefusal): string {
     : t`This unit has no parts to make a style from.`;
 }
 
+/** Why no style can be made from this unit, or null when one can. */
+export function styleRefusal(
+  project: LegoProject,
+  pack: LoadedPack,
+): StyleRefusal | null {
+  if (project.imported) return "imported";
+  return partsOf(project, pack).length === 0 ? "no-parts" : null;
+}
+
 export interface Measures {
   slenderness: number;
   density: number;
@@ -166,21 +175,15 @@ export function styleFromUnit(
   project: LegoProject,
   pack: LoadedPack,
 ): StyleFromUnit {
-  if (project.imported) {
+  const refusal = styleRefusal(project, pack);
+  if (refusal) {
     return {
       status: "refused",
-      reason: "imported",
-      message: refusalMessage("imported"),
+      reason: refusal,
+      message: refusalMessage(refusal),
     };
   }
   const parts = partsOf(project, pack);
-  if (parts.length === 0) {
-    return {
-      status: "refused",
-      reason: "no-parts",
-      message: refusalMessage("no-parts"),
-    };
-  }
 
   const colours = new Map<string, number>();
   const shapes = new Map<string, number>();

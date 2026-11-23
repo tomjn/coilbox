@@ -93,13 +93,13 @@ vi.mock("../useRawGeometry", () => ({
 
 // Draws its `chrome`, which is the toolbar over the view, in one view or in
 // four as a test sets.
-const layout = { fourViews: false };
+const layout = { banded: false };
 vi.mock("./components/ModelViewport", () => ({
   ModelViewport: ({
     chrome,
   }: {
-    chrome?: (fourViews: boolean) => React.ReactNode;
-  }) => chrome?.(layout.fourViews),
+    chrome?: (banded: boolean, corner: React.ReactNode) => React.ReactNode;
+  }) => chrome?.(layout.banded, null),
 }));
 
 // Reads the app's own settings store for its target engine, which nothing
@@ -260,7 +260,7 @@ function show(project: LegoProject, selectedId?: string) {
 }
 
 beforeEach(() => {
-  layout.fourViews = false;
+  layout.banded = false;
   localStorage.clear();
   packLoad = loadedPack();
   loadedRaw = null;
@@ -284,6 +284,7 @@ describe("the unit info card (#5403)", () => {
   it("keeps a width of its own and truncates its info line rather than wrapping words", async () => {
     show(unit());
     await screen.findByRole("button", { name: "Script" });
+    fireEvent.click(screen.getByRole("button", { name: "walker" }));
     const card = screen.getByTestId("unit-card");
     expect(card.className).toContain("min-w-56");
     const line = screen.getByLabelText("Export name").parentElement;
@@ -292,13 +293,33 @@ describe("the unit info card (#5403)", () => {
     expect(text.className).toContain("truncate");
     expect(text.className).toContain("min-w-0");
     // The row lets the toolbar drop below the card rather than squeeze it.
-    expect(card.parentElement?.className).toContain("flex-wrap");
+    expect(card.parentElement?.parentElement?.className).toContain("flex-wrap");
+    // Open, it hangs out of a slot the closed card's height, so the row
+    // under it, and the tool rail, do not move.
+    expect(card.parentElement?.className).toContain("h-[38px]");
   });
 });
 
-describe("the unit info card in four views (#5410)", () => {
+describe("the unit info card over one view", () => {
+  it("starts closed on the unit's name, opens in place and closes again", async () => {
+    show(unit());
+    await screen.findByRole("button", { name: "Script" });
+    expect(screen.queryByLabelText("Export name")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "walker" }));
+    expect(screen.getByLabelText("Export name")).toBeTruthy();
+    expect((screen.getByLabelText("Unit name") as HTMLInputElement).value).toBe(
+      "walker",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide unit details" }));
+    expect(screen.queryByLabelText("Export name")).toBeNull();
+  });
+});
+
+describe("the unit info card in bands (#5414)", () => {
   it("is one line with the unit's name, and opens the rest of the card from it", async () => {
-    layout.fourViews = true;
+    layout.banded = true;
     show(unit());
     await screen.findByRole("button", { name: "Script" });
     const card = screen.getByTestId("unit-card");
@@ -644,28 +665,44 @@ describe("the create a style button (#3238)", () => {
     );
   });
 
-  it("says a unit with no parts cannot give a style", async () => {
+  // Disabled rather than pressed into an error, with the reason as its
+  // tooltip (`refusalMessage`, covered in styleFromUnit.test.ts).
+  it("is off for a unit with no parts", async () => {
     show(unit());
-    await click();
+    const button = await screen.findByRole("button", {
+      name: "Create a style from this unit",
+    });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button);
     expect(copyStyle).not.toHaveBeenCalled();
-    expect(notice).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: "error",
-        body: expect.stringContaining("no parts"),
-      }),
-    );
+    expect(notice).not.toHaveBeenCalled();
   });
 
-  it("says a unit imported from a game model cannot give a style", async () => {
+  it("is off for a unit imported from a game model", async () => {
     show(unit({ imported: { source: "/tmp/unit.s3o" } }));
-    await click();
+    const button = await screen.findByRole("button", {
+      name: "Create a style from this unit",
+    });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button);
     expect(copyStyle).not.toHaveBeenCalled();
-    expect(notice).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: "error",
-        body: expect.stringContaining("imported"),
-      }),
-    );
+    expect(notice).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Timeline tab", () => {
+  it("is off for a unit that runs its own script", async () => {
+    show(unit({ script: "function Create() end" }));
+    const timeline = await screen.findByRole("button", { name: "Timeline" });
+    expect(timeline.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(timeline);
+    expect(timeline.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("is on for a unit whose script coilbox writes", async () => {
+    show(unit());
+    const timeline = await screen.findByRole("button", { name: "Timeline" });
+    expect(timeline.getAttribute("aria-disabled")).toBeNull();
   });
 });
 

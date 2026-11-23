@@ -25,7 +25,8 @@ import {
   Copy,
   FlipHorizontal2,
   Move,
-  RotateCw,
+  Rotate3d,
+  RulerDimensionLine,
   Scaling,
   Trash2,
 } from "lucide-react";
@@ -97,6 +98,7 @@ import {
   bandsFrom,
   chromeFits,
   NO_BANDS,
+  QUADRANTS,
   type Quadrant,
   type ViewBands,
 } from "../../quadViews";
@@ -135,6 +137,7 @@ import { disposeBalance } from "./balanceLayer";
 import {
   boundsBox,
   focusSelection,
+  orbitBy,
   resetFrame,
   showFourViews,
   showView,
@@ -152,12 +155,12 @@ import {
   handleBox,
 } from "./collisionHandles";
 import { disposePieceCollision } from "./collisionVolumes";
+import { COMPASS_SIZE } from "./compassLayout";
 import { dotMaterial, points } from "./dotsAndPoints";
 import {
   type DrawMode,
   disposeDrawLayer,
   newDrawLayer,
-  nextDrawMode,
   refreshDrawMode,
   rememberDrawMode,
   rememberedDrawMode,
@@ -167,7 +170,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
-import { ChromeBands, FourViewsButton, QuadrantFrames } from "./FourViews";
+import { ChromeBands, QuadrantFrames } from "./FourViews";
 import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
@@ -271,7 +274,7 @@ const MODES: {
   Icon: typeof Move;
 }[] = [
   { id: "translate", label: () => t`Move`, key: "G", Icon: Move },
-  { id: "rotate", label: () => t`Turn`, key: "R", Icon: RotateCw },
+  { id: "rotate", label: () => t`Rotate`, key: "R", Icon: Rotate3d },
   { id: "scale", label: () => t`Scale`, key: "S", Icon: Scaling },
 ];
 
@@ -425,8 +428,13 @@ interface Props {
    * Told whether the chrome sits in bands round the views rather than over
    * them, which it does in four views (#5410) and in one view that is too
    * small to hold it (#5414). It has less room then, along the top.
+   *
+   * `corner` is the axis compass, for the chrome to
+   * put under its top right toolbar. Over the view the chrome's row is as tall
+   * as the unit card, and below that row the compass hung a card's height
+   * under a toolbar a third of it. Null in bands, where they stay in the view.
    */
-  chrome?: (banded: boolean) => ReactNode;
+  chrome?: (banded: boolean, corner: ReactNode) => ReactNode;
   /** The game unit picked as the reference figure, or null when none is. */
   onReferenceUnit?: (unit: ReferenceUnit | null) => void;
   /**
@@ -866,13 +874,15 @@ export function ModelViewport({
    *  measured from where it is drawn so a wrapping toolbar is allowed for. */
   const [bands, setBands] = useState<ViewBands>(NO_BANDS);
   /** Whether the chrome is too big to sit over one view (#5414): the tool
-   *  rail has to scroll. One view then takes the bands four views do. */
+   *  rail has to scroll. One view then takes bands round it. */
   const [crowded, setCrowded] = useState(false);
   /** Whether the tool rail has tools below what it shows, for the fade that
    *  says so. */
   const [railMore, setRailMore] = useState(false);
-  /** In bands round the views rather than over them. */
-  const banded = fourViews || crowded;
+  /** In bands round the view rather than over it. Four views never are: the
+   *  chrome floats over them as it does over one view, since the bands left
+   *  a margin of empty space round all four and made each of them smaller. */
+  const banded = crowded && !fourViews;
   /** What was drawn last, for the measure below, which runs from observers
    *  and would otherwise read the render it was set up in. */
   const crowdedRef = useRef(crowded);
@@ -1327,11 +1337,25 @@ export function ModelViewport({
       controls.zoomToCursor = true;
 
       const render = () => {
-        refreshDrawMode(state.draw, state.groups.values());
+        const quad = state.quad;
+        // In four views a quadrant may have a mode of its own, so each is put
+        // in its mode as it is drawn, holding on to what the others use.
+        const allMode = state.draw.mode;
+        const modes = quad
+          ? QUADRANTS.map((id) => state.quadDraw[id] ?? allMode)
+          : [allMode];
+        const keep = {
+          edges: modes.some((mode) => mode !== "solid"),
+          offsetFaces: modes.includes("both"),
+        };
+        refreshDrawMode(
+          state.draw,
+          state.groups.values(),
+          quad ? keep : undefined,
+        );
         // In four views the skeleton's names and the compass follow the
         // perspective quadrant. The names are laid out so they do not overlap
         // as that camera sees them, so they are drawn in that quadrant only.
-        const quad = state.quad;
         const mainCamera = quad ? state.perspectiveCamera : state.camera;
         const labels = state.skeleton;
         if (labels) {
@@ -1360,8 +1384,16 @@ export function ModelViewport({
             // The wide line shader works in pixels of the viewport it draws in.
             pieceEditMaterial.resolution.set(rect.width, rect.height);
             for (const sprite of named) sprite.visible = id === "perspective";
+            const mode = state.quadDraw[id] ?? allMode;
+            if (mode !== state.draw.mode) {
+              state.draw.mode = mode;
+              refreshDrawMode(state.draw, state.groups.values(), keep);
+            }
           });
           for (const sprite of named) sprite.visible = true;
+          // The pieces stay in the active quadrant's mode, drawn last, until
+          // the next frame. The layer's own mode is the one for all views.
+          state.draw.mode = allMode;
           pieceEditMaterial.resolution.set(state.size.width, state.size.height);
         } else {
           renderer.render(scene, state.camera);
@@ -1469,6 +1501,7 @@ export function ModelViewport({
         footprint: null,
         overlap: null,
         draw: newDrawLayer(),
+        quadDraw: {},
         guideLayer: null,
         guidePlanes: [],
         guideLines: [],
@@ -1766,6 +1799,23 @@ export function ModelViewport({
     state.render();
   }, [drawMode]);
 
+  // A mode of its own for a quadrant, picked beside its name in four views.
+  // The draw mode button and its key set every view, so a change of
+  // `drawMode` clears these.
+  const [quadDrawModes, setQuadDrawModes] = useState<
+    Partial<Record<Quadrant, DrawMode>>
+  >({});
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the mode for every view changes
+  useEffect(() => {
+    setQuadDrawModes({});
+  }, [drawMode]);
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.quadDraw = quadDrawModes;
+    state.render();
+  }, [quadDrawModes]);
+
   useBalance(sceneRef, { result: balance, show: showBalance });
 
   // Built at the rest pose, and moved onto the pieces by the script playback.
@@ -1983,14 +2033,14 @@ export function ModelViewport({
     toggleFourViews,
   });
 
-  // In four views the chrome keeps bands along the top, the bottom and the
-  // left, and the views share what is left (#5410). The bands are measured
-  // from the chrome as drawn, again whenever any of it changes size, so a
-  // toolbar that wraps grows the top band and the views shrink to suit.
+  // One view takes bands along the top, the bottom and the left once the
+  // chrome no longer fits over it (#5414), which the tool rail says: it gets
+  // what the chrome above and below leave, and scrolls when that is not
+  // enough. The bands are measured from the chrome as drawn, again whenever
+  // any of it changes size, so a toolbar that wraps grows the top band.
   //
-  // One view takes the same bands once the chrome no longer fits over it
-  // (#5414), which the tool rail says: it gets what the chrome above and below
-  // leave, and scrolls when that is not enough.
+  // Four views took the same bands once (#5410). They fill the viewport now,
+  // with the chrome over them, so their quadrants are told there are none.
   //
   // In bands the unit card is one line, so the chrome is shorter and the rail
   // has more room than it would over the view. Reading the rail there would
@@ -2008,17 +2058,19 @@ export function ModelViewport({
       // A pixel of slack, as `chromeFits` allows.
       setRailMore(rail.scrollTop + rail.clientHeight < rail.scrollHeight - 1);
     const measure = () => {
-      // Four views are banded whatever the rail says, and the chrome is in
-      // bands when it is measured, so there is nothing to ask of it.
+      // Four views are never banded, so there is nothing to ask of the rail:
+      // it scrolls when it does not fit.
       if (!fourViews) {
         if (crowdedRef.current) flushSync(() => setCrowded(false));
         if (!chromeFits(rail)) flushSync(() => setCrowded(true));
       }
-      const next = bandsFrom(
-        wrapper.getBoundingClientRect(),
-        views.getBoundingClientRect(),
-        rail.getBoundingClientRect(),
-      );
+      const next = fourViews
+        ? NO_BANDS
+        : bandsFrom(
+            wrapper.getBoundingClientRect(),
+            views.getBoundingClientRect(),
+            rail.getBoundingClientRect(),
+          );
       setBands((was) =>
         was.top === next.top &&
         was.bottom === next.bottom &&
@@ -2047,6 +2099,27 @@ export function ModelViewport({
   const { t } = useLingui();
   // Re-render when a shortcut is rebound, so its tooltip keeps up.
   useShortcutOverrides();
+  const measureKey = shortcutLabel("measure");
+
+  // Top right, under the unit's chrome toolbar when the chrome is over one
+  // view. In bands, or with no chrome, it is the top right of the view, and in
+  // four views the top right of the perspective quadrant.
+  const cornerInChrome = Boolean(chrome) && !banded && !fourViews;
+  const corner = (
+    <AxisCompass
+      compassRef={compassRef}
+      view={activeView}
+      onView={(id) => {
+        const state = sceneRef.current;
+        if (state) showView(state, id, selectedIdsRef.current);
+      }}
+      onResetView={resetView}
+      onOrbit={(dx, dy) => {
+        const state = sceneRef.current;
+        if (state) orbitBy(state, dx, dy, COMPASS_SIZE);
+      }}
+    />
+  );
 
   // What the line at the foot of the view says about the gesture in progress.
   function hintText(): string {
@@ -2118,6 +2191,15 @@ export function ModelViewport({
             maximiseQuadrant(state, id);
             state.render();
           }}
+          drawModes={{
+            top: quadDrawModes.top ?? drawMode,
+            front: quadDrawModes.front ?? drawMode,
+            side: quadDrawModes.side ?? drawMode,
+            perspective: quadDrawModes.perspective ?? drawMode,
+          }}
+          onDrawMode={(id, mode) =>
+            setQuadDrawModes((was) => ({ ...was, [id]: mode }))
+          }
         />
       )}
       {crowded && !fourViews ? <ChromeBands bands={bands} /> : null}
@@ -2132,7 +2214,13 @@ export function ModelViewport({
           Clicks fall through to the model except on the controls themselves,
           which take `pointer-events-auto` back one at a time. */}
       <div className="pointer-events-none absolute inset-3 z-10 flex flex-col gap-3">
-        {chrome?.(banded)}
+        {chrome?.(banded, cornerInChrome ? corner : null)}
+        {/* In four views, the top right of the perspective quadrant, the
+            view the compass turns. The quadrants fill the viewport, so that
+            is halfway down it. */}
+        {fourViews ? (
+          <div className="absolute top-1/2 right-0 z-10 mt-3">{corner}</div>
+        ) : null}
 
         {/* `m-auto` on the inner column rather than `justify-center` on the
             scrollport: centring a flex container that way clips content off
@@ -2145,29 +2233,11 @@ export function ModelViewport({
             has it hold room for a classic scrollbar. Padding is what works on
             both. */}
         <div ref={viewsRef} className="relative flex min-h-0 flex-1 flex-col">
-          {/* Top right, under the unit's chrome and clear of the tool rail. In
-              four views, the top right of the perspective view, which starts
-              halfway down the room the bands leave. */}
-          <div
-            className={cn(
-              "absolute right-0 z-10 flex items-start gap-2",
-              fourViews ? "top-1/2 mt-2" : "top-0",
-            )}
-          >
-            <FourViewsButton
-              on={quadrant !== null}
-              onToggle={toggleFourViews}
-            />
-            <AxisCompass
-              compassRef={compassRef}
-              view={activeView}
-              onView={(id) => {
-                const state = sceneRef.current;
-                if (state) showView(state, id, selectedIdsRef.current);
-              }}
-              onResetView={resetView}
-            />
-          </div>
+          {/* One view in bands or with no chrome. Otherwise it is in the
+              chrome, or in four views in the perspective quadrant. */}
+          {!cornerInChrome && !fourViews ? (
+            <div className="absolute top-0 right-0 z-10">{corner}</div>
+          ) : null}
           <TooltipProvider delayDuration={300}>
             <div
               ref={railRef}
@@ -2215,8 +2285,31 @@ export function ModelViewport({
                   })}
                 </ButtonGroup>
 
-                {/* A group of its own. The three above are a mode you are in, this
-              is a thing you do once. */}
+                {/* A tool you are in, like the modes above, but one that puts
+                    the handles away rather than being a kind of handle. */}
+                <ButtonGroup orientation="vertical">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant={measure.active ? "default" : "outline"}
+                        onClick={() => measure.setActive(!measure.active)}
+                        aria-pressed={measure.active}
+                        aria-label={t`Measure`}
+                      >
+                        <RulerDimensionLine className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {measure.active
+                        ? t`Leave the measure tool (${measureKey})`
+                        : t`Measure between two points (${measureKey})`}
+                    </TooltipContent>
+                  </Tooltip>
+                </ButtonGroup>
+
+                {/* A group of its own. The groups above are tools you are in,
+              this is a thing you do once. */}
                 {onGround ? (
                   <ButtonGroup orientation="vertical">
                     <Tooltip>
@@ -2339,21 +2432,26 @@ export function ModelViewport({
             corner, so a long key runs out of room before it runs under the
             buttons. Stacked within their group, so the compass keeps the
             corner and the buttons do not push it inward. */}
-        <div ref={bottomRef} className="flex flex-col gap-3">
-          {measure.active || measure.measurements.length > 0 ? (
-            <LiveMeasureReadout
-              store={measure.lines}
-              step={partUnit(pack)}
-              onClear={measure.clear}
-            />
-          ) : null}
-          {measure.moved ? (
-            <DragReadout
-              moved={measure.moved}
-              size={draggedSize}
-              step={partUnit(pack)}
-            />
-          ) : null}
+        <div ref={bottomRef} className="relative flex flex-col gap-3">
+          {/* Over the view, just above this block, rather than in it. In four
+              views this block's height is the bottom band, so a readout in it
+              shrank all four views for as long as a drag lasted. */}
+          <div className="absolute bottom-full left-0 mb-3 flex flex-col items-start gap-2">
+            {measure.active || measure.measurements.length > 0 ? (
+              <LiveMeasureReadout
+                store={measure.lines}
+                step={partUnit(pack)}
+                onClear={measure.clear}
+              />
+            ) : null}
+            {measure.moved ? (
+              <DragReadout
+                moved={measure.moved}
+                size={draggedSize}
+                step={partUnit(pack)}
+              />
+            ) : null}
+          </div>
 
           {/* In one view in bands the buttons drop to a row of their own when
               the key would otherwise be squeezed into a narrow column
@@ -2397,22 +2495,16 @@ export function ModelViewport({
                   ? balance
                   : null
               }
-              footprint={
-                footprint?.result &&
-                (showFootprint ||
-                  (footprint.result.status === "ok" &&
-                    (footprint.result.differs ||
-                      footprint.result.overhang.x > 0 ||
-                      footprint.result.overhang.z > 0)))
-                  ? footprint.result
-                  : null
-              }
               overlap={overlap && showOverlap ? overlap : null}
               reaches={showReach ? reaches : []}
               hint={hintText()}
             />
 
             <ViewportBar
+              fourViews={{
+                on: quadrant !== null,
+                onChange: () => toggleFourViews(),
+              }}
               problems={
                 problems ? (
                   <ProblemsButton
@@ -2429,7 +2521,7 @@ export function ModelViewport({
               grid={{ on: showGrid, onChange: setShowGrid }}
               snapping={{ on: snapEnabled, onChange: setSnapEnabled }}
               drawMode={drawMode}
-              onNextDrawMode={() => setDrawMode(nextDrawMode)}
+              onDrawModeChange={setDrawMode}
               collision={{ on: showCollision, onChange: setShowCollision }}
               skeleton={{ on: showSkeleton, onChange: setSkeletonChoice }}
               balance={{ on: showBalance, onChange: setShowBalance }}
@@ -2450,7 +2542,6 @@ export function ModelViewport({
                   ? { on: showReach, onChange: setShowReach }
                   : undefined
               }
-              measure={{ on: measure.active, onChange: measure.setActive }}
               poses={posing?.control}
               guides={
                 guides ? (

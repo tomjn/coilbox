@@ -9012,6 +9012,10 @@ msgstr ""
 msgid "All units"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "All views"
+msgstr ""
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Allies"
 msgstr ""
@@ -13564,10 +13568,6 @@ msgstr ""
 msgid "Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How {gameName} reads a tweakdefs slot is unverified, so check the changes in game."
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "Coilbox has its own copy and there is no file behind it to re-read, which is what a model out of a packed game or map leaves you with. Choose one, and refresh picks up edits to it after that."
-msgstr ""
-
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
 msgstr ""
@@ -17045,6 +17045,10 @@ msgstr ""
 msgid "Drag to turn"
 msgstr ""
 
+#: src/lego/pages/components/AxisCompass.tsx
+msgid "Drag to turn the view"
+msgstr ""
+
 #: src/lego/pages/components/ShapeFields.tsx
 msgid "Dragging a round side sets the radius."
 msgstr ""
@@ -17063,18 +17067,6 @@ msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Draw some boxes first"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Draw the unit as edges ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Draw the unit solid ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Draw the unit solid with edges ({key})"
 msgstr ""
 
 #: src/lego/shortcuts.ts
@@ -19352,6 +19344,7 @@ msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 #: src/lego/generateChecked.ts
+#: src/lego/pages/components/GamePanel.tsx
 #: src/lego/problems.ts
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
 msgid "Footprint"
@@ -19525,7 +19518,7 @@ msgstr ""
 msgid "Four legs"
 msgstr ""
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Four views ({key})"
 msgstr ""
 
@@ -19542,7 +19535,7 @@ msgid "Frame {frame}"
 msgstr ""
 
 #: src/lego/pages/components/TimelineTab.tsx
-msgid "Frame {frame}, {time} s"
+msgid "Frame {frame} / {last}, {time} s"
 msgstr ""
 
 #: src/lego/pages/components/ScrubberMarks.tsx
@@ -20874,6 +20867,10 @@ msgstr ""
 msgid "Hide this map"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+msgid "Hide unit details"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "hideSettings id ''{id}'' matches nothing"
 msgstr ""
@@ -21399,6 +21396,10 @@ msgstr ""
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr ""
 
+#: src/lego/pages/components/FourViews.tsx
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr ""
+
 #: src/mapconv/pages/CompilePage.tsx
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
 msgstr ""
@@ -21413,6 +21414,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "How the target moves"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
 msgstr ""
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -23430,7 +23435,7 @@ msgstr ""
 msgid "Leave the measure tool"
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Leave the measure tool ({measureKey})"
 msgstr ""
 
@@ -24924,6 +24929,7 @@ msgid "Maximum water depth"
 msgstr ""
 
 #: src/lego/pages/components/MeasureReadout.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Measure"
 msgstr ""
 
@@ -24931,7 +24937,7 @@ msgstr ""
 msgid "Measure between two points"
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Measure between two points ({measureKey})"
 msgstr ""
 
@@ -26916,6 +26922,10 @@ msgstr ""
 msgid "No file in this game names this parameter."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "No file to re-read"
+msgstr ""
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "No file to save over"
 msgstr ""
@@ -27908,10 +27918,6 @@ msgstr ""
 
 #: src/scenario/validate.ts
 msgid "no text, so the radio panel opens on an empty message"
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "no texture"
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -29447,6 +29453,10 @@ msgstr ""
 msgid "one team"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "One view ({key})"
+msgstr ""
+
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Online"
@@ -29867,7 +29877,6 @@ msgid "Open the scenario"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
-#: src/lego/pages/components/TimelineTab.tsx
 msgid "Open the Script tab"
 msgstr ""
 
@@ -32288,10 +32297,6 @@ msgstr ""
 msgid "Raw text"
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "Re-read the texture file, to pick up an edit made elsewhere"
-msgstr ""
-
 #: src/animation/pages/CobPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Re-run"
@@ -33050,16 +33055,16 @@ msgstr ""
 msgid "Refresh {repoName} versions"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Refresh re-reads the file the texture came from, to pick up an edit made elsewhere. A model out of a packed game or map has no such file until you choose one."
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Refresh server IP"
 msgstr ""
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Refresh the address (admins only)"
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "Refresh the texture"
 msgstr ""
 
 #: src/lib/relativeTime.ts
@@ -34480,6 +34485,14 @@ msgstr ""
 msgid "Rosters"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Rotate"
+msgstr ""
+
+#: src/lego/shortcuts.ts
+msgid "Rotate the selection"
+msgstr ""
+
 #: src/lego/pages/components/TransformFields.tsx
 msgid "Rotation"
 msgstr ""
@@ -34822,6 +34835,10 @@ msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "Save the model"
+msgstr ""
+
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Save the model file on its own"
 msgstr ""
 
 #: src/lego/moduleFileIo.ts
@@ -36386,7 +36403,6 @@ msgid "Shaders compiled"
 msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
-#: src/lego/pages/components/TexturePicker.tsx
 msgid "Shading map"
 msgstr ""
 
@@ -36913,6 +36929,10 @@ msgstr ""
 msgid "Show this sheet"
 msgstr ""
 
+#: src/lego/pages/components/UnitCard.tsx
+msgid "Show unit details"
+msgstr ""
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "Show updates"
 msgstr ""
@@ -37032,6 +37052,10 @@ msgstr ""
 
 #: src/campaign/pages/components/missionEditorGroups.ts
 msgid "side graphic video"
+msgstr ""
+
+#: src/lego/pages/BuilderPage.tsx
+msgid "Side panel"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -37499,6 +37523,14 @@ msgstr ""
 
 #: src/lego/pages/components/ReferencePicker.tsx
 msgid "Solar collector (a building)"
+msgstr ""
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+msgid "Solid"
+msgstr ""
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+msgid "Solid with edges"
 msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
@@ -39067,10 +39099,6 @@ msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "texture"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -40855,7 +40883,7 @@ msgstr ""
 msgid "The model names none."
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
 msgstr ""
 
@@ -43318,8 +43346,8 @@ msgstr ""
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
 msgstr ""
 
-#: src/lego/pages/components/TimelineTab.tsx
-msgid "This unit runs its own script."
+#: src/lego/pages/BuilderPage.tsx
+msgid "This unit runs its own script, so it has no actions to show. Its motion is in the Script tab."
 msgstr ""
 
 #: src/lego/pack.ts
@@ -43382,10 +43410,6 @@ msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 msgid "This unit's script is your own and does not pull the file in, so nothing set here reaches a game. Add <0>{includeLine}</0> near the top of it. A script generated after these were set carries that line already."
-msgstr ""
-
-#: src/lego/pages/components/TexturePicker.tsx
-msgid "This unit's team-colour mask is missing"
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -43976,7 +44000,6 @@ msgid "Tube"
 msgstr ""
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 msgid "Turn"
 msgstr ""
@@ -44077,10 +44100,6 @@ msgstr ""
 
 #: src/lego/banking.ts
 msgid "turn speed per elmo a frame of flying speed"
-msgstr ""
-
-#: src/lego/shortcuts.ts
-msgid "Turn the selection"
 msgstr ""
 
 #: src/lego/pages/components/JointLimitFields.tsx
@@ -46154,7 +46173,7 @@ msgstr ""
 msgid "What this project is called, and what it is for."
 msgstr ""
 
-#: src/lego/pages/components/TexturePicker.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
 msgstr ""
 
@@ -46718,6 +46737,7 @@ msgstr ""
 msgid "Wins"
 msgstr ""
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 msgid "Wireframe"
 msgstr ""

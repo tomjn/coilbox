@@ -1,7 +1,7 @@
 /**
- * The controls of the four view layout (#5371): the button beside the compass
- * that switches between one view and four, and the frame round each quadrant
- * with its name.
+ * The controls of the four view layout (#5371): the frame round each quadrant
+ * with its name, and beside the name a menu for how that quadrant alone draws
+ * the unit, as 3D tools put a shading menu on each viewport's label.
  *
  * The scene draws the quadrants. This only marks them out, so the frames let
  * every click through to the canvas except on the names. The bands the chrome
@@ -11,36 +11,43 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
-import { Grid2x2 } from "lucide-react";
 import { QUADRANTS, type Quadrant, type ViewBands } from "../../quadViews";
-import { useShortcutOverrides } from "../../shortcutOverridesStore";
-import { shortcutLabel } from "../../shortcuts";
+import {
+  DRAW_MODE_ICONS,
+  DrawModeMenu,
+  useDrawModeNames,
+} from "./DrawModeMenu";
+import type { DrawMode } from "./drawMode";
 
-export function FourViewsButton({
-  on,
-  onToggle,
+/** The menu beside a quadrant's name, its face the mode the quadrant is in. */
+/** The chip beside a quadrant's name, its face the mode the quadrant is in. */
+function QuadrantDrawMenu({
+  view,
+  mode,
+  onChange,
 }: {
-  on: boolean;
-  onToggle: () => void;
+  /** The quadrant's name, for the menu's own. */
+  view: string;
+  mode: DrawMode;
+  onChange: (mode: DrawMode) => void;
 }) {
   const { t } = useLingui();
-  // Re-render when a shortcut is rebound, so its tooltip keeps up.
-  useShortcutOverrides();
-  const key = shortcutLabel("four-views");
-  const label = t`Four views (${key})`;
+  const Face = DRAW_MODE_ICONS[mode];
+  const modeName = useDrawModeNames()[mode];
+  const label = t`How the ${view} view draws the unit: ${modeName}`;
   return (
-    <Button
-      type="button"
-      variant={on ? "default" : "outline"}
-      size="icon"
-      aria-label={label}
-      title={label}
-      aria-pressed={on}
-      onClick={onToggle}
-      className="pointer-events-auto"
-    >
-      <Grid2x2 className="size-4" />
-    </Button>
+    <DrawModeMenu heading={view} mode={mode} onChange={onChange}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={label}
+        title={label}
+        className="size-6 rounded bg-background/70 backdrop-blur"
+      >
+        <Face className="size-3.5" />
+      </Button>
+    </DrawModeMenu>
   );
 }
 
@@ -85,6 +92,8 @@ export function QuadrantFrames({
   active,
   bands,
   onMaximise,
+  drawModes,
+  onDrawMode,
 }: {
   /** The quadrant that has the controls. */
   active: Quadrant;
@@ -92,6 +101,10 @@ export function QuadrantFrames({
    *  rest. */
   bands: ViewBands;
   onMaximise: (id: Quadrant) => void;
+  /** How each quadrant draws the unit, for the menu beside its name. */
+  drawModes: Record<Quadrant, DrawMode>;
+  /** Draws one quadrant in a mode, leaving the others as they are. */
+  onDrawMode: (id: Quadrant, mode: DrawMode) => void;
 }) {
   const { t } = useLingui();
   const names: Record<Quadrant, string> = {
@@ -118,21 +131,32 @@ export function QuadrantFrames({
               id === active ? "border-primary" : "border-border/60",
             )}
           >
-            <button
-              type="button"
-              title={t`Double click to fill the view`}
-              onDoubleClick={() => onMaximise(id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") onMaximise(id);
-              }}
+            <div
               className={cn(
-                "pointer-events-auto absolute rounded bg-background/70 px-1.5 py-0.5 text-xs backdrop-blur focus-visible:outline-2 focus-visible:outline-ring",
+                "pointer-events-auto absolute flex items-center gap-0.5",
                 NAME_CORNER[id],
-                id === active && "text-primary",
               )}
             >
-              {names[id]}
-            </button>
+              <button
+                type="button"
+                title={t`Double click to fill the view`}
+                onDoubleClick={() => onMaximise(id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") onMaximise(id);
+                }}
+                className={cn(
+                  "rounded bg-background/70 px-1.5 py-0.5 text-xs backdrop-blur focus-visible:outline-2 focus-visible:outline-ring",
+                  id === active && "text-primary",
+                )}
+              >
+                {names[id]}
+              </button>
+              <QuadrantDrawMenu
+                view={names[id]}
+                mode={drawModes[id]}
+                onChange={(mode) => onDrawMode(id, mode)}
+              />
+            </div>
           </div>
         ))}
       </div>

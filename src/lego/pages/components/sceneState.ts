@@ -39,7 +39,7 @@ import { getShapeGeometry } from "../../shapes";
 import type { Vec3 } from "../../snapping";
 import { onGround } from "../../standIn";
 import type { CollisionFaceDrag } from "./collisionHandles";
-import type { DrawLayer } from "./drawMode";
+import type { DrawLayer, DrawMode } from "./drawMode";
 import type { EffectsLayer } from "./effectsLayer";
 import type { MeasureScene } from "./measureLayer";
 import type { PackFaceDrag } from "./packHandles";
@@ -275,6 +275,9 @@ export interface SceneState {
   overlap: THREE.Group | null;
   /** Whether the unit is drawn solid, as edges, or both, and what that holds. */
   draw: DrawLayer;
+  /** A quadrant drawn in a mode of its own in four views, rather than in
+   *  `draw.mode` as the rest are. */
+  quadDraw: Partial<Record<Quadrant, DrawMode>>;
   /** The guide planes, drawn in `overlay` while they are shown. Rebuilt
    *  whenever a guide or the root changes. */
   guideLayer: THREE.Group | null;

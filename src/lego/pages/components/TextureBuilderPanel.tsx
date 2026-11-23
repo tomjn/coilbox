@@ -18,7 +18,11 @@
  * team-colour mask into a sheet other units sample too is a different feature
  * from this one (#2574).
  *
- * Building writes into the same store `TexturePicker` points a unit at, so the
+ * Above each builder is the texture the unit has now, to change or refresh by
+ * hand (`TexturePicker.tsx`). That used to sit on the unit card over the view,
+ * which put the unit's textures in two places.
+ *
+ * Building writes into the same store a chosen texture goes to, so the
  * result flows through the same export and pruning path as any other texture:
  * nothing downstream needs to know it was composed rather than chosen.
  */
@@ -36,6 +40,11 @@ import {
   legoTextureComposeShading,
 } from "../../bindings";
 import type { LegoImported } from "../../model";
+import {
+  TextureFileOffers,
+  TextureSlot,
+  useTextureFiles,
+} from "./TexturePicker";
 
 interface Props {
   imported: LegoImported;
@@ -55,6 +64,8 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
   const [busy, setBusy] = useState<"colour" | "shading" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [built, setBuilt] = useState<{ colour?: string; shading?: string }>({});
+  const files = useTextureFiles(imported, onChange);
+  const refreshNote = t`Refresh re-reads the file the texture came from, to pick up an edit made elsewhere. A model out of a packed game or map has no such file until you choose one.`;
 
   async function pick(
     title: string,
@@ -134,12 +145,28 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
   const builtShading = built.shading ?? "";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 py-3">
+      {files.offers.length > 0 || files.problem ? (
+        <div className="flex flex-col gap-2">
+          <TextureFileOffers imported={imported} files={files} />
+          {files.problem ? (
+            <p className="text-xs text-destructive">{files.problem}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1">
           <span className="text-sm font-medium">
             <Trans>Colour texture</Trans>
           </span>
           <HelpPopover label={t`About the colour texture`}>
+            <p>
+              <Trans>
+                What this unit is painted with. Its UV map points onto this
+                image, so a different one is a different look rather than a
+                remap.
+              </Trans>
+            </p>
+            <p>{refreshNote}</p>
             <p>
               <Trans>
                 Compose this unit's two textures from separate layers, in the
@@ -164,6 +191,15 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
             <p>{redChannelNote}</p>
           </HelpPopover>
         </div>
+        <TextureSlot
+          texture={imported.texture}
+          missing={imported.missingTexture}
+          note={files.note}
+          busy={files.busy === "texture"}
+          previewTeamColour
+          onChoose={() => void files.choose("texture")}
+          onRefresh={() => void files.refresh("texture")}
+        />
         <PickRow
           label={t`Colour picture`}
           path={colour}
@@ -201,6 +237,15 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
           <HelpPopover label={t`About the shading map`}>
             <p>
               <Trans>
+                The model's second texture, which the engine reads as glow in
+                red and shine in green rather than as a picture. Kept with the
+                unit and written back out by the export, but nothing here draws
+                it.
+              </Trans>
+            </p>
+            <p>{refreshNote}</p>
+            <p>
+              <Trans>
                 Glow into red, reflectivity into green. Blue is not read by the
                 engine. Neither map here supplies alpha, the one-bit visibility
                 cutout the engine also reads from this texture, so if this unit
@@ -220,6 +265,14 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
             <p>{redChannelNote}</p>
           </HelpPopover>
         </div>
+        <TextureSlot
+          texture={imported.texture2}
+          missing={imported.missingTexture2}
+          busy={files.busy === "texture2"}
+          previewTeamColour={false}
+          onChoose={() => void files.choose("texture2")}
+          onRefresh={() => void files.refresh("texture2")}
+        />
         <PickRow
           label={t`Glow (greyscale, optional)`}
           path={glow}

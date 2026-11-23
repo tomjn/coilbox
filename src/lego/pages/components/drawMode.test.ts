@@ -233,6 +233,49 @@ describe("refreshDrawMode", () => {
     expect(freed).toBe(2);
     disposeDrawLayer(layer, [group]);
   });
+
+  it("hides rather than frees what another view drawn this frame still uses", () => {
+    const material = new THREE.MeshStandardMaterial();
+    const { group, mesh } = piece(new THREE.BoxGeometry(1, 1, 1), material);
+    const layer = newDrawLayer();
+    const keep = { edges: true, offsetFaces: true };
+    layer.mode = "both";
+    refreshDrawMode(layer, [group], keep);
+    const lines = edgesOf(mesh)[0];
+    let freed = 0;
+    lines.geometry.addEventListener("dispose", () => {
+      freed += 1;
+    });
+
+    layer.mode = "solid";
+    refreshDrawMode(layer, [group], keep);
+    expect(mesh.material).toBe(material);
+    expect(lines.visible).toBe(false);
+    expect(layer.edges.size).toBe(1);
+    expect(layer.offsetFaces.size).toBe(1);
+
+    layer.mode = "wireframe";
+    refreshDrawMode(layer, [group], keep);
+    // The same edges as before, shown again rather than built again.
+    expect(edgesOf(mesh)).toEqual([lines]);
+    expect(lines.visible).toBe(true);
+    expect(freed).toBe(0);
+    disposeDrawLayer(layer, [group]);
+  });
+
+  it("frees what it kept once the piece has left the scene", () => {
+    const { group } = piece(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial(),
+    );
+    const layer = newDrawLayer();
+    layer.mode = "wireframe";
+    refreshDrawMode(layer, [group], { edges: true, offsetFaces: false });
+    expect(layer.edges.size).toBe(1);
+
+    refreshDrawMode(layer, [], { edges: true, offsetFaces: false });
+    expect(layer.edges.size).toBe(0);
+  });
 });
 
 describe("showSolid", () => {

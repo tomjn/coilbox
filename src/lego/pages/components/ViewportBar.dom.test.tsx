@@ -72,13 +72,13 @@ function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
     grid: toggle(true),
     snapping: toggle(true),
     drawMode: "solid",
-    onNextDrawMode: vi.fn(),
+    onDrawModeChange: vi.fn(),
     collision: toggle(),
     balance: toggle(),
     overlap: toggle(),
     footprint: { ...toggle(), leaveOut: true, onLeaveOutChange: vi.fn() },
     aim: toggle(),
-    measure: toggle(),
+    fourViews: toggle(),
     guides: (
       <GuidesPopover
         guides={[]}
@@ -218,20 +218,40 @@ describe("the Show menu", () => {
 });
 
 describe("tools in the bar", () => {
-  it("shows the measure tool as on while it is on", () => {
-    const { rerender } = render(<ViewportBar {...props()} />);
-    const idle = screen.getByRole("button", {
-      name: /^Measure between two points/,
+  it("picks how every view draws the unit from a menu", async () => {
+    const onDrawModeChange = vi.fn();
+    render(<ViewportBar {...props({ onDrawModeChange })} />);
+    const button = screen.getByRole("button", {
+      name: "How the unit is drawn: Solid (W to switch)",
     });
-    expect(idle.getAttribute("aria-pressed")).toBe("false");
-    expect(idle.className).not.toContain("bg-primary");
+    fireEvent.pointerDown(button, { button: 0, pointerType: "mouse" });
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "Solid with edges" }),
+    );
+    expect(onDrawModeChange).toHaveBeenCalledWith("both");
+  });
 
-    rerender(<ViewportBar {...props({ measure: toggle(true) })} />);
-    const active = screen.getByRole("button", {
-      name: /^Leave the measure tool/,
-    });
-    expect(active.getAttribute("aria-pressed")).toBe("true");
-    expect(active.className).toContain("bg-primary");
+  it("switches between one view and four, and says which it offers", () => {
+    const fourViews = toggle();
+    const { rerender } = render(<ViewportBar {...props({ fourViews })} />);
+    const button = screen.getByRole("button", { name: "Four views (4)" });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(button);
+    expect(fourViews.onChange).toHaveBeenCalledWith(true);
+
+    rerender(<ViewportBar {...props({ fourViews: toggle(true) })} />);
+    expect(
+      screen
+        .getByRole("button", { name: "One view (4)" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("leaves the measure tool to the tool rail", () => {
+    render(<ViewportBar {...props()} />);
+    expect(
+      screen.queryByRole("button", { name: /^Measure between two points/ }),
+    ).toBeNull();
   });
 });
 
@@ -252,20 +272,13 @@ describe("icons", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it("draws the measure tool and the guides with different icons", () => {
+  it("does not give the guides a ruler, which the measure tool has", () => {
     render(<ViewportBar {...props()} />);
-    const measure = screen.getByRole("button", {
-      name: /^Measure between two points/,
-    });
     const guides = screen.getByRole("button", { name: "Guides" });
-    const measureIcon = lucideName(
-      measure.querySelector("svg.lucide") as Element,
-    );
     const guidesIcon = lucideName(
       guides.querySelector("svg.lucide") as Element,
     );
-    expect(measureIcon).not.toBe(guidesIcon);
-    expect([measureIcon, guidesIcon]).not.toContain("lucide-ruler");
+    expect(guidesIcon).not.toMatch(/^lucide-ruler/);
   });
 });
 
@@ -275,7 +288,7 @@ describe("the axis compass", () => {
     expect(screen.queryByRole("button", { name: "Reset the view" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Fixed views" })).toBeNull();
     expect(screen.queryByRole("button", { name: /perspective/ })).toBeNull();
-    // The Show menu, the draw mode, the measure tool, the pickers and the
+    // The Show menu, the draw mode, one or four views, the pickers and the
     // keyboard sheet are what is left.
     expect(barButtons()).toHaveLength(7);
   });
