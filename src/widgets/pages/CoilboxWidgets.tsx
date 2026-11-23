@@ -1,7 +1,14 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import { ChevronRight } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   type CoilboxWidget,
   contentWidgetInstall,
@@ -61,8 +68,11 @@ function useCoilboxWidget(
   rootPath: string,
   refresh: number,
   onChanged: () => void,
+  onStatus: (status: WidgetStatus | null) => void,
 ) {
   const [status, setStatus] = useState<WidgetStatus | null>(null);
+  // The section heading counts the widgets with an update waiting.
+  useEffect(() => onStatus(status), [onStatus, status]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,18 +121,25 @@ function CoilboxWidgetRow({
   rootPath,
   refresh,
   onChanged,
+  onStatus,
 }: {
   entry: CoilboxWidgetEntry;
   rootPath: string;
   refresh: number;
   onChanged: () => void;
+  onStatus: (widget: CoilboxWidget, status: WidgetStatus | null) => void;
 }) {
+  const report = useCallback(
+    (status: WidgetStatus | null) => onStatus(entry.widget, status),
+    [onStatus, entry.widget],
+  );
   const { t } = useLingui();
   const { status, busy, error, read, install, remove } = useCoilboxWidget(
     entry.widget,
     rootPath,
     refresh,
     onChanged,
+    report,
   );
   // `stale` also lists the shared licence notice, which is not one of the
   // widget's files.
@@ -200,22 +217,49 @@ export function CoilboxWidgets({
 }) {
   const { t } = useLingui();
   const entries = useEntries();
+  const [statuses, setStatuses] = useState<
+    Partial<Record<CoilboxWidget, WidgetStatus | null>>
+  >({});
+  const onStatus = useCallback(
+    (widget: CoilboxWidget, status: WidgetStatus | null) =>
+      setStatuses((all) => ({ ...all, [widget]: status })),
+    [],
+  );
+  const [open, setOpen] = useState(false);
+  const updates = Object.values(statuses).filter(
+    (s) => s?.installed && !s.current,
+  ).length;
   return (
-    <section aria-label={t`Coilbox widgets`} className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">{t`Coilbox widgets`}</h2>
-      <ul className="divide-y rounded-md border">
-        {entries.map((entry) => (
-          <CoilboxWidgetRow
-            // Keyed by the root too, so a read for a root the page has moved
-            // off cannot land on the new root's row.
-            key={`${rootPath}:${entry.widget}`}
-            entry={entry}
-            rootPath={rootPath}
-            refresh={refresh}
-            onChanged={onChanged}
-          />
-        ))}
-      </ul>
-    </section>
+    <Collapsible asChild open={open} onOpenChange={setOpen}>
+      <section aria-label={t`Coilbox widgets`} className="flex flex-col gap-2">
+        <CollapsibleTrigger className="group flex w-fit cursor-pointer items-center gap-2 text-left">
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none" />
+          <h2 className="text-sm font-medium">{t`Coilbox widgets`}</h2>
+          {updates > 0 && (
+            <Badge>
+              {plural(updates, { one: "# update", other: "# updates" })}
+            </Badge>
+          )}
+        </CollapsibleTrigger>
+        {/* Kept mounted while closed, so the rows still read their status for
+            the badge. */}
+        <CollapsibleContent forceMount hidden={!open}>
+          <ul className="divide-y rounded-md border">
+            {entries.map((entry) => (
+              <CoilboxWidgetRow
+                // Keyed by the root too, so a read for a root the page has moved
+                // off cannot land on the new root's row.
+                key={`${rootPath}:${entry.widget}`}
+                entry={entry}
+                rootPath={rootPath}
+                refresh={refresh}
+                onChanged={onChanged}
+                onStatus={onStatus}
+              />
+            ))}
+          </ul>
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
   );
 }

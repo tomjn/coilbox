@@ -1,8 +1,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import {
   FolderOpen,
   Plus,
+  PowerOff,
   Puzzle,
   RefreshCw,
   SlidersHorizontal,
@@ -60,6 +61,8 @@ import {
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
 import { CoilboxWidgets } from "./CoilboxWidgets";
 import {
+  coilboxWidgetOf,
+  DeleteCoilboxWidgetButton,
   RemovedNotice,
   type RemovedWidget,
   RemoveWidgetButton,
@@ -184,11 +187,24 @@ export default function WidgetsPage() {
     if (!list.rows) return null;
     return game ? rowsForGame(list.rows, game) : list.rows;
   }, [list.rows, game]);
+  const [query, setQuery] = useState("");
+  const visible = useMemo(
+    () => shown?.filter((r) => matches(r, query)) ?? null,
+    [shown, query],
+  );
+  const visibleOwn = useMemo(
+    () => ownRows?.filter((r) => matches(r, query)) ?? null,
+    [ownRows, query],
+  );
 
+  // A mutator is left out, because only its base game's widgets are worth a
+  // choice of their own. The picked game stays, so the trigger shows it.
   const options = useMemo(
     () => [
       { value: ALL, label: t`All games` },
-      ...(list.games ?? []).map((g) => ({ value: g.game, label: g.game })),
+      ...(list.games ?? [])
+        .filter((g) => !g.mutator || g === game)
+        .map((g) => ({ value: g.game, label: g.game })),
       // A link can name a game that is not installed here, or not read yet.
       // Keep it pickable so the trigger shows what was asked for, rather than
       // going blank.
@@ -196,6 +212,48 @@ export default function WidgetsPage() {
     ],
     [list.games, game, picked, t],
   );
+
+  const userSwitches: TableSwitches | undefined =
+    picked === ALL
+      ? {
+          game: null,
+          set: sets.global,
+          toggle: (name, on) => updateSets((s) => switchIn(s, null, name, on)),
+          disabled: running,
+        }
+      : game && key !== null
+        ? {
+            game: game.game,
+            // With no file, an unchosen widget takes its default in the
+            // handler.
+            set:
+              file?.kind === "missing" && shown
+                ? {
+                    ...gameWidgetStates(shown, new Map()),
+                    ...appliedSet(sets, key),
+                  }
+                : appliedSet(sets, key),
+            toggle: (name, on) => updateSets((s) => switchIn(s, key, name, on)),
+            disabled: running,
+          }
+        : undefined;
+  // Every one of the player's widgets that is on here, search or no search.
+  const onNames = userSwitches
+    ? [
+        ...new Set(
+          (shown ?? [])
+            .map((r) => switchName(r, userSwitches.game))
+            .filter((n): n is string => n !== null)
+            .filter((n) => userSwitches.set[n] === true),
+        ),
+      ]
+    : [];
+  const turnAllOff = () => {
+    const setTo = picked === ALL ? null : key;
+    updateSets((s) =>
+      onNames.reduce((all, name) => switchIn(all, setTo, name, false), s),
+    );
+  };
 
   const pick = (value: string) => {
     setSettingsFile(null);
@@ -283,13 +341,34 @@ export default function WidgetsPage() {
       {list.targets.length === 0 && <NoEngines />}
 
       {list.targets.length > 0 && (
-        <OptionSelect
-          className="w-72"
-          value={game?.game ?? picked}
-          onValueChange={pick}
-          options={options}
-          ariaLabel={t`Game`}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <OptionSelect
+            className="w-72"
+            value={game?.game ?? picked}
+            onValueChange={pick}
+            options={options}
+            ariaLabel={t`Game`}
+          />
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t`Search widgets…`}
+            aria-label={t`Search widgets`}
+            className="h-9 max-w-sm"
+          />
+          {userSwitches && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={running || onNames.length === 0}
+              onClick={turnAllOff}
+            >
+              <PowerOff />
+              <Trans>Turn all off</Trans>
+            </Button>
+          )}
+        </div>
       )}
 
       {list.widgetDir && (
@@ -377,10 +456,17 @@ export default function WidgetsPage() {
                   }
                 />
               </SectionMessage>
+            ) : visible && visible.length === 0 ? (
+              <SectionMessage columns={columns}>
+                <EmptyState
+                  icon={Puzzle}
+                  label={t`None of your widgets match "${query}".`}
+                />
+              </SectionMessage>
             ) : (
-              shown && (
+              visible && (
                 <WidgetRows
-                  rows={shown}
+                  rows={visible}
                   columns={columns}
                   flagUnloaded={!game && list.gamesKnown}
                   someUnknown={!!list.games?.some((g) => g.handler === null)}
@@ -395,49 +481,37 @@ export default function WidgetsPage() {
                   }
                   renderRemove={
                     columns.remove
-                      ? (row) => (
-                          <RemoveWidgetButton
-                            row={row}
-                            rows={list.rows ?? []}
-                            games={list.games ?? []}
-                            writeDir={list.configDir ?? ""}
-                            running={running}
-                            onRemoved={(done) => {
-                              setRemoved((all) => [...all, done]);
-                              setSettingsFile(null);
-                              reread();
-                            }}
-                          />
-                        )
+                      ? (row) => {
+                          const own = row.coilbox ? coilboxWidgetOf(row) : null;
+                          return own ? (
+                            <DeleteCoilboxWidgetButton
+                              row={row}
+                              widget={own}
+                              running={running}
+                              onDeleted={() => {
+                                setSettingsFile(null);
+                                setRescans((n) => n + 1);
+                                reread();
+                              }}
+                            />
+                          ) : (
+                            <RemoveWidgetButton
+                              row={row}
+                              rows={list.rows ?? []}
+                              games={list.games ?? []}
+                              writeDir={list.configDir ?? ""}
+                              running={running}
+                              onRemoved={(done) => {
+                                setRemoved((all) => [...all, done]);
+                                setSettingsFile(null);
+                                reread();
+                              }}
+                            />
+                          );
+                        }
                       : undefined
                   }
-                  switches={
-                    picked === ALL
-                      ? {
-                          game: null,
-                          set: sets.global,
-                          toggle: (name, on) =>
-                            updateSets((s) => switchIn(s, null, name, on)),
-                          disabled: running,
-                        }
-                      : game && key !== null
-                        ? {
-                            game: game.game,
-                            // With no file, an unchosen widget takes its
-                            // default in the handler.
-                            set:
-                              file?.kind === "missing"
-                                ? {
-                                    ...gameWidgetStates(shown, new Map()),
-                                    ...appliedSet(sets, key),
-                                  }
-                                : appliedSet(sets, key),
-                            toggle: (name, on) =>
-                              updateSets((s) => switchIn(s, key, name, on)),
-                            disabled: running,
-                          }
-                        : undefined
-                  }
+                  switches={userSwitches}
                 />
               )
             )}
@@ -479,10 +553,17 @@ export default function WidgetsPage() {
                     label={t`${game.game} ships no widgets.`}
                   />
                 </SectionMessage>
+              ) : visibleOwn && visibleOwn.length === 0 ? (
+                <SectionMessage columns={columns}>
+                  <EmptyState
+                    icon={Puzzle}
+                    label={t`None of ${game.game}'s widgets match "${query}".`}
+                  />
+                </SectionMessage>
               ) : (
-                ownRows && (
+                visibleOwn && (
                   <WidgetRows
-                    rows={ownRows}
+                    rows={visibleOwn}
                     columns={columns}
                     flagUnloaded={false}
                     someUnknown={false}
@@ -538,6 +619,16 @@ export default function WidgetsPage() {
 
 function fileName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
+}
+
+/** Whether the search box's text is in a row's name, description, author or
+ *  path. Empty text matches every row. */
+function matches(row: WidgetRow, query: string): boolean {
+  const text = query.trim().toLowerCase();
+  if (!text) return true;
+  return [row.info?.name, row.info?.desc, row.info?.author, row.path].some(
+    (field) => field?.toLowerCase().includes(text),
+  );
 }
 
 /** What the table needs to show a switch on each widget in one set. */
@@ -735,7 +826,8 @@ function WidgetRows({
   /** Present with a recognised game picked. */
   onSettings?: (row: WidgetRow) => void;
   canSettings: (row: WidgetRow) => boolean;
-  /** The remove button for a row. Not offered for coilbox's own widget. */
+  /** The delete button for a row. A row of coilbox's own widget gets one that
+   *  removes every file of that widget. */
   renderRemove?: (row: WidgetRow) => ReactNode;
 }) {
   const { t } = useLingui();
@@ -821,9 +913,7 @@ function WidgetRows({
               )}
             </TableCell>
           )}
-          {columns.remove && (
-            <TableCell>{!row.coilbox && renderRemove?.(row)}</TableCell>
-          )}
+          {columns.remove && <TableCell>{renderRemove?.(row)}</TableCell>}
         </TableRow>
       ))}
     </>

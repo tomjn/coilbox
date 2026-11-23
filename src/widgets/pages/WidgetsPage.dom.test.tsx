@@ -283,9 +283,14 @@ const page = (url = "/library/widgets") =>
 
 afterEach(cleanup);
 
+/** Opens the Coilbox widgets section, which starts closed. */
+const openCoilbox = () =>
+  fireEvent.click(screen.getByRole("button", { name: /Coilbox widgets/ }));
+
 describe("WidgetsPage", () => {
   it("lists each coilbox widget with its state, and installs and removes the skeleton widget", async () => {
     page();
+    openCoilbox();
     const row = await screen.findByRole("listitem", { name: "Skeleton" });
     const own = within(row);
     await own.findByText("Not installed");
@@ -308,6 +313,7 @@ describe("WidgetsPage", () => {
 
   it("leaves writing skeleton files to the unit builder's Models page", async () => {
     page();
+    openCoilbox();
     const row = within(
       await screen.findByRole("listitem", { name: "Skeleton" }),
     );
@@ -328,6 +334,11 @@ describe("WidgetsPage", () => {
       .spyOn(bindings, "contentWidgetStatus")
       .mockResolvedValue(status);
     page();
+    // The closed section says updates are waiting, here for every widget.
+    const trigger = screen.getByRole("button", { name: /Coilbox widgets/ });
+    await waitFor(() => expect(trigger.textContent).toContain("3 updates"));
+    expect(screen.queryByRole("listitem", { name: "Skeleton" })).toBeNull();
+    openCoilbox();
     const row = within(
       await screen.findByRole("listitem", { name: "Skeleton" }),
     );
@@ -348,6 +359,7 @@ describe("WidgetsPage", () => {
       .spyOn(bindings, "contentWidgetStatus")
       .mockResolvedValue(status);
     page();
+    openCoilbox();
     const row = within(
       await screen.findByRole("listitem", { name: "Skeleton" }),
     );
@@ -360,6 +372,7 @@ describe("WidgetsPage", () => {
 
   it("reads every row again when the page rescans", async () => {
     page();
+    openCoilbox();
     const row = within(
       await screen.findByRole("listitem", { name: "Skeleton" }),
     );
@@ -428,6 +441,51 @@ describe("WidgetsPage", () => {
       "Metal Factions",
       "Mystery 1.0",
     ]);
+  });
+
+  it("leaves a mutator out of the game picker", () => {
+    games.push({
+      game: "Metal Factions Chaos 1.0",
+      shortName: "MFC",
+      handler: engine,
+      mutator: true,
+    });
+    try {
+      page();
+      fireEvent.click(screen.getByRole("combobox", { name: "Game" }));
+      expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "All games",
+        "Metal Factions",
+        "Mystery 1.0",
+      ]);
+    } finally {
+      games.pop();
+    }
+  });
+
+  it("filters the widgets by the search box", () => {
+    page();
+    const search = screen.getByRole("searchbox", { name: "Search widgets" });
+    fireEvent.change(search, { target: { value: "watches" } });
+    expect(screen.getByText("BuildWatch")).toBeTruthy();
+    expect(screen.queryByText("helper.lua")).toBeNull();
+    fireEvent.change(search, { target: { value: "nothing like it" } });
+    expect(
+      screen.getByText('None of your widgets match "nothing like it".'),
+    ).toBeTruthy();
+  });
+
+  it("turns every widget off in the set shown", () => {
+    updateSets((s) => ({ ...s, global: { BuildWatch: true, Other: true } }));
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Turn all off" }));
+    // Only the widgets listed here change.
+    expect(readSets().global).toEqual({ BuildWatch: false, Other: true });
+    expect(
+      screen
+        .getByRole("button", { name: "Turn all off" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("lands on the game's entry from a link naming one of its versions", () => {
@@ -545,11 +603,11 @@ describe("WidgetsPage", () => {
 
   it("asks before removing a widget, naming the games that lose it", async () => {
     page();
-    fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
-    expect(screen.getByText("Remove BuildWatch?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete BuildWatch" }));
+    expect(screen.getByText("Delete BuildWatch for all games?")).toBeTruthy();
     expect(
       screen.getByText(
-        "It is removed from every game that loads it: Metal Factions",
+        "It is deleted from every game that loads it: Metal Factions",
       ),
     ).toBeTruthy();
     expect(
@@ -562,7 +620,7 @@ describe("WidgetsPage", () => {
     await waitFor(() =>
       expect(
         screen
-          .getAllByRole("button", { name: "Remove" })
+          .getAllByRole("button", { name: "Delete" })
           .every((b) => !b.hasAttribute("disabled")),
       ).toBe(true),
     );
@@ -574,17 +632,17 @@ describe("WidgetsPage", () => {
   it("removes a widget when confirmed, forgets it in the sets, and can restore it", async () => {
     updateSets((s) => ({ ...s, global: { BuildWatch: true, Other: true } }));
     page();
-    fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete BuildWatch" }));
     const confirm = await waitFor(() => {
       const button = screen
-        .getAllByRole("button", { name: "Remove" })
+        .getAllByRole("button", { name: "Delete" })
         .find((b) => b.className.includes("destructive"));
       if (!button || button.hasAttribute("disabled")) throw new Error("wait");
       return button;
     });
     fireEvent.click(confirm);
     await waitFor(() =>
-      expect(screen.getByText("Removed BuildWatch.")).toBeTruthy(),
+      expect(screen.getByText("Deleted BuildWatch.")).toBeTruthy(),
     );
     expect(removeCalls).toEqual([
       {
@@ -621,11 +679,11 @@ describe("WidgetsPage", () => {
       ),
     ).toBeTruthy();
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Remove BuildWatch" })[1],
+      screen.getAllByRole("button", { name: "Delete BuildWatch" })[1],
     );
     const confirm = await waitFor(() => {
       const button = screen
-        .getAllByRole("button", { name: "Remove" })
+        .getAllByRole("button", { name: "Delete" })
         .find((b) => b.className.includes("destructive"));
       if (!button || button.hasAttribute("disabled")) throw new Error("wait");
       return button;
@@ -642,18 +700,18 @@ describe("WidgetsPage", () => {
     page();
     for (let n = 1; n <= 2; n++) {
       fireEvent.click(
-        screen.getByRole("button", { name: "Remove BuildWatch" }),
+        screen.getByRole("button", { name: "Delete BuildWatch" }),
       );
       const confirm = await waitFor(() => {
         const button = screen
-          .getAllByRole("button", { name: "Remove" })
+          .getAllByRole("button", { name: "Delete" })
           .find((b) => b.className.includes("destructive"));
         if (!button || button.hasAttribute("disabled")) throw new Error("wait");
         return button;
       });
       fireEvent.click(confirm);
       await waitFor(() =>
-        expect(screen.getAllByText("Removed BuildWatch.")).toHaveLength(n),
+        expect(screen.getAllByText("Deleted BuildWatch.")).toHaveLength(n),
       );
     }
     expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(2);
@@ -667,25 +725,37 @@ describe("WidgetsPage", () => {
     expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(1);
   });
 
-  it("offers no way to remove coilbox's own widget", () => {
+  it("deletes coilbox's own widget from its row, after asking", async () => {
+    installedWidgets.add("blueprints");
     page();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete Coilbox blueprints" }),
+    );
     expect(
-      screen.queryByRole("button", { name: "Remove Coilbox blueprints" }),
-    ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Remove BuildWatch" }),
+      screen.getByText("Delete Coilbox blueprints for all games?"),
     ).toBeTruthy();
+    expect(widgetCalls).toEqual([]);
+    fireEvent.click(
+      within(screen.getByRole("dialog"))
+        .getAllByRole("button", { name: "Delete" })
+        .at(-1) as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(widgetCalls).toEqual([`remove blueprints in ${ROOT}`]),
+    );
+    // Its files go through the coilbox widget removal, not the backup one.
+    expect(removeCalls).toEqual([]);
   });
 
   it("will not remove while a game is running", async () => {
     play.running = true;
     page();
-    fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete BuildWatch" }));
     expect(
-      screen.getByText("A game is running. Close it to remove widgets."),
+      screen.getByText("A game is running. Close it to delete widgets."),
     ).toBeTruthy();
     const confirm = screen
-      .getAllByRole("button", { name: "Remove" })
+      .getAllByRole("button", { name: "Delete" })
       .find((b) => b.className.includes("destructive"));
     expect(confirm?.hasAttribute("disabled")).toBe(true);
   });

@@ -9,7 +9,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { contentOpenPath, contentWidgetRestore } from "@/content/bindings";
+import {
+  type CoilboxWidget,
+  contentOpenPath,
+  contentWidgetRemove,
+  contentWidgetRestore,
+} from "@/content/bindings";
 import { describeError } from "@/i18n/uiError";
 import { errorText } from "@/lib/helpers";
 import type { GameHandler, WidgetRow } from "../widgetList";
@@ -119,10 +124,10 @@ export function RemoveWidgetButton({
           type="button"
           variant="outline"
           size="sm"
-          aria-label={t`Remove ${name}`}
+          aria-label={t`Delete ${name}`}
         >
           <Trash2 />
-          <Trans>Remove</Trans>
+          <Trans>Delete</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -131,13 +136,19 @@ export function RemoveWidgetButton({
       >
         <div className="flex flex-col gap-2">
           <h3 className="break-words text-sm font-medium">
-            {t`Remove ${name}?`}
+            {t`Delete ${name} for all games?`}
           </h3>
           {removal.games.length > 0 && (
             <p className="max-h-32 overflow-y-auto break-words text-xs">
-              {t`It is removed from every game that loads it: ${removal.games.join(", ")}`}
+              {t`It is deleted from every game that loads it: ${removal.games.join(", ")}`}
             </p>
           )}
+          <p className="break-words text-xs text-muted-foreground">
+            <Trans>
+              Only the files listed below are deleted. Files the widget includes
+              from elsewhere stay, because other widgets may share them.
+            </Trans>
+          </p>
           {unknown.length > 0 && (
             <p className="max-h-24 overflow-y-auto break-words text-xs text-muted-foreground">
               {t`Coilbox cannot tell whether these games load it too: ${unknown.join(", ")}`}
@@ -173,7 +184,7 @@ export function RemoveWidgetButton({
         ))}
         {running && (
           <p role="status" className="text-xs text-muted-foreground">
-            <Trans>A game is running. Close it to remove widgets.</Trans>
+            <Trans>A game is running. Close it to delete widgets.</Trans>
           </p>
         )}
         {error && (
@@ -199,7 +210,124 @@ export function RemoveWidgetButton({
             onClick={() => void remove()}
           >
             {busy ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            <Trans>Remove</Trans>
+            <Trans>Delete</Trans>
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const COILBOX_WIDGETS: readonly CoilboxWidget[] = [
+  "blueprints",
+  "skeleton",
+  "xray",
+];
+
+/** Which of coilbox's widgets a row's file is, going by the `coilbox_<id>` its
+ *  file name starts with, as the plugin names them. */
+export function coilboxWidgetOf(row: WidgetRow): CoilboxWidget | null {
+  const file = fileName(row.path).toLowerCase();
+  return COILBOX_WIDGETS.find((w) => file.startsWith(`coilbox_${w}`)) ?? null;
+}
+
+/**
+ * Delete one of coilbox's own widgets from a row of the table, after asking.
+ * It takes out every file of the widget, as Remove widget in the Coilbox
+ * widgets section does, so nothing of it is left half installed.
+ */
+export function DeleteCoilboxWidgetButton({
+  row,
+  widget,
+  running,
+  onDeleted,
+}: {
+  row: WidgetRow;
+  widget: CoilboxWidget;
+  running: boolean;
+  onDeleted: () => void;
+}) {
+  const { t } = useLingui();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const name = row.info?.name || fileName(row.path);
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await contentWidgetRemove({ rootPath: row.root, widget });
+      setOpen(false);
+      onDeleted();
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        setError(null);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={t`Delete ${name}`}
+        >
+          <Trash2 />
+          <Trans>Delete</Trans>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-96 flex-col gap-3">
+        <h3 className="break-words text-sm font-medium">
+          {t`Delete ${name} for all games?`}
+        </h3>
+        <p className="break-words text-xs">
+          <Trans>
+            All of its files are deleted. You can install it again from Coilbox
+            widgets.
+          </Trans>
+        </p>
+        <p className="break-all font-mono text-xs text-muted-foreground">
+          {row.root}
+        </p>
+        {running && (
+          <p role="status" className="text-xs text-muted-foreground">
+            <Trans>A game is running. Close it to delete widgets.</Trans>
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="break-words text-xs text-destructive">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => setOpen(false)}
+          >
+            <Trans>Cancel</Trans>
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={busy || running}
+            onClick={() => void remove()}
+          >
+            {busy ? <Loader2 className="animate-spin" /> : <Trash2 />}
+            <Trans>Delete</Trans>
           </Button>
         </div>
       </PopoverContent>
@@ -266,7 +394,7 @@ export function RemovedNotice({
           ? restored.length === 0 && removed.forgotten.length > 0
             ? t`Restored ${name}, switched off.`
             : t`Restored ${name}.`
-          : t`Removed ${name}.`}
+          : t`Deleted ${name}.`}
       </p>
       {restored?.map((line) => (
         <p key={line} className="break-words text-xs text-destructive">
