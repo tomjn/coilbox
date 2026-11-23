@@ -550,8 +550,9 @@ msgstr "{0, plural, one {{inPicture} van de {libraryTotal} op deze kaart in je b
 
 #. placeholder {0}: b.positions
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "{0, plural, one {{share} of # spot} other {{share} of # spots}}"
-msgstr ""
+msgstr "{0, plural, one {{share} van # plek} other {{share} van # plekken}}"
 
 #. placeholder {0}: all.length
 #: src/workshop/pages/components/UnitList.tsx
@@ -676,13 +677,15 @@ msgstr "{0, plural, one {# def-override} other {# def-overrides}}"
 
 #. placeholder {0}: state.report.groups.length
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "{0, plural, one {# duplicate} other {# duplicates}}"
-msgstr ""
+msgstr "{0, plural, one {# duplicaat} other {# duplicaten}}"
 
 #. placeholder {0}: rows.length
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "{0, plural, one {# entry.} other {# entries.}}"
-msgstr ""
+msgstr "{0, plural, one {# item.} other {# items.}}"
 
 #. placeholder {0}: model.paletteFaces
 #: src/content/pages/components/ModelViewport.tsx
@@ -792,8 +795,9 @@ msgstr "{0, plural, one {# nederlaag} other {# nederlagen}}"
 
 #. placeholder {0}: metal.spotCount
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "{0, plural, one {# metal spot, extractor radius is {radius} elmos} other {# metal spots, extractor radius is {radius} elmos}}"
-msgstr ""
+msgstr "{0, plural, one {# metaalplek, extractorradius is {radius} elmos} other {# metaalplekken, extractorradius is {radius} elmos}}"
 
 #. placeholder {0}: outcome.alreadyInstalled.length
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -877,8 +881,9 @@ msgstr "{0, plural, one {# verweesde blob} other {# verweesde blobs}}"
 
 #. placeholder {0}: metal.closeCount
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "{0, plural, one {# pair of spots is closer together than the extractor radius, {radius} elmos:} other {# pairs of spots are closer together than the extractor radius, {radius} elmos:}}"
-msgstr ""
+msgstr "{0, plural, one {# paar plekken ligt dichter bij elkaar dan de extractorradius, {radius} elmos:} other {# paren plekken liggen dichter bij elkaar dan de extractorradius, {radius} elmos:}}"
 
 #. placeholder {0}: s.incompletes
 #: src/content/rapidPool.ts
@@ -980,8 +985,9 @@ msgstr "{0, plural, one {# bron} other {# bronnen}}"
 
 #. placeholder {0}: metal.wide
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "{0, plural, one {# spot has metal farther than the extractor radius from its centre. The widest reaches {widest} elmos.} other {# spots have metal farther than the extractor radius from their centre. The widest reaches {widest} elmos.}}"
-msgstr ""
+msgstr "{0, plural, one {# plek heeft metaal dat verder dan de extractorradius van het midden ligt. De breedste reikt tot {widest} elmos.} other {# plekken hebben metaal dat verder dan de extractorradius van hun midden ligt. De breedste reikt tot {widest} elmos.}}"
 
 #. placeholder {0}: dots.length
 #: src/content/pages/components/MapAggregate.tsx
@@ -1358,8 +1364,9 @@ msgstr "{0, plural, one {Dit spel levert # missie mee} other {Dit spel levert # 
 
 #. placeholder {0}: total - affordableUnits
 #: src/hub/assets/blueprintBackfill.ts
+#, fuzzy
 msgid "{0, plural, one {This hour's allowance for {game} ran out with # unit still missing pictures. Send it again in an hour to carry on.} other {This hour's allowance for {game} ran out with # units still missing pictures. Send it again in an hour to carry on.}}"
-msgstr ""
+msgstr "{0, plural, one {Het uurlimiet voor {game} was op met nog # eenheid zonder afbeeldingen. Stuur het over een uur opnieuw om verder te gaan.} other {Het uurlimiet voor {game} was op met nog # eenheden zonder afbeeldingen. Stuur het over een uur opnieuw om verder te gaan.}}"
 
 #. placeholder {0}: fit.needed
 #: src/workshop/pages/components/PackagePanel.tsx
@@ -1420,8 +1427,9 @@ msgstr "{0} heeft een stemming gestart: {1}"
 #. placeholder {1}: found.skipped.length
 #. placeholder {2}: found.listed
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "{0} can be uploaded, {1} cannot, and {2} are already on the hub."
-msgstr ""
+msgstr "{0} kunnen worden geüpload, {1} niet, en {2} staan al op de hub."
 
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
@@ -1437,8 +1445,9 @@ msgstr "{0} heeft geen map voor RmlUi-widgets."
 
 #. placeholder {0}: formatBytes(state.report.wastedBytes)
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "{0} in extra copies"
-msgstr ""
+msgstr "{0} aan extra kopieën"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
@@ -1524,8 +1533,9 @@ msgid "{actionName} and {other} both move {pieces}."
 msgstr "{actionName} en {other} bewegen allebei {pieces}."
 
 #: src/lego/actions.ts
+#, fuzzy
 msgid "{actionName}: {pieceName} turns on {axisName} by half a circle or more between frames {from} and {to}, so the engine takes the shorter way round. Add a key between them."
-msgstr ""
+msgstr "{actionName}: {pieceName} draait op {axisName} een halve cirkel of meer tussen frame {from} en {to}, dus de engine neemt de kortste weg. Voeg een keyframe daartussen toe."
 
 #: src/lego/actions.ts
 #, fuzzy
@@ -1639,8 +1649,9 @@ msgid "{angle} render of this unit"
 msgstr "Weergave van deze eenheid vanuit {angle}"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "{apart} of {pairs} pairs not connected"
-msgstr ""
+msgstr "{apart} van {pairs} paren niet verbonden"
 
 #: src/onboarding/pages/GamesPage.tsx
 #, fuzzy
@@ -1863,8 +1874,9 @@ msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr "{boxes, plural, one {# gebied} other {# gebieden}}"
 
 #: src/content/replayStartAreas.ts
+#, fuzzy
 msgid "{boxTeam} start box"
-msgstr ""
+msgstr "Startvak van {boxTeam}"
 
 #: src/lego/buildList.ts
 #, fuzzy
@@ -2012,8 +2024,9 @@ msgid "{changes}, so nothing in it can be placed"
 msgstr "{changes}, dus niets erin kan worden geplaatst"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "{channel} of {piece}, frame {frame}"
-msgstr ""
+msgstr "{channel} van {piece}, frame {frame}"
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -2771,8 +2784,9 @@ msgid "{factionWins}W of {factionGames}"
 msgstr "{factionWins}W van {factionGames}"
 
 #: src/hub/upload/bulkMaps.ts
+#, fuzzy
 msgid "{failed, plural, one {# map failed. Settings > Coilbox hub says why.} other {# maps failed. Settings > Coilbox hub says why.}}"
-msgstr ""
+msgstr "{failed, plural, one {# kaart is mislukt. Instellingen > Coilbox hub legt uit waarom.} other {# kaarten zijn mislukt. Instellingen > Coilbox hub legt uit waarom.}}"
 
 #: src/hub/games/factsSweep.ts
 #, fuzzy
@@ -2830,12 +2844,14 @@ msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr "{figure}: de replay registreerde {recorded}, het afspelen gaf {observed}."
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "{file} ({size}) will be public. Anyone can download it from the hub's mirrors."
-msgstr ""
+msgstr "{file} ({size}) wordt openbaar. Iedereen kan het downloaden van de mirrors van de hub."
 
 #: src/downloads/failureReason.ts
+#, fuzzy
 msgid "{file} from {who} did not match its checksum"
-msgstr ""
+msgstr "{file} van {who} kwam niet overeen met de controlesom"
 
 #: src/content/caches.ts
 #, fuzzy
@@ -2863,25 +2879,30 @@ msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} is geen .sdz- of .sd7-archief."
 
 #: src/downloads/hubMismatch.ts
+#, fuzzy
 msgid "{filename} is not what the hub says it is. Coilbox could not tell the hub. The file stays installed."
-msgstr ""
+msgstr "{filename} is niet wat de hub zegt dat het is. Coilbox kon de hub dit niet melden. Het bestand blijft geïnstalleerd."
 
 #: src/downloads/hubMismatch.ts
+#, fuzzy
 msgid "{filename} is not what the hub says it is. The hub has been told. The file stays installed."
-msgstr ""
+msgstr "{filename} is niet wat de hub zegt dat het is. De hub is op de hoogte gebracht. Het bestand blijft geïnstalleerd."
 
 #: src/downloads/installArchive.ts
+#, fuzzy
 msgid "{fileName}, a game, goes in {destDir}."
-msgstr ""
+msgstr "{fileName}, een spel, komt in {destDir}."
 
 #: src/downloads/installArchive.ts
+#, fuzzy
 msgid "{fileName}, a map, goes in {destDir}."
-msgstr ""
+msgstr "{fileName}, een kaart, komt in {destDir}."
 
 #. placeholder {0}: run.items.length
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "{finished} of {0} done"
-msgstr ""
+msgstr "{finished} van {0} klaar"
 
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
@@ -2949,8 +2970,9 @@ msgid "{found} of {tiles} were found. Nothing in the game matched {missing}, so 
 msgstr "{found} van {tiles} zijn gevonden. Niets in het spel kwam overeen met {missing}, dus de vlakken die ze gebruiken worden effen getekend."
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "{from} and {to} not connected"
-msgstr ""
+msgstr "{from} en {to} niet verbonden"
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -2958,16 +2980,19 @@ msgid "{from} It was called \"{wasCalled}\" in there."
 msgstr "{from} Het heette daar “{wasCalled}”."
 
 #: src/multiplayer/store.tsx
+#, fuzzy
 msgid "{from} mentioned you in #{where}"
-msgstr ""
+msgstr "{from} heeft je genoemd in #{where}"
 
 #: src/multiplayer/store.tsx
+#, fuzzy
 msgid "{from} mentioned you in a private message"
-msgstr ""
+msgstr "{from} heeft je genoemd in een privébericht"
 
 #: src/multiplayer/store.tsx
+#, fuzzy
 msgid "{from} mentioned you in battle chat"
-msgstr ""
+msgstr "{from} heeft je genoemd in de gevechtschat"
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #: src/workshop/weaponSlots.ts
@@ -3001,8 +3026,9 @@ msgid "{front} and {last}"
 msgstr "{front} en {last}"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "{full} full, {partial} partial, {none} none"
-msgstr ""
+msgstr "{full} volledig, {partial} gedeeltelijk, {none} geen"
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
 #, fuzzy
@@ -3369,8 +3395,9 @@ msgid "{generated} It is not offered anywhere a game is picked, which is why you
 msgstr "{generated} Het wordt nergens aangeboden waar je een spel kiest, en daarom vind je het niet in Singleplayer of in de opzet van een scenario."
 
 #: src/lego/actions.ts
+#, fuzzy
 msgid "{gone, plural, one {{actionName}: # track names a piece that no longer exists, so it is skipped.} other {{actionName}: # tracks name pieces that no longer exist, so they are skipped.}}"
-msgstr ""
+msgstr "{gone, plural, one {{actionName}: # track noemt een deel dat niet meer bestaat en wordt overgeslagen.} other {{actionName}: # tracks noemen delen die niet meer bestaan en worden overgeslagen.}}"
 
 #: src/scenario/pages/components/selection.ts
 #: src/scenario/pages/components/SetupPanel.tsx
@@ -3554,8 +3581,9 @@ msgid "{itemName} ({itemModule}). Added before changes were tracked."
 msgstr "{itemName} ({itemModule}). Toegevoegd voordat wijzigingen werden bijgehouden."
 
 #: src/lego/generate.ts
+#, fuzzy
 msgid "{jobLabel} {planLabel} {seed}"
-msgstr ""
+msgstr "{jobLabel} {planLabel} {seed}"
 
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
@@ -3678,8 +3706,9 @@ msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {T
 msgstr "{kind, select, campaign {De hub ondersteunt nog geen campagnes.} keymap {De hub ondersteunt nog geen toetsenindelingen.} module {De hub ondersteunt nog geen modules.} other {De hub ondersteunt dit soort bestand nog niet.}}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "{kind}, {when}: {text}"
-msgstr ""
+msgstr "{kind}, {when}: {text}"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
@@ -3742,24 +3771,29 @@ msgid "{label} for {unitName}, now {text}. {before}"
 msgstr "{label} voor {unitName}, nu {text}. {before}"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "{label} is installed as an unpacked folder. The hub takes one .sd7 or .sdz file, so it cannot be uploaded."
-msgstr ""
+msgstr "{label} is geïnstalleerd als uitgepakte map. De hub accepteert één .sd7- of .sdz-bestand, dus uploaden kan niet."
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "{label} is installed through rapid. The hub takes one .sd7 or .sdz file, so it cannot be uploaded."
-msgstr ""
+msgstr "{label} is geïnstalleerd via rapid. De hub accepteert één .sd7- of .sdz-bestand, dus uploaden kan niet."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "{label} is on the hub"
-msgstr ""
+msgstr "{label} staat op de hub"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "{label} of {piece}, frame {frame}, {degrees} degrees"
-msgstr ""
+msgstr "{label} van {piece}, frame {frame}, {degrees} graden"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "{label} of {piece}, frame {frame}, {elmos} elmos"
-msgstr ""
+msgstr "{label} van {piece}, frame {frame}, {elmos} elmos"
 
 #: src/sound/LevelRow.tsx
 #, fuzzy
@@ -3767,13 +3801,15 @@ msgid "{label} volume"
 msgstr "Volume van {label}"
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "{label} was not sent to the hub"
-msgstr ""
+msgstr "{label} is niet naar de hub gestuurd"
 
 #: src/hub/upload/messages.ts
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "{label} was not uploaded"
-msgstr ""
+msgstr "{label} is niet geüpload"
 
 #: src/lego/pages/components/StatsSection.tsx
 #, fuzzy
@@ -3856,8 +3892,9 @@ msgid "{LARGE_STEP_SECONDS, plural, one {Forward # second} other {Forward # seco
 msgstr "{LARGE_STEP_SECONDS, plural, one {# seconde vooruit} other {# seconden vooruit}}"
 
 #: src/hub/maps/pictureSweep.ts
+#, fuzzy
 msgid "{layerCount, plural, one {Coilbox could not send one map's terrain, metal or type layer.} other {Coilbox could not send # terrain, metal or type layers.}}"
-msgstr ""
+msgstr "{layerCount, plural, one {Coilbox kon de terrein-, metaal- of typelaag van één kaart niet versturen.} other {Coilbox kon # terrein-, metaal- of typelagen niet versturen.}}"
 
 #: src/content/mapImage.ts
 #, fuzzy
@@ -4510,8 +4547,9 @@ msgid "{matches}, {note}"
 msgstr "{matches}, {note}"
 
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "{matching} of {total} entries match."
-msgstr ""
+msgstr "{matching} van {total} items komen overeen."
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -4887,8 +4925,9 @@ msgid "{n, plural, one {{count} match} other {{count} matches}}"
 msgstr "{n, plural, one {{count} wedstrijd} other {{count} wedstrijden}}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "{n, plural, one {# chat line from {when}} other {# chat lines from {when}}}"
-msgstr ""
+msgstr "{n, plural, one {# chatregel van {when}} other {# chatregels van {when}}}"
 
 #: src/workshop/pages/components/LuaTableValue.tsx
 #, fuzzy
@@ -4929,8 +4968,9 @@ msgid "{n, plural, one {# participant} other {# participants}}"
 msgstr "{n, plural, one {# deelnemer} other {# deelnemers}}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "{n, plural, one {# player event from {when}} other {# player events from {when}}}"
-msgstr ""
+msgstr "{n, plural, one {# spelergebeurtenis van {when}} other {# spelergebeurtenissen van {when}}}"
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -4973,8 +5013,9 @@ msgid "{n, plural, one {Removed # clip ({size}).} other {Removed # clips ({size}
 msgstr "{n, plural, one {# clip verwijderd ({size}).} other {# clips verwijderd ({size}).}}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "{n} units destroyed from {when}"
-msgstr ""
+msgstr "{n} eenheden vernietigd van {when}"
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
@@ -5019,8 +5060,9 @@ msgid "{name} (you)"
 msgstr "{name} (jij)"
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "{name} {label} {tier}"
-msgstr ""
+msgstr "{name} {label} {tier}"
 
 #: src/lego/movement.ts
 #, fuzzy
@@ -5063,12 +5105,14 @@ msgid "{name} details"
 msgstr "Details van {name}"
 
 #: src/lego/skeletonScanRead.ts
+#, fuzzy
 msgid "{name} has no model coilbox can read."
-msgstr ""
+msgstr "{name} heeft geen model dat coilbox kan lezen."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "{name} has no short name, so the widget could not find its file."
-msgstr ""
+msgstr "{name} heeft geen korte naam, dus de widget kon het bestand niet vinden."
 
 #: src/campaign/units.ts
 #, fuzzy
@@ -5076,12 +5120,14 @@ msgid "{name} has no unit name a game can load. Give it one in the unit builder 
 msgstr "{name} heeft geen eenheidsnaam die een spel kan laden. Geef het er eerst een in de eenhedenbouwer."
 
 #: src/lego/skeletonScanRead.ts
+#, fuzzy
 msgid "{name} has only a compiled script, with no source to read."
-msgstr ""
+msgstr "{name} heeft alleen een gecompileerd script, zonder bron om te lezen."
 
 #: src/lego/unitGame.ts
+#, fuzzy
 msgid "{name} has pieces from {ownName}, so it cannot play in {gameName}."
-msgstr ""
+msgstr "{name} heeft delen van {ownName}, dus het kan niet spelen in {gameName}."
 
 #: src/lego/movement.ts
 #, fuzzy
@@ -5144,8 +5190,9 @@ msgid "{name} preview"
 msgstr "Voorbeeld van {name}"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "{name} progress"
-msgstr ""
+msgstr "Voortgang van {name}"
 
 #: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
@@ -5163,8 +5210,9 @@ msgid "{name} ships inside a game, which is packaged, so it cannot be saved ther
 msgstr "{name} zit in een spel dat is ingepakt, dus het kan daar niet worden opgeslagen."
 
 #: src/lego/legChains.ts
+#, fuzzy
 msgid "{name} slides rather than turns when the unit moves, so it is not proposed as a leg."
-msgstr ""
+msgstr "{name} schuift in plaats van te draaien als de eenheid beweegt, dus wordt niet als poot voorgesteld."
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
@@ -5202,12 +5250,14 @@ msgid "{named, plural, one {which game # blueprint is for} other {which game # b
 msgstr "{named, plural, one {voor welk spel # blauwdruk is} other {voor welk spel # blauwdrukken zijn}}"
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "{names} are all proposed as {role}, so which one it is is left for you to pick."
-msgstr ""
+msgstr "{names} worden allemaal voorgesteld als {role}, dus welke het is, laten we aan jou over."
 
 #: src/lego/legChains.ts
+#, fuzzy
 msgid "{names} are legs on the same side at the same distance front to back, so which pair each is in is unknown and none of them is proposed."
-msgstr ""
+msgstr "{names} zijn poten aan dezelfde kant op dezelfde afstand van voor naar achter, dus het is onbekend in welk paar elk zit en geen ervan wordt voorgesteld."
 
 #: src/lego/moduleFile.ts
 #, fuzzy
@@ -5215,24 +5265,29 @@ msgid "{names} came from a game, but the file does not say which. A piece from a
 msgstr "{names} kwam uit een spel, maar het bestand zegt niet welk. Een deel uit een spel hoort alleen in eenheden voor dat spel."
 
 #: src/lego/legChains.ts
+#, fuzzy
 msgid "{names} turn about y or z when the unit moves, and a leg swings about x, so they are not proposed as legs."
-msgstr ""
+msgstr "{names} draaien om y of z als de eenheid beweegt, en een poot zwaait om x, dus ze worden niet als poten voorgesteld."
 
 #: src/lego/legChains.ts
+#, fuzzy
 msgid "{names} turn as a chain of {count} when the unit moves, more than a thigh, shin and foot, so no leg is proposed for them."
-msgstr ""
+msgstr "{names} draaien als een keten van {count} als de eenheid beweegt, meer dan dij, scheen en voet, dus er wordt geen poot voor voorgesteld."
 
 #: src/lego/legChains.ts
+#, fuzzy
 msgid "{names} turn as a chain of two when the unit moves. That could be a thigh and foot or a shin and foot, so no leg is proposed for them."
-msgstr ""
+msgstr "{names} draaien als een keten van twee als de eenheid beweegt. Dat kan een dij en voet zijn of een scheen en voet, dus er wordt geen poot voor voorgesteld."
 
 #: src/lego/legChains.ts
+#, fuzzy
 msgid "{names} turn like a leg when the unit moves, but {top} sits on the unit's centre line, so which side it is on is unknown and no leg is proposed for it."
-msgstr ""
+msgstr "{names} draaien als een poot als de eenheid beweegt, maar {top} ligt op de middenlijn van de eenheid, dus het is onbekend aan welke kant het zit en er wordt geen poot voorgesteld."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "{names} turn like wheels but sit on the unit's centre line, so which side each is on is unknown and no plan is proposed."
-msgstr ""
+msgstr "{names} draaien als wielen maar liggen op de middenlijn van de eenheid, dus het is onbekend aan welke kant elk zit en er wordt geen plan voorgesteld."
 
 #: src/lego/upgradeChain.ts
 #, fuzzy
@@ -5574,16 +5629,19 @@ msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr "{paletteFaces} vlakken kregen een paletkleur die niet kon worden gevonden"
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "{parent} (different weapon)"
-msgstr ""
+msgstr "{parent} (ander wapen)"
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "{parent} (heavier)"
-msgstr ""
+msgstr "{parent} (zwaarder)"
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "{parent} (lighter)"
-msgstr ""
+msgstr "{parent} (lichter)"
 
 #: src/lego/pages/components/JoinedTo.tsx
 #, fuzzy
@@ -5834,8 +5892,9 @@ msgid "{plan}, gun, builds"
 msgstr "{plan}, geschut, bouwt"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "{plan}, with no piece for {missing}."
-msgstr ""
+msgstr "{plan}, zonder deel voor {missing}."
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
@@ -6308,8 +6367,9 @@ msgid "{sent, plural, one {One picture has already gone, and it stays on the hub
 msgstr "{sent, plural, one {Eén afbeelding is al verzonden, en die blijft op de hub.} other {# afbeeldingen zijn al verzonden, en die blijven op de hub.}}"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "{sent} of {size} sent"
-msgstr ""
+msgstr "{sent} van {size} verstuurd"
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -6793,8 +6853,9 @@ msgid "{subject} come from the unit list the engine wrote when this replay was a
 msgstr "{subject} komen uit de eenhedenlijst die de engine schreef toen deze replay op {date} werd geanalyseerd, op {game}."
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "{subject} progress"
-msgstr ""
+msgstr "Voortgang van {subject}"
 
 #: src/content/pages/components/ReplayTimeWindowNote.tsx
 #, fuzzy
@@ -6902,8 +6963,9 @@ msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
 msgstr "{terrain, plural, one {# terreinwijziging} other {# terreinwijzigingen}}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "{text}, {when}"
-msgstr ""
+msgstr "{text}, {when}"
 
 #: src/lego/pages/components/AtlasPicker.tsx
 #, fuzzy
@@ -6951,8 +7013,9 @@ msgid "{tier} weight"
 msgstr "Gewicht van {tier}"
 
 #: src/conquest/galaxy3d/MapLoading.tsx
+#, fuzzy
 msgid "{tilesDone} of {tilesTotal}"
-msgstr ""
+msgstr "{tilesDone} van {tilesTotal}"
 
 #: src/lego/pages/components/UnitCheckResult.tsx
 #, fuzzy
@@ -7463,8 +7526,9 @@ msgid "{unitName} sets no {explosionField}, so the engine uses its empty NOWEAPO
 msgstr "{unitName} stelt geen {explosionField} in, dus de engine gebruikt zijn lege NOWEAPON-definitie en de eenheid ontploft als niets."
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "{unitName} style"
-msgstr ""
+msgstr "Stijl van {unitName}"
 
 #: src/scenario/pages/components/teams.ts
 #, fuzzy
@@ -7552,8 +7616,9 @@ msgid "{unopenable, plural, one {# unit names a model in a format the builder ca
 msgstr "{unopenable, plural, one {# eenheid noemt een model in een formaat dat de bouwer niet kan openen, al bevat het archief het wel.} other {# eenheden noemen modellen in een formaat dat de bouwer niet kan openen, al bevat het archief ze wel.}}"
 
 #: src/lego/pages/components/WriteSkeletons.tsx
+#, fuzzy
 msgid "{unplacedCount, plural, one {# unit left out: its game has no short name coilbox knows.} other {# units left out: their games have no short name coilbox knows.}}"
-msgstr ""
+msgstr "{unplacedCount, plural, one {# eenheid weggelaten: het spel ervan heeft geen korte naam die coilbox kent.} other {# eenheden weggelaten: hun spellen hebben geen korte naam die coilbox kent.}}"
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -7749,20 +7814,24 @@ msgid "{vertices, plural, one {{triangles} from # vertex} other {{triangles} fro
 msgstr "{vertices, plural, one {{triangles} uit # hoekpunt} other {{triangles} uit # hoekpunten}}"
 
 #: src/content/replayEventList.ts
+#, fuzzy
 msgid "{victim} destroyed"
-msgstr ""
+msgstr "{victim} vernietigd"
 
 #: src/content/replayEventList.ts
+#, fuzzy
 msgid "{victim} destroyed by {killer}"
-msgstr ""
+msgstr "{victim} vernietigd door {killer}"
 
 #: src/content/replayEventList.ts
+#, fuzzy
 msgid "{victim} destroyed by {killer} ({owner})"
-msgstr ""
+msgstr "{victim} vernietigd door {killer} ({owner})"
 
 #: src/content/replayEventList.ts
+#, fuzzy
 msgid "{victim} destroyed by {owner}"
-msgstr ""
+msgstr "{victim} vernietigd door {owner}"
 
 #: src/scenario/wording.ts
 #, fuzzy
@@ -8000,8 +8069,9 @@ msgid "{width} by {height} elmos"
 msgstr "{width} bij {height} elmo"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "{width} elmos, {from} to {to}, at {x}, {z}"
-msgstr ""
+msgstr "{width} elmos, {from} tot {to}, op {x}, {z}"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -8102,8 +8172,9 @@ msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so na
 msgstr "{wrong, plural, one {# van {orderCount} past niet bij deze eenhedenlijst, dus namen en kosten kunnen fout zijn.} other {# van {orderCount} passen niet bij deze eenhedenlijst, dus namen en kosten kunnen fout zijn.}}"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "{wrote, plural, one {# unit written} other {# units written}}"
-msgstr ""
+msgstr "{wrote, plural, one {# eenheid geschreven} other {# eenheden geschreven}}"
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -8262,8 +8333,9 @@ msgid "+{reward} salvage"
 msgstr "+{reward} schroot"
 
 #: src/runlite/pages/RunPage.tsx
+#, fuzzy
 msgid "+{salvage} salvage"
-msgstr ""
+msgstr "+{salvage} bergingsbuit"
 
 #: src/runlite/generate.ts
 #, fuzzy
@@ -8555,8 +8627,9 @@ msgid "30 minutes to 1 hour"
 msgstr "30 minuten tot 1 uur"
 
 #: src/content/pages/components/ReplayMapCard.tsx
+#, fuzzy
 msgid "3D"
-msgstr ""
+msgstr "3D"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -8906,8 +8979,9 @@ msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskin
 msgstr "Er is een distributieprofiel actief (geladen uit <0>{source}</0>). Het geeft deze build een ander uiterlijk en beperkt hem:"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off."
-msgstr ""
+msgstr "Een stip is waar de start van een speler vóór het spel was ingesteld. De engine kan een start naar zijn startvak verplaatsen, dus de commander kan een stukje verderop zijn verschenen."
 
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -9081,8 +9155,9 @@ msgid "A gunship circling or attacking keeps picking new points around the circl
 msgstr "Een gunship dat rondcirkelt of aanvalt, blijft nieuwe punten op de cirkel kiezen in plaats van op één plek te blijven."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "A heavier variant of {parent}."
-msgstr ""
+msgstr "Een zwaardere variant van {parent}."
 
 #: src/lego/environment.ts
 #, fuzzy
@@ -9136,8 +9211,9 @@ msgid "A layout names its buildings by the game's own unit names, so it is drawn
 msgstr "Een opstelling noemt zijn gebouwen bij de eigen eenheidsnamen van het spel, dus hij wordt getekend met de eenheden van één spel."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "A lighter variant of {parent}."
-msgstr ""
+msgstr "Een lichtere variant van {parent}."
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -9211,8 +9287,9 @@ msgstr "Een kaart heeft een start en een doel nodig, of geen van beide."
 
 #. placeholder {0}: result.outSuffix
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "A map with this name is already installed. The engine caches archives by name, so a changed map under an unchanged name can confuse it. Package it under a new name with a version suffix, such as {0}_v2, to keep both."
-msgstr ""
+msgstr "Er is al een kaart met deze naam geïnstalleerd. De engine cachet archieven op naam, dus een gewijzigde kaart onder een ongewijzigde naam kan hem in de war brengen. Verpak hem onder een nieuwe naam met een versiesuffix, zoals {0}_v2, om beide te houden."
 
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -9250,8 +9327,9 @@ msgid "A matchup is the games where you were on opposing teams, from the replays
 msgstr "Een confrontatie bestaat uit de spellen waarin jullie in tegengestelde teams zaten, uit de replays in je inhoudsmappen."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "A mirror already has a file with this name that the hub has not listed, so the hub cannot list this one."
-msgstr ""
+msgstr "Een mirror heeft al een bestand met deze naam dat de hub niet heeft vermeld, dus de hub kan dit bestand niet vermelden."
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -9354,8 +9432,9 @@ msgid "A picture of this map is not available, so the match is drawn on plain gr
 msgstr "Er is geen afbeelding van deze kaart beschikbaar, dus de wedstrijd wordt op effen grond getekend."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "A player unticked in the players table has faint units. Point at a player in the table and their units get a white edge while everyone else's go faint."
-msgstr ""
+msgstr "Een speler waarvan het vinkje in de spelerstabel is weggehaald, heeft vage eenheden. Wijs een speler in de tabel aan en zijn eenheden krijgen een witte rand terwijl die van iedereen anders vervagen."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -9408,8 +9487,9 @@ msgid "A ratio is one figure over another for the same army, and is not per minu
 msgstr "Een verhouding is de ene waarde gedeeld door een andere voor hetzelfde leger, en is niet per minuut. Een spel waarin de onderste waarde nul is, heeft geen verhouding. Dat spel wordt uit het gemiddelde gelaten en ernaast geteld."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "A rectangle is a unit, in the colour of its player's line in the chart and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
-msgstr ""
+msgstr "Een rechthoek is een eenheid, in de kleur van de lijn van zijn speler in de grafiek en met de grootte van zijn voetafdruk, met een streep in de richting waarin hij kijkt. Een eenheid die nog wordt gebouwd is vaag. Op een grote kaart is een markering nooit kleiner dan 3 pixels, dus kleine eenheden lijken groter dan ze zijn."
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy
@@ -9452,12 +9532,14 @@ msgid "A replay's unit numbers only mean something against the unit list of the 
 msgstr "De eenheidsnummers van een replay betekenen alleen iets ten opzichte van de eenhedenlijst van de build waarop hij is gespeeld. Een spel zonder zo’n lijst wordt helemaal weggelaten, net als een spel waarvan de eigen orders niet bij de lijst passen."
 
 #: src/lego/pages/components/PieceTree.tsx
+#, fuzzy
 msgid "A reroll keeps it with a kept part"
-msgstr ""
+msgstr "Een reroll behoudt het met een behouden onderdeel"
 
 #: src/lego/pages/components/PieceTree.tsx
+#, fuzzy
 msgid "A reroll replaces it"
-msgstr ""
+msgstr "Een reroll vervangt het"
 
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
@@ -9480,12 +9562,14 @@ msgid "A room on this computer"
 msgstr "Een ruimte op deze computer"
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "A roster has from 1 to {max} tiers."
-msgstr ""
+msgstr "Een roster heeft 1 tot {max} niveaus."
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "A roster needs a name."
-msgstr ""
+msgstr "Een roster heeft een naam nodig."
 
 #: src/lego/importS3o.ts
 #, fuzzy
@@ -9515,8 +9599,9 @@ msgstr "Een doorzichtige zee op y = 0, om te zien hoe een romp erin ligt."
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "A seed is a whole number."
-msgstr ""
+msgstr "Een seed is een geheel getal."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -9665,8 +9750,9 @@ msgid "A trot: diagonal pairs move together, so the body does not rock. Needs bo
 msgstr "Een draf: diagonale paren bewegen samen, dus de romp wiegt niet. Heeft beide paren poten nodig."
 
 #: src/content/replayEventList.ts
+#, fuzzy
 msgid "A unit"
-msgstr ""
+msgstr "Een eenheid"
 
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
@@ -9679,8 +9765,9 @@ msgid "A unit definition was already there that coilbox has no record of writing
 msgstr "Er stond al een eenheidsdefinitie waarvan coilbox niet weet dat het die heeft geschreven, dus die is met rust gelaten."
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "A unit is already called {name} or {unitName}. Choose another roster name."
-msgstr ""
+msgstr "Een eenheid heet al {name} of {unitName}. Kies een andere rosternaam."
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -9718,12 +9805,14 @@ msgid "A variable needs a name"
 msgstr "Een variabele heeft een naam nodig"
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "A variant at seed {seed} fails the {check} check, and a variant keeps its seed. It said: {said}"
-msgstr ""
+msgstr "Een variant met seed {seed} faalt de controle {check}, en een variant behoudt zijn seed. Melding: {said}"
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "A variant of {parent} with a different weapon."
-msgstr ""
+msgstr "Een variant van {parent} met een ander wapen."
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -9802,8 +9891,9 @@ msgid "A widget that lists the blueprints in this library while you play, places
 msgstr "Een widget die de blauwdrukken in deze bibliotheek toont terwijl je speelt, er een als schimmen en bouwopdrachten bij de cursor plaatst, en de gebouwen die je hebt geselecteerd hier terug opslaat. Hij leest ook de eigen blueprints.json van BAR, en schrijft die nooit. Hij maakt geen netwerkverbinding."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "A yellow circle that grows and fades is an explosion: a projectile landing, or, larger, a unit destroyed. Debris landing makes none. The Explosions switch turns them off."
-msgstr ""
+msgstr "Een gele cirkel die groeit en vervaagt is een explosie: een inslaand projectiel of, groter, een vernietigde eenheid. Neerkomend puin maakt er geen. De schakelaar Explosies zet ze uit."
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -9987,8 +10077,9 @@ msgid "About the shading map"
 msgstr "Over de schaduwkaart"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "About the timeline"
-msgstr ""
+msgstr "Over de tijdlijn"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -10188,8 +10279,9 @@ msgid "Action name"
 msgstr "Actienaam"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Action settings"
-msgstr ""
+msgstr "Instellingen van de actie"
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -10549,8 +10641,9 @@ msgid "Add spawn"
 msgstr "Spawn toevoegen"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Add start position"
-msgstr ""
+msgstr "Startpositie toevoegen"
 
 #: src/content/pages/components/ReplayNotes.tsx
 #, fuzzy
@@ -11215,8 +11308,9 @@ msgstr "Al geprobeerd, en de wedstrijd werd niet gereproduceerd: {triedLabels}."
 
 #. placeholder {0}: mapinfoResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Already up to date <0>{0}</0>"
-msgstr ""
+msgstr "Al up-to-date <0>{0}</0>"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
@@ -11239,8 +11333,9 @@ msgid "Also delete its entries from the config files"
 msgstr "Ook de vermeldingen in de configuratiebestanden verwijderen"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Also moved by {list}."
-msgstr ""
+msgstr "Ook bewogen door {list}."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -11454,8 +11549,9 @@ msgid "An extra gap the unit keeps from other moving units, on top of its own si
 msgstr "Een extra afstand die de eenheid tot andere bewegende eenheden houdt, bovenop haar eigen grootte. De engine raadt 32 of minder aan. Het heeft geen invloed op de padbepaling bij gebouwen of terrein."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "An icon is a unit, drawn as the game draws it on its own map, in the colour of its player's line in the chart. A unit still being built is faint. An icon is never smaller than {leastIcon} pixels, so small units look bigger than they are. A unit whose icon is not known is a rectangle, as is every unit while the icons load."
-msgstr ""
+msgstr "Een pictogram is een eenheid, getekend zoals het spel hem op zijn eigen kaart tekent, in de kleur van de lijn van zijn speler in de grafiek. Een eenheid die nog wordt gebouwd is vaag. Een pictogram is nooit kleiner dan {leastIcon} pixels, dus kleine eenheden lijken groter dan ze zijn. Een eenheid met een onbekend pictogram is een rechthoek, net als elke eenheid terwijl de pictogrammen laden."
 
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
@@ -11519,8 +11615,9 @@ msgid "Analyse and record with {chosenLabel}"
 msgstr "Analyseren en opnemen met {chosenLabel}"
 
 #: src/content/pages/components/ReplayMapCard.tsx
+#, fuzzy
 msgid "Analyse replay"
-msgstr ""
+msgstr "Replay analyseren"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -11633,8 +11730,9 @@ msgid "Animation role"
 msgstr "Animatierol"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Animation tools"
-msgstr ""
+msgstr "Animatietools"
 
 #: src/direct/room.ts
 #, fuzzy
@@ -11666,8 +11764,9 @@ msgstr "Aankondigingen"
 #: src/runlite/model.ts
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
+#, fuzzy
 msgid "Anomaly"
-msgstr ""
+msgstr "Anomalie"
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -11710,8 +11809,9 @@ msgid "Answered the question at {spot}."
 msgstr "De vraag bij {spot} beantwoord."
 
 #: src/lego/generatorJobs.ts
+#, fuzzy
 msgid "Anti-air"
-msgstr ""
+msgstr "Luchtafweer"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -12033,8 +12133,9 @@ msgid "Archives ({archiveCount})"
 msgstr "Archieven ({archiveCount})"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Archives and Rapid"
-msgstr ""
+msgstr "Archieven en Rapid"
 
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -12042,8 +12143,9 @@ msgid "Area"
 msgstr "Gebied"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Areas"
-msgstr ""
+msgstr "Gebieden"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -12133,8 +12235,9 @@ msgid "Arsenal"
 msgstr "Arsenaal"
 
 #: src/lego/generatorJobs.ts
+#, fuzzy
 msgid "Artillery"
-msgstr ""
+msgstr "Artillerie"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -12147,8 +12250,9 @@ msgid "As a copy"
 msgstr "Als kopie"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "As generated"
-msgstr ""
+msgstr "Zoals gegenereerd"
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
@@ -12171,12 +12275,14 @@ msgid "As the builder would write it"
 msgstr "Zoals de bouwer het zou schrijven"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "As the job rolls it"
-msgstr ""
+msgstr "Zoals de taak het trekt"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "As the job rolls them"
-msgstr ""
+msgstr "Zoals de taak ze trekt"
 
 #: src/hub/preview.ts
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -12268,8 +12374,9 @@ msgid "Asks your router to forward the room's port and the game's port {hostPort
 msgstr "Vraagt je router de poort van de ruimte en de poort van het spel {hostPort} door te sturen, zodat mensen buiten dit netwerk kunnen meedoen. Allebei, want als alleen die van de ruimte open is, komt iedereen binnen en mislukt het daarna bij het starten."
 
 #: src/lego/generatorJobs.ts
+#, fuzzy
 msgid "Assault"
-msgstr ""
+msgstr "Aanval"
 
 #: src/home/groupDescription.ts
 #, fuzzy
@@ -12302,8 +12409,9 @@ msgid "at {fromPercent}"
 msgstr "op {fromPercent}"
 
 #: src/content/pages/components/ReplayRoster.tsx
+#, fuzzy
 msgid "At {time}"
-msgstr ""
+msgstr "Om {time}"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -12986,8 +13094,9 @@ msgid "Base height"
 msgstr "Basishoogte"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
+#, fuzzy
 msgid "Base of {name}"
-msgstr ""
+msgstr "Basis van {name}"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -13232,8 +13341,9 @@ msgid "BeamLaser only. Uses burst mechanics, with beamtime forced to the length 
 msgstr "Alleen BeamLaser. Gebruikt salvomechaniek, met beamtime vastgezet op de lengte van één simulatieframe."
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Beams"
-msgstr ""
+msgstr "Stralen"
 
 #: src/content/achievements.ts
 #, fuzzy
@@ -13251,8 +13361,9 @@ msgid "Becomes true the moment a named actor is destroyed."
 msgstr "Wordt waar op het moment dat een benoemde actor wordt vernietigd."
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "before the game"
-msgstr ""
+msgstr "vóór het spel"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -13290,8 +13401,9 @@ msgid "Beginner guide"
 msgstr "Gids voor beginners"
 
 #: src/content/pages/components/ReplayTimeWindowNote.tsx
+#, fuzzy
 msgid "Behind the box on the Heat window lane, {activityLabel} across all teams."
-msgstr ""
+msgstr "Achter het vak op de baan Hittevenster, {activityLabel} over alle teams."
 
 #: src/lego/drive.ts
 #, fuzzy
@@ -13360,8 +13472,9 @@ msgid "Best-effort by name — a download may not be an exact match. See <0>Cont
 msgstr "Zo goed mogelijk op naam — een download komt misschien niet exact overeen. Zie <0>Instellingen voor inhoudsmappen</0> voor de doelmap."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Between two keys a piece moves at a steady speed, as the game moves it."
-msgstr ""
+msgstr "Tussen twee keyframes beweegt een deel met constante snelheid, zoals het spel het beweegt."
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -13434,8 +13547,9 @@ msgid "Blockers"
 msgstr "Blokkades"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Blocks"
-msgstr ""
+msgstr "Blokken"
 
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 #, fuzzy
@@ -13526,12 +13640,14 @@ msgid "Body length"
 msgstr "Romplengte"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#, fuzzy
 msgid "Body plan"
-msgstr ""
+msgstr "Lichaamsplan"
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Body plans"
-msgstr ""
+msgstr "Lichaamsplannen"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -13566,8 +13682,9 @@ msgid "BOS → Lua"
 msgstr "BOS → Lua"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "BOS to Lua, COB tools and Skeletor"
-msgstr ""
+msgstr "BOS naar Lua, COB-tools en Skeletor"
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #, fuzzy
@@ -14079,8 +14196,9 @@ msgid "Build your own campaigns and scenarios."
 msgstr "Bouw je eigen campagnes en scenario’s."
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Buildable"
-msgstr ""
+msgstr "Bebouwbaar"
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -14096,8 +14214,9 @@ msgid "Builder"
 msgstr "Bouwer"
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
+#, fuzzy
 msgid "Builders"
-msgstr ""
+msgstr "Bouwers"
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -14196,8 +14315,9 @@ msgid "Building the sheet for {folder}"
 msgstr "Het blad voor {folder} wordt gebouwd"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Buildings and metal"
-msgstr ""
+msgstr "Gebouwen en metaal"
 
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -14417,8 +14537,9 @@ msgid "By output"
 msgstr "Per uitvoer"
 
 #: src/lego/pages/components/JoinedTo.tsx
+#, fuzzy
 msgid "By size"
-msgstr ""
+msgstr "Op grootte"
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
@@ -15240,8 +15361,9 @@ msgid "Channels"
 msgstr "Kanalen"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Channels of {name}"
-msgstr ""
+msgstr "Kanalen van {name}"
 
 #: src/multiplayer/admin/ModeratorFeedSection.tsx
 #, fuzzy
@@ -15677,12 +15799,14 @@ msgid "Choose an engine to host with."
 msgstr "Kies een engine om mee te hosten."
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "Choose at least one body plan."
-msgstr ""
+msgstr "Kies minstens één lichaamsplan."
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "Choose at least one job."
-msgstr ""
+msgstr "Kies minstens één taak."
 
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #, fuzzy
@@ -16305,8 +16429,9 @@ msgid "Coilbox can read the maps on this computer and tell the hub what is in th
 msgstr "Coilbox kan de kaarten op deze computer lezen en de hub vertellen wat erin zit: hoe groot elke kaart is, hoe hoog de grond gaat, hoeveel ervan onder water ligt, hoeveel wind- en getijdenkracht ze heeft en waar spelers starten. Het stuurt geen afbeeldingen en geen bestanden, alleen die metingen."
 
 #: src/hub/pages/components/MapPicturesControl.tsx
+#, fuzzy
 msgid "Coilbox can read the minimap, terrain, metal and ground types out of every map on this computer and send them to the hub, so a map somebody is looking at there has a picture and terrain rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
-msgstr ""
+msgstr "Coilbox kan de minimap, het terrein, het metaal en de grondtypes van elke kaart op deze computer lezen en naar de hub sturen, zodat een kaart waar iemand daar naar kijkt een afbeelding en terrein heeft in plaats van een tekening van zijn naam. Het vraagt eerst aan de hub wat die al heeft, dus een kaart die al door iemand anders is gedekt kost één vraag."
 
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -16319,8 +16444,9 @@ msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox kan deze afbeelding niet tekenen. Het spel kan haar nog wel lezen."
 
 #: src/mapconv/skyboxNote.ts
+#, fuzzy
 msgid "Coilbox cannot read this map's skybox, so the preview draws a sky from the map's colours instead."
-msgstr ""
+msgstr "Coilbox kan de skybox van deze kaart niet lezen, dus het voorbeeld tekent een lucht met de kleuren van de kaart."
 
 #: src/content/buildPicMissing.ts
 #, fuzzy
@@ -16387,12 +16513,14 @@ msgid "Coilbox could not create the game's settings file."
 msgstr "Coilbox kon het instellingenbestand van het spel niet maken."
 
 #: src/hub/upload/bulkMaps.ts
+#, fuzzy
 msgid "Coilbox could not find the file for this map."
-msgstr ""
+msgstr "Coilbox kon het bestand van deze kaart niet vinden."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Coilbox could not keep a connection to the hub or its mirror. Check your connection and upload it again to carry on."
-msgstr ""
+msgstr "Coilbox kon geen verbinding met de hub of zijn mirror houden. Controleer je verbinding en upload opnieuw om verder te gaan."
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -16435,17 +16563,20 @@ msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox kon {game} niet lezen: {said}"
 
 #: src/hub/assets/pictureSweep.ts
+#, fuzzy
 msgid "Coilbox could not read the factions, so no faction logos were sent. {sidesFailed}"
-msgstr ""
+msgstr "Coilbox kon de facties niet lezen, dus er zijn geen factielogo’s verstuurd. {sidesFailed}"
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Coilbox could not read the file."
-msgstr ""
+msgstr "Coilbox kon het bestand niet lezen."
 
 #: src/hub/manualSend/run.ts
 #: src/hub/upload/bulkMaps.ts
+#, fuzzy
 msgid "Coilbox could not read the map."
-msgstr ""
+msgstr "Coilbox kon de kaart niet lezen."
 
 #: src/widgets/widgetConfig.ts
 #, fuzzy
@@ -16734,8 +16865,9 @@ msgid "Coilbox Hub"
 msgstr "Coilbox Hub"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "Coilbox is asking the hub where to send {name}."
-msgstr ""
+msgstr "Coilbox vraagt de hub waarheen {name} moet worden gestuurd."
 
 #: src/multiplayer/battle/compatBattle.ts
 #, fuzzy
@@ -16743,12 +16875,14 @@ msgid "Coilbox is building the compatibility mode copy of {baseName} (compat {ve
 msgstr "Coilbox bouwt de kopie in compatibiliteitsmodus van {baseName} (compat {version}) die dit gevecht gebruikt. Het kan voor jou starten zodra dat klaar is."
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Coilbox is making pictures of {subject}'s units for the hub."
-msgstr ""
+msgstr "Coilbox maakt afbeeldingen van de eenheden van {subject} voor de hub."
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Coilbox is making pictures of {subject}'s units. Nothing has been sent yet."
-msgstr ""
+msgstr "Coilbox maakt afbeeldingen van de eenheden van {subject}. Er is nog niets verstuurd."
 
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
@@ -16761,16 +16895,19 @@ msgid "Coilbox is out of date"
 msgstr "Coilbox is verouderd"
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Coilbox is reading {subject} to send to the hub."
-msgstr ""
+msgstr "Coilbox leest {subject} om naar de hub te sturen."
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Coilbox is sending {subject} to the hub."
-msgstr ""
+msgstr "Coilbox stuurt {subject} naar de hub."
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Coilbox is sending {subject}'s pictures to the hub."
-msgstr ""
+msgstr "Coilbox stuurt de afbeeldingen van {subject} naar de hub."
 
 #: src/widgets/widgetSync.ts
 #, fuzzy
@@ -16778,8 +16915,9 @@ msgid "Coilbox is still scanning your content, so the game starts with the widge
 msgstr "Coilbox scant je inhoud nog, dus het spel start met de widgets die het het laatst had."
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "Coilbox is uploading {name} to the hub's mirror."
-msgstr ""
+msgstr "Coilbox uploadt {name} naar de mirror van de hub."
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -16839,8 +16977,9 @@ msgid "Coilbox on GitHub"
 msgstr "Coilbox op GitHub"
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "Coilbox only sends a released version of a game."
-msgstr ""
+msgstr "Coilbox stuurt alleen een uitgebrachte versie van een spel."
 
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
@@ -16866,8 +17005,9 @@ msgid "Coilbox scenario"
 msgstr "Coilbox-scenario"
 
 #: src/lego/generatorStyles.ts
+#, fuzzy
 msgid "Coilbox style"
-msgstr ""
+msgstr "Coilbox-stijl"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -16892,8 +17032,9 @@ msgid "Coilbox updates"
 msgstr "Coilbox-updates"
 
 #: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
 msgid "Coilbox widgets"
-msgstr ""
+msgstr "Coilbox-widgets"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -16946,8 +17087,9 @@ msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Inklappen verbergt de zijbalk helemaal in plaats van een balk met pictogrammen te tonen."
 
 #: src/runlite/galaxyAdapter.ts
+#, fuzzy
 msgid "Collect salvage"
-msgstr ""
+msgstr "Berging verzamelen"
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -17368,8 +17510,9 @@ msgid "Compiles the mission, checks it loads, then starts the engine."
 msgstr "Compileert de missie, controleert of hij laadt en start daarna de engine."
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
+#, fuzzy
 msgid "Compiling shaders…"
-msgstr ""
+msgstr "Shaders compileren…"
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #, fuzzy
@@ -18034,8 +18177,9 @@ msgid "Copy code adds a line under the code: \"{bestText}\". It is your claim, a
 msgstr "Code kopiëren voegt een regel onder de code toe: “{bestText}”. Dat is jouw bewering, en coilbox controleert die niet."
 
 #: src/play/pages/components/CrashDrawer.tsx
+#, fuzzy
 msgid "Copy crash report"
-msgstr ""
+msgstr "Crashrapport kopiëren"
 
 #: src/general/ErrorBoundary.tsx
 #, fuzzy
@@ -18231,8 +18375,9 @@ msgid "Could not count the backups: {0}"
 msgstr "Kan de back-ups niet tellen: {0}"
 
 #: src/deeplink/DeepLinkHandler.tsx
+#, fuzzy
 msgid "Could not delete an original"
-msgstr ""
+msgstr "Kon een origineel niet verwijderen"
 
 #: src/game-updates/GameUpdatesProvider.tsx
 #, fuzzy
@@ -18250,12 +18395,14 @@ msgid "Could not follow {name} into their battle"
 msgstr "Kan {name} niet naar het gevecht volgen"
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Could not generate the roster: {reason}"
-msgstr ""
+msgstr "Kon het roster niet genereren: {reason}"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#, fuzzy
 msgid "Could not generate units: {reason}"
-msgstr ""
+msgstr "Kon geen eenheden genereren: {reason}"
 
 #: src/multiplayer/battles/hostBattle.ts
 #, fuzzy
@@ -18300,12 +18447,14 @@ msgstr "Kan de module niet laden"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Could not load the parts: {reason}"
-msgstr ""
+msgstr "Kon de onderdelen niet laden: {reason}"
 
 #: src/lego/generatorStyles.ts
+#, fuzzy
 msgid "Could not load the style"
-msgstr ""
+msgstr "Kon de stijl niet laden"
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18313,8 +18462,9 @@ msgid "Could not look for extension packs: {reason}"
 msgstr "Kan niet zoeken naar uitbreidingspakketten: {reason}"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Could not measure the map: {error}"
-msgstr ""
+msgstr "Kon de kaart niet meten: {error}"
 
 #: src/profile/openBundledFile.ts
 #, fuzzy
@@ -18360,8 +18510,9 @@ msgid "Could not reach unitsync to read this unit's model."
 msgstr "Kan unitsync niet bereiken om het model van deze eenheid te lezen."
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "Could not read"
-msgstr ""
+msgstr "Kon niet lezen"
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
@@ -18486,16 +18637,19 @@ msgstr "Kan de bitmaps van het spel niet lezen, dus effecten worden als een eenv
 
 #. placeholder {0}: defs.error
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Could not read the game's units: {0}"
-msgstr ""
+msgstr "Kon de eenheden van het spel niet lezen: {0}"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Could not read the map's heights: {heightsError}"
-msgstr ""
+msgstr "Kon de hoogtes van de kaart niet lezen: {heightsError}"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "Could not read the map's metal: {error}"
-msgstr ""
+msgstr "Kon het metaal van de kaart niet lezen: {error}"
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -18597,8 +18751,9 @@ msgid "Could not save the module"
 msgstr "Kan de module niet opslaan"
 
 #: src/lego/pages/ProjectsPage.tsx
+#, fuzzy
 msgid "Could not save the roster: {reason}"
-msgstr ""
+msgstr "Kon het roster niet opslaan: {reason}"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
@@ -18607,8 +18762,9 @@ msgid "Could not save the setting for {line}"
 msgstr "Kan de instelling voor {line} niet opslaan"
 
 #: src/lego/generatorStyles.ts
+#, fuzzy
 msgid "Could not save the style"
-msgstr ""
+msgstr "Kon de stijl niet opslaan"
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
@@ -18616,8 +18772,9 @@ msgid "Could not save the unit: {reason}"
 msgstr "Kan de eenheid niet opslaan: {reason}"
 
 #: src/lego/pages/components/VariantMenu.tsx
+#, fuzzy
 msgid "Could not save the variant: {reason}"
-msgstr ""
+msgstr "Kon de variant niet opslaan: {reason}"
 
 #: src/content/pages/components/SetupCard.tsx
 #, fuzzy
@@ -18797,8 +18954,9 @@ msgid "Create a bounce effect"
 msgstr "Een stuiteffect maken"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Create a generator style from this unit's colours, shapes, proportions and number of parts"
-msgstr ""
+msgstr "Maak een generatorstijl van de kleuren, vormen, verhoudingen en het aantal onderdelen van deze eenheid"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #, fuzzy
@@ -18811,12 +18969,14 @@ msgid "Create a new account"
 msgstr "Een nieuw account aanmaken"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Create a style"
-msgstr ""
+msgstr "Een stijl maken"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Create a style from this unit"
-msgstr ""
+msgstr "Een stijl maken van deze eenheid"
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -18911,12 +19071,14 @@ msgstr "Maak de eerste beheerder, of zet een account op het niveau <0>fresh</0> 
 
 #. placeholder {0}: mapinfoResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Created <0>{0}</0>"
-msgstr ""
+msgstr "<0>{0}</0> aangemaakt"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Created a style"
-msgstr ""
+msgstr "Een stijl gemaakt"
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
@@ -19555,12 +19717,14 @@ msgid "Defines the terrain elevation. A grayscale image where <0>white is the hi
 msgstr "Bepaalt de hoogte van het terrein. Een grijswaardenafbeelding waarin <0>wit het hoogste punt is en zwart het laagste</0>. Grijstinten zijn hoogten daartussen. Hij moet aan elke kant <1>(textuur ÷ 8) + 1</1> pixels zijn (een textuur van 8192 px heeft bijvoorbeeld een hoogtekaart van 1025 px nodig)."
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Defs this shape"
-msgstr ""
+msgstr "Defs van deze vorm"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "degrees"
-msgstr ""
+msgstr "graden"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -19796,8 +19960,9 @@ msgid "Delete set"
 msgstr "Set verwijderen"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Delete style?"
-msgstr ""
+msgstr "Stijl verwijderen?"
 
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 #, fuzzy
@@ -19821,8 +19986,9 @@ msgstr "De naam {name} verwijderen"
 
 #: src/deeplink/ArchiveChoices.tsx
 #: src/downloads/pages/SettingsSection.tsx
+#, fuzzy
 msgid "Delete the original after installing"
-msgstr ""
+msgstr "Verwijder het origineel na het installeren"
 
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/lego/shortcuts.ts
@@ -19836,8 +20002,9 @@ msgid "Delete the set “{setName}”? Only the set goes."
 msgstr "De set “{setName}” verwijderen? Alleen de set verdwijnt."
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Delete the style \"{name}\"? This cannot be undone."
-msgstr ""
+msgstr "De stijl “{name}” verwijderen? Dit kan niet ongedaan worden gemaakt."
 
 #: src/scenario/pages/components/BaseControls.tsx
 #, fuzzy
@@ -19977,8 +20144,9 @@ msgid "Demo files in your content folder."
 msgstr "Demobestanden in je inhoudsmap."
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Dense"
-msgstr ""
+msgstr "Dicht"
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -20116,8 +20284,9 @@ msgid "Detached: turned off its face."
 msgstr "Losgemaakt: van zijn vlak gedraaid."
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Detail"
-msgstr ""
+msgstr "Detail"
 
 #: src/components/ResultCard.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -20205,8 +20374,9 @@ msgid "Dies with one and a half times its health taken in the last few seconds, 
 msgstr "Sterft met anderhalf keer zijn levenspunten verloren in de laatste paar seconden, de zwaarste graad van vernietiging die een script kent."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "Different weapon"
-msgstr ""
+msgstr "Ander wapen"
 
 #: src/campaign/pages/components/RunDifficulty.tsx
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -20413,8 +20583,9 @@ msgid "do ... end"
 msgstr "do ... end"
 
 #: src/deeplink/ArchiveChoices.tsx
+#, fuzzy
 msgid "Do not ask again"
-msgstr ""
+msgstr "Niet meer vragen"
 
 #: src/runlite/generate.ts
 #, fuzzy
@@ -21012,8 +21183,9 @@ msgid "Draws a trail on the ground behind the unit as it moves."
 msgstr "Tekent een spoor op de grond achter de eenheid terwijl hij beweegt."
 
 #: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
 msgid "Draws the bones of the selected units in game."
-msgstr ""
+msgstr "Tekent de botten van de geselecteerde eenheden in het spel."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21071,8 +21243,9 @@ msgid "Dropped a rank"
 msgstr "Een rang gezakt"
 
 #: src/downloads/pages/SettingsSection.tsx
+#, fuzzy
 msgid "Dropped archives"
-msgstr ""
+msgstr "Neergezette archieven"
 
 #: src/multiplayer/debriefing.ts
 #, fuzzy
@@ -21130,8 +21303,9 @@ msgid "Duplicate {poseName}"
 msgstr "{poseName} dupliceren"
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Duplicate content"
-msgstr ""
+msgstr "Dubbele inhoud"
 
 #: src/scenario/pages/components/shortcuts.ts
 #, fuzzy
@@ -21259,8 +21433,9 @@ msgid "Each round must be built up by the player before it can fire. Only the fi
 msgstr "Elke lading moet door de speler worden opgebouwd voordat hij kan vuren. Alleen het eerste opgespaarde wapen van dit type op een eenheid werkt goed."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Each row is a piece the action moves, and each diamond is a frame where it has a key. Open a row to see its turns and moves one by one. Drag the ruler to scrub the motion."
-msgstr ""
+msgstr "Elke rij is een deel dat de actie beweegt, en elke ruit is een frame waarop het een keyframe heeft. Open een rij om de draaiingen en bewegingen één voor één te zien. Sleep de liniaal om door de beweging te scrubben."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -21314,12 +21489,14 @@ msgid "east"
 msgstr "oost"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "east edge"
-msgstr ""
+msgstr "oostrand"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "east to west"
-msgstr ""
+msgstr "van oost naar west"
 
 #: src/play/scenarioDifficulty.ts
 #: src/scenario/pages/components/DifficultyRangeFields.tsx
@@ -21444,8 +21621,9 @@ msgid "edited {edited}"
 msgstr "bewerkt {edited}"
 
 #: src/lego/pages/components/PieceTree.tsx
+#, fuzzy
 msgid "Edited by hand, so a reroll keeps it"
-msgstr ""
+msgstr "Met de hand bewerkt, dus een reroll behoudt het"
 
 #: src/workshop/deathExplosions.ts
 #, fuzzy
@@ -21592,8 +21770,9 @@ msgid "Empty, so it carries other pieces and can be an emit point."
 msgstr "Leeg, dus het draagt andere delen en kan een uitstootpunt zijn."
 
 #: src/onboarding/pages/registry.ts
+#, fuzzy
 msgid "Enable Content Dev Tools?"
-msgstr ""
+msgstr "Content Dev Tools inschakelen?"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -22062,8 +22241,9 @@ msgstr "Gebeurtenissen"
 
 #: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayPanel.tsx
+#, fuzzy
 msgid "Events and chat"
-msgstr ""
+msgstr "Gebeurtenissen en chat"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22101,8 +22281,9 @@ msgid "Every command allowed"
 msgstr "Elk commando toegestaan"
 
 #: src/downloads/downloadHubGame.ts
+#, fuzzy
 msgid "Every download source for {label} failed. {errors}"
-msgstr ""
+msgstr "Elke downloadbron voor {label} is mislukt. {errors}"
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
@@ -22275,8 +22456,9 @@ msgid "Every unit matching this rule belongs too, kept up to date as values chan
 msgstr "Elke eenheid die aan deze regel voldoet, hoort er ook bij, en dat blijft bijgewerkt als waarden veranderen, bovenop alles wat hieronder is aangevinkt."
 
 #: src/scenario/triggerTypes.ts
+#, fuzzy
 msgid "every unit of the group"
-msgstr ""
+msgstr "elke eenheid van de groep"
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -22756,8 +22938,9 @@ msgstr "Factie voor de nieuwe AI"
 
 #. placeholder {0}: describeError(e)
 #: src/hub/assets/pictureSweep.ts
+#, fuzzy
 msgid "Faction logos were not sent. {0}"
-msgstr ""
+msgstr "Factielogo’s zijn niet verstuurd. {0}"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -22767,8 +22950,9 @@ msgid "Factions"
 msgstr "Facties"
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
+#, fuzzy
 msgid "Factories"
-msgstr ""
+msgstr "Fabrieken"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -23180,8 +23364,9 @@ msgid "Find it in Downloads"
 msgstr "Zoeken in Downloads"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Find maps the hub is missing"
-msgstr ""
+msgstr "Kaarten zoeken die de hub mist"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -23189,8 +23374,9 @@ msgid "Find other accounts on this IP"
 msgstr "Andere accounts op dit IP zoeken"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Finding maps…"
-msgstr ""
+msgstr "Kaarten zoeken…"
 
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
@@ -23607,8 +23793,9 @@ msgid "Fly over the smoothed map"
 msgstr "Over de afgevlakte kaart vliegen"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Fog colour"
-msgstr ""
+msgstr "Mistkleur"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -23617,8 +23804,9 @@ msgid "Fog of war"
 msgstr "Mist van oorlog"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "Fold the extra lanes"
-msgstr ""
+msgstr "Extra banen inklappen"
 
 #: src/mapconv/pages/ProjectsPage.tsx
 #, fuzzy
@@ -23776,12 +23964,14 @@ msgid "Footprint width"
 msgstr "Breedte van voetafdruk"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "Footprints"
-msgstr ""
+msgstr "Voetafdrukken"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "Footprints, in the switch beside the map, draws each unit as a rectangle the size of its footprint instead."
-msgstr ""
+msgstr "Voetafdrukken, in de schakelaar naast de kaart, tekent elke eenheid in plaats daarvan als een rechthoek ter grootte van zijn voetafdruk."
 
 #: src/lego/pages/components/UnitGamePicker.tsx
 #, fuzzy
@@ -23859,8 +24049,9 @@ msgid "Forces the direction the scar decal is projected from, as if from a proje
 msgstr "Legt de richting vast waaruit de littekendecal wordt geprojecteerd, alsof vanuit een projector op die vector in wereldruimte. Allemaal nullen gebruikt in plaats daarvan de grondnormaal, en '{'0, 1, 0'}' past bij orbitale wapens."
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
+#, fuzzy
 msgid "Forest planted"
-msgstr ""
+msgstr "Bos geplant"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -23962,8 +24153,9 @@ msgid "Frame {frame}"
 msgstr "Frame {frame}"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Frame {frame} / {last}, {time} s"
-msgstr ""
+msgstr "Frame {frame} / {last}, {time} s"
 
 #: src/lego/pages/components/ScrubberMarks.tsx
 #, fuzzy
@@ -24215,8 +24407,9 @@ msgid "From the orders and messages recorded during the match."
 msgstr "Uit de orders en berichten die tijdens de wedstrijd zijn opgenomen."
 
 #: src/content/replayEntries.ts
+#, fuzzy
 msgid "From the replay"
-msgstr ""
+msgstr "Uit de replay"
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -24569,8 +24762,9 @@ msgid "Game whose bindings to show"
 msgstr "Spel waarvan de toewijzingen worden getoond"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Game whose units to measure with"
-msgstr ""
+msgstr "Spel waarmee de eenheden worden gemeten"
 
 #: src/content/pages/components/MissingContentNotice.tsx
 #, fuzzy
@@ -24619,8 +24813,9 @@ msgid "Game: <0>{onlyGameName}</0>"
 msgstr "Spel: <0>{onlyGameName}</0>"
 
 #: src/content/pages/MapDetailPage.tsx
+#, fuzzy
 msgid "Gameplay"
-msgstr ""
+msgstr "Gameplay"
 
 #: src/blueprint/pages/BlueprintsPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -24724,8 +24919,9 @@ msgid "Generate a map"
 msgstr "Een kaart genereren"
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Generate a roster"
-msgstr ""
+msgstr "Een roster genereren"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -24733,12 +24929,14 @@ msgid "Generate seed SQL"
 msgstr "Seed-SQL genereren"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#, fuzzy
 msgid "Generate units"
-msgstr ""
+msgstr "Eenheden genereren"
 
 #: src/lego/generate.ts
+#, fuzzy
 msgid "Generated from seed {seed}, body plan {plan}, job {job}, size {size}."
-msgstr ""
+msgstr "Gegenereerd uit seed {seed}, lichaamsplan {plan}, taak {job}, grootte {size}."
 
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 #, fuzzy
@@ -24746,8 +24944,9 @@ msgid "Generated Lua"
 msgstr "Gegenereerde Lua"
 
 #: src/mapconv/skyboxNote.ts
+#, fuzzy
 msgid "generated sky"
-msgstr ""
+msgstr "gegenereerde lucht"
 
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -25001,8 +25200,9 @@ msgid "Graphics"
 msgstr "Grafisch"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "grass"
-msgstr ""
+msgstr "gras"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -25062,12 +25262,14 @@ msgid "Ground"
 msgstr "Grond"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Ground ambient"
-msgstr ""
+msgstr "Grondomgevingslicht"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Ground diffuse"
-msgstr ""
+msgstr "Grond diffuus"
 
 #: src/workshop/explosionGenerators.ts
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -25351,8 +25553,9 @@ msgid "Heard from in the last 15 seconds"
 msgstr "In de laatste 15 seconden gehoord"
 
 #: src/content/pages/components/ReplayMapCard.tsx
+#, fuzzy
 msgid "Heat"
-msgstr ""
+msgstr "Hitte"
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -25365,16 +25568,19 @@ msgid "heat cloud bitmap"
 msgstr "bitmap van hittewolk"
 
 #: src/content/pages/components/ReplayHeatWindow.tsx
+#, fuzzy
 msgid "Heat window"
-msgstr ""
+msgstr "Hittevenster"
 
 #: src/content/pages/components/ReplayHeatWindow.tsx
+#, fuzzy
 msgid "Heat window end"
-msgstr ""
+msgstr "Einde hittevenster"
 
 #: src/content/pages/components/ReplayHeatWindow.tsx
+#, fuzzy
 msgid "Heat window start"
-msgstr ""
+msgstr "Begin hittevenster"
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -25382,8 +25588,9 @@ msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. T
 msgstr "heatfalloff: hoe snel de hitte van de wolk wegvloeit, geen vast aantal frames. Deze klasse heeft geen eigen kleur."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "Heavier"
-msgstr ""
+msgstr "Zwaarder"
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
@@ -25577,8 +25784,9 @@ msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Verberg de zijbalk en open hem in plaats daarvan via een menuknop."
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Hide the timeline"
-msgstr ""
+msgstr "De tijdlijn verbergen"
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
@@ -25661,8 +25869,9 @@ msgid "Highlight words"
 msgstr "Woorden markeren"
 
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "Highlights"
-msgstr ""
+msgstr "Hoogtepunten"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/uberstress/index.ts
@@ -25777,8 +25986,9 @@ msgid "Holds once a team has kept a zone for the time you set, optionally only w
 msgstr "Geldt zodra een team een zone de ingestelde tijd heeft vastgehouden, eventueel alleen zolang niemand anders hem betwist."
 
 #: src/scenario/triggerTypes.ts
+#, fuzzy
 msgid "Holds once every unit in a group has died. A group that has not been placed yet is not dead."
-msgstr ""
+msgstr "Geldt zodra elke eenheid in een groep dood is. Een groep die nog niet is geplaatst is niet dood."
 
 #: src/scenario/pages/components/GroupControls.tsx
 #, fuzzy
@@ -26389,8 +26599,9 @@ msgid "Icon set, no background"
 msgstr "Pictogram ingesteld, geen achtergrond"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "Icons"
-msgstr ""
+msgstr "Pictogrammen"
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/mapconv/pages/components/MapinfoOptions.tsx
@@ -26861,8 +27072,9 @@ msgid "In the source"
 msgstr "In de bron"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "In the timeline at the bottom of the page, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is a chat line and a diamond is a player joining, pausing, resigning, giving everything away, leaving or a team dying, taken from the replay and its analysis. A chat dot is green for allies, blue for spectators, violet for whispers and hollow for the system. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
-msgstr ""
+msgstr "In de tijdlijn onderaan de pagina stelt de knop de tijd in en spelen de knoppen de wedstrijd vooruit of achteruit af, op de snelheid ernaast. Een hoge balk is een vernietigde eenheid, een stip is een chatregel en een ruit is een speler die meedoet, pauzeert, opgeeft, alles weggeeft, vertrekt of een team dat sneuvelt, afgeleid uit de replay en de analyse ervan. Een chatstip is groen voor bondgenoten, blauw voor toeschouwers, violet voor fluisterberichten en hol voor het systeem. Markeringen die elkaar zouden raken worden als één, grotere, getekend, en klikken erop gaat naar de vroegste gebeurtenis erin. Een replay die niet is geanalyseerd heeft geen kills. Het adres bevat de tijd, dus een link opent op dat moment."
 
 #: src/workshop/pages/components/UnitTextPanel.tsx
 #, fuzzy
@@ -27094,8 +27306,9 @@ msgid "Install widget"
 msgstr "Widget installeren"
 
 #: src/downloads/pages/SettingsSection.tsx
+#, fuzzy
 msgid "Install without asking"
-msgstr ""
+msgstr "Installeren zonder te vragen"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -27139,8 +27352,9 @@ msgstr "{fileName} geïnstalleerd"
 
 #. placeholder {0}: installResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Installed <0>{0}</0>"
-msgstr ""
+msgstr "<0>{0}</0> geïnstalleerd"
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
@@ -27170,8 +27384,9 @@ msgid "Installed, and {staleCount} of {fileCount, plural, one {# file differs} o
 msgstr "Geïnstalleerd, en {staleCount} van {fileCount, plural, one {# bestand wijkt} other {# bestanden wijken}} af van wat deze coilbox meelevert"
 
 #: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
 msgid "Installed, and its licence notice is missing or out of date"
-msgstr ""
+msgstr "Geïnstalleerd, en de licentievermelding ontbreekt of is verouderd"
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -27201,8 +27416,9 @@ msgid "Installs an engine matching this platform into the configured content fol
 msgstr "Installeert een engine voor dit platform in de map <0>engine/</0> van de ingestelde inhoudsmap (stel de bestemming in onder <1>Instellingen voor inhoudsmappen</1>)."
 
 #: src/runlite/pages/components/ArsenalOverlay.tsx
+#, fuzzy
 msgid "Intelligence"
-msgstr ""
+msgstr "Inlichtingen"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27410,8 +27626,9 @@ msgid "it encoded, and the file could not be written."
 msgstr "het werd gecodeerd, en het bestand kon niet worden geschreven."
 
 #: src/downloads/installArchive.ts
+#, fuzzy
 msgid "It goes in {destDir}."
-msgstr ""
+msgstr "Het komt in {destDir}."
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
@@ -27474,8 +27691,9 @@ msgid "It is a test route and never a distribution one. For {gameName} to play s
 msgstr "Het is een testroute en nooit een distributieroute. Om {gameName} zelf scenario’s te laten spelen, moet het archief de runtime meeleveren, en coilbox kan die alleen installeren in een losse .sdd-kopie van het spel."
 
 #: src/deeplink/actions.ts
+#, fuzzy
 msgid "It is added to your modules, which needs Unit tools turned on in Settings."
-msgstr ""
+msgstr "Het wordt toegevoegd aan je modules, wat vereist dat Eenheidstools is ingeschakeld in Instellingen."
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 #, fuzzy
@@ -27488,8 +27706,9 @@ msgid "It is converted from the game's BOS again. Edits you made since are lost.
 msgstr "Het wordt opnieuw omgezet uit de BOS van het spel. Wijzigingen die je sindsdien hebt gemaakt, gaan verloren."
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "It is in the style list under Generate on the Models page."
-msgstr ""
+msgstr "Het staat in de stijllijst onder Genereren op de pagina Modellen."
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -27513,8 +27732,9 @@ msgid "It is removed from every game that loads it: {0}"
 msgstr "Het wordt verwijderd uit elk spel dat het laadt: {0}"
 
 #: src/deeplink/actions.ts
+#, fuzzy
 msgid "It is saved to Unit tweaks and opened, which needs Unit tools turned on in Settings."
-msgstr ""
+msgstr "Het wordt opgeslagen in Eenheidsaanpassingen en geopend, wat vereist dat Eenheidstools is ingeschakeld in Instellingen."
 
 #: src/lego/pages/components/CollisionPanel.tsx
 #, fuzzy
@@ -27537,16 +27757,19 @@ msgid "It kept running, because a game is still being played through it. Nobody 
 msgstr "Hij bleef draaien, omdat er nog een spel via hem wordt gespeeld. Niemand is afgesneden. Hij stopt vanzelf als dat spel afloopt, en dan werkt hosten weer."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "It loops and runs until it is started again."
-msgstr ""
+msgstr "Het herhaalt en loopt door tot het opnieuw wordt gestart."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "It loops and stops on {stopsOn}."
-msgstr ""
+msgstr "Het herhaalt en stopt bij {stopsOn}."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "It loops and stops when {stopFunction} is called."
-msgstr ""
+msgstr "Het herhaalt en stopt wanneer {stopFunction} wordt aangeroepen."
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -27587,8 +27810,9 @@ msgid "It opens in the keybinds editor, unsaved."
 msgstr "Het opent in de sneltoetseditor, niet opgeslagen."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "It plays once and holds the last pose."
-msgstr ""
+msgstr "Het speelt één keer en houdt de laatste pose vast."
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -27709,8 +27933,9 @@ msgid "its facing is not three numbers of unit length"
 msgstr "de richting is niet drie getallen met eenheidslengte"
 
 #: src/lego/pages/components/ExportDrawer.tsx
+#, fuzzy
 msgid "its game has no short name coilbox knows, so the widget's file has no place to go"
-msgstr ""
+msgstr "het spel ervan heeft geen korte naam die coilbox kent, dus het bestand van de widget kan nergens heen"
 
 #: src/lego/connectors.ts
 #, fuzzy
@@ -27794,12 +28019,14 @@ msgid "Its workshop project is gone."
 msgstr "Het werkplaatsproject bestaat niet meer."
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#, fuzzy
 msgid "Job"
-msgstr ""
+msgstr "Taak"
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Jobs"
-msgstr ""
+msgstr "Taken"
 
 #: src/direct/LanRooms.tsx
 #: src/multiplayer/battles/battleFilters.ts
@@ -27973,8 +28200,9 @@ msgid "Kamikaze trigger distance"
 msgstr "Activeringsafstand van kamikaze"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "kbot"
-msgstr ""
+msgstr "kbot"
 
 #: src/lego/pages/components/ProportionsPanel.tsx
 #, fuzzy
@@ -28149,8 +28377,9 @@ msgid "Kept, because they were changed after the last export:"
 msgstr "Behouden, omdat ze na de laatste export zijn gewijzigd:"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Key"
-msgstr ""
+msgstr "Keyframe"
 
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 #, fuzzy
@@ -28163,16 +28392,19 @@ msgid "Key {key}"
 msgstr "Toets {key}"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Key the pieces you changed on this frame"
-msgstr ""
+msgstr "Maak keyframes voor de delen die je op dit frame hebt gewijzigd"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Key value in degrees"
-msgstr ""
+msgstr "Keyframewaarde in graden"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Key value in elmos"
-msgstr ""
+msgstr "Keyframewaarde in elmos"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -28206,8 +28438,9 @@ msgid "keymaps"
 msgstr "toetsenindelingen"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Keys of {piece} on frame {frame}"
-msgstr ""
+msgstr "Keyframes van {piece} op frame {frame}"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #: src/multiplayer/battle/MemberRow.tsx
@@ -28271,8 +28504,9 @@ msgid "Kicks the barrel back along its own bore when the weapon fires, and eases
 msgstr "Laat de loop bij het vuren langs zijn eigen as terugslaan en brengt hem rustig terug. Eén keer, geen herhaling: het voorbeeld herhaalt het met een timer zodat er iets te zien is."
 
 #: src/content/replayEventList.ts
+#, fuzzy
 msgid "Kill"
-msgstr ""
+msgstr "Kill"
 
 #: src/content/pages/components/ReplayEventList.tsx
 #: src/content/pages/components/ReplayTimelineDock.tsx
@@ -28312,8 +28546,9 @@ msgid "Knee bend"
 msgstr "Kniebuiging"
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
+#, fuzzy
 msgid "Land built"
-msgstr ""
+msgstr "Land gebouwd"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -28337,12 +28572,14 @@ msgid "Language packs loaded: {loadedList}"
 msgstr "Geladen taalpakketten: {loadedList}"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Lap ends"
-msgstr ""
+msgstr "Einde van de ronde"
 
 #: src/lego/generate.ts
+#, fuzzy
 msgid "Large"
-msgstr ""
+msgstr "Groot"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -28361,8 +28598,9 @@ msgid "Largest angle"
 msgstr "Grootste hoek"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Largest area"
-msgstr ""
+msgstr "Grootste gebied"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -28582,8 +28820,9 @@ msgid "Leading accuracy"
 msgstr "Nauwkeurigheid van voorhouden"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Lean"
-msgstr ""
+msgstr "Slank"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -29097,8 +29336,9 @@ msgid "Light hit up to"
 msgstr "Lichte treffer tot"
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "Lighter"
-msgstr ""
+msgstr "Lichter"
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
@@ -29160,8 +29400,9 @@ msgid "listed twice in the library"
 msgstr "twee keer in de bibliotheek vermeld"
 
 #: src/content/replayEntries.ts
+#, fuzzy
 msgid "Living unit value"
-msgstr ""
+msgstr "Waarde levende eenheid"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -29189,8 +29430,9 @@ msgid "Load a rapid master to list its repositories."
 msgstr "Laad een rapid-master om de repository’s ervan te tonen."
 
 #: src/lego/generatorStyles.ts
+#, fuzzy
 msgid "Load a style"
-msgstr ""
+msgstr "Een stijl laden"
 
 #: src/lego/pages/components/Inventory.tsx
 #: src/lego/pages/PartsPage.tsx
@@ -29214,12 +29456,14 @@ msgid "Load repos"
 msgstr "Repo’s laden"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Load style"
-msgstr ""
+msgstr "Stijl laden"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Load tests for lobby servers, and their results"
-msgstr ""
+msgstr "Belastingtests voor lobbyservers en hun resultaten"
 
 #: src/play/PresetLoadGate.tsx
 #, fuzzy
@@ -29458,8 +29702,9 @@ msgid "Lock {loadoutName}"
 msgstr "{loadoutName} vergrendelen"
 
 #: src/lego/pages/components/PieceTree.tsx
+#, fuzzy
 msgid "Lock {pieceName}"
-msgstr ""
+msgstr "{pieceName} vergrendelen"
 
 #: src/lego/pages/components/LoadoutPicker.tsx
 #, fuzzy
@@ -29488,8 +29733,9 @@ msgid "Locked until a campaign grants it"
 msgstr "Vergrendeld tot een campagne hem toekent"
 
 #: src/lego/pages/components/PieceTree.tsx
+#, fuzzy
 msgid "Locked, so a reroll keeps it"
-msgstr ""
+msgstr "Vergrendeld, dus een reroll behoudt het"
 
 #: src/conquest/unlocks.ts
 #, fuzzy
@@ -29703,8 +29949,9 @@ msgid "Loose .sdd directory (uncompressed)"
 msgstr "Losse .sdd-map (niet gecomprimeerd)"
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Loose map and rapid package"
-msgstr ""
+msgstr "Losse kaart en rapid-pakket"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
@@ -29866,12 +30113,14 @@ msgid "Make {rowLabel} follow the game"
 msgstr "{rowLabel} het spel laten volgen"
 
 #: src/lego/pages/components/VariantMenu.tsx
+#, fuzzy
 msgid "Make a variant"
-msgstr ""
+msgstr "Een variant maken"
 
 #: src/lego/pages/components/VariantMenu.tsx
+#, fuzzy
 msgid "Make a variant of this unit as a new unit"
-msgstr ""
+msgstr "Maak een variant van deze eenheid als nieuwe eenheid"
 
 #: src/multiplayer/battle/MemberRow.tsx
 #, fuzzy
@@ -30034,12 +30283,14 @@ msgid "Map icon"
 msgstr "Kaarticoon"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Map info"
-msgstr ""
+msgstr "Kaartinfo"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Map info ({mapinfoCount})"
-msgstr ""
+msgstr "Kaartinfo ({mapinfoCount})"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -30121,8 +30372,9 @@ msgid "Map preview"
 msgstr "Kaartvoorbeeld"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Map projects, compiling and decompiling maps"
-msgstr ""
+msgstr "Kaartprojecten, kaarten compileren en decompileren"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #, fuzzy
@@ -30157,8 +30409,9 @@ msgid "Map style"
 msgstr "Kaartstijl"
 
 #: src/content/pages/components/ReplayMapCard.tsx
+#, fuzzy
 msgid "Map view"
-msgstr ""
+msgstr "Kaartweergave"
 
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 #, fuzzy
@@ -30311,8 +30564,9 @@ msgid "Marks an objective as failed."
 msgstr "Markeert een doel als mislukt."
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "Marks on the unit map"
-msgstr ""
+msgstr "Markeringen op de eenhedenkaart"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -30451,8 +30705,9 @@ msgid "Matches: {matches}"
 msgstr "Overeenkomsten: {matches}"
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
+#, fuzzy
 msgid "Matching units"
-msgstr ""
+msgstr "Overeenkomende eenheden"
 
 #: src/multiplayer/debriefing.ts
 #: src/multiplayer/index.tsx
@@ -30511,8 +30766,9 @@ msgid "Max rudder"
 msgstr "Max. richtingsroer"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Max slope"
-msgstr ""
+msgstr "Maximale helling"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -30581,8 +30837,9 @@ msgid "median {median}"
 msgstr "mediaan {median}"
 
 #: src/lego/generate.ts
+#, fuzzy
 msgid "Medium"
-msgstr ""
+msgstr "Middel"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -30776,8 +31033,9 @@ msgid "Metal used"
 msgstr "Metaal verbruikt"
 
 #: src/content/pages/components/ReplayMetricLane.tsx
+#, fuzzy
 msgid "Metric in the timeline: {name}"
-msgstr ""
+msgstr "Meetwaarde in de tijdlijn: {name}"
 
 #: src/lego/pivot.ts
 #, fuzzy
@@ -31001,8 +31259,9 @@ msgid "Mission {position} has no map"
 msgstr "Missie {position} heeft geen kaart"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Mission builders"
-msgstr ""
+msgstr "Missiebouwers"
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #, fuzzy
@@ -31299,8 +31558,9 @@ msgid "Move each of the {boxHolders} boxes on to the next ally"
 msgstr "Elk van de {boxHolders} gebieden doorschuiven naar de volgende bondgenoot"
 
 #: src/runlite/pages/RunPage.tsx
+#, fuzzy
 msgid "Move here to collect it: a schematic that unlocks units, or a field upgrade for you."
-msgstr ""
+msgstr "Ga hierheen om het te verzamelen: een blauwdruk die eenheden ontgrendelt, of een veldupgrade voor jou."
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -31363,16 +31623,19 @@ msgid "Move up"
 msgstr "Omhoog"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Move x"
-msgstr ""
+msgstr "Verplaats x"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Move y"
-msgstr ""
+msgstr "Verplaats y"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Move z"
-msgstr ""
+msgstr "Verplaats z"
 
 #: src/lego/pages/components/MeasureReadout.tsx
 #, fuzzy
@@ -31408,8 +31671,9 @@ msgid "Moved {step} {way}, now at {spot}."
 msgstr "{step} naar {way} verplaatst, nu op {spot}."
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
+#, fuzzy
 msgid "Moved in {callin}"
-msgstr ""
+msgstr "Verplaatst in {callin}"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -31417,8 +31681,9 @@ msgid "Moved the base's origin, now at {spot}."
 msgstr "De oorsprong van de basis verplaatst, nu op {spot}."
 
 #: src/deeplink/DeepLinkHandler.tsx
+#, fuzzy
 msgid "Moved to {destDir}."
-msgstr ""
+msgstr "Verplaatst naar {destDir}."
 
 #: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
@@ -31847,8 +32112,9 @@ msgid "Named by the script"
 msgstr "Benoemd door het script"
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
+#, fuzzy
 msgid "Named by the script in {callin}"
-msgstr ""
+msgstr "Benoemd door het script in {callin}"
 
 #: src/workshop/customParamConsumers.ts
 #, fuzzy
@@ -31946,8 +32212,9 @@ msgid "Nano spray from no piece"
 msgstr "Nanostraal vanuit geen enkel deel"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Narrowest point on the widest way"
-msgstr ""
+msgstr "Smalste punt op de breedste route"
 
 #: src/uberstress/pages/SettingsSection.tsx
 #, fuzzy
@@ -31975,8 +32242,9 @@ msgid "Nearest multiple of…"
 msgstr "Dichtstbijzijnde veelvoud van…"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "Nearest spots, in elmos"
-msgstr ""
+msgstr "Dichtstbijzijnde plekken, in elmos"
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -32024,8 +32292,9 @@ msgid "Needs a piece set as {missingRoles}."
 msgstr "Vereist een deel ingesteld als {missingRoles}."
 
 #: src/content/pages/components/ReplayMapCard.tsx
+#, fuzzy
 msgid "Needs a recording of the match."
-msgstr ""
+msgstr "Heeft een opname van de wedstrijd nodig."
 
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -32059,8 +32328,9 @@ msgid "Needs an objective"
 msgstr "Vereist een doel"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "Needs analysis"
-msgstr ""
+msgstr "Analyse nodig"
 
 #: src/startbox/StartBoxControls.tsx
 #, fuzzy
@@ -32078,8 +32348,9 @@ msgid "Needs cob_vars.lua"
 msgstr "Vereist cob_vars.lua"
 
 #: src/scenario/validate.ts
+#, fuzzy
 msgid "needs one of {list}"
-msgstr ""
+msgstr "heeft er één nodig van {list}"
 
 #: src/scenario/capabilities.ts
 #, fuzzy
@@ -32092,8 +32363,9 @@ msgid "Needs the game's units"
 msgstr "Vereist de eenheden van het spel"
 
 #: src/content/pages/components/ReplayMapCard.tsx
+#, fuzzy
 msgid "Needs the map's picture and height data."
-msgstr ""
+msgstr "Heeft de afbeelding en hoogtegegevens van de kaart nodig."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -32140,12 +32412,14 @@ msgid "neutral space"
 msgstr "neutrale ruimte"
 
 #: src/scenario/pages/components/NeutralTeamField.tsx
+#, fuzzy
 msgid "Neutral team"
-msgstr ""
+msgstr "Neutraal team"
 
 #: src/scenario/pages/components/NeutralTeamField.tsx
+#, fuzzy
 msgid "Neutral team colour"
-msgstr ""
+msgstr "Kleur van neutraal team"
 
 #: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -32347,8 +32621,9 @@ msgstr "Naam nieuwe set"
 
 #: src/lego/generatorStyles.ts
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "New style"
-msgstr ""
+msgstr "Nieuwe stijl"
 
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
@@ -32410,8 +32685,9 @@ msgid "Next match"
 msgstr "Volgende overeenkomst"
 
 #: src/runlite/pages/RunPage.tsx
+#, fuzzy
 msgid "Next:"
-msgstr ""
+msgstr "Volgende:"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -32558,8 +32834,9 @@ msgid "No blueprints yet. A blueprint is a layout of buildings you draw once and
 msgstr "Nog geen blauwdrukken. Een blauwdruk is een indeling van gebouwen die je één keer tekent en plaatst waar je maar wilt: een opening, een muur, een fabriekshoek. Maak er een met de knop hierboven, importeer er een die iemand gedeeld heeft, of open een pakket: een bestand met indelingen uit een spel of uit de communitygalerij."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "No body plan has {pairs} pairs of legs, so none is proposed."
-msgstr ""
+msgstr "Geen lichaamsplan heeft {pairs} paar poten, dus er wordt er geen voorgesteld."
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -32814,8 +33091,9 @@ msgid "No downloads match \"{query}\"."
 msgstr "Geen downloads die passen bij \"{query}\"."
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "No duplicates found."
-msgstr ""
+msgstr "Geen duplicaten gevonden."
 
 #: src/multiplayer/chat/EmojiPicker.tsx
 #, fuzzy
@@ -32951,8 +33229,9 @@ msgid "No engines found in your content folders. Add a folder in <0>Content fold
 msgstr "Geen engines gevonden in je inhoudsmappen. Voeg een map toe in <0>Inhoudsmappen</0> of installeer er een via <1>Engines</1>."
 
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "No entry matches these filters."
-msgstr ""
+msgstr "Geen item komt overeen met deze filters."
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -32991,8 +33270,9 @@ msgid "No file to save over"
 msgstr "Geen bestand om te overschrijven"
 
 #: src/downloads/hubFileDownload.ts
+#, fuzzy
 msgid "no filename to save it as"
-msgstr ""
+msgstr "geen bestandsnaam om het onder op te slaan"
 
 #: src/content/pages/components/ArchiveTree.tsx
 #, fuzzy
@@ -33046,8 +33326,9 @@ msgid "No game installed"
 msgstr "Geen spel geïnstalleerd"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "No game installed."
-msgstr ""
+msgstr "Geen spel geïnstalleerd."
 
 #: src/lego/pages/components/TestDrawer.tsx
 #, fuzzy
@@ -33320,8 +33601,9 @@ msgid "No mapinfo.lua, settings from the .smd file"
 msgstr "Geen mapinfo.lua, instellingen uit het .smd-bestand"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "No maps folder is set, so there is nowhere to install to. Add a content folder in Settings."
-msgstr ""
+msgstr "Er is geen kaartenmap ingesteld, dus er is nergens om naartoe te installeren. Voeg een inhoudsmap toe in Instellingen."
 
 #: src/content/pages/MapsPage.tsx
 #, fuzzy
@@ -33381,8 +33663,9 @@ msgid "No match on this map passes these filters."
 msgstr "Geen enkele wedstrijd op deze kaart voldoet aan deze filters."
 
 #: src/content/pages/components/ReplayTimeWindowNote.tsx
+#, fuzzy
 msgid "No match statistics are drawn behind the box."
-msgstr ""
+msgstr "Achter het vak worden geen wedstrijdstatistieken getekend."
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -33416,8 +33699,9 @@ msgid "No minimap"
 msgstr "Geen minikaart"
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "No mirror can take an upload right now. Try again later."
-msgstr ""
+msgstr "Geen enkele mirror kan nu een upload accepteren. Probeer het later opnieuw."
 
 #: src/campaign/listing.ts
 #, fuzzy
@@ -33525,8 +33809,9 @@ msgid "No orders were given in this stretch."
 msgstr "In dit stuk zijn geen orders gegeven."
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
+#, fuzzy
 msgid "No orders were given."
-msgstr ""
+msgstr "Er zijn geen bevelen gegeven."
 
 #: src/content/pages/components/ReplayMapRail.tsx
 #, fuzzy
@@ -33534,8 +33819,9 @@ msgid "No orders with a place on the map were given in this replay."
 msgstr "In deze replay zijn geen orders met een plek op de kaart gegeven."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "No other module is in the {category} category."
-msgstr ""
+msgstr "Geen andere module zit in de categorie {category}."
 
 #: src/lego/pages/components/SwapModuleDrawer.tsx
 #, fuzzy
@@ -33543,8 +33829,9 @@ msgid "No other modules in this category"
 msgstr "Geen andere modules in deze categorie"
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "No other part has this part's shape and colour."
-msgstr ""
+msgstr "Geen ander onderdeel heeft de vorm en kleur van dit onderdeel."
 
 #: src/lego/resizePackBlock.ts
 #, fuzzy
@@ -33623,8 +33910,9 @@ msgid "No piece has a foot or wheel role, so there is no ground it stands on."
 msgstr "Geen enkel deel heeft de rol voet of wiel, dus er is geen grond waar het op staat."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "No plan fits."
-msgstr ""
+msgstr "Geen plan past."
 
 #: src/content/pages/MatchupPage.tsx
 #, fuzzy
@@ -33775,12 +34063,14 @@ msgid "No release archive found for {repo}."
 msgstr "Geen releasearchief gevonden voor {repo}."
 
 #: src/downloads/hubFileDownload.ts
+#, fuzzy
 msgid "no release archives"
-msgstr ""
+msgstr "geen releasearchieven"
 
 #: src/downloads/hubFileDownload.ts
+#, fuzzy
 msgid "no release matching \"{wanted}\" in its latest {count} release(s)"
-msgstr ""
+msgstr "geen release die overeenkomt met “{wanted}” in de laatste {count} release(s)"
 
 #: src/content/pages/components/UnitModelPanel.tsx
 #, fuzzy
@@ -33925,8 +34215,9 @@ msgid "No saved profiles yet."
 msgstr "Nog geen opgeslagen profielen."
 
 #: src/lego/pages/components/WriteSkeletons.tsx
+#, fuzzy
 msgid "No saved unit has a skeleton."
-msgstr ""
+msgstr "Geen opgeslagen eenheid heeft een skelet."
 
 #: src/campaign/pages/components/CampaignUnits.tsx
 #, fuzzy
@@ -33994,24 +34285,29 @@ msgid "No scripts here."
 msgstr "Geen scripts hier."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "No seed from {first} to {last} found another module that fits. Try again or change it by hand."
-msgstr ""
+msgstr "Geen seed van {first} tot {last} vond een andere module die past. Probeer het opnieuw of wijzig het met de hand."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "No seed from {first} to {last} found another part that fits. Try again or change it by hand."
-msgstr ""
+msgstr "Geen seed van {first} tot {last} vond een ander onderdeel dat past. Probeer het opnieuw of wijzig het met de hand."
 
 #: src/lego/roster.ts
+#, fuzzy
 msgid "No seed from {first} to {last} made {label} bigger than the tier below it."
-msgstr ""
+msgstr "Geen seed van {first} tot {last} maakte {label} groter dan het niveau eronder."
 
 #: src/lego/generateChecked.ts
+#, fuzzy
 msgid "No seed from {first} to {last} made a unit that passes the checks. The {label} check failed most often. The first time, it said: {said}"
-msgstr ""
+msgstr "Geen seed van {first} tot {last} maakte een eenheid die de controles doorstaat. De controle {label} faalde het vaakst. De eerste keer meldde het: {said}"
 
 #: src/lego/reroll.ts
+#, fuzzy
 msgid "No seed from {first} to {last} made a unit with the kept parts that passes the checks. Free some parts and try again."
-msgstr ""
+msgstr "Geen seed van {first} tot {last} maakte een eenheid met de behouden onderdelen die de controles doorstaat. Maak enkele onderdelen vrij en probeer het opnieuw."
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -34049,8 +34345,9 @@ msgid "No shorter part in the pack. Shortest is {elmos} elmos, {units} units"
 msgstr "Geen korter onderdeel in het pakket. Het kortste is {elmos} elmo, {units} rastereenheden"
 
 #: src/lego/pages/components/WriteSkeletons.tsx
+#, fuzzy
 msgid "No skeleton has changed since the last write."
-msgstr ""
+msgstr "Er is geen skelet gewijzigd sinds de laatste keer schrijven."
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -34154,8 +34451,9 @@ msgid "No stored scenario has this id any more, so there is nothing to compare a
 msgstr "Geen opgeslagen scenario heeft deze id nog, dus er is niets om mee te vergelijken. De missie speelt zijn eigen kopie."
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "No style"
-msgstr ""
+msgstr "Geen stijl"
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -34234,8 +34532,9 @@ msgid "no tweak slot left to hold it"
 msgstr "geen aanpassingsslot meer over om het te bevatten"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "No two spots are closer together than the extractor radius, {radius} elmos."
-msgstr ""
+msgstr "Geen twee plekken liggen dichter bij elkaar dan de extractorradius, {radius} elmos."
 
 #: src/content/pages/components/UnitPicker.tsx
 #, fuzzy
@@ -34382,8 +34681,9 @@ msgid "No weapon matches that."
 msgstr "Geen wapen dat hierop past."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "No weapon seed from {first} to {last} made a different weapon that passes the checks."
-msgstr ""
+msgstr "Geen wapenseed van {first} tot {last} maakte een ander wapen dat de controles doorstaat."
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -34469,8 +34769,9 @@ msgid "None"
 msgstr "Geen"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "none across"
-msgstr ""
+msgstr "geen in totaal"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
@@ -34596,12 +34897,14 @@ msgid "north"
 msgstr "noord"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "north edge"
-msgstr ""
+msgstr "noordrand"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "north to south"
-msgstr ""
+msgstr "van noord naar zuid"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -35020,8 +35323,9 @@ msgid "not tried"
 msgstr "niet geprobeerd"
 
 #: src/downloads/hubMismatch.ts
+#, fuzzy
 msgid "Not what the hub says it is"
-msgstr ""
+msgstr "Niet wat de hub zegt dat het is"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -35554,8 +35858,9 @@ msgid "Nothing was named to open."
 msgstr "Er is niets opgegeven om te openen."
 
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "Nothing was recorded for this replay."
-msgstr ""
+msgstr "Er is niets opgenomen voor deze replay."
 
 #: src/downloads/pages/ActivityPage.tsx
 #, fuzzy
@@ -35953,8 +36258,9 @@ msgid "on or off"
 msgstr "aan of uit"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "On the hub"
-msgstr ""
+msgstr "Op de hub"
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
@@ -36223,8 +36529,9 @@ msgid "Only the first {scanned} items on the hub were read, so there may be more
 msgstr "Alleen de eerste {scanned} items op de hub zijn gelezen, dus er kunnen meer voor dit spel zijn dan hier staan. Zoek om het te verfijnen."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Only the game's owner can upload it. You can ask to own it on the game's page on the hub."
-msgstr ""
+msgstr "Alleen de eigenaar van het spel kan het uploaden. Je kunt op de pagina van het spel op de hub vragen om eigenaar te worden."
 
 #: src/multiplayer/battles/OaPorts.tsx
 #, fuzzy
@@ -36424,8 +36731,9 @@ msgid "Open another file"
 msgstr "Een ander bestand openen"
 
 #: src/runlite/pages/components/RunHud.tsx
+#, fuzzy
 msgid "Open arsenal"
-msgstr ""
+msgstr "Arsenaal openen"
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
@@ -36483,8 +36791,9 @@ msgid "Open game downloads"
 msgstr "Speldownloads openen"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Open in builder"
-msgstr ""
+msgstr "Openen in de bouwer"
 
 #: src/content/pages/components/OpenInEngineButton.tsx
 #, fuzzy
@@ -36498,8 +36807,9 @@ msgid "Open in the builder"
 msgstr "Openen in de bouwer"
 
 #: src/lego/pages/components/AnimationPanel.tsx
+#, fuzzy
 msgid "Open in the Timeline tab"
-msgstr ""
+msgstr "Openen in het tabblad Tijdlijn"
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -36562,8 +36872,9 @@ msgid "Open the game \"{id}\"."
 msgstr "Het spel \"{id}\" openen."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Open the game on the hub"
-msgstr ""
+msgstr "Het spel openen op de hub"
 
 #: src/onboarding/pages/HubPage.tsx
 #, fuzzy
@@ -36797,8 +37108,9 @@ msgid "Optional. Zero-K keeps it against your account and does not send a code."
 msgstr "Optioneel. Zero-K bewaart het bij je account en stuurt geen code."
 
 #: src/onboarding/pages/ToolsPage.tsx
+#, fuzzy
 msgid "Optionally pick tools to turn on, these can be changed in settings if you change your mind."
-msgstr ""
+msgstr "Kies eventueel tools om in te schakelen. Je kunt ze in de instellingen wijzigen als je je bedenkt."
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -37003,8 +37315,9 @@ msgid "Other pieces stay where they are."
 msgstr "Andere delen blijven waar ze zijn."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Other players can now download it from the hub's mirrors."
-msgstr ""
+msgstr "Andere spelers kunnen het nu downloaden van de mirrors van de hub."
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -37037,8 +37350,9 @@ msgid "Out of date: {reasons}"
 msgstr "Verouderd: {reasons}"
 
 #: src/runlite/pages/RunPage.tsx
+#, fuzzy
 msgid "Out of reach from here"
-msgstr ""
+msgstr "Vanaf hier buiten bereik"
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
@@ -37082,8 +37396,9 @@ msgid "Output name (-o)"
 msgstr "Uitvoernaam (-o)"
 
 #: src/lego/animPresets.ts
+#, fuzzy
 msgid "Outward swing"
-msgstr ""
+msgstr "Zwaai naar buiten"
 
 #: src/content/replayMatchFigures.ts
 #, fuzzy
@@ -37217,8 +37532,9 @@ msgstr "Aanpassingsproject verpakken"
 
 #. placeholder {0}: packResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Packaged <0>{0}</0>"
-msgstr ""
+msgstr "<0>{0}</0> verpakt"
 
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
@@ -37246,8 +37562,9 @@ msgid "Page {current} of {lastPage}"
 msgstr "Pagina {current} van {lastPage}"
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
+#, fuzzy
 msgid "Painting the ground…"
-msgstr ""
+msgstr "De grond schilderen…"
 
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/modes.tsx
@@ -37313,8 +37630,9 @@ msgid "Part of the map's name."
 msgstr "Deel van de naam van de kaart."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Partial"
-msgstr ""
+msgstr "Gedeeltelijk"
 
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
@@ -37375,12 +37693,14 @@ msgstr "Groep"
 
 #: src/content/pages/MapDetailPage.tsx
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Passability"
-msgstr ""
+msgstr "Begaanbaarheid"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Passable"
-msgstr ""
+msgstr "Begaanbaar"
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
@@ -37639,8 +37959,9 @@ msgid "People whose messages coilbox hides from you."
 msgstr "Mensen van wie coilbox de berichten voor je verbergt."
 
 #: src/content/pages/components/ReplayMetricLane.tsx
+#, fuzzy
 msgid "per minute"
-msgstr ""
+msgstr "per minuut"
 
 #: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
@@ -37902,8 +38223,9 @@ msgid "Picture uploads stopped early"
 msgstr "Uploaden van afbeeldingen vroegtijdig gestopt"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
+#, fuzzy
 msgid "Pictures show orders given from {from} to {to}."
-msgstr ""
+msgstr "De afbeeldingen tonen bevelen gegeven van {from} tot {to}."
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
@@ -38056,8 +38378,9 @@ msgid "Places a base that appears from a trigger: its terrain changes, then its 
 msgstr "Plaatst een basis die door een trigger verschijnt: eerst de terreinwijzigingen, dan de gebouwen."
 
 #: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
 msgid "Places a blueprint from your library in game and saves one back."
-msgstr ""
+msgstr "Plaatst een blauwdruk uit je bibliotheek in het spel en slaat er een terug op."
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -38122,12 +38445,14 @@ msgid "Planet Wars"
 msgstr "Planet Wars"
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
+#, fuzzy
 msgid "Planting the forest…"
-msgstr ""
+msgstr "Het bos planten…"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Plates"
-msgstr ""
+msgstr "Platen"
 
 #: src/campaign/index.ts
 #: src/conquest/index.ts
@@ -38266,8 +38591,9 @@ msgid "Play your first recorded game."
 msgstr "Speel je eerste opgenomen spel."
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "Playability"
-msgstr ""
+msgstr "Speelbaarheid"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -38681,8 +39007,9 @@ msgid "Preferred"
 msgstr "Voorkeur"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Preferred shapes"
-msgstr ""
+msgstr "Voorkeursvormen"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -39059,13 +39386,15 @@ msgid "Promoted to {name}"
 msgstr "Gepromoveerd tot {name}"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Proportions"
-msgstr ""
+msgstr "Verhoudingen"
 
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GameModelDrawer.tsx
+#, fuzzy
 msgid "Propose a skeleton"
-msgstr ""
+msgstr "Een skelet voorstellen"
 
 #: src/multiplayer/ConsoleDrawer.tsx
 #, fuzzy
@@ -39163,12 +39492,14 @@ msgid "Put back the game's weapon"
 msgstr "Het wapen van het spel terugzetten"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Put in another module of the same category"
-msgstr ""
+msgstr "Zet een andere module van dezelfde categorie in"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Put in another part of the same shape, colour and size"
-msgstr ""
+msgstr "Zet een ander onderdeel van dezelfde vorm, kleur en grootte in"
 
 #: src/scenario/pages/components/MissionHomeActions.tsx
 #, fuzzy
@@ -39554,8 +39885,9 @@ msgid "Rapid index {refreshed} from {hosts}"
 msgstr "Rapid-index {refreshed} van {hosts}"
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Rapid package"
-msgstr ""
+msgstr "Rapid-pakket"
 
 #: src/downloads/index.ts
 #: src/downloads/pages/ExplorerPage.tsx
@@ -39614,8 +39946,9 @@ msgstr "Opnieuw verifiëren"
 #. placeholder {0}: progress.done
 #. placeholder {1}: progress.total
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Read {0} of {1}"
-msgstr ""
+msgstr "{0} van {1} gelezen"
 
 #: src/hub/pages/components/MapCatalogControl.tsx
 #: src/hub/pages/components/MapPicturesControl.tsx
@@ -39791,8 +40124,9 @@ msgid "Reading {gameName}'s units…"
 msgstr "De eenheden van {gameName} lezen…"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Reading {label}…"
-msgstr ""
+msgstr "{label} lezen…"
 
 #: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
@@ -39971,8 +40305,9 @@ msgid "Reading the game's files…"
 msgstr "De bestanden van het spel lezen…"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Reading the game's units…"
-msgstr ""
+msgstr "De eenheden van het spel lezen…"
 
 #: src/content/pages/components/PlayerNamedStarts.tsx
 #, fuzzy
@@ -39995,8 +40330,9 @@ msgid "Reading the model."
 msgstr "Het model lezen."
 
 #: src/lego/pages/components/ShareModuleForm.tsx
+#, fuzzy
 msgid "Reading the module's meshes."
-msgstr ""
+msgstr "De meshes van de module lezen."
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #, fuzzy
@@ -41016,8 +41352,9 @@ msgid "Remove tag {tag}"
 msgstr "Tag {tag} verwijderen"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Remove team {team}"
-msgstr ""
+msgstr "Team {team} verwijderen"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -41333,8 +41670,9 @@ msgstr "Vervangen"
 
 #. placeholder {0}: basename(packResult.path)
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Replace {0}?"
-msgstr ""
+msgstr "{0} vervangen?"
 
 #: src/workshop/pages/components/CloneActions.tsx
 #, fuzzy
@@ -41403,8 +41741,9 @@ msgstr "\"{layoutName}\" vervangen in {dest}."
 
 #. placeholder {0}: installResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Replaced <0>{0}</0>"
-msgstr ""
+msgstr "<0>{0}</0> vervangen"
 
 #: src/content/compatReport.ts
 #, fuzzy
@@ -41454,8 +41793,9 @@ msgid "Replay deleted"
 msgstr "Replay verwijderd"
 
 #: src/content/pages/ReplayDetailPage.tsx
+#, fuzzy
 msgid "Replay facts"
-msgstr ""
+msgstr "Replaygegevens"
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -41566,16 +41906,19 @@ msgstr "Hun voorraad vorderen"
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/GenerateDrawer.tsx
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Reroll"
-msgstr ""
+msgstr "Reroll"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Reroll module"
-msgstr ""
+msgstr "Module rerollen"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Reroll part"
-msgstr ""
+msgstr "Onderdeel rerollen"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -41584,8 +41927,9 @@ msgid "Reroll seed"
 msgstr "Nieuwe seed trekken"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Reroll the parts that are not locked. Seed {rerollSeed}"
-msgstr ""
+msgstr "Reroll de onderdelen die niet zijn vergrendeld. Seed {rerollSeed}"
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -42028,8 +42372,9 @@ msgid "Reveal {firstPath}"
 msgstr "{firstPath} tonen"
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Reveal {folder}"
-msgstr ""
+msgstr "{folder} tonen"
 
 #: src/content/pages/StorageSection.tsx
 #, fuzzy
@@ -42053,8 +42398,9 @@ msgstr "De map {engineVersion} tonen"
 
 #. placeholder {0}: copy.path
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Reveal the folder holding {0}"
-msgstr ""
+msgstr "De map met {0} tonen"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -42256,16 +42602,19 @@ msgid "Rose"
 msgstr "Rozerood"
 
 #: src/lego/pages/ProjectsPage.tsx
+#, fuzzy
 msgid "Roster"
-msgstr ""
+msgstr "Roster"
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Roster name"
-msgstr ""
+msgstr "Naam van het roster"
 
 #: src/lego/pages/ProjectsPage.tsx
+#, fuzzy
 msgid "Rosters"
-msgstr ""
+msgstr "Rosters"
 
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -42440,8 +42789,9 @@ msgid "Running the engine"
 msgstr "De engine draait"
 
 #: src/content/pages/components/ReplayMetricLane.tsx
+#, fuzzy
 msgid "running total"
-msgstr ""
+msgstr "lopend totaal"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -42522,16 +42872,19 @@ msgid "Same as default"
 msgstr "Gelijk aan standaard"
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Same name and size"
-msgstr ""
+msgstr "Dezelfde naam en grootte"
 
 #: src/content/pages/components/DuplicateContent.tsx
+#, fuzzy
 msgid "Same name, different sizes"
-msgstr ""
+msgstr "Dezelfde naam, verschillende groottes"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "sand"
-msgstr ""
+msgstr "zand"
 
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -42660,8 +43013,9 @@ msgid "Save preset"
 msgstr "Voorinstelling opslaan"
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Save roster"
-msgstr ""
+msgstr "Roster opslaan"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -42704,8 +43058,9 @@ msgid "Save the selection as a module"
 msgstr "De selectie opslaan als module"
 
 #: src/lego/generatorStyles.ts
+#, fuzzy
 msgid "Save the style"
-msgstr ""
+msgstr "De stijl opslaan"
 
 #: src/startbox/StartBoxPresetsPopover.tsx
 #, fuzzy
@@ -42757,8 +43112,9 @@ msgid "Saved \"{copyName}\" to your presets."
 msgstr "\"{copyName}\" opgeslagen in je voorinstellingen."
 
 #: src/lego/pages/components/VariantMenu.tsx
+#, fuzzy
 msgid "Saved \"{name}\" beside this unit."
-msgstr ""
+msgstr "“{name}” naast deze eenheid opgeslagen."
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -42995,8 +43351,9 @@ msgid "Scaling: {scaling}."
 msgstr "Schaling: {scaling}."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Scan"
-msgstr ""
+msgstr "Scannen"
 
 #: src/content/pages/ArchivesPage.tsx
 #, fuzzy
@@ -43024,12 +43381,14 @@ msgid "Scan on startup"
 msgstr "Scannen bij opstarten"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Scanned {all} units in {time}: {counted}. {wroteText}."
-msgstr ""
+msgstr "{all} eenheden gescand in {time}: {counted}. {wroteText}."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Scanned {done} of {total} units."
-msgstr ""
+msgstr "{done} van {total} eenheden gescand."
 
 #: src/content/pages/components/RootCard.tsx
 #, fuzzy
@@ -43042,8 +43401,9 @@ msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "Gescande inhoudsmappen ({scanRootCount}): {scanRootPaths}."
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Scanned units"
-msgstr ""
+msgstr "Gescande eenheden"
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -43231,8 +43591,9 @@ msgid "Scope: {scopeText}."
 msgstr "Bereik: {scopeText}."
 
 #: src/lego/generatorJobs.ts
+#, fuzzy
 msgid "Scout"
-msgstr ""
+msgstr "Verkenner"
 
 #: src/content/pages/components/BrandingScreenshots.tsx
 #, fuzzy
@@ -43281,8 +43642,9 @@ msgid "Scroll to start"
 msgstr "Naar het begin scrollen"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "Scrub the action"
-msgstr ""
+msgstr "Door de actie scrubben"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -43644,8 +44006,9 @@ msgid "Seed"
 msgstr "Seed"
 
 #: src/lego/pages/components/GenerateDrawer.tsx
+#, fuzzy
 msgid "Seed {seed}"
-msgstr ""
+msgstr "Seed {seed}"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -44000,8 +44363,9 @@ msgstr "Naar elke speler versturen?"
 
 #: src/hub/manualSend/HubSendControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Send to hub"
-msgstr ""
+msgstr "Naar hub sturen"
 
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
@@ -44077,12 +44441,14 @@ msgid "Sending pictures to the hub"
 msgstr "Afbeeldingen naar de hub versturen"
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Sending to hub"
-msgstr ""
+msgstr "Naar hub versturen"
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Sending to the hub. Open to stop."
-msgstr ""
+msgstr "Naar de hub versturen. Open om te stoppen."
 
 #: src/hub/pages/components/GameFactsControl.tsx
 #, fuzzy
@@ -44133,12 +44499,14 @@ msgid "Sent"
 msgstr "Verzonden"
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "Sent {label} to the hub"
-msgstr ""
+msgstr "{label} naar de hub gestuurd"
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "Sent part of {label} to the hub"
-msgstr ""
+msgstr "Een deel van {label} naar de hub gestuurd"
 
 #: src/multiplayer/admin/AnnouncementsSection.tsx
 #, fuzzy
@@ -44596,8 +44964,9 @@ msgid "Shaded: {activityLabel}"
 msgstr "Gearceerd: {activityLabel}"
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
+#, fuzzy
 msgid "Shaders compiled"
-msgstr ""
+msgstr "Shaders gecompileerd"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/lego/pages/components/TexturePicker.tsx
@@ -44946,8 +45315,9 @@ msgid "Shoot at each piece"
 msgstr "Op elk deel schieten"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Short name"
-msgstr ""
+msgstr "Korte naam"
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -45058,8 +45428,9 @@ msgid "Show build orders"
 msgstr "Bouwvolgorde tonen"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "Show every lane"
-msgstr ""
+msgstr "Alle banen tonen"
 
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
@@ -45140,8 +45511,9 @@ msgstr "Nanostraal tonen"
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Show on hub"
-msgstr ""
+msgstr "Tonen op hub"
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -45234,8 +45606,9 @@ msgid "Show the side panel"
 msgstr "Het zijpaneel tonen"
 
 #: src/lego/pages/BuilderPage.tsx
+#, fuzzy
 msgid "Show the timeline"
-msgstr ""
+msgstr "De tijdlijn tonen"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -45343,8 +45716,9 @@ msgid "Shows the repulse effect (old name)"
 msgstr "Toont het afstotingseffect (oude naam)"
 
 #: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
 msgid "Shows units behind buildings and other tall features as team coloured silhouettes."
-msgstr ""
+msgstr "Toont eenheden achter gebouwen en andere hoge dingen als silhouetten in teamkleur."
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #, fuzzy
@@ -45397,8 +45771,9 @@ msgid "side graphic video"
 msgstr "zijafbeelding (video)"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
+#, fuzzy
 msgid "Side trips to every town"
-msgstr ""
+msgstr "Uitstapjes naar elke stad"
 
 #: src/lego/shortcuts.ts
 #, fuzzy
@@ -45484,8 +45859,9 @@ msgid "Sign in to the hub"
 msgstr "Inloggen op de hub"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Sign in to the hub to upload {label}."
-msgstr ""
+msgstr "Log in bij de hub om {label} te uploaden."
 
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy
@@ -45702,8 +46078,9 @@ msgid "Skeleton"
 msgstr "Skelet"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Skeletons"
-msgstr ""
+msgstr "Skeletten"
 
 #: src/animation/index.ts
 #, fuzzy
@@ -45765,12 +46142,14 @@ msgid "Sky"
 msgstr "Hemelsblauw"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Sky and light"
-msgstr ""
+msgstr "Lucht en licht"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Sky colour"
-msgstr ""
+msgstr "Luchtkleur"
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -45843,8 +46222,9 @@ msgid "SM3 map, not supported since Spring 95.0"
 msgstr "SM3-kaart, niet ondersteund sinds Spring 95.0"
 
 #: src/lego/generate.ts
+#, fuzzy
 msgid "Small"
-msgstr ""
+msgstr "Klein"
 
 #: src/campaign/pages/CampaignEditPage.tsx
 #, fuzzy
@@ -45958,8 +46338,9 @@ msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>Lua
 msgstr "Maak een snapshot van <0>springsettings.cfg</0>, <1>LuaUI/Config</1> en <2>uikeys.txt</2> van deze inhoudsmap en wissel ze om."
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "snow"
-msgstr ""
+msgstr "sneeuw"
 
 #: src/lego/pages/components/ReferencePicker.tsx
 #, fuzzy
@@ -45987,8 +46368,9 @@ msgid "Some engines record into their own folder, so deleting that engine delete
 msgstr "Sommige engines nemen op in hun eigen map, dus als je die engine verwijdert, verwijder je ook die replays. Dit verplaatst ze naar de demos-map bij de rest."
 
 #: src/deeplink/DeepLinkHandler.tsx
+#, fuzzy
 msgid "Some files were not installed"
-msgstr ""
+msgstr "Sommige bestanden zijn niet geïnstalleerd"
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
@@ -46026,8 +46408,9 @@ msgid "Something finished"
 msgstr "Er is iets klaar"
 
 #: src/runlite/pages/RunPage.tsx
+#, fuzzy
 msgid "Something strange is here. Make a choice, with no battle."
-msgstr ""
+msgstr "Hier is iets vreemds. Maak een keuze, zonder gevecht."
 
 #: src/scenario/pages/components/groups.ts
 #, fuzzy
@@ -46140,8 +46523,9 @@ msgid "south"
 msgstr "zuid"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "south edge"
-msgstr ""
+msgstr "zuidrand"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -46164,8 +46548,9 @@ msgid "Space separated category names. Empty means anything."
 msgstr "Door spaties gescheiden categorienamen. Leeg betekent alles."
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Sparse"
-msgstr ""
+msgstr "Dun bezaaid"
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -46253,8 +46638,9 @@ msgid "Speed, elmos a second"
 msgstr "Snelheid, elmo per seconde"
 
 #: src/runlite/pages/components/RunHud.tsx
+#, fuzzy
 msgid "Spend at <0><1/>depots</0>"
-msgstr ""
+msgstr "Besteed bij <0><1/>depots</0>"
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -46308,12 +46694,14 @@ msgid "Splash falloff shape"
 msgstr "Afnamevorm van de spetter"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "Spot with the largest gap"
-msgstr ""
+msgstr "Plek met de grootste kloof"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "Spots, largest gap"
-msgstr ""
+msgstr "Plekken, grootste kloof"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -46484,8 +46872,9 @@ msgstr "Starten"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "start {number}"
-msgstr ""
+msgstr "start {number}"
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
@@ -46545,8 +46934,9 @@ msgid "Start boxes"
 msgstr "Startgebieden"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "Start boxes and dots are drawn under the units, so they never hide one."
-msgstr ""
+msgstr "Startvakken en stippen worden onder de eenheden getekend, dus ze verbergen er nooit een."
 
 #: src/content/pages/components/ReplayMapHeat.tsx
 #, fuzzy
@@ -46682,8 +47072,9 @@ msgid "Start positions · {startCount}"
 msgstr "Startposities · {startCount}"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Start positions (elmos)"
-msgstr ""
+msgstr "Startposities (elmos)"
 
 #: src/content/pages/components/MapExportButtons.tsx
 #, fuzzy
@@ -46859,8 +47250,9 @@ msgid "Starts switched on"
 msgstr "Begint ingeschakeld"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "Starts, largest gap"
-msgstr ""
+msgstr "Starts, grootste kloof"
 
 #: src/general/pages/SettingsSection.tsx
 #, fuzzy
@@ -47010,8 +47402,9 @@ msgid "Stockpile round time (old name)"
 msgstr "Tijd per munitieronde (oude naam)"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Stocky"
-msgstr ""
+msgstr "Gedrongen"
 
 #: src/i18n/frameStrings.ts
 #, fuzzy
@@ -47061,8 +47454,9 @@ msgid "Stop searching"
 msgstr "Stoppen met zoeken"
 
 #: src/hub/assets/UploadRunBadge.tsx
+#, fuzzy
 msgid "Stop sending"
-msgstr ""
+msgstr "Versturen stoppen"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
@@ -47080,8 +47474,9 @@ msgid "Stop sending pictures"
 msgstr "Stoppen met versturen van afbeeldingen"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "Stop uploading"
-msgstr ""
+msgstr "Uploaden stoppen"
 
 #: src/direct/lan.ts
 #, fuzzy
@@ -47089,12 +47484,14 @@ msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr "Stop eerst je eigen ruimte. Coilbox kan maar in één ruimte tegelijk zijn."
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Stopped"
-msgstr ""
+msgstr "Gestopt"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "Stopped after {scanned} of {all} units in {time}: {counted}. {wroteText}."
-msgstr ""
+msgstr "Gestopt na {scanned} van {all} eenheden in {time}: {counted}. {wroteText}."
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -47102,12 +47499,14 @@ msgid "Stopped following {name}"
 msgstr "Je volgt {name} niet meer"
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "Stopped sending {label}"
-msgstr ""
+msgstr "Versturen van {label} gestopt"
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "Stopped uploading {label}"
-msgstr ""
+msgstr "Uploaden van {label} gestopt"
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -47115,8 +47514,9 @@ msgid "Stopping"
 msgstr "Stoppen"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "Stopping keeps what the mirror has. Uploading it again carries on from there."
-msgstr ""
+msgstr "Stoppen behoudt wat de mirror heeft. Opnieuw uploaden gaat vanaf daar verder."
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -47194,8 +47594,9 @@ msgid "Stream messages"
 msgstr "Stroomberichten"
 
 #: src/lego/pages/components/JoinedTo.tsx
+#, fuzzy
 msgid "Strength"
-msgstr ""
+msgstr "Sterkte"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -47223,8 +47624,9 @@ msgid "Stuns instead of damaging"
 msgstr "Verdooft in plaats van te beschadigen"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
+#, fuzzy
 msgid "Style"
-msgstr ""
+msgstr "Stijl"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -47268,16 +47670,19 @@ msgid "Suggested map"
 msgstr "Voorgestelde kaart"
 
 #: src/content/pages/components/ReplayPanel.tsx
+#, fuzzy
 msgid "Summary"
-msgstr ""
+msgstr "Samenvatting"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Sun colour"
-msgstr ""
+msgstr "Zonkleur"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Sun direction {axis}"
-msgstr ""
+msgstr "Zonrichting {axis}"
 
 #: src/lego/balance.ts
 #, fuzzy
@@ -47620,8 +48025,9 @@ msgid "Talk it over in {0}, which is in your chat list."
 msgstr "Bespreek het in {0}, dat in je chatlijst staat."
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "tank"
-msgstr ""
+msgstr "tank"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -47703,12 +48109,14 @@ msgid "Team {team}"
 msgstr "Team {team}"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Team {team} X"
-msgstr ""
+msgstr "Team {team} X"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Team {team} Z"
-msgstr ""
+msgstr "Team {team} Z"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -47796,8 +48204,9 @@ msgid "Terrain changes"
 msgstr "Terreinwijzigingen"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Terrain hardness"
-msgstr ""
+msgstr "Terreinhardheid"
 
 #: src/placement/TerrainControls.tsx
 #, fuzzy
@@ -48234,8 +48643,9 @@ msgid "The <0>mapdecompile</0> sidecar was not found. Bundle SpringMapConvNG or 
 msgstr "De sidecar <0>mapdecompile</0> is niet gevonden. Bundel SpringMapConvNG of stel <1>MAPCONV_MAPDECOMPILE_SIDECAR</1> in."
 
 #: src/content/pages/components/ReplayMap3D.tsx
+#, fuzzy
 msgid "the 3D map"
-msgstr ""
+msgstr "de 3D-kaart"
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 #, fuzzy
@@ -48283,8 +48693,9 @@ msgid "The animation could not be run: {failure}"
 msgstr "De animatie kon niet uitgevoerd worden: {failure}"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "The archive explorer and Rapid repositories"
-msgstr ""
+msgstr "De archiefverkenner en Rapid-repository’s"
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
@@ -48766,8 +49177,9 @@ msgid "The engine ran out of time and was stopped."
 msgstr "De engine had geen tijd meer en is gestopt."
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "The engine sees it on its next archive scan. Press Rescan on the <0>Maps page</0>."
-msgstr ""
+msgstr "De engine ziet het bij zijn volgende archiefscan. Druk op Opnieuw scannen op de <0>pagina Kaarten</0>."
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
@@ -48775,8 +49187,9 @@ msgid "The engine set as preferred could not be read. Pick another in Settings �
 msgstr "De engine die als voorkeur is ingesteld, kon niet gelezen worden. Kies een andere in Instellingen → Engines en probeer het opnieuw, of ga verder zonder de controle en zie het wanneer je speelt."
 
 #: src/play/pages/components/CrashDrawer.tsx
+#, fuzzy
 msgid "The engine stopped before it wrote its log. Everything it printed is in this file."
-msgstr ""
+msgstr "De engine stopte voordat hij zijn log schreef. Alles wat hij afdrukte staat in dit bestand."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -48834,8 +49247,9 @@ msgid "The engine's unit list could not be read."
 msgstr "De eenhedenlijst van de engine kon niet gelezen worden."
 
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "the events and chat"
-msgstr ""
+msgstr "de gebeurtenissen en chat"
 
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
@@ -48879,8 +49293,9 @@ msgid "the file"
 msgstr "het bestand"
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The file changed while it was uploading. Upload it again to send the new version."
-msgstr ""
+msgstr "Het bestand is gewijzigd tijdens het uploaden. Upload het opnieuw om de nieuwe versie te versturen."
 
 #: src/conquest/handmade/archive.ts
 #, fuzzy
@@ -48923,8 +49338,9 @@ msgid "The file is in the document but could not be read back, so it will be mis
 msgstr "Het bestand staat in het document, maar kon niet teruggelezen worden, dus het ontbreekt ook in de missie."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The file is larger than the mirror takes."
-msgstr ""
+msgstr "Het bestand is groter dan de mirror accepteert."
 
 #: src/content/pages/components/DeleteReplayButton.tsx
 #, fuzzy
@@ -49061,8 +49477,9 @@ msgid "The game could not be read"
 msgstr "Het spel kon niet gelezen worden"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "The game declares no movement classes."
-msgstr ""
+msgstr "Het spel declareert geen bewegingsklassen."
 
 #: src/i18n/uiError.ts
 #, fuzzy
@@ -49121,8 +49538,9 @@ msgid "The game has no builders."
 msgstr "Het spel heeft geen bouwers."
 
 #: src/hub/assets/pictureSweep.ts
+#, fuzzy
 msgid "The game has no logo for these factions: {names}."
-msgstr ""
+msgstr "Het spel heeft geen logo voor deze facties: {names}."
 
 #: src/lego/gameFit.ts
 #, fuzzy
@@ -49441,16 +49859,19 @@ msgid "The hub already had every map on this machine."
 msgstr "De hub had al elke kaart op deze computer."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub already has {label}"
-msgstr ""
+msgstr "De hub heeft {label} al"
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub already has a file with exactly the same contents."
-msgstr ""
+msgstr "De hub heeft al een bestand met precies dezelfde inhoud."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub already has a file with the same name."
-msgstr ""
+msgstr "De hub heeft al een bestand met dezelfde naam."
 
 #: src/hub/maps/pictureSweep.ts
 #, fuzzy
@@ -49468,12 +49889,14 @@ msgid "The hub already has a picture of every unit in your games."
 msgstr "De hub heeft al een afbeelding van elke eenheid in je spellen."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub already has an archive with the same name and version."
-msgstr ""
+msgstr "De hub heeft al een archief met dezelfde naam en versie."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub already has this archive."
-msgstr ""
+msgstr "De hub heeft dit archief al."
 
 #: src/hub/assets/pictures.ts
 #, fuzzy
@@ -49506,16 +49929,19 @@ msgid "The hub could not publish it."
 msgstr "De hub kon het niet publiceren."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub did not accept your sign-in. Sign in again, then upload it again."
-msgstr ""
+msgstr "De hub accepteerde je aanmelding niet. Meld je opnieuw aan en upload het dan opnieuw."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub does not know this game yet. Send it to the hub first, then upload the file."
-msgstr ""
+msgstr "De hub kent dit spel nog niet. Stuur het eerst naar de hub en upload dan het bestand."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The hub does not know this map yet. Send it to the hub first, then upload the file."
-msgstr ""
+msgstr "De hub kent deze kaart nog niet. Stuur hem eerst naar de hub en upload dan het bestand."
 
 #: src/content/pages/GamesPage.tsx
 #, fuzzy
@@ -49528,8 +49954,9 @@ msgid "The hub gave no address for that item's contents."
 msgstr "De hub gaf geen adres voor de inhoud van dat item."
 
 #: src/hub/upload/bulkMaps.ts
+#, fuzzy
 msgid "The hub has a different map under this name, so your copy may not match other players'."
-msgstr ""
+msgstr "De hub heeft een andere kaart onder deze naam, dus jouw kopie komt mogelijk niet overeen met die van andere spelers."
 
 #: src/hub/api.ts
 #, fuzzy
@@ -49552,8 +49979,9 @@ msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "Er staat nog niets op de hub. Alles wat je deelt, verschijnt hier."
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "The hub keeps the name of your account, privately."
-msgstr ""
+msgstr "De hub bewaart de naam van je account, privé."
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -49603,8 +50031,9 @@ msgid "The hub refused the picture lookup (HTTP {status})."
 msgstr "De hub weigerde het opzoeken van de afbeelding (HTTP {status})."
 
 #: src/hub/assets/pictureSweep.ts
+#, fuzzy
 msgid "The hub refused these factions, so they have no logo: {names}."
-msgstr ""
+msgstr "De hub weigerde deze facties, dus ze hebben geen logo: {names}."
 
 #: src/hub/api.ts
 #, fuzzy
@@ -49659,12 +50088,14 @@ msgid "The hub would not take any more {anyNoun} just now."
 msgstr "De hub wilde op dit moment geen {anyNoun} meer aannemen."
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "The hub would not take it."
-msgstr ""
+msgstr "De hub wilde het niet accepteren."
 
 #: src/hub/upload/bulkMaps.ts
+#, fuzzy
 msgid "The hub would not take this map's facts."
-msgstr ""
+msgstr "De hub wilde de gegevens van deze kaart niet accepteren."
 
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
@@ -49748,8 +50179,9 @@ msgid "The launch carries the edits itself. Placing the unit adds a generated ga
 msgstr "De start neemt de wijzigingen zelf mee. Het plaatsen van de eenheid voegt een gegenereerd spel toe, {WORKSHOP_MUTATOR_FOLDER}, en een nieuwe scan."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The legs do not all hang from one piece, so the body is left for you to pick."
-msgstr ""
+msgstr "De poten hangen niet allemaal aan één deel, dus het lichaam laten we aan jou over."
 
 #: src/lego/walkFit.ts
 #, fuzzy
@@ -49757,8 +50189,9 @@ msgid "The legs do not hang down from their joints, so \"{label}\" cannot keep t
 msgstr "De benen hangen niet omlaag vanaf hun gewrichten, dus \"{label}\" kan de voeten niet op de grond houden."
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
+#, fuzzy
 msgid "The legs hang from it"
-msgstr ""
+msgstr "De poten hangen eraan"
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -49973,8 +50406,9 @@ msgid "The maximum charge the shield can hold, reduced by incoming weapon damage
 msgstr "De maximale lading die het schild kan bevatten, verminderd door inkomende wapenschade."
 
 #: src/lego/moduleShare.ts
+#, fuzzy
 msgid "The meshes in this module could not be read."
-msgstr ""
+msgstr "De meshes in deze module konden niet worden gelezen."
 
 #: src/lego/liftIntoUnit.ts
 #, fuzzy
@@ -49987,8 +50421,9 @@ msgid "The meshes of {name} could not be read: {reason}"
 msgstr "De meshes van {name} konden niet gelezen worden: {reason}"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "The metal map has no metal."
-msgstr ""
+msgstr "De metaalkaart heeft geen metaal."
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
@@ -50006,12 +50441,14 @@ msgid "the mirror"
 msgstr "de mirror"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "The mirror has all of {name}. Waiting for the hub to list it."
-msgstr ""
+msgstr "De mirror heeft alles van {name}. Wachten tot de hub het vermeldt."
 
 #: src/hub/upload/messages.ts
+#, fuzzy
 msgid "The mirror keeps what it received, so uploading it again carries on from there."
-msgstr ""
+msgstr "De mirror bewaart wat hij heeft ontvangen, dus opnieuw uploaden gaat vanaf daar verder."
 
 #: src/scenario/wording.ts
 #, fuzzy
@@ -50292,8 +50729,9 @@ msgid "The portrait this line shows"
 msgstr "Het portret dat deze regel toont"
 
 #: src/lego/pages/components/ScanSkeletons.tsx
+#, fuzzy
 msgid "The preferred engine changed, so the scan stopped and wrote nothing."
-msgstr ""
+msgstr "De voorkeursengine is gewijzigd, dus de scan stopte en schreef niets."
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
@@ -50547,8 +50985,9 @@ msgid "The same seed and rules against this game always produce the same mod."
 msgstr "Dezelfde seed en regels voor dit spel leveren altijd dezelfde mod op."
 
 #: src/lego/pages/components/WriteSkeletons.tsx
+#, fuzzy
 msgid "The saved units could not be read: {loadMessage}"
-msgstr ""
+msgstr "De opgeslagen eenheden konden niet worden gelezen: {loadMessage}"
 
 #: src/content/pages/components/states.tsx
 #, fuzzy
@@ -50591,8 +51030,9 @@ msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a d
 msgstr "Het scenario \"{scenarioName}\" is gemaakt voor {scenarioGame}, een ander spel dan {installedName}. Het kan hier niet gespeeld worden."
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "The scenario and campaign builders"
-msgstr ""
+msgstr "De scenario- en campagnebouwers"
 
 #: src/conquest/handmade/read.ts
 #, fuzzy
@@ -50785,8 +51225,9 @@ msgid "The settings changed after coilbox read them, so nothing was saved. Close
 msgstr "De instellingen zijn veranderd nadat coilbox ze gelezen had, dus er is niets opgeslagen. Sluit dit en open het opnieuw."
 
 #: src/lego/pages/components/TexturePicker.tsx
+#, fuzzy
 msgid "The shading map file has changed."
-msgstr ""
+msgstr "Het bestand met de schaduwkaart is gewijzigd."
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -50809,8 +51250,9 @@ msgid "the sine of the roll angle, so 0.8 is 53 degrees"
 msgstr "de sinus van de rolhoek, dus 0.8 is 53 graden"
 
 #: src/lego/pages/components/TestDrawer.tsx
+#, fuzzy
 msgid "The skeleton overlay could not be set up, so the match starts without it: {skeletonProblem}"
-msgstr ""
+msgstr "De skeletoverlay kon niet worden ingesteld, dus de wedstrijd start zonder: {skeletonProblem}"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -50913,8 +51355,9 @@ msgid "The surround picture \"{file}\" is {wideWidth} by {wideHeight} pixels. It
 msgstr "De randafbeelding \"{file}\" is {wideWidth} bij {wideHeight} pixels. Hij moet {wantWidth} bij {wantHeight} zijn om net zo ver te reiken als de randhoogtekaart."
 
 #: src/content/pages/components/ReplayMap3D.tsx
+#, fuzzy
 msgid "The terrain comes from the map's own height data."
-msgstr ""
+msgstr "Het terrein komt uit de eigen hoogtegegevens van de kaart."
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -50922,8 +51365,9 @@ msgid "The test mutator brings {conditionCount} conditions and {actionCount} act
 msgstr "De testmutator brengt {conditionCount} voorwaarden en {actionCount} acties mee"
 
 #: src/lego/pages/components/TexturePicker.tsx
+#, fuzzy
 msgid "The texture file has changed."
-msgstr ""
+msgstr "Het texturebestand is gewijzigd."
 
 #: src/lego/sandboxReload.ts
 #, fuzzy
@@ -51056,20 +51500,24 @@ msgid "The unit definition, the model and the texture changed."
 msgstr "De eenheidsdefinitie, het model en de textuur zijn veranderd."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit flies, and plans are proposed only for units that walk or roll and for buildings, so no plan is proposed."
-msgstr ""
+msgstr "De eenheid vliegt, en plannen worden alleen voorgesteld voor eenheden die lopen of rollen en voor gebouwen, dus er wordt geen plan voorgesteld."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit has {count} wheels a side, and the Wheels plan takes {min} to {max} axles, so no plan is proposed."
-msgstr ""
+msgstr "De eenheid heeft {count} wielen per kant, en het plan Wielen accepteert {min} tot {max} assen, dus er wordt geen plan voorgesteld."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit has {l} legs on its left and {r} on its right, so they do not pair up and no plan is proposed."
-msgstr ""
+msgstr "De eenheid heeft {l} poten links en {r} rechts, dus ze vormen geen paren en er wordt geen plan voorgesteld."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit has {l} wheels on its left and {r} on its right, so they do not pair up into axles and no plan is proposed."
-msgstr ""
+msgstr "De eenheid heeft {l} wielen links en {r} rechts, dus ze vormen geen assen en er wordt geen plan voorgesteld."
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 #, fuzzy
@@ -51082,8 +51530,9 @@ msgid "The unit has files the game did not start with, so relaunch to see them."
 msgstr "De eenheid heeft bestanden waarmee het spel niet begon, dus start opnieuw om ze te zien."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit has no game definition to say whether it moves, and no legs or wheels were found, so no plan is proposed."
-msgstr ""
+msgstr "De eenheid heeft geen spelsdefinitie die zegt of hij beweegt, en er zijn geen poten of wielen gevonden, dus er wordt geen plan voorgesteld."
 
 #: src/lego/footprint.ts
 #, fuzzy
@@ -51091,8 +51540,9 @@ msgid "The unit has no geometry."
 msgstr "De eenheid heeft geen geometrie."
 
 #: src/lego/pages/components/ExportDrawer.tsx
+#, fuzzy
 msgid "The unit is exported, but its skeleton file is not: {doneSkeletonProblem}"
-msgstr ""
+msgstr "De eenheid is geëxporteerd, maar het skeletbestand niet: {doneSkeletonProblem}"
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -51135,12 +51585,14 @@ msgid "The unit moves sideways when it cannot shoot from where it is."
 msgstr "De eenheid beweegt zijwaarts als ze niet kan schieten vanaf waar ze staat."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit moves, but its script moves none of its pieces when it starts moving, so there are no legs or wheels to find and no plan is proposed."
-msgstr ""
+msgstr "De eenheid beweegt, maar zijn script beweegt geen enkel deel als hij begint te bewegen, dus er zijn geen poten of wielen te vinden en er wordt geen plan voorgesteld."
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The unit moves, but no legs or wheels were found that turn as it does, so no plan is proposed."
-msgstr ""
+msgstr "De eenheid beweegt, maar er zijn geen poten of wielen gevonden die draaien zoals hij, dus er wordt geen plan voorgesteld."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -51153,16 +51605,19 @@ msgid "The unit throws out a decoy whenever a missile comes at it."
 msgstr "De eenheid werpt een lokmiddel uit telkens als er een raket op haar afkomt."
 
 #: src/lego/generateChecked.ts
+#, fuzzy
 msgid "The unit's lowest point is {distance} elmos above the ground."
-msgstr ""
+msgstr "Het laagste punt van de eenheid ligt {distance} elmos boven de grond."
 
 #: src/lego/generateChecked.ts
+#, fuzzy
 msgid "The unit's lowest point is {distance} elmos below the ground."
-msgstr ""
+msgstr "Het laagste punt van de eenheid ligt {distance} elmos onder de grond."
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
+#, fuzzy
 msgid "The unit's root piece"
-msgstr ""
+msgstr "Het hoofddeel van de eenheid"
 
 #: src/content/pages/components/ReplayEventList.tsx
 #, fuzzy
@@ -51225,16 +51680,19 @@ msgid "The warpath was not started. {reason}"
 msgstr "Het Oorlogspad is niet gestart. {reason}"
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The wheels do not all hang from one piece, so the body is left for you to pick."
-msgstr ""
+msgstr "De wielen hangen niet allemaal aan één deel, dus het lichaam laten we aan jou over."
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
+#, fuzzy
 msgid "The wheels hang from it"
-msgstr ""
+msgstr "De wielen hangen eraan"
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "The wheels on the left and right are not level front to back, so which wheels share an axle is unknown and no plan is proposed."
-msgstr ""
+msgstr "De wielen links en rechts liggen niet op gelijke hoogte van voor naar achter, dus het is onbekend welke wielen een as delen en er wordt geen plan voorgesteld."
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -51436,8 +51894,9 @@ msgid "These costs come from a different build and may be wrong."
 msgstr "Deze kosten komen uit een andere build en kunnen fout zijn."
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "These files will be public. Anyone can download them from the hub's mirrors."
-msgstr ""
+msgstr "Deze bestanden worden openbaar. Iedereen kan ze downloaden van de mirrors van de hub."
 
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #, fuzzy
@@ -51455,8 +51914,9 @@ msgid "These sums differ from the damage figures in the match chart. The engine'
 msgstr "Deze sommen wijken af van de schadecijfers in de wedstrijdgrafiek. Het eigen totaal van de engine telt elke treffer als de levenspunten die het doelwit al miste, tot de grootte van de treffer, dus de eerste treffer op een onbeschadigde eenheid voegt er niets aan toe."
 
 #: src/lego/pages/components/ShareModuleForm.tsx
+#, fuzzy
 msgid "These textures are too large for a code or are not in coilbox's texture store, so the module arrives without them: {leftOut}"
-msgstr ""
+msgstr "Deze texturen zijn te groot voor een code of staan niet in de texturewinkel van coilbox, dus de module komt zonder aan: {leftOut}"
 
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
@@ -51886,8 +52346,9 @@ msgid "This file is empty and nothing in it can be played. A game that was close
 msgstr "Dit bestand is leeg en er valt niets uit af te spelen. Een spel dat gesloten, beëindigd of gecrasht werd voordat het afgelopen was, laat zo’n bestand achter."
 
 #: src/lego/generatorStyles.ts
+#, fuzzy
 msgid "This file is not a coilbox style."
-msgstr ""
+msgstr "Dit bestand is geen coilbox-stijl."
 
 #: src/content/pages/KeybindsSection.tsx
 #, fuzzy
@@ -52067,8 +52528,9 @@ msgid "This import URL is not valid."
 msgstr "Deze import-URL is ongeldig."
 
 #: src/deeplink/readImport.ts
+#, fuzzy
 msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Mission builders in Settings, then use Campaign builder and its Import button."
-msgstr ""
+msgstr "Dit is {campaignPhrase}. Campagnes importeer je uit een bestand: schakel Missiebouwers in bij Instellingen en gebruik dan Campaign builder en de knop Importeren."
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -52264,8 +52726,9 @@ msgid "This map's heights could not be read. Nothing here has been checked again
 msgstr "De hoogtes van deze kaart konden niet gelezen worden. Niets hier is tegen de grond gecontroleerd, dus elk vak is gestippeld in plaats van strak."
 
 #: src/mapconv/skyboxNote.ts
+#, fuzzy
 msgid "This map's skybox is a DDS, but not a cube map, so the preview draws a sky from the map's colours instead."
-msgstr ""
+msgstr "De skybox van deze kaart is een DDS, maar geen cubemap, dus het voorbeeld tekent een lucht met de kleuren van de kaart."
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -52369,12 +52832,14 @@ msgid "This model was opened from inside a packed archive, which holds no path t
 msgstr "Dit model is geopend uit een ingepakt archief, dat geen pad bevat om naar terug te schrijven. Sla het in plaats daarvan op in een gekozen pad."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "This module has no category, so there is no other of its kind."
-msgstr ""
+msgstr "Deze module heeft geen categorie, dus er is geen andere van zijn soort."
 
 #: src/lego/moduleShare.ts
+#, fuzzy
 msgid "This module holds geometry from a game, or meshes with no record that they are the maker's own, which a shared module cannot carry."
-msgstr ""
+msgstr "Deze module bevat geometrie uit een spel, of meshes zonder vermelding dat ze van de maker zelf zijn, wat een gedeelde module niet kan bevatten."
 
 #: src/lego/moduleShare.ts
 #, fuzzy
@@ -52382,8 +52847,9 @@ msgid "This module is {size} KB, over the {limit} KB a code can carry."
 msgstr "Deze module is {size} KB, meer dan de {limit} KB die een code kan bevatten."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "This module is not in the module library."
-msgstr ""
+msgstr "Deze module staat niet in de modulebibliotheek."
 
 #: src/lego/moduleShare.ts
 #, fuzzy
@@ -52476,12 +52942,14 @@ msgid "This piece is from {pieceGame}. This unit is for {unitGameName}."
 msgstr "Dit deel komt uit {pieceGame}. Deze eenheid is voor {unitGameName}."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "This piece is not a part or module, so it cannot be rerolled."
-msgstr ""
+msgstr "Dit deel is geen onderdeel of module, dus het kan niet worden gererold."
 
 #: src/lego/rerollPart.ts
+#, fuzzy
 msgid "This piece's part is not in the parts library."
-msgstr ""
+msgstr "Het onderdeel van dit deel staat niet in de onderdelenbibliotheek."
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #, fuzzy
@@ -52596,8 +53064,9 @@ msgid "This replay could not be read to the end, so later orders may be missing.
 msgstr "Deze replay kon niet tot het einde gelezen worden, dus latere orders kunnen ontbreken."
 
 #: src/content/pages/components/ReplayEventList.tsx
+#, fuzzy
 msgid "This replay could not be read to the end, so the list may be incomplete."
-msgstr ""
+msgstr "Deze replay kon niet tot het einde worden gelezen, dus de lijst is mogelijk onvolledig."
 
 #: src/content/replayAnalysis.ts
 #, fuzzy
@@ -52904,8 +53373,9 @@ msgid "This script includes {includes}. A script pasted here cannot load its inc
 msgstr "Dit script bevat {includes}. Een script dat hier geplakt is, kan zijn includes niet laden, dus het kan niet omgezet worden. Laad in plaats daarvan de .bos uit zijn map, of open de eenheid uit haar spel."
 
 #: src/lego/pages/components/ScriptTab.tsx
+#, fuzzy
 msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Discard it and the Animation panel works again."
-msgstr ""
+msgstr "Dit script is leeg, dus de eenheid heeft helemaal geen animatie en de presets kunnen hem niet bereiken. Verwerp het en het paneel Animatie werkt weer."
 
 #: src/lego/aimResolver.ts
 #, fuzzy
@@ -53048,8 +53518,9 @@ msgid "This unit has no game, so its effects are drawn as a plain round sprite."
 msgstr "Deze eenheid heeft geen spel, dus haar effecten worden als gewone ronde sprite getekend."
 
 #: src/lego/styleFromUnit.ts
+#, fuzzy
 msgid "This unit has no parts to make a style from."
-msgstr ""
+msgstr "Deze eenheid heeft geen onderdelen om een stijl van te maken."
 
 #: src/lego/pages/components/WorthSection.tsx
 #, fuzzy
@@ -53069,8 +53540,9 @@ msgid "This unit has no root piece."
 msgstr "Deze eenheid heeft geen worteldeel."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "This unit has no weapon module to change."
-msgstr ""
+msgstr "Deze eenheid heeft geen wapenmodule om te wijzigen."
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 #, fuzzy
@@ -53104,12 +53576,14 @@ msgid "This unit moves but names no movement class, so the engine drops it at lo
 msgstr "Deze eenheid beweegt maar noemt geen bewegingsklasse, dus de engine laat haar bij het laden vallen. Kies er een."
 
 #: src/lego/reroll.ts
+#, fuzzy
 msgid "This unit no longer has the skeleton it was generated on, so it cannot be rerolled."
-msgstr ""
+msgstr "Deze eenheid heeft het skelet waarop hij is gegenereerd niet meer, dus hij kan niet worden gererold."
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "This unit runs its own script."
-msgstr ""
+msgstr "Deze eenheid draait zijn eigen script."
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -53117,13 +53591,15 @@ msgid "This unit was built against the \"{builtAgainst}\" pack, and that pack is
 msgstr "Deze eenheid is gebouwd tegen het pakket \"{builtAgainst}\", en dat pakket is niet geïnstalleerd."
 
 #: src/lego/styleFromUnit.ts
+#, fuzzy
 msgid "This unit was imported from a game model, so it has no parts to make a style from."
-msgstr ""
+msgstr "Deze eenheid is geïmporteerd uit een spelmodel, dus hij heeft geen onderdelen om een stijl van te maken."
 
 #: src/lego/reroll.ts
 #: src/lego/variant.ts
+#, fuzzy
 msgid "This unit was not generated."
-msgstr ""
+msgstr "Deze eenheid is niet gegenereerd."
 
 #: src/lego/pack.ts
 #, fuzzy
@@ -53167,8 +53643,9 @@ msgid "this unit's geometry file is missing (404). It was written when the model
 msgstr "het geometriebestand van deze eenheid ontbreekt (404). Het is geschreven toen het model geïmporteerd werd, en het is de enige kopie van de meshes."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "This unit's job fixes its weapon's size and shape, and the module library has no other weapon of its kind, so there is nothing to change."
-msgstr ""
+msgstr "De taak van deze eenheid legt de grootte en vorm van zijn wapen vast, en de modulebibliotheek heeft geen ander wapen van zijn soort, dus er valt niets te wijzigen."
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -53203,12 +53680,14 @@ msgid "This value has been changed from the game's default."
 msgstr "Deze waarde is gewijzigd ten opzichte van de standaard van het spel."
 
 #: src/lego/reroll.ts
+#, fuzzy
 msgid "This version cannot generate the job {job} at size {size}, so the unit cannot be rerolled."
-msgstr ""
+msgstr "Deze versie kan de taak {job} niet genereren op grootte {size}, dus de eenheid kan niet worden gererold."
 
 #: src/lego/variant.ts
+#, fuzzy
 msgid "This version cannot generate the job {name} at size {sized}, so a variant cannot be made."
-msgstr ""
+msgstr "Deze versie kan de taak {name} niet genereren op grootte {sized}, dus er kan geen variant worden gemaakt."
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
@@ -53271,8 +53750,9 @@ msgid "Threshold (-th)"
 msgstr "Drempel (-th)"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "through the centre"
-msgstr ""
+msgstr "door het midden"
 
 #: src/uberstress/pages/components/ReportDetail.tsx
 #, fuzzy
@@ -53335,8 +53815,9 @@ msgid "Tier weights: {tierText}."
 msgstr "Niveaugewichten: {tierText}."
 
 #: src/lego/pages/components/RosterDrawer.tsx
+#, fuzzy
 msgid "Tiers"
-msgstr ""
+msgstr "Niveaus"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -53447,8 +53928,9 @@ msgid "to allies"
 msgstr "aan bondgenoten"
 
 #: src/lego/pages/components/TimelineTab.tsx
+#, fuzzy
 msgid "To make a key, pause on a frame, move a piece with the gizmo, and press Key. Every turn and move you changed gets a key on that frame. Moving the ruler drops a change you have not keyed. Pick a key on a turn or move row to type its value."
-msgstr ""
+msgstr "Om een keyframe te maken, pauzeer je op een frame, verplaats je een deel met de gizmo en druk je op Keyframe. Elke draaiing en beweging die je hebt gewijzigd krijgt een keyframe op dat frame. Als je de liniaal verplaatst, vervalt een wijziging zonder keyframe. Kies een keyframe op een draai- of beweegrij om de waarde in te typen."
 
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
@@ -53516,8 +53998,9 @@ msgid "Took \"{name}\" off the withheld list."
 msgstr "\"{name}\" van de achtergehouden lijst gehaald."
 
 #: src/general/pages/SettingsSection.tsx
+#, fuzzy
 msgid "Tools"
-msgstr ""
+msgstr "Tools"
 
 #: src/general/index.ts
 #, fuzzy
@@ -54056,16 +54539,19 @@ msgid "Turn without slowing"
 msgstr "Draaien zonder af te remmen"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Turn x"
-msgstr ""
+msgstr "Draai x"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Turn y"
-msgstr ""
+msgstr "Draai y"
 
 #: src/lego/timelineModel.ts
+#, fuzzy
 msgid "Turn z"
-msgstr ""
+msgstr "Draai z"
 
 #: src/scenario/pages/components/rigidTurn.ts
 #, fuzzy
@@ -54227,12 +54713,14 @@ msgid "Two sides"
 msgstr "Twee kanten"
 
 #: src/mapconv/pages/components/MetalFigures.tsx
+#, fuzzy
 msgid "two spots are {distance} elmos apart, at {ax}, {az} and {bx}, {bz}"
-msgstr ""
+msgstr "twee plekken liggen {distance} elmos uit elkaar, op {ax}, {az} en {bx}, {bz}"
 
 #: src/lego/proposePlan.ts
+#, fuzzy
 msgid "Two wheels on one side are the same distance front to back, so which axle each is on is unknown and no plan is proposed."
-msgstr ""
+msgstr "Twee wielen aan één kant liggen even ver van voor naar achter, dus het is onbekend op welke as elk zit en er wordt geen plan voorgesteld."
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -54310,8 +54798,9 @@ msgid "uberstress"
 msgstr "uberstress"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Uberstress"
-msgstr ""
+msgstr "Uberstress"
 
 #: src/content/pages/components/ReplayRoster.tsx
 #, fuzzy
@@ -54360,8 +54849,9 @@ msgid "Unblock…"
 msgstr "Deblokkeren…"
 
 #: src/lego/pages/components/JoinedTo.tsx
+#, fuzzy
 msgid "Unbreakable"
-msgstr ""
+msgstr "Onbreekbaar"
 
 #: src/lego/inventoryCategory.ts
 #: src/lego/pages/components/DetailPanel.tsx
@@ -54464,8 +54954,9 @@ msgid "Undo ({undoShortcut})"
 msgstr "Ongedaan maken ({undoShortcut})"
 
 #: src/lego/pages/components/ScriptTab.tsx
+#, fuzzy
 msgid "Undo brings the text back."
-msgstr ""
+msgstr "Ongedaan maken brengt de tekst terug."
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #, fuzzy
@@ -54593,8 +55084,9 @@ msgid "Unit defs: {defsError}"
 msgstr "Eenheidsdefinities: {defsError}"
 
 #: src/content/pages/components/ReplayTimelineDock.tsx
+#, fuzzy
 msgid "Unit destroyed, {when}"
-msgstr ""
+msgstr "Eenheid vernietigd, {when}"
 
 #: src/lego/pages/components/UnitCard.tsx
 #, fuzzy
@@ -54602,8 +55094,9 @@ msgid "Unit details"
 msgstr "Eenheidsdetails"
 
 #: src/content/pages/components/ReplayMapUnits.tsx
+#, fuzzy
 msgid "Unit drawing"
-msgstr ""
+msgstr "Eenheden tekenen"
 
 #: src/campaign/slots.ts
 #, fuzzy
@@ -54616,8 +55109,9 @@ msgid "Unit models"
 msgstr "Eenheidsmodellen"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Unit models, Lego parts and unit tweaks"
-msgstr ""
+msgstr "Eenheidsmodellen, Lego-onderdelen en eenheidsaanpassingen"
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -54675,8 +55169,9 @@ msgid "unit to build"
 msgstr "te bouwen eenheid"
 
 #: src/general/FeatureToggles.tsx
+#, fuzzy
 msgid "Unit tools"
-msgstr ""
+msgstr "Eenheidstools"
 
 #: src/container/names.ts
 #, fuzzy
@@ -55239,8 +55734,9 @@ msgstr "Bijgewerkt"
 
 #. placeholder {0}: mapinfoResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Updated <0>{0}</0>"
-msgstr ""
+msgstr "<0>{0}</0> bijgewerkt"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
@@ -55293,48 +55789,59 @@ msgid "Upgrades into"
 msgstr "Upgradet naar"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Upload"
-msgstr ""
+msgstr "Uploaden"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Upload {count, plural, one {# map} other {# maps}} ({size})"
-msgstr ""
+msgstr "{count, plural, one {# kaart} other {# kaarten}} uploaden ({size})"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Upload {label} to the hub?"
-msgstr ""
+msgstr "{label} uploaden naar de hub?"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Upload again"
-msgstr ""
+msgstr "Opnieuw uploaden"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Upload to hub"
-msgstr ""
+msgstr "Uploaden naar hub"
 
 #: src/hub/upload/bulkMaps.ts
+#, fuzzy
 msgid "Uploaded {listed} of {total, plural, one {# map} other {# maps}} to the hub"
-msgstr ""
+msgstr "{listed} van {total, plural, one {# kaart} other {# kaarten}} geüpload naar de hub"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Uploading"
-msgstr ""
+msgstr "Uploaden"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "Uploading to hub"
-msgstr ""
+msgstr "Uploaden naar hub"
 
 #: src/hub/upload/ArchiveUploadBadge.tsx
+#, fuzzy
 msgid "Uploading to the hub. Open to stop."
-msgstr ""
+msgstr "Uploaden naar de hub. Open om te stoppen."
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Uploading your map files"
-msgstr ""
+msgstr "Je kaartbestanden uploaden"
 
 #: src/hub/upload/UploadToHubButton.tsx
+#, fuzzy
 msgid "Uploading…"
-msgstr ""
+msgstr "Uploaden…"
 
 #: src/lego/pages/components/EnvironmentPicker.tsx
 #, fuzzy
@@ -55603,12 +56110,14 @@ msgid "Variables"
 msgstr "Variabelen"
 
 #: src/lego/pages/components/VariantMenu.tsx
+#, fuzzy
 msgid "Variant"
-msgstr ""
+msgstr "Variant"
 
 #: src/lego/pages/ProjectsPage.tsx
+#, fuzzy
 msgid "Variant of {parentName}"
-msgstr ""
+msgstr "Variant van {parentName}"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -55867,8 +56376,9 @@ msgid "Wait for them"
 msgstr "Op hen wachten"
 
 #: src/hub/pages/components/MapArchivesControl.tsx
+#, fuzzy
 msgid "Waiting"
-msgstr ""
+msgstr "Wachten"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx
@@ -56131,12 +56641,14 @@ msgid "Water"
 msgstr "Water"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Water and ground"
-msgstr ""
+msgstr "Water en grond"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Water colour"
-msgstr ""
+msgstr "Waterkleur"
 
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
@@ -56144,8 +56656,9 @@ msgid "Water depth"
 msgstr "Waterdiepte"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
+#, fuzzy
 msgid "Water opacity"
-msgstr ""
+msgstr "Wateropaciteit"
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -56307,8 +56820,9 @@ msgid "west"
 msgstr "west"
 
 #: src/mapconv/pages/components/PlayabilityPanel.tsx
+#, fuzzy
 msgid "west edge"
-msgstr ""
+msgstr "westrand"
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
@@ -56386,8 +56900,9 @@ msgid "What every key does, on a keyboard you can click."
 msgstr "Wat elke toets doet, op een toetsenbord waarop je kunt klikken."
 
 #: src/hub/manualSend/run.ts
+#, fuzzy
 msgid "What had already gone stays on the hub."
-msgstr ""
+msgstr "Wat al weg was, blijft op de hub."
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -56896,8 +57411,9 @@ msgid "Which team won"
 msgstr "Welk team won"
 
 #: src/content/pages/components/ReplayRoster.tsx
+#, fuzzy
 msgid "Which time the figures are for"
-msgstr ""
+msgstr "Voor welk tijdstip de cijfers gelden"
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
@@ -57356,8 +57872,9 @@ msgid "won {won} of {known}"
 msgstr "{won} van {known} gewonnen"
 
 #: src/runlite/pages/components/RunHud.tsx
+#, fuzzy
 msgid "Won in battles (more for elites and bosses) and collected at salvage caches. Spend it at depots on unit unlocks, perks, and repairs."
-msgstr ""
+msgstr "Gewonnen in gevechten (meer bij elites en bazen) en verzameld bij bergingsdepots. Besteed het bij depots aan eenheidsontgrendelingen, voordelen en reparaties."
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
@@ -57524,8 +58041,9 @@ msgid "Write into {gameLabel}'s {gameFileName}"
 msgstr "Schrijven naar {gameFileName} van {gameLabel}"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Write mapinfo.lua"
-msgstr ""
+msgstr "mapinfo.lua schrijven"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -57538,16 +58056,19 @@ msgid "Write root portability n/a (not portable)"
 msgstr "Draagbaarheid van de schrijfmap n.v.t. (niet draagbaar)"
 
 #: src/lego/pages/components/WriteSkeletons.tsx
+#, fuzzy
 msgid "Write saved models"
-msgstr ""
+msgstr "Opgeslagen modellen schrijven"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Write sky"
-msgstr ""
+msgstr "Lucht schrijven"
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Write splats"
-msgstr ""
+msgstr "Splats schrijven"
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #, fuzzy
@@ -57671,12 +58192,14 @@ msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# she
 msgstr "{modelsWritten} van {modelsFound} modellen geschreven in {0, plural, one {# blad} other {# bladen}}."
 
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Wrote {splatCount} splat files with {splatGround} ground to <0>{splatFolder}</0>"
-msgstr ""
+msgstr "{splatCount} splatbestanden met {splatGround} grond geschreven naar <0>{splatFolder}</0>"
 
 #: src/lego/pages/components/WriteSkeletons.tsx
+#, fuzzy
 msgid "Wrote {unitCount, plural, one {# unit} other {# units}} to {fileCount, plural, one {# file} other {# files}}."
-msgstr ""
+msgstr "{unitCount, plural, one {# eenheid} other {# eenheden}} geschreven naar {fileCount, plural, one {# bestand} other {# bestanden}}."
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -57685,8 +58208,9 @@ msgstr "<0/> geschreven. Start Coilbox opnieuw om het te laden."
 
 #. placeholder {0}: skyResult.path
 #: src/mapconv/pages/CompilePage.tsx
+#, fuzzy
 msgid "Wrote <0>{0}</0>"
-msgstr ""
+msgstr "<0>{0}</0> geschreven"
 
 #: src/blueprint/pack.ts
 #, fuzzy
@@ -57729,8 +58253,9 @@ msgid "X in elmos"
 msgstr "X in elmo"
 
 #: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
 msgid "X-Ray Unit Silhouettes"
-msgstr ""
+msgstr "Röntgensilhouetten van eenheden"
 
 #: src/lego/pages/components/AxisCompass.tsx
 #, fuzzy
@@ -58038,8 +58563,9 @@ msgid "you only · per-team"
 msgstr "alleen jij · per team"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
+#, fuzzy
 msgid "you only · unlocks units"
-msgstr ""
+msgstr "alleen jij · ontgrendelt eenheden"
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
