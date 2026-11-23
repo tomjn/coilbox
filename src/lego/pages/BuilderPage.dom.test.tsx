@@ -644,28 +644,28 @@ describe("the create a style button (#3238)", () => {
     );
   });
 
-  it("says a unit with no parts cannot give a style", async () => {
+  // Disabled rather than pressed into an error, with the reason as its
+  // tooltip (`refusalMessage`, covered in styleFromUnit.test.ts).
+  it("is off for a unit with no parts", async () => {
     show(unit());
-    await click();
+    const button = await screen.findByRole("button", {
+      name: "Create a style from this unit",
+    });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button);
     expect(copyStyle).not.toHaveBeenCalled();
-    expect(notice).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: "error",
-        body: expect.stringContaining("no parts"),
-      }),
-    );
+    expect(notice).not.toHaveBeenCalled();
   });
 
-  it("says a unit imported from a game model cannot give a style", async () => {
+  it("is off for a unit imported from a game model", async () => {
     show(unit({ imported: { source: "/tmp/unit.s3o" } }));
-    await click();
+    const button = await screen.findByRole("button", {
+      name: "Create a style from this unit",
+    });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button);
     expect(copyStyle).not.toHaveBeenCalled();
-    expect(notice).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: "error",
-        body: expect.stringContaining("imported"),
-      }),
-    );
+    expect(notice).not.toHaveBeenCalled();
   });
 });
 
