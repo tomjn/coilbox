@@ -78,7 +78,6 @@ function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
     overlap: toggle(),
     footprint: { ...toggle(), leaveOut: true, onLeaveOutChange: vi.fn() },
     aim: toggle(),
-    measure: toggle(),
     guides: (
       <GuidesPopover
         guides={[]}
@@ -218,20 +217,11 @@ describe("the Show menu", () => {
 });
 
 describe("tools in the bar", () => {
-  it("shows the measure tool as on while it is on", () => {
-    const { rerender } = render(<ViewportBar {...props()} />);
-    const idle = screen.getByRole("button", {
-      name: /^Measure between two points/,
-    });
-    expect(idle.getAttribute("aria-pressed")).toBe("false");
-    expect(idle.className).not.toContain("bg-primary");
-
-    rerender(<ViewportBar {...props({ measure: toggle(true) })} />);
-    const active = screen.getByRole("button", {
-      name: /^Leave the measure tool/,
-    });
-    expect(active.getAttribute("aria-pressed")).toBe("true");
-    expect(active.className).toContain("bg-primary");
+  it("leaves the measure tool to the tool rail", () => {
+    render(<ViewportBar {...props()} />);
+    expect(
+      screen.queryByRole("button", { name: /^Measure between two points/ }),
+    ).toBeNull();
   });
 });
 
@@ -252,20 +242,13 @@ describe("icons", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it("draws the measure tool and the guides with different icons", () => {
+  it("does not give the guides a ruler, which the measure tool has", () => {
     render(<ViewportBar {...props()} />);
-    const measure = screen.getByRole("button", {
-      name: /^Measure between two points/,
-    });
     const guides = screen.getByRole("button", { name: "Guides" });
-    const measureIcon = lucideName(
-      measure.querySelector("svg.lucide") as Element,
-    );
     const guidesIcon = lucideName(
       guides.querySelector("svg.lucide") as Element,
     );
-    expect(measureIcon).not.toBe(guidesIcon);
-    expect([measureIcon, guidesIcon]).not.toContain("lucide-ruler");
+    expect(guidesIcon).not.toMatch(/^lucide-ruler/);
   });
 });
 
@@ -275,8 +258,8 @@ describe("the axis compass", () => {
     expect(screen.queryByRole("button", { name: "Reset the view" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Fixed views" })).toBeNull();
     expect(screen.queryByRole("button", { name: /perspective/ })).toBeNull();
-    // The Show menu, the draw mode, the measure tool, the pickers and the
-    // keyboard sheet are what is left.
-    expect(barButtons()).toHaveLength(7);
+    // The Show menu, the draw mode, the pickers and the keyboard sheet are
+    // what is left.
+    expect(barButtons()).toHaveLength(6);
   });
 });

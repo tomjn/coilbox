@@ -20,7 +20,6 @@ import {
   Layers,
   ListChecks,
   type LucideIcon,
-  RulerDimensionLine,
   SquareDashed,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -68,7 +67,6 @@ export interface ViewportBarProps {
   aim: Toggle;
   /** Absent for a unit with no weapon ranges to draw. */
   reach?: Toggle;
-  measure: Toggle;
   /** The pose list popover, absent where poses cannot be edited. */
   poses?: ReactNode;
   /** The guides popover, absent where guides cannot be edited. */
@@ -115,7 +113,6 @@ export function ViewportBar({
   footprint,
   aim,
   reach,
-  measure,
   poses,
   guides,
   guideVisibility,
@@ -130,7 +127,6 @@ export function ViewportBar({
   // Re-render when a shortcut is rebound, so its tooltip keeps up.
   useShortcutOverrides();
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
-  const measureKey = shortcutLabel("measure");
   const skeletonKey = shortcutLabel("skeleton");
   /** The plain on and off overlays, in the order the menu lists them. A toggle
    *  the page does not offer is left out. */
@@ -199,13 +195,6 @@ export function ViewportBar({
       >
         <DrawModeFace className="size-4" />
       </ViewButton>
-      <ViewToggle
-        icon={RulerDimensionLine}
-        on={measure.on}
-        onChange={measure.onChange}
-        hideTitle={t`Leave the measure tool (${measureKey})`}
-        showTitle={t`Measure between two points (${measureKey})`}
-      />
       {poses}
       {guides}
       {environment}

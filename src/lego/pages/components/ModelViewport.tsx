@@ -26,6 +26,7 @@ import {
   FlipHorizontal2,
   Move,
   RotateCw,
+  RulerDimensionLine,
   Scaling,
   Trash2,
 } from "lucide-react";
@@ -2047,6 +2048,7 @@ export function ModelViewport({
   const { t } = useLingui();
   // Re-render when a shortcut is rebound, so its tooltip keeps up.
   useShortcutOverrides();
+  const measureKey = shortcutLabel("measure");
 
   // What the line at the foot of the view says about the gesture in progress.
   function hintText(): string {
@@ -2215,8 +2217,31 @@ export function ModelViewport({
                   })}
                 </ButtonGroup>
 
-                {/* A group of its own. The three above are a mode you are in, this
-              is a thing you do once. */}
+                {/* A tool you are in, like the modes above, but one that puts
+                    the handles away rather than being a kind of handle. */}
+                <ButtonGroup orientation="vertical">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant={measure.active ? "default" : "outline"}
+                        onClick={() => measure.setActive(!measure.active)}
+                        aria-pressed={measure.active}
+                        aria-label={t`Measure`}
+                      >
+                        <RulerDimensionLine className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {measure.active
+                        ? t`Leave the measure tool (${measureKey})`
+                        : t`Measure between two points (${measureKey})`}
+                    </TooltipContent>
+                  </Tooltip>
+                </ButtonGroup>
+
+                {/* A group of its own. The groups above are tools you are in,
+              this is a thing you do once. */}
                 {onGround ? (
                   <ButtonGroup orientation="vertical">
                     <Tooltip>
@@ -2455,7 +2480,6 @@ export function ModelViewport({
                   ? { on: showReach, onChange: setShowReach }
                   : undefined
               }
-              measure={{ on: measure.active, onChange: measure.setActive }}
               poses={posing?.control}
               guides={
                 guides ? (
