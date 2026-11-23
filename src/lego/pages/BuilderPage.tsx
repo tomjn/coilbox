@@ -320,7 +320,6 @@ import { SwapModuleDrawer } from "./components/SwapModuleDrawer";
 import { SwapPartDrawer } from "./components/SwapPartDrawer";
 import { TestDrawer } from "./components/TestDrawer";
 import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
-import { TexturePicker } from "./components/TexturePicker";
 import type { TileDrag } from "./components/TileGrid";
 import { TimelineTab } from "./components/TimelineTab";
 import { TransformFields } from "./components/TransformFields";
@@ -2676,12 +2675,9 @@ function Builder({ id }: { id: string | undefined }) {
                               className="h-5 w-40 min-w-0 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
                             />
                           </p>
-                          {imported ? (
-                            <TexturePicker
-                              imported={imported}
-                              onChange={changeTextures}
-                            />
-                          ) : (
+                          {/* An imported unit's two textures are in the
+                              Texture tab. */}
+                          {imported ? null : (
                             <AtlasPicker
                               project={draft}
                               pack={pack}

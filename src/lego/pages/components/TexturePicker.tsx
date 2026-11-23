@@ -69,13 +69,23 @@ import { maskLoss, maskLossNote } from "../../textureMask";
 /** Which of the two textures a control is about. */
 type Slot = "texture" | "texture2";
 
-interface Props {
-  imported: LegoImported;
-  /** An ordinary document edit, so undo takes a swapped texture back. */
-  onChange: (change: Partial<LegoImported>) => void;
+/** What the Texture tab needs to show and change the two texture files. */
+export interface TextureFiles {
+  busy: Slot | null;
+  problem: string | null;
+  /** Something wrong with the stored colour texture itself. */
+  note: string | null;
+  /** The texture files edited elsewhere since they were last read. */
+  offers: { slot: Slot; title: string }[];
+  choose: (slot: Slot) => Promise<void>;
+  refresh: (slot: Slot) => Promise<void>;
+  forget: (path: string) => void;
 }
 
-export function TexturePicker({ imported, onChange }: Props) {
+export function useTextureFiles(
+  imported: LegoImported,
+  onChange: (change: Partial<LegoImported>) => void,
+): TextureFiles {
   const { t } = useLingui();
   const [busy, setBusy] = useState<Slot | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -83,9 +93,6 @@ export function TexturePicker({ imported, onChange }: Props) {
     imported.texture?.source,
     imported.texture2?.source,
   );
-
-  const label =
-    imported.texture?.name ?? imported.missingTexture ?? t`no texture`;
   const note = maskLossNote(maskLoss(imported.texture, useAlpha(imported)));
 
   /** Put a file in the store and point the unit at it. */
@@ -148,115 +155,49 @@ export function TexturePicker({ imported, onChange }: Props) {
       title: t`The shading map file has changed.`,
     });
 
-  return (
-    <>
-      <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-        <span>
-          <Trans>texture</Trans>
-        </span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 max-w-40 justify-start gap-1 px-1 text-xs font-normal"
-              // The unit is visibly missing its markings and nothing else on this
-              // screen says why, so the warning rides on the control that opens
-              // the sentence explaining it.
-              {...(note ? { title: note } : {})}
-            >
-              <Image size={12} className="shrink-0" />
-              <span className="truncate">{label}</span>
-              {note ? (
-                <>
-                  <TriangleAlert
-                    size={12}
-                    aria-hidden
-                    className="shrink-0 text-amber-500"
-                  />
-                  <span className="sr-only">
-                    <Trans>This unit's team-colour mask is missing</Trans>
-                  </span>
-                </>
-              ) : null}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-80">
-            <div className="flex flex-col gap-4">
-              <TextureSlot
-                title={t`Texture`}
-                hint={t`What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap.`}
-                texture={imported.texture}
-                missing={imported.missingTexture}
-                note={note}
-                busy={busy === "texture"}
-                previewTeamColour
-                onChoose={() => void choose("texture")}
-                onRefresh={() => void refresh("texture")}
-              />
-              <TextureSlot
-                title={t`Shading map`}
-                hint={t`The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it.`}
-                texture={imported.texture2}
-                missing={imported.missingTexture2}
-                busy={busy === "texture2"}
-                previewTeamColour={false}
-                onChoose={() => void choose("texture2")}
-                onRefresh={() => void refresh("texture2")}
-              />
-              {problem ? (
-                <p className="text-xs text-destructive">{problem}</p>
-              ) : null}
-            </div>
-          </PopoverContent>
-        </Popover>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-5"
-          aria-label={t`Refresh the texture`}
-          title={t`Re-read the texture file, to pick up an edit made elsewhere`}
-          disabled={busy !== null || !imported.texture?.source}
-          onClick={() => void refresh("texture")}
-        >
-          <RefreshCw size={12} />
-        </Button>
-      </div>
-      {offers.map(({ slot, title }) => {
-        const source = (
-          slot === "texture" ? imported.texture : imported.texture2
-        )?.source;
-        return (
-          <div
-            key={slot}
-            role="status"
-            className="mt-1 flex items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-background/90 px-2 py-1 text-xs"
+  return { busy, problem, note, offers, choose, refresh, forget };
+}
+
+/** An offer to reload each texture file edited elsewhere. */
+export function TextureFileOffers({
+  imported,
+  files,
+}: {
+  imported: LegoImported;
+  files: TextureFiles;
+}) {
+  return files.offers.map(({ slot, title }) => {
+    const source = (slot === "texture" ? imported.texture : imported.texture2)
+      ?.source;
+    return (
+      <div
+        key={slot}
+        role="status"
+        className="flex items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-background/90 px-2 py-1 text-xs"
+      >
+        <span>{title}</span>
+        <span className="flex shrink-0 gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={files.busy !== null}
+            onClick={() => void files.refresh(slot)}
           >
-            <span>{title}</span>
-            <span className="flex shrink-0 gap-1">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy !== null}
-                onClick={() => void refresh(slot)}
-              >
-                <Trans>Reload</Trans>
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  if (source) forget(source);
-                }}
-              >
-                <Trans>Dismiss</Trans>
-              </Button>
-            </span>
-          </div>
-        );
-      })}
-    </>
-  );
+            <Trans>Reload</Trans>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (source) files.forget(source);
+            }}
+          >
+            <Trans>Dismiss</Trans>
+          </Button>
+        </span>
+      </div>
+    );
+  });
 }
 
 /**
@@ -339,10 +280,9 @@ function useAlpha(imported: LegoImported): boolean | undefined {
   return alpha;
 }
 
-/** One of the two textures: what it is, where it came from, and what to do. */
-function TextureSlot({
-  title,
-  hint,
+/** One of the two textures: what it is, where it came from, and what to do.
+ *  Its heading and its explanation are the Texture tab's. */
+export function TextureSlot({
   texture,
   missing,
   note,
@@ -351,8 +291,6 @@ function TextureSlot({
   onChoose,
   onRefresh,
 }: {
-  title: string;
-  hint: string;
   texture: LegoTexture | undefined;
   missing: string | undefined;
   /** Something wrong with the stored file itself, as against with finding it. */
@@ -370,8 +308,6 @@ function TextureSlot({
   const missingName = missing ?? "";
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-foreground">{title}</span>
-      <p className="text-xs text-muted-foreground">{hint}</p>
       {texture ? (
         <>
           <TexturePreview
@@ -385,12 +321,7 @@ function TextureSlot({
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              <Trans>
-                Coilbox has its own copy and there is no file behind it to
-                re-read, which is what a model out of a packed game or map
-                leaves you with. Choose one, and refresh picks up edits to it
-                after that.
-              </Trans>
+              <Trans>No file to re-read</Trans>
             </p>
           )}
         </>

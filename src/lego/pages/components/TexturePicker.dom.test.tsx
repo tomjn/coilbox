@@ -43,7 +43,19 @@ vi.mock("@/lib/textureAlpha", () => ({
 }));
 
 import type { LegoImported } from "../../model";
-import { TexturePicker } from "./TexturePicker";
+import { TextureFileOffers, useTextureFiles } from "./TexturePicker";
+
+/** The hook and its offers, as the Texture tab puts them together. */
+function Offers({
+  imported,
+  onChange,
+}: {
+  imported: LegoImported;
+  onChange: (change: Partial<LegoImported>) => void;
+}) {
+  const files = useTextureFiles(imported, onChange);
+  return <TextureFileOffers imported={imported} files={files} />;
+}
 
 function unit(
   texture?: { source?: string },
@@ -73,7 +85,7 @@ afterEach(cleanup);
 describe("the texture reload offer", () => {
   it("watches the file each texture came from", async () => {
     render(
-      <TexturePicker
+      <Offers
         imported={unit({ source: "/a/skin.png" }, { source: "/a/shade.png" })}
         onChange={vi.fn()}
       />,
@@ -86,17 +98,14 @@ describe("the texture reload offer", () => {
   });
 
   it("watches nothing for a texture with no file behind it", async () => {
-    render(<TexturePicker imported={unit({})} onChange={vi.fn()} />);
+    render(<Offers imported={unit({})} onChange={vi.fn()} />);
     await waitFor(() => expect(watched()).toHaveLength(1));
     expect(watched()[0]?.args).toEqual({ paths: [] });
   });
 
   it("stops watching when the unit is closed", async () => {
     const { unmount } = render(
-      <TexturePicker
-        imported={unit({ source: "/a/skin.png" })}
-        onChange={vi.fn()}
-      />,
+      <Offers imported={unit({ source: "/a/skin.png" })} onChange={vi.fn()} />,
     );
     await waitFor(() => expect(watched()).toHaveLength(1));
     unmount();
@@ -105,10 +114,7 @@ describe("the texture reload offer", () => {
 
   it("shows nothing until a watched file changes", async () => {
     render(
-      <TexturePicker
-        imported={unit({ source: "/a/skin.png" })}
-        onChange={vi.fn()}
-      />,
+      <Offers imported={unit({ source: "/a/skin.png" })} onChange={vi.fn()} />,
     );
     await waitFor(() => expect(watched()).toHaveLength(1));
     act(() => emit({ path: "/somewhere/else.png" }));
@@ -118,10 +124,7 @@ describe("the texture reload offer", () => {
   it("offers a reload once, and accepting it reloads the file", async () => {
     const onChange = vi.fn();
     render(
-      <TexturePicker
-        imported={unit({ source: "/a/skin.png" })}
-        onChange={onChange}
-      />,
+      <Offers imported={unit({ source: "/a/skin.png" })} onChange={onChange} />,
     );
     await waitFor(() => expect(watched()).toHaveLength(1));
 
@@ -152,7 +155,7 @@ describe("the texture reload offer", () => {
   it("offers the shading map separately", async () => {
     const onChange = vi.fn();
     render(
-      <TexturePicker
+      <Offers
         imported={unit({ source: "/a/skin.png" }, { source: "/a/shade.png" })}
         onChange={onChange}
       />,
@@ -173,10 +176,7 @@ describe("the texture reload offer", () => {
 
   it("dismissing the offer reloads nothing, and a later edit offers again", async () => {
     render(
-      <TexturePicker
-        imported={unit({ source: "/a/skin.png" })}
-        onChange={vi.fn()}
-      />,
+      <Offers imported={unit({ source: "/a/skin.png" })} onChange={vi.fn()} />,
     );
     await waitFor(() => expect(watched()).toHaveLength(1));
 
@@ -191,20 +191,14 @@ describe("the texture reload offer", () => {
 
   it("drops the offer when the texture is changed to another file", async () => {
     const { rerender } = render(
-      <TexturePicker
-        imported={unit({ source: "/a/skin.png" })}
-        onChange={vi.fn()}
-      />,
+      <Offers imported={unit({ source: "/a/skin.png" })} onChange={vi.fn()} />,
     );
     await waitFor(() => expect(watched()).toHaveLength(1));
     act(() => emit({ path: "/a/skin.png" }));
     expect(screen.getAllByRole("status")).toHaveLength(1);
 
     rerender(
-      <TexturePicker
-        imported={unit({ source: "/b/other.png" })}
-        onChange={vi.fn()}
-      />,
+      <Offers imported={unit({ source: "/b/other.png" })} onChange={vi.fn()} />,
     );
     expect(screen.queryByRole("status")).toBeNull();
     await waitFor(() =>
