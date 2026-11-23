@@ -116,6 +116,14 @@ function offsetFacesOf(layer: DrawLayer, solid: THREE.Material) {
 export function refreshDrawMode(
   layer: DrawLayer,
   groups: Iterable<THREE.Object3D>,
+  /** What to hold on to for another view drawn in another mode this frame,
+   *  as four views with a mode each do. Without it a quadrant in solid would
+   *  free the edges the next one draws, and they would be built again every
+   *  frame. Nothing kept is held for a piece no longer in the scene. */
+  keep: { edges: boolean; offsetFaces: boolean } = {
+    edges: false,
+    offsetFaces: false,
+  },
 ) {
   // The usual case, every frame: solid, with nothing left over to put back.
   if (
@@ -131,10 +139,12 @@ export function refreshDrawMode(
   ]);
   const usedGeometry = new Set<THREE.BufferGeometry>();
   const usedSolid = new Set<THREE.Material>();
+  const present = new Set<THREE.BufferGeometry>();
 
   for (const group of groups) {
     const mesh = meshOf(group);
     if (!mesh) continue;
+    present.add(mesh.geometry);
 
     // Whatever is on the mesh and is not ours is a material a caller just
     // assigned, and is the one to give back in solid.
@@ -148,7 +158,12 @@ export function refreshDrawMode(
     const lines = edgeLinesOf(mesh);
     if (layer.mode === "solid") {
       mesh.material = solid;
-      lines?.removeFromParent();
+      // Hidden rather than taken off while another view still draws them.
+      if (keep.edges) {
+        if (lines) lines.visible = false;
+      } else {
+        lines?.removeFromParent();
+      }
       continue;
     }
     mesh.material =
@@ -175,6 +190,7 @@ export function refreshDrawMode(
 
   for (const [geometry, edges] of layer.edges) {
     if (usedGeometry.has(geometry)) continue;
+    if (keep.edges && present.has(geometry)) continue;
     edges.dispose();
     layer.edges.delete(geometry);
   }
@@ -186,7 +202,8 @@ export function refreshDrawMode(
       copy.customProgramCacheKey = solid.customProgramCacheKey;
       copy.needsUpdate = true;
     }
-    if (layer.mode === "both" && usedSolid.has(solid)) continue;
+    if ((layer.mode === "both" || keep.offsetFaces) && usedSolid.has(solid))
+      continue;
     copy.dispose();
     layer.offsetFaces.delete(solid);
   }

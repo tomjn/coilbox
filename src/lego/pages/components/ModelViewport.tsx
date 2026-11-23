@@ -98,6 +98,7 @@ import {
   bandsFrom,
   chromeFits,
   NO_BANDS,
+  QUADRANTS,
   type Quadrant,
   type ViewBands,
 } from "../../quadViews";
@@ -160,7 +161,6 @@ import {
   type DrawMode,
   disposeDrawLayer,
   newDrawLayer,
-  nextDrawMode,
   refreshDrawMode,
   rememberDrawMode,
   rememberedDrawMode,
@@ -1337,11 +1337,25 @@ export function ModelViewport({
       controls.zoomToCursor = true;
 
       const render = () => {
-        refreshDrawMode(state.draw, state.groups.values());
+        const quad = state.quad;
+        // In four views a quadrant may have a mode of its own, so each is put
+        // in its mode as it is drawn, holding on to what the others use.
+        const allMode = state.draw.mode;
+        const modes = quad
+          ? QUADRANTS.map((id) => state.quadDraw[id] ?? allMode)
+          : [allMode];
+        const keep = {
+          edges: modes.some((mode) => mode !== "solid"),
+          offsetFaces: modes.includes("both"),
+        };
+        refreshDrawMode(
+          state.draw,
+          state.groups.values(),
+          quad ? keep : undefined,
+        );
         // In four views the skeleton's names and the compass follow the
         // perspective quadrant. The names are laid out so they do not overlap
         // as that camera sees them, so they are drawn in that quadrant only.
-        const quad = state.quad;
         const mainCamera = quad ? state.perspectiveCamera : state.camera;
         const labels = state.skeleton;
         if (labels) {
@@ -1370,8 +1384,16 @@ export function ModelViewport({
             // The wide line shader works in pixels of the viewport it draws in.
             pieceEditMaterial.resolution.set(rect.width, rect.height);
             for (const sprite of named) sprite.visible = id === "perspective";
+            const mode = state.quadDraw[id] ?? allMode;
+            if (mode !== state.draw.mode) {
+              state.draw.mode = mode;
+              refreshDrawMode(state.draw, state.groups.values(), keep);
+            }
           });
           for (const sprite of named) sprite.visible = true;
+          // The pieces stay in the active quadrant's mode, drawn last, until
+          // the next frame. The layer's own mode is the one for all views.
+          state.draw.mode = allMode;
           pieceEditMaterial.resolution.set(state.size.width, state.size.height);
         } else {
           renderer.render(scene, state.camera);
@@ -1479,6 +1501,7 @@ export function ModelViewport({
         footprint: null,
         overlap: null,
         draw: newDrawLayer(),
+        quadDraw: {},
         guideLayer: null,
         guidePlanes: [],
         guideLines: [],
@@ -1775,6 +1798,23 @@ export function ModelViewport({
     state.draw.mode = drawMode;
     state.render();
   }, [drawMode]);
+
+  // A mode of its own for a quadrant, picked beside its name in four views.
+  // The draw mode button and its key set every view, so a change of
+  // `drawMode` clears these.
+  const [quadDrawModes, setQuadDrawModes] = useState<
+    Partial<Record<Quadrant, DrawMode>>
+  >({});
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the mode for every view changes
+  useEffect(() => {
+    setQuadDrawModes({});
+  }, [drawMode]);
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    state.quadDraw = quadDrawModes;
+    state.render();
+  }, [quadDrawModes]);
 
   useBalance(sceneRef, { result: balance, show: showBalance });
 
@@ -2151,6 +2191,15 @@ export function ModelViewport({
             maximiseQuadrant(state, id);
             state.render();
           }}
+          drawModes={{
+            top: quadDrawModes.top ?? drawMode,
+            front: quadDrawModes.front ?? drawMode,
+            side: quadDrawModes.side ?? drawMode,
+            perspective: quadDrawModes.perspective ?? drawMode,
+          }}
+          onDrawMode={(id, mode) =>
+            setQuadDrawModes((was) => ({ ...was, [id]: mode }))
+          }
         />
       )}
       {crowded && !fourViews ? <ChromeBands bands={bands} /> : null}
@@ -2472,7 +2521,7 @@ export function ModelViewport({
               grid={{ on: showGrid, onChange: setShowGrid }}
               snapping={{ on: snapEnabled, onChange: setSnapEnabled }}
               drawMode={drawMode}
-              onNextDrawMode={() => setDrawMode(nextDrawMode)}
+              onDrawModeChange={setDrawMode}
               collision={{ on: showCollision, onChange: setShowCollision }}
               skeleton={{ on: showSkeleton, onChange: setSkeletonChoice }}
               balance={{ on: showBalance, onChange: setShowBalance }}

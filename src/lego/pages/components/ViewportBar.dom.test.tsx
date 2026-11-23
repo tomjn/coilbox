@@ -72,7 +72,7 @@ function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
     grid: toggle(true),
     snapping: toggle(true),
     drawMode: "solid",
-    onNextDrawMode: vi.fn(),
+    onDrawModeChange: vi.fn(),
     collision: toggle(),
     balance: toggle(),
     overlap: toggle(),
@@ -218,6 +218,19 @@ describe("the Show menu", () => {
 });
 
 describe("tools in the bar", () => {
+  it("picks how every view draws the unit from a menu", async () => {
+    const onDrawModeChange = vi.fn();
+    render(<ViewportBar {...props({ onDrawModeChange })} />);
+    const button = screen.getByRole("button", {
+      name: "How the unit is drawn: Solid (W to switch)",
+    });
+    fireEvent.pointerDown(button, { button: 0, pointerType: "mouse" });
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "Solid with edges" }),
+    );
+    expect(onDrawModeChange).toHaveBeenCalledWith("both");
+  });
+
   it("switches between one view and four, and says which it offers", () => {
     const fourViews = toggle();
     const { rerender } = render(<ViewportBar {...props({ fourViews })} />);

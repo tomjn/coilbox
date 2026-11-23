@@ -14,15 +14,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import {
-  Cuboid,
-  Grid2x2,
-  Keyboard,
-  Layers,
-  ListChecks,
-  type LucideIcon,
-  SquareDashed,
-} from "lucide-react";
+import { Grid2x2, Keyboard, ListChecks } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   DropdownMenu,
@@ -38,6 +30,11 @@ import {
 } from "@/components/ViewControls";
 import { useShortcutOverrides } from "../../shortcutOverridesStore";
 import { shortcutLabel } from "../../shortcuts";
+import {
+  DRAW_MODE_ICONS,
+  DrawModeMenu,
+  useDrawModeNames,
+} from "./DrawModeMenu";
 import type { DrawMode } from "./drawMode";
 
 /** Something in the view that is either on or off. */
@@ -53,7 +50,7 @@ export interface ViewportBarProps {
   /** Whether a drag snaps. Alt frees one drag whatever this says. */
   snapping: Toggle;
   drawMode: DrawMode;
-  onNextDrawMode: () => void;
+  onDrawModeChange: (mode: DrawMode) => void;
   collision: Toggle;
   /** Absent for a unit with no skeleton. */
   skeleton?: Toggle;
@@ -89,26 +86,12 @@ export interface ViewportBarProps {
   onShortcuts: () => void;
 }
 
-/** The face of the draw mode button, which is the mode the unit is in. */
-const DRAW_MODE_ICONS: Record<DrawMode, LucideIcon> = {
-  solid: Cuboid,
-  wireframe: SquareDashed,
-  both: Layers,
-};
-
-/** What pressing the button does from each mode, naming the mode it goes to. */
-const DRAW_MODE_TITLES: Record<DrawMode, (key: string) => string> = {
-  solid: (key) => t`Draw the unit as edges (${key})`,
-  wireframe: (key) => t`Draw the unit solid with edges (${key})`,
-  both: (key) => t`Draw the unit solid (${key})`,
-};
-
 export function ViewportBar({
   problems,
   grid,
   snapping,
   drawMode,
-  onNextDrawMode,
+  onDrawModeChange,
   fourViews,
   collision,
   skeleton,
@@ -131,6 +114,9 @@ export function ViewportBar({
   // Re-render when a shortcut is rebound, so its tooltip keeps up.
   useShortcutOverrides();
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
+  const drawModeName = useDrawModeNames()[drawMode];
+  const drawKey = shortcutLabel("draw-mode");
+  const drawTitle = t`How the unit is drawn: ${drawModeName} (${drawKey} to switch)`;
   const skeletonKey = shortcutLabel("skeleton");
   const key = shortcutLabel("four-views");
   /** The plain on and off overlays, in the order the menu lists them. A toggle
@@ -194,12 +180,21 @@ export function ViewportBar({
     <ViewControls className="pointer-events-auto shrink-0">
       {problems}
       <ShowMenu items={items} />
-      <ViewButton
-        title={DRAW_MODE_TITLES[drawMode](shortcutLabel("draw-mode"))}
-        onClick={onNextDrawMode}
+      <DrawModeMenu
+        heading={fourViews.on ? t`All views` : undefined}
+        mode={drawMode}
+        onChange={onDrawModeChange}
+        align="end"
       >
-        <DrawModeFace className="size-4" />
-      </ViewButton>
+        <Button
+          size="icon"
+          variant="outline"
+          title={drawTitle}
+          aria-label={drawTitle}
+        >
+          <DrawModeFace className="size-4" />
+        </Button>
+      </DrawModeMenu>
       <ViewToggle
         icon={Grid2x2}
         on={fourViews.on}

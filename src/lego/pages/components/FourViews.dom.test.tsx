@@ -7,7 +7,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
+import type { Quadrant } from "../../quadViews";
+import type { DrawMode } from "./drawMode";
 import { ChromeBands, QuadrantFrames } from "./FourViews";
 import type { SceneState } from "./sceneState";
 import { useModelShortcuts } from "./useModelShortcuts";
@@ -15,6 +16,17 @@ import { useModelShortcuts } from "./useModelShortcuts";
 afterEach(cleanup);
 
 const BANDS = { top: 60, bottom: 64, left: 56 };
+
+function modes(
+  drawModes: Record<Quadrant, DrawMode> = {
+    top: "solid",
+    front: "solid",
+    side: "solid",
+    perspective: "solid",
+  },
+) {
+  return { drawModes, onDrawMode: vi.fn() };
+}
 
 /** Only the shortcut hook, with no scene behind it. */
 function Shortcuts({ toggleFourViews }: { toggleFourViews: () => void }) {
@@ -54,14 +66,23 @@ describe("the four views shortcut", () => {
 describe("the quadrant frames", () => {
   it("name each quadrant and mark the one that has the controls", () => {
     render(
-      <QuadrantFrames active="front" bands={BANDS} onMaximise={vi.fn()} />,
+      <QuadrantFrames
+        active="front"
+        bands={BANDS}
+        onMaximise={vi.fn()}
+        {...modes()}
+      />,
     );
     for (const name of ["Top", "Front", "Side", "Perspective"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
-    const front = screen.getByRole("button", { name: "Front" }).parentElement;
+    const front = screen
+      .getByRole("button", { name: "Front" })
+      .closest<HTMLElement>("[data-quadrant]");
     expect(front?.dataset.active).toBe("true");
-    const top = screen.getByRole("button", { name: "Top" }).parentElement;
+    const top = screen
+      .getByRole("button", { name: "Top" })
+      .closest<HTMLElement>("[data-quadrant]");
     expect(top?.dataset.active).toBeUndefined();
   });
 
@@ -72,6 +93,7 @@ describe("the quadrant frames", () => {
         active="perspective"
         bands={BANDS}
         onMaximise={onMaximise}
+        {...modes()}
       />,
     );
     const side = screen.getByRole("button", { name: "Side" });
@@ -84,6 +106,55 @@ describe("the quadrant frames", () => {
   });
 });
 
+describe("each quadrant's draw mode", () => {
+  it("shows the mode the quadrant is in beside its name", () => {
+    render(
+      <QuadrantFrames
+        active="perspective"
+        bands={BANDS}
+        onMaximise={vi.fn()}
+        {...modes({
+          top: "solid",
+          front: "wireframe",
+          side: "solid",
+          perspective: "both",
+        })}
+      />,
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "How the Front view draws the unit: Wireframe",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "How the Perspective view draws the unit: Solid with edges",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("changes the one quadrant whose menu is used", async () => {
+    const props = modes();
+    render(
+      <QuadrantFrames
+        active="perspective"
+        bands={BANDS}
+        onMaximise={vi.fn()}
+        {...props}
+      />,
+    );
+    const menu = screen.getByRole("button", {
+      name: "How the Side view draws the unit: Solid",
+    });
+    fireEvent.pointerDown(menu, { button: 0, pointerType: "mouse" });
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "Wireframe" }),
+    );
+    expect(props.onDrawMode).toHaveBeenCalledWith("side", "wireframe");
+    expect(props.onDrawMode).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("the chrome's bands (#5410)", () => {
   it("lay the quadrants out in the room the bands leave, and take the clicks on them", () => {
     const { container } = render(
@@ -91,9 +162,12 @@ describe("the chrome's bands (#5410)", () => {
         active="perspective"
         bands={BANDS}
         onMaximise={vi.fn()}
+        {...modes()}
       />,
     );
-    const top = screen.getByRole("button", { name: "Top" }).parentElement;
+    const top = screen
+      .getByRole("button", { name: "Top" })
+      .closest<HTMLElement>("[data-quadrant]");
     const grid = top?.parentElement as HTMLElement;
     expect(grid.style.top).toBe("60px");
     expect(grid.style.bottom).toBe("64px");
