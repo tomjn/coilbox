@@ -24133,7 +24133,7 @@ msgstr "Grunnlegger (valgfritt, standard er deg)"
 msgid "Four legs"
 msgstr "Fire ben"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "Fire visninger ({key})"
@@ -36413,6 +36413,11 @@ msgstr "Én selvstendig fil med bildene innebygd – større, men klar til bruk.
 #, fuzzy
 msgid "one team"
 msgstr "ett lag"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "Én visning ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

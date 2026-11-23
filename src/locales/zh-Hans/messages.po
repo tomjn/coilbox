@@ -24126,7 +24126,7 @@ msgstr "房主（可选，默认为你）"
 msgid "Four legs"
 msgstr "四条腿"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "四视图 ({key})"
@@ -36399,6 +36399,11 @@ msgstr "单个独立文件，图片内嵌，体积较大，但可直接使用。
 #, fuzzy
 msgid "one team"
 msgstr "一支队伍"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "单视图 ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

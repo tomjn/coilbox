@@ -24133,7 +24133,7 @@ msgstr "Ιδρυτής (προαιρετικό, προεπιλογή εσείς)
 msgid "Four legs"
 msgstr "Τέσσερα πόδια"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "Τέσσερις προβολές ({key})"
@@ -36413,6 +36413,11 @@ msgstr "Ένα αυτόνομο αρχείο με ενσωματωμένες ε�
 #, fuzzy
 msgid "one team"
 msgstr "μία ομάδα"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "Μία προβολή ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

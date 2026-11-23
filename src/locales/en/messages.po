@@ -19527,7 +19527,7 @@ msgstr "Founder (optional, defaults to you)"
 msgid "Four legs"
 msgstr "Four legs"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Four views ({key})"
 msgstr "Four views ({key})"
 
@@ -29453,6 +29453,10 @@ msgstr "One self-contained file with pics inlined — larger, but drop-in."
 #: src/content/pages/components/MatchStatsSection.tsx
 msgid "one team"
 msgstr "one team"
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "One view ({key})"
+msgstr "One view ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

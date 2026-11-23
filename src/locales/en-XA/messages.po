@@ -19526,7 +19526,7 @@ msgstr ""
 msgid "Four legs"
 msgstr ""
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Four views ({key})"
 msgstr ""
 
@@ -29451,6 +29451,10 @@ msgstr ""
 
 #: src/content/pages/components/MatchStatsSection.tsx
 msgid "one team"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "One view ({key})"
 msgstr ""
 
 #: src/multiplayer/chat/presence.ts

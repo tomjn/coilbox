@@ -24126,7 +24126,7 @@ msgstr "Засновник (необов’язково, типово – ви)"
 msgid "Four legs"
 msgstr "Чотири ноги"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "Чотири вигляди ({key})"
@@ -36399,6 +36399,11 @@ msgstr "Один самодостатній файл із вбудованими
 #, fuzzy
 msgid "one team"
 msgstr "одна команда"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "Один вигляд ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

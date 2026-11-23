@@ -24133,7 +24133,7 @@ msgstr "Grundare (valfritt, standard är du)"
 msgid "Four legs"
 msgstr "Fyra ben"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "Fyra vyer ({key})"
@@ -36413,6 +36413,11 @@ msgstr "En fristående fil med bilderna inbäddade – större, men klar att anv
 #, fuzzy
 msgid "one team"
 msgstr "ett lag"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "En vy ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

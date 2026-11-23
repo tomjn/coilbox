@@ -24133,7 +24133,7 @@ msgstr "Oprichter (optioneel, standaard jij)"
 msgid "Four legs"
 msgstr "Vier poten"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "Vier weergaven ({key})"
@@ -36413,6 +36413,11 @@ msgstr "Eén opzichzelfstaand bestand met ingesloten afbeeldingen: groter, maar 
 #, fuzzy
 msgid "one team"
 msgstr "één team"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "Eén weergave ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

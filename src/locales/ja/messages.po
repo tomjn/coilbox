@@ -24126,7 +24126,7 @@ msgstr "ホスト（任意、デフォルトは自分）"
 msgid "Four legs"
 msgstr "4 本脚"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "4分割ビュー ({key})"
@@ -36399,6 +36399,11 @@ msgstr "画像を埋め込んだ単体ファイル — サイズは大きいで�
 #, fuzzy
 msgid "one team"
 msgstr "1 チーム"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "単一ビュー ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx

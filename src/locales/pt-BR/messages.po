@@ -24133,7 +24133,7 @@ msgstr "Fundador (opcional, padrão é você)"
 msgid "Four legs"
 msgstr "Quatro pernas"
 
-#: src/lego/pages/components/FourViews.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 #, fuzzy
 msgid "Four views ({key})"
 msgstr "Quatro vistas ({key})"
@@ -36413,6 +36413,11 @@ msgstr "Um único arquivo autossuficiente com as imagens embutidas, maior, mas p
 #, fuzzy
 msgid "one team"
 msgstr "uma equipe"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "One view ({key})"
+msgstr "Uma vista ({key})"
 
 #: src/multiplayer/chat/presence.ts
 #: src/multiplayer/LobbyStatusButton.tsx
