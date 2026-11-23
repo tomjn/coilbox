@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type GameItem, type PlayerWidgetScan } from "@/content/bindings";
+import type { GameItem, PlayerWidgetScan } from "@/content/bindings";
 import {
   useScanTargetSelection,
   useUnitsyncEngineConfig,
@@ -19,6 +19,7 @@ import {
 } from "@/content/config";
 import { useContentState } from "@/content/contentState";
 import { engineConfigDir } from "@/content/enginePaths";
+import { mutatorNames } from "@/content/library";
 import { stripVersionSuffix } from "@/content/resolveContent";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { errorText } from "@/lib/helpers";
@@ -106,6 +107,7 @@ export function useWidgetList() {
     if (!enginePath || !dataDir || !scanData) return;
     let cancelled = false;
     setGames(null);
+    const mutators = mutatorNames(scanData.games);
     (async () => {
       const found: InstalledGame[] = [];
       // One at a time, because every read goes through the one unitsync worker.
@@ -123,6 +125,7 @@ export function useWidgetList() {
           handler,
           version: game.info.version ?? "",
           title: nameWithoutVersion(game),
+          ...(mutators.has(game.name) && { mutator: true }),
         });
       }
       setGames(oneEntryPerGame(found));

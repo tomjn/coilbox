@@ -7725,6 +7725,11 @@ msgstr "Το {updateName} χρησιμοποιεί παλαιότερο {updateM
 msgid "{updateName} via {updateVia}"
 msgstr "{updateName} μέσω {updateVia}"
 
+#: src/widgets/pages/CoilboxWidgets.tsx
+#, fuzzy
+msgid "{updates, plural, one {# update} other {# updates}}"
+msgstr "{updates, plural, one {# ενημέρωση} other {# ενημερώσεις}}"
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 #, fuzzy
 msgid "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in this window.}}"
@@ -9086,8 +9091,8 @@ msgstr "Εκτελείται ένα παιχνίδι. Κλείστε το για
 
 #: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
-msgid "A game is running. Close it to remove widgets."
-msgstr "Εκτελείται ένα παιχνίδι. Κλείστε το για να αφαιρέσετε widgets."
+msgid "A game is running. Close it to delete widgets."
+msgstr "Ένα παιχνίδι εκτελείται. Κλείστε το για να διαγράψετε widgets."
 
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
@@ -11099,6 +11104,11 @@ msgstr "Όλοι οι εξοπλισμοί"
 #, fuzzy
 msgid "all Map options"
 msgstr "όλες οι επιλογές χάρτη"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "All of its files are deleted. You can install it again from Coilbox widgets."
+msgstr "Διαγράφονται όλα τα αρχεία του. Μπορείτε να το εγκαταστήσετε ξανά από τα Widgets του Coilbox."
 
 #: src/scenario/pages/components/TriggerPanel.tsx
 #, fuzzy
@@ -19759,6 +19769,7 @@ msgstr "Καθυστέρηση ανάμεσα στις βολές μιας ρι�
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/components/TriggerPanel.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -19828,9 +19839,15 @@ msgstr "Διαγραφή {loadoutName}"
 
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Delete {name}"
 msgstr "Διαγραφή {name}"
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Delete {name} for all games?"
+msgstr "Διαγραφή του {name} για όλα τα παιχνίδια;"
 
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -20062,6 +20079,7 @@ msgid "Deleted {name}, freeing {freed}."
 msgstr "Διαγράφηκε το {name}, ελευθερώθηκαν {freed}."
 
 #: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Deleted {name}."
 msgstr "Διαγράφηκε το {name}."
@@ -27711,6 +27729,12 @@ msgstr "Μεταφέρει μια μάχη που φιλοξενεί αυτή τ
 msgid "It is converted from the game's BOS again. Edits you made since are lost."
 msgstr "Μετατρέπεται ξανά από το BOS του παιχνιδιού. Οι αλλαγές που κάνατε από τότε χάνονται."
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "It is deleted from every game that loads it: {0}"
+msgstr "Διαγράφεται από κάθε παιχνίδι που το φορτώνει: {0}"
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "It is in the style list under Generate on the Models page."
@@ -27730,12 +27754,6 @@ msgstr "δεν είναι αντικείμενο"
 #, fuzzy
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "υπάρχει μόνο από {atLeast} και πάνω και μόνο έως {atMost}, που δεν είναι καμία δυσκολία, οπότε δεν εμφανίζεται ποτέ"
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "It is removed from every game that loads it: {0}"
-msgstr "Αφαιρείται από κάθε παιχνίδι που το φορτώνει: {0}"
 
 #: src/deeplink/actions.ts
 #, fuzzy
@@ -34795,6 +34813,12 @@ msgstr "δεν βρέθηκε κανένα"
 msgid "None named, so it opens untextured"
 msgstr "Δεν ονομάζεται καμία, οπότε ανοίγει χωρίς υφή"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of {0}'s widgets match \"{query}\"."
+msgstr "Κανένα widget του {0} δεν ταιριάζει με \"{query}\"."
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "None of it has an attacker, so it came from nowhere on the map."
@@ -34844,6 +34868,11 @@ msgstr "Κανένα από αυτά δεν περιστρέφεται. Όλες
 #, fuzzy
 msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
 msgstr "Καμία από τις φατρίες αυτού του παιχνιδιού δεν αντιστοιχεί σε αρχική μονάδα της λίστας του, οπότε κάθε δέντρο κατασκευής παρακάτω είναι κενό. Το Όλες οι μονάδες εξακολουθεί να δείχνει ολόκληρη τη λίστα."
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "None of your widgets match \"{query}\"."
+msgstr "Κανένα από τα widgets σας δεν ταιριάζει με \"{query}\"."
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #, fuzzy
@@ -36534,6 +36563,11 @@ msgstr "Μόνο τα πεδία όπου διαφέρουν οι επιλεγμ
 #, fuzzy
 msgid "Only the fields you change are recorded, so the rest still follow the game when it updates."
 msgstr "Καταγράφονται μόνο τα πεδία που αλλάζετε, ώστε τα υπόλοιπα να ακολουθούν το παιχνίδι όταν ενημερώνεται."
+
+#: src/widgets/pages/RemoveWidget.tsx
+#, fuzzy
+msgid "Only the files listed below are deleted. Files the widget includes from elsewhere stay, because other widgets may share them."
+msgstr "Διαγράφονται μόνο τα αρχεία που αναφέρονται παρακάτω. Τα αρχεία που το widget φορτώνει από αλλού μένουν, γιατί μπορεί να τα μοιράζονται άλλα widgets."
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -41162,7 +41196,6 @@ msgstr "Remix από"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/ChobbyPresetsView.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -41232,7 +41265,6 @@ msgstr "Αφαίρεση του {mapTitle};"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
-#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "Αφαίρεση: {name}"
@@ -41256,11 +41288,6 @@ msgstr "Αφαίρεση του {name} από τα έργα"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "Αφαίρεση του {name} από τη σύγκριση"
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Remove {name}?"
-msgstr "Αφαίρεση του {name};"
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -41447,11 +41474,6 @@ msgstr "Αφαιρέθηκε το «{name}» από το Chobby"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "Αφαιρέθηκε από το παιχνίδι: {missionName}."
-
-#: src/widgets/pages/RemoveWidget.tsx
-#, fuzzy
-msgid "Removed {name}."
-msgstr "Αφαιρέθηκε: {name}."
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -43884,6 +43906,16 @@ msgstr "Αναζήτηση αρχείων βίντεο…"
 #, fuzzy
 msgid "Search weapons…"
 msgstr "Αναζήτηση όπλων…"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets"
+msgstr "Αναζήτηση widgets"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Search widgets…"
+msgstr "Αναζήτηση widgets…"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -54475,6 +54507,11 @@ msgstr "Περιστροφή όλων"
 #, fuzzy
 msgid "Turn all {count}"
 msgstr "Περιστροφή όλων ({count})"
+
+#: src/widgets/pages/WidgetsPage.tsx
+#, fuzzy
+msgid "Turn all off"
+msgstr "Απενεργοποίηση όλων"
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy
