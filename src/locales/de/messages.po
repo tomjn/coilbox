@@ -42602,6 +42602,16 @@ msgstr "Name des Aufgebots"
 msgid "Rosters"
 msgstr "Aufgebote"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Drehen"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Die Auswahl drehen"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "Röhre"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "Drehgeschwindigkeit"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "Drehgeschwindigkeit pro Elmo pro Frame Fluggeschwindigkeit"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Auswahl drehen"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

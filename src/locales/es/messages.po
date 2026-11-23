@@ -42602,6 +42602,16 @@ msgstr "Nombre de la plantilla de unidades"
 msgid "Rosters"
 msgstr "Plantillas de unidades"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Rotar"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Rotar la selección"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "Tubo"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "Velocidad de giro"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "velocidad de giro por elmo por frame de velocidad de vuelo"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Girar la selección"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

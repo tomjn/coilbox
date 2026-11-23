@@ -34486,6 +34486,14 @@ msgstr "Roster name"
 msgid "Rosters"
 msgstr "Rosters"
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Rotate"
+msgstr "Rotate"
+
+#: src/lego/shortcuts.ts
+msgid "Rotate the selection"
+msgstr "Rotate the selection"
+
 #: src/lego/pages/components/TransformFields.tsx
 msgid "Rotation"
 msgstr "Rotation"
@@ -43993,7 +44001,6 @@ msgid "Tube"
 msgstr "Tube"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 msgid "Turn"
 msgstr "Turn"
@@ -44095,10 +44102,6 @@ msgstr "Turn speed"
 #: src/lego/banking.ts
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "turn speed per elmo a frame of flying speed"
-
-#: src/lego/shortcuts.ts
-msgid "Turn the selection"
-msgstr "Turn the selection"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 msgid "Turn to"

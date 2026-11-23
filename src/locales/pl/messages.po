@@ -42602,6 +42602,16 @@ msgstr "Nazwa zestawu jednostek"
 msgid "Rosters"
 msgstr "Zestawy jednostek"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Obróć"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Obróć zaznaczenie"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "Rura"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "Szybkość obrotu"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "szybkość skrętu na elmo na klatkę prędkości lotu"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Obróć zaznaczenie"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

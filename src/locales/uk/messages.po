@@ -42602,6 +42602,16 @@ msgstr "Назва складу"
 msgid "Rosters"
 msgstr "Склади"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Обертати"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Обернути виділення"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "Труба"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "Швидкість повороту"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "швидкість повороту на ельмо за кадр швидкості польоту"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Повернути виділене"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

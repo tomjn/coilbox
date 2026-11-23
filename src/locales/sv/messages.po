@@ -42622,6 +42622,16 @@ msgstr "Truppnamn"
 msgid "Rosters"
 msgstr "Trupper"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Rotera"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Rotera markeringen"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54415,7 +54425,6 @@ msgid "Tube"
 msgstr "Rör"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54542,11 +54551,6 @@ msgstr "Vridhastighet"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "svänghastighet per elmo per bildruta i flyghastighet"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Vrid markeringen"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

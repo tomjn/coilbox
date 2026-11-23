@@ -42622,6 +42622,16 @@ msgstr "Nome do elenco"
 msgid "Rosters"
 msgstr "Elencos"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Girar"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Girar a seleção"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54415,7 +54425,6 @@ msgid "Tube"
 msgstr "Tubo"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54542,11 +54551,6 @@ msgstr "Velocidade de giro"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "velocidade de giro por elmo por frame de velocidade de voo"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Girar a seleção"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

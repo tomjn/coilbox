@@ -42622,6 +42622,16 @@ msgstr "Όνομα σύνθεσης"
 msgid "Rosters"
 msgstr "Συνθέσεις"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Περιστροφή"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Περιστροφή της επιλογής"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54415,7 +54425,6 @@ msgid "Tube"
 msgstr "Σωλήνας"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54542,11 +54551,6 @@ msgstr "Ταχύτητα περιστροφής"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "ταχύτητα στροφής ανά elmo ανά καρέ ταχύτητας πτήσης"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Περιστροφή της επιλογής"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

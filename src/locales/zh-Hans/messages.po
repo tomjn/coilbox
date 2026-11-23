@@ -42602,6 +42602,16 @@ msgstr "编队名称"
 msgid "Rosters"
 msgstr "编队"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "旋转"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "旋转所选内容"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "管状"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "旋转速度"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "飞行速度每帧每 elmo 对应的转向速度"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "旋转所选对象"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

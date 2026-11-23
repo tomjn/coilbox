@@ -42602,6 +42602,16 @@ msgstr "Nom de l’effectif"
 msgid "Rosters"
 msgstr "Effectifs"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Pivoter"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Faire pivoter la sélection"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "Tube"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "Vitesse de rotation"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "vitesse de rotation par elmo par image de vitesse de vol"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Tourner la sélection"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

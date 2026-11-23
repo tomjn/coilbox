@@ -42602,6 +42602,16 @@ msgstr "ロスター名"
 msgid "Rosters"
 msgstr "ロスター"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "回転"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "選択範囲を回転"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54384,7 +54394,6 @@ msgid "Tube"
 msgstr "チューブ"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54511,11 +54520,6 @@ msgstr "回転速度"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "飛行速度 1 フレーム 1 elmo あたりの旋回速度"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "選択を回転"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy

@@ -42622,6 +42622,16 @@ msgstr "Nome del roster"
 msgid "Rosters"
 msgstr "Roster"
 
+#: src/lego/pages/components/ModelViewport.tsx
+#, fuzzy
+msgid "Rotate"
+msgstr "Ruota"
+
+#: src/lego/shortcuts.ts
+#, fuzzy
+msgid "Rotate the selection"
+msgstr "Ruota la selezione"
+
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
 msgid "Rotation"
@@ -54415,7 +54425,6 @@ msgid "Tube"
 msgstr "Tubo"
 
 #: src/lego/animPresets.ts
-#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
@@ -54542,11 +54551,6 @@ msgstr "Velocità di rotazione"
 #, fuzzy
 msgid "turn speed per elmo a frame of flying speed"
 msgstr "velocità di rotazione per elmo per frame di velocità di volo"
-
-#: src/lego/shortcuts.ts
-#, fuzzy
-msgid "Turn the selection"
-msgstr "Ruota la selezione"
 
 #: src/lego/pages/components/JointLimitFields.tsx
 #, fuzzy
