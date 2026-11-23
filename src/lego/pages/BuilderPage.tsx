@@ -253,7 +253,12 @@ import { applyProportions, resetToPlan } from "../skeletonEdit";
 import { applyTarget } from "../skeletonSize";
 import type { Vec3 } from "../snapping";
 import { starterModules } from "../starterModules";
-import { styleFromUnit } from "../styleFromUnit";
+import {
+  refusalMessage,
+  type StyleRefusal,
+  styleFromUnit,
+  styleRefusal,
+} from "../styleFromUnit";
 import { swapModule, swapRefusal } from "../swapModule";
 import { swapPart } from "../swapPart";
 import { upgradeChainProblems } from "../upgradeChain";
@@ -330,6 +335,41 @@ import { openNewProject } from "./openNewProject";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
+
+/** Makes a generator style from the unit. Disabled, with the reason as its
+ *  tooltip, on a unit it cannot be made from. */
+function StyleButton({
+  refusal,
+  onCreate,
+}: {
+  refusal: StyleRefusal | null;
+  onCreate: () => void;
+}) {
+  const { t } = useLingui();
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <TipButton
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            onClick={onCreate}
+            disabled={refusal !== null}
+            aria-label={t`Create a style from this unit`}
+          >
+            <Palette size={14} />
+          </TipButton>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          {refusal
+            ? refusalMessage(refusal)
+            : t`Create a generator style from this unit's colours, shapes, proportions and number of parts`}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 /**
  * Assemble one unit.
@@ -3573,16 +3613,10 @@ function Builder({ id }: { id: string | undefined }) {
                       <Trans>Pieces</Trans>
                     </h2>
                     {pack ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="ml-auto"
-                        onClick={createStyle}
-                        aria-label={t`Create a style from this unit`}
-                        title={t`Create a generator style from this unit's colours, shapes, proportions and number of parts`}
-                      >
-                        <Palette size={14} />
-                      </Button>
+                      <StyleButton
+                        refusal={styleRefusal(draft, pack)}
+                        onCreate={createStyle}
+                      />
                     ) : null}
                     {pack && draft.generated ? (
                       <Button
