@@ -11179,6 +11179,11 @@ msgstr "όλες οι μονάδες"
 msgid "All units"
 msgstr "Όλες οι μονάδες"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "All views"
+msgstr "Όλες οι προβολές"
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
@@ -21091,21 +21096,6 @@ msgstr "Σχεδίαση της περιοχής του συμμάχου {letter
 msgid "Draw some boxes first"
 msgstr "Σχεδιάστε πρώτα μερικές περιοχές"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit as edges ({key})"
-msgstr "Σχεδίαση της μονάδας ως ακμές ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid ({key})"
-msgstr "Σχεδίαση της μονάδας συμπαγής ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid with edges ({key})"
-msgstr "Σχεδίαση της μονάδας συμπαγής με ακμές ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Draw the unit solid, as edges, or solid with edges"
@@ -26453,6 +26443,11 @@ msgstr "Πόσο συχνά μια μονάδα πέφτει σε κάθε σπ�
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "Πόσο συχνά το ίχνος προσθέτει νέα κορυφή. Χαμηλότερο είναι πιο ομαλό αλλά κοστίζει περισσότερο σε απόδοση. Χρήσιμο για πύραυλους καθοδήγησης που στρίβουν γρήγορα ώστε να αποφεύγονται τα οδοντωτά ίχνη."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr "Πώς η προβολή {view} σχεδιάζει τη μονάδα: {modeName}"
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
@@ -26472,6 +26467,11 @@ msgstr "Πώς ήταν διατεταγμένες οι πλευρές"
 #, fuzzy
 msgid "How the target moves"
 msgstr "Πώς κινείται ο στόχος"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
+msgstr "Πώς σχεδιάζεται η μονάδα: {drawModeName} ({drawKey} για αλλαγή)"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #, fuzzy
@@ -46367,6 +46367,16 @@ msgstr "χιόνι"
 msgid "Solar collector (a building)"
 msgstr "Ηλιακός συλλέκτης (κτίριο)"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid"
+msgstr "Συμπαγές"
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid with edges"
+msgstr "Συμπαγές με ακμές"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
@@ -57794,6 +57804,7 @@ msgstr "Νικητής"
 msgid "Wins"
 msgstr "Νίκες"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 #, fuzzy
 msgid "Wireframe"

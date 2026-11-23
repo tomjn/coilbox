@@ -11179,6 +11179,11 @@ msgstr "alle enheter"
 msgid "All units"
 msgstr "Alle enheter"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "All views"
+msgstr "Alle visninger"
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
@@ -21091,21 +21096,6 @@ msgstr "Tegn området til alliert {letter} (har allerede ett)"
 msgid "Draw some boxes first"
 msgstr "Tegn noen områder først"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit as edges ({key})"
-msgstr "Tegn enheten som kanter ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid ({key})"
-msgstr "Tegn enheten heldekkende ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid with edges ({key})"
-msgstr "Tegn enheten heldekkende med kanter ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Draw the unit solid, as edges, or solid with edges"
@@ -26453,6 +26443,11 @@ msgstr "Hvor ofte en enhet havner i hver sjeldenhetsgrad. Trenger ikke å summer
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "Hvor ofte sporet legger til et nytt hjørnepunkt. Lavere er jevnere, men koster mer ytelse. Nyttig for målsøkende missiler som svinger raskt, for å unngå hakkete spor."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr "Hvordan {view}-visningen tegner enheten: {modeName}"
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
@@ -26472,6 +26467,11 @@ msgstr "Hvordan sidene var satt opp"
 #, fuzzy
 msgid "How the target moves"
 msgstr "Hvordan målet beveger seg"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
+msgstr "Hvordan enheten tegnes: {drawModeName} ({drawKey} for å bytte)"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #, fuzzy
@@ -46367,6 +46367,16 @@ msgstr "snø"
 msgid "Solar collector (a building)"
 msgstr "Solfanger (en bygning)"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid"
+msgstr "Massiv"
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid with edges"
+msgstr "Massiv med kanter"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
@@ -57794,6 +57804,7 @@ msgstr "Vinner"
 msgid "Wins"
 msgstr "Seire"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 #, fuzzy
 msgid "Wireframe"

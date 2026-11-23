@@ -11178,6 +11178,11 @@ msgstr "todas las unidades"
 msgid "All units"
 msgstr "Todas las unidades"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "All views"
+msgstr "Todas las vistas"
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
@@ -21086,21 +21091,6 @@ msgstr "Dibujar la zona del aliado {letter} (ya tiene una)"
 msgid "Draw some boxes first"
 msgstr "Dibuja antes algunas zonas"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit as edges ({key})"
-msgstr "Dibujar la unidad como aristas ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid ({key})"
-msgstr "Dibujar la unidad sólida ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid with edges ({key})"
-msgstr "Dibujar la unidad sólida con aristas ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Draw the unit solid, as edges, or solid with edges"
@@ -26445,6 +26435,11 @@ msgstr "Con qué frecuencia recibe una unidad cada rareza. No tienen que sumar 1
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "Cada cuánto añade la estela un vértice nuevo. Más bajo es más suave pero cuesta más rendimiento; útil para misiles guiados que giran rápido y así evitar estelas dentadas."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr "Cómo dibuja la unidad la vista {view}: {modeName}"
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
@@ -26464,6 +26459,11 @@ msgstr "Cómo estaban dispuestos los bandos"
 #, fuzzy
 msgid "How the target moves"
 msgstr "Cómo se mueve el objetivo"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
+msgstr "Cómo se dibuja la unidad: {drawModeName} ({drawKey} para cambiar)"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #, fuzzy
@@ -46339,6 +46339,16 @@ msgstr "nieve"
 msgid "Solar collector (a building)"
 msgstr "Colector solar (un edificio)"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid"
+msgstr "Sólido"
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid with edges"
+msgstr "Sólido con aristas"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
@@ -57763,6 +57773,7 @@ msgstr "Ganador"
 msgid "Wins"
 msgstr "Victorias"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 #, fuzzy
 msgid "Wireframe"

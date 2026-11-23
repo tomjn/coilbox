@@ -9012,6 +9012,10 @@ msgstr ""
 msgid "All units"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "All views"
+msgstr ""
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 msgid "Allies"
 msgstr ""
@@ -17065,18 +17069,6 @@ msgstr ""
 msgid "Draw some boxes first"
 msgstr ""
 
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Draw the unit as edges ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Draw the unit solid ({key})"
-msgstr ""
-
-#: src/lego/pages/components/ViewportBar.tsx
-msgid "Draw the unit solid with edges ({key})"
-msgstr ""
-
 #: src/lego/shortcuts.ts
 msgid "Draw the unit solid, as edges, or solid with edges"
 msgstr ""
@@ -21404,6 +21396,10 @@ msgstr ""
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr ""
 
+#: src/lego/pages/components/FourViews.tsx
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr ""
+
 #: src/mapconv/pages/CompilePage.tsx
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
 msgstr ""
@@ -21418,6 +21414,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "How the target moves"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
 msgstr ""
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -37517,6 +37517,14 @@ msgstr ""
 msgid "Solar collector (a building)"
 msgstr ""
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+msgid "Solid"
+msgstr ""
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+msgid "Solid with edges"
+msgstr ""
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
 msgstr ""
@@ -46726,6 +46734,7 @@ msgstr ""
 msgid "Wins"
 msgstr ""
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 msgid "Wireframe"
 msgstr ""

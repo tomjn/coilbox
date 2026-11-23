@@ -11178,6 +11178,11 @@ msgstr "toutes les unités"
 msgid "All units"
 msgstr "Toutes les unités"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "All views"
+msgstr "Toutes les vues"
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
@@ -21086,21 +21091,6 @@ msgstr "Tracer la zone de l’allié {letter} (il en a déjà une)"
 msgid "Draw some boxes first"
 msgstr "Tracez d’abord des zones"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit as edges ({key})"
-msgstr "Dessiner l’unité en arêtes ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid ({key})"
-msgstr "Dessiner l’unité en plein ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid with edges ({key})"
-msgstr "Dessiner l’unité en plein avec arêtes ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Draw the unit solid, as edges, or solid with edges"
@@ -26445,6 +26435,11 @@ msgstr "Fréquence à laquelle une unité tombe sur chaque rareté. Pas besoin d
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "Fréquence à laquelle la traînée ajoute un sommet. Plus bas est plus lisse mais coûte plus en performance ; utile pour les missiles à tête chercheuse qui tournent vite, pour éviter des traînées saccadées."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr "Comment la vue {view} dessine l’unité : {modeName}"
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
@@ -26464,6 +26459,11 @@ msgstr "Disposition des camps"
 #, fuzzy
 msgid "How the target moves"
 msgstr "Mouvement de la cible"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
+msgstr "Comment l’unité est dessinée : {drawModeName} ({drawKey} pour changer)"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #, fuzzy
@@ -46339,6 +46339,16 @@ msgstr "neige"
 msgid "Solar collector (a building)"
 msgstr "Collecteur solaire (un bâtiment)"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid"
+msgstr "Plein"
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid with edges"
+msgstr "Plein avec arêtes"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
@@ -57763,6 +57773,7 @@ msgstr "Vainqueur"
 msgid "Wins"
 msgstr "Victoires"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 #, fuzzy
 msgid "Wireframe"

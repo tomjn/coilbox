@@ -11178,6 +11178,11 @@ msgstr "усі юніти"
 msgid "All units"
 msgstr "Усі юніти"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "All views"
+msgstr "Усі вигляди"
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
@@ -21086,21 +21091,6 @@ msgstr "Намалювати зону союзника {letter} (уже є)"
 msgid "Draw some boxes first"
 msgstr "Спершу намалюйте зони"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit as edges ({key})"
-msgstr "Показувати юніт ребрами ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid ({key})"
-msgstr "Показувати юніт суцільним ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid with edges ({key})"
-msgstr "Показувати юніт суцільним із ребрами ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Draw the unit solid, as edges, or solid with edges"
@@ -26445,6 +26435,11 @@ msgstr "Як часто юніт отримує кожну рідкість. С�
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "Як часто слід додає нову вершину. Менше значення – плавніше, але дорожче для продуктивності. Корисно для ракет із самонаведенням, що швидко повертають, щоб уникнути зубчастих слідів."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr "Як вигляд {view} малює юніт: {modeName}"
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
@@ -26464,6 +26459,11 @@ msgstr "Як були розставлені сторони"
 #, fuzzy
 msgid "How the target moves"
 msgstr "Як рухається ціль"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
+msgstr "Як намальовано юніт: {drawModeName} ({drawKey}, щоб перемкнути)"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #, fuzzy
@@ -46339,6 +46339,16 @@ msgstr "сніг"
 msgid "Solar collector (a building)"
 msgstr "Сонячна батарея (будівля)"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid"
+msgstr "Суцільний"
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid with edges"
+msgstr "Суцільний з ребрами"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
@@ -57763,6 +57773,7 @@ msgstr "Перемога"
 msgid "Wins"
 msgstr "Перемоги"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 #, fuzzy
 msgid "Wireframe"

@@ -11179,6 +11179,11 @@ msgstr "alle eenheden"
 msgid "All units"
 msgstr "Alle eenheden"
 
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "All views"
+msgstr "Alle weergaven"
+
 #: src/content/pages/components/ReplayTimelineDock.tsx
 #, fuzzy
 msgid "Allies"
@@ -21091,21 +21096,6 @@ msgstr "Gebied van bondgenoot {letter} tekenen (heeft er al een)"
 msgid "Draw some boxes first"
 msgstr "Teken eerst een paar gebieden"
 
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit as edges ({key})"
-msgstr "De eenheid als randen tekenen ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid ({key})"
-msgstr "De eenheid massief tekenen ({key})"
-
-#: src/lego/pages/components/ViewportBar.tsx
-#, fuzzy
-msgid "Draw the unit solid with edges ({key})"
-msgstr "De eenheid massief met randen tekenen ({key})"
-
 #: src/lego/shortcuts.ts
 #, fuzzy
 msgid "Draw the unit solid, as edges, or solid with edges"
@@ -26453,6 +26443,11 @@ msgstr "Hoe vaak een eenheid elke zeldzaamheid krijgt. Hoeft niet op te tellen t
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "Hoe vaak het spoor een nieuw hoekpunt toevoegt. Lager is vloeiender maar kost meer prestaties. Handig voor snel draaiende geleide raketten om hoekige sporen te voorkomen."
 
+#: src/lego/pages/components/FourViews.tsx
+#, fuzzy
+msgid "How the {view} view draws the unit: {modeName}"
+msgstr "Hoe de weergave {view} de eenheid tekent: {modeName}"
+
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
 msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
@@ -26472,6 +26467,11 @@ msgstr "Hoe de kanten waren opgesteld"
 #, fuzzy
 msgid "How the target moves"
 msgstr "Hoe het doel beweegt"
+
+#: src/lego/pages/components/ViewportBar.tsx
+#, fuzzy
+msgid "How the unit is drawn: {drawModeName} ({drawKey} to switch)"
+msgstr "Hoe de eenheid wordt getekend: {drawModeName} ({drawKey} om te wisselen)"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #, fuzzy
@@ -46367,6 +46367,16 @@ msgstr "sneeuw"
 msgid "Solar collector (a building)"
 msgstr "Zonnecollector (een gebouw)"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid"
+msgstr "Massief"
+
+#: src/lego/pages/components/DrawModeMenu.tsx
+#, fuzzy
+msgid "Solid with edges"
+msgstr "Massief met randen"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
@@ -57794,6 +57804,7 @@ msgstr "Winnaar"
 msgid "Wins"
 msgstr "Overwinningen"
 
+#: src/lego/pages/components/DrawModeMenu.tsx
 #: src/mapconv/pages/components/MapPreview3D.tsx
 #, fuzzy
 msgid "Wireframe"
