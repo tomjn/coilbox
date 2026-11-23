@@ -17364,11 +17364,6 @@ msgstr "Comandos retenidos"
 msgid "Common"
 msgstr "Común"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Comunidad"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26525,6 +26520,7 @@ msgid "HTML page"
 msgstr "Página HTML"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hub"
@@ -45894,11 +45890,6 @@ msgstr "Inicia sesión para publicar desde aquí. O copia el código y termina e
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Iniciar sesión en el hub"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Inicia sesión en el hub para subir {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"

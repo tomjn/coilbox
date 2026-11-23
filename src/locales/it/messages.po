@@ -17368,11 +17368,6 @@ msgstr "Comandi trattenuti"
 msgid "Common"
 msgstr "Comune"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Comunità"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26533,6 +26528,7 @@ msgid "HTML page"
 msgstr "Pagina HTML"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hub"
@@ -45919,11 +45915,6 @@ msgstr "Accedi per pubblicare da qui. Oppure copia il codice e completa nella pa
 #, fuzzy
 msgid "Sign in to the hub"
 msgstr "Accedi all’hub"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Accedi all’hub per caricare {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy

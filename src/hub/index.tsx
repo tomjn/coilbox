@@ -14,7 +14,7 @@ import ArchiveUploadBadge from "./upload/ArchiveUploadBadge";
  * The Coilbox hub plugin (issue #1347): one screen listing what other players
  * have shared, with the same filters the website's gallery has.
  *
- * In the Library group as Community (issue #4584). It shipped as a group of one
+ * In the Library group as Hub, first named Community (issue #4584). It shipped as a group of one
  * with no label, which the frame draws as a stray top-level item with nothing
  * saying what it belongs to, and then sat first in a Downloads group. Other
  * people's containers are things the library can hold, so they are listed beside
@@ -86,7 +86,7 @@ const hubPlugin: FramePlugin = {
       items: [
         {
           id: "hub.browse",
-          label: lazyText(msg`Community`),
+          label: lazyText(msg`Hub`),
           to: "/hub",
           order: 1.25,
           icon: CoilboxGlyph,

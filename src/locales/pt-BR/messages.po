@@ -17368,11 +17368,6 @@ msgstr "Comandos retidos"
 msgid "Common"
 msgstr "Comum"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Comunidade"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26533,6 +26528,7 @@ msgid "HTML page"
 msgstr "Página HTML"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hub"
@@ -45919,11 +45915,6 @@ msgstr "Entre para publicar daqui. Ou copie o código e termine na página do pr
 #, fuzzy
 msgid "Sign in to the hub"
 msgstr "Entrar no hub"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Entre no hub para enviar {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy

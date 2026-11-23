@@ -17364,11 +17364,6 @@ msgstr "Zurückgehaltene Befehle"
 msgid "Common"
 msgstr "Häufig"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Community"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26525,6 +26520,7 @@ msgid "HTML page"
 msgstr "HTML-Seite"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hub"
@@ -45894,11 +45890,6 @@ msgstr "Melden Sie sich an, um von hier zu veröffentlichen. Oder kopieren Sie d
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Beim Hub anmelden"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Melden Sie sich im Hub an, um {label} hochzuladen."
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"

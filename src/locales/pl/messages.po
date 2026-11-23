@@ -17364,11 +17364,6 @@ msgstr "Wstrzymane polecenia"
 msgid "Common"
 msgstr "Pospolite"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Społeczność"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26525,6 +26520,7 @@ msgid "HTML page"
 msgstr "Strona HTML"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hub"
@@ -45894,11 +45890,6 @@ msgstr "Zaloguj się, aby opublikować stąd. Albo skopiuj kod i dokończ na str
 #: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Zaloguj się do hubu"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Zaloguj się do huba, aby wysłać {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with {name}"

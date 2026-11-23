@@ -17368,11 +17368,6 @@ msgstr "Undanhållna kommandon"
 msgid "Common"
 msgstr "Vanlig"
 
-#: src/hub/index.tsx
-#, fuzzy
-msgid "Community"
-msgstr "Community"
-
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
 msgid "Compare"
@@ -26533,6 +26528,7 @@ msgid "HTML page"
 msgstr "HTML-sida"
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/hub/index.tsx
 #, fuzzy
 msgid "Hub"
 msgstr "Hubb"
@@ -45919,11 +45915,6 @@ msgstr "Logga in för att publicera härifrån. Eller kopiera koden och slutför
 #, fuzzy
 msgid "Sign in to the hub"
 msgstr "Logga in på hubben"
-
-#: src/hub/upload/UploadToHubButton.tsx
-#, fuzzy
-msgid "Sign in to the hub to upload {label}."
-msgstr "Logga in på hubben för att ladda upp {label}."
 
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy

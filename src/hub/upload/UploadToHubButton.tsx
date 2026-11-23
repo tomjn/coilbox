@@ -23,7 +23,6 @@ import {
 } from "../manualSend/grant";
 import { startManualSend } from "../manualSend/run";
 import { gamePageUrl, type HubState } from "../manualSend/status";
-import { SignInButton } from "../pages/components/AccountControl";
 import { sendMapFactsFirst } from "./bulkMaps";
 import { describeUploadEnd } from "./messages";
 import {
@@ -54,8 +53,8 @@ export function packedInstall(
 /**
  * "Upload to hub", beside the send control on a map or game's page (issue #5259).
  *
- * Offered for every installed map and game, and gone once the hub lists an
- * archive with this one's hash. A game installed through rapid or as an unpacked
+ * Offered for every installed map and game to a player signed in to the hub,
+ * and gone once the hub lists an archive with this one's hash. A game installed through rapid or as an unpacked
  * folder keeps the button, and the panel it opens says plainly that the hub
  * takes one `.sd7` or `.sdz` file. A disabled button cannot say why, and nothing
  * a player does on the page changes the answer.
@@ -143,6 +142,8 @@ export function UploadToHubButton({
   // The hub has not said what it holds, so an upload could be one it already
   // has, or one it cannot take at all. The send control waits the same way.
   if (!running && !ending && hub.hashes === undefined) return null;
+  // Only signed in players can upload, so nobody else is offered the button.
+  if (!running && !ending && !account.signedIn) return null;
   if (!running && !packed && (!enginePath || !dataDir || !archivePath)) {
     return null;
   }
@@ -286,17 +287,6 @@ export function UploadToHubButton({
             </Button>
           )}
         </div>
-      </>
-    );
-  } else if (!account.signedIn) {
-    body = (
-      <>
-        <p>{t`Sign in to the hub to upload ${label}.`}</p>
-        <SignInButton
-          hubUrl={hubUrl}
-          busy={account.busy}
-          onSignIn={account.signIn}
-        />
       </>
     );
   } else if (read.loading || (!facts && !read.problem && !read.failed)) {
