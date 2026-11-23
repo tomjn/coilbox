@@ -78,6 +78,7 @@ function props(overrides: Partial<ViewportBarProps> = {}): ViewportBarProps {
     overlap: toggle(),
     footprint: { ...toggle(), leaveOut: true, onLeaveOutChange: vi.fn() },
     aim: toggle(),
+    fourViews: toggle(),
     guides: (
       <GuidesPopover
         guides={[]}
@@ -217,6 +218,22 @@ describe("the Show menu", () => {
 });
 
 describe("tools in the bar", () => {
+  it("switches between one view and four, and says which it offers", () => {
+    const fourViews = toggle();
+    const { rerender } = render(<ViewportBar {...props({ fourViews })} />);
+    const button = screen.getByRole("button", { name: "Four views (4)" });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(button);
+    expect(fourViews.onChange).toHaveBeenCalledWith(true);
+
+    rerender(<ViewportBar {...props({ fourViews: toggle(true) })} />);
+    expect(
+      screen
+        .getByRole("button", { name: "One view (4)" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
   it("leaves the measure tool to the tool rail", () => {
     render(<ViewportBar {...props()} />);
     expect(
@@ -258,8 +275,8 @@ describe("the axis compass", () => {
     expect(screen.queryByRole("button", { name: "Reset the view" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Fixed views" })).toBeNull();
     expect(screen.queryByRole("button", { name: /perspective/ })).toBeNull();
-    // The Show menu, the draw mode, the pickers and the keyboard sheet are
-    // what is left.
-    expect(barButtons()).toHaveLength(6);
+    // The Show menu, the draw mode, one or four views, the pickers and the
+    // keyboard sheet are what is left.
+    expect(barButtons()).toHaveLength(7);
   });
 });

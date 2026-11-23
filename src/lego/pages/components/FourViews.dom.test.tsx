@@ -1,38 +1,20 @@
 // @vitest-environment happy-dom
 
 /**
- * The four view layout's controls (#5371): the button beside the compass, its
- * shortcut, and the named frame round each quadrant.
+ * The four view layout's controls (#5371): its shortcut and the named frame round each quadrant.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ChromeBands, FourViewsButton, QuadrantFrames } from "./FourViews";
+import { ChromeBands, QuadrantFrames } from "./FourViews";
 import type { SceneState } from "./sceneState";
 import { useModelShortcuts } from "./useModelShortcuts";
 
 afterEach(cleanup);
 
 const BANDS = { top: 60, bottom: 64, left: 56 };
-
-describe("the four views button", () => {
-  it("names its shortcut and says whether four views are showing", () => {
-    const onToggle = vi.fn();
-    const { rerender } = render(
-      <FourViewsButton on={false} onToggle={onToggle} />,
-    );
-    const button = screen.getByRole("button", { name: "Four views (4)" });
-    expect(button.getAttribute("aria-pressed")).toBe("false");
-
-    fireEvent.click(button);
-    expect(onToggle).toHaveBeenCalledTimes(1);
-
-    rerender(<FourViewsButton on onToggle={onToggle} />);
-    expect(button.getAttribute("aria-pressed")).toBe("true");
-  });
-});
 
 /** Only the shortcut hook, with no scene behind it. */
 function Shortcuts({ toggleFourViews }: { toggleFourViews: () => void }) {

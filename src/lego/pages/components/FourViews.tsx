@@ -1,6 +1,5 @@
 /**
- * The controls of the four view layout (#5371): the button beside the compass
- * that switches between one view and four, and the frame round each quadrant
+ * The controls of the four view layout (#5371): the frame round each quadrant
  * with its name.
  *
  * The scene draws the quadrants. This only marks them out, so the frames let
@@ -10,39 +9,8 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
-import { Button, cn } from "@picoframe/frame";
-import { Grid2x2 } from "lucide-react";
+import { cn } from "@picoframe/frame";
 import { QUADRANTS, type Quadrant, type ViewBands } from "../../quadViews";
-import { useShortcutOverrides } from "../../shortcutOverridesStore";
-import { shortcutLabel } from "../../shortcuts";
-
-export function FourViewsButton({
-  on,
-  onToggle,
-}: {
-  on: boolean;
-  onToggle: () => void;
-}) {
-  const { t } = useLingui();
-  // Re-render when a shortcut is rebound, so its tooltip keeps up.
-  useShortcutOverrides();
-  const key = shortcutLabel("four-views");
-  const label = t`Four views (${key})`;
-  return (
-    <Button
-      type="button"
-      variant={on ? "default" : "outline"}
-      size="icon"
-      aria-label={label}
-      title={label}
-      aria-pressed={on}
-      onClick={onToggle}
-      className="pointer-events-auto"
-    >
-      <Grid2x2 className="size-4" />
-    </Button>
-  );
-}
 
 /** Where each quadrant's name sits: in the corner nearest the middle of the
  *  canvas, clear of the chrome round its edges. */

@@ -16,6 +16,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   Cuboid,
+  Grid2x2,
   Keyboard,
   Layers,
   ListChecks,
@@ -67,6 +68,8 @@ export interface ViewportBarProps {
   aim: Toggle;
   /** Absent for a unit with no weapon ranges to draw. */
   reach?: Toggle;
+  /** One view or four. */
+  fourViews: Toggle;
   /** The pose list popover, absent where poses cannot be edited. */
   poses?: ReactNode;
   /** The guides popover, absent where guides cannot be edited. */
@@ -106,6 +109,7 @@ export function ViewportBar({
   snapping,
   drawMode,
   onNextDrawMode,
+  fourViews,
   collision,
   skeleton,
   balance,
@@ -128,6 +132,7 @@ export function ViewportBar({
   useShortcutOverrides();
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
   const skeletonKey = shortcutLabel("skeleton");
+  const key = shortcutLabel("four-views");
   /** The plain on and off overlays, in the order the menu lists them. A toggle
    *  the page does not offer is left out. */
   const items: ShowItem[] = [
@@ -195,6 +200,13 @@ export function ViewportBar({
       >
         <DrawModeFace className="size-4" />
       </ViewButton>
+      <ViewToggle
+        icon={Grid2x2}
+        on={fourViews.on}
+        onChange={fourViews.onChange}
+        hideTitle={t`One view (${key})`}
+        showTitle={t`Four views (${key})`}
+      />
       {poses}
       {guides}
       {environment}

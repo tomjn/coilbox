@@ -170,7 +170,7 @@ import { drawDrivePath } from "./drivePlayback";
 import { EnvironmentPicker } from "./EnvironmentPicker";
 import type { EffectsAtlas } from "./effectsLayer";
 import { buildEffectsLayer } from "./effectsLayer";
-import { ChromeBands, FourViewsButton, QuadrantFrames } from "./FourViews";
+import { ChromeBands, QuadrantFrames } from "./FourViews";
 import { disposeFootprint } from "./footprintLayer";
 import { GuidesPopover } from "./GuidesPopover";
 import {
@@ -429,7 +429,7 @@ interface Props {
    * them, which it does in four views (#5410) and in one view that is too
    * small to hold it (#5414). It has less room then, along the top.
    *
-   * `corner` is the four views button and the axis compass, for the chrome to
+   * `corner` is the axis compass, for the chrome to
    * put under its top right toolbar. Over the view the chrome's row is as tall
    * as the unit card, and below that row the compass hung a card's height
    * under a toolbar a third of it. Null in bands, where they stay in the view.
@@ -2066,22 +2066,19 @@ export function ModelViewport({
   // four views the top right of the perspective quadrant.
   const cornerInChrome = Boolean(chrome) && !banded && !fourViews;
   const corner = (
-    <div className="flex items-start gap-2">
-      <FourViewsButton on={quadrant !== null} onToggle={toggleFourViews} />
-      <AxisCompass
-        compassRef={compassRef}
-        view={activeView}
-        onView={(id) => {
-          const state = sceneRef.current;
-          if (state) showView(state, id, selectedIdsRef.current);
-        }}
-        onResetView={resetView}
-        onOrbit={(dx, dy) => {
-          const state = sceneRef.current;
-          if (state) orbitBy(state, dx, dy, COMPASS_SIZE);
-        }}
-      />
-    </div>
+    <AxisCompass
+      compassRef={compassRef}
+      view={activeView}
+      onView={(id) => {
+        const state = sceneRef.current;
+        if (state) showView(state, id, selectedIdsRef.current);
+      }}
+      onResetView={resetView}
+      onOrbit={(dx, dy) => {
+        const state = sceneRef.current;
+        if (state) orbitBy(state, dx, dy, COMPASS_SIZE);
+      }}
+    />
   );
 
   // What the line at the foot of the view says about the gesture in progress.
@@ -2455,6 +2452,10 @@ export function ModelViewport({
             />
 
             <ViewportBar
+              fourViews={{
+                on: quadrant !== null,
+                onChange: () => toggleFourViews(),
+              }}
               problems={
                 problems ? (
                   <ProblemsButton
