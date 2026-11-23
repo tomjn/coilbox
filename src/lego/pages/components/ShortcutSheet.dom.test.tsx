@@ -129,7 +129,7 @@ describe("rebinding a shortcut", () => {
     fireEvent.keyDown(document.body, { key: "r" });
     expect(getShortcutOverrides()).toEqual({});
     const alert = screen.getByRole("alert");
-    expect(alert.textContent).toContain("Turn the selection");
+    expect(alert.textContent).toContain("Rotate the selection");
     expect(screen.getByText("Press the new keys")).toBeTruthy();
   });
 
@@ -150,7 +150,7 @@ describe("rebinding a shortcut", () => {
     render(<ShortcutSheet open onOpenChange={() => {}} />);
     startChanging("Move the selection");
     fireEvent.keyDown(document.body, { key: "q" });
-    startChanging("Turn the selection");
+    startChanging("Rotate the selection");
     fireEvent.keyDown(document.body, { key: "x" });
     expect(Object.keys(getShortcutOverrides()).sort()).toEqual([
       "rotate",

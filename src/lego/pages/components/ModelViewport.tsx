@@ -25,7 +25,7 @@ import {
   Copy,
   FlipHorizontal2,
   Move,
-  RotateCw,
+  Rotate3d,
   RulerDimensionLine,
   Scaling,
   Trash2,
@@ -274,7 +274,7 @@ const MODES: {
   Icon: typeof Move;
 }[] = [
   { id: "translate", label: () => t`Move`, key: "G", Icon: Move },
-  { id: "rotate", label: () => t`Turn`, key: "R", Icon: RotateCw },
+  { id: "rotate", label: () => t`Rotate`, key: "R", Icon: Rotate3d },
   { id: "scale", label: () => t`Scale`, key: "S", Icon: Scaling },
 ];
 
