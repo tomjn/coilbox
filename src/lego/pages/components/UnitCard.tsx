@@ -12,7 +12,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
-import { Blocks, ChevronDown, ChevronRight } from "lucide-react";
+import { Blocks, ChevronDown, ChevronUp } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import {
   Collapsible,
@@ -28,50 +28,72 @@ import {
 export function UnitCard({
   compact,
   name,
+  nameField,
   children,
 }: {
   /** One line, with the card behind it. */
   compact: boolean;
-  /** The unit's name, which the one line shows. */
+  /** The unit's name, which the closed card shows. */
   name: string;
-  /** What the card holds. */
+  /** Where the name is edited, which takes the name's place in the open
+   *  card, so the name does not move as the card opens. */
+  nameField: ReactNode;
+  /** The rest of what the card holds, under the name. */
   children: ReactNode;
 }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
   if (!compact) {
+    // The icon, the name and the chevron on the right are one row, open or
+    // closed. Open, the name becomes its field in the same place, and the
+    // rest of the card is underneath, lined up with the name.
     return (
       <Collapsible open={open} onOpenChange={setOpen} asChild>
         <div
           data-testid="unit-card"
           className={cn(
-            "pointer-events-auto flex max-w-full items-center gap-1 rounded-lg border border-border/60 bg-background/80 px-1 py-1 backdrop-blur",
+            "pointer-events-auto flex max-w-full flex-col rounded-lg border border-border/60 bg-background/80 p-1 backdrop-blur",
             open && "min-w-56",
           )}
         >
-          <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 min-w-0 shrink-0 gap-1.5 self-start px-1.5"
-              // Closed, the button's name is the unit's name it shows.
-              {...(open
-                ? { "aria-label": t`Hide unit details` }
-                : { title: t`Show unit details` })}
-            >
-              {open ? (
-                <ChevronDown size={14} className="shrink-0" />
-              ) : (
-                <ChevronRight size={14} className="shrink-0" />
-              )}
+          {open ? (
+            <div className="flex h-7 min-w-0 items-center gap-2 pl-2">
               <Blocks size={16} className="shrink-0 text-muted-foreground" />
-              {open ? null : (
-                <span className="min-w-0 truncate font-semibold">{name}</span>
-              )}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="min-w-0">
+              <div className="min-w-0 flex-1">{nameField}</div>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0"
+                  aria-label={t`Hide unit details`}
+                >
+                  <ChevronUp size={14} />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          ) : (
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 min-w-0 justify-start gap-2 pr-1.5 pl-2"
+                title={t`Show unit details`}
+              >
+                <Blocks size={16} className="shrink-0 text-muted-foreground" />
+                {/* Inset as the field's text is, by its border and padding. */}
+                <span className="min-w-0 truncate px-[5px] font-semibold">
+                  {name}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className="ml-auto shrink-0 text-muted-foreground"
+                />
+              </Button>
+            </CollapsibleTrigger>
+          )}
+          <CollapsibleContent className="min-w-0 pb-1 pl-8">
             {children}
           </CollapsibleContent>
         </div>
@@ -94,6 +116,7 @@ export function UnitCard({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
+        {nameField}
         {children}
       </PopoverContent>
     </Popover>

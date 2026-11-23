@@ -2659,14 +2659,19 @@ function Builder({ id }: { id: string | undefined }) {
                           to hold the chrome (#5414), the card is one line in
                           the band along the top: the unit's name, with the rest
                           of the card a click away. */}
-                      <UnitCard compact={banded} name={draft.name}>
-                        <div className="min-w-0">
+                      <UnitCard
+                        compact={banded}
+                        name={draft.name}
+                        nameField={
                           <Input
                             value={draft.name}
                             onChange={(event) => renameUnit(event.target.value)}
                             aria-label={t`Unit name`}
-                            className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
+                            className="h-6 min-w-0 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
                           />
+                        }
+                      >
+                        <div className="min-w-0">
                           <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
                             <span className="min-w-0 truncate">
                               {plural(pieceCount, {
