@@ -23,6 +23,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { describeError } from "@/i18n/uiError";
 import { basename } from "@/lib/helpers";
 import { notify } from "@/notify/notify";
@@ -94,11 +99,18 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button size="icon" variant="outline" aria-label={t`Save model`}>
-          <FileDown size={14} />
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button size="icon" variant="outline" aria-label={t`Save model`}>
+              <FileDown size={14} />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <Trans>Save the model file on its own</Trans>
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="w-80 space-y-3">
         <div className="space-y-0.5">
           <p className="text-sm font-medium">
