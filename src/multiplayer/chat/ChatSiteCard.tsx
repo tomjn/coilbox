@@ -93,49 +93,67 @@ export function ChatLinkCard({
   // A picture that fails to load (offline, blocked, removed video) is dropped
   // rather than left as a broken-image icon. The card still opens the link.
   const [failed, setFailed] = useState(false);
+  const open = () => {
+    openUrl(url).catch(() => {});
+  };
+  // `no-referrer` so the third party is not told which page or lobby the
+  // message was read in. `alt=""` because the text beside it names the link.
+  const image = (className: string) =>
+    picture &&
+    !failed && (
+      <img
+        src={picture}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        className={className}
+        onError={() => setFailed(true)}
+      />
+    );
+
+  if (title) {
+    // A page's own card, laid out as Discord lays out an embed: the text first,
+    // then the picture at its own shape, since Open Graph pictures are wider
+    // than a video and often carry text that cropping would cut. A square or
+    // tall picture is held to a height rather than filling the width.
+    return (
+      <button
+        type="button"
+        data-link-card=""
+        className="block w-md max-w-full cursor-pointer overflow-hidden rounded-md border border-l-4 border-l-primary bg-muted p-3 text-left text-sm transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+        onClick={open}
+      >
+        <span className="flex items-center gap-2 text-muted-foreground text-xs">
+          <span className="min-w-0 flex-1 truncate">{site}</span>
+          <ExternalLink className="size-3.5 shrink-0 opacity-60" aria-hidden />
+        </span>
+        <span className="mt-0.5 line-clamp-2 font-semibold text-primary">
+          {title}
+        </span>
+        {description && (
+          <span className="mt-1 line-clamp-4">{description}</span>
+        )}
+        {image("mt-3 h-auto max-h-80 w-auto max-w-full rounded")}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       data-link-card=""
       className="w-64 max-w-full cursor-pointer overflow-hidden rounded-lg border bg-muted text-left text-sm transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
-      onClick={() => {
-        openUrl(url).catch(() => {});
-      }}
+      onClick={open}
     >
-      {picture && !failed && (
-        // `no-referrer` so the third party is not told which page or lobby the
-        // message was read in. `alt=""` because the text below names the link.
-        <img
-          src={picture}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          className="aspect-video w-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      )}
+      {image("aspect-video w-full object-cover")}
       <span className="flex items-center gap-2 px-2 py-1.5">
-        {title ? (
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-muted-foreground text-xs">
-              {site}
-            </span>
-            <span className="line-clamp-2 font-medium">{title}</span>
-            {description && (
-              <span className="line-clamp-2 text-muted-foreground text-xs">
-                {description}
-              </span>
-            )}
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium">{site}</span>
+          <span className="block truncate text-muted-foreground text-xs">
+            {url}
           </span>
-        ) : (
-          <span className="min-w-0 flex-1">
-            <span className="block font-medium">{site}</span>
-            <span className="block truncate text-muted-foreground text-xs">
-              {url}
-            </span>
-          </span>
-        )}
+        </span>
         <ExternalLink className="size-3.5 shrink-0 opacity-60" aria-hidden />
       </span>
     </button>
