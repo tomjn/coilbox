@@ -156,15 +156,28 @@ export function resetNames(
   game: string,
   playerRows: readonly WidgetRow[],
 ): string[] {
-  const kept = new Set(
-    playerRows
-      .filter((r) => r.loadedBy.includes(game))
-      .flatMap((r) => [nameOf(r), ...(r.info?.previousNames ?? [])]),
-  );
+  const kept = new Set(userResetNames(game, playerRows));
   const names = rows.flatMap((r) =>
     r.switch.kind === "ready" ? [r.switch.name, ...r.switch.previousNames] : [],
   );
   return [...new Set(names)].filter((n) => !kept.has(n));
+}
+
+/**
+ * The entries that reset the player's widgets `game` loads: each one's name and
+ * the names it had before.
+ */
+export function userResetNames(
+  game: string,
+  playerRows: readonly WidgetRow[],
+): string[] {
+  const names = playerRows
+    .filter((r) => r.loadedBy.includes(game))
+    .flatMap((r) => {
+      const name = nameOf(r);
+      return name === null ? [] : [name, ...(r.info?.previousNames ?? [])];
+    });
+  return [...new Set(names)];
 }
 
 /**

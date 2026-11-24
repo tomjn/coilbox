@@ -28,7 +28,6 @@ import {
   findData,
   LuaSyntaxError,
   returnedTable,
-  rewriteConfig,
   type Table,
   unreadable,
   writeWithBackup,
@@ -356,9 +355,9 @@ export async function removeEntries({
 }
 
 /**
- * Take `names` out of the game's order table, which puts those widgets back to
- * their defaults, and leaves their saved settings alone. The file is copied
- * first. Refuses while a game is running, which writes the file back.
+ * Take `names` out of the game's order table and its saved settings, which puts
+ * those widgets back to their defaults with nothing saved. Each file is copied
+ * first. Refuses while a game is running, which writes the files back.
  */
 export async function resetEntries({
   io,
@@ -373,12 +372,13 @@ export async function resetEntries({
   names: readonly string[];
   gameRunning: boolean;
 }): Promise<void> {
-  if (gameRunning) throw gameIsRunning();
-  const { config } = game.handler;
-  await rewriteConfig(
-    { io, writeDir, config, shortName: game.shortName ?? "" },
-    (text) => dropEntries(text, config, "order", names).text,
-  );
+  const out = await removeEntries({
+    io,
+    writeDir,
+    targets: [{ game, names: [...names] }],
+    gameRunning,
+  });
+  if (out.failed.length > 0) throw new Error(out.failed.join("\n"));
 }
 
 function gameIsRunning(): Error {

@@ -14839,7 +14839,7 @@ msgstr "Kan ikke skade sin egen enhet"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -39477,10 +39477,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Lilla"
 
-#: src/widgets/pages/ResetGameWidgets.tsx
-#, fuzzy
-msgid "Put {game}'s own widgets back to their defaults?"
-msgstr "Tilbakestille widgetene til {game} til standard?"
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Put {0}'s own widgets back to their defaults and clear their saved settings?"
+msgstr ""
 
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
@@ -41997,7 +41997,7 @@ msgstr "Send bekreftelses-e-post på nytt"
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
-#: src/widgets/pages/ResetGameWidgets.tsx
+#: src/widgets/pages/ResetWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Tilbakestill"
@@ -42011,11 +42011,6 @@ msgstr "Tilbakestill {description}"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Tilbakestill {eventLabel} til {defaultSoundLabel}"
-
-#: src/widgets/pages/ResetGameWidgets.tsx
-#, fuzzy
-msgid "Reset {game}'s own widgets"
-msgstr "Tilbakestill widgetene til {game}"
 
 #: src/mapconv/pages/components/MapinfoOptions.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -42057,6 +42052,10 @@ msgstr "Tilbakestill databasen før hver benchmark-kjøring"
 #, fuzzy
 msgid "Reset filters"
 msgstr "Tilbakestill filtre"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset game widgets"
+msgstr ""
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 #, fuzzy
@@ -42108,6 +42107,10 @@ msgstr "Tilbakestill til planen"
 #, fuzzy
 msgid "Reset to the built shape"
 msgstr "Tilbakestill til den bygde formen"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Reset user widgets"
+msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
@@ -47829,6 +47832,11 @@ msgstr "Slå på bygger"
 #, fuzzy
 msgid "Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints"
 msgstr "Bytt modus: Velg, Soner, Aktører, Grupper, Baser, Blåkopier"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Switch off your widgets in {0} and clear their saved settings?"
+msgstr ""
 
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #, fuzzy

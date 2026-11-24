@@ -35,7 +35,12 @@ import {
 import { errorText } from "@/lib/helpers";
 import { usePlay } from "@/play/PlayProvider";
 import { newConfigText } from "../gameHandler";
-import { gameWidgetRows, gameWidgetStates, resetNames } from "../gameWidgets";
+import {
+  gameWidgetRows,
+  gameWidgetStates,
+  resetNames,
+  userResetNames,
+} from "../gameWidgets";
 import { useGameFiles } from "../useGameFiles";
 import { useGameWidgets } from "../useGameWidgets";
 import { useWidgetList } from "../useWidgetList";
@@ -67,7 +72,7 @@ import {
   type RemovedWidget,
   RemoveWidgetButton,
 } from "./RemoveWidget";
-import { ResetGameWidgets } from "./ResetGameWidgets";
+import { ResetWidgets } from "./ResetWidgets";
 import { type SettingsTarget, WidgetSettingsDrawer } from "./WidgetSettings";
 
 /** The picker's value for the list of every widget file. Not empty, because
@@ -163,13 +168,6 @@ export default function WidgetsPage() {
         : null,
     [ownRows, file],
   );
-  // Only a widget the file has moved away from its default has anything to
-  // reset. A game saves every widget it knows, so most entries match it.
-  const ownChanged = useMemo(() => {
-    if (!ownRows || !ownStates) return false;
-    const defaults = gameWidgetStates(ownRows, new Map());
-    return Object.keys(ownStates).some((n) => ownStates[n] !== defaults[n]);
-  }, [ownRows, ownStates]);
   const resetOwn = async () => {
     if (!game?.handler || !list.configDir || !ownRows) return;
     await resetEntries({
@@ -253,6 +251,25 @@ export default function WidgetsPage() {
     updateSets((s) =>
       onNames.reduce((all, name) => switchIn(all, setTo, name, false), s),
     );
+  };
+  // The player's widgets are on or off as coilbox's set says, which it writes
+  // to the file at each launch, so the set switches them off as well.
+  const resetUser = async () => {
+    if (!game?.handler || !list.configDir || key === null) return;
+    await resetEntries({
+      io: appFileIO,
+      writeDir: list.configDir,
+      game: { ...game, handler: game.handler },
+      names: userResetNames(game.game, list.rows ?? []),
+      gameRunning: running,
+    });
+    const names = (shown ?? [])
+      .map((r) => switchName(r, game.game))
+      .filter((n): n is string => n !== null);
+    updateSets((s) =>
+      names.reduce((all, name) => switchIn(all, key, name, false), s),
+    );
+    await files.reload();
   };
 
   const pick = (value: string) => {
@@ -437,7 +454,20 @@ export default function WidgetsPage() {
         >
           <TableBody>
             {game?.handler && (
-              <SectionHeading columns={columns}>
+              <SectionHeading
+                columns={columns}
+                action={
+                  file?.kind === "ready" &&
+                  !!shown?.length && (
+                    <ResetWidgets
+                      label={t`Reset user widgets`}
+                      question={t`Switch off your widgets in ${game.game} and clear their saved settings?`}
+                      running={running}
+                      onReset={resetUser}
+                    />
+                  )
+                }
+              >
                 <Trans>Your widgets</Trans>
               </SectionHeading>
             )}
@@ -521,9 +551,11 @@ export default function WidgetsPage() {
               <SectionHeading
                 columns={columns}
                 action={
-                  ownChanged && (
-                    <ResetGameWidgets
-                      game={game.game}
+                  file?.kind === "ready" &&
+                  !!ownRows?.length && (
+                    <ResetWidgets
+                      label={t`Reset game widgets`}
+                      question={t`Put ${game.game}'s own widgets back to their defaults and clear their saved settings?`}
                       running={running}
                       onReset={resetOwn}
                     />
