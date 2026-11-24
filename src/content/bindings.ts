@@ -1335,6 +1335,19 @@ export interface ReplayDisagreement {
   observed: string;
   /** Observed minus recorded, for a figure that is a number. */
   difference?: number;
+  /**
+   * On a count of the logger's unit lines, the team's last line of that kind,
+   * as a lead on where the two counts parted.
+   */
+  lastUnit?: ReplayDisagreementUnit;
+}
+
+/** A unit named on a disagreement. */
+export interface ReplayDisagreementUnit {
+  unit: number;
+  frame: number;
+  /** What a player calls it. Absent when the log holds no definitions. */
+  name?: string;
 }
 
 /**

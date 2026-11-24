@@ -50201,6 +50201,14 @@ msgstr "このマップの陸地を作成できませんでした。{terrainErro
 msgid "The last recording failed. Try again, then watch it with rewind?"
 msgstr "前回の記録は失敗しました。再試行してから、巻き戻し付きで観戦しますか？"
 
+#: src/content/replayAnalysis.ts
+msgid "The last was {name} (unit {id}), at {time}."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The last was unit {id}, at {time}."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "The launch carries the edits itself. Placing the unit adds a generated game, {WORKSHOP_MUTATOR_FOLDER}, and a rescan."

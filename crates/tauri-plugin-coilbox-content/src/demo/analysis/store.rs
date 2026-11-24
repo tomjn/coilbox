@@ -634,6 +634,7 @@ pub(super) mod tests {
                         recorded: "1500".into(),
                         observed: "1750".into(),
                         difference: Some(250.0),
+                        last_unit: None,
                     }]
                 } else {
                     Vec::new()

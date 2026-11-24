@@ -2,7 +2,7 @@ import { i18n, type MessageDescriptor } from "@lingui/core";
 import { msg, t } from "@lingui/core/macro";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useSyncExternalStore } from "react";
-import { formatNumber } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import { isProfileHidden } from "../profile/hidden";
 import {
   ANALYSIS_QUEUE_EVENT,
@@ -16,8 +16,10 @@ import {
   type ReplayAnalysisQueue,
   type ReplayAnalysisRunningJob,
   type ReplayDisagreement,
+  type ReplayDisagreementUnit,
   type StoredReplayAnalysis,
 } from "./bindings";
+import { FRAMES_PER_SECOND } from "./chatClock";
 import { refreshStoredTracks } from "./replayTracks";
 
 /**
@@ -423,5 +425,16 @@ export function disagreementInWords(
   if (d.team === undefined)
     return t`${figure}: the replay recorded ${recorded}, the playback gave ${observed}.`;
   const team = d.team;
-  return t`${figure} for team ${team}: the replay recorded ${recorded}, the playback gave ${observed}.`;
+  const sentence = t`${figure} for team ${team}: the replay recorded ${recorded}, the playback gave ${observed}.`;
+  if (!d.lastUnit) return sentence;
+  return `${sentence} ${lastUnitInWords(d.lastUnit)}`;
+}
+
+/** The last unit the playback logged for a figure, with when. */
+function lastUnitInWords(unit: ReplayDisagreementUnit): string {
+  const id = unit.unit;
+  const time = formatDuration(unit.frame / FRAMES_PER_SECOND);
+  if (unit.name === undefined) return t`The last was unit ${id}, at ${time}.`;
+  const name = unit.name;
+  return t`The last was ${name} (unit ${id}), at ${time}.`;
 }

@@ -35,7 +35,7 @@
 --   start_unit_replaced  frame, unit, by, team, x, z
 --   damage               frame, team, target, at, origin, off
 --   unit_damage          frame, unit, def, team, dealt, taken
---   game_over            frame, winners, teams
+--   game_over            frame, winners, teams, dying
 --
 -- The game over line is the last one. The engine is told to quit as soon as it
 -- is on disk.
@@ -44,6 +44,11 @@
 -- four attacker fields are left out when the engine names none. Each entry of
 -- "teams" is that team's last statistics sample as Spring.GetTeamStatsHistory
 -- reports it, plus "samples", the number of samples the team has.
+--
+-- "dying" lists the units with a unit_destroyed line that the engine still
+-- held when the game ended, in id order. The engine counts a unit in its
+-- team's unitsDied only when it removes the unit, after any death animation,
+-- so these units have a line but are not in the totals.
 --
 -- "startUnit" is true on a unit its team started with, and left out on every
 -- other unit. The engine has no idea of a commander: UnitDefs.isCommander
@@ -239,6 +244,7 @@ if gadgetHandler:IsSyncedCode() then
 	local GetTeamUnitStats = Spring.GetTeamUnitStats
 	local AreTeamsAllied = Spring.AreTeamsAllied
 	local GetUnitBuildFacing = Spring.GetUnitBuildFacing
+	local GetUnitIsDead = Spring.GetUnitIsDead
 	local floor = math.floor
 	local abs = math.abs
 	local min = math.min
@@ -335,6 +341,8 @@ if gadgetHandler:IsSyncedCode() then
 	local dying = {}
 	-- Units the engine has destroyed, until it hands out the id again.
 	local dead = {}
+	-- The same units in the order they died, so game over can walk them.
+	local deadInOrder = {}
 
 	local function tallyOf(unitID, unitDefID, unitTeam)
 		local tally = tallies[unitID]
@@ -644,6 +652,7 @@ if gadgetHandler:IsSyncedCode() then
 			dying[#dying + 1] = tallies[unitID]
 		end
 		dead[unitID] = true
+		deadInOrder[#deadInOrder + 1] = unitID
 
 		-- A unit that could have been a successor and died first is not one.
 		local old = successorOf[unitID]
@@ -849,10 +858,24 @@ if gadgetHandler:IsSyncedCode() then
 			end
 		end
 
+		local stillDying = {}
+		local seen = {}
+		for _, unitID in ipairs(deadInOrder) do
+			if dead[unitID] and not seen[unitID] and GetUnitIsDead(unitID) then
+				stillDying[#stillDying + 1] = unitID
+			end
+			seen[unitID] = true
+		end
+		table.sort(stillDying)
+		for index, unitID in ipairs(stillDying) do
+			stillDying[index] = number(unitID)
+		end
+
 		-- The second argument tells the unsynced half this was the last line.
 		SendToUnsynced(MESSAGE, '{"kind":"game_over","frame":' .. number(GetGameFrame())
 			.. ',"winners":[' .. table.concat(winners, ",") .. "]"
-			.. ',"teams":[' .. table.concat(teams, ",") .. "]}", true)
+			.. ',"teams":[' .. table.concat(teams, ",") .. "]"
+			.. ',"dying":[' .. table.concat(stillDying, ",") .. "]}", true)
 	end
 else
 	----------------------------------------------------------------------------

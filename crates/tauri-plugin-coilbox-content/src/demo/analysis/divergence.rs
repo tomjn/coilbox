@@ -18,6 +18,9 @@
 //!   `unit_destroyed` line per unit a team lost, and a `unit_given` line per
 //!   unit a team was given, gave, captured or had captured. This is the check
 //!   on the logger itself, and it is the one a log with events missing fails.
+//!   A unit still dying when the game ended has a `unit_destroyed` line but is
+//!   not yet in the engine's count, so the game over line names it and its
+//!   line is left out.
 //! - The engine's own verdict. A replay carries the checksum every player's
 //!   simulation had as the match was played, and the engine compares its own
 //!   against each one as it plays back, logging `[DESYNC WARNING]` for a frame
@@ -60,7 +63,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::log::{EventLog, LogLine, LoggedTeam};
+use super::super::def_sets::UnitDef;
+use super::log::{unit_defs_of, EventLog, LogLine, LoggedTeam, UnitEvent};
 use crate::model::{DemoTrailer, TeamStatSample};
 
 /// `GAME_SPEED` in `rts/Sim/Misc/GlobalConstants.h`: simulation frames a
@@ -84,6 +88,22 @@ pub struct Disagreement {
     /// Observed minus recorded, for a figure that is a number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub difference: Option<f64>,
+    /// On a count of the logger's unit lines, the team's last line of that
+    /// kind, as a lead on where the two counts parted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_unit: Option<DisagreementUnit>,
+}
+
+/// A unit named on a disagreement.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DisagreementUnit {
+    pub unit: i32,
+    pub frame: i32,
+    /// What a player calls the unit, or the definition's key when the game
+    /// gives no such name. Absent when the log holds no definitions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 fn list(values: &[u32]) -> String {
@@ -106,6 +126,7 @@ impl Findings {
                 recorded: recorded.to_string(),
                 observed: observed.to_string(),
                 difference: Some((observed - recorded) as f64),
+                last_unit: None,
             });
         }
     }
@@ -119,6 +140,27 @@ impl Findings {
                 recorded: recorded.to_string(),
                 observed: observed.to_string(),
                 difference: Some(f64::from(observed) - f64::from(recorded)),
+                last_unit: None,
+            });
+        }
+    }
+
+    /// A count of the logger's unit lines against the engine's own count.
+    fn unit_lines(
+        &mut self,
+        figure: &str,
+        team: i32,
+        recorded: i64,
+        lines: &[&UnitEvent],
+        defs: Option<&[UnitDef]>,
+    ) {
+        let before = self.0.len();
+        self.count(figure, Some(team), recorded, lines.len() as i64);
+        if self.0.len() > before {
+            self.0[before].last_unit = lines.last().map(|event| DisagreementUnit {
+                unit: event.unit,
+                frame: event.frame,
+                name: name_of(defs, event.def),
             });
         }
     }
@@ -196,6 +238,13 @@ impl Findings {
     }
 }
 
+/// A unit's name from the run's own definitions, which number from 1.
+fn name_of(defs: Option<&[UnitDef]>, def: i32) -> Option<String> {
+    let index = usize::try_from(def).ok()?.checked_sub(1)?;
+    let def = defs?.get(index)?;
+    Some(def.human_name.clone().unwrap_or_else(|| def.name.clone()))
+}
+
 /// How many times the engine said its simulation differed from a recorded
 /// player's, in the output of a run.
 pub fn desync_warnings(engine_log: &str) -> usize {
@@ -233,6 +282,7 @@ pub fn compare(
             recorded: "the game ended".into(),
             observed: "the run recorded no game over".into(),
             difference: None,
+            last_unit: None,
         });
         return found.0;
     };
@@ -250,6 +300,7 @@ pub fn compare(
             recorded: list(&recorded_winners),
             observed: list(&observed_winners),
             difference: None,
+            last_unit: None,
         });
     }
 
@@ -265,6 +316,22 @@ pub fn compare(
         trailer.teams.len() as i64,
         over.teams.len() as i64,
     );
+
+    let defs = unit_defs_of(&log.lines);
+    // The death line of each unit the engine still held at game over: the
+    // last one with its id, as the engine can hand an id out again.
+    let still_dying: Vec<(i32, i32)> = over
+        .dying
+        .iter()
+        .filter_map(|unit| {
+            log.lines.iter().rev().find_map(|line| match line {
+                LogLine::UnitDestroyed(event) if event.unit == *unit => {
+                    Some((event.unit, event.frame))
+                }
+                _ => None,
+            })
+        })
+        .collect();
 
     for series in &trailer.teams {
         let team = series.team;
@@ -288,71 +355,89 @@ pub fn compare(
         // The logger against the trailer: one line per unit made and per unit
         // lost. A log with events missing fails here even when the simulation
         // itself reproduced.
-        let lines = |wanted: fn(&LogLine) -> Option<i32>| {
+        let lines = |wanted: &dyn Fn(&LogLine) -> Option<(i32, &UnitEvent)>| {
             log.lines
                 .iter()
-                .filter(|line| wanted(line) == Some(team))
-                .count() as i64
+                .filter_map(|line| wanted(line).filter(|(of, _)| *of == team))
+                .map(|(_, event)| event)
+                .collect::<Vec<_>>()
         };
-        found.count(
+        let defs = defs.as_deref();
+        found.unit_lines(
             "unitCreatedLines",
-            Some(team),
+            team,
             last.units_produced.into(),
-            lines(|line| match line {
-                LogLine::UnitCreated(event) => Some(event.team),
+            &lines(&|line| match line {
+                LogLine::UnitCreated(event) => Some((event.team, event)),
                 _ => None,
             }),
+            defs,
         );
-        found.count(
+        // A unit still dying when the game ended has its line, and the engine
+        // counts it only once it removes the unit, so that line is left out.
+        let destroyed: Vec<_> = lines(&|line| match line {
+            LogLine::UnitDestroyed(event) => Some((event.team, event)),
+            _ => None,
+        })
+        .into_iter()
+        .filter(|event| !still_dying.contains(&(event.unit, event.frame)))
+        .collect();
+        found.unit_lines(
             "unitDestroyedLines",
-            Some(team),
+            team,
             last.units_died.into(),
-            lines(|line| match line {
-                LogLine::UnitDestroyed(event) => Some(event.team),
-                _ => None,
-            }),
+            &destroyed,
+            defs,
         );
         // One `unit_given` line per unit that changed team. The engine raises
         // these four counters in `CUnit::ChangeTeam` and nowhere else, one for
         // the team that gained the unit and one for the team that lost it.
-        fn captured(event: &super::log::UnitEvent) -> bool {
+        fn captured(event: &UnitEvent) -> bool {
             event.captured == Some(true)
         }
-        found.count(
+        found.unit_lines(
             "unitsReceivedLines",
-            Some(team),
+            team,
             last.units_received.into(),
-            lines(|line| match line {
-                LogLine::UnitGiven(event) if !captured(event) => Some(event.team),
+            &lines(&|line| match line {
+                LogLine::UnitGiven(event) if !captured(event) => Some((event.team, event)),
                 _ => None,
             }),
+            defs,
         );
-        found.count(
+        found.unit_lines(
             "unitsSentLines",
-            Some(team),
+            team,
             last.units_sent.into(),
-            lines(|line| match line {
-                LogLine::UnitGiven(event) if !captured(event) => event.from,
+            &lines(&|line| match line {
+                LogLine::UnitGiven(event) if !captured(event) => {
+                    event.from.map(|from| (from, event))
+                }
                 _ => None,
             }),
+            defs,
         );
-        found.count(
+        found.unit_lines(
             "unitsCapturedLines",
-            Some(team),
+            team,
             last.units_captured.into(),
-            lines(|line| match line {
-                LogLine::UnitGiven(event) if captured(event) => Some(event.team),
+            &lines(&|line| match line {
+                LogLine::UnitGiven(event) if captured(event) => Some((event.team, event)),
                 _ => None,
             }),
+            defs,
         );
-        found.count(
+        found.unit_lines(
             "unitsOutCapturedLines",
-            Some(team),
+            team,
             last.units_out_captured.into(),
-            lines(|line| match line {
-                LogLine::UnitGiven(event) if captured(event) => event.from,
+            &lines(&|line| match line {
+                LogLine::UnitGiven(event) if captured(event) => {
+                    event.from.map(|from| (from, event))
+                }
                 _ => None,
             }),
+            defs,
         );
     }
     found.0
@@ -533,6 +618,94 @@ pub(super) mod tests {
         ));
         assert_eq!((d.figure.as_str(), d.team), ("unitDestroyedLines", Some(1)));
         assert_eq!((d.recorded.as_str(), d.observed.as_str()), ("2", "1"));
+        // The last loss the log does hold for the team, as a lead.
+        let last = d.last_unit.expect("a unit named");
+        assert_eq!((last.unit, last.frame, last.name), (2, 1500, None));
+    }
+
+    /// The engine had not removed team 1's start unit when the game ended, so
+    /// its count, in the trailer and in the logger's totals alike, is one
+    /// short of the logger's lines.
+    fn trailer_with_unit_still_dying() -> DemoTrailer {
+        let mut trailer = fixture_trailer();
+        trailer.teams[1].samples[1].units_died = 1;
+        trailer
+    }
+
+    fn log_with_unit_still_dying(dying: &str) -> String {
+        let text = FIXTURE
+            .replace("\"unitsDied\":2", "\"unitsDied\":1")
+            .replace("\"dying\":[]", dying);
+        assert_ne!(text, FIXTURE);
+        text
+    }
+
+    #[test]
+    fn a_unit_still_dying_at_game_over_is_left_out_of_the_count() {
+        let text = log_with_unit_still_dying("\"dying\":[2]");
+
+        assert_eq!(
+            compare(
+                &trailer_with_unit_still_dying(),
+                FIXTURE_SECONDS,
+                &parse_log(&text),
+                0
+            ),
+            Vec::new()
+        );
+    }
+
+    #[test]
+    fn a_unit_still_dying_that_the_logger_did_not_name_is_a_disagreement() {
+        let d = only(compare(
+            &trailer_with_unit_still_dying(),
+            FIXTURE_SECONDS,
+            &parse_log(&log_with_unit_still_dying("\"dying\":[]")),
+            0,
+        ));
+        assert_eq!((d.figure.as_str(), d.team), ("unitDestroyedLines", Some(1)));
+        assert_eq!((d.recorded.as_str(), d.observed.as_str()), ("1", "2"));
+        let last = d.last_unit.expect("a unit named");
+        assert_eq!((last.unit, last.frame), (2, 1500));
+    }
+
+    /// A dying unit belongs to the team on its last death line, as the engine
+    /// can hand its id to a unit of another team after the first one died.
+    #[test]
+    fn a_dying_unit_is_counted_against_the_team_of_its_last_death() {
+        // Unit 5 died for team 1 at frame 900. Here its id comes back for team
+        // 0 and that unit is still dying at game over.
+        let cut = FIXTURE
+            .rfind("{\"kind\":\"game_over\"")
+            .expect("the game over line");
+        let reused = "{\"kind\":\"unit_destroyed\",\"frame\":1500,\"unit\":5,\"def\":40,\"team\":0,\"x\":0,\"y\":0,\"z\":0}\n";
+        let text = format!("{}{reused}{}", &FIXTURE[..cut], &FIXTURE[cut..])
+            .replace("\"dying\":[]", "\"dying\":[5]");
+
+        assert_eq!(
+            compare(&fixture_trailer(), FIXTURE_SECONDS, &parse_log(&text), 0),
+            Vec::new()
+        );
+    }
+
+    #[test]
+    fn a_unit_is_named_from_the_runs_own_definitions() {
+        let defs = vec![
+            UnitDef {
+                name: "armcom".into(),
+                human_name: Some("Commander".into()),
+                ..Default::default()
+            },
+            UnitDef {
+                name: "corscout".into(),
+                ..Default::default()
+            },
+        ];
+        assert_eq!(name_of(Some(&defs), 1).as_deref(), Some("Commander"));
+        assert_eq!(name_of(Some(&defs), 2).as_deref(), Some("corscout"));
+        assert_eq!(name_of(Some(&defs), 3), None);
+        assert_eq!(name_of(Some(&defs), 0), None);
+        assert_eq!(name_of(None, 1), None);
     }
 
     #[test]
