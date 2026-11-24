@@ -20,6 +20,7 @@ import type { LibraryMap } from "../../content/library";
 import { buildMapLink } from "../../deeplink/build";
 import { identityOf } from "../../downloads/DownloadQueueProvider";
 import type { HeldMapAsset } from "../../hub/assets/picture";
+import { forgetLinkCards } from "../../hub/linkCard";
 import type { MapFacts } from "../../hub/maps/lookup";
 import type { ChatMsg } from "../bindings";
 import { ChatPane } from "./ChatPane";
@@ -140,8 +141,19 @@ beforeEach(() => {
   hoisted.cancel.mockClear();
   hoisted.openUrl.mockClear();
   hoisted.dispatch.mockClear();
+  forgetLinkCards();
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ card: null })));
+  vi.stubGlobal("fetch", fetchMock);
+  // With no observer a hub card asks straight away rather than on scroll.
+  vi.stubGlobal("IntersectionObserver", undefined);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+const fetchMock = vi.fn();
 
 it("shows a missing map with the hub's picture and details, and downloads it", async () => {
   hoisted.facts = {
@@ -261,15 +273,64 @@ it("resolves a Beyond All Reason link to the newest version and asks BAR for not
   expect(hoisted.openUrl).toHaveBeenCalledExactlyOnceWith(url);
 });
 
-it("names the slug and opens the page when a hub link matches no known map", () => {
+it("names the slug of a Beyond All Reason link it cannot match, and asks the hub nothing", () => {
+  hoisted.maps = [];
+  const { container } = draw(
+    "https://www.beyondallreason.info/map/never-heard-of-it",
+  );
+  expect(
+    within(mapCard(container)).getByText("never-heard-of-it"),
+  ).toBeTruthy();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it("names the slug and opens the page when a hub link matches no known map and the hub has no card", async () => {
   hoisted.maps = [];
   const url = `${HUB}/map/never-heard-of-it`;
   const { container } = draw(url);
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
   const card = within(mapCard(container));
 
   expect(card.getByText("never-heard-of-it")).toBeTruthy();
   expect(card.queryByRole("button", { name: "Download" })).toBeNull();
   expect(screen.getAllByText(url).length).toBeGreaterThan(0);
   fireEvent.click(card.getByRole("button", { name: "Open link" }));
+  expect(hoisted.openUrl).toHaveBeenCalledExactlyOnceWith(url);
+});
+
+it("shows the hub's card for a hub map page that matches no known map", async () => {
+  hoisted.maps = [];
+  const picture = `${HUB}/api/v1/links/image?url=x&sig=y`;
+  fetchMock.mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        card: {
+          url: `${HUB}/map/voidborn-nift-2-0`,
+          type: null,
+          site_name: "hub.coilbox.org",
+          title: "voidborn_nift 2.0",
+          description: "Floating asteroids in deep space.",
+          image: picture,
+        },
+      }),
+    ),
+  );
+  const url = `${HUB}/map/voidborn-nift-2-0`;
+  const { container } = draw(url);
+
+  const card = await waitFor(() => {
+    const found = container.querySelector<HTMLButtonElement>(
+      "button[data-link-card]",
+    );
+    if (!found) throw new Error("no hub card yet");
+    return found;
+  });
+  expect(container.querySelector("[data-map-card]")).toBeNull();
+  expect(card.textContent).toContain("voidborn_nift 2.0");
+  expect(card.textContent).toContain("Floating asteroids in deep space.");
+  expect(card.textContent).toContain("Coilbox Hub");
+  expect(card.querySelector("img")?.getAttribute("src")).toBe(picture);
+
+  fireEvent.click(card);
   expect(hoisted.openUrl).toHaveBeenCalledExactlyOnceWith(url);
 });

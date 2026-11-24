@@ -11,6 +11,7 @@ import {
   mpChatLogOpen,
   mpChatLogs,
 } from "../bindings";
+import { ChatLinkCards } from "../chat/ChatLinkCards";
 import { isBattleChannel } from "../chat/conversation";
 import { FormattedText } from "../chat/FormattedText";
 import { accountLabel, threadLabel } from "../chatLogNames";
@@ -231,6 +232,9 @@ export default function ChatLogPage() {
                             </span>
                             <FormattedText text={m.text} />
                           </span>
+                          <div className="col-start-2">
+                            <ChatLinkCards text={m.text} own={false} />
+                          </div>
                         </li>
                       );
                     })}

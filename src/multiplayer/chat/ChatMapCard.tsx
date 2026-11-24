@@ -34,8 +34,10 @@ import {
   useMapPictureLadder,
   useMapPictureRung,
 } from "@/hub/assets/useMapPicture";
+import { isHubOrigin, useTrustedHubUrl } from "@/hub/config";
 import { useMapFacts } from "@/hub/maps/useMapFacts";
 import { usePreferredTarget } from "@/play/config";
+import { HubCard } from "./ChatSiteCard";
 import { type MapLinkCard, mapNameForSlug } from "./linkCards";
 
 /**
@@ -120,8 +122,29 @@ function OpenLinkButton({ url }: { url: string }) {
   );
 }
 
-/** A map page whose slug matches no name this machine knows. */
+/**
+ * A map page whose slug matches no name this machine knows. A page on the hub
+ * gets the hub's card for it (issue #5436), with the map's own title, picture
+ * and description. The slug on its own is the card until then, for a page the
+ * hub has no card for, and for Beyond All Reason's pages, which coilbox does
+ * not fetch (#1728).
+ */
 function UnresolvedMapCard({ card }: { card: MapLinkCard }) {
+  const hubUrl = useTrustedHubUrl();
+  const slugCard = <SlugCard card={card} />;
+  if (!hubUrl || !isHubOrigin(card.url, hubUrl)) return slugCard;
+  return (
+    <HubCard
+      key={`${hubUrl}\n${card.url}`}
+      hubUrl={hubUrl}
+      href={card.url}
+      site={card.site}
+      fallback={slugCard}
+    />
+  );
+}
+
+function SlugCard({ card }: { card: MapLinkCard }) {
   const title = card.map.kind === "slug" ? card.map.slug : card.map.name;
   return (
     <div data-link-card="" data-map-card="" className={CARD}>

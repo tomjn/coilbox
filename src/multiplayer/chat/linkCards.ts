@@ -211,6 +211,25 @@ function collectUrls(nodes: Inline[], out: string[]): void {
 }
 
 /**
+ * The message's first `http` or `https` link, or null. A message with no card
+ * from a known site asks the hub for this one's (issue #5436).
+ */
+export function firstWebLink(text: string): string | null {
+  const urls: string[] = [];
+  collectUrls(parseMessage(text), urls);
+  return urls.find(isWebLink) ?? null;
+}
+
+function isWebLink(href: string): boolean {
+  try {
+    const { protocol } = new URL(href);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The cards to show under a message, in the order their links appear. Reads the
  * same `url` tokens the message body links from, so a link inside a code span
  * or a code block, which the parser leaves as literal text, gets no card.
