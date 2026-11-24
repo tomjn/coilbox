@@ -27,7 +27,9 @@ const hubAccount = vi.fn();
 const hubSignIn = vi.fn();
 vi.mock("@/hub/auth", () => ({
   hubAccount: (args: { hubUrl: string }) => hubAccount(args),
-  hubProviders: async () => ({ providers: ["discord", "github", "twitch"] }),
+  hubProviders: async () => ({
+    providers: ["discord", "github", "google", "twitch"],
+  }),
   hubSignIn: (args: { hubUrl: string; provider: string }) => hubSignIn(args),
   hubSignOut: async () => {},
 }));
@@ -106,6 +108,14 @@ it("signs in with the provider whose button is pressed", async () => {
   expect(busy.hasAttribute("disabled")).toBe(true);
   fireEvent.click(busy);
   expect(hubSignIn).toHaveBeenCalledTimes(1);
+});
+
+it("shows Google's mark on a white button", async () => {
+  show();
+  const google = await signInButton("Google");
+  expect(google.className).toContain("bg-white");
+  expect(google.className).not.toContain("text-white");
+  expect(google.querySelector('path[fill="#4285F4"]')).not.toBeNull();
 });
 
 it("moves on after a successful sign in", async () => {
