@@ -150,13 +150,20 @@ async fn respond(sock: &mut TcpStream, status: &str, body: &str) {
     let _ = sock.flush().await;
 }
 
-/// Read the request line of an HTTP request and return its target, for example
+/// Read an HTTP request head and return its target, for example
 /// `/oauth2callback?code=x`. Anything longer than 8 KiB before the first line break
 /// is not a browser and is dropped.
+///
+/// The headers after the first line are read to the blank line that ends them
+/// and thrown away as they arrive. Closing with any of them unread makes the OS
+/// reset the connection, and the browser then drops the page it was sent.
 async fn read_target(sock: &mut TcpStream) -> Option<String> {
     let mut buf = Vec::new();
     let mut chunk = [0u8; 512];
-    while !buf.windows(2).any(|w| w == b"\r\n") {
+    let line_end = loop {
+        if let Some(end) = buf.windows(2).position(|w| w == b"\r\n") {
+            break end;
+        }
         if buf.len() > 8192 {
             return None;
         }
@@ -164,9 +171,18 @@ async fn read_target(sock: &mut TcpStream) -> Option<String> {
             Ok(0) | Err(_) => return None,
             Ok(n) => buf.extend_from_slice(&chunk[..n]),
         }
+    };
+    // Only the last three bytes matter for spotting the blank line across reads.
+    let mut rest = buf[line_end..].to_vec();
+    while !rest.windows(4).any(|w| w == b"\r\n\r\n") {
+        rest.drain(..rest.len().saturating_sub(3));
+        match sock.read(&mut chunk).await {
+            Ok(0) | Err(_) => return None,
+            Ok(n) => rest.extend_from_slice(&chunk[..n]),
+        }
     }
-    let line = String::from_utf8_lossy(&buf);
-    let line = line.split("\r\n").next()?;
+    let line = String::from_utf8_lossy(&buf[..line_end]);
+    let line = line.as_ref();
     let mut parts = line.split(' ');
     let _method = parts.next()?;
     Some(parts.next()?.to_owned())
@@ -451,6 +467,33 @@ mod tests {
         let mut buf = Vec::new();
         sock.read_to_end(&mut buf).await.unwrap();
         String::from_utf8_lossy(&buf).into_owned()
+    }
+
+    /// A real browser's request runs to a couple of kilobytes of headers, well past
+    /// the first line. Closing with those unread makes the OS reset the
+    /// connection, and the browser drops the page it was sent and shows nothing.
+    #[tokio::test]
+    async fn a_browser_sized_request_still_gets_the_page() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let wait = tokio::spawn(loopback.wait_for_code(
+            "real-state",
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+        ));
+        let mut sock = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let headers = format!(
+            "GET /oauth2callback?state=real-state&code=the-code HTTP/1.1\r\nHost: 127.0.0.1\r\nCookie: {}\r\n\r\n",
+            "a".repeat(4096)
+        );
+        sock.write_all(headers.as_bytes()).await.unwrap();
+        let mut buf = Vec::new();
+        sock.read_to_end(&mut buf)
+            .await
+            .expect("the connection was reset rather than closed");
+        let response = String::from_utf8_lossy(&buf);
+        assert!(response.contains("Signed in"), "{response}");
+        assert_eq!(wait.await.unwrap().unwrap(), "the-code");
     }
 
     #[tokio::test]
