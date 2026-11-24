@@ -50231,6 +50231,14 @@ msgstr "Impossibile costruire il terreno di questa mappa. {terrainError}"
 msgid "The last recording failed. Try again, then watch it with rewind?"
 msgstr "L’ultima registrazione non è riuscita. Riprovare e poi guardarlo con il riavvolgimento?"
 
+#: src/content/replayAnalysis.ts
+msgid "The last was {name} (unit {id}), at {time}."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The last was unit {id}, at {time}."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "The launch carries the edits itself. Placing the unit adds a generated game, {WORKSHOP_MUTATOR_FOLDER}, and a rescan."

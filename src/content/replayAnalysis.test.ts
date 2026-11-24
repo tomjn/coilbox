@@ -300,4 +300,20 @@ describe("a disagreement in words", () => {
       }),
     ).toMatch(/^Units lost for team 1:/);
   });
+
+  it("names the last unit the playback logged, and when", () => {
+    const d = {
+      figure: "unitDestroyedLines",
+      team: 2,
+      recorded: "87",
+      observed: "88",
+      lastUnit: { unit: 4012, frame: 30 * 754, name: "Overseer" },
+    };
+    expect(disagreementInWords(d)).toBe(
+      "Units lost for team 2: the replay recorded 87, the playback gave 88. The last was Overseer (unit 4012), at 12:34.",
+    );
+    expect(
+      disagreementInWords({ ...d, lastUnit: { unit: 4012, frame: 30 } }),
+    ).toMatch(/The last was unit 4012, at 0:01\.$/);
+  });
 });

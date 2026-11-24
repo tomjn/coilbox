@@ -50231,6 +50231,14 @@ msgstr "Kartans land kunde inte byggas. {terrainError}"
 msgid "The last recording failed. Try again, then watch it with rewind?"
 msgstr "Den senaste inspelningen misslyckades. Försöka igen och sedan titta på den med tillbakaspolning?"
 
+#: src/content/replayAnalysis.ts
+msgid "The last was {name} (unit {id}), at {time}."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The last was unit {id}, at {time}."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "The launch carries the edits itself. Placing the unit adds a generated game, {WORKSHOP_MUTATOR_FOLDER}, and a rescan."
