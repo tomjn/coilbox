@@ -159,6 +159,13 @@ function M.newEngine(options)
 			local unit = engine.units[unitID]
 			return unit and (unit.facing or 0)
 		end,
+		GetUnitIsDead = function(unitID)
+			local unit = engine.units[unitID]
+			if not unit then
+				return nil
+			end
+			return unit.dead == true
+		end,
 		GetUnitHealth = function(unitID)
 			local unit = engine.units[unitID]
 			if not unit then
@@ -364,6 +371,16 @@ function M.newEngine(options)
 		engine.synced:UnitDestroyed(unitID, unit.defID, unit.team, attackerID,
 			attacker and attacker.defID, attacker and attacker.team, weaponDefID)
 		engine.units[unitID] = nil
+	end
+
+	--- Destroy a unit that the engine goes on holding, as it does for one
+	-- playing a death animation.
+	function engine.kill(unitID, attackerID, weaponDefID)
+		local unit = engine.units[unitID]
+		unit.dead = true
+		local attacker = attackerID and engine.units[attackerID]
+		engine.synced:UnitDestroyed(unitID, unit.defID, unit.team, attackerID,
+			attacker and attacker.defID, attacker and attacker.team, weaponDefID)
 	end
 
 	return engine

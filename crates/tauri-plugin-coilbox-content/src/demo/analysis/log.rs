@@ -243,6 +243,11 @@ pub struct LoggedGameOver {
     pub frame: i32,
     pub winners: Vec<u32>,
     pub teams: Vec<LoggedTeam>,
+    /// Units with a `unit_destroyed` line that the engine still held when the
+    /// game ended, such as one playing a death animation. The engine counts a
+    /// unit in `unitsDied` only when it removes it, so these are not in the
+    /// totals. Empty from a logger older than this field.
+    pub dying: Vec<i32>,
 }
 
 /// One line of the log.

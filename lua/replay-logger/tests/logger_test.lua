@@ -481,6 +481,7 @@ do
 		GetUnitPosition = true,
 		GetUnitBuildFacing = true,
 		GetUnitHealth = true,
+		GetUnitIsDead = true,
 		GetTeamStatsHistory = true,
 		GetGaiaTeamID = true,
 		GetTeamList = true,
@@ -1385,6 +1386,38 @@ do
 		fixture:close()
 	end
 	check("the upgrade fixture is what the upgrade match writes, byte for byte", recorded == engine.raw)
+end
+
+--------------------------------------------------------------------------------
+-- A unit still dying when the game ends. The engine counts it in unitsDied
+-- only once it removes the unit, so game over names it.
+--------------------------------------------------------------------------------
+
+do
+	local engine = newEngine({ teams = { 0, 1 } })
+	engine.synced:GameStart()
+	local a = engine.create(12, 0, 100, 5, 100)
+	local b = engine.create(31, 1, 200, 5, 200)
+	local c = engine.create(31, 1, 300, 5, 300)
+	engine.runTo(10)
+	engine.destroy(b, a, 7)
+	engine.kill(c, a, 7)
+	engine.runTo(11)
+	engine.synced:GameOver({ 0 })
+
+	local over = ofKind(engine, "game_over")[1]
+	check("game over names the unit still dying, and not the one already removed",
+		#over.dying == 1 and over.dying[1] == c, table.concat(over.dying, ","))
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1 } })
+	engine.synced:GameStart()
+	engine.runTo(1)
+	engine.synced:GameOver({})
+	local over = ofKind(engine, "game_over")[1]
+	check("game over writes an empty dying list when nothing is dying",
+		type(over.dying) == "table" and #over.dying == 0)
 end
 
 do
