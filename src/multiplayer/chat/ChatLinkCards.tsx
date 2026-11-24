@@ -2,7 +2,7 @@ import { cn } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import { useTrustedHubUrl } from "@/hub/config";
 import { ChatMapCard } from "./ChatMapCard";
-import { ChatLinkCard, HubCard } from "./ChatSiteCard";
+import { ChatAnimationCard, ChatLinkCard, HubCard } from "./ChatSiteCard";
 import { firstWebLink, linkCardsIn } from "./linkCards";
 
 /**
@@ -49,6 +49,13 @@ function LinkCards({ text, own }: { text: string; own: boolean }) {
       {cards.map((card) =>
         "map" in card ? (
           <ChatMapCard key={card.url} card={card} />
+        ) : "animation" in card ? (
+          <ChatAnimationCard
+            key={card.url}
+            url={card.url}
+            site={card.site}
+            animation={card.animation}
+          />
         ) : (
           <ChatLinkCard
             key={card.url}

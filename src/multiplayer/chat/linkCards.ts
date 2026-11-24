@@ -41,7 +41,15 @@ export interface MapLinkCard {
   map: MapLinkTarget;
 }
 
-export type LinkCardInfo = SiteLinkCard | MapLinkCard;
+/** A chat card that is an animation the site serves, drawn in place. */
+export interface AnimationLinkCard {
+  site: string;
+  url: string;
+  /** The animation, built from the link alone. Loading it contacts the site. */
+  animation: string;
+}
+
+export type LinkCardInfo = SiteLinkCard | MapLinkCard | AnimationLinkCard;
 
 /** One entry per known site. Returns null for a URL that is not the site's. */
 type Resolver = (
@@ -124,8 +132,52 @@ const barMapPage: Resolver = (url, href) => {
   };
 };
 
+const GIPHY_ID = /^[A-Za-z0-9]+$/;
+const GIPHY_PAGE_HOSTS = new Set(["giphy.com", "www.giphy.com"]);
+const GIPHY_MEDIA_HOST = /^(media\d?|i)\.giphy\.com$/;
+
+/** The GIF's id in a Giphy link, or null for a link that does not carry one. */
+function giphyId(url: URL): string | null {
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (GIPHY_PAGE_HOSTS.has(url.hostname)) {
+    // `/gifs/<slug>-<id>`, `/gifs/<id>`, `/stickers/...` and `/embed/<id>`.
+    const [kind, page] = parts;
+    if (parts.length !== 2) return null;
+    if (kind === "embed") return page;
+    if (kind === "gifs" || kind === "stickers") {
+      return page.slice(page.lastIndexOf("-") + 1);
+    }
+    return null;
+  }
+  if (GIPHY_MEDIA_HOST.test(url.hostname)) {
+    // `/media/<id>/<file>`, or with a `v1.` segment before the id.
+    if (parts[0] === "media" && parts.length >= 3) return parts.at(-2) ?? null;
+    // `i.giphy.com/<id>.gif`.
+    if (url.hostname === "i.giphy.com" && parts.length === 1) {
+      return parts[0].replace(/\.(gif|webp)$/, "");
+    }
+  }
+  return null;
+}
+
+/**
+ * Giphy: every link to a GIF names it, and Giphy serves each one at a fixed
+ * height of 200 pixels as `200.webp`, so the animation needs no lookup and
+ * not the hub. Loading it contacts Giphy, as YouTube's thumbnail contacts
+ * YouTube. A `gph.is` short link names nothing, so it is left to the hub.
+ */
+const giphy: Resolver = (url, href) => {
+  const id = giphyId(url);
+  if (!id || !GIPHY_ID.test(id)) return null;
+  return {
+    site: "GIPHY",
+    url: href,
+    animation: `https://media.giphy.com/media/${id}/200.webp`,
+  };
+};
+
 /** The known sites. A new site is one more resolver here. */
-const RESOLVERS: readonly Resolver[] = [youtube, hubMapPage, barMapPage];
+const RESOLVERS: readonly Resolver[] = [youtube, giphy, hubMapPage, barMapPage];
 
 /**
  * A map as the hub writes it in a URL. The same rule as `mapSlug` in

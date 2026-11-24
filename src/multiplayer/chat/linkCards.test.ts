@@ -40,6 +40,42 @@ it.each([
   expect(linkCardFor(href)).toBeNull();
 });
 
+const GIF = "3o7TKSjRrfIPjeiVyM";
+const GIF_200 = `https://media.giphy.com/media/${GIF}/200.webp`;
+
+it.each([
+  `https://giphy.com/gifs/funny-cat-${GIF}`,
+  `https://giphy.com/gifs/${GIF}`,
+  `https://www.giphy.com/gifs/funny-cat-${GIF}?utm_source=x`,
+  `https://giphy.com/stickers/happy-${GIF}`,
+  `https://giphy.com/embed/${GIF}`,
+  `https://media.giphy.com/media/${GIF}/giphy.gif`,
+  `https://media3.giphy.com/media/${GIF}/giphy.webp`,
+  `https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjEx/${GIF}/giphy.gif`,
+  `https://i.giphy.com/${GIF}.gif`,
+  `https://i.giphy.com/${GIF}.webp`,
+  `https://i.giphy.com/media/${GIF}/giphy.gif`,
+])("gives %s a GIPHY card with the 200 pixel high animation", (href) => {
+  expect(linkCardFor(href)).toEqual({
+    site: "GIPHY",
+    url: href,
+    animation: GIF_200,
+  });
+});
+
+it.each([
+  "https://giphy.com/",
+  "https://giphy.com/explore/cats",
+  "https://giphy.com/gifs/",
+  "https://giphy.com/channel/someone/gifs",
+  "https://gph.is/2iaYNGK",
+  `https://giphy.com.evil.example/gifs/${GIF}`,
+  `https://evilgiphy.com/gifs/${GIF}`,
+  "https://giphy.com/gifs/bad-id%2Fslash",
+])("gives %s no GIPHY card", (href) => {
+  expect(linkCardFor(href)).toBeNull();
+});
+
 it("finds a link in the middle of a sentence, past trailing punctuation", () => {
   expect(linkCardsIn(`watch this https://youtu.be/${ID}, it is good`)).toEqual([
     { site: "YouTube", url: `https://youtu.be/${ID}`, thumbnail: THUMB },
