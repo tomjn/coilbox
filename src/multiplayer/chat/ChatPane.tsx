@@ -48,6 +48,7 @@ import {
 } from "./emojiMenu";
 import { FormattedText, type NameHighlight } from "./FormattedText";
 import { type Format, formatSelection, listContinuation } from "./formatting";
+import { isBareAnimationLink } from "./linkCards";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { foldNotices, summariseNotices } from "./noticeRuns";
 import { PRESENCE_META, type Presence } from "./presence";
@@ -730,6 +731,9 @@ export function ChatPane({
                       const mark = markFor?.(m.from) ?? null;
                       const bot = isBot?.(m.from) ?? false;
                       const highlighted = isHighlighted?.(m) ?? false;
+                      // A message that is only a GIF link shows the GIF alone,
+                      // with no bubble holding the link above it.
+                      const bare = isBareAnimationLink(m.text);
                       body = (
                         <div
                           className={cn(
@@ -758,60 +762,67 @@ export function ChatPane({
                               {mark && <NameMarkIcon mark={mark} />}
                             </span>
                           )}
-                          <div
-                            className={cn(
-                              BUBBLE_MAX_WIDTH,
-                              // Holds the floated time when it wraps under the
-                              // last line.
-                              "flow-root",
-                              own
-                                ? "rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                                : "rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
-                              // Bot output (SPADS command lists / stats tables)
-                              // relies on monospace alignment, human chat reads
-                              // better proportional. On the bubble rather than
-                              // the text inside it, so the width cap counts
-                              // columns of the font the lines are drawn in.
-                              bot && "font-mono",
-                              // Mention: accent ring so a flagged message stands
-                              // out in the log.
-                              highlighted && "ring-2 ring-amber-400/60",
-                            )}
-                            // Wash the non-own bubble with the sender's team colour
-                            // (low alpha keeps the foreground text readable in both
-                            // themes).
-                            style={
-                              !own && color
-                                ? { backgroundColor: `${color}26` }
-                                : undefined
-                            }
-                          >
-                            <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                              <FormattedText
-                                text={m.text}
-                                highlight={nameHighlightFor(bot)}
-                                mentionable={mentionable}
-                              />
-                            </span>
-                            {/* The time sits inside the bubble at the end of
+                          {!bare && (
+                            <div
+                              className={cn(
+                                BUBBLE_MAX_WIDTH,
+                                // Holds the floated time when it wraps under the
+                                // last line.
+                                "flow-root",
+                                own
+                                  ? "rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                                  : "rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
+                                // Bot output (SPADS command lists / stats tables)
+                                // relies on monospace alignment, human chat reads
+                                // better proportional. On the bubble rather than
+                                // the text inside it, so the width cap counts
+                                // columns of the font the lines are drawn in.
+                                bot && "font-mono",
+                                // Mention: accent ring so a flagged message stands
+                                // out in the log.
+                                highlighted && "ring-2 ring-amber-400/60",
+                              )}
+                              // Wash the non-own bubble with the sender's team colour
+                              // (low alpha keeps the foreground text readable in both
+                              // themes).
+                              style={
+                                !own && color
+                                  ? { backgroundColor: `${color}26` }
+                                  : undefined
+                              }
+                            >
+                              <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                                <FormattedText
+                                  text={m.text}
+                                  highlight={nameHighlightFor(bot)}
+                                  mentionable={mentionable}
+                                />
+                              </span>
+                              {/* The time sits inside the bubble at the end of
                                 the last line, and drops under it when the line
                                 is full. Floated so the text wraps around it,
                                 and not selectable so copying a message copies
                                 the message alone. */}
-                            {m.at > 0 && (
-                              <span
-                                className={cn(
-                                  "float-right mt-1 ml-3 select-none font-sans text-[10px] leading-4",
-                                  own
-                                    ? "text-primary-foreground/70"
-                                    : "text-muted-foreground",
-                                )}
-                              >
-                                {formatTime(m.at)}
-                              </span>
-                            )}
-                          </div>
+                              {m.at > 0 && (
+                                <span
+                                  className={cn(
+                                    "float-right mt-1 ml-3 select-none font-sans text-[10px] leading-4",
+                                    own
+                                      ? "text-primary-foreground/70"
+                                      : "text-muted-foreground",
+                                  )}
+                                >
+                                  {formatTime(m.at)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <ChatLinkCards text={m.text} own={own} />
+                          {bare && m.at > 0 && (
+                            <span className="mt-0.5 select-none px-1 text-[10px] text-muted-foreground leading-4">
+                              {formatTime(m.at)}
+                            </span>
+                          )}
                           {messageAction?.(m)}
                         </div>
                       );

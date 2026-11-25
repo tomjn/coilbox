@@ -105,6 +105,26 @@ it("draws a Giphy link's animation in place, from Giphy and not the hub, and ope
   expect(openUrl).toHaveBeenCalledExactlyOnceWith(url);
 });
 
+it("shows a message that is only a Giphy link as the GIF alone, with no bubble", () => {
+  const url = "https://giphy.com/gifs/3o7TKSjRrfIPjeiVyM";
+  render(
+    <ChatPane
+      title="#main"
+      messages={[{ ...said(url), at: 1 }]}
+      onSend={() => {}}
+    />,
+  );
+  expect(screen.queryByText(url)).toBeNull();
+  expect(document.querySelector("[data-link-card] img")).not.toBeNull();
+});
+
+it("keeps the bubble when a Giphy link comes with other words", () => {
+  const url = "https://giphy.com/gifs/3o7TKSjRrfIPjeiVyM";
+  draw(`ha ${url}`);
+  expect(screen.getByText(url)).toBeTruthy();
+  expect(document.querySelector("[data-link-card] img")).not.toBeNull();
+});
+
 it("leaves a plain card that still opens the link when the animation fails to load", () => {
   const url = "https://giphy.com/gifs/3o7TKSjRrfIPjeiVyM";
   const { container } = draw(url);

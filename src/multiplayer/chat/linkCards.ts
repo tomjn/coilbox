@@ -263,6 +263,17 @@ function collectUrls(nodes: Inline[], out: string[]): void {
 }
 
 /**
+ * Is the message nothing but one link to an animation, such as a Giphy GIF?
+ * Chat then draws the animation without a bubble around the link.
+ */
+export function isBareAnimationLink(text: string): boolean {
+  const nodes = parseMessage(text.trim());
+  if (nodes.length !== 1 || nodes[0].type !== "url") return false;
+  const card = linkCardFor(nodes[0].value);
+  return card !== null && "animation" in card;
+}
+
+/**
  * The message's first `http` or `https` link, or null. A message with no card
  * from a known site asks the hub for this one's (issue #5436).
  */
