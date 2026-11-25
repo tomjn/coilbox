@@ -2873,6 +2873,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "Το {fileName} περιλαμβάνει το {includes}, που δεν βρέθηκε δίπλα του ούτε σε φάκελο scripts πιο πάνω, οπότε δεν μπορεί να μετατραπεί."
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "{filename} is listed on the hub."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName} is not a .sdz or .sd7 archive."
@@ -10682,6 +10686,7 @@ msgid "Add to or remove from a set"
 msgstr "Προσθήκη σε σύνολο ή αφαίρεση από αυτό"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Add to queue"
@@ -11577,6 +11582,10 @@ msgstr "Ένα εσωτερικό όνομα μπορεί να περιέχει 
 #, fuzzy
 msgid "An objective is what the player is told to do. A trigger completes or fails it, and the panel in game shows it until then."
 msgstr "Ένας στόχος είναι αυτό που λέγεται στον παίκτη να κάνει. Ένα έναυσμα τον ολοκληρώνει ή τον αποτυγχάνει, και το πάνελ στο παιχνίδι τον δείχνει μέχρι τότε."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "An official Recoil release already has a {platform} build of {version}, so the hub does not take this one."
+msgstr ""
 
 #: src/content/pages/components/StaleRemixNotice.tsx
 #, fuzzy
@@ -14812,6 +14821,7 @@ msgstr "Δεν μπορεί να βλάψει τη δική του μονάδα"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -16495,6 +16505,10 @@ msgstr "Το Coilbox συνδέεται σε οποιοδήποτε λόμπι �
 #, fuzzy
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Το Coilbox δεν μπόρεσε να δημιουργήσει το {baseName} (compat {version}) για αυτή τη μάχη: {error}"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
+msgstr ""
 
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
@@ -18486,6 +18500,7 @@ msgstr "Δεν ήταν δυνατή η επικοινωνία με το {where}
 msgid "Could not reach the host."
 msgstr "Δεν ήταν δυνατή η επικοινωνία με τον οικοδεσπότη."
 
+#: src/downloads/hubEngines.ts
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
 #, fuzzy
@@ -20646,6 +20661,7 @@ msgstr "Κυρίαρχος"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -20811,6 +20827,10 @@ msgstr "Λήψη μηχανής"
 #, fuzzy
 msgid "Download engine {engineName}"
 msgstr "Λήψη μηχανής {engineName}"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Download engine {version}"
+msgstr ""
 
 #: src/downloads/downloadNotify.ts
 #, fuzzy
@@ -22035,10 +22055,18 @@ msgstr "Μηχανή {reqLabel}"
 msgid "Engine {version}"
 msgstr "Μηχανή {version}"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Engine {version} (hub test build)"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
 msgid "Engine AIs"
 msgstr "AI μηχανής"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Engine build"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -26548,6 +26576,10 @@ msgstr "Πλήμνη στα άκρα"
 msgid "Hub results"
 msgstr "Αποτελέσματα hub"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Hub test builds"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Hub website"
@@ -27219,6 +27251,7 @@ msgstr "εισήχθη στη μέση της ουράς"
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
@@ -27430,6 +27463,7 @@ msgstr "Εγκατάσταση ενημέρωσης"
 
 #: src/content/pages/components/SetupCard.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy
 msgid "Installing…"
@@ -29590,6 +29624,10 @@ msgstr "φόρτωση αναφοράς…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "Φόρτωση φατριών…"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "loading test builds…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -35383,6 +35421,7 @@ msgstr "Δεν γράφτηκε: {error}"
 msgid "Not yet earned"
 msgstr "Δεν έχει κερδηθεί ακόμη"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #, fuzzy
 msgid "Note"
@@ -36867,6 +36906,10 @@ msgstr "Άνοιγμα στην καρτέλα Χρονογραμμή"
 msgid "Open it"
 msgstr "Άνοιγμα"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open its hub page"
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Open last time"
@@ -36917,6 +36960,10 @@ msgstr "Άνοιγμα της λίστας μαχών."
 msgid "Open the battle page"
 msgstr "Άνοιγμα της σελίδας μάχης"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open the build the hub has"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -36931,6 +36978,10 @@ msgstr "Άνοιγμα του παιχνιδιού στο hub"
 #, fuzzy
 msgid "Open the hub"
 msgstr "Άνοιγμα του hub"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Open the hub page for {version}"
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -39632,6 +39683,7 @@ msgstr "σε ουρά"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -40331,6 +40383,10 @@ msgstr "Ανάγνωση της αρχειοθήκης…"
 #, fuzzy
 msgid "Reading the battle report…"
 msgstr "Ανάγνωση της αναφοράς μάχης…"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Reading the build…"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -50042,6 +50098,10 @@ msgstr "Το hub έχει διαφορετικό χάρτη με αυτό το �
 msgid "The hub has no such item. It may have been taken down."
 msgstr "Το hub δεν έχει τέτοιο στοιχείο. Ίσως έχει αφαιρεθεί."
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "The hub has no test builds for this computer."
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -50099,6 +50159,10 @@ msgstr "Το hub έχει πλέον κάθε μονάδα των παιχνιδ
 msgid "The hub refused that request (HTTP {status})."
 msgstr "Το hub απέρριψε το αίτημα (HTTP {status})."
 
+#: src/downloads/hubEngines.ts
+msgid "The hub refused the engine list (HTTP {status})."
+msgstr ""
+
 #: src/hub/maps/lookup.ts
 #, fuzzy
 msgid "The hub refused the map lookup (HTTP {status})."
@@ -50128,6 +50192,10 @@ msgstr "Το hub έστειλε καταχώριση χωρίς στοιχεία
 #, fuzzy
 msgid "The hub sent a map pack list with no packs in it."
 msgstr "Το hub έστειλε λίστα πακέτων χαρτών χωρίς πακέτα."
+
+#: src/downloads/hubEngines.ts
+msgid "The hub sent an engine list Coilbox could not read."
+msgstr ""
 
 #: src/hub/api.ts
 #: src/hub/assets/pictures.ts
@@ -51730,6 +51798,14 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση των μονάδων �
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "Δεν ήταν δυνατή η ανάγνωση των μονάδων του παιχνιδιού αυτής της επανάληψης, οπότε τίποτα δεν λέει ποιες ολοκληρωμένες μονάδες είναι κτίρια, και αυτό το επίπεδο χρειάζεται το παιχνίδι εγκατεστημένο."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} stopped."
+msgstr ""
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} was cancelled."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -55869,6 +55945,7 @@ msgstr "Αναβαθμίζεται σε"
 msgid "Upgrades into"
 msgstr "Αναβάθμιση με STLS"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload"
@@ -55884,10 +55961,18 @@ msgstr "Μεταφόρτωση {count, plural, one {# χάρτη} other {# χα�
 msgid "Upload {label} to the hub?"
 msgstr "Μεταφόρτωση του {label} στο hub;"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload a test build"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload again"
 msgstr "Μεταφόρτωση ξανά"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload another"
+msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -56487,6 +56572,10 @@ msgstr "αναμονή για τη μάχη"
 #, fuzzy
 msgid "Waiting for the engine to start"
 msgstr "Αναμονή για την εκκίνηση της μηχανής"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Waiting for the hub to list it…"
+msgstr ""
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy

@@ -2872,6 +2872,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "{fileName} 包含了 {includes}，但在它旁边或其上级的 scripts 文件夹中都找不到，因此无法转换。"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "{filename} is listed on the hub."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName} is not a .sdz or .sd7 archive."
@@ -10681,6 +10685,7 @@ msgid "Add to or remove from a set"
 msgstr "添加到回放集或从中移除"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Add to queue"
@@ -11576,6 +11581,10 @@ msgstr "内部名称只能使用小写字母、数字和下划线。"
 #, fuzzy
 msgid "An objective is what the player is told to do. A trigger completes or fails it, and the panel in game shows it until then."
 msgstr "目标是告诉玩家要做的事。触发器会完成或使其失败，在此之前游戏中的面板会一直显示它。"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "An official Recoil release already has a {platform} build of {version}, so the hub does not take this one."
+msgstr ""
 
 #: src/content/pages/components/StaleRemixNotice.tsx
 #, fuzzy
@@ -14811,6 +14820,7 @@ msgstr "不会伤害自己的单位"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -16492,6 +16502,10 @@ msgstr "Coilbox 可以连接任何兼容 TASServer 的大厅，包括你自己�
 #, fuzzy
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox 无法为此对局构建 {baseName}（兼容 {version}）：{error}"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
+msgstr ""
 
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
@@ -18482,6 +18496,7 @@ msgstr "无法连接 {where}。你可能与主机不在同一网络，或者被�
 msgid "Could not reach the host."
 msgstr "无法连接主机。"
 
+#: src/downloads/hubEngines.ts
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
 #, fuzzy
@@ -20642,6 +20657,7 @@ msgstr "压倒性"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -20806,6 +20822,10 @@ msgstr "下载引擎"
 #, fuzzy
 msgid "Download engine {engineName}"
 msgstr "下载引擎 {engineName}"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Download engine {version}"
+msgstr ""
 
 #: src/downloads/downloadNotify.ts
 #, fuzzy
@@ -22030,10 +22050,18 @@ msgstr "引擎 {reqLabel}"
 msgid "Engine {version}"
 msgstr "引擎 {version}"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Engine {version} (hub test build)"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
 msgid "Engine AIs"
 msgstr "引擎 AI"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Engine build"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -26540,6 +26568,10 @@ msgstr "两端带轮毂"
 msgid "Hub results"
 msgstr "中心结果"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Hub test builds"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Hub website"
@@ -27210,6 +27242,7 @@ msgstr "插入到队列中间"
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
@@ -27421,6 +27454,7 @@ msgstr "正在安装更新"
 
 #: src/content/pages/components/SetupCard.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy
 msgid "Installing…"
@@ -29580,6 +29614,10 @@ msgstr "正在加载报告…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "正在加载阵营…"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "loading test builds…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -35371,6 +35409,7 @@ msgstr "未写入：{error}"
 msgid "Not yet earned"
 msgstr "尚未获得"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #, fuzzy
 msgid "Note"
@@ -36853,6 +36892,10 @@ msgstr "在“时间轴”标签页中打开"
 msgid "Open it"
 msgstr "打开"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open its hub page"
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Open last time"
@@ -36903,6 +36946,10 @@ msgstr "打开对局列表。"
 msgid "Open the battle page"
 msgstr "打开对局页面"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open the build the hub has"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -36916,6 +36963,10 @@ msgstr "在中心上打开该游戏"
 #: src/onboarding/pages/HubPage.tsx
 msgid "Open the hub"
 msgstr "打开中心"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Open the hub page for {version}"
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -39614,6 +39665,7 @@ msgstr "排队中"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -40313,6 +40365,10 @@ msgstr "正在读取归档…"
 #, fuzzy
 msgid "Reading the battle report…"
 msgstr "正在读取战斗报告…"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Reading the build…"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -50012,6 +50068,10 @@ msgstr "中心上此名称下有另一张不同的地图，因此你的副本可
 msgid "The hub has no such item. It may have been taken down."
 msgstr "中心没有此项目，它可能已被撤下。"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "The hub has no test builds for this computer."
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -50069,6 +50129,10 @@ msgstr "中心现在已有你的游戏中的所有单位。"
 msgid "The hub refused that request (HTTP {status})."
 msgstr "中心拒绝了该请求（HTTP {status}）。"
 
+#: src/downloads/hubEngines.ts
+msgid "The hub refused the engine list (HTTP {status})."
+msgstr ""
+
 #: src/hub/maps/lookup.ts
 #, fuzzy
 msgid "The hub refused the map lookup (HTTP {status})."
@@ -50098,6 +50162,10 @@ msgstr "中心发送的列表中没有项目。"
 #, fuzzy
 msgid "The hub sent a map pack list with no packs in it."
 msgstr "中心发送的地图包列表中没有包。"
+
+#: src/downloads/hubEngines.ts
+msgid "The hub sent an engine list Coilbox could not read."
+msgstr ""
 
 #: src/hub/api.ts
 #: src/hub/assets/pictures.ts
@@ -51700,6 +51768,14 @@ msgstr "无法读取此回放所用游戏的单位，所以没有任何信息说
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "无法读取此回放所用游戏的单位，所以无从得知哪些已完成的单位是建筑，因此此图层需要安装该游戏。"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} stopped."
+msgstr ""
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} was cancelled."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -55838,6 +55914,7 @@ msgstr "使用 STLS 升级"
 msgid "Upgrades into"
 msgstr "升级为"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload"
@@ -55853,10 +55930,18 @@ msgstr "上传 {count, plural, other {# 张地图}}（{size}）"
 msgid "Upload {label} to the hub?"
 msgstr "将 {label} 上传到中心？"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload a test build"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload again"
 msgstr "再次上传"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload another"
+msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -56456,6 +56541,10 @@ msgstr "等待对局中"
 #, fuzzy
 msgid "Waiting for the engine to start"
 msgstr "正在等待引擎启动"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Waiting for the hub to list it…"
+msgstr ""
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy

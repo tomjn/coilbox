@@ -2872,6 +2872,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "{fileName} は {includes} を読み込みますが、同じ場所にもその上の scripts フォルダーにも見つからないため、変換できません。"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "{filename} is listed on the hub."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName} is not a .sdz or .sd7 archive."
@@ -10681,6 +10685,7 @@ msgid "Add to or remove from a set"
 msgstr "セットに追加または削除"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Add to queue"
@@ -11576,6 +11581,10 @@ msgstr "内部名に使えるのは小文字、数字、アンダースコアだ
 #, fuzzy
 msgid "An objective is what the player is told to do. A trigger completes or fails it, and the panel in game shows it until then."
 msgstr "目標は、プレイヤーに指示する内容です。トリガーが達成または失敗にし、それまではゲーム内のパネルに表示されます。"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "An official Recoil release already has a {platform} build of {version}, so the hub does not take this one."
+msgstr ""
 
 #: src/content/pages/components/StaleRemixNotice.tsx
 #, fuzzy
@@ -14811,6 +14820,7 @@ msgstr "自身のユニットにダメージを与えない"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -16492,6 +16502,10 @@ msgstr "Coilbox は、自分で運営するものも含め、TASServer 互換の
 #, fuzzy
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox はこの試合用に {baseName}（互換 {version}）を作成できませんでした：{error}"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
+msgstr ""
 
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
@@ -18482,6 +18496,7 @@ msgstr "{where} に到達できませんでした。ホストと別のネット�
 msgid "Could not reach the host."
 msgstr "ホストに到達できませんでした。"
 
+#: src/downloads/hubEngines.ts
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
 #, fuzzy
@@ -20642,6 +20657,7 @@ msgstr "圧倒"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -20806,6 +20822,10 @@ msgstr "エンジンをダウンロード"
 #, fuzzy
 msgid "Download engine {engineName}"
 msgstr "エンジン {engineName} をダウンロード"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Download engine {version}"
+msgstr ""
 
 #: src/downloads/downloadNotify.ts
 #, fuzzy
@@ -22030,10 +22050,18 @@ msgstr "エンジン {reqLabel}"
 msgid "Engine {version}"
 msgstr "エンジン {version}"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Engine {version} (hub test build)"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
 msgid "Engine AIs"
 msgstr "エンジンの AI"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Engine build"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -26540,6 +26568,10 @@ msgstr "両端にハブ"
 msgid "Hub results"
 msgstr "ハブの結果"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Hub test builds"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Hub website"
@@ -27210,6 +27242,7 @@ msgstr "キューの途中に挿入"
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
@@ -27421,6 +27454,7 @@ msgstr "アップデートをインストール中"
 
 #: src/content/pages/components/SetupCard.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy
 msgid "Installing…"
@@ -29580,6 +29614,10 @@ msgstr "レポートを読み込み中…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "勢力を読み込み中…"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "loading test builds…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -35371,6 +35409,7 @@ msgstr "書き込めませんでした：{error}"
 msgid "Not yet earned"
 msgstr "未獲得"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #, fuzzy
 msgid "Note"
@@ -36853,6 +36892,10 @@ msgstr "「タイムライン」タブで開く"
 msgid "Open it"
 msgstr "開く"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open its hub page"
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Open last time"
@@ -36903,6 +36946,10 @@ msgstr "試合一覧を開きます。"
 msgid "Open the battle page"
 msgstr "試合ページを開く"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open the build the hub has"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -36916,6 +36963,10 @@ msgstr "ハブでゲームを開く"
 #: src/onboarding/pages/HubPage.tsx
 msgid "Open the hub"
 msgstr "ハブを開く"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Open the hub page for {version}"
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -39614,6 +39665,7 @@ msgstr "キュー待ち"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -40313,6 +40365,10 @@ msgstr "アーカイブを読み込み中…"
 #, fuzzy
 msgid "Reading the battle report…"
 msgstr "戦闘レポートを読み込み中…"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Reading the build…"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -50012,6 +50068,10 @@ msgstr "ハブにはこの名前の別のマップがあるため、あなたの
 msgid "The hub has no such item. It may have been taken down."
 msgstr "ハブにそのアイテムはありません。削除された可能性があります。"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "The hub has no test builds for this computer."
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -50069,6 +50129,10 @@ msgstr "ゲーム内のすべてのユニットが、ハブにそろいました
 msgid "The hub refused that request (HTTP {status})."
 msgstr "ハブがそのリクエストを拒否しました（HTTP {status}）。"
 
+#: src/downloads/hubEngines.ts
+msgid "The hub refused the engine list (HTTP {status})."
+msgstr ""
+
 #: src/hub/maps/lookup.ts
 #, fuzzy
 msgid "The hub refused the map lookup (HTTP {status})."
@@ -50098,6 +50162,10 @@ msgstr "ハブから送られた一覧にアイテムがありません。"
 #, fuzzy
 msgid "The hub sent a map pack list with no packs in it."
 msgstr "ハブから送られたマップパックの一覧にパックがありません。"
+
+#: src/downloads/hubEngines.ts
+msgid "The hub sent an engine list Coilbox could not read."
+msgstr ""
 
 #: src/hub/api.ts
 #: src/hub/assets/pictures.ts
@@ -51700,6 +51768,14 @@ msgstr "このリプレイのゲームのユニットを読み込めなかった
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "このリプレイのゲームのユニットを読み込めなかったため、どの完成ユニットが建物かわかりません。このレイヤーにはゲームのインストールが必要です。"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} stopped."
+msgstr ""
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} was cancelled."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -55838,6 +55914,7 @@ msgstr "STLS でアップグレード"
 msgid "Upgrades into"
 msgstr "アップグレード先"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload"
@@ -55853,10 +55930,18 @@ msgstr "{count, plural, other {# 個のマップ}}をアップロード（{size}
 msgid "Upload {label} to the hub?"
 msgstr "{label} をハブにアップロードしますか？"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload a test build"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload again"
 msgstr "もう一度アップロード"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload another"
+msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -56456,6 +56541,10 @@ msgstr "試合を待機中"
 #, fuzzy
 msgid "Waiting for the engine to start"
 msgstr "エンジンの起動を待っています"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Waiting for the hub to list it…"
+msgstr ""
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy

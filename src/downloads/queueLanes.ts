@@ -53,6 +53,7 @@ export function contentOf(input: EnqueueInput): QueueContent {
       return "map";
     case "engineRecoil":
     case "engineSpring":
+    case "engineHub":
     case "engineBundled":
       return "engine";
     case "file":

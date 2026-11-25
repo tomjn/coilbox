@@ -350,11 +350,74 @@ export interface EngineRelease {
   prerelease: boolean;
 }
 
+/** One build an official Recoil release publishes, in the hub's platform
+ *  words (`amd64-linux`, `amd64-windows`, `arm64-macos`). */
+export interface OfficialEngineBuild {
+  version: string;
+  platform: string;
+}
+
 /** Recoil engine releases for the current platform (empty on macOS). */
 export const dlRecoilEngines = defineCommand<
   undefined,
   { releases: EngineRelease[]; platform: string }
 >("coilbox-downloads", "dl_recoil_engines");
+
+/** This machine's platform in the hub's words, or null where nobody builds an
+ *  engine for it. Asks nobody. */
+export const dlHubEnginePlatform = defineCommand<
+  undefined,
+  { platform: string | null }
+>("coilbox-downloads", "dl_hub_engine_platform");
+
+/** Every build the official Recoil releases publish, for every platform. */
+export const dlRecoilOfficialBuilds = defineCommand<
+  undefined,
+  { builds: OfficialEngineBuild[] }
+>("coilbox-downloads", "dl_recoil_official_builds");
+
+/** Install a hub engine build into `<writePath>/engine/<version>/`, from the
+ *  first of `sources` whose copy has the hub's `sha256`. */
+export const dlDownloadEngineHub = withDownloadNotify(
+  defineCommand<
+    {
+      version: string;
+      sources: string[];
+      sha256: string;
+      writePath: string;
+      /** Pass a stable id to make the download phase cancellable via `dlCancel`. */
+      opId?: string;
+      onProgress: Channel<DownloadProgress>;
+    },
+    { message: string; path: string }
+  >("coilbox-downloads", "dl_download_engine_hub"),
+  (a) => {
+    const version = a.version;
+    return t`Engine ${version}`;
+  },
+);
+
+/** What the hub needs to hear about an engine archive before an upload. */
+export interface EngineUploadFacts {
+  sha256: string;
+  size: number;
+  filename: string;
+  kind: "engine";
+  internal_name: "recoil";
+  version: string;
+  platform: string;
+}
+
+/**
+ * Read an engine archive's facts from its name, its bytes and its listing.
+ * Rejects with a sentence naming the problem: a name that is not
+ * `recoil_<version>_<platform>.7z`, or an archive without the program its
+ * platform starts.
+ */
+export const dlEngineUploadFacts = defineCommand<
+  { path: string },
+  { facts: EngineUploadFacts }
+>("coilbox-downloads", "dl_engine_upload_facts");
 
 /** Install a Recoil engine release into `<writePath>/engine/<version>/`. */
 export const dlDownloadEngineRecoil = withDownloadNotify(

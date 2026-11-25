@@ -1131,30 +1131,41 @@ async fn fetch_github(url: &str) -> Result<String, String> {
 
 /// `dl_recoil_engines` — Recoil engine releases whose assets match the running
 /// platform (`amd64-<os>.7z`). Empty on platforms with no official build (macOS).
-///
-/// `officialBuilds` is every version and platform the releases publish, and
-/// `hubPlatform` is this machine's platform in the hub's words, so hub engines
-/// that an official build already covers are hidden and never uploaded. The
-/// list is fetched on macOS too, for those.
 #[tauri::command]
 async fn dl_recoil_engines() -> CliResult {
     let os = std::env::consts::OS;
-    let suffix = sources::recoil_asset_suffix();
+    let Some(suffix) = sources::recoil_asset_suffix() else {
+        return CliResult::ok(json!({ "releases": [], "platform": os }));
+    };
     match fetch_github(sources::RECOIL_RELEASES_URL).await {
         Ok(body) => match serde_json::from_str::<Vec<sources::GithubRelease>>(&body) {
             Ok(rels) => {
-                let releases: Vec<_> = suffix.map_or_else(Vec::new, |suffix| {
-                    rels.iter()
-                        .filter_map(|r| sources::match_engine_release(r, suffix))
-                        .collect()
-                });
-                CliResult::ok(json!({
-                    "releases": releases,
-                    "platform": os,
-                    "hubPlatform": hub_engines::this_platform(),
-                    "officialBuilds": hub_engines::official_builds(&rels),
-                }))
+                let releases: Vec<_> = rels
+                    .iter()
+                    .filter_map(|r| sources::match_engine_release(r, suffix))
+                    .collect();
+                CliResult::ok(json!({ "releases": releases, "platform": os }))
             }
+            Err(e) => CliResult::err(format!("could not parse Recoil releases: {e}")),
+        },
+        Err(e) => CliResult::err(format!("failed to fetch Recoil releases: {e}")),
+    }
+}
+
+/// `dl_hub_engine_platform` — this machine's platform in the hub's words, such
+/// as `arm64-macos`, or null where nobody builds an engine for it. Asks nobody.
+#[tauri::command]
+fn dl_hub_engine_platform() -> CliResult {
+    CliResult::ok(json!({ "platform": hub_engines::this_platform() }))
+}
+
+/// `dl_recoil_official_builds` — every version and platform the Recoil releases
+/// publish, so a hub engine one of them covers is hidden and never uploaded.
+#[tauri::command]
+async fn dl_recoil_official_builds() -> CliResult {
+    match fetch_github(sources::RECOIL_RELEASES_URL).await {
+        Ok(body) => match serde_json::from_str::<Vec<sources::GithubRelease>>(&body) {
+            Ok(rels) => CliResult::ok(json!({ "builds": hub_engines::official_builds(&rels) })),
             Err(e) => CliResult::err(format!("could not parse Recoil releases: {e}")),
         },
         Err(e) => CliResult::err(format!("failed to fetch Recoil releases: {e}")),
@@ -1990,6 +2001,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_file,
             dl_recoil_engines,
             dl_download_engine_hub,
+            dl_hub_engine_platform,
+            dl_recoil_official_builds,
             dl_engine_upload_facts,
             dl_github_latest_release,
             dl_github_release_archives,

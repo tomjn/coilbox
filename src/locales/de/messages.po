@@ -2872,6 +2872,10 @@ msgstr "{filename} · {mirrorCount}"
 msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
 msgstr "{fileName} bindet {includes} ein, das weder daneben noch in einem darüberliegenden scripts-Ordner gefunden wurde, daher kann es nicht konvertiert werden."
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "{filename} is listed on the hub."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 #, fuzzy
 msgid "{fileName} is not a .sdz or .sd7 archive."
@@ -10681,6 +10685,7 @@ msgid "Add to or remove from a set"
 msgstr "Zu einem Satz hinzufügen oder daraus entfernen"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Add to queue"
@@ -11576,6 +11581,10 @@ msgstr "Ein interner Name darf nur Kleinbuchstaben, Ziffern und Unterstriche ent
 #, fuzzy
 msgid "An objective is what the player is told to do. A trigger completes or fails it, and the panel in game shows it until then."
 msgstr "Ein Ziel ist das, was der Spieler tun soll. Ein Auslöser erfüllt es oder lässt es scheitern, und bis dahin zeigt es die Anzeige im Spiel."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "An official Recoil release already has a {platform} build of {version}, so the hub does not take this one."
+msgstr ""
 
 #: src/content/pages/components/StaleRemixNotice.tsx
 #, fuzzy
@@ -14811,6 +14820,7 @@ msgstr "Kann der eigenen Einheit nicht schaden"
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/pages/components/MapArchivesControl.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
@@ -16492,6 +16502,10 @@ msgstr "Coilbox verbindet sich mit jeder TASServer-kompatiblen Lobby, auch mit e
 #, fuzzy
 msgid "Coilbox could not build {baseName} (compat {version}) for this battle: {error}"
 msgstr "Coilbox konnte {baseName} (compat {version}) für diese Partie nicht erstellen: {error}"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Coilbox could not check the official Recoil releases, so it cannot tell whether the hub needs this build. {why}"
+msgstr ""
 
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 #, fuzzy
@@ -18482,6 +18496,7 @@ msgstr "{where} ist nicht erreichbar. Vielleicht sind Sie in einem anderen Netzw
 msgid "Could not reach the host."
 msgstr "Der Host ist nicht erreichbar."
 
+#: src/downloads/hubEngines.ts
 #: src/hub/assets/pictures.ts
 #: src/hub/maps/lookup.ts
 #, fuzzy
@@ -20642,6 +20657,7 @@ msgstr "Dominant"
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -20806,6 +20822,10 @@ msgstr "Engine herunterladen"
 #, fuzzy
 msgid "Download engine {engineName}"
 msgstr "Engine {engineName} herunterladen"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Download engine {version}"
+msgstr ""
 
 #: src/downloads/downloadNotify.ts
 #, fuzzy
@@ -22030,10 +22050,18 @@ msgstr "Engine {reqLabel}"
 msgid "Engine {version}"
 msgstr "Engine {version}"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Engine {version} (hub test build)"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
 msgid "Engine AIs"
 msgstr "Engine-KIs"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Engine build"
+msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -26540,6 +26568,10 @@ msgstr "Nabe an den Enden"
 msgid "Hub results"
 msgstr "Hub-Ergebnisse"
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Hub test builds"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Hub website"
@@ -27210,6 +27242,7 @@ msgstr "in der Mitte eingefügt"
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
@@ -27421,6 +27454,7 @@ msgstr "Update wird installiert"
 
 #: src/content/pages/components/SetupCard.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy
 msgid "Installing…"
@@ -29580,6 +29614,10 @@ msgstr "Bericht wird geladen…"
 #, fuzzy
 msgid "Loading sides…"
 msgstr "Fraktionen werden geladen…"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "loading test builds…"
+msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
@@ -35371,6 +35409,7 @@ msgstr "Nicht geschrieben: {error}"
 msgid "Not yet earned"
 msgstr "Noch nicht erreicht"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #, fuzzy
 msgid "Note"
@@ -36853,6 +36892,10 @@ msgstr "Im Reiter Zeitleiste öffnen"
 msgid "Open it"
 msgstr "Öffnen"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open its hub page"
+msgstr ""
+
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy
 msgid "Open last time"
@@ -36903,6 +36946,10 @@ msgstr "Partienliste öffnen."
 msgid "Open the battle page"
 msgstr "Partie-Seite öffnen"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Open the build the hub has"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open the game \"{id}\"."
@@ -36916,6 +36963,10 @@ msgstr "Das Spiel im Hub öffnen"
 #: src/onboarding/pages/HubPage.tsx
 msgid "Open the hub"
 msgstr "Hub öffnen"
+
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "Open the hub page for {version}"
+msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
@@ -39614,6 +39665,7 @@ msgstr "in Warteschlange"
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/HubEngineList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -40313,6 +40365,10 @@ msgstr "Archiv wird gelesen…"
 #, fuzzy
 msgid "Reading the battle report…"
 msgstr "Gefechtsbericht wird gelesen…"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Reading the build…"
+msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 #, fuzzy
@@ -50012,6 +50068,10 @@ msgstr "Der Hub hat unter diesem Namen eine andere Karte, daher stimmt Ihre Kopi
 msgid "The hub has no such item. It may have been taken down."
 msgstr "Der Hub hat keinen solchen Eintrag. Er wurde eventuell entfernt."
 
+#: src/downloads/pages/components/HubEngineList.tsx
+msgid "The hub has no test builds for this computer."
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
@@ -50069,6 +50129,10 @@ msgstr "Der Hub hat jetzt jede Einheit Ihrer Spiele."
 msgid "The hub refused that request (HTTP {status})."
 msgstr "Der Hub hat die Anfrage abgelehnt (HTTP {status})."
 
+#: src/downloads/hubEngines.ts
+msgid "The hub refused the engine list (HTTP {status})."
+msgstr ""
+
 #: src/hub/maps/lookup.ts
 #, fuzzy
 msgid "The hub refused the map lookup (HTTP {status})."
@@ -50098,6 +50162,10 @@ msgstr "Der Hub hat eine Liste ohne Einträge gesendet."
 #, fuzzy
 msgid "The hub sent a map pack list with no packs in it."
 msgstr "Der Hub hat eine Kartenpaket-Liste ohne Pakete gesendet."
+
+#: src/downloads/hubEngines.ts
+msgid "The hub sent an engine list Coilbox could not read."
+msgstr ""
 
 #: src/hub/api.ts
 #: src/hub/assets/pictures.ts
@@ -51700,6 +51768,14 @@ msgstr "Die Einheiten des Spiels dieser Wiederholung konnten nicht gelesen werde
 #, fuzzy
 msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
 msgstr "Die Einheiten des Spiels dieser Wiederholung konnten nicht gelesen werden, also sagt nichts, welche fertigen Einheiten Gebäude sind. Diese Ebene braucht das installierte Spiel."
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} stopped."
+msgstr ""
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "The upload of {filename} was cancelled."
+msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -55838,6 +55914,7 @@ msgstr "Wird aufgerüstet zu"
 msgid "Upgrades into"
 msgstr "Rüstet auf zu"
 
+#: src/downloads/pages/components/EngineUpload.tsx
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload"
@@ -55853,10 +55930,18 @@ msgstr "{count, plural, one {# Karte} other {# Karten}} hochladen ({size})"
 msgid "Upload {label} to the hub?"
 msgstr "{label} in den Hub hochladen?"
 
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload a test build"
+msgstr ""
+
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
 msgid "Upload again"
 msgstr "Erneut hochladen"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Upload another"
+msgstr ""
 
 #: src/hub/upload/UploadToHubButton.tsx
 #, fuzzy
@@ -56456,6 +56541,10 @@ msgstr "warte auf die Partie"
 #, fuzzy
 msgid "Waiting for the engine to start"
 msgstr "Warte auf Start der Engine"
+
+#: src/downloads/pages/components/EngineUpload.tsx
+msgid "Waiting for the hub to list it…"
+msgstr ""
 
 #: src/multiplayer/MatchFoundPanel.tsx
 #, fuzzy

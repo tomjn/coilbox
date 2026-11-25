@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { describeError } from "@/i18n/uiError";
 import { EngineInstaller } from "../../downloads/pages/components/EngineInstaller";
+import { HubEngineList } from "../../downloads/pages/components/HubEngineList";
 import {
   type ContentState,
   contentOpenPath,
@@ -144,6 +145,7 @@ export default function EnginesSection() {
       )}
 
       <EngineInstaller />
+      <HubEngineList />
     </div>
   );
 }
