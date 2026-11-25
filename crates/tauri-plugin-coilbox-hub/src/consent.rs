@@ -70,7 +70,11 @@ pub const PROFILE_REFUSED: &str =
 /// and something carried on calling.
 pub const GRANT_ENDED: &str = "This send to the hub has already ended.";
 
-/// The one game or map a manual send is for.
+/// What an engine send without a grant says.
+pub const ENGINE_NEEDS_GRANT: &str =
+    "An engine build is only sent when you press its upload button.";
+
+/// The one game, map or engine build a manual send is for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SendSubject {
@@ -78,6 +82,8 @@ pub enum SendSubject {
     Game { shortname: String },
     /// A map, by its full name, compared exactly as the hub does.
     Map { map_name: String },
+    /// An engine build, by its archive's file name.
+    Engine { filename: String },
 }
 
 impl SendSubject {
@@ -85,6 +91,7 @@ impl SendSubject {
         match self {
             Self::Game { shortname } => shortname,
             Self::Map { map_name } => map_name,
+            Self::Engine { filename } => filename,
         }
     }
 
@@ -192,6 +199,17 @@ impl AssetUploadConsent {
                 Ok(())
             }
             Some(subject) => Err(subject.refuse(shortname)),
+        }
+    }
+
+    /// Whether this engine build is this proof's subject. An engine is only ever
+    /// sent by a press of its upload button, so the uploads switch, which is
+    /// about pictures, never admits one.
+    pub fn admits_engine(&self, filename: &str) -> Result<(), String> {
+        match &self.0 {
+            None => Err(ENGINE_NEEDS_GRANT.to_string()),
+            Some(SendSubject::Engine { filename: granted }) if granted == filename => Ok(()),
+            Some(subject) => Err(subject.refuse(filename)),
         }
     }
 
@@ -440,6 +458,28 @@ mod tests {
         assert!(proof.admits_maps(["tabula v4"]).is_err());
         assert!(proof.admits_assets([&unit("sf")]).is_err());
         assert!(proof.admits_game("sf").is_err());
+    }
+
+    #[test]
+    fn an_engine_needs_its_own_grant() {
+        let filename = "recoil_2026.09.03_arm64-macos.7z";
+        let granted = AssetUploadConsent::for_test_subject(SendSubject::Engine {
+            filename: filename.into(),
+        });
+        assert!(granted.admits_engine(filename).is_ok());
+        assert!(granted
+            .admits_engine("recoil_2026.09.03_amd64-linux.7z")
+            .is_err());
+        assert!(granted.admits_game("bar").is_err());
+        assert!(granted.admits_maps(["Comet Catcher"]).is_err());
+
+        assert_eq!(
+            AssetUploadConsent::for_test().admits_engine(filename),
+            Err(ENGINE_NEEDS_GRANT.to_string())
+        );
+        assert!(AssetUploadConsent::for_test_subject(game("bar"))
+            .admits_engine(filename)
+            .is_err());
     }
 
     #[test]

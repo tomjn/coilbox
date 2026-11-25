@@ -153,6 +153,29 @@ async fn hub_account(hub_url: String) -> CliResult {
     }
 }
 
+/// `hub_can_upload_engines`: whether whoever is signed in may upload engine
+/// builds, read fresh from the hub's profile. `allowed` is false when nobody is
+/// signed in. The hub refuses an upload from anyone else anyway, so this only
+/// decides whether the upload button is shown.
+#[tauri::command]
+async fn hub_can_upload_engines(hub_url: String) -> CliResult {
+    let allowed = |allowed: bool| CliResult::ok(json!({ "allowed": allowed }));
+    match auth::signed_in(&hub_url).await {
+        Err(e) => return CliResult::err(auth::explain(&e, &hub_url)),
+        Ok(false) => return allowed(false),
+        Ok(true) => {}
+    }
+    let token = match auth::access_token(&hub_url).await {
+        Ok(token) => token,
+        Err(e) if e.needs_sign_in() => return allowed(false),
+        Err(e) => return CliResult::err(auth::explain(&e, &hub_url)),
+    };
+    match auth::fetch_engine_grant(&hub_url, &token).await {
+        Ok(granted) => allowed(granted),
+        Err(said) => CliResult::err(said),
+    }
+}
+
 /// `hub_publish`: publish a share code to a hub, as whoever is signed in.
 ///
 /// The request is made here because the access token is here. What comes back is
@@ -477,6 +500,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_sign_in,
             hub_sign_out,
             hub_account,
+            hub_can_upload_engines,
             hub_publish,
             hub_assets_have,
             hub_upload_assets,
