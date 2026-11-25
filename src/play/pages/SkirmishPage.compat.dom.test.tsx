@@ -122,6 +122,7 @@ vi.mock("@/content/config", async (importOriginal) => ({
 vi.mock("../config", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   usePreferredTarget: () => ({
+    targets: [],
     target: {
       enginePath: "/engine",
       dataDir: "/data",

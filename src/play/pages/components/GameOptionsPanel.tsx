@@ -2,7 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ChevronDown, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -54,6 +54,8 @@ export function GameOptionsPanel({
   onOptionChange,
   onOptionValuesChange,
   disabled,
+  engineField,
+  engineSummary,
 }: {
   selectedGame?: GameItem | null;
   options: ConfigOption[];
@@ -67,6 +69,10 @@ export function GameOptionsPanel({
    */
   onOptionValuesChange?: (values: Record<string, string>) => void;
   disabled?: boolean;
+  /** An engine picker shown below the options, where the screen offers one. */
+  engineField?: ReactNode;
+  /** The picked engine, for the collapsed summary, when it is not the default. */
+  engineSummary?: string;
 }) {
   const { t } = useLingui();
   const groups = groupOptions(options);
@@ -80,6 +86,7 @@ export function GameOptionsPanel({
     changed > 0
       ? plural(changed, { one: "# option changed", other: "# options changed" })
       : t`default options`,
+    ...(engineSummary ? [t`engine ${engineSummary}`] : []),
   ].join(" · ");
 
   return (
@@ -137,6 +144,9 @@ export function GameOptionsPanel({
                 onResetGroup={resetGroup}
               />
             </>
+          )}
+          {engineField && (
+            <div className="mt-4 max-w-[18rem]">{engineField}</div>
           )}
         </div>
       </CollapsibleContent>

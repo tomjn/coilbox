@@ -17772,12 +17772,17 @@ msgstr ""
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/components/EngineOverrideField.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Engine"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "engine {attemptEngine} with {attemptGame}"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "engine {engineSummary}"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
@@ -28158,6 +28163,10 @@ msgstr ""
 msgid "none found"
 msgstr ""
 
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "none installed"
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "None named, so it opens untextured"
 msgstr ""
@@ -31581,6 +31590,10 @@ msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
 msgid "Preferred"
+msgstr ""
+
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "Preferred engine ({preferredVersion})"
 msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx

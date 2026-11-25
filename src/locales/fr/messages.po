@@ -21953,6 +21953,7 @@ msgstr "moteur"
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/components/EngineOverrideField.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Engine"
@@ -21962,6 +21963,10 @@ msgstr "Moteur"
 #, fuzzy
 msgid "engine {attemptEngine} with {attemptGame}"
 msgstr "moteur {attemptEngine} avec {attemptGame}"
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "engine {engineSummary}"
+msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
 #, fuzzy
@@ -34792,6 +34797,10 @@ msgstr "Aucun obtenu pour l’instant. Encore {total}."
 msgid "none found"
 msgstr "aucun trouvé"
 
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "none installed"
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "None named, so it opens untextured"
@@ -39030,6 +39039,10 @@ msgstr "Pré-créer des comptes pour qu’un test de charge puisse tourner avec 
 #, fuzzy
 msgid "Preferred"
 msgstr "Préféré"
+
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "Preferred engine ({preferredVersion})"
+msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 #, fuzzy

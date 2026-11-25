@@ -17773,6 +17773,7 @@ msgstr "engine"
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/components/EngineOverrideField.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Engine"
 msgstr "Engine"
@@ -17780,6 +17781,10 @@ msgstr "Engine"
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "engine {attemptEngine} with {attemptGame}"
 msgstr "engine {attemptEngine} with {attemptGame}"
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "engine {engineSummary}"
+msgstr "engine {engineSummary}"
 
 #: src/downloads/pages/components/EngineInstaller.tsx
 msgid "Engine {engineTitle}"
@@ -28159,6 +28164,10 @@ msgstr "None earned yet. {total} to go."
 msgid "none found"
 msgstr "none found"
 
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "none installed"
+msgstr "none installed"
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "None named, so it opens untextured"
 msgstr "None named, so it opens untextured"
@@ -31583,6 +31592,10 @@ msgstr "Pre-seed accounts so a load test can run with registration off."
 #: src/content/pages/components/EngineRow.tsx
 msgid "Preferred"
 msgstr "Preferred"
+
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "Preferred engine ({preferredVersion})"
+msgstr "Preferred engine ({preferredVersion})"
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 msgid "Preferred shapes"

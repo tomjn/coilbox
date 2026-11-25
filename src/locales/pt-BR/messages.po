@@ -21958,6 +21958,7 @@ msgstr "engine"
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/components/EngineOverrideField.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Engine"
@@ -21967,6 +21968,10 @@ msgstr "Engine"
 #, fuzzy
 msgid "engine {attemptEngine} with {attemptGame}"
 msgstr "engine {attemptEngine} com {attemptGame}"
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "engine {engineSummary}"
+msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
 #, fuzzy
@@ -34804,6 +34809,10 @@ msgstr "Nenhuma conquistada ainda. Faltam {total}."
 msgid "none found"
 msgstr "nada encontrado"
 
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "none installed"
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "None named, so it opens untextured"
@@ -39046,6 +39055,10 @@ msgstr "Criar contas antecipadamente para que um teste de carga rode com o regis
 #, fuzzy
 msgid "Preferred"
 msgstr "Preferida"
+
+#: src/play/pages/components/EngineOverrideField.tsx
+msgid "Preferred engine ({preferredVersion})"
+msgstr ""
 
 #: src/lego/pages/components/GeneratorStyleSection.tsx
 #, fuzzy
