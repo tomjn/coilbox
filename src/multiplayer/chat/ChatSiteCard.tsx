@@ -72,6 +72,44 @@ export function HubCard({
 }
 
 /**
+ * An animation drawn in place, such as a GIF from Giphy, at most 200 pixels
+ * high. Clicking it opens the link. If the animation fails to load, the site's
+ * name is left as a plain card so the link still opens.
+ */
+export function ChatAnimationCard({
+  url,
+  site,
+  animation,
+}: {
+  url: string;
+  site: string;
+  animation: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <ChatLinkCard url={url} site={site} picture={null} />;
+  return (
+    <button
+      type="button"
+      data-link-card=""
+      className="block max-w-full cursor-pointer overflow-hidden rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+      onClick={() => {
+        openUrl(url).catch(() => {});
+      }}
+    >
+      {/* `no-referrer` so the site is not told where the message was read. */}
+      <img
+        src={animation}
+        alt={site}
+        decoding="async"
+        referrerPolicy="no-referrer"
+        className="block h-auto max-h-[200px] w-auto max-w-full"
+        onError={() => setFailed(true)}
+      />
+    </button>
+  );
+}
+
+/**
  * A card that hands its link to the OS browser, as the inline link does. It is
  * never an iframe.
  */
