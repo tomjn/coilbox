@@ -5,6 +5,7 @@
 //! list downloadable content before downloading a tag.
 
 mod github_cache;
+mod hub_engines;
 mod install;
 mod preset_pack;
 mod progress;
@@ -1130,20 +1131,29 @@ async fn fetch_github(url: &str) -> Result<String, String> {
 
 /// `dl_recoil_engines` — Recoil engine releases whose assets match the running
 /// platform (`amd64-<os>.7z`). Empty on platforms with no official build (macOS).
+///
+/// `officialBuilds` is every version and platform the releases publish, and
+/// `hubPlatform` is this machine's platform in the hub's words, so hub engines
+/// that an official build already covers are hidden and never uploaded. The
+/// list is fetched on macOS too, for those.
 #[tauri::command]
 async fn dl_recoil_engines() -> CliResult {
     let os = std::env::consts::OS;
-    let Some(suffix) = sources::recoil_asset_suffix() else {
-        return CliResult::ok(json!({ "releases": [], "platform": os }));
-    };
+    let suffix = sources::recoil_asset_suffix();
     match fetch_github(sources::RECOIL_RELEASES_URL).await {
         Ok(body) => match serde_json::from_str::<Vec<sources::GithubRelease>>(&body) {
             Ok(rels) => {
-                let releases: Vec<_> = rels
-                    .iter()
-                    .filter_map(|r| sources::match_engine_release(r, suffix))
-                    .collect();
-                CliResult::ok(json!({ "releases": releases, "platform": os }))
+                let releases: Vec<_> = suffix.map_or_else(Vec::new, |suffix| {
+                    rels.iter()
+                        .filter_map(|r| sources::match_engine_release(r, suffix))
+                        .collect()
+                });
+                CliResult::ok(json!({
+                    "releases": releases,
+                    "platform": os,
+                    "hubPlatform": hub_engines::this_platform(),
+                    "officialBuilds": hub_engines::official_builds(&rels),
+                }))
             }
             Err(e) => CliResult::err(format!("could not parse Recoil releases: {e}")),
         },
@@ -1448,10 +1458,24 @@ async fn install_recoil_engine(
         return Err(e);
     }
 
+    unpack_engine(&tmp, &engine_root, &dest, on_progress).await?;
+    let _ = on_progress.send(DownloadProgress::done(downloaded, total));
+    Ok(dest.display().to_string())
+}
+
+/// Extract a downloaded engine archive into `dest`, delete the archive, and
+/// carry the player's config files onto the new install. Emits the
+/// indeterminate `extracting` phase. Once started it runs to completion.
+async fn unpack_engine(
+    tmp: &std::path::Path,
+    engine_root: &std::path::Path,
+    dest: &std::path::Path,
+    on_progress: &Channel<DownloadProgress>,
+) -> Result<(), String> {
     let _ = on_progress.send(DownloadProgress::extracting());
 
-    let tmp_for_extract = tmp.clone();
-    let dest_for_extract = dest.clone();
+    let tmp_for_extract = tmp.to_path_buf();
+    let dest_for_extract = dest.to_path_buf();
     let extracted = tauri::async_runtime::spawn_blocking(move || {
         // Installing a version that is already there writes over its files, and
         // Windows will not overwrite a library a unitsync worker has loaded
@@ -1463,14 +1487,138 @@ async fn install_recoil_engine(
     .await
     .map_err(|e| format!("extract task failed: {e}"))?;
     if extracted.is_ok() {
-        restore_exec_bits(&tmp, &dest);
+        restore_exec_bits(tmp, dest);
     }
-    let _ = std::fs::remove_file(&tmp);
+    let _ = std::fs::remove_file(tmp);
     extracted?;
-    carry_engine_config(&engine_root, &dest);
+    carry_engine_config(engine_root, dest);
+    Ok(())
+}
 
-    let _ = on_progress.send(DownloadProgress::done(downloaded, total));
+/// Download a hub engine build from each of its mirrors in turn and install it
+/// into `<write_path>/engine/<version>/`.
+///
+/// A mirror whose copy fails to arrive, or arrives with a different SHA-256,
+/// is passed over for the next one. The error names every mirror and what went
+/// wrong with it when none delivers. A cancel stops at once.
+async fn install_hub_engine(
+    version: &str,
+    sources: &[String],
+    sha256: &str,
+    write_path: &str,
+    on_progress: &Channel<DownloadProgress>,
+    cancel: &Arc<AtomicBool>,
+) -> Result<String, String> {
+    let engine_root = std::path::Path::new(write_path).join("engine");
+    let dest = engine_root.join(version);
+    std::fs::create_dir_all(&dest)
+        .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
+    let tmp_name = format!(".{version}.hub.7z");
+    let engine_root_text = engine_root.display().to_string();
+
+    let mut failures = Vec::new();
+    let mut fetched = None;
+    for url in sources {
+        match download_to(
+            url,
+            &engine_root_text,
+            &tmp_name,
+            on_progress,
+            cancel,
+            Some(sha256),
+        )
+        .await
+        {
+            Ok(path) => {
+                fetched = Some(std::path::PathBuf::from(path));
+                break;
+            }
+            Err(e) if e == CANCELLED_MSG => return Err(e),
+            Err(e) => failures.push(format!("{}: {e}", host_of(url))),
+        }
+    }
+    let Some(tmp) = fetched else {
+        return Err(if failures.is_empty() {
+            "No mirror holds this engine.".to_string()
+        } else {
+            format!("No mirror delivered this engine. {}", failures.join(". "))
+        });
+    };
+
+    let size = std::fs::metadata(&tmp).map_or(0, |m| m.len());
+    unpack_engine(&tmp, &engine_root, &dest, on_progress).await?;
+    let _ = on_progress.send(DownloadProgress::done(size, Some(size)));
     Ok(dest.display().to_string())
+}
+
+/// The host of a mirror's address, for an error that names it.
+fn host_of(url: &str) -> String {
+    reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_owned))
+        .unwrap_or_else(|| url.to_owned())
+}
+
+/// `dl_download_engine_hub` — install an engine build the hub lists, from the
+/// first of its mirrors whose copy has the hub's SHA-256. `op_id` (optional)
+/// makes the download phase user-cancellable.
+#[tauri::command]
+async fn dl_download_engine_hub(
+    version: String,
+    sources: Vec<String>,
+    sha256: String,
+    write_path: String,
+    op_id: Option<String>,
+    on_progress: Channel<DownloadProgress>,
+) -> CliResult {
+    if version.trim().is_empty() || write_path.trim().is_empty() {
+        return CliResult::err("version and write_path are required");
+    }
+    // The version names the folder the engine goes in, so it is held to the
+    // shape the hub accepts and cannot climb out of `engine/`.
+    if !hub_engines::valid_version(&version) {
+        return CliResult::err(format!("{version} is not an engine version the hub lists"));
+    }
+    if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(&write_path)) {
+        return CliResult::err(e);
+    }
+    let (cancel, _child_slot) = cancel_slots(&op_id);
+    let res = install_hub_engine(
+        &version,
+        &sources,
+        &sha256,
+        &write_path,
+        &on_progress,
+        &cancel,
+    )
+    .await;
+    if let Some(id) = &op_id {
+        unregister_cancel(id);
+    }
+    match res {
+        Ok(dir) => {
+            CliResult::ok(json!({ "message": format!("Installed engine {version}"), "path": dir }))
+        }
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `dl_engine_upload_facts` — what the hub needs to hear about an engine
+/// archive before it is uploaded: its name's version and platform, its size and
+/// SHA-256. Refuses a name the hub would refuse and an archive without the
+/// program its platform starts. unitsync cannot read engine archives, so this
+/// reads the name and the 7z listing instead.
+#[tauri::command]
+async fn dl_engine_upload_facts(path: String) -> CliResult {
+    let read = tauri::async_runtime::spawn_blocking(move || {
+        hub_engines::upload_facts(std::path::Path::new(&path))
+    })
+    .await;
+    match read {
+        Ok(Ok(facts)) => CliResult::ok(json!({ "facts": facts })),
+        Ok(Err(said)) => CliResult::err(said),
+        Err(e) => CliResult::err(format!("could not read the engine archive: {e}")),
+    }
 }
 
 /// `dl_download_engine_recoil` — install a Recoil engine release into the chosen
@@ -1841,6 +1989,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download_map,
             dl_download_file,
             dl_recoil_engines,
+            dl_download_engine_hub,
+            dl_engine_upload_facts,
             dl_github_latest_release,
             dl_github_release_archives,
             dl_download_engine_recoil,
@@ -2823,5 +2973,100 @@ mod hash_check_tests {
         assert!(err.contains("64 hex characters"), "{err}");
         assert_eq!(served.load(Ordering::SeqCst), 0);
         assert!(!tmp.path().join("game.sdz").exists());
+    }
+}
+
+#[cfg(test)]
+mod hub_engine_install_tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    /// Answers every request with `body`, and returns its address.
+    fn serving(body: Vec<u8>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind a local port");
+        let port = listener.local_addr().expect("local addr").port();
+        std::thread::spawn(move || {
+            while let Ok((mut sock, _)) = listener.accept() {
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 512];
+                while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match sock.read(&mut chunk) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    }
+                }
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = sock.write_all(header.as_bytes());
+                let _ = sock.write_all(&body);
+                let _ = sock.flush();
+            }
+        });
+        format!("http://127.0.0.1:{port}/engines/recoil_2026.09.03_arm64-macos.7z")
+    }
+
+    fn engine_archive() -> Vec<u8> {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("engine.7z");
+        let mut writer = sevenz_rust2::ArchiveWriter::create(&path).unwrap();
+        writer
+            .push_archive_entry(
+                sevenz_rust2::ArchiveEntry::new_file("spring"),
+                Some(&b"engine"[..]),
+            )
+            .unwrap();
+        writer.finish().unwrap();
+        std::fs::read(path).unwrap()
+    }
+
+    fn install(sources: &[String], sha256: &str, root: &std::path::Path) -> Result<String, String> {
+        let on_progress: Channel<DownloadProgress> = Channel::new(|_| Ok(()));
+        let cancel = Arc::new(AtomicBool::new(false));
+        tauri::async_runtime::block_on(install_hub_engine(
+            "2026.09.03",
+            sources,
+            sha256,
+            root.to_str().expect("utf8 path"),
+            &on_progress,
+            &cancel,
+        ))
+    }
+
+    #[test]
+    fn a_mirror_with_the_wrong_bytes_is_passed_over_for_the_next() {
+        let archive = engine_archive();
+        let sha256 = hex_lower(&Sha256::digest(&archive));
+        let sources = [serving(b"not the engine".to_vec()), serving(archive)];
+        let root = tempfile::tempdir().expect("tempdir");
+
+        let dir = install(&sources, &sha256, root.path()).expect("installed");
+
+        let dest = std::path::Path::new(&dir);
+        assert_eq!(dest, root.path().join("engine").join("2026.09.03"));
+        assert_eq!(std::fs::read(dest.join("spring")).unwrap(), b"engine");
+        assert!(!root
+            .path()
+            .join("engine")
+            .join(".2026.09.03.hub.7z")
+            .exists());
+    }
+
+    #[test]
+    fn no_mirror_delivering_names_what_each_one_did() {
+        let sha256 = hex_lower(&Sha256::digest(engine_archive()));
+        let sources = [serving(b"one".to_vec()), serving(b"two".to_vec())];
+        let root = tempfile::tempdir().expect("tempdir");
+
+        let said = install(&sources, &sha256, root.path()).unwrap_err();
+
+        assert!(
+            said.starts_with("No mirror delivered this engine."),
+            "{said}"
+        );
+        assert_eq!(said.matches(HASH_MISMATCH_MSG).count(), 2, "{said}");
     }
 }
