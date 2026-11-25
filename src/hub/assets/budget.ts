@@ -45,16 +45,17 @@ import { RENDER_ANGLES } from "./vocabulary";
 /**
  * How many pictures coilbox will write for one game in a rolling hour.
  *
- * The hub's own `SUBJECT_UPLOADS_PER_HOUR` is 500, so this leaves room for the
+ * The hub's own `SUBJECT_UPLOADS_PER_HOUR` is 5000, so this leaves room for the
  * hub to still be the authority on anything this misses, including uploads made
  * by another install signed in to the same account. Four fifths of the hub's
- * number, the same share as the eighty of a hundred it was before.
+ * number, the same share as it has always been.
  *
- * It was eighty while the hub staged uploads in Vercel Blob. Raised with the hub
- * once the move to Supabase Storage took the operations allowance away, because
- * at eighty a roster sweep spent a whole hour on build pics and drew nothing.
+ * It was eighty while the hub staged uploads in Vercel Blob, then four hundred.
+ * At four hundred a large game took a press of the button every hour for days.
+ * Four thousand covers Beyond All Reason's 564 units at five pictures each in
+ * one press.
  */
-export const WRITES_PER_GAME_PER_HOUR = 400;
+export const WRITES_PER_GAME_PER_HOUR = 4000;
 
 /**
  * How many pictures one unit can produce: a build pic, and a render at every
@@ -66,8 +67,8 @@ export const WRITES_PER_GAME_PER_HOUR = 400;
  * that had to be remembered separately would be the one that was not
  * (issue #1951).
  *
- * It costs coverage rather than correctness: at five, the four hundred an hour
- * is eighty units rather than two hundred.
+ * It costs coverage rather than correctness: at five, the four thousand an hour
+ * is eight hundred units rather than two thousand.
  */
 export const VARIANTS_PER_UNIT = 1 + RENDER_ANGLES.length;
 
