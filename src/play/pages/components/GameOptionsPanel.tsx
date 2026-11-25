@@ -69,7 +69,7 @@ export function GameOptionsPanel({
    */
   onOptionValuesChange?: (values: Record<string, string>) => void;
   disabled?: boolean;
-  /** An engine picker shown above the options, where the screen offers one. */
+  /** An engine picker shown below the options, where the screen offers one. */
   engineField?: ReactNode;
   /** The picked engine, for the collapsed summary, when it is not the default. */
   engineSummary?: string;
@@ -124,9 +124,6 @@ export function GameOptionsPanel({
 
       <CollapsibleContent>
         <div className="border-t border-border/40 px-4 pb-4 pt-3">
-          {engineField && (
-            <div className="mb-4 max-w-[18rem]">{engineField}</div>
-          )}
           {/* Start positions used to fill this panel whatever the game, so with
               them moved under the map a game declaring no options would open
               onto nothing at all. Say so instead. */}
@@ -147,6 +144,9 @@ export function GameOptionsPanel({
                 onResetGroup={resetGroup}
               />
             </>
+          )}
+          {engineField && (
+            <div className="mt-4 max-w-[18rem]">{engineField}</div>
           )}
         </div>
       </CollapsibleContent>
